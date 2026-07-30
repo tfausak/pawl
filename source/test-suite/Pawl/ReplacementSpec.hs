@@ -66,6 +66,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -154,6 +155,11 @@ countersOn kind oid gs =
 castAndResolve :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
 castAndResolve answer gs spellId =
   S.runPure answer gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+
+-- castAndResolve over several of alice's spells in order. Top-level rather than
+-- a `where` binding because the answer is rank-2 and GHC will not infer it.
+castEach :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> [ObjectId.ObjectId] -> GameState.GameState
+castEach answer = List.foldl' (castAndResolve answer)
 
 -- Copy `wanted` when it is offered, decline otherwise.
 copyOf :: ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -277,6 +283,145 @@ stepSkipTests registry =
             -- though it didn't exist" -- past it, not past the rest of the turn.
             HU.assertEqual "the turn proceeded to the draw step" drawStep (GameState.phase after)
             HU.assertEqual "having consumed exactly that one step" Seq.empty (GameState.remaining after)
+        ]
+
+-- Aim every target slot at one player. The player-side twin of `aimObject`
+-- above; Fatigue's spec is Pool.Players, so a recipient tagged for any other
+-- pool is not in its legal set at all.
+aimPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer pid)) sets
+  _ -> S.identityAnswer p
+
+-- Fatigue {1}{U} Sorcery: "Target player skips their next draw step."
+--
+-- The three things Eon Hub above does not do, and this card does:
+--
+--   1. The skip is created by an EFFECT. Nothing on the battlefield carries it --
+--      Fatigue is in a graveyard by the time the skip matters -- so it lives in
+--      GameState.replacements, the floating store CR 614.3 describes as lasting
+--      "until they're used up".
+--   2. It is scoped to ONE player (PhasePattern.whosePhase), where Eon Hub's
+--      "players skip their upkeep steps" is symmetric.
+--   3. CR 614.10a: it is CONSUMED after one occurrence, and two of them
+--      ACCUMULATE rather than coalescing -- "if two effects each cause a player
+--      to skip their next occurrence, that player must skip the next two".
+--
+-- The observables are the same pair the Eon Hub cases use, read together so a
+-- skipped step cannot be confused with a step that happened and drew nothing:
+-- the CR 603.2b StepBegan record (CR 614.6, "if an event is replaced, it never
+-- happens"), and alice's library, which a real draw step empties by one.
+fatigueTests :: Registry.Type.Registry -> Tasty.TestTree
+fatigueTests registry =
+  let drawStep = Phase.Beginning BeginningStep.DrawStep
+      -- alice's turn, positioned at her draw step with the precombat main phase
+      -- scheduled after it. Not an empty schedule: that hands the turn off, which
+      -- would clear the event log these cases count and move the active player.
+      --
+      -- CR 103.8a's first-turn skip is a TURN-BASED action (Engine.skipsDraw),
+      -- not a replacement effect, and it would swallow the control case's draw;
+      -- turn 2 puts it out of the way, which is also what makes this the SECOND
+      -- turn's draw step -- exactly the "next" one Fatigue named.
+      atDraw gs =
+        gs
+          { GameState.phase = drawStep,
+            GameState.activePlayer = S.alice,
+            GameState.remaining = Seq.singleton Phase.PrecombatMain,
+            GameState.turnNumber = 2
+          }
+      -- One draw step. Applied repeatedly, each call is alice's NEXT draw step:
+      -- the store under test is not turn-scoped (Expiry.Never, and no sweep ends
+      -- it -- every Pawl.Expiry sweep keeps a Never), so what a real
+      -- intervening turn would contribute is a longer log, not a different
+      -- answer.
+      runDraw gs = snd (Engine.runGamePure S.identityAnswer (atDraw gs) Engine.runStep)
+      begun gs = length (filter (== GameEvent.StepBegan drawStep S.alice) (foldr (:) [] (GameState.events gs)))
+      libraryOf pid gs = length (Game.zoneMembers Zone.Library pid gs)
+      armed gs = length (GameState.replacements gs)
+      -- alice: two Islands per Fatigue to cast, a stocked library to draw from,
+      -- and `n` Fatigues in hand. Only alice's draw step is ever run below, so
+      -- only her library needs stocking.
+      board island piker fatigue n =
+        let (base, held) = blueBoard island (2 * n) (replicate n fatigue)
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) base [1 .. (5 :: Int)]
+         in (stocked, held)
+   in Tasty.testGroup
+        "Fatigue"
+        [ -- The control: the same board with the spell never cast. Without it
+          -- alice's draw step begins and draws, which is what every case below is
+          -- measured against.
+          HU.testCase "CR 500.6 without a skip alice's draw step begins and draws" $ do
+            island <- Registry.printing registry "Island"
+            piker <- Registry.printing registry "Goblin Piker"
+            fatigue <- Registry.printing registry "Fatigue"
+            let (gs, _) = board island piker fatigue 1
+                after = runDraw gs
+            HU.assertEqual "the draw step began" 1 (begun after)
+            HU.assertEqual "and took a card off the library" 4 (libraryOf S.alice after),
+          -- CR 614.1b / 614.10a: one Fatigue takes exactly ONE draw step, and is
+          -- gone afterwards. The second half is what distinguishes this from Eon
+          -- Hub, whose skip is re-derived from the battlefield every time and so
+          -- never runs out.
+          HU.testCase "CR 614.10a one Fatigue skips one draw step, and the next one draws" $ do
+            island <- Registry.printing registry "Island"
+            piker <- Registry.printing registry "Goblin Piker"
+            fatigue <- Registry.printing registry "Fatigue"
+            let (gs, held) = board island piker fatigue 1
+                cast = castEach (aimPlayer S.alice) gs held
+            HU.assertEqual "the resolution armed one floating skip" 1 (armed cast)
+            let first_ = runDraw cast
+            HU.assertEqual "the draw step never began" 0 (begun first_)
+            HU.assertEqual "so nothing was drawn" 5 (libraryOf S.alice first_)
+            HU.assertEqual "and the skip was used up (CR 614.3)" 0 (armed first_)
+            let second = runDraw first_
+            HU.assertEqual "the following draw step began" 1 (begun second)
+            HU.assertEqual "and drew" 4 (libraryOf S.alice second),
+          -- THE PROVING CASE. CR 614.10a: "if two effects each cause a player to
+          -- skip their next occurrence, that player must skip the next two; one
+          -- effect will be satisfied in skipping the first occurrence, while the
+          -- other will remain until another occurrence can be skipped."
+          --
+          -- Fails against any store that treats a skip as a fact about a player
+          -- rather than as a countable instance -- a Set of patterns, a Boolean
+          -- flag, or a single Maybe -- all of which coalesce the two into one and
+          -- let the second draw step happen.
+          HU.testCase "CR 614.10a two Fatigues skip two draw steps, not one" $ do
+            island <- Registry.printing registry "Island"
+            piker <- Registry.printing registry "Goblin Piker"
+            fatigue <- Registry.printing registry "Fatigue"
+            let (gs, held) = board island piker fatigue 2
+                cast = castEach (aimPlayer S.alice) gs held
+            HU.assertEqual "two resolutions armed two floating skips" 2 (armed cast)
+            let first_ = runDraw cast
+            HU.assertEqual "the first draw step never began" 0 (begun first_)
+            HU.assertEqual "and exactly one skip was spent" 1 (armed first_)
+            let second = runDraw first_
+            HU.assertEqual "nor did the second" 0 (begun second)
+            HU.assertEqual "which spent the other" 0 (armed second)
+            let third = runDraw second
+            HU.assertEqual "the third began" 1 (begun third)
+            HU.assertEqual "and it is the only card drawn across all three" 4 (libraryOf S.alice third)
+            -- CR 616.1's choice is elided, not made: the two candidates are EQUAL
+            -- AS VALUES, so every order of applying them leaves the same board
+            -- (one instance spent, one waiting). See Replacement.choose.
+            HU.assertBool
+              "and the engine chose nothing: two equal skips are indistinguishable"
+              (not (wasAskedToReplace (answersFor S.identityAnswer (atDraw cast) Engine.runStep))),
+          -- The "whose" dimension, read the discriminating way round: bob is
+          -- named, so ALICE's draw step is untouched and the skip is still
+          -- waiting afterwards. A skip that ignored PhasePattern.whosePhase --
+          -- which is what every skip in the pool did before this card -- would
+          -- take alice's step here and spend itself doing it.
+          HU.testCase "CR 614.1b a Fatigue aimed at bob leaves alice's draw step alone" $ do
+            island <- Registry.printing registry "Island"
+            piker <- Registry.printing registry "Goblin Piker"
+            fatigue <- Registry.printing registry "Fatigue"
+            let (gs, held) = board island piker fatigue 1
+                cast = castEach (aimPlayer S.bob) gs held
+                after = runDraw cast
+            HU.assertEqual "alice's draw step began" 1 (begun after)
+            HU.assertEqual "and drew" 4 (libraryOf S.alice after)
+            HU.assertEqual "bob's skip is still armed, waiting for his own turn" 1 (armed after)
         ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
@@ -893,5 +1038,6 @@ tests registry =
               (piker, g1) = S.addCreature pikerPrinting S.alice base
               (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)
           HU.assertEqual "consumed by the shield" Nothing settled,
-        stepSkipTests registry
+        stepSkipTests registry,
+        fatigueTests registry
       ]

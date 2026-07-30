@@ -1006,12 +1006,17 @@ runStepThatBegan phase = do
         Monad.unless stillFinished advance
 
 -- Terminates because libraries are finite, each turn draws at most one card, and
--- drawing from an empty library is a loss (CR 704.5b). That argument now rests on
--- the DRAW step being reached: a CR 614.1b skip of it (runStep's check above)
--- would suspend it, exactly as a real Stasis lock suspends a real game. No card
--- in the pool skips the draw step -- Eon Hub takes the upkeep step, which draws
--- nothing -- so the argument stands for every game this engine can currently
--- play, and there is no progress bound behind it if one ever does not (#338).
+-- drawing from an empty library is a loss (CR 704.5b). That argument rests on the
+-- DRAW step being reached, and a CR 614.1b skip of it (runStep's check above)
+-- suspends it, exactly as a real Stasis lock suspends a real game.
+--
+-- Fatigue skips a draw step, so the argument no longer covers every game this
+-- engine can be asked to play; there is still no progress bound behind it
+-- (#338). It is not yet a way to hang this loop: Fatigue's skip is CR 614.10a's
+-- "next", spent on one occurrence and then gone, so each copy cast postpones the
+-- draw by one turn rather than stopping it, and a finite number of copies still
+-- runs the library out. A card whose skip is unbounded -- a permanent's static,
+-- as Eon Hub's upkeep skip is -- would be the one that hangs it.
 playGame :: Game Result
 playGame =
   let loop = do

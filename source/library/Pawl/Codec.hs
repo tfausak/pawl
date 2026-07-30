@@ -918,15 +918,23 @@ jsonToTokenPattern value = do
   w <- Json.field (Text.pack "whose") ps >>= jsonToControllerRelation
   pure TokenPattern.MkTokenPattern {TokenPattern.whose = w}
 
+-- `whosePhase` is meant to be runtime-only -- a player-scoped skip is baked by
+-- Resolve's SkipNextPhase arm, not authored on a card -- but the codec must stay
+-- total, so this accepts one from card JSON and a lint owes the pool the check
+-- (#437). Same treatment, and same reason, as SetController's PlayerId above.
 phasePatternToJson :: PhasePattern.PhasePattern -> Value
 phasePatternToJson p =
-  Object [(Text.pack "whichPhase", phaseToJson (PhasePattern.whichPhase p))]
+  Object
+    [ (Text.pack "whichPhase", phaseToJson (PhasePattern.whichPhase p)),
+      (Text.pack "whosePhase", maybeTo playerIdToJson (PhasePattern.whosePhase p))
+    ]
 
 jsonToPhasePattern :: Value -> Either Text PhasePattern.PhasePattern
 jsonToPhasePattern value = do
   ps <- Json.asObject value
   p <- Json.field (Text.pack "whichPhase") ps >>= jsonToPhase
-  pure PhasePattern.MkPhasePattern {PhasePattern.whichPhase = p}
+  w <- Json.field (Text.pack "whosePhase") ps >>= maybeFrom jsonToPlayerId
+  pure PhasePattern.MkPhasePattern {PhasePattern.whichPhase = p, PhasePattern.whosePhase = w}
 
 damagePatternToJson :: DamagePattern.DamagePattern -> Value
 damagePatternToJson p =
@@ -1576,6 +1584,7 @@ effectToJson e = case e of
         <> (if te == defaultTokenEntry then [] else [tokenEntryToJson te])
         <> fmap slotNameToJson (Maybe.maybeToList ms)
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
+  Effect.SkipNextPhase r ph -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array [playerRefToJson r, phaseToJson ph]))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerRefToJson r, playerCounterKindToJson k, quantityToJson q]))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
@@ -1663,6 +1672,9 @@ jsonToEffect value = do
         effect <- jsonToReplacementEffect re
         pure (Effect.Replace duration uses effect)
       _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
+    "SkipNextPhase" -> case mv of
+      Just (Array [r, ph]) -> Effect.SkipNextPhase <$> jsonToPlayerRef r <*> jsonToPhase ph
+      _ -> Left (Text.pack "SkipNextPhase expects [playerRef, phase]")
     "PutCounters" -> case mv of
       Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")

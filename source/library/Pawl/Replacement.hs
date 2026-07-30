@@ -236,12 +236,12 @@ loop asOf batch applied event = do
 --      order. Read from `sources`, which for a CR 608.2f batch is the board the
 --      batch began in rather than the live one (see applyReplacementsIn).
 --   2. The FLOATING store (GameState.replacements): newest first -- Resolve.hs
---      (the Replace opcode) and Pawl.Cast (rule 702.34a's flashback exile, armed
---      as the spell goes onto the stack) each prepend a new ActiveReplacement
---      onto the front of the list as it is created, so the most recently
---      installed floating replacement is collected before any older one. Always
---      the LIVE store, never a frozen one: CR 614.3 spends a one-shot as it is
---      applied, and `consume` writes that back here.
+--      (the Replace and SkipNextPhase opcodes) and Pawl.Cast (rule 702.34a's
+--      flashback exile, armed as the spell goes onto the stack) each prepend a
+--      new ActiveReplacement onto the front of the list as it is created, so the
+--      most recently installed floating replacement is collected before any older
+--      one. Always the LIVE store, never a frozen one: CR 614.3 spends a one-shot
+--      as it is applied, and `consume` writes that back here.
 --
 -- That concatenated order is what the ChooseReplacement prompt indexes into. The
 -- two segments take separate arguments -- rather than one GameState apiece, which
@@ -334,11 +334,22 @@ applies gs event candidate =
               Just you -> pid /= you
               Nothing -> False
         -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
-        -- names exactly which one. The event's PlayerId is not read: every skip
-        -- in the pool is symmetric ("PLAYERS skip their upkeep steps"), so
-        -- PhasePattern carries no relation to test it against.
-        (ReplacementEffect.PhaseR pat, ProposedEvent.WouldBeginPhase phase _) ->
+        -- names exactly which one -- and, for a player-scoped skip, whose.
+        --
+        -- The event's PlayerId is the ACTIVE player (Engine.runStep), which is
+        -- also whose step this is: every step and phase in a turn belongs to the
+        -- player whose turn it is. So Fatigue's "target player skips their next
+        -- draw step" is exactly `whosePhase == Just that player` -- it lies
+        -- dormant through everyone else's draw steps and takes the named player's
+        -- own. Nothing is Eon Hub's symmetric "PLAYERS skip their upkeep steps",
+        -- which reads no PlayerId at all.
+        --
+        -- The SOURCE's controller is not consulted: unlike matchesController's CR
+        -- 109.5 "you", the player here was named by the effect, not derived, and
+        -- Fatigue's caster is free to name themselves.
+        (ReplacementEffect.PhaseR pat, ProposedEvent.WouldBeginPhase phase pid) ->
           PhasePattern.whichPhase pat == phase
+            && maybe True (== pid) (PhasePattern.whosePhase pat)
         -- Every row below falls through to False, because an arm ABOVE already
         -- matches every event of that class -- a row below only fires for a
         -- MISMATCHED class (e.g. a DestructionR candidate offered a
@@ -701,6 +712,24 @@ apply batch candidate event =
     -- pattern and no rewrite, because CR 614.1b leaves a skip only one possible
     -- outcome (see Pawl.Type.ReplacementEffect). The day a PhaseRewrite exists,
     -- this arm owes it a case.
+    --
+    -- CR 614.10a: "if two effects each cause a player to skip their next
+    -- occurrence, that player must skip the next two; one effect will be
+    -- satisfied in skipping the first occurrence, while the other will remain
+    -- until another occurrence can be skipped." Both halves fall out of the
+    -- floating store's SHAPE rather than out of care taken here. Two Fatigues
+    -- prepend two ActiveReplacements, and a list of instances with distinct
+    -- timestamps cannot coalesce the way a Set of patterns or a Boolean flag
+    -- would; `consume` below deletes by (source, timestamp), so it spends
+    -- exactly the one that applied; and returning Nothing ENDS the CR 616.1
+    -- loop, so no second skip can be spent on the same step. One occurrence
+    -- skipped, one instance gone, the rest waiting.
+    --
+    -- Eon Hub's PhaseR reaches the same arm and consumes nothing: it is a
+    -- permanent's static ability, so its CandidateId is OfPermanent and `consume`
+    -- is a no-op for it. Idempotent and permanent, which is what "players skip
+    -- their upkeep steps" means, and it is the store -- not this arm -- that
+    -- tells the two apart.
     (ReplacementEffect.PhaseR _, ProposedEvent.WouldBeginPhase _ _) -> do
       consume (ReplacementCandidate.identity candidate)
       pure Nothing

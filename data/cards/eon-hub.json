@@ -19,7 +19,8 @@
           "value": {
             "type": "Upkeep"
           }
-        }
+        },
+        "whosePhase": null
       }
     }
   ],

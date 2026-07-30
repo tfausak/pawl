@@ -40,6 +40,11 @@ import Pawl.Type.ZoneChangePattern (ZoneChangePattern)
 -- action" is a separate ability alongside the skip, not a different rewrite of
 -- it, and has no producer.)
 --
+-- Nor does the pattern say "next": CR 614.10a's once-and-gone skip (Fatigue) is
+-- Uses.Once on the ActiveReplacement holding it, which is what lets a permanent's
+-- unbounded skip (Eon Hub) and a resolution's single-occurrence one share one
+-- constructor. A "next" field here would say the same thing in a second place.
+--
 -- The sole rules-casing site is Pawl.Replacement (CR 616.1's loop). Pawl.Codec
 -- also cases on every constructor, but only as the JSON data boundary.
 data ReplacementEffect
