@@ -90,8 +90,8 @@ zeroToughness pc =
 
 -- CR 704.5g/h: a creature destroyed by lethal marked damage or by a deathtouch
 -- source. A DESTRUCTION -- indestructible-gated (CR 700.4) and regeneration-
--- interceptable (CR 701.19a via Event.destroy). Excludes 704.5f (that is
--- zeroToughness), so toughness here is > 0.
+-- interceptable (CR 701.19a via the Pawl.Event destroy funnel). Excludes 704.5f
+-- (that is zeroToughness), so toughness here is > 0.
 destroyedBySba :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
 destroyedBySba gs pc oid =
   let isCreature = Set.member CardType.Creature (PC.cardTypes pc)
@@ -542,20 +542,22 @@ performStateBasedActions = do
   -- put-into-graveyards, not destructions, so neither offers the shield an
   -- opportunity nor may consume one here.
   --
-  -- ONE batch, not one call per victim, for CR 704.3's "simultaneously as a
-  -- single event" -- the same reason every classification above was computed from
-  -- the pre-pass state. The funnel's own CR 702.12b gate is therefore judged once
-  -- for the whole batch rather than against a board the earlier victims have
-  -- already left. `destroyedBySba` has already applied that gate against the
-  -- state this pass began in, so the funnel's is a second, narrower look, and it
-  -- can only spare a permanent that lost indestructible since -- never condemn
-  -- one this pass had already excluded.
+  -- ONE batch, not one call per victim, and on the SAME pre-pass board as the
+  -- put-into-graveyard batch above, because CR 704.3 makes the two halves one
+  -- event: "performs all applicable state-based actions simultaneously as a
+  -- single event". Splitting them is an implementation order, not a rules one, so
+  -- a replacement effect belonging to a permanent buried above is still in force
+  -- for a destruction here -- an animated Rest in Peace this pass buries exiles
+  -- the card of the creature this pass destroys.
   --
-  -- Event.destroy binds its own board, so this batch and the put-into-graveyard
-  -- batch above do NOT share the pass's board the way CR 704.3's "single event"
-  -- asks: a replacement effect belonging to a permanent buried above is already
-  -- gone by the time a destruction here collects its candidates (#422).
-  Event.destroy Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
+  -- The funnel's own CR 702.12b gate is judged against that same board too, so it
+  -- asks what `destroyedBySba` asked above rather than second-guessing it from a
+  -- board the buries have already changed. Only the funnel's existence filter is
+  -- live, which is what keeps a permanent the buries already moved -- CR 704.5m's
+  -- Aura is the one this line does not exclude by name -- from being offered a
+  -- destruction that never happens (CR 614.7). Event.destroyIn sets all three
+  -- readers out.
+  Event.destroyInBatch gs Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving

@@ -105,10 +105,12 @@ applyReplacements :: ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacements = applyReplacementsIn Nothing Set.empty
 
 -- CR 608.2f / 704.3: `asOf` is the board a BATCH's candidates are read from --
--- `Just` the state the batch began in, or `Nothing` for the live board. Only two
--- funnels pass `Just`: Event.destroy, and Pawl.Sba's put-into-graveyard batch
--- (both through Event.changeZoneInBatch). Everything else is a lone event and
--- wants the live board.
+-- `Just` the state the batch began in, or `Nothing` for the live board. Only the
+-- destroy funnel passes `Just` (Event.destroy for its own batch, and
+-- Event.destroyInBatch for a batch that is one part of a CR 704.3 pass), together
+-- with the graveyard moves both it and Pawl.Sba's put-into-graveyard batch make
+-- through Event.changeZoneInBatch. Everything else is a lone event and wants the
+-- live board.
 --
 -- Two parameters that both name a batch, and they are OPPOSITES: `asOf` widens
 -- the candidate set to include effects belonging to permanents the batch is
@@ -815,9 +817,10 @@ asDamageEvent event = case event of
 -- redirect it; `Nothing` means a replacement took the event (regeneration), and
 -- that rewrite has already done its own work.
 --
--- `asOf` is applyReplacementsIn's, and Event.destroy always supplies it: a
+-- `asOf` is applyReplacementsIn's, and the destroy funnel always supplies it: a
 -- destruction is never lone, since CR 608.2f gives even a single Doom Blade the
--- one-element batch.
+-- one-element batch -- and when that batch is itself part of a CR 704.3 pass, the
+-- board is the pass's rather than the batch's (Event.destroyInBatch).
 resolveDestruction :: Maybe GameState -> Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
 resolveDestruction asOf regenerability oid = do
   outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid regenerability)
