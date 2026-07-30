@@ -435,8 +435,8 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 --
 -- It only ever REMOVES. That asymmetry is what makes the sampling sound, exactly
 -- as it is there: a discrepancy proves the characteristic changed, so removing is
--- always right, while putting a creature BACK when control returns or the
--- animation is recast would invent a CR 506.4 the rules do not have -- removal
+-- always right, while putting a creature BACK when control returns or a new
+-- animation starts would invent a CR 506.4 the rules do not have -- removal
 -- from combat is permanent for that combat phase (the glossary: "has no further
 -- involvement in that combat phase").
 --
@@ -445,8 +445,8 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- was already removed by that separate clause of CR 506.4 -- whose implementation
 -- is elsewhere (Pawl.Departure, and Pawl.Damage's liveness filters for the
 -- CR 509.1h key this must not disturb). Without the gate, an object gone from
--- GameState.objects would answer Nothing to both questions here and be swept up
--- under the wrong clause.
+-- GameState.objects would fail both tests here -- no controller to match, and no
+-- card types to find a creature in -- and be swept up under the wrong clause.
 --
 -- Removal goes through Game.removeFromCombat, so a removed ATTACKER takes its
 -- blocked-ness with it (Map.delete) while a removed BLOCKER leaves the attacker
