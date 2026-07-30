@@ -129,6 +129,8 @@ library
     directory ^>=1.3.10,
     parsec ^>=3.1.18,
     pawl:decimal,
+    pawl:extra,
+    pawl:json,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
@@ -233,7 +235,6 @@ library
     Pawl.Type.GameEvent
     Pawl.Type.GameState
     Pawl.Type.HandActionPerformer
-    Pawl.Type.Json
     Pawl.Type.Keyword
     Pawl.Type.LastKnown
     Pawl.Type.Layer

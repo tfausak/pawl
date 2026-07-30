@@ -12,6 +12,14 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Json as J
+-- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
+-- evaluator module Pawl.Filter is not imported here today, but the alias
+-- convention is fixed project-wide so a later import never collides.
+
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Number as Number
+import qualified Pawl.Json.String as String
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
@@ -50,12 +58,8 @@ import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
 import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.ExtraPhase as ExtraPhase
--- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
--- evaluator module Pawl.Filter is not imported here today, but the alias
--- convention is fixed project-wide so a later import never collides.
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
-import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaProduction as ManaProduction
@@ -112,23 +116,23 @@ import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-roundTrip :: (Eq a, Show a) => String -> (a -> Json.Value) -> (Json.Value -> Either Text a) -> a -> HU.Assertion
+roundTrip :: (Eq a, Show a) => String -> (a -> Value.Value) -> (Value.Value -> Either Text a) -> a -> HU.Assertion
 roundTrip label enc dec x = HU.assertEqual label (Right x) (dec (enc x))
 
 -- The first element of an encoded effect's positional payload -- for Destroy,
--- the ObjectRef. Json.Null when the effect is nullary or the payload is not an
+-- the ObjectRef. JSON null when the effect is nullary or the payload is not an
 -- array, neither of which any caller passes.
-payloadHead :: Json.Value -> Json.Value
+payloadHead :: Value.Value -> Value.Value
 payloadHead value = case J.tag value of
-  Right (_, Just (Json.Array (h : _))) -> h
-  _ -> Json.Null
+  Right (_, Just (Value.Array (Array.MkArray (h : _)))) -> h
+  _ -> J.jNull
 
 -- The `optionality` key of an encoded Mode, or Nothing when it was omitted (CR
 -- 603.5's Mandatory default).
-optionalityKey :: Json.Value -> Maybe Json.Value
-optionalityKey value = case value of
-  Json.Object ps -> J.optField (Text.pack "optionality") ps
-  _ -> Nothing
+optionalityKey :: Value.Value -> Maybe Value.Value
+optionalityKey value = case J.asObject value of
+  Right ps -> J.optField (Text.pack "optionality") ps
+  Left _ -> Nothing
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -184,7 +188,7 @@ tests registry =
           HU.testCase "Zone.Command" $
             roundTrip "command" Codec.zoneToJson Codec.jsonToZone Zone.Command,
           HU.testCase "unknown tag fails" $
-            HU.assertBool "left" (either (const True) (const False) (Codec.jsonToColor (Json.Object [])))
+            HU.assertBool "left" (either (const True) (const False) (Codec.jsonToColor (J.jObject [])))
         ],
       Tasty.testGroup
         "newtypes"
@@ -198,7 +202,7 @@ tests registry =
         [ HU.testCase "Quantity.Literal is a tagged object with numeric value" $
             HU.assertEqual
               "shape"
-              (Json.Object [(Text.pack "type", Json.String (Text.pack "Literal")), (Text.pack "value", Json.Number (Decimal.mkDecimal 3 0))])
+              (J.jObject [(Text.pack "type", Value.String (String.MkString (Text.pack "Literal"))), (Text.pack "value", Value.Number (Number.MkNumber (Decimal.mkDecimal 3 0)))])
               (Codec.quantityToJson (Quantity.Literal 3)),
           HU.testCase "Quantity.ManaValue is nullary tagged" $
             roundTrip "mv" Codec.quantityToJson Codec.jsonToQuantity Quantity.ManaValue,
@@ -387,9 +391,9 @@ tests registry =
           -- this pins that the boundary really says no.
           HU.testCase "a static ability with an empty modifications array is rejected" $ do
             let value =
-                  Json.Object
+                  J.jObject
                     [ (Text.pack "affected", Codec.affectedToJson Affected.Attached),
-                      (Text.pack "modifications", Json.Array [])
+                      (Text.pack "modifications", J.jArray [])
                     ]
             HU.assertBool
               "an empty array does not decode"
@@ -537,7 +541,7 @@ tests registry =
               -- the footgun the corpus migration exists to avoid, pinned so a future
               -- card file cannot lose its mana field unnoticed.
               HU.testCase "an omitted mana field decodes to Nothing, not to {0}" $
-                let value = Json.Object [(Text.pack "components", Json.Array [])]
+                let value = J.jObject [(Text.pack "components", J.jArray [])]
                  in HU.assertEqual
                       "unpayable"
                       (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
@@ -704,7 +708,7 @@ tests registry =
               ( either
                   (const True)
                   (const False)
-                  (Codec.jsonToModal (Json.Object [(Text.pack "modes", Json.Array []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
+                  (Codec.jsonToModal (J.jObject [(Text.pack "modes", J.jArray []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
               )
         ],
       Tasty.testGroup
@@ -844,7 +848,7 @@ tests registry =
             HU.assertEqual
               "a default TokenEntry is not written"
               (Codec.effectToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
-              (J.tagged (Text.pack "Create") (Just (Json.Array [Codec.quantityToJson (Quantity.Literal 2), Codec.cardToJson card]))),
+              (J.tagged (Text.pack "Create") (Just (J.jArray [Codec.quantityToJson (Quantity.Literal 2), Codec.cardToJson card]))),
           -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
           -- pair rather than the battlefield.
           HU.testCase "TriggerCondition.SelfPutIntoGraveyardFromLibrary round-trips" $
