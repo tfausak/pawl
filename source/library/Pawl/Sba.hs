@@ -520,7 +520,14 @@ performStateBasedActions = do
   -- dies-triggers again. 704.5f and 704.5k overlap the same way, and reachably:
   -- Opalescence animates a world enchantment, Night of Souls' Betrayal makes it
   -- a 0/0, and the older of two world permanents is then named by both.
-  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras))
+  --
+  -- Moved as a BATCH on the pre-pass state, not one move at a time on the live
+  -- board, for the same CR 704.3 reason every classification above was computed
+  -- from `gs`: each member's CR 616.1 loop collects its replacement candidates
+  -- from the board the pass began in, so an animated Rest in Peace this pass is
+  -- itself burying still exiles the cards the rest of the batch would put into
+  -- graveyards. See Pawl.Replacement's applyReplacementsIn.
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras))
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Event: no Moved event, no replacement, no trigger.
@@ -543,6 +550,11 @@ performStateBasedActions = do
   -- state this pass began in, so the funnel's is a second, narrower look, and it
   -- can only spare a permanent that lost indestructible since -- never condemn
   -- one this pass had already excluded.
+  --
+  -- Event.destroy binds its own board, so this batch and the put-into-graveyard
+  -- batch above do NOT share the pass's board the way CR 704.3's "single event"
+  -- asks: a replacement effect belonging to a permanent buried above is already
+  -- gone by the time a destruction here collects its candidates (#422).
   Event.destroy Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)

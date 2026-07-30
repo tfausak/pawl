@@ -79,9 +79,12 @@ import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 
 -- CR 614: settle a proposed zone change. Nothing means the move does not happen.
 -- The typed door Pawl.Event uses, so Event never cases on a ProposedEvent.
-resolveZoneChange :: ZoneChange -> Game (Maybe ZoneChange)
-resolveZoneChange zc = do
-  outcome <- applyReplacements (ProposedEvent.WouldChangeZone zc)
+--
+-- `asOf` is applyReplacementsIn's: Nothing for a lone move, Just the pre-batch
+-- board when this move is one member of a CR 608.2f / 704.3 batch.
+resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange)
+resolveZoneChange asOf zc = do
+  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldChangeZone zc)
   pure (outcome >>= asZoneChange)
 
 asZoneChange :: ProposedEvent -> Maybe ZoneChange
@@ -99,8 +102,54 @@ asZoneChange event = case event of
 -- event has already performed its own consequences by the time it returns
 -- Nothing.
 applyReplacements :: ProposedEvent -> Game (Maybe ProposedEvent)
-applyReplacements = applyReplacementsIn Set.empty
+applyReplacements = applyReplacementsIn Nothing Set.empty
 
+-- CR 608.2f / 704.3: `asOf` is the board a BATCH's candidates are read from --
+-- `Just` the state the batch began in, or `Nothing` for the live board. Only two
+-- funnels pass `Just`: Event.destroy, and Pawl.Sba's put-into-graveyard batch
+-- (both through Event.changeZoneInBatch). Everything else is a lone event and
+-- wants the live board.
+--
+-- Two parameters that both name a batch, and they are OPPOSITES: `asOf` widens
+-- the candidate set to include effects belonging to permanents the batch is
+-- itself removing, while `batch` below NARROWS the copy-target set to exclude
+-- permanents entering beside the loop's subject. Deliberately not one parameter:
+-- they are about different batches (a simultaneous departure versus a
+-- simultaneous entry), they are read by different code (candidate collection
+-- versus legalCopyTargets), and no call site ever supplies both.
+--
+-- CR 608.2f -- "Some spells and abilities include actions taken on multiple
+-- players and/or objects. In most cases, each such action is processed
+-- simultaneously" -- and CR 704.3 -- state-based actions are performed
+-- "simultaneously as a single event" -- make such a batch ONE event, so CR 614.4
+-- ("replacement effects must exist before the appropriate event occurs") asks
+-- which effects existed before the batch, not before the member being processed.
+-- Without this, Rest in Peace animated by Opalescence and swept by Day of
+-- Judgment exiles the victims ahead of it in the sweep and buries the ones
+-- behind it, an answer that depends on an order CR 608.2f gives nobody the right
+-- to decide.
+--
+-- What it does NOT freeze, and why:
+--
+--   * The FLOATING store stays live (see `collect`). CR 614.3: a floating
+--     replacement "last[s] until [it's] used up", and `consume` spends a
+--     one-shot as it applies -- re-reading a frozen store would hand a spent
+--     regeneration shield to the next member of the same batch. Freezing it
+--     would also buy nothing for this bug: the store is keyed by source id and
+--     is not swept when the source leaves the battlefield.
+--
+--   * The loop still RE-COLLECTS every iteration, so CR 616.1f and CR 616.2 are
+--     untouched; only the board those collections read changes.
+--
+--   * `apply`'s writes and `choose`'s chooser lookup read the LIVE state, since
+--     they act on the board as it is now rather than asking what existed.
+--
+-- A permanent that ENTERED after the batch began therefore contributes nothing,
+-- which is the same rule read the other way: CR 614.4 forbids an effect
+-- "go[ing] back in time" to change an event that is already under way. No
+-- producer today -- nothing enters the battlefield in the middle of a mass
+-- destruction or an SBA pass -- so this half is unexercised.
+--
 -- CR 614.12a: `batch` is the set of ids entering the battlefield AT THE SAME TIME
 -- as the object this loop is about -- "If a replacement effect that modifies how
 -- a permanent enters the battlefield requires a choice, that choice is made
@@ -148,18 +197,19 @@ applyReplacements = applyReplacementsIn Set.empty
 -- (nothing else is entering). Channel 1's exclusion is IMPLEMENTED BUT UNTESTED:
 -- no card in the pool puts two copy-choosers onto the battlefield simultaneously
 -- (#73).
-applyReplacementsIn :: Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
-applyReplacementsIn batch = loop batch Set.empty
+applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
+applyReplacementsIn asOf batch = loop asOf batch Set.empty
 
-loop :: Set ObjectId -> Set CandidateId -> ProposedEvent -> Game (Maybe ProposedEvent)
-loop batch applied event = do
+loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> ProposedEvent -> Game (Maybe ProposedEvent)
+loop asOf batch applied event = do
   gs <- State.get
-  -- Step 1, from scratch each iteration: collect against the CURRENT state, minus
-  -- CR 614.5's already-applied set. Re-collecting is what makes CR 616.2 work --
-  -- an effect that only became applicable because of the last application is
-  -- picked up here.
+  -- Step 1, from scratch each iteration: collect against the CURRENT state (or,
+  -- for a CR 608.2f batch, the state the batch began in), minus CR 614.5's
+  -- already-applied set. Re-collecting is what makes CR 616.2 work -- an effect
+  -- that only became applicable because of the last application is picked up
+  -- here.
   let unused candidate = not (Set.member (ReplacementCandidate.identity candidate) applied)
-      fresh = filter unused (applicable gs event)
+      fresh = filter unused (applicable asOf gs event)
   case highestBucket fresh of
     -- CR 616.1f: no candidate remains, so the loop ends and the surviving event
     -- is what happens (CR 614.6).
@@ -174,23 +224,29 @@ loop batch applied event = do
           outcome <- apply batch candidate event
           case outcome of
             Nothing -> pure Nothing
-            Just rewritten -> loop batch (Set.insert (ReplacementCandidate.identity candidate) applied) rewritten
+            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) rewritten
 
 -- Every replacement effect instance in the game, in the engine's canonical order.
 -- Two segments, concatenated in this order:
 --
 --   1. PERMANENT abilities (Projection.replacementsAffecting): battlefield
 --      permanents ascending by id, each permanent's own effects in printed
---      order.
+--      order. Read from `sources`, which for a CR 608.2f batch is the board the
+--      batch began in rather than the live one (see applyReplacementsIn).
 --   2. The FLOATING store (GameState.replacements): newest first -- Resolve.hs
 --      (the Replace opcode) and Pawl.Cast (rule 702.34a's flashback exile, armed
 --      as the spell goes onto the stack) each prepend a new ActiveReplacement
 --      onto the front of the list as it is created, so the most recently
---      installed floating replacement is collected before any older one.
+--      installed floating replacement is collected before any older one. Always
+--      the LIVE store, never a frozen one: CR 614.3 spends a one-shot as it is
+--      applied, and `consume` writes that back here.
 --
--- That concatenated order is what the ChooseReplacement prompt indexes into.
-collect :: GameState -> [ReplacementCandidate]
-collect gs =
+-- That concatenated order is what the ChooseReplacement prompt indexes into. The
+-- two segments take separate arguments -- rather than one GameState apiece, which
+-- would be two interchangeable parameters of the same type -- so the split cannot
+-- be got backwards.
+collect :: GameState -> [ActiveReplacement.ActiveReplacement] -> [ReplacementCandidate]
+collect sources floating =
   let fromPermanent (src, re) =
         ReplacementCandidate.MkReplacementCandidate
           { ReplacementCandidate.identity = CandidateId.OfPermanent src re,
@@ -203,11 +259,24 @@ collect gs =
             ReplacementCandidate.effect = ActiveReplacement.effect active,
             ReplacementCandidate.source = ActiveReplacement.source active
           }
-   in fmap fromPermanent (Projection.replacementsAffecting gs)
-        <> fmap fromFloating (GameState.replacements gs)
+   in fmap fromPermanent (Projection.replacementsAffecting sources)
+        <> fmap fromFloating floating
 
-applicable :: GameState -> ProposedEvent -> [ReplacementCandidate]
-applicable gs event = filter (applies gs event) (collect gs)
+-- The candidates that apply to this event. `asOf` is Nothing for a lone event
+-- and Just the pre-batch board for a CR 608.2f batch (see applyReplacementsIn);
+-- `gs` is always the live state.
+--
+-- `applies` reads the pre-batch board too, not just `collect`. Both ask about
+-- the SOURCE -- CR 614.1's "does this instance apply?" reads the source's
+-- controller for CR 109.5's "you" (matchesController, matchesZoneOwner, and the
+-- TokenR arm) -- and a source the batch has already removed has no controller,
+-- so the two have to agree on which board that is. Collecting Leyline of the
+-- Void's "an opponent's graveyard" from the frozen board only to have `applies`
+-- reject it against the live one would leave the bug exactly where it was.
+applicable :: Maybe GameState -> GameState -> ProposedEvent -> [ReplacementCandidate]
+applicable asOf gs event =
+  let sources = Maybe.fromMaybe gs asOf
+   in filter (applies sources event) (collect sources (GameState.replacements gs))
 
 -- CR 614.1: does this instance apply to this proposed event? The arms must agree
 -- on the EVENT CLASS -- which the type already rules out for the impossible pairs
@@ -695,8 +764,20 @@ legalCopyTargets batch self gs =
 -- does not happen." Safe here: both EntryR arms (AsCopy, ChoiceOf) always
 -- return `Just`; only DamageR/DestructionR ever return `Nothing`, and neither
 -- pairs with WouldEnter, the only event this loop ever proposes.
+--
+-- Always the LIVE board (`Nothing`), even when the zone change containing this
+-- entry belongs to a CR 608.2f batch. Two reasons, both CR: the entering object
+-- is not on the pre-batch board at all, and CR 614.12 asks this loop to "check
+-- the characteristics of the permanent AS IT WOULD EXIST ON THE BATTLEFIELD" --
+-- a question about now, not about when the containing event began. CR 616.1g is
+-- the rule that recognizes an entry like this as an event CONTAINED within
+-- another rather than a second member of the batch -- though it speaks only to
+-- the ORDER the two events' effects are chosen in ("the second effect can't be
+-- chosen until after the first effect has been chosen"), not to which board each
+-- collects from. That a contained event keeps its own footing is this engine's
+-- reading, resting on CR 614.12 above; no rule states it outright.
 runEntry :: Set ObjectId -> ObjectId -> Game ()
-runEntry batch oid = Monad.void (applyReplacementsIn batch (ProposedEvent.WouldEnter oid))
+runEntry batch oid = Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
 
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
 -- applied. A permanent's STATIC replacement ability has no use count at all --
@@ -733,9 +814,13 @@ asDamageEvent event = case event of
 -- destroyed -- which need not be the one asked about, since a rewrite may
 -- redirect it; `Nothing` means a replacement took the event (regeneration), and
 -- that rewrite has already done its own work.
-resolveDestruction :: Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
-resolveDestruction regenerability oid = do
-  outcome <- applyReplacements (ProposedEvent.WouldBeDestroyed oid regenerability)
+--
+-- `asOf` is applyReplacementsIn's, and Event.destroy always supplies it: a
+-- destruction is never lone, since CR 608.2f gives even a single Doom Blade the
+-- one-element batch.
+resolveDestruction :: Maybe GameState -> Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
+resolveDestruction asOf regenerability oid = do
+  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid regenerability)
   pure (outcome >>= asDestruction)
 
 asDestruction :: ProposedEvent -> Maybe ObjectId

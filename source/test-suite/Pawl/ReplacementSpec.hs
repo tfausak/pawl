@@ -327,6 +327,34 @@ tests registry =
               (piker, g2) = S.addCreature pikerPrinting S.bob g1
               asked = answersFor S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
           HU.assertBool "no ChooseReplacement was raised" (not (wasAskedToReplace asked)),
+        -- CR 704.3: "the game checks for any of the listed conditions for
+        -- state-based actions, then performs all applicable state-based actions
+        -- simultaneously as a single event." So the put-into-graveyard batch one
+        -- pass performs is ONE event, and the replacement effects in force for it
+        -- are the ones on the battlefield when the pass began -- including one
+        -- belonging to a permanent the pass is itself burying.
+        --
+        -- Opalescence makes Rest in Peace a 2/2 (its mana value); two -1/-1
+        -- counters take it to 0/0 and one takes the 2/1 Piker to 1/0, so CR
+        -- 704.5f names both in the same pass. Rest in Peace is added FIRST on
+        -- purpose: Sba walks the battlefield in ascending ObjectId order, so it
+        -- is buried first and an implementation that re-collected the Piker's
+        -- candidates from the live board would find it gone.
+        HU.testCase "CR 704.3 a Rest in Peace buried by an SBA pass still exiles that pass's other victim" $ do
+          opalescence <- Registry.printing registry "Opalescence"
+          restInPeace <- Registry.printing registry "Rest in Peace"
+          pikerPrinting <- Registry.printing registry "Goblin Piker"
+          let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
+              (rip, g1) = S.addCreature restInPeace S.alice g0
+              (piker, g2) = S.addCreature pikerPrinting S.bob g1
+              board = S.addCounter CounterKind.MinusOneMinusOne 1 piker (S.addCounter CounterKind.MinusOneMinusOne 2 rip g2)
+              after = S.settleSba board
+          HU.assertBool "setup: Rest in Peace is buried before the Piker" (rip < piker)
+          HU.assertEqual "setup: Opalescence's 2/2 is a 0/0" (Just (0, 0)) (S.powerToughnessOf rip board)
+          HU.assertEqual "setup: the Piker is a 1/0" (Just (1, 0)) (S.powerToughnessOf piker board)
+          HU.assertEqual "the Piker was exiled, not buried" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+          HU.assertEqual "the Piker's card is in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after))
+          HU.assertEqual "and Rest in Peace exiled its own card too" 1 (length (Game.zoneMembers Zone.Exile S.alice after)),
         HU.testCase "CR 614.1a a move whose destination the pattern misses is untouched" $ do
           restInPeace <- Registry.printing registry "Rest in Peace"
           pikerPrinting <- Registry.printing registry "Goblin Piker"
@@ -765,14 +793,14 @@ tests registry =
           pikerPrinting <- Registry.printing registry "Goblin Piker"
           let base = S.landsInPlay swamp 1
               (piker, g1) = S.addCreature pikerPrinting S.alice base
-              (settled, _) = S.runPureWith S.identityAnswer g1 (Replacement.resolveDestruction Regenerability.Regenerable piker)
+              (settled, _) = S.runPureWith S.identityAnswer g1 (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)
           HU.assertEqual "the object it was asked about" (Just piker) settled,
         HU.testCase "CR 701.19a a regenerated destruction settles on nothing" $ do
           swamp <- Registry.printing registry "Swamp"
           pikerPrinting <- Registry.printing registry "Goblin Piker"
           let base = S.landsInPlay swamp 1
               (piker, g1) = S.addCreature pikerPrinting S.alice base
-              (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Regenerability.Regenerable piker)
+              (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)
           HU.assertEqual "consumed by the shield" Nothing settled,
         stepSkipTests registry
       ]
