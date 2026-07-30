@@ -32,50 +32,50 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
-import Pawl.Type.CandidateId (CandidateId)
-import qualified Pawl.Type.CandidateId as CandidateId
-import Pawl.Type.Card (Card)
-import Pawl.Type.ControllerRelation (ControllerRelation)
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.CounterPattern as CounterPattern
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamagePattern as DamagePattern
-import qualified Pawl.Type.DamageRewrite as DamageRewrite
-import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
-import qualified Pawl.Type.EntryOption as EntryOption
-import qualified Pawl.Type.EntryRewrite as EntryRewrite
-import qualified Pawl.Type.Filter as Filter.Type
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.Phase (Phase)
-import qualified Pawl.Type.PhasePattern as PhasePattern
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Prompt as Prompt
-import Pawl.Type.ProposedEvent (ProposedEvent)
-import qualified Pawl.Type.ProposedEvent as ProposedEvent
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Regenerability as Regenerability
-import Pawl.Type.ReplacementBucket (ReplacementBucket)
-import qualified Pawl.Type.ReplacementBucket as ReplacementBucket
-import Pawl.Type.ReplacementCandidate (ReplacementCandidate)
-import qualified Pawl.Type.ReplacementCandidate as ReplacementCandidate
-import Pawl.Type.ReplacementEffect (ReplacementEffect)
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Type.Scaling as Scaling
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TokenPattern as TokenPattern
-import qualified Pawl.Type.Uses as Uses
-import Pawl.Type.ZoneChange (ZoneChange)
-import qualified Pawl.Type.ZoneChange as ZoneChange
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import Pawl.Types.CandidateId (CandidateId)
+import qualified Pawl.Types.CandidateId as CandidateId
+import Pawl.Types.Card (Card)
+import Pawl.Types.ControllerRelation (ControllerRelation)
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Filter as Filter.Type
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.Phase (Phase)
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
+import Pawl.Types.ProposedEvent (ProposedEvent)
+import qualified Pawl.Types.ProposedEvent as ProposedEvent
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
+import Pawl.Types.ReplacementBucket (ReplacementBucket)
+import qualified Pawl.Types.ReplacementBucket as ReplacementBucket
+import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
+import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
+import Pawl.Types.ReplacementEffect (ReplacementEffect)
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.Uses as Uses
+import Pawl.Types.ZoneChange (ZoneChange)
+import qualified Pawl.Types.ZoneChange as ZoneChange
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- CR 614: settle a proposed zone change. Nothing means the move does not happen.
 -- The typed door Pawl.Event uses, so Event never cases on a ProposedEvent.
@@ -710,7 +710,7 @@ apply batch candidate event =
     -- The obligation the doc above places on every arm -- case on the inner sum
     -- rather than bind it with `_` -- has nothing to bind here: PhaseR carries a
     -- pattern and no rewrite, because CR 614.1b leaves a skip only one possible
-    -- outcome (see Pawl.Type.ReplacementEffect). The day a PhaseRewrite exists,
+    -- outcome (see Pawl.Types.ReplacementEffect). The day a PhaseRewrite exists,
     -- this arm owes it a case.
     --
     -- CR 614.10a: "if two effects each cause a player to skip their next

@@ -1,0 +1,139 @@
+module Pawl.Types.Response where
+
+import Data.Map.Strict (Map)
+import Data.Set (Set)
+import Numeric.Natural (Natural)
+import Pawl.Types.Action (Action)
+import Pawl.Types.Concession (Concession)
+import Pawl.Types.Cost (Cost)
+import Pawl.Types.ManaType (ManaType)
+import Pawl.Types.ModeIndex (ModeIndex)
+import Pawl.Types.MulliganDecision (MulliganDecision)
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.OptionalDecision (OptionalDecision)
+import Pawl.Types.PhyrexianPayment (PhyrexianPayment)
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.Recipient (Recipient)
+import Pawl.Types.SlotName (SlotName)
+import Pawl.Types.Subtype (Subtype)
+
+data Response
+  = ChoseAction Action
+  | -- CR 104.3a: whether a player conceded when asked, serialized so a
+    -- DecisionLog replays the concession deterministically.
+    Conceded Concession
+  | Shuffled [ObjectId]
+  | -- CR 729.2: the player randomness picked to go first in a subgame,
+    -- serialized so a DecisionLog replays that roll deterministically.
+    DeterminedFirstPlayer PlayerId
+  | ChoseDiscard [ObjectId]
+  | -- CR 507.1: the opponent the active player chose to attack, serialized so a
+    -- DecisionLog replays a multiplayer combat deterministically. Its own
+    -- constructor rather than a reuse of DeterminedFirstPlayer: decode's job is to
+    -- return Nothing for a response that does not match the prompt being asked,
+    -- and two prompts sharing a constructor cannot do that.
+    ChoseDefender PlayerId
+  | -- CR 601.2g: the mana source the player chose to tap.
+    ChoseManaSource ObjectId
+  | -- CR 605.3b / 105.4: the mana type the source's controller chose it to
+    -- produce, serialized so a DecisionLog replays an any-colour source (or a
+    -- dual land) deterministically. Its own constructor rather than a reuse of
+    -- ChoseManaSource: decode must return Nothing for a response that does not
+    -- match the prompt being asked, and two prompts sharing a constructor cannot.
+    ChoseManaType ManaType
+  | -- CR 701.34a: the permanents and players a proliferating player chose,
+    -- serialized so a DecisionLog replays a proliferate deterministically. A pair
+    -- rather than two constructors, because one prompt asks one question.
+    ChoseProliferation (Set ObjectId, Set PlayerId)
+  | -- CR 704.5j: the legendary permanent its controller kept, serialized so a
+    -- DecisionLog replays the legend rule deterministically. Its own constructor
+    -- rather than a reuse of ChoseManaSource: decode must return Nothing for a
+    -- response that does not match the prompt asked, and two ObjectId-shaped
+    -- prompts sharing a constructor cannot do that.
+    ChoseLegend ObjectId
+  | DeclaredAttackers [ObjectId]
+  | DeclaredBlockers (Map ObjectId ObjectId)
+  | AssignedCombatDamage (Map Recipient Natural)
+  | ChoseTargets (Map SlotName Recipient)
+  | -- CR 612 / the D4 binding: the (from, to) basic land types a text-changer's
+    -- caster chose, serialized so a DecisionLog replays the hack deterministically.
+    ChoseBasicLandTypes (Subtype, Subtype)
+  | -- CR 701.23: the library card a search found (Nothing = failed to find),
+    -- serialized so a DecisionLog replays a tutor deterministically.
+    Searched (Maybe ObjectId)
+  | -- CR 601.3 (Panglacial): the library card cast while searching (Nothing =
+    -- declined), serialized so a DecisionLog replays the re-entrant cast.
+    CastWhileSearched (Maybe ObjectId)
+  | -- CR 601.2b: the value of X a caster chose, serialized so a DecisionLog
+    -- replays a variable-cost spell deterministically.
+    ChoseX Natural
+  | -- CR 601.2b: the mode(s) a caster chose for a modal spell, serialized so a
+    -- DecisionLog replays a modal cast deterministically.
+    ChoseModes (Set ModeIndex)
+  | -- CR 707.5: the permanent a copy chose to copy (Nothing = declined),
+    -- serialized so a DecisionLog replays an as-enters copy deterministically.
+    ChoseCopyTarget (Maybe ObjectId)
+  | -- CR 208.2b: the index of the entry shape a player chose as an object entered,
+    -- serialized so a DecisionLog replays it deterministically.
+    ChoseEntryOption Natural
+  | -- CR 603.3b: the order a player chose for their simultaneous triggers, as a
+    -- permutation of the offered indices, serialized so a DecisionLog replays it.
+    OrderedTriggers [Natural]
+  | -- CR 616.1: the index of the replacement effect a player chose to apply next,
+    -- serialized so a DecisionLog replays a replacement race deterministically.
+    ChoseReplacement Natural
+  | -- CR 603.7c: the minted token a Create's slot bound, once a CR 614.16
+    -- replacement had made several of them, serialized so a DecisionLog replays
+    -- the binding deterministically. Its own constructor rather than a reuse of
+    -- ChoseLegend, for the reason ChoseDefender records: decode must return
+    -- Nothing for a response that does not match the prompt being asked, and two
+    -- ObjectId-shaped prompts sharing a constructor cannot do that.
+    ChoseBoundToken ObjectId
+  | -- CR 701.21a: the permanents a player chose to sacrifice to pay a cost,
+    -- serialized so a DecisionLog replays the payment deterministically.
+    ChoseSacrifices (Set ObjectId)
+  | -- CR 701.3a: the object a player chose to attach a moving permanent to,
+    -- serialized so a DecisionLog replays the move deterministically. Its own
+    -- constructor rather than a reuse of ChoseBoundToken, for the reason
+    -- ChoseDefender records: decode must return Nothing for a response that does
+    -- not match the prompt being asked, and two ObjectId-shaped prompts sharing a
+    -- constructor cannot do that.
+    ChoseAttachment ObjectId
+  | -- CR 601.2b: the cost a caster announced they would pay, serialized so a
+    -- DecisionLog replays an alternative-cost cast deterministically.
+    ChoseCost Cost
+  | -- CR 103.5: a player's mulligan declaration, serialized so a DecisionLog
+    -- replays the mulligan round deterministically.
+    DeclaredMulligan MulliganDecision
+  | -- CR 103.5: the cards a player put on the bottom of their library after a
+    -- mulligan, in chosen order, serialized so a DecisionLog replays it.
+    PutOnBottom [ObjectId]
+  | -- CR 103.5b: the hand card whose mulligan-window action a player took
+    -- (Nothing = declined), serialized so a DecisionLog replays it. Its own
+    -- constructor rather than a reuse of Searched / CastWhileSearched, for the
+    -- reason ChoseDefender records: decode's job is to return Nothing for a
+    -- response that does not match the prompt being asked, and two prompts
+    -- sharing a constructor cannot do that.
+    TookMulliganAction (Maybe ObjectId)
+  | -- CR 103.6: the hand card whose opening-hand action a player took (Nothing =
+    -- declined), serialized so a DecisionLog replays it. Its own constructor
+    -- rather than a reuse of TookMulliganAction, for the reason ChoseDefender
+    -- records: decode must return Nothing for a response that does not match the
+    -- prompt being asked, and two prompts sharing a constructor cannot do that.
+    TookOpeningHandAction (Maybe ObjectId)
+  | -- CR 603.5: whether the controller of a resolving spell or ability exercised
+    -- a printed "may", serialized so a DecisionLog replays an optional effect
+    -- deterministically. Its own constructor rather than a reuse of Conceded or
+    -- DeclaredMulligan, for the reason ChoseDefender records: decode must return
+    -- Nothing for a response that does not match the prompt being asked, and two
+    -- prompts sharing a constructor cannot do that.
+    ChoseOptional OptionalDecision
+  | -- CR 118.13a / 601.2b: which way a caster announced they would pay a
+    -- Phyrexian mana symbol, serialized so a DecisionLog replays a Mutagenic
+    -- Growth paid out of life exactly as it was cast. Its own constructor rather
+    -- than a reuse of ChoseOptional, Conceded or DeclaredMulligan, for the reason
+    -- ChoseDefender records: decode must return Nothing for a response that does
+    -- not match the prompt being asked, and two two-valued prompts sharing a
+    -- constructor cannot do that.
+    AnnouncedPhyrexianPayment PhyrexianPayment
+  deriving (Eq, Show)

@@ -17,24 +17,24 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Summoning as Summoning
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.AttackTarget as AttackTarget
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
-import Pawl.Type.Combat (Combat)
-import qualified Pawl.Type.Combat as Combat
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import Pawl.Types.Combat (Combat)
+import qualified Pawl.Types.Combat as Combat
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Zone as Zone
 
 emptyCombat :: Combat
 emptyCombat =
@@ -504,7 +504,7 @@ chooseDefender = do
   -- priority rule and stops there; CR 800.4h is the one that would hand this
   -- choice -- required of the active player by CR 507.1 and CR 703.4h -- to the
   -- next player in turn order. pawl skips it, which is an unobservable divergence
-  -- rather than a vacuous case (#181); the argument is on Pawl.Type.Combat's
+  -- rather than a vacuous case (#181); the argument is on Pawl.Types.Combat's
   -- defender field and is not repeated here.
   --
   -- Engine.runTurnBasedActions binds the identical test (hasActive) before
@@ -637,7 +637,7 @@ declareAttackers pid = do
 --
 -- Combat.defender being Nothing is the fourth way, and it is CR 506.3c's clause
 -- again rather than a fallback: outside the combat phase there is no defending
--- player at all (see Pawl.Type.Combat's defender field), so there is nobody for
+-- player at all (see Pawl.Types.Combat's defender field), so there is nobody for
 -- the creature to be attacking.
 --
 -- CR 508.4's CHOICE is not prompted, because there is exactly one candidate: one

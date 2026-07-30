@@ -17,36 +17,36 @@ import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Summoning as Summoning
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.Mana (Mana)
-import qualified Pawl.Type.Mana as Mana
-import Pawl.Type.ManaCost (ManaCost)
-import qualified Pawl.Type.ManaCost as ManaCost
-import Pawl.Type.ManaProduction (ManaProduction)
-import qualified Pawl.Type.ManaProduction as ManaProduction
-import Pawl.Type.ManaSymbol (ManaSymbol)
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import Pawl.Type.ManaType (ManaType)
-import qualified Pawl.Type.ManaType as ManaType
-import Pawl.Type.ManaUnit (ManaUnit)
-import qualified Pawl.Type.ManaUnit as ManaUnit
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.PhyrexianPayment as PhyrexianPayment
-import qualified Pawl.Type.Player as Player
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Prompt as Prompt
-import Pawl.Type.Subtype (Subtype)
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Mana (Mana)
+import qualified Pawl.Types.Mana as Mana
+import Pawl.Types.ManaCost (ManaCost)
+import qualified Pawl.Types.ManaCost as ManaCost
+import Pawl.Types.ManaProduction (ManaProduction)
+import qualified Pawl.Types.ManaProduction as ManaProduction
+import Pawl.Types.ManaSymbol (ManaSymbol)
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import Pawl.Types.ManaType (ManaType)
+import qualified Pawl.Types.ManaType as ManaType
+import Pawl.Types.ManaUnit (ManaUnit)
+import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
+import qualified Pawl.Types.Player as Player
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
+import Pawl.Types.Subtype (Subtype)
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 
 -- CR 305.6: a basic land's mana ability is granted intrinsically by its subtype,
 -- not printed in its text box. This is a classification of the type line -- it

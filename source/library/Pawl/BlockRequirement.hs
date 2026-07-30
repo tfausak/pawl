@@ -5,7 +5,7 @@
 -- sees neither -- CR 613.11 applies both "after all other continuous effects have
 -- been applied".
 --
--- This module is the only reader of Pawl.Type.BlockRequirement. Pawl.Combat asks
+-- This module is the only reader of Pawl.Types.BlockRequirement. Pawl.Combat asks
 -- for requirement INSTANCES -- bare (blocker, attacker) pairs -- and never learns
 -- which card produced one, the same posture Pawl.Cast takes toward
 -- Pawl.PlayerEffect.prohibitsCasting.
@@ -15,11 +15,11 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Type.BlockRequirement as BlockRequirement
-import qualified Pawl.Type.Card as Card
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.Card as Card
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.ObjectId (ObjectId)
 
 -- CR 509.1c: every requirement in force right now, INSTANTIATED as the
 -- (blocker, attacker) pairs the defending player is required to declare.
@@ -75,7 +75,7 @@ instances able candidates attackers gs =
             -- requirement "after all other continuous effects have been applied",
             -- so it has no layer to have started applying in. Nor could another
             -- part of the same card's text have started on its behalf: a
-            -- requirement is its OWN carrier (Pawl.Type.BlockRequirement), never a
+            -- requirement is its OWN carrier (Pawl.Types.BlockRequirement), never a
             -- part of a StaticAbility, so CR 613.6's "the same set of objects in
             -- each other applicable layer" has nothing here to hold together. The
             -- cut is therefore unconditional.

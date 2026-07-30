@@ -14,24 +14,24 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.Deck as Deck
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.HandActionPerformer (HandActionPerformer)
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Player as Player
-import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.Printing (Printing)
-import qualified Pawl.Type.RestartSignal as RestartSignal
-import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.Timestamp as Timestamp
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Deck as Deck
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.HandActionPerformer (HandActionPerformer)
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Player as Player
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.Printing (Printing)
+import qualified Pawl.Types.RestartSignal as RestartSignal
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.Zone as Zone
 
 startingLife :: Integer
 startingLife = 20

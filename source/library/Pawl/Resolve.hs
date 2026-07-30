@@ -27,61 +27,61 @@ import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
-import Pawl.Type.AbilityName (AbilityName)
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
-import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.DamageKind as DamageKind
-import qualified Pawl.Type.Decider as Decider
-import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Type.Duration as Duration
-import Pawl.Type.Effect (Effect)
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.Expiry as Expiry.Type
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.HandActionPerformer as HandActionPerformer
-import Pawl.Type.ManaProduction (ManaProduction)
-import qualified Pawl.Type.Mode as Mode
-import Pawl.Type.ModeIndex (ModeIndex)
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.MonarchTarget as MonarchTarget
-import qualified Pawl.Type.MonarchWatch as MonarchWatch
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.ObjectRef (ObjectRef)
-import qualified Pawl.Type.ObjectRef as ObjectRef
-import qualified Pawl.Type.OptionalDecision as OptionalDecision
-import qualified Pawl.Type.Optionality as Optionality
-import qualified Pawl.Type.PhasePattern as PhasePattern
-import qualified Pawl.Type.Player as Player
-import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.PlayerRef (PlayerRef)
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Quantity as Quantity.Type
-import Pawl.Type.Recipient (Recipient)
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import Pawl.Type.Result (Result)
-import qualified Pawl.Type.Result as Result
-import qualified Pawl.Type.SearchDestination as SearchDestination
-import qualified Pawl.Type.Sickness as Sickness
-import Pawl.Type.SlotName (SlotName)
-import qualified Pawl.Type.Source as Source
-import Pawl.Type.Subtype (Subtype)
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TokenEntry as TokenEntry
-import qualified Pawl.Type.Uses as Uses
-import qualified Pawl.Type.Zone as Zone
+import Pawl.Types.AbilityName (AbilityName)
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.Duration as Duration
+import Pawl.Types.Effect (Effect)
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Expiry as Expiry.Type
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
+import Pawl.Types.ManaProduction (ManaProduction)
+import qualified Pawl.Types.Mode as Mode
+import Pawl.Types.ModeIndex (ModeIndex)
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.ObjectRef (ObjectRef)
+import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.Player as Player
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.PlayerRef (PlayerRef)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
+import Pawl.Types.Recipient (Recipient)
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.Sickness as Sickness
+import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.Source as Source
+import Pawl.Types.Subtype (Subtype)
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TokenEntry as TokenEntry
+import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Zone as Zone
 
 -- The slots a PlayerRef reads. Only InSlot names one; EachPlayer and Relative
 -- are answered from the evaluation context alone. Factored out of slotsOf below
@@ -973,7 +973,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- CR 727.4: this resolves several frames deep -- inside the priority loop,
   -- inside a step -- and the rebuild replaces the game those frames are running.
   -- GameState.restartSignal is how they unwind to the rebuilt turn 1; see
-  -- Pawl.Type.RestartSignal.
+  -- Pawl.Types.RestartSignal.
   -- Not implemented: the CR 727.5/727.5a exemption + put-onto-battlefield rider
   -- of full Karn Liberated (#135), which retires the synthetic-restart gate.
   Effect.RestartGame -> Setup.restartGame performHandAction controller
@@ -1412,7 +1412,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                           { PhasePattern.whichPhase = phase,
                             -- The player the resolution named, baked now. Card
                             -- data cannot name one (see
-                            -- Pawl.Type.PhasePattern).
+                            -- Pawl.Types.PhasePattern).
                             PhasePattern.whosePhase = Just pid
                           },
                     ActiveReplacement.source = source,
@@ -1798,7 +1798,7 @@ applyEffect = applyEffectWith noSubgame
 -- CR 103.5b / CR 103.6: perform the effects of an action a card grants from a
 -- player's hand. Pawl.Mulligan's two window loops reach this through the
 -- HandActionPerformer parameter they are handed (see
--- Pawl.Type.HandActionPerformer for why it is a parameter).
+-- Pawl.Types.HandActionPerformer for why it is a parameter).
 --
 -- The action does not use the stack -- both rules say the player PERFORMS it,
 -- not that they cast or activate anything -- so there is nothing to put on the

@@ -4,14 +4,14 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Count as Count
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
-import qualified Pawl.Type.Card as Card
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.Quantity (Quantity)
-import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Types.Card as Card
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.Quantity (Quantity)
+import qualified Pawl.Types.Quantity as Quantity
 
 -- Nothing when the value cannot be determined.
 --

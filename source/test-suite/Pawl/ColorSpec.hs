@@ -16,18 +16,18 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
-import qualified Pawl.Type.Color as Color
+import qualified Pawl.Types.Color as Color
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.Pool as Pool
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.TargetSpec as TargetSpec
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

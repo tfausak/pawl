@@ -21,21 +21,21 @@ import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Monarch as Monarch
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Type.Combat as Combat
-import qualified Pawl.Type.Decider as Decider
-import Pawl.Type.Departure (Departure)
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.Player as Player
-import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.Result (Result)
-import qualified Pawl.Type.Result as Result
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Decider as Decider
+import Pawl.Types.Departure (Departure)
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Player as Player
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Zone as Zone
 
 -- Mark a player as having left, with the reason they left, and perform
 -- everything the rules attach to that moment. Pure, because the CR 704.5 pass
@@ -68,7 +68,7 @@ depart reason pid gs =
 -- CR 800.4: "Unlike two-player games, multiplayer games can continue after one
 -- or more players have left the game." CR 800.1: "A multiplayer game is a game
 -- that begins with more than two players." GameState.turnOrder is the roster the
--- game BEGAN with and is never shortened (see Pawl.Type.GameState), so counting
+-- game BEGAN with and is never shortened (see Pawl.Types.GameState), so counting
 -- seats answers "begins with" directly: a three-player game down to two
 -- survivors still continues, and a rebuilt game (CR 727.1, CR 729.2) is seated
 -- from the players who were in the game it came from and so answers for itself.

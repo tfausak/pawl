@@ -9,18 +9,18 @@ import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
-import qualified Pawl.Type.Action as Action
-import qualified Pawl.Type.Concession as Concession
-import qualified Pawl.Type.Deck as Deck
-import qualified Pawl.Type.MulliganDecision as MulliganDecision
-import qualified Pawl.Type.OptionalDecision as OptionalDecision
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Registry as Registry.Type
-import Pawl.Type.Result (Result)
-import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Registry as Registry.Type
+import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Test.Tasty.Bench as Bench
 
 isCreatureRecipient :: Recipient.Recipient -> Bool

@@ -1,4 +1,4 @@
--- CR 613 / CR 608.2h: the one place a Pawl.Type.Count is interpreted. A pure
+-- CR 613 / CR 608.2h: the one place a Pawl.Types.Count is interpreted. A pure
 -- fold -- enumerate the scope, keep by the Filter, aggregate -- that never
 -- learns which effect or card produced the count.
 --
@@ -17,22 +17,22 @@ import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
-import qualified Pawl.Type.Aggregation as Aggregation
-import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.EventShape as EventShape
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Scope as Scope
-import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- The characteristics of a candidate, as of the layers the CALLER has already
 -- applied. Nothing when the candidate has no view -- an unknown id, or an object

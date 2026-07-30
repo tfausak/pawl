@@ -17,43 +17,43 @@ import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Subtype as Subtype
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.Combat as Combat
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.Keyword (Keyword)
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.LastKnown as LastKnown
-import Pawl.Type.Layer (Layer)
-import qualified Pawl.Type.Layer as Layer
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import Pawl.Type.Modification (Modification)
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.Power as Power
-import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Quantity as Quantity.Type
-import Pawl.Type.ReplacementEffect (ReplacementEffect)
-import qualified Pawl.Type.StaticAbility as StaticAbility
-import qualified Pawl.Type.Subtype as Subtype.Type
-import qualified Pawl.Type.Supertype as Supertype
-import Pawl.Type.Timestamp (Timestamp)
-import qualified Pawl.Type.Toughness as Toughness
-import Pawl.Type.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Type.TypeLine as TypeLine
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LastKnown as LastKnown
+import Pawl.Types.Layer (Layer)
+import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import Pawl.Types.Modification (Modification)
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Power as Power
+import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity.Type
+import Pawl.Types.ReplacementEffect (ReplacementEffect)
+import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype.Type
+import qualified Pawl.Types.Supertype as Supertype
+import Pawl.Types.Timestamp (Timestamp)
+import qualified Pawl.Types.Toughness as Toughness
+import Pawl.Types.TriggeredAbility (TriggeredAbility)
+import qualified Pawl.Types.TypeLine as TypeLine
 
 -- CR 613.1: the layer a modification applies in. THE ABI classification the
 -- rules core would ask -- never the modification's identity. One of two case-on-
@@ -85,7 +85,7 @@ layer m = case m of
 -- it's on" -- the effect's SOURCE's controller, not the affected object's. `src`
 -- (the Gathered candidate's own source) supplies both the
 -- perspective and the InSlot binding source for the built Filter.Context. `lyr`
--- is the layer bound the Pawl.Type.Count fold sees (viewUpTo) -- the layers
+-- is the layer bound the Pawl.Types.Count fold sees (viewUpTo) -- the layers
 -- already applied when this modification is folded in. This is the #34 fix: a
 -- characteristic-defining ability is the OTHER case (CR 604.3a(3): a CDA does
 -- not directly affect the characteristics of any other object), and it is
@@ -626,7 +626,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 -- moment it entered, instead of recomputing, which violates CR 707.2 (a copy
 -- acquires the ABILITY, not its computed value). So P3b must fold Tarmogoyf's
 -- CDA in-place at Layer.CharacteristicPT (7a, which already exists in
--- Pawl.Type.Layer as the CR's own dedicated sublayer for this), not at the seed.
+-- Pawl.Types.Layer as the CR's own dedicated sublayer for this), not at the seed.
 -- The precedent below (baseCharacteristics already evaluating a printed `*` P/T
 -- at the seed via Quantity.evaluate) is harmless ONLY for the one card that
 -- has `*` P/T with NO characteristic-defining ability behind it -- Primal Plasma
@@ -1362,7 +1362,7 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 -- derived Ord IS that order, so `(< bound)` is exactly "the layers before this
 -- one".
 --
--- The bound exists for counting: a Pawl.Type.Count evaluated while layer L is
+-- The bound exists for counting: a Pawl.Types.Count evaluated while layer L is
 -- being applied sees its candidates through `< L`, so a count encountered inside
 -- THAT fold is applied at some K < L and sees `< K`. The bound strictly
 -- decreases and Layer is finite, so the nesting terminates.
@@ -1580,7 +1580,7 @@ projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom = projectWith (const True)
 
 -- CR 613.1: a projection bounded to the layers BEFORE `bound` -- the fold a
--- Pawl.Type.Count sees while layer `bound` is being applied. See projectWith's
+-- Pawl.Types.Count sees while layer `bound` is being applied. See projectWith's
 -- comment for the termination argument this exists to serve.
 projectUpTo :: Layer -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectUpTo bound = projectWith (< bound)
@@ -1942,7 +1942,7 @@ controlsGiven grants pid gs =
 -- CR 800.4a: does this stored effect give `pid` control of an object? The
 -- control-granting classification Pawl.Departure asks, so that the case on
 -- Modification stays in the one module allowed to make it (see
--- Pawl.Type.Modification). Modification.SetController's payload IS the player who
+-- Pawl.Types.Modification). Modification.SetController's payload IS the player who
 -- gains control -- it is baked at effect creation and is the effect's source's
 -- controller -- so the payload is what "that player" names.
 givesControlTo :: PlayerId.PlayerId -> ContinuousEffect.ContinuousEffect -> Bool

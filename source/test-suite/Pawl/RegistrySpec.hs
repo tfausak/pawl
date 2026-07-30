@@ -1,4 +1,4 @@
--- Covers Pawl.Registry and Pawl.Type.Registry. Every test builds its own corpus
+-- Covers Pawl.Registry and Pawl.Types.Registry. Every test builds its own corpus
 -- in a temporary directory: the committed data/cards is read-only here, and the
 -- failure modes (a missing file, a malformed file, a file whose name disagrees
 -- with its file name) have no representative in it by construction.
@@ -16,9 +16,9 @@ import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
-import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Registry as Registry.Type
 import qualified System.Directory as Directory
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU

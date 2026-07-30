@@ -10,23 +10,23 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import Pawl.Type.Card (Card)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import Pawl.Type.ModeIndex (ModeIndex)
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Pool as Pool
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import Pawl.Type.Recipient (Recipient)
-import qualified Pawl.Type.Recipient as Recipient
-import Pawl.Type.SlotName (SlotName)
-import Pawl.Type.TargetSpec (TargetSpec)
-import qualified Pawl.Type.TargetSpec as TargetSpec
-import qualified Pawl.Type.Zone as Zone
+import Pawl.Types.Card (Card)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import Pawl.Types.ModeIndex (ModeIndex)
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import Pawl.Types.Recipient (Recipient)
+import qualified Pawl.Types.Recipient as Recipient
+import Pawl.Types.SlotName (SlotName)
+import Pawl.Types.TargetSpec (TargetSpec)
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 115: a target slot's legal recipients are its Pool's base candidate set
 -- (CR 115.4's "any target" is creatures on the battlefield plus players still in

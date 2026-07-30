@@ -12,7 +12,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Event as Event
--- The logic module, alongside Pawl.Type.Modal below: unambiguous under one
+-- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
 -- triggered ability's effects (Card.allEffects only reaches the spell).
@@ -24,65 +24,65 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.Aggregation as Aggregation
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.BlockRequirement as BlockRequirement
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.Comparison as Comparison
--- Aliased Condition.Type, matching Pawl.Type.Count below and the project-wide
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Comparison as Comparison
+-- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
 -- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
 -- later be imported and must not collide.
-import qualified Pawl.Type.Condition as Condition.Type
-import qualified Pawl.Type.Cost as Cost.Type
-import qualified Pawl.Type.CostComponent as CostComponent
-import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.Counterability as Counterability
-import qualified Pawl.Type.Duration as Duration
-import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Effect as Effect
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Layer as Layer
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaProduction as ManaProduction
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeSelection as ModeSelection
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.ObjectRef as ObjectRef
-import qualified Pawl.Type.Optionality as Optionality
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.PlayerEffect as PlayerEffect
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.PlayerScope as PlayerScope
-import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
-import qualified Pawl.Type.Pool as Pool
-import qualified Pawl.Type.Power as Power
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Quantity as Quantity.Type
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Scope as Scope
-import qualified Pawl.Type.SearchDestination as SearchDestination
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.StaticAbility as StaticAbility
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.Supertype as Supertype
-import qualified Pawl.Type.TargetSpec as TargetSpec
-import qualified Pawl.Type.Toughness as Toughness
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TurnScope as TurnScope
-import qualified Pawl.Type.TypeLine as TypeLine
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -297,7 +297,7 @@ countCounts (Count.Type.MkCount _ _ aggregation) = case aggregation of
   Aggregation.Greatest quantity -> quantityCounts quantity
 
 -- Every Count reachable from a Condition: both sides are Quantities, and either
--- may embed one (Pawl.Type.Condition).
+-- may embed one (Pawl.Types.Condition).
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
 conditionCounts (Condition.Type.MkCondition measured _ threshold) =
   quantityCounts measured <> quantityCounts threshold
@@ -334,7 +334,7 @@ triggerConditionCounts :: TriggerCondition.TriggerCondition -> [Count.Type.Count
 triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
-  -- Filter holds no Count (Pawl.Type.Filter's atoms are all characteristics).
+  -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
@@ -398,7 +398,7 @@ triggeredAbilityCounts ability =
     <> foldMap conditionCounts (TriggeredAbility.intervening ability)
     <> concatMap effectCounts (Modal.allEffects (TriggeredAbility.modal ability))
 
--- Every Count reachable from a card: every site a Pawl.Type.Count can be
+-- Every Count reachable from a card: every site a Pawl.Types.Count can be
 -- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
 -- effect/modification quantity), Condition (a trigger's own condition, a
 -- triggered ability's intervening clause, and a ForAsLongAs duration), and

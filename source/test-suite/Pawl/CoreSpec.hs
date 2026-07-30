@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers the VM core: Pawl.Type.Program (the suspension interpreter) and
+-- Covers the VM core: Pawl.Types.Program (the suspension interpreter) and
 -- Pawl.Quantity (numeric evaluation).
 module Pawl.CoreSpec where
 
@@ -15,20 +15,20 @@ import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Aggregation as Aggregation
-import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Quantity as Quantity.Type
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Scope as Scope
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

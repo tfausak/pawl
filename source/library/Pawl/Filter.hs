@@ -2,14 +2,14 @@ module Pawl.Filter where
 
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.Filter as Filter
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.Supertype as Supertype
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
 -- battlefield/stack and by the printed card off the battlefield (both builders

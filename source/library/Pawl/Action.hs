@@ -7,16 +7,16 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Turn as Turn
-import Pawl.Type.Action (Action)
-import qualified Pawl.Type.Action as Action
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Zone as Zone
+import Pawl.Types.Action (Action)
+import qualified Pawl.Types.Action as Action
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Zone as Zone
 
 playableLands :: PlayerId -> GameState -> [ObjectId]
 playableLands pid gs =

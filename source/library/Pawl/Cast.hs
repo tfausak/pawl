@@ -20,24 +20,24 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CastingPermission as CastingPermission
-import Pawl.Type.Cost (Cost)
-import qualified Pawl.Type.Expiry as Expiry
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.Payment as Payment
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Supertype as Supertype
-import qualified Pawl.Type.Uses as Uses
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CastingPermission as CastingPermission
+import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Expiry as Expiry
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Payment as Payment
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 302.1 / 307.1: a creature spell may be cast only when its controller could
 -- cast a sorcery -- a main phase of their own turn, with an empty stack. Both
@@ -212,7 +212,7 @@ legendaryRestrictionOk pid oid gs = case Game.cardOf oid gs of
 -- Pawl.Sba.legendGroups takes for the legend rule.
 --
 -- Rule 205.4e's second disjunct, "or a legendary planeswalker", is not
--- implemented: Pawl.Type.CardType has no Planeswalker constructor to test for
+-- implemented: Pawl.Types.CardType has no Planeswalker constructor to test for
 -- (#301).
 controlsLegendaryCreature :: PlayerId -> GameState -> Bool
 controlsLegendaryCreature pid gs =

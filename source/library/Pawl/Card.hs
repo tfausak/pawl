@@ -9,18 +9,18 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Modal as Modal
-import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.CardType as CardType
-import Pawl.Type.Effect (Effect)
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import Pawl.Type.SlotName (SlotName)
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.Supertype as Supertype
-import Pawl.Type.TargetSpec (TargetSpec)
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TypeLine as TypeLine
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardType as CardType
+import Pawl.Types.Effect (Effect)
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
+import Pawl.Types.TargetSpec (TargetSpec)
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TypeLine as TypeLine
 
 -- Every effect across all of a card's modes, in printed (mode, then written)
 -- order. CR 608.2c/700.2: the card's whole text spans its modes; the D4 lint

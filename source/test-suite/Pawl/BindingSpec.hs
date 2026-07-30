@@ -1,4 +1,4 @@
--- Covers: Pawl.Type.Binding, Pawl.Binding
+-- Covers: Pawl.Types.Binding, Pawl.Binding
 module Pawl.BindingSpec where
 
 import qualified Data.Map.Strict as Map
@@ -6,11 +6,11 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Support as S
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

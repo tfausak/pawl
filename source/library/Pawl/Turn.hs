@@ -2,16 +2,16 @@ module Pawl.Turn where
 
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.CombatStep as CombatStep
-import qualified Pawl.Type.EndingStep as EndingStep
-import Pawl.Type.ExtraPhase (ExtraPhase)
-import qualified Pawl.Type.ExtraPhase as ExtraPhase
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.Phase (Phase)
-import qualified Pawl.Type.Phase as Phase
-import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.EndingStep as EndingStep
+import Pawl.Types.ExtraPhase (ExtraPhase)
+import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Phase (Phase)
+import qualified Pawl.Types.Phase as Phase
+import Pawl.Types.PlayerId (PlayerId)
 
 allPhases :: [Phase]
 allPhases =

@@ -1,5 +1,5 @@
--- Covers Pawl.Count, Pawl.Type.Count, Pawl.Type.Scope, Pawl.Type.PlayerRef,
--- Pawl.Type.EventShape and Pawl.Type.Aggregation. Unit-level: the fold is driven
+-- Covers Pawl.Count, Pawl.Types.Count, Pawl.Types.Scope, Pawl.Types.PlayerRef,
+-- Pawl.Types.EventShape and Pawl.Types.Aggregation. Unit-level: the fold is driven
 -- against a stubbed ViewOf so the evaluator is tested apart from the projection
 -- that supplies it (Pawl.PowerToughnessSpec covers the wiring). The one
 -- exception is the Aggregation.Greatest case that folds a PROJECTED power --
@@ -19,26 +19,26 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Aggregation as Aggregation
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Departure as Departure.Type
-import qualified Pawl.Type.EventShape as EventShape
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameEvent as GameEvent
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Quantity as Quantity.Type
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Scope as Scope
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

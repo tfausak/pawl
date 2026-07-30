@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Cost and the three types it cases on (Pawl.Type.Cost,
--- Pawl.Type.CostComponent, Pawl.Type.Payment), plus the two prompts the axis
+-- Covers Pawl.Cost and the three types it cases on (Pawl.Types.Cost,
+-- Pawl.Types.CostComponent, Pawl.Types.Payment), plus the two prompts the axis
 -- adds. CR 118: what a cost IS, what it takes to pay one, and the alternative
 -- and additional costs that change the answer.
 --
@@ -29,42 +29,42 @@ import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Action as Action.Type
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.ActivationTiming as ActivationTiming
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.Cost as Cost.Type
-import qualified Pawl.Type.CostComponent as CostComponent
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Departure as Departure
-import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Departure as Departure
+import qualified Pawl.Types.EndingStep as EndingStep
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.Game as Game.Type
-import qualified Pawl.Type.GameEvent as GameEvent
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Payment as Payment
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Type.Power as Power
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Quantity as Quantity.Type
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Response as Response
-import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

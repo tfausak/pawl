@@ -3,7 +3,7 @@
 -- performs IO: it is the shell around the pure codec, and the only place in the
 -- library that touches a file system.
 --
--- Every way this can fail has its own type (Pawl.Type.{MissingRoot,
+-- Every way this can fail has its own type (Pawl.Types.{MissingRoot,
 -- UnslugifiableName, UnknownCard, CorruptCard, MisfiledCard,
 -- UnslugifiableFile}), thrown as an exception. A caller that wants to say
 -- "unknown card X, did you mean...?" catches UnknownCard; one that wants "that
@@ -26,9 +26,9 @@ import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Json as Json
 import qualified Pawl.Slug as Slug
-import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Registry as Registry
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Registry as Registry
 import qualified System.Directory as Directory
 import qualified System.IO.Error as IOError
 

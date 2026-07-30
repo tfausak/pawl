@@ -17,32 +17,32 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Target as Target
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.Departure as Departure.Type
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Pool as Pool
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.Supertype as Supertype
-import qualified Pawl.Type.TargetSpec as TargetSpec
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.Departure as Departure.Type
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), and CR
 -- 704.5c (ten or more poison counters). Two-Headed Giant's shared-poison variant
