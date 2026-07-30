@@ -22,7 +22,9 @@
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
 -- against the keys eventBindings actually stamps. CR 603.4's intervening "if"
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
--- -- `lookBackInterveningTests`.
+-- -- `lookBackInterveningTests`. The same CR 400.7e slot read from the ENTRY
+-- direction, where the entrant is a different card from the bearer, with Aether
+-- Flash -- `aetherFlashTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -2150,5 +2152,160 @@ strippedTriggerTests registry =
             HU.assertBool "colorless gone" (ManaType.Colorless `notElem` Mana.manaTypesOf fountainId after)
         ]
 
+-- CR 400.7e's slot read from the OTHER direction of a zone change: an entry.
+-- "Abilities that trigger when an object moves from one zone to another ... can
+-- find the new object that it became in the zone it moved to when the ability
+-- triggered, if that zone is a public zone" -- and CR 400.2 lists the
+-- battlefield among the public zones, so an enters trigger's payload may name
+-- the entrant with no proviso to check.
+--
+-- Aether Flash, {2}{R}{R} Enchantment, "Whenever a creature enters, this
+-- enchantment deals 2 damage to it." Soul Warden proved the CONDITION
+-- (permanentEntersTests above); its "you gain 1 life" names nothing about the
+-- creature that entered. This is the first card whose EFFECT refers back to the
+-- entrant, which is the whole of #330.
+--
+-- The contrast with becameSlotTests is the point of reusing one slot name.
+-- There the bearer and the entrant are two incarnations of ONE card, and
+-- `became` is the second of them; here the bearer is the enchantment and the
+-- entrant is a different card entirely. CR 400.7e distinguishes neither
+-- situation: it names "the new object that IT became", where "it" is whatever
+-- moved, and the moved object being the bearer is a fact about the condition
+-- rather than about the slot.
+--
+-- Goblin Piker ({1}{R} Creature -- Goblin Warrior 2/1) and Ogre Sentry ({1}{R}
+-- Creature -- Ogre Warrior 3/3, defender) are the pair: identical costs and
+-- colors, so two Mountains cast either, and the ONLY difference the test can be
+-- reading is the toughness the 2 damage is measured against.
+aetherFlashTests :: Registry.Type.Registry -> Tasty.TestTree
+aetherFlashTests registry =
+  let -- alice: Aether Flash already on the battlefield and two Mountains, with
+      -- one creature card in hand. Casting it is the only thing on offer, so
+      -- S.identityAnswer needs no bespoke interpreter.
+      flashBoard creature = do
+        mountain <- Registry.printing registry "Mountain"
+        aetherFlash <- Registry.printing registry "Aether Flash"
+        entrant <- Registry.printing registry creature
+        let (flashId, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
+        pure (flashId, S.handOne entrant withFlash)
+      castIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+         in S.runPure S.identityAnswer cast Engine.priorityLoop
+      namesIn zone pid gs =
+        fmap Card.Type.name (Maybe.mapMaybe (\oid -> Game.cardOf oid gs) (Game.zoneMembers zone pid gs))
+      damageEventsIn gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events gs))
+      -- CR 120.3e's marked damage on the one battlefield permanent with this
+      -- name. Nothing if it is not there, or if there is more than one of it.
+      markedOn name gs =
+        case filter (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just name) (Set.toList (GameState.battlefield gs)) of
+          [oid] -> fmap Object.damage (Game.lookupObject oid gs)
+          _ -> Nothing
+      pikerName = Text.pack "Goblin Piker"
+      sentryName = Text.pack "Ogre Sentry"
+   in Tasty.testGroup
+        "CR 400.7e the entrant an enters trigger names"
+        [ -- The gameplay-level proof, cast to resolution. The discriminating
+          -- assertion is the GRAVEYARD: an ability whose `became` slot went
+          -- unbound would resolve, find nothing under it and silently deal no
+          -- damage, leaving a live 2/1 on the battlefield.
+          HU.testCase "CR 603.6a whole card: a Goblin Piker enters and Aether Flash's 2 damage kills it (CR 704.5g)" $ do
+            (flashId, board) <- flashBoard "Goblin Piker"
+            let after = castIt board
+            HU.assertEqual "the Piker is not on the battlefield" 0 (S.countOnBattlefieldByName pikerName S.alice after)
+            HU.assertEqual "it is in the graveyard, once" [pikerName] (namesIn Zone.Graveyard S.alice after)
+            -- Falsifiers. The damage went to the creature, not to a player
+            -- (CR 120.1a admits only battles, creatures and planeswalkers), and
+            -- Aether Flash did not damage itself into the graveyard either.
+            HU.assertEqual "alice's life is untouched" (Just 20) (S.lifeOf S.alice after)
+            HU.assertEqual "bob's too" (Just 20) (S.lifeOf S.bob after)
+            HU.assertBool "and the enchantment is still on the battlefield" (Set.member flashId (GameState.battlefield after))
+            HU.assertEqual "exactly one damage event, of 2" [2] (fmap DamageEvent.amount (damageEventsIn after)),
+          -- The control, differing only in the entrant's toughness: 2 damage
+          -- marked on a 3/3 is not lethal (CR 704.5g compares the total marked
+          -- against toughness), so the creature stays and CARRIES the mark. The
+          -- marked damage is what proves the effect landed at all -- without it
+          -- "still on the battlefield" would also be what a no-op looks like.
+          HU.testCase "CR 704.5g the control: an Ogre Sentry survives the same 2 damage, marked" $ do
+            (_, board) <- flashBoard "Ogre Sentry"
+            let after = castIt board
+            HU.assertEqual "the Sentry is on the battlefield" 1 (S.countOnBattlefieldByName sentryName S.alice after)
+            HU.assertEqual "the graveyard is empty" [] (namesIn Zone.Graveyard S.alice after)
+            HU.assertEqual "with 2 damage marked on it" (Just 2) (markedOn sentryName after),
+          -- eventBindings in isolation, so the binding is pinned to CR 400.7e
+          -- rather than to Aether Flash's payload. The entrant is
+          -- ZoneChange.object -- for an ENTRY the arriving incarnation is what
+          -- the event is about, so `departed` would be the pre-move id of a card
+          -- that is not on the battlefield at all.
+          HU.testCase "CR 400.7e eventBindings binds the ENTRANT under became" $
+            let castCard = ObjectId.MkObjectId 1
+                entered = ObjectId.MkObjectId 2
+                entry = GameEvent.Moved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics
+             in HU.assertEqual
+                  "became names the permanent that entered"
+                  (Map.singleton Binding.became (Binding.toObject entered))
+                  (Event.eventBindings (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry),
+          -- CR 603.6a's "EACH TIME an event puts one or more permanents onto
+          -- the battlefield" met with a per-entrant payload: Dragon Fodder
+          -- ({1}{R} Sorcery, "create two 1/1 red Goblin creature tokens") makes
+          -- two entrants in one event, so one Aether Flash places two triggers
+          -- and each has to name ITS OWN. Both tokens dying is what says so --
+          -- two triggers sharing one binding would kill one token twice and
+          -- leave the other standing.
+          --
+          -- A token is also the one entrant whose Moved event is
+          -- battlefield-to-battlefield (Event.recordTokenEntry's pseudo-move,
+          -- where `departed` and `object` are the same fresh id), so this is the
+          -- shape where reading either field would look identical. It is here as
+          -- the reminder that the fields agree for a token and only for a token.
+          -- CR 704.5d then removes the dead tokens from the graveyard, so the
+          -- damage's proof is the DamageDealt log, not a graveyard census.
+          HU.testCase "CR 603.6a two tokens enter together and each trigger names its own" $ do
+            mountain <- Registry.printing registry "Mountain"
+            aetherFlash <- Registry.printing registry "Aether Flash"
+            dragonFodder <- Registry.printing registry "Dragon Fodder"
+            let (_, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
+                (gs, spellId) = S.handOne dragonFodder withFlash
+                after = castIt (gs, spellId)
+            HU.assertEqual "no Goblin token survived" 0 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
+            HU.assertEqual "two damage events of 2, one per token" [2, 2] (fmap DamageEvent.amount (damageEventsIn after))
+            HU.assertEqual
+              "and they were dealt to two different objects"
+              2
+              (Set.size (Set.fromList (fmap DamageEvent.target (damageEventsIn after)))),
+          -- CR 608.2h, the case Aether Flash makes reachable with no second
+          -- card: "if the effect requires information from a specific object
+          -- ... the effect uses the current information of that object if it's
+          -- in the public zone it was expected to be in". Two Aether Flashes,
+          -- one 2/1 entrant, two triggers -- and the first one's damage kills it
+          -- at the next state-based-action check, so the second resolves with
+          -- its entrant already gone from the battlefield it was expected to be
+          -- on. CR 400.7 minted a fresh id for the graveyard card, so the effect
+          -- does not follow it there.
+          HU.testCase "CR 608.2h a second Aether Flash resolves with the entrant already dead, and deals nothing" $ do
+            mountain <- Registry.printing registry "Mountain"
+            aetherFlash <- Registry.printing registry "Aether Flash"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (_, oneFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
+                (_, twoFlashes) = S.addCreature aetherFlash S.alice oneFlash
+                (gs, spellId) = S.handOne piker twoFlashes
+                cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+                -- The creature spell resolves and enters; the settle's CR 117.5
+                -- scan places both triggers.
+                entered = S.runPure S.identityAnswer cast Stack.resolveTop
+                placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+                -- One trigger resolves for 2, and the settle after it is where
+                -- CR 704.5g destroys the 2/1.
+                hit = S.runPure S.identityAnswer placed Stack.resolveTop
+                buried = S.runPure S.identityAnswer hit Engine.settleForPriority
+                -- The second trigger, resolving against an id CR 400.7 deleted.
+                after = S.runPure S.identityAnswer buried Stack.resolveTop
+            HU.assertEqual "both triggers were placed" 2 (length (GameState.stack placed))
+            HU.assertEqual "the Piker is dead before the second resolves" 0 (S.countOnBattlefieldByName pikerName S.alice buried)
+            HU.assertEqual "one damage event so far" [2] (fmap DamageEvent.amount (damageEventsIn buried))
+            HU.assertEqual "the second trigger did resolve" [] (GameState.stack after)
+            HU.assertEqual "and dealt nothing: still one damage event" [2] (fmap DamageEvent.amount (damageEventsIn after))
+            HU.assertEqual "the card is in the graveyard once, not twice" [pikerName] (namesIn Zone.Graveyard S.alice after)
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, aetherFlashTests registry]

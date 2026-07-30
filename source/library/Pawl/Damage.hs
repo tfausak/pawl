@@ -251,6 +251,35 @@ gatherCombatDamage assigns = do
   let fromBlockers = concatMap (blockerAssignment gs) blockers
   pure (concat parts <> fromBlockers)
 
+-- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
+-- creature, or a planeswalker." Which of those a Recipient names is a question
+-- only a slot-bound one raises: Recipient.ToObject is a permanent named
+-- GENERICALLY (Pawl.Binding.became's entrant, Aether Flash's "it"), so what it
+-- names has to be classified before an effect can deal damage to it, and it may
+-- name nothing at all by the time the ability resolves (CR 608.2h). Nothing is
+-- CR 120.1a's "can't": the effect deals no damage and no damage event is
+-- proposed, so nothing downstream -- CR 616's replacement loop, CR 704.5h's
+-- deathtouch scan, CR 120.3f's lifelink -- sees an event that never happened.
+--
+-- ToCreature and ToPlayer pass through untouched. Both are produced by combat
+-- (CR 510.1b-d, which name the blocking creature or the attacked player
+-- outright) and by a CR 601.2c target chosen out of a typed Pool, so what they
+-- name was already classified when the recipient was built; re-asking here
+-- would be a second, later reading of the same question, which is what CR
+-- 608.2b's target re-validation is for and this is not.
+--
+-- Only battles and planeswalkers are missing from the classification, and only
+-- because no card type for either exists yet; CR 120.3c and CR 120.3h are what
+-- each would need.
+damageRecipient :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
+damageRecipient gs recipient = case recipient of
+  Recipient.ToPlayer _ -> Just recipient
+  Recipient.ToCreature _ -> Just recipient
+  Recipient.ToObject oid ->
+    if Projection.isCreatureOf oid gs
+      then Just (Recipient.ToCreature oid)
+      else Nothing
+
 -- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
 -- record each event into GameState.events. The change-and-emit funnel for
 -- combat's two waves and resolving effects alike.
@@ -315,6 +344,13 @@ applyDamage events = do
                   then givePoison (DamageEvent.amount ev + toxic) player
                   else givePoison toxic (drain player)
            in g {GameState.players = Map.adjust hit pid (GameState.players g)}
+        -- CR 120.1a, and defensive: combat never builds this shape (CR 510.1b-d
+        -- name a creature or a player), and the one producer that can --
+        -- Resolve's DealDamage arm, reading a slot that names a permanent
+        -- generically -- runs it through damageRecipient above first, which
+        -- turns it into ToCreature or into no event at all. Marking damage here
+        -- would be the wrong answer if anything did reach it: nothing has said
+        -- the object is a creature.
         Recipient.ToObject _ -> g
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.

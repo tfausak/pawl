@@ -861,9 +861,6 @@ matchesTrigger gs bearer you cond event = case cond of
 -- The parallel for a SOURCELESS inherent ability is Pawl.Monarch.inherentMatch,
 -- which binds its own event's creature; there is no shared matcher because that
 -- one has no bearer to scope the match to.
---
--- PermanentEnters contributes no binding: the permanent that entered is not
--- named by any slot, so an enters trigger cannot refer back to it (#330).
 eventBindings :: TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
 eventBindings cond event = case (cond, event) of
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
@@ -901,6 +898,35 @@ eventBindings cond event = case (cond, event) of
   -- -- and Pawl.Activate.isHiddenZone is the classifier it would reach for.
   (TriggerCondition.SelfDies, GameEvent.Moved zc _) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- CR 400.7e again, read in the ENTRY direction: Aether Flash's "whenever a
+  -- creature enters, this enchantment deals 2 damage to IT". The object that
+  -- moved is the entrant, and "the new object that it became in the zone it
+  -- moved to" is the permanent now on the battlefield -- ZoneChange.object, the
+  -- same field the SelfDies arm above reads, for the same reason.
+  --
+  -- The SAME slot as that arm, not a second one, because CR 400.7e is one rule
+  -- and this is one of its two readings. What differs between the arms is which
+  -- object CR 113.7a's SOURCE happens to be, and that is a fact about the
+  -- CONDITION rather than about the slot: SelfDies matches on the departing
+  -- incarnation (CR 603.10a's look-back), so `triggerSource` and `became` are
+  -- two incarnations of one card, while here the bearer is some other permanent
+  -- entirely and `became` is the only name the entrant has. Two slots would
+  -- have to be kept apart by every reader for a distinction no rule draws --
+  -- and Pawl.Resolve, which is where the slot is read, cannot draw it: it never
+  -- learns which condition placed the ability.
+  --
+  -- CR 400.7e's public-zone proviso holds by construction here too, and even
+  -- more simply than for SelfDies: matchesTrigger's PermanentEnters arm has
+  -- already required `to == Battlefield`, and CR 400.2 lists the battlefield
+  -- among the public zones.
+  --
+  -- Bound whatever the Filter admits, creature or not. Whether the entrant can
+  -- RECEIVE what the payload does to it is the payload's question -- CR 120.1a
+  -- for damage, answered in Pawl.Damage.damageRecipient -- not this arm's; a
+  -- binding that existed only for creatures would make the slot's presence
+  -- depend on the entrant, which eventBindingSlots below could not express.
+  (TriggerCondition.PermanentEnters _, GameEvent.Moved zc _) ->
+    Binding.setBecame (ZoneChange.object zc) Map.empty
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -930,22 +956,27 @@ eventBindings cond event = case (cond, event) of
 -- which runs every condition against an event that genuinely fires it and
 -- compares Map.keysSet of the result against the answer here.
 --
--- Both slots are unconditional GIVEN A MATCH, and that is what makes a
--- per-CONDITION set sound at all: matchesTrigger's SelfDies arm has already
--- required the graveyard destination (so CR 400.7e's public-zone proviso holds
--- by construction, CR 400.2), and its SelfDealsCombatDamageToPlayer arm has
--- already required a player recipient (isPlayerRecipient). #384's wider
+-- Every slot named here is unconditional GIVEN A MATCH, and that is what makes
+-- a per-CONDITION set sound at all: matchesTrigger's SelfDies and
+-- PermanentEnters arms have already required the graveyard and battlefield
+-- destinations respectively (so CR 400.7e's public-zone proviso holds by
+-- construction for both, CR 400.2), and its SelfDealsCombatDamageToPlayer arm
+-- has already required a player recipient (isPlayerRecipient). #384's wider
 -- leaves-the-battlefield condition is where that stops being true: its
 -- destination may be a hand or a library, so `became` would be bound only for a
 -- PUBLIC destination and the answer would become per-condition-AND-destination,
 -- which this signature cannot express.
 eventBindingSlots :: TriggerCondition -> Set.Set SlotName.SlotName
 eventBindingSlots cond = case cond of
-  -- CR 603.6a's entrant is named by no slot, so an enters trigger cannot refer
-  -- back to it -- eventBindings' own PermanentEnters note, from this side
-  -- (#330).
+  -- CR 603.6a's two written forms differ here, and only because of which object
+  -- the bearer is. SelfEnters matches on `ZoneChange.object == bearer`, so the
+  -- bearer IS the entrant and CR 113.7a's source slot already names it; binding
+  -- it again under `became` would be a second name for one object, exactly the
+  -- SelfPutIntoGraveyardFromLibrary case below. "Whenever a [type] enters" has
+  -- no such luck: the entrant is some other permanent, so CR 400.7e's slot is
+  -- the only name it has (Aether Flash).
   TriggerCondition.SelfEnters -> Set.empty
-  TriggerCondition.PermanentEnters _ -> Set.empty
+  TriggerCondition.PermanentEnters _ -> Set.singleton Binding.became
   -- CR 603.2b's step beginning names no object and no player but the active one,
   -- and the active player is not what CR 109.5's `you` means.
   TriggerCondition.StepBegins _ _ -> Set.empty
