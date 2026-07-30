@@ -28,10 +28,7 @@ import qualified Pawl.Type.MisfiledCard as MisfiledCard
 import qualified Pawl.Type.MissingRoot as MissingRoot
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Registry as Registry
-import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.UnknownCard as UnknownCard
-import qualified Pawl.Type.UnslugifiableFile as UnslugifiableFile
-import qualified Pawl.Type.UnslugifiableName as UnslugifiableName
 import qualified System.Directory as Directory
 import qualified System.IO.Error as IOError
 
@@ -67,16 +64,14 @@ defaultRoot = Paths.getDataFileName "data/cards"
 -- lookup builds its path FROM a slug, so nothing could ever open that file by
 -- name, and quietly omitting it would report a pool larger than the loadable
 -- one. Non-.json entries are ignored outright -- a README is not a broken card.
-slugs :: Registry.Registry -> IO [Slug.Type.Slug]
+slugs :: Registry.Registry -> IO [Slug.Slug]
 slugs registry =
   let json = ".json"
       stem name = take (length name - length json) name
-      toSlug name = case Slug.Type.fromText (Text.pack (stem name)) of
-        Nothing -> Exception.throwIO (UnslugifiableFile.MkUnslugifiableFile (pathIn registry name))
-        Just slug -> pure slug
+      toSlug = Slug.fromText . Text.pack . stem
    in do
         entries <- Directory.listDirectory (Registry.root registry)
-        mapM toSlug (List.sort (filter (List.isSuffixOf json) entries))
+        pure $ fmap toSlug (List.sort (filter (List.isSuffixOf json) entries))
 
 -- The whole pool, loaded. Goes through the same cache as `card`, so a caller
 -- that sweeps everything and then looks one card up does not read it twice.
@@ -89,10 +84,7 @@ printings registry = fmap (fmap Printing.MkPrinting) (cards registry)
 -- A card by name ("Goblin Piker") or by slug ("goblin-piker") -- slugify is
 -- idempotent, so both are the same lookup.
 card :: Registry.Registry -> String -> IO Card.Card
-card registry name =
-  case Slug.slugify (Text.pack name) of
-    Nothing -> Exception.throwIO (UnslugifiableName.MkUnslugifiableName (Text.pack name))
-    Just slug -> cached registry slug
+card registry = cached registry . Slug.fromText . Text.pack
 
 printing :: Registry.Registry -> String -> IO Printing.Printing
 printing registry name = fmap Printing.MkPrinting (card registry name)
@@ -100,7 +92,7 @@ printing registry name = fmap Printing.MkPrinting (card registry name)
 -- Parsed at most once per registry; a failed load is not cached, so a fixed file
 -- is picked up by the next lookup (modifyMVar restores the cache when `load`
 -- throws).
-cached :: Registry.Registry -> Slug.Type.Slug -> IO Card.Card
+cached :: Registry.Registry -> Slug.Slug -> IO Card.Card
 cached registry slug = MVar.modifyMVar (Registry.cache registry) $ \entries ->
   case Map.lookup slug entries of
     Just c -> pure (entries, c)
@@ -122,9 +114,9 @@ pathIn registry name = Registry.root registry <> "/" <> name
 -- The name check is the one thing a per-card load can assert that no sweep has
 -- to: a file's own `name` field must slugify back to the name it is filed
 -- under, or a lookup would quietly serve a different card than it was asked for.
-load :: Registry.Registry -> Slug.Type.Slug -> IO Card.Card
+load :: Registry.Registry -> Slug.Slug -> IO Card.Card
 load registry slug =
-  let path = pathIn registry (Text.unpack (Slug.Type.toText slug) <> ".json")
+  let path = pathIn registry (Text.unpack (Slug.unwrap slug) <> ".json")
       corrupt reason = Exception.throwIO (CorruptCard.MkCorruptCard path reason)
    in do
         result <- IOError.tryIOError (ByteString.readFile path)
@@ -142,7 +134,7 @@ load registry slug =
               case Json.parse contents >>= Codec.jsonToCard of
                 Left err -> corrupt err
                 Right c ->
-                  let actual = Slug.slugify (Card.name c)
-                   in if actual == Just slug
+                  let actual = Slug.fromText (Card.name c)
+                   in if actual == slug
                         then pure c
-                        else Exception.throwIO (MisfiledCard.MkMisfiledCard path slug (Card.name c) actual)
+                        else Exception.throwIO (MisfiledCard.MkMisfiledCard path slug (Card.name c) (Just actual))

@@ -51,7 +51,7 @@ import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec as SetupSpec
-import qualified Pawl.SlugSpec as SlugSpec
+import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.TriggerSpec as TriggerSpec
 import qualified Pawl.TurnSpec as TurnSpec
@@ -112,7 +112,6 @@ testTree registry =
       TriggerSpec.tests registry,
       FilterSpec.tests,
       RegistrySpec.tests,
-      SlugSpec.tests,
       ExtraSpec.tests,
       AuraSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty
@@ -135,3 +134,4 @@ spec s = do
   Pawl.Json.PairSpec.spec s
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
+  Pawl.SlugSpec.spec s

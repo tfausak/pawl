@@ -2,7 +2,7 @@ module Pawl.Type.MisfiledCard where
 
 import qualified Control.Exception as Exception
 import Data.Text (Text)
-import Pawl.Type.Slug (Slug)
+import qualified Pawl.Slug as Slug
 
 -- A card's file parsed, but the card's own name does not slugify back to the
 -- slug it is filed under -- so a lookup would quietly serve a different card
@@ -10,9 +10,9 @@ import Pawl.Type.Slug (Slug)
 -- slug at all is misfiled under every name.
 data MisfiledCard = MkMisfiledCard
   { path :: FilePath,
-    filedUnder :: Slug,
+    filedUnder :: Slug.Slug,
     name :: Text,
-    slugifiesTo :: Maybe Slug
+    slugifiesTo :: Maybe Slug.Slug
   }
   deriving (Eq, Show)
 

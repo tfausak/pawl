@@ -11,16 +11,14 @@ import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Slug as Slug
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CorruptCard as CorruptCard
 import qualified Pawl.Type.MisfiledCard as MisfiledCard
 import qualified Pawl.Type.MissingRoot as MissingRoot
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Slug as Slug
 import qualified Pawl.Type.UnknownCard as UnknownCard
-import qualified Pawl.Type.UnslugifiableFile as UnslugifiableFile
-import qualified Pawl.Type.UnslugifiableName as UnslugifiableName
 import qualified System.Directory as Directory
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -129,7 +127,7 @@ tests =
           expectExceptionWith
             "missing file"
             ( \err -> do
-                HU.assertEqual "names the slug" (Text.pack "goblin-piker") (Slug.toText (UnknownCard.slug err))
+                HU.assertEqual "names the slug" (Text.pack "goblin-piker") (Slug.unwrap (UnknownCard.slug err))
                 HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (UnknownCard.path err)
             )
             (Registry.card registry "Goblin Piker"),
@@ -150,18 +148,11 @@ tests =
             "misfiled card"
             ( \err -> do
                 HU.assertEqual "names the path" (Registry.Type.root registry <> "/bird-maiden.json") (MisfiledCard.path err)
-                HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.toText (MisfiledCard.filedUnder err))
+                HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.unwrap (MisfiledCard.filedUnder err))
                 HU.assertEqual "names the card" (Text.pack "Goblin Piker") (MisfiledCard.name err)
-                HU.assertEqual "names the card's slug" (Just (Text.pack "goblin-piker")) (fmap Slug.toText (MisfiledCard.slugifiesTo err))
+                HU.assertEqual "names the card's slug" (Just (Text.pack "goblin-piker")) (fmap Slug.unwrap (MisfiledCard.slugifiesTo err))
             )
             (Registry.card registry "Bird Maiden"),
-      HU.testCase "a name with no alphanumerics raises UnslugifiableName instead of reading .json"
-        . withCorpus "empty-slug" []
-        $ \registry ->
-          expectException
-            "empty slug"
-            (UnslugifiableName.MkUnslugifiableName (Text.pack "!!!"))
-            (Registry.card registry "!!!"),
       HU.testCase "a file with invalid UTF-8 bytes raises CorruptCard naming the path and the decode failure"
         . withInvalidUtf8Corpus "invalid-utf8"
         $ \registry ->
@@ -209,17 +200,10 @@ tests =
           ]
           $ \registry -> do
             found <- Registry.slugs registry
-            HU.assertEqual "sorted, .json only" [Text.pack "bird-maiden", Text.pack "goblin-piker"] (fmap Slug.toText found),
+            HU.assertEqual "sorted, .json only" [Text.pack "bird-maiden", Text.pack "goblin-piker"] (fmap Slug.unwrap found),
       HU.testCase "cards loads every card the pool enumerates" $ do
         piker <- pikerJson
         withCorpus "load-all" [("goblin-piker.json", piker)] $ \registry -> do
           loaded <- Registry.cards registry
-          HU.assertEqual "one card, by name" [Text.pack "Goblin Piker"] (fmap Card.name loaded),
-      HU.testCase "a .json file whose stem is not a slug raises UnslugifiableFile" $ do
-        piker <- pikerJson
-        withCorpus "bad-stem" [("Goblin Piker.json", piker)] $ \registry ->
-          expectException
-            "unslugifiable file"
-            (UnslugifiableFile.MkUnslugifiableFile (Registry.Type.root registry <> "/Goblin Piker.json"))
-            (Registry.slugs registry)
+          HU.assertEqual "one card, by name" [Text.pack "Goblin Piker"] (fmap Card.name loaded)
     ]

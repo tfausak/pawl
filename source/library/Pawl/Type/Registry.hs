@@ -5,8 +5,8 @@ module Pawl.Type.Registry where
 
 import qualified Control.Concurrent.MVar as MVar
 import qualified Data.Map.Strict as Map
+import qualified Pawl.Slug as Slug
 import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.Slug as Slug
 
 data Registry = MkRegistry
   { root :: FilePath,

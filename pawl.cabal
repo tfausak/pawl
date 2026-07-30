@@ -114,6 +114,19 @@ library json
 
   hs-source-dirs: source/libraries/json
 
+library slug
+  import: library
+  build-depends:
+    pawl:spec,
+    text ^>=2.1.3,
+
+  -- cabal-gild: discover source/libraries/slug
+  exposed-modules:
+    Pawl.Slug
+    Pawl.SlugSpec
+
+  hs-source-dirs: source/libraries/slug
+
 library spec
   import: library
   -- cabal-gild: discover source/libraries/spec
@@ -131,6 +144,7 @@ library
     pawl:decimal,
     pawl:extra,
     pawl:json,
+    pawl:slug,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
@@ -174,7 +188,6 @@ library
     Pawl.Resolve
     Pawl.Sba
     Pawl.Setup
-    Pawl.Slug
     Pawl.Stack
     Pawl.Subtype
     Pawl.Summoning
@@ -295,7 +308,6 @@ library
     Pawl.Type.SearchDestination
     Pawl.Type.Sickness
     Pawl.Type.SlotName
-    Pawl.Type.Slug
     Pawl.Type.Source
     Pawl.Type.StaticAbility
     Pawl.Type.Status
@@ -314,8 +326,6 @@ library
     Pawl.Type.TurnScope
     Pawl.Type.TypeLine
     Pawl.Type.UnknownCard
-    Pawl.Type.UnslugifiableFile
-    Pawl.Type.UnslugifiableName
     Pawl.Type.Uses
     Pawl.Type.Zone
     Pawl.Type.ZoneChange
@@ -340,6 +350,7 @@ test-suite pawl-test-suite
     pawl:decimal,
     pawl:extra,
     pawl:json,
+    pawl:slug,
     pawl:spec,
     random ^>=1.3.1,
     tasty ^>=1.5.4,
@@ -388,7 +399,6 @@ test-suite pawl-test-suite
     Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.SetupSpec
-    Pawl.SlugSpec
     Pawl.Support
     Pawl.TriggerSpec
     Pawl.TurnSpec

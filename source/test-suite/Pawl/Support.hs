@@ -37,6 +37,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Slug as Slug
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
@@ -89,7 +90,6 @@ import qualified Pawl.Type.RestartSignal as RestartSignal
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -1477,7 +1477,7 @@ stubView table oid =
 -- is what the sweeps feed back to Registry.card; the enumeration itself is the
 -- library's since #167.
 corpusSlugs :: Registry.Type.Registry -> IO [String]
-corpusSlugs registry = fmap (fmap (Text.unpack . Slug.Type.toText)) (Registry.slugs registry)
+corpusSlugs registry = fmap (fmap (Text.unpack . Slug.unwrap)) (Registry.slugs registry)
 
 allPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
 allPrintings = Registry.printings
