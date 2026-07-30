@@ -103,6 +103,10 @@ library json
     Pawl.Json.NullSpec
     Pawl.Json.Number
     Pawl.Json.NumberSpec
+    Pawl.Json.Object
+    Pawl.Json.ObjectSpec
+    Pawl.Json.Pair
+    Pawl.Json.PairSpec
     Pawl.Json.String
     Pawl.Json.StringSpec
 

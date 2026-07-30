@@ -15,11 +15,11 @@ newtype Array a = MkArray
 decode :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m a -> Parsec.ParsecT s u m (Array a)
 decode p =
   fmap MkArray
-    . Parsec.between (Parsec.char '[' <* Parsec.many blank) (Parsec.char ']')
-    $ Parsec.sepBy (p <* Parsec.many blank) (Parsec.char ',' <* Parsec.many blank)
+    . Parsec.between (Parsec.char '[' <* Parsec.many decodeBlank) (Parsec.char ']')
+    $ Parsec.sepBy (p <* Parsec.many decodeBlank) (Parsec.char ',' <* Parsec.many decodeBlank)
 
-blank :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m Char
-blank = Parsec.oneOf " \t\n\r"
+decodeBlank :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m Char
+decodeBlank = Parsec.oneOf " \t\n\r"
 
 encode :: (a -> Builder.Builder) -> Array a -> Builder.Builder
 encode b =

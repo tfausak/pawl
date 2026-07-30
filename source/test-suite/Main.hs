@@ -33,6 +33,8 @@ import qualified Pawl.Json.ArraySpec
 import qualified Pawl.Json.BooleanSpec
 import qualified Pawl.Json.NullSpec
 import qualified Pawl.Json.NumberSpec
+import qualified Pawl.Json.ObjectSpec
+import qualified Pawl.Json.PairSpec
 import qualified Pawl.Json.StringSpec
 import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
@@ -128,4 +130,6 @@ spec s = do
   Pawl.Json.BooleanSpec.spec s
   Pawl.Json.NullSpec.spec s
   Pawl.Json.NumberSpec.spec s
+  Pawl.Json.ObjectSpec.spec s
+  Pawl.Json.PairSpec.spec s
   Pawl.Json.StringSpec.spec s
