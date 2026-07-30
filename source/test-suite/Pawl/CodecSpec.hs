@@ -10,6 +10,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Codec as Codec
+import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Json as J
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -39,7 +40,6 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.DamagePattern as DamagePattern
 import qualified Pawl.Type.DamageRewrite as DamageRewrite
-import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration

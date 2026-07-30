@@ -1,3 +1,4 @@
+import qualified Control.Monad.Trans.Writer as Writer
 import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.AuraSpec as AuraSpec
 import qualified Pawl.BindingSpec as BindingSpec
@@ -14,6 +15,7 @@ import qualified Pawl.CostSpec as CostSpec
 import qualified Pawl.CountSpec as CountSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec as DecideSpec
+import qualified Pawl.DecimalSpec as DecimalSpec
 import qualified Pawl.DepartureSpec as DepartureSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
@@ -35,16 +37,26 @@ import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec as SetupSpec
 import qualified Pawl.SlugSpec as SlugSpec
+import qualified Pawl.Spec as Spec
 import qualified Pawl.TriggerSpec as TriggerSpec
 import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
+import qualified Test.Tasty.HUnit as HU
 
 main :: IO ()
 main = do
   root <- Registry.defaultRoot
   registry <- Registry.new root
   Tasty.defaultMain (testTree registry)
+
+tasty :: Spec.Spec IO (Writer.Writer [Tasty.TestTree])
+tasty =
+  Spec.MkSpec
+    { Spec.assertFailure = HU.assertFailure,
+      Spec.describe = \s -> Writer.tell . pure . Tasty.testGroup s . Writer.execWriter,
+      Spec.it = \s -> Writer.tell . pure . HU.testCase s
+    }
 
 testTree :: Registry.Type.Registry -> Tasty.TestTree
 testTree registry =
@@ -87,5 +99,6 @@ testTree registry =
       RegistrySpec.tests,
       SlugSpec.tests,
       ExtraSpec.tests,
-      AuraSpec.tests registry
+      AuraSpec.tests registry,
+      Tasty.testGroup "decimal" . Writer.execWriter $ DecimalSpec.spec tasty
     ]

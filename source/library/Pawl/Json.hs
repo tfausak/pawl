@@ -14,7 +14,7 @@ import qualified Data.Maybe as Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import qualified Pawl.Type.Decimal as Decimal
+import qualified Pawl.Decimal as Decimal
 import Pawl.Type.Json (Value)
 import qualified Pawl.Type.Json as Json
 import qualified Text.Parsec as Parsec

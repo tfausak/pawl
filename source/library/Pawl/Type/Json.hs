@@ -8,7 +8,7 @@
 module Pawl.Type.Json where
 
 import Data.Text (Text)
-import Pawl.Type.Decimal (Decimal)
+import Pawl.Decimal (Decimal)
 
 data Value
   = Null
