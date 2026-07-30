@@ -48,6 +48,24 @@ common executable
   build-depends: pawl
   ghc-options: -rtsopts
 
+-- JSON encoders and decoders for Pawl's types.
+library codec
+  import: library
+  build-depends:
+    containers ^>=0.8,
+    parsec ^>=3.1.18,
+    pawl:decimal,
+    pawl:extra,
+    pawl:json,
+    pawl:types,
+    text ^>=2.1.3,
+
+  hs-source-dirs: source/libraries/codec
+  -- cabal-gild: discover source/libraries/codec
+  exposed-modules:
+    Pawl.Codec.All
+    Pawl.Codec.Json
+
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
 -- scientific packages.
 library decimal
@@ -108,7 +126,8 @@ library extra
     Pawl.Extra.Semigroup
     Pawl.Extra.SemigroupSpec
 
--- RFC compliant JSON types and codecs. Similar to aeson, but much simpler.
+-- RFC compliant JSON types, encoders, and decoders. Similar to aeson, but much
+-- simpler.
 library json
   import: library
   build-depends:
@@ -139,7 +158,8 @@ library json
     Pawl.Json.Value
     Pawl.Json.ValueSpec
 
--- Slugifying text: a card name in, a file-name key out.
+-- Converts text (card names) into slugs, which can be used for convenient file
+-- names.
 library slug
   import: library
   build-depends:
@@ -161,7 +181,7 @@ library spec
   exposed-modules:
     Pawl.Spec
 
--- All of the type definitions, without any behavior.
+-- All of Pawl's type definitions, without any associated behavior.
 library types
   import: library
   build-depends:
@@ -308,20 +328,18 @@ library types
     Pawl.Types.ZoneChangePattern
     Pawl.Types.ZoneChangeSubject
 
--- The engine: the comprehensive rules, plus the codec and registry that load
--- cards as data. Belongs in a sublibrary of its own, and will get one once a
--- second consumer (a client, a CLI) exists to make the split pay.
+-- The engine: the comprehensive rules, plus the registry that loads cards as
+-- data. Belongs in a sublibrary of its own, and will get one once a second
+-- consumer (a client, a CLI) exists to make the split pay.
 library
   import: library
   build-depends:
     bytestring ^>=0.12,
     containers ^>=0.8,
     directory ^>=1.3.10,
-    parsec ^>=3.1.18,
-    pawl:decimal,
+    pawl:codec,
     pawl:exceptions,
     pawl:extra,
-    pawl:json,
     pawl:slug,
     pawl:types,
     text ^>=2.1.3,
@@ -339,7 +357,6 @@ library
     Pawl.BlockRequirement
     Pawl.Card
     Pawl.Cast
-    Pawl.Codec
     Pawl.Combat
     Pawl.Condition
     Pawl.Cost
@@ -352,7 +369,6 @@ library
     Pawl.Expiry
     Pawl.Filter
     Pawl.Game
-    Pawl.Json
     Pawl.Keyword
     Pawl.Mana
     Pawl.Modal
@@ -385,6 +401,7 @@ test-suite pawl-test-suite
     bytestring ^>=0.12,
     containers ^>=0.8,
     directory ^>=1.3.10,
+    pawl:codec,
     pawl:decimal,
     pawl:exceptions,
     pawl:extra,

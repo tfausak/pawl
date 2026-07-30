@@ -3,7 +3,7 @@
 -- functions -- no type classes -- over the transitive closure of @Card@'s
 -- fields. Every @Pawl.Types.*@ module stays JSON-free; casing on an effect's
 -- identity here is open-half machinery, not the rules core.
-module Pawl.Codec where
+module Pawl.Codec.All where
 
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -16,8 +16,8 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Extra.Integer as Integer
-import qualified Pawl.Json as Json
 import Pawl.Json.Array (Array (MkArray))
 import qualified Pawl.Json.Boolean as Boolean
 import Pawl.Json.Value (Value (Array, Boolean, Null, Object))

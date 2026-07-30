@@ -9,7 +9,7 @@
 -- and reads them back by name. That order is incidental -- JSON objects are
 -- unordered, nothing checks the bytes of a card file, and 'sortKeys' exists to
 -- compare two values regardless of it.
-module Pawl.Json where
+module Pawl.Codec.Json where
 
 import qualified Data.List as List
 import Data.Text (Text)

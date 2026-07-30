@@ -18,12 +18,12 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Paths_pawl as Paths
-import qualified Pawl.Codec as Codec
+import qualified Pawl.Codec.All as Codec
+import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Exceptions.CorruptCard as CorruptCard
 import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Exceptions.UnknownCard as UnknownCard
-import qualified Pawl.Json as Json
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Printing as Printing

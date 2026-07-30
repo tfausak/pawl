@@ -9,9 +9,9 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
-import qualified Pawl.Codec as Codec
+import qualified Pawl.Codec.All as Codec
+import qualified Pawl.Codec.Json as J
 import qualified Pawl.Decimal as Decimal
-import qualified Pawl.Json as J
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Filter is not imported here today, but the alias
 -- convention is fixed project-wide so a later import never collides.

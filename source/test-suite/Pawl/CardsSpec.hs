@@ -7,8 +7,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Binding as Binding
-import qualified Pawl.Codec as Codec
-import qualified Pawl.Json as Json
+import qualified Pawl.Codec.All as Codec
+import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
