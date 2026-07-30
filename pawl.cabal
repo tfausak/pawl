@@ -72,8 +72,12 @@ library extra
     Pawl.Extra.BuilderSpec
     Pawl.Extra.Either
     Pawl.Extra.EitherSpec
+    Pawl.Extra.Ord
+    Pawl.Extra.OrdSpec
     Pawl.Extra.Parsec
     Pawl.Extra.ParsecSpec
+    Pawl.Extra.Semigroup
+    Pawl.Extra.SemigroupSpec
 
   hs-source-dirs: source/libraries/extra
 
@@ -85,6 +89,7 @@ library json
     pawl:decimal,
     pawl:extra,
     pawl:spec,
+    text ^>=2.1.3,
 
   -- cabal-gild: discover source/libraries/json
   exposed-modules:
@@ -94,6 +99,8 @@ library json
     Pawl.Json.NullSpec
     Pawl.Json.Number
     Pawl.Json.NumberSpec
+    Pawl.Json.String
+    Pawl.Json.StringSpec
 
   hs-source-dirs: source/libraries/json
 
