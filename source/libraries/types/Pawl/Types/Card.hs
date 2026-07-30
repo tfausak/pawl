@@ -123,9 +123,11 @@ data Card = MkCard
     -- castingPermissions precedent: the restriction is consulted while the object
     -- is in a hand (CR 113.6), where the CR 613 layer system does not reach.
     --
-    -- Printed-only. An EFFECT that prohibits casting is a player-axis continuous
-    -- effect instead (PlayerEffect.CantCastSpells, Silence), which is the other
-    -- producer CR 601.3's "rule or effect" names and has no business on a card.
+    -- SELF-scoped and printed-only, which is the whole difference between this
+    -- and the other producer CR 601.3's "rule or effect" names. A prohibition
+    -- aimed at a PLAYER -- Rule of Law, Silence -- is a continuous effect on the
+    -- CR 613.11 axis (playerAbilities / Effect.AffectPlayers, read by
+    -- Pawl.PlayerEffect); every entry here is a card restricting only itself.
     castingRestrictions :: [CastingRestriction],
     -- CR 702.5a: this card's `enchant` ability -- "Enchant [object or player]"
     -- -- which "restricts what an Aura spell can target and what an Aura can

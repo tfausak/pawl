@@ -39,9 +39,8 @@ data CastingRestriction
     -- narrow the same window by turn as well. Pawl.Types.TurnScope is the type that
     -- would say it; no card in the pool needs it yet (#445).
     DuringPhase Phase
-  | -- "and only if you've been attacked this step" -- the second clause eight
-    -- printings in the Portal Three Kingdoms combat-trick cycle carry, Rally the
-    -- Troops among them.
+  | -- "and only if you've been attacked this step" -- the second clause fifteen
+    -- printings carry, Rally the Troops among them.
     --
     -- Not a timing window at all, which is why it is its own arm rather than a
     -- field on DuringPhase: it is a question about what the combat record already

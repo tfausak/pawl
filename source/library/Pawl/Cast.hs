@@ -56,6 +56,10 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 -- CR 117.1a / 304.1: an instant is castable whenever its controller has
 -- priority; anything else needs sorcery speed (CR 302.1 / 307.1). Priority is
 -- implicit: the engine only offers actions to the priority holder.
+--
+-- The window the RULES give a spell, and not the whole of when it may be cast: a
+-- card may narrow this further with a printed restriction (CR 601.3), which
+-- `castable` conjoins separately through printedRestrictionsOk.
 timingOk :: PlayerId -> ObjectId -> GameState -> Bool
 timingOk pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
@@ -248,7 +252,7 @@ restrictionMet :: PlayerId -> GameState -> CastingRestriction.CastingRestriction
 restrictionMet pid gs restriction = case restriction of
   -- CR 500.1: a step or a stepless phase, compared against the one the game is
   -- in. Reading GameState.phase is the same closed-half act as CR 307.1's
-  -- main-phase test above.
+  -- main-phase test in Turn.sorcerySpeedWindow.
   CastingRestriction.DuringPhase phase -> GameState.phase gs == phase
   CastingRestriction.AttackedThisStep -> attackedThisStep pid gs
 
