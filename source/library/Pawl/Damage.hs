@@ -259,7 +259,7 @@ gatherCombatDamage assigns = do
 -- name nothing at all by the time the ability resolves (CR 608.2h). Nothing is
 -- CR 120.1a's "can't": the effect deals no damage and no damage event is
 -- proposed, so nothing downstream -- CR 616's replacement loop, CR 704.5h's
--- deathtouch scan, CR 120.3f's lifelink -- sees an event that never happened.
+-- deathtouch scan, CR 608.2i's turn log -- sees an event that never happened.
 --
 -- ToCreature and ToPlayer pass through untouched. Both are produced by combat
 -- (CR 510.1b-d, which name the blocking creature or the attacked player

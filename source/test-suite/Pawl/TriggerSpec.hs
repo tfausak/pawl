@@ -2163,7 +2163,7 @@ strippedTriggerTests registry =
 -- enchantment deals 2 damage to it." Soul Warden proved the CONDITION
 -- (permanentEntersTests above); its "you gain 1 life" names nothing about the
 -- creature that entered. This is the first card whose EFFECT refers back to the
--- entrant, which is the whole of #330.
+-- entrant.
 --
 -- The contrast with becameSlotTests is the point of reusing one slot name.
 -- There the bearer and the entrant are two incarnations of ONE card, and
