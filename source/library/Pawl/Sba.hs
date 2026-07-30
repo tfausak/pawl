@@ -214,9 +214,11 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- attached to one its own enchant ability no longer admits (CR 303.4c's "as
 -- defined by its enchant ability and other applicable effects").
 --
--- The third clause reads `pcs` -- the SAME pre-pass Projection.projectAll
--- performStateBasedActions computed once for every other CR 704.4 classification
--- -- via stillLegalEnchant below, instead of calling Target.stillLegal directly.
+-- The third clause goes through stillLegalEnchant below rather than calling
+-- Target.stillLegal directly, so that the common enchant spec is answered off
+-- `pcs` -- the SAME pre-pass Projection.projectAll performStateBasedActions
+-- computed once for every other CR 704.4 classification. (A spec carrying a Filter
+-- still reaches stillLegal, by that function's own fallthrough; see its haddock.)
 -- stillLegal reaches Target.legalRecipients -> basePool Pool.Creatures ->
 -- creatureRecipients -> Projection.isCreatureOf, and THAT is `project oid gs` --
 -- a fresh `gather` PER Aura. Every other classify here shares one `gather`
@@ -251,12 +253,13 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
             || not (stillLegalEnchant pcs gs oid spec target)
 
 -- CR 303.4c / 608.2b: is `target` still a legal recipient for the enchanting
--- Aura `source`'s spec, read against `pcs` -- the pre-pass projection every
--- other classification in performStateBasedActions shares (CR 704.4
--- simultaneity), not a re-projection?
+-- Aura `source`'s spec? Answered off `pcs` -- the pre-pass projection every other
+-- classification in performStateBasedActions shares (CR 704.4 simultaneity) --
+-- for the one spec shape that reduces to a lookup, and by the general
+-- Target.stillLegal for every other.
 --
--- Pool.Creatures with no Filter is the ONLY shape any Card.enchant carries in
--- this pool today (Unholy Strength's "enchant creature"). Target.creatureRecipients
+-- Pool.Creatures with no Filter is the shape MOST Card.enchant specs in this pool
+-- carry (Unholy Strength's "enchant creature"). Target.creatureRecipients
 -- (Target.hs) tags every candidate it produces ToCreature, drawn from the
 -- battlefield objects owned by a still-playing player (Game.stillPlaying);
 -- with no Filter left to narrow that set, "still legal" reduces EXACTLY to
@@ -268,13 +271,24 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 -- exactly what Target.creatureRecipients' own battlefield scan would have missed
 -- it for -- target is not on the battlefield at all.
 --
--- Any OTHER shape -- a non-Creatures pool, or a Creatures spec that DOES carry a
--- Filter -- has no producer in this pool today (a second enchant pool, CR
--- 702.5d's enchant-player Auras, is #190). Rather than assume the
--- Creatures-with-no-Filter shape holds regardless (a shortcut that would go
--- silently wrong the day it stops holding), this falls through to the general,
--- slower Target.stillLegal, which reuses the SAME legality Cast/Resolve already
--- judge.
+-- Any OTHER shape falls through to the general, slower Target.stillLegal, which
+-- reuses the SAME legality Cast/Resolve already judge -- rather than assuming the
+-- Creatures-with-no-Filter shape holds regardless, a shortcut that would go
+-- silently wrong the day it stops holding. That day has come: Setessan Training's
+-- "Enchant creature you control" is a Creatures spec that DOES carry a Filter, and
+-- its ControlledBy You conjunct is unanswerable from `pcs` -- CR 109.5 makes that
+-- "you" the AURA's controller (enchant is a static ability, CR 702.5a), so the
+-- answer changes when an opponent steals the enchanted creature even though the
+-- reduction's three facts all still hold. Pawl.AuraSpec's Control Magic case is
+-- the proof. A non-Creatures pool still has no producer (a second enchant pool,
+-- CR 702.5d's enchant-player Auras, is #190).
+--
+-- So the fallthrough pays the per-Aura re-projection the reduction above exists to
+-- avoid -- but only for the Auras whose spec the reduction cannot serve, and `pcs`
+-- remains the source of truth for every other CR 704.4 classification on the pass,
+-- so the simultaneity the pre-pass buys is untouched. Serving a filtered spec off
+-- `pcs` would mean answering Filter.matches against the pre-pass projection
+-- instead of a fresh one, which is #430.
 --
 -- That fallback is general in its POOL and FILTER, not in its recipient TAG: it
 -- still hard-codes Recipient.ToCreature, which is what Pool.Creatures produces

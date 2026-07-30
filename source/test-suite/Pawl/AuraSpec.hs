@@ -33,6 +33,7 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
@@ -364,6 +365,25 @@ destination oid p = case p of
   Prompt.ChooseAttachment {} -> oid
   _ -> S.identityAnswer p
 
+-- Both of Crown of the Ages' prompts at once: its "target Aura" slot with a fixed
+-- Aura, and its CR 701.3a destination choice with a fixed creature. aimRecipient
+-- and destination each answer one of the two, and driving the printed activated
+-- ability needs both.
+moveAura :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+moveAura aura dest p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject aura)) sets
+  Prompt.ChooseAttachment {} -> dest
+  _ -> S.identityAnswer p
+
+-- The battlefield permanents attached to `host`. How a test finds the Aura a
+-- resolved Aura SPELL entered as: CR 400.7 mints a fresh id for the battlefield
+-- incarnation, so the spell's own id names nothing afterwards.
+attachedTo :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
+attachedTo host gs =
+  filter
+    (\oid -> fmap Object.attachedTo (Game.lookupObject oid gs) == Just (Just host))
+    (Set.toList (GameState.battlefield gs))
+
 -- Crown of the Ages' one target slot, read off its printed activated ability --
 -- the committed spec, not a restatement of it, so a test asserting what it admits
 -- is asserting what the card really says.
@@ -403,12 +423,9 @@ reattachTests registry =
             (withAura, auraSpell) = S.handOne unholyStrength base2
             castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) withAura (Cast.castSpell S.alice auraSpell))
             enchanted = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) castAura Stack.resolveTop)
-            auraId = case filter (\oid -> fmap Object.attachedTo (Game.lookupObject oid enchanted) == Just (Just first)) (Set.toList (GameState.battlefield enchanted)) of
-              oid : _ -> Just oid
-              [] -> Nothing
-        case auraId of
-          Nothing -> HU.assertFailure "Unholy Strength should have entered attached to the Piker"
-          Just aura -> do
+        case attachedTo first enchanted of
+          [] -> HU.assertFailure "Unholy Strength should have entered attached to the Piker"
+          aura : _ -> do
             let (withCrown, crownSpell) = S.handOne crown enchanted
                 castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (Cast.castSpell S.alice crownSpell))
                 onBattlefield = snd (Engine.runGamePure S.identityAnswer castCrown Stack.resolveTop)
@@ -424,14 +441,9 @@ reattachTests registry =
                 case ability of
                   Nothing -> HU.assertFailure "Crown of the Ages should print one activated ability"
                   Just move -> do
-                    let answer :: Prompt.Prompt r -> r
-                        answer p = case p of
-                          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject aura)) sets
-                          Prompt.ChooseAttachment {} -> second
-                          _ -> S.identityAnswer p
-                        ready = onBattlefield {GameState.priority = Just S.alice}
-                        activated = snd (Engine.runGamePure answer ready (Activate.activateAbility S.alice crownObj move))
-                        after = snd (Engine.runGamePure answer activated Stack.resolveTop)
+                    let ready = onBattlefield {GameState.priority = Just S.alice}
+                        activated = snd (Engine.runGamePure (moveAura aura second) ready (Activate.activateAbility S.alice crownObj move))
+                        after = snd (Engine.runGamePure (moveAura aura second) activated Stack.resolveTop)
                         settled = S.settleSba (S.settleSba after)
                     HU.assertEqual "before, the Piker is 2/1 + 2/+1" (Just (4, 2)) (S.powerToughnessOf first onBattlefield)
                     HU.assertEqual "and the Mammoth is a plain 3/3" (Just (3, 3)) (S.powerToughnessOf second onBattlefield)
@@ -531,13 +543,14 @@ reattachTests registry =
       -- FAILURE MODE, not a fizzle: the ability resolved, and the only thing that
       -- did not happen is the move.
       --
-      -- No printed card in the pool reaches this through its own text: every
-      -- Card.enchant in the pool is an unfiltered Pool.Creatures, and Crown of the
-      -- Ages only ever offers creatures, so every destination it can offer is one
-      -- the Aura may legally enchant. The opcode is driven directly with a wider
-      -- destination filter instead -- the same way the Effect.Attach cases in the
-      -- Equipment group above drive that opcode -- because the clause is the rule
-      -- whether or not a card exercises it (#355).
+      -- The case where the destination is not a CREATURE at all, which no card in
+      -- the pool reaches: Crown of the Ages is the only Effect.AttachTarget producer
+      -- and its destination filter is HasCardType Creature. The opcode is driven
+      -- directly with a wider, hand-made filter instead -- the same way the
+      -- Effect.Attach cases in the Equipment group above drive that opcode -- and
+      -- that synthetic filter is the labeled crutch (#431). The rule's other case,
+      -- a destination the Aura's own enchant restriction rejects, is the whole-cards
+      -- test right below.
       HU.testCase "CR 303.4j attaching an Aura to something it cannot enchant leaves it where it was" $ do
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"
@@ -568,7 +581,72 @@ reattachTests registry =
         HU.assertEqual "the Piker still has the bonus" (Just (4, 2)) (S.powerToughnessOf first after)
         -- CR 704.5m: a failed move must not leave the Aura in a state the
         -- state-based actions then punish -- it is still on a legal host.
-        HU.assertBool "and the Aura is not buried afterwards" (Set.member aura (GameState.battlefield settled))
+        HU.assertBool "and the Aura is not buried afterwards" (Set.member aura (GameState.battlefield settled)),
+      -- CR 303.4j through two printed cards. Setessan Training's "Enchant creature
+      -- you control" is the first Card.enchant in the pool that narrows past
+      -- "creature" (CR 702.5a: the enchant ability "restricts what an Aura spell can
+      -- target and what an Aura can enchant"), and Crown of the Ages' destination
+      -- filter is the bare "another creature" -- so the Crown really does offer a
+      -- destination the Aura may not legally enchant, which is the situation CR
+      -- 303.4j is about and which no pair of cards could produce before.
+      --
+      -- CR 109.5 fixes whose "you" that is: the AURA's controller, not the moving
+      -- effect's. Pawl.Resolve.attachLegal asks Target.legalRecipients with
+      -- Projection.controllerOf on the Aura for exactly that reason. Alice controls
+      -- both cards here, so this board cannot tell the two readings apart -- nothing
+      -- in the pool takes control of a noncreature artifact -- but attachLegal is
+      -- never handed the moving effect's source at all, so there is no second
+      -- controller for it to read by mistake.
+      --
+      -- BOTH branches off one board and one activation, so the refusal cannot be
+      -- the machinery declining to move anything: aimed at alice's own Mammoth the
+      -- very same ability moves the Aura.
+      HU.testCase "CR 303.4j whole cards: Crown of the Ages cannot move Setessan Training onto an opponent's creature" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        setessanTraining <- Registry.printing registry "Setessan Training"
+        crown <- Registry.printing registry "Crown of the Ages"
+        -- {1}{G} for the Aura, {2} to cast the Crown, {4} to activate it.
+        let base0 = S.landsInPlay forest 8
+            (host, base1) = S.addCreature piker S.alice base0
+            (mine, base2) = S.addCreature warMammoth S.alice base1
+            (theirs, base3) = S.addCreature piker S.bob base2
+            (withAura, auraSpell) = S.handOne setessanTraining base3
+            castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature host)) withAura (Cast.castSpell S.alice auraSpell))
+            enchanted = snd (Engine.runGamePure S.identityAnswer castAura Stack.resolveTop)
+            (withCrown, crownSpell) = S.handOne crown enchanted
+            castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (Cast.castSpell S.alice crownSpell))
+            settledIn = snd (Engine.runGamePure S.identityAnswer castCrown Stack.resolveTop)
+            crowns = filter (\oid -> Game.cardOf oid settledIn == Just (Printing.card crown)) (Set.toList (GameState.battlefield settledIn))
+        case (attachedTo host enchanted, crowns, Card.Type.activatedAbilities (Printing.card crown)) of
+          ([aura], [crownObj], [move]) -> do
+            let ready = settledIn {GameState.priority = Just S.alice}
+                run dest =
+                  let activated = snd (Engine.runGamePure (moveAura aura dest) ready (Activate.activateAbility S.alice crownObj move))
+                   in snd (Engine.runGamePure (moveAura aura dest) activated Stack.resolveTop)
+                refused = run theirs
+                moved = run mine
+                stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
+            HU.assertEqual "before either activation the Piker is 2/1 + 1/+0" (Just (3, 1)) (S.powerToughnessOf host ready)
+            -- A FAILURE MODE, not a fizzle: the ability resolved, and the only
+            -- thing that did not happen is the move.
+            HU.assertEqual "the Aura did not move onto bob's creature" (Just (Just host)) (fmap Object.attachedTo (Game.lookupObject aura refused))
+            HU.assertEqual "and was not restamped (CR 701.3c)" (stampOf ready) (stampOf refused)
+            HU.assertEqual "alice's Piker keeps the +1/+0" (Just (3, 1)) (S.powerToughnessOf host refused)
+            HU.assertEqual "bob's Piker gains nothing" (Just (2, 1)) (S.powerToughnessOf theirs refused)
+            HU.assertBool "and no trample" (not (Projection.hasKeyword Keyword.Trample theirs refused))
+            -- CR 704.5m: a refused move must not leave the Aura somewhere the
+            -- state-based actions then punish.
+            HU.assertBool "the Aura survives the state-based actions" (Set.member aura (GameState.battlefield (S.settleSba (S.settleSba refused))))
+            -- The control case, which is what stops the assertions above from
+            -- passing for the wrong reason.
+            HU.assertEqual "onto a creature alice DOES control it moves" (Just (Just mine)) (fmap Object.attachedTo (Game.lookupObject aura moved))
+            HU.assertBool "and was restamped" (stampOf ready /= stampOf moved)
+            HU.assertEqual "so the Mammoth is 3/3 + 1/+0" (Just (4, 3)) (S.powerToughnessOf mine moved)
+            HU.assertBool "with trample (CR 702.19)" (Projection.hasKeyword Keyword.Trample mine moved)
+            HU.assertEqual "and the Piker is a plain 2/1" (Just (2, 1)) (S.powerToughnessOf host moved)
+          _ -> HU.assertFailure "the fixture wanted one Aura on the Piker, one Crown on the battlefield, and one printed ability"
     ]
 
 auraTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -627,15 +705,107 @@ auraTests registry =
         HU.assertBool "the Aura is still on the battlefield after pass one" (Set.member aura (GameState.battlefield pass1))
         HU.assertBool "the Aura is gone from the battlefield after pass two" (not (Set.member aura (GameState.battlefield pass2)))
         HU.assertEqual "and is in its OWNER's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice pass2)),
-      -- CR 704.5m's remaining clause: unattached. The third clause -- attached to
-      -- an object the enchant spec no longer admits -- is dormant: nothing in
-      -- the pool strips creature-ness from a permanent, so it has no test here.
+      -- CR 704.5m's remaining clause: unattached. Its third clause -- attached to an
+      -- object the enchant spec no longer admits (CR 303.4c) -- is the Control Magic
+      -- and Setessan Training case below; nothing in the pool strips creature-ness
+      -- from a permanent, so a CONTROL change is how that clause is reached.
       HU.testCase "CR 704.5m: an unattached Aura on the battlefield goes to the graveyard" $ do
         unholyStrength <- Registry.printing registry "Unholy Strength"
         let base = Setup.emptyGame S.bothPlayers
             (aura, gs) = S.addCreature unholyStrength S.alice base
             after = S.settleSba gs
         HU.assertBool "never attached, so it falls off immediately" (not (Set.member aura (GameState.battlefield after))),
+      -- Setessan Training's own three lines, at gameplay level (design.md section 4):
+      -- "Enchant creature you control" (CR 702.5a) narrowing the enchant slot, "When
+      -- this Aura enters, draw a card" firing, and "+1/+0 and has trample" (CR
+      -- 702.19) landing on the enchanted creature.
+      --
+      -- The first pair of assertions is the one the filter exists for: CR 109.5's
+      -- "you" on an enchant ability is the Aura's would-be controller while the
+      -- spell is being cast, so alice's creature is offered and bob's is withheld.
+      -- The spec is read out of the committed card, never hand-built.
+      HU.testCase "CR 702.5a whole card: Setessan Training enchants only its caster's creature, draws, and grants +1/+0 and trample" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        setessanTraining <- Registry.printing registry "Setessan Training"
+        let base0 = S.landsInPlay forest 2
+            (mine, base1) = S.addCreature piker S.alice base0
+            (theirs, base2) = S.addCreature piker S.bob base1
+            -- Something to draw, so the trigger is observable rather than an
+            -- attempted draw from an empty library (CR 704.5b).
+            (_, base3) = S.addLibraryCard forest S.alice base2
+            (gs, spellId) = S.handOne setessanTraining base3
+            offered = fmap (\spec -> Target.legalRecipients (Just S.alice) spellId spec gs) (Card.Type.enchant (Printing.card setessanTraining))
+            cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mine)) gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            -- CR 704.3: the enters trigger waits until a player would get priority,
+            -- which resolveTop alone never reaches.
+            placed = snd (Engine.runGamePure S.identityAnswer after Engine.placePendingTriggers)
+            drawn = snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop)
+        HU.assertEqual "alice's own creature is a legal host" (Just True) (fmap (Set.member (Recipient.ToCreature mine)) offered)
+        HU.assertEqual "bob's is not" (Just False) (fmap (Set.member (Recipient.ToCreature theirs)) offered)
+        HU.assertEqual "exactly one permanent entered attached to alice's creature" 1 (length (attachedTo mine after))
+        HU.assertEqual "and nothing is attached to bob's" 0 (length (attachedTo theirs after))
+        HU.assertEqual "the enchanted creature is a 2/1 plus 1/+0" (Just (3, 1)) (S.powerToughnessOf mine after)
+        HU.assertBool "and has trample" (Projection.hasKeyword Keyword.Trample mine after)
+        HU.assertBool "bob's Piker has neither" (not (Projection.hasKeyword Keyword.Trample theirs after))
+        HU.assertEqual "bob's Piker is still 2/1" (Just (2, 1)) (S.powerToughnessOf theirs after)
+        HU.assertEqual "the cast emptied alice's hand" 0 (S.handSize S.alice after)
+        HU.assertEqual "and the enters trigger refills it" 1 (S.handSize S.alice drawn),
+      -- CR 704.5m's third clause -- "attached to an illegal object ... as defined by
+      -- its enchant ability and other applicable effects" (CR 303.4c) -- reached
+      -- without touching the host's card types: Setessan Training says "enchant
+      -- creature you control", so an opponent STEALING the creature is enough. CR
+      -- 109.5 makes that "you" the Aura's controller (enchant is a static ability,
+      -- CR 702.5a), which is why the answer changes when control does.
+      --
+      -- This is the case Pawl.Sba.stillLegalEnchant's Filter fallthrough exists for.
+      -- Its Pool.Creatures-with-no-Filter reduction -- still a creature, on the
+      -- battlefield, owned by a player still in the game -- would answer "legal"
+      -- here, because none of those three facts changed.
+      --
+      -- Discriminating on one board and one pass: Control Magic's own enchant spec
+      -- is a bare "enchant creature", so it stays attached to the very creature
+      -- Setessan Training just fell off.
+      HU.testCase "CR 704.5m whole cards: Control Magic steals the enchanted creature, so Setessan Training is buried and Control Magic is not" $ do
+        forest <- Registry.printing registry "Forest"
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        setessanTraining <- Registry.printing registry "Setessan Training"
+        controlMagic <- Registry.printing registry "Control Magic"
+        -- {1}{G} for alice's Aura, {2}{U}{U} for bob's. S.landsInPlay seats
+        -- alice's lands and nothing else, so bob's go in one at a time through
+        -- S.addCreature -- which puts a printing onto the battlefield whatever its
+        -- card types are, despite the name.
+        let base0 = S.landsInPlay forest 2
+            (creature, base1) = S.addCreature piker S.alice base0
+            (_, base2) = S.addCreature island S.bob base1
+            (_, base3) = S.addCreature island S.bob base2
+            (_, base4) = S.addCreature island S.bob base3
+            (_, base5) = S.addCreature island S.bob base4
+            (gs, auraSpell) = S.handOne setessanTraining base5
+            castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (Cast.castSpell S.alice auraSpell))
+            enchanted = snd (Engine.runGamePure S.identityAnswer castAura Stack.resolveTop)
+        case attachedTo creature enchanted of
+          [training] -> do
+            let (stealId, withSteal) = S.addHandCard controlMagic S.bob enchanted
+                ready = withSteal {GameState.priority = Just S.bob, GameState.activePlayer = S.bob}
+                castSteal = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) ready (Cast.castSpell S.bob stealId))
+                stolen = snd (Engine.runGamePure S.identityAnswer castSteal Stack.resolveTop)
+                settled = S.settleSba stolen
+                survivors = attachedTo creature settled
+            -- The control case: with control unchanged the Aura is legal, so an SBA
+            -- pass leaves it alone.
+            HU.assertBool "while alice still controls the creature the Aura survives a pass" (S.onBattlefield training (S.settleSba enchanted))
+            HU.assertEqual "the steal really moved control (CR 613.1b)" (Just S.bob) (Projection.controllerOf creature stolen)
+            HU.assertBool "Setessan Training is off the battlefield" (not (S.onBattlefield training settled))
+            HU.assertEqual "and in its OWNER's graveyard, not the thief's" 1 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
+            HU.assertEqual "bob's graveyard is empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob settled))
+            HU.assertEqual "exactly one Aura is left on the creature" 1 (length survivors)
+            HU.assertEqual "and it is Control Magic, whose enchant spec narrows nothing" [Just (Printing.card controlMagic)] (fmap (\oid -> Game.cardOf oid settled) survivors)
+            HU.assertEqual "so the creature is a plain 2/1 again" (Just (2, 1)) (S.powerToughnessOf creature settled)
+            HU.assertBool "and has lost trample" (not (Projection.hasKeyword Keyword.Trample creature settled))
+          _ -> HU.assertFailure "Setessan Training should have entered attached to alice's Piker",
       -- CR 613.1b / 303.4e: Control Magic's static ability moves control of the
       -- enchanted creature to the AURA's controller, and leaves the Aura itself alone.
       HU.testCase "CR 613.1b: Control Magic gives the Aura's controller the creature" $ do
