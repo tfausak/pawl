@@ -9,6 +9,7 @@ import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -21,7 +22,6 @@ import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone

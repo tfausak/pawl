@@ -1,3 +1,7 @@
+-- The card pool: a root directory of one-card-per-file JSON, plus the cards
+-- read from it so far. Not a record of every card -- nothing is read until it is
+-- asked for, so a root holding the whole ~34k-card pool costs one MVar.
+--
 -- Loading cards from a directory of JSON files, one card per file, each named
 -- by the slug of the card's own name. This is the library's only module that
 -- performs IO: it is the shell around the pure codec, and the only place in the
@@ -27,24 +31,38 @@ import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Registry as Registry
 import qualified System.Directory as Directory
 import qualified System.IO.Error as IOError
+
+data Registry = MkRegistry
+  { root :: FilePath,
+    -- Keyed by slug (Pawl.Slug.slugify of the card's name). An MVar rather
+    -- than an IORef because the test suite is built -threaded and tasty runs
+    -- cases concurrently: holding it across the read-and-parse is what makes
+    -- "each file is parsed at most once" exact rather than merely likely.
+    -- Not a TVar either, for that same reason: the lock has to span a
+    -- readFile, which no transaction can, so the STM equivalent is a TMVar --
+    -- this, plus a hand-written copy of base's modifyMVar (#265).
+    cache :: MVar.MVar (Map.Map Slug.Slug Card.Card)
+  }
+  -- No Show: MVar has no Show instance. Eq is MVar identity, so two registries
+  -- over one root are equal only if they share a cache.
+  deriving (Eq)
 
 -- Checks the root here rather than at the first lookup: a mistyped --cards-dir
 -- otherwise surfaces as N identical "no such file or directory" failures, one
 -- per card, instead of one clear failure at startup.
-new :: FilePath -> IO Registry.Registry
-new root = do
-  exists <- Directory.doesDirectoryExist root
+new :: FilePath -> IO Registry
+new rt = do
+  exists <- Directory.doesDirectoryExist rt
   if not exists
-    then Exception.throwIO MissingRoot.MkMissingRoot {MissingRoot.path = root}
+    then Exception.throwIO MissingRoot.MkMissingRoot {MissingRoot.path = rt}
     else do
-      cache <- MVar.newMVar Map.empty
+      ch <- MVar.newMVar Map.empty
       pure
-        Registry.MkRegistry
-          { Registry.root = root,
-            Registry.cache = cache
+        MkRegistry
+          { root = rt,
+            cache = ch
           }
 
 -- The card corpus's default root: data/cards declared as cabal data-files,
@@ -64,44 +82,44 @@ defaultRoot = Paths.getDataFileName "data/cards"
 -- rather than reporting the mismatch here. Pawl.CardSpec pins every committed
 -- file name to its own slug so that never arises in the corpus. Non-.json
 -- entries are ignored outright -- a README is not a broken card.
-slugs :: Registry.Registry -> IO [Slug.Slug]
+slugs :: Registry -> IO [Slug.Slug]
 slugs registry =
   let json = ".json"
       stem name = take (length name - length json) name
       toSlug = Slug.fromText . Text.pack . stem
    in do
-        entries <- Directory.listDirectory (Registry.root registry)
+        entries <- Directory.listDirectory (root registry)
         pure $ fmap toSlug (List.sort (filter (List.isSuffixOf json) entries))
 
 -- The whole pool, loaded. Goes through the same cache as `card`, so a caller
 -- that sweeps everything and then looks one card up does not read it twice.
-cards :: Registry.Registry -> IO [Card.Card]
+cards :: Registry -> IO [Card.Card]
 cards registry = slugs registry >>= mapM (cached registry)
 
-printings :: Registry.Registry -> IO [Printing.Printing]
+printings :: Registry -> IO [Printing.Printing]
 printings registry = fmap (fmap Printing.MkPrinting) (cards registry)
 
 -- A card by name ("Goblin Piker") or by slug ("goblin-piker") -- slugify is
 -- idempotent, so both are the same lookup.
-card :: Registry.Registry -> String -> IO Card.Card
+card :: Registry -> String -> IO Card.Card
 card registry = cached registry . Slug.fromText . Text.pack
 
-printing :: Registry.Registry -> String -> IO Printing.Printing
+printing :: Registry -> String -> IO Printing.Printing
 printing registry name = fmap Printing.MkPrinting (card registry name)
 
 -- Parsed at most once per registry; a failed load is not cached, so a fixed file
 -- is picked up by the next lookup (modifyMVar restores the cache when `load`
 -- throws).
-cached :: Registry.Registry -> Slug.Slug -> IO Card.Card
-cached registry slug = MVar.modifyMVar (Registry.cache registry) $ \entries ->
+cached :: Registry -> Slug.Slug -> IO Card.Card
+cached registry slug = MVar.modifyMVar (cache registry) $ \entries ->
   case Map.lookup slug entries of
     Just c -> pure (entries, c)
     Nothing -> do
       c <- load registry slug
       pure (Map.insert slug c entries, c)
 
-pathIn :: Registry.Registry -> FilePath -> FilePath
-pathIn registry name = Registry.root registry <> "/" <> name
+pathIn :: Registry -> FilePath -> FilePath
+pathIn registry name = root registry <> "/" <> name
 
 -- Read and parse one file.
 --
@@ -114,7 +132,7 @@ pathIn registry name = Registry.root registry <> "/" <> name
 -- The name check is the one thing a per-card load can assert that no sweep has
 -- to: a file's own `name` field must slugify back to the name it is filed
 -- under, or a lookup would quietly serve a different card than it was asked for.
-load :: Registry.Registry -> Slug.Slug -> IO Card.Card
+load :: Registry -> Slug.Slug -> IO Card.Card
 load registry slug =
   let path = pathIn registry (Text.unpack (Slug.unwrap slug) <> ".json")
       corrupt reason =

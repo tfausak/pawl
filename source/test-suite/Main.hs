@@ -48,6 +48,7 @@ import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.RegistrySpec as RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
@@ -57,7 +58,6 @@ import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.TriggerSpec as TriggerSpec
 import qualified Pawl.TurnSpec as TurnSpec
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

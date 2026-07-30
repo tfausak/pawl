@@ -10,6 +10,7 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Codec.All as Codec
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -36,7 +37,6 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype

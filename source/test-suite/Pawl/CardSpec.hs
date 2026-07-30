@@ -22,6 +22,14 @@ import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
+-- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
+-- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
+-- later be imported and must not collide.
+
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Filter may later be imported and must not collide.
+
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Slug as Slug
@@ -35,9 +43,6 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Comparison as Comparison
--- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
--- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
--- later be imported and must not collide.
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -45,8 +50,6 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
@@ -71,7 +74,6 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName

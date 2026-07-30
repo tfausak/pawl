@@ -7,8 +7,8 @@ module Pawl.Cards where
 
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Types.Deck as Deck
-import qualified Pawl.Types.Registry as Registry.Type
 
 redDeck :: Registry.Type.Registry -> IO Deck.Deck
 redDeck registry = do

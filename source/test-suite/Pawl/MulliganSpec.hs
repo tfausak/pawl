@@ -18,6 +18,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
@@ -33,7 +34,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty

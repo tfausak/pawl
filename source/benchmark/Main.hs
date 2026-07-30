@@ -8,6 +8,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Concession as Concession
@@ -18,7 +19,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Registry as Registry.Type
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Test.Tasty.Bench as Bench

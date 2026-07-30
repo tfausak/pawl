@@ -16,6 +16,7 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
@@ -28,7 +29,6 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone

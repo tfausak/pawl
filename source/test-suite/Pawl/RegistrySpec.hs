@@ -15,10 +15,10 @@ import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified System.Directory as Directory
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU

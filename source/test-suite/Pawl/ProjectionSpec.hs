@@ -20,6 +20,11 @@ import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+-- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
+-- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
+-- aliased Subtype.Type below for the same reason, against Pawl.Subtype.
+
+import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
@@ -35,9 +40,6 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry
--- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
--- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
--- aliased Subtype.Type below for the same reason, against Pawl.Subtype.
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -51,7 +53,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
