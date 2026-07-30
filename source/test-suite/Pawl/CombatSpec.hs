@@ -8,23 +8,29 @@
 module Pawl.CombatSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
+import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -44,7 +50,9 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -1447,6 +1455,193 @@ controlChangeRemovalTests registry =
           _ -> HU.assertFailure "fixture did not build an attacker and a blocker"
     ]
 
+-- Labyrinth of Skophos' SECOND activated ability -- "{4}, {T}: Remove target
+-- attacking or blocking creature from combat" -- read off the JSON-loaded
+-- printing rather than hand-built, so every leg below exercises the codec's
+-- parse of the committed card data (S.spellTargetSpec's posture, for an
+-- activated ability rather than a spell). The first is the land's "{T}: Add
+-- {C}".
+removalAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+removalAbility printing = case Card.Type.activatedAbilities (Printing.card printing) of
+  [_, ability] -> Just ability
+  _ -> Nothing
+
+-- That ability's "target" slot spec: CR 601.2c's narrowing, reached for an
+-- activated ability through CR 602.2b, which for this card is Pool.Creatures
+-- under `Or [IsAttacking, IsBlocking]`.
+removalSpec :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Maybe TargetSpec.TargetSpec
+removalSpec ability =
+  Map.lookup
+    (SlotName.MkSlotName (Text.pack "target"))
+    (Modal.allTargetSpecs (ActivatedAbility.modal ability))
+
+-- alice is mid-combat with one creature per printing in `mine`; bob defends with
+-- one per printing in `theirs`. `who` also controls a Labyrinth of Skophos and
+-- the four lands that pay its {4}. S.addCreature is what puts all five out --
+-- the "any printing, on the battlefield, untapped and Settled" helper its
+-- haddock says it is, which is what a land needs.
+skophosBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId)
+skophosBoard labyrinth land who mine theirs =
+  let (gs0, ours, yours) = S.combatBoardOf mine theirs
+      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature land who g))
+      (mazeId, gs1) = S.addCreature labyrinth who (addLands 4 gs0)
+   in (gs1, ours, yours, mazeId)
+
+-- Fire the Labyrinth's removal ability once, aim it at `victim`, and pay the {4}
+-- with anything BUT the Labyrinth itself: CR 601.2g pays an activation's mana
+-- before its components (Pawl.Activate), so tapping the land for its own {C}
+-- would leave the {T} unpayable and revert the whole activation. Choosing around
+-- that is the player's job, not the engine's.
+--
+-- Every other prompt falls through to S.aggressiveAnswer, so attacks and blocks
+-- still happen.
+--
+-- STATEFUL, and it has to be, for GameSpec's illegalActivationAnswer reason: an
+-- answerer that names the same Activate at every ask never lets the priority
+-- loop terminate once the activation stops SUCCEEDING. A rejected one is a
+-- no-op (CR 601.2c: an answer outside the legal target set reverts the whole
+-- activation), so the cost goes unpaid, the land stays untapped, and the same
+-- action is offered again forever. That is unreachable while the engine is
+-- right, and this was written pure first: breaking Filter.IsBlocking on purpose
+-- hung the suite instead of failing it, which is not a test.
+mazeAnswer ::
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  State.State Bool r
+mazeAnswer mazeId ability victim p = case p of
+  Prompt.ChooseAction _ _ actions -> do
+    tried <- State.get
+    if tried || notElem (A.Activate mazeId ability) actions
+      then pure A.Pass
+      else do
+        State.put True
+        pure (A.Activate mazeId ability)
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToCreature victim)) sets)
+  Prompt.ChooseManaSource _ _ candidates ->
+    pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (/= mazeId) (NonEmpty.toList candidates)))
+  _ -> pure (S.aggressiveAnswer p)
+
+-- runToEndOfCombat's stateful twin, for the answerer above: the same bounded
+-- walk of whole steps, threading the "have I activated yet" flag across them.
+runToEndOfCombatWith ::
+  (forall r. Prompt.Prompt r -> State.State Bool r) ->
+  GameState.GameState ->
+  GameState.GameState
+runToEndOfCombatWith answer gs0 =
+  let go n g s =
+        if n <= (0 :: Int)
+          || GameState.phase g == Phase.Combat CombatStep.EndOfCombat
+          || not (S.inCombatPhase (GameState.phase g))
+          then g
+          else
+            let ((_, g1), s1) = State.runState (Engine.runGame answer g Engine.runStep) s
+             in go (n - 1) g1 s1
+   in go 8 gs0 False
+
+-- Attack with everything except `homebody`, and otherwise behave aggressively --
+-- so the board carries an attacking creature, a blocking creature and a creature
+-- that is neither, which is what the target filter has to tell apart.
+stayHomeAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+stayHomeAnswer homebody p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (/= homebody) ids
+  _ -> S.aggressiveAnswer p
+
+-- CR 506.4: "A permanent is removed from combat if ... an effect specifically
+-- removes it from combat." The rule's one clause a card ASKS for, rather than a
+-- condition the engine has to notice -- and Labyrinth of Skophos is the pool's
+-- producer: "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking
+-- creature from combat." (Land, Murders at Karlov Manor Commander; oracle text
+-- checked against Scryfall.)
+--
+-- Every leg runs whole steps through Engine.runStep, so the combat record under
+-- test is the engine's own: the fixture declares nothing by hand. The two damage
+-- legs stop at the end of combat step, where CR 511.3 says the record still
+-- reads live; the filter leg stops one step earlier, before anything dies.
+--
+-- Removal is removal only. Nothing here puts a creature back into combat, which
+-- is what the rules say too -- the glossary's "removed from combat" entry has
+-- the permanent take "no further involvement in that combat phase".
+effectRemovalTests :: Registry.Type.Registry -> Tasty.TestTree
+effectRemovalTests registry =
+  Tasty.testGroup
+    "EffectRemoval"
+    [ HU.testCase "CR 506.4 whole card: Labyrinth of Skophos removes target ATTACKING creature, and it deals no combat damage" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+        case (removalAbility labyrinth, skophosBoard labyrinth island S.bob [piker] []) of
+          (Just ability, (gs, [attacker], _, mazeId)) -> do
+            let atEnd = runToEndOfCombatWith (mazeAnswer mazeId ability attacker) gs
+                quiet = runToEndOfCombat S.aggressiveAnswer gs
+                legal = fmap (\spec -> Target.legalRecipients Nothing S.noSource spec atEnd) (removalSpec ability)
+            HU.assertEqual "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase atEnd)
+            HU.assertEqual "the ability really was activated: its {T} component was paid" (Just TapState.Tapped) (tapStateOf mazeId atEnd)
+            HU.assertBool "CR 506.4: the Piker stopped being an attacking creature" (Map.notMember attacker (Combat.Type.attackers (GameState.combat atEnd)))
+            -- The discriminating assertion: with the removal missing, the Piker
+            -- stays in the record and deals its 2.
+            HU.assertEqual "CR 510.1: so bob takes nothing" (Just 20) (S.lifeOf S.bob atEnd)
+            HU.assertEqual "and the card's own target filter no longer finds it" (Just False) (fmap (Set.member (Recipient.ToCreature attacker)) legal)
+            HU.assertBool "control leg: unactivated, the Piker is still attacking" (Map.member attacker (Combat.Type.attackers (GameState.combat quiet)))
+            HU.assertEqual "and bob takes its 2" (Just 18) (S.lifeOf S.bob quiet)
+          _ -> HU.assertFailure "fixture should give bob a Labyrinth with two abilities and alice one Piker",
+      HU.testCase "CR 509.1h a removed BLOCKER leaves the attacker blocked, so nothing is dealt combat damage" $ do
+        -- The blocker side of the same clause, and the interaction
+        -- Game.removeFromCombat's two-way edit of Combat.blockers exists for: the
+        -- blocker leaves the SET while the attacker's KEY survives, so the
+        -- attacker stays blocked and (CR 510.1c) assigns no combat damage at all.
+        --
+        -- alice holds the Labyrinth and aims it at her opponent's blocker, so the
+        -- removal has to land after blocks are declared: the declare attackers
+        -- step is played under an answerer that never activates, and only the
+        -- declare blockers step onwards sees `mazeAnswer`.
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+        case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker] [piker]) of
+          (Just ability, (gs, [attacker], [blocker], mazeId)) -> do
+            let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+                atEnd = runToEndOfCombatWith (mazeAnswer mazeId ability blocker) atBlockers
+                -- The control leg: the same board and the same blocks, with the
+                -- ability never activated. Two 2/1 Pikers then trade.
+                traded = runToEndOfCombat S.aggressiveAnswer atBlockers
+            HU.assertEqual "the leg hands over at the declare blockers step, so the blocks are declared before the activation" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase atBlockers)
+            HU.assertEqual "the ability really was activated" (Just TapState.Tapped) (tapStateOf mazeId atEnd)
+            HU.assertBool "CR 510.1c: neither creature was dealt combat damage" (S.onBattlefield attacker atEnd && S.onBattlefield blocker atEnd)
+            HU.assertEqual "CR 506.4: the removed creature is blocking nothing" Set.empty (Combat.blockersOf attacker atEnd)
+            HU.assertBool "CR 509.1h: but the attacker remains blocked" (Combat.isBlocked attacker atEnd)
+            HU.assertEqual "so bob takes nothing either" (Just 20) (S.lifeOf S.bob atEnd)
+            HU.assertBool "control leg: unactivated, the two Pikers trade and both die" (not (S.onBattlefield attacker traded) && not (S.onBattlefield blocker traded))
+          _ -> HU.assertFailure "fixture should give alice a Labyrinth and an attacker, and bob a blocker",
+      HU.testCase "CR 601.2c the card's filter admits the attacker and the blocker and rejects the creature that stayed home" $ do
+        -- Or [IsAttacking, IsBlocking], and both halves are load-bearing: with
+        -- IsAttacking alone the blocker would be rejected, and with no filter at
+        -- all the homebody would be admitted.
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+        case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker, piker] [piker]) of
+          (Just ability, (gs, [attacker, homebody], [blocker], _)) -> do
+            -- The combat damage step is the vantage point: blockers have been
+            -- declared and nothing has died yet.
+            let atDamage = runToStep (Phase.Combat CombatStep.CombatDamage) (stayHomeAnswer homebody) gs
+                legal = fmap (\spec -> Target.legalRecipients Nothing S.noSource spec atDamage) (removalSpec ability)
+                admits oid = fmap (Set.member (Recipient.ToCreature oid)) legal
+            HU.assertEqual "the fixture reached the combat damage step with blocks declared" (Phase.Combat CombatStep.CombatDamage) (GameState.phase atDamage)
+            HU.assertBool "the blocker really is blocking the attacker" (Set.member blocker (Combat.blockersOf attacker atDamage))
+            HU.assertEqual "IsAttacking admits the attacker" (Just True) (admits attacker)
+            HU.assertEqual "IsBlocking admits the blocker" (Just True) (admits blocker)
+            HU.assertEqual "and the creature in neither role is rejected" (Just False) (admits homebody)
+          _ -> HU.assertFailure "fixture should give alice two Pikers and a Labyrinth, and bob a blocker"
+    ]
+
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
 -- chooses which defending player ... it's attacking ... Such creatures are
 -- 'attacking' but, for the purposes of trigger events and effects, they never
@@ -1531,5 +1726,6 @@ tests registry =
       blockRequirementTests registry,
       controlChangeSicknessTests registry,
       controlChangeRemovalTests registry,
+      effectRemovalTests registry,
       putOntoBattlefieldAttackingTests registry
     ]

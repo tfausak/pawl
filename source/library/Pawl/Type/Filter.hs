@@ -14,8 +14,8 @@ import Pawl.Type.Supertype (Supertype)
 -- controller, and for a player candidate its identity) -- exactly as the rules
 -- already case on a CardType -- and on a handful of things CR 109.3 says are NOT
 -- characteristics but that the closed half owns just as squarely: combat status
--- (IsAttacking), attachment (IsAttachedToCreature), what a permanent is
--- represented by (IsToken), and what happened earlier this turn
+-- (IsAttacking, IsBlocking), attachment (IsAttachedToCreature), what a permanent
+-- is represented by (IsToken), and what happened earlier this turn
 -- (AttackedThisTurn, the only one that is not a present state at all). Each arm
 -- carries its own defence. Casing on a characteristic classification is
 -- legitimate; the invariant forbids only casing on an EFFECT's identity, which
@@ -70,6 +70,31 @@ data Filter
     -- type. What the invariant forbids is casing on an EFFECT's identity, which
     -- this arm still does not do.
     IsAttacking
+  | -- CR 509.1g: the candidate is a BLOCKING creature -- one declared as a
+    -- blocker this combat phase ("it remains a blocking creature until it's
+    -- removed from combat or the combat phase ends, whichever comes first") and
+    -- not since removed under CR 506.4. Labyrinth of Skophos' "target attacking
+    -- or blocking creature" is the card text this exists for, and that text is
+    -- spelled `Or [IsAttacking, IsBlocking]` -- two atoms and one combinator,
+    -- rather than a third atom meaning "in combat", because the two roles are
+    -- separate rules concepts that separate cards ask about separately.
+    --
+    -- The fifth atom, after IsAttacking, IsAttachedToCreature, IsToken and
+    -- AttackedThisTurn, reading something CR 109.3 leaves off the characteristic
+    -- list -- and the only one of the five that is a MIRROR of an existing arm
+    -- rather than a new kind of reading, so it is legitimate for word-for-word
+    -- IsAttacking's reason: combat status is a RULES concept the closed half
+    -- already owns (CR 506-511, Pawl.Type.Combat), which makes reading it the
+    -- same kind of act as reading a card type. Casing on an EFFECT's identity is
+    -- what the invariant forbids, and this arm does not do it.
+    --
+    -- NOT the same question as "is something blocking it": Pawl.Combat.isBlocked
+    -- asks whether an ATTACKER has an entry in Combat.blockers, and this asks
+    -- whether the candidate is a MEMBER of some attacker's set. CR 509.1h's last
+    -- sentence is what keeps the two apart -- "a creature remains blocked even if
+    -- all the creatures blocking it are removed from combat" -- so an attacker
+    -- can be blocked at a moment when nothing answers True here.
+    IsBlocking
   | -- CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
     -- read of the turn-scoped GameEvent log, which is what CR 608.2i sanctions:

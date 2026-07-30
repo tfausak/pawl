@@ -280,6 +280,31 @@ data Effect card
     -- gives at length: one opcode serving both the chosen permanent and the
     -- named set, rather than a sibling UntapAll to keep in step with it.
     Untap ObjectRef
+  | -- CR 506.4: "A permanent is removed from combat if ... an effect
+    -- specifically removes it from combat." THIS is that effect -- the rule's one
+    -- clause that a card ASKS for rather than a condition the engine has to
+    -- notice, which is why it is an opcode and not a sampler like
+    -- Combat.removeControlChanged. Labyrinth of Skophos' "{4}, {T}: Remove target
+    -- attacking or blocking creature from combat" is the card text it exists
+    -- for; the slot's target is what leaves.
+    --
+    -- Removal ONLY. CR 506.4's second sentence -- "a creature that's removed from
+    -- combat stops being an attacking, blocking, blocked, and/or unblocked
+    -- creature" -- is the whole of the effect, and nothing in rule 506 puts a
+    -- creature back, so there is no inverse opcode and no duration to carry.
+    --
+    -- A bare SlotName rather than Destroy's ObjectRef: the printed card names one
+    -- target, and the "each matching" half of ObjectRef exists for a card that
+    -- sweeps a set (Day of Judgment). None does here, and the narrower parameter
+    -- is what the pool exercises.
+    --
+    -- CR 506.4a and CR 506.4b bound what removal is NOT, and neither reaches this
+    -- opcode: 506.4a keeps a spell that "would have kept that creature from
+    -- attacking or blocking" from removing an already-declared creature, and
+    -- 506.4b says tapping or untapping does not remove one either. Both are about
+    -- effects that do something ELSE; this one says "remove from combat" in as
+    -- many words, which is precisely what the rule's own clause names.
+    RemoveFromCombat SlotName
   | -- CR 500.8: "Some effects can add phases to a turn. They do this by adding
     -- the phases directly after the specified phase." The payload says which
     -- phases, in written order: Aggravated Assault and Relentless Assault are

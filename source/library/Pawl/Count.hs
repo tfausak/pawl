@@ -160,6 +160,9 @@ snapshotView shape event = case event of
                 -- not one (CR 109.3) -- so IsAttacking is vacuously False over a
                 -- past event, the posture controller already takes here.
                 Filter.attacking = False,
+                -- Nor is blocking one (CR 509.1g is combat status too), so
+                -- IsBlocking is vacuously False here as well.
+                Filter.blocking = False,
                 -- Nor does the snapshot record what the object DID: it holds the
                 -- characteristics the object last had (CR 608.2h), not the
                 -- turn's event log, and this view is built from one event rather

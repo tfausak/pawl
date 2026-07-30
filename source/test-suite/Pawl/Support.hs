@@ -1464,6 +1464,7 @@ stubView table oid =
                 Filter.identity = Just o,
                 Filter.playerIdentity = Nothing,
                 Filter.attacking = False,
+                Filter.blocking = False,
                 Filter.attackedThisTurn = False,
                 Filter.attachedToCreature = False,
                 Filter.token = False

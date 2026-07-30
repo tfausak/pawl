@@ -43,6 +43,13 @@ data View = MkView
     -- combat status to read: a printed card off the battlefield, a player, and an
     -- event snapshot -- the same vacuous posture power and controller take.
     attacking :: Bool,
+    -- CR 509.1g: is this candidate a blocking creature right now? Not a
+    -- characteristic either (CR 109.3), so it is read from GameState.combat
+    -- alongside `attacking` -- but from the OTHER map: Combat.blockers is keyed
+    -- by attacker, and a blocking creature is a MEMBER of some attacker's set.
+    -- False for every candidate with no combat status to read, the vacuous
+    -- posture `attacking` takes.
+    blocking :: Bool,
     -- CR 608.2i: was this candidate declared as an attacker earlier this turn?
     -- Not a characteristic either, and unlike `attacking` not even a present
     -- state: it is a look-back read of the turn-scoped GameEvent log, which
@@ -100,6 +107,8 @@ playerView pid =
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
       attacking = False,
+      -- CR 509.1a: only a creature can block, either.
+      blocking = False,
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
@@ -164,6 +173,13 @@ matches context view predicate = case predicate of
   -- or the combat phase ends, whichever comes first" -- so this is a live read of
   -- the combat record, never a stamp on the object.
   Filter.IsAttacking -> attacking view
+  -- CR 509.1g: "it remains a blocking creature until it's removed from combat or
+  -- the combat phase ends, whichever comes first" -- the same live read of the
+  -- combat record IsAttacking is, off the other map. Never the question
+  -- Pawl.Combat.isBlocked asks: CR 509.1h's last sentence keeps an attacker
+  -- blocked after every creature blocking it has gone, so this can be False for
+  -- everything while that is still True.
+  Filter.IsBlocking -> blocking view
   -- CR 608.2i: a look-back read of the turn's event log. Unlike IsAttacking it
   -- cannot stop being true within a turn -- nothing removes a GameEvent -- so a
   -- creature removed from combat (CR 506.4) still attacked, which is what
@@ -209,6 +225,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsSource -> predicate
   Filter.IsPlayer _ -> predicate
   Filter.IsAttacking -> predicate
+  Filter.IsBlocking -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsToken -> predicate

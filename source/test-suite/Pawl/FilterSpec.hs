@@ -29,6 +29,7 @@ blackCreature =
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.blocking = False,
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.token = False
@@ -47,6 +48,7 @@ devoidBigCreature =
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.blocking = False,
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.token = False
@@ -149,6 +151,41 @@ tests =
             . HU.assertBool "player"
             . not
             $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttacking
+        ],
+      Tasty.testGroup
+        "IsBlocking"
+        [ HU.testCase "matches a view whose combat status says so"
+            . HU.assertBool "blocking"
+            $ Filter.matches self (blackCreature {Filter.blocking = True}) Filter.Type.IsBlocking,
+          HU.testCase "does not match a creature that is not blocking"
+            . HU.assertBool "not blocking"
+            . not
+            $ Filter.matches self blackCreature Filter.Type.IsBlocking,
+          -- The two combat roles are independent in BOTH directions, which is
+          -- why Labyrinth of Skophos' "attacking or blocking" needs two atoms
+          -- rather than one: CR 508.1k confers the first at the attacker
+          -- declaration and CR 509.1g the second at the blocker declaration,
+          -- and neither says anything about the other.
+          HU.testCase "is not implied by attacking"
+            . HU.assertBool "attacking does not imply blocking"
+            . not
+            $ Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.IsBlocking,
+          HU.testCase "does not imply attacking"
+            . HU.assertBool "blocking does not imply attacking"
+            . not
+            $ Filter.matches self (blackCreature {Filter.blocking = True}) Filter.Type.IsAttacking,
+          -- Labyrinth of Skophos' own filter, over each role in turn.
+          HU.testCase "Or [IsAttacking, IsBlocking] admits either role and rejects a creature in neither" $ do
+            let both = Filter.Type.Or [Filter.Type.IsAttacking, Filter.Type.IsBlocking]
+            HU.assertBool "attacker" (Filter.matches self (blackCreature {Filter.attacking = True}) both)
+            HU.assertBool "blocker" (Filter.matches self (blackCreature {Filter.blocking = True}) both)
+            HU.assertBool "neither" (not (Filter.matches self blackCreature both)),
+          -- CR 509.1a: only a creature can be chosen to block, and a player is
+          -- not one.
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsBlocking
         ],
       Tasty.testGroup
         "rewrite"
