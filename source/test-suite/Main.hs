@@ -26,6 +26,7 @@ import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.ExtraSpec as ExtraSpec
 import qualified Pawl.FilterSpec as FilterSpec
 import qualified Pawl.GameSpec as GameSpec
+import qualified Pawl.Json.BooleanSpec
 import qualified Pawl.Json.NullSpec
 import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
@@ -114,4 +115,5 @@ spec s = do
   Pawl.Extra.BuilderSpec.spec s
   Pawl.Extra.EitherSpec.spec s
   Pawl.Extra.ParsecSpec.spec s
+  Pawl.Json.BooleanSpec.spec s
   Pawl.Json.NullSpec.spec s

@@ -87,6 +87,8 @@ library json
 
   -- cabal-gild: discover source/libraries/json
   exposed-modules:
+    Pawl.Json.Boolean
+    Pawl.Json.BooleanSpec
     Pawl.Json.Null
     Pawl.Json.NullSpec
 

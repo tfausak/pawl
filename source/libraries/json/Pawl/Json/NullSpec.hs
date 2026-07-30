@@ -1,5 +1,6 @@
 module Pawl.Json.NullSpec where
 
+import qualified Pawl.Extra.Builder as Builder
 import qualified Pawl.Extra.Parsec as Parsec
 import qualified Pawl.Json.Null as Null
 import qualified Pawl.Spec as Spec
@@ -12,3 +13,7 @@ spec s = Spec.describe s "Pawl.Json.Null" $ do
 
     Spec.it s "succeeds with a match" $ do
       Spec.assertEq s (Parsec.parseString Null.decode "null") . Just $ Null.MkNull ()
+
+  Spec.describe s "encode" $ do
+    Spec.it s "encodes null" $ do
+      Spec.assertEq s (Builder.toString . Null.encode $ Null.MkNull ()) "null"
