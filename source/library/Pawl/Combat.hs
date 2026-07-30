@@ -31,6 +31,7 @@ import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
@@ -120,29 +121,52 @@ attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayingInOrder gs)
 
 isCreatureObject :: ObjectId -> GameState -> Bool
-isCreatureObject = Projection.isCreatureOf
+isCreatureObject = isCreatureObjectGiven Map.empty
+
+isCreatureObjectGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Bool
+isCreatureObjectGiven = Projection.isCreatureGiven
 
 -- CR 508.1a: an attacking creature must be untapped, controlled by the active
 -- player, and not summoning sick (CR 302.6).
+--
+-- canAttackGiven is the half a LOOP wants: `grants` is one control-grant walk
+-- (Projection.controlGrants) and `pcs` one whole-board projection
+-- (Projection.projectAll), taken once per declaration pass by legalAttackers
+-- below rather than once per candidate -- the questions this asks are otherwise
+-- as many as three fresh gathers (haste, creature-ness, defender) and a fresh
+-- grant walk apiece, which made the pass quadratic in the battlefield (#200).
+-- Same hoist Sba.performStateBasedActions takes for the CR 704.3 sweep and
+-- Projection.controls takes for the grant list; Projection.projectGiven carries
+-- the argument for why a shared board is the same answer, and for why it is
+-- valid only within one pure pass over one GameState.
+--
+-- canAttack itself passes Map.empty, so a lone query projects per read exactly
+-- as it always did.
 canAttack :: PlayerId -> ObjectId -> GameState -> Bool
-canAttack pid oid gs = case Game.lookupObject oid gs of
+canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty pid oid gs
+
+canAttackGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> Bool
+canAttackGiven grants pcs pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
-    Projection.controllerOf oid gs == Just pid
+    Projection.controllerOfGiven grants Set.empty oid gs == Just pid
       && GameState.activePlayer gs == pid
       && Object.zone obj == Zone.Battlefield
       && Object.tapped obj == TapState.Untapped
       -- CR 302.6, relaxed by CR 702.10b: a creature with haste can attack even if
       -- it hasn't been controlled continuously since its controller's most recent
       -- turn began.
-      && Summoning.settledOrHasty pid oid gs
-      && isCreatureObject oid gs
+      && Summoning.settledOrHastyGiven pcs pid oid gs
+      && isCreatureObjectGiven pcs oid gs
       -- CR 702.3b: a creature with defender can't attack. It may still block --
       -- 702.3b says nothing about blocking.
-      && not (Projection.hasKeyword Keyword.Defender oid gs)
+      && not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs)
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
-legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Projection.controls pid gs)
+legalAttackers pid gs =
+  let grants = Projection.controlGrants gs
+      pcs = Projection.projectAll gs
+   in filter (\oid -> canAttackGiven grants pcs pid oid gs) (Projection.controlsGiven grants pid gs)
 
 -- CR 509.1a: a blocking creature must be untapped and controlled by the
 -- defending player.
@@ -150,17 +174,27 @@ legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Projection.contro
 -- Summoning sickness is NOT a blocking restriction. CR 302.6 restricts attacking
 -- and activated abilities with the tap or untap symbol, and says nothing about
 -- blocking.
+--
+-- canBlockGiven/legalBlockersGiven are canAttackGiven's pair, hoisted for the
+-- same reason and with the same snapshot argument.
 canBlock :: PlayerId -> ObjectId -> GameState -> Bool
-canBlock pid oid gs = case Game.lookupObject oid gs of
+canBlock pid oid gs = canBlockGiven (Projection.controlGrants gs) Map.empty pid oid gs
+
+canBlockGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> Bool
+canBlockGiven grants pcs pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
-    Projection.controllerOf oid gs == Just pid
+    Projection.controllerOfGiven grants Set.empty oid gs == Just pid
       && Object.zone obj == Zone.Battlefield
       && Object.tapped obj == TapState.Untapped
-      && isCreatureObject oid gs
+      && isCreatureObjectGiven pcs oid gs
 
 legalBlockers :: PlayerId -> GameState -> [ObjectId]
-legalBlockers pid gs = filter (\oid -> canBlock pid oid gs) (Projection.controls pid gs)
+legalBlockers pid gs = legalBlockersGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+
+legalBlockersGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
+legalBlockersGiven grants pcs pid gs =
+  filter (\oid -> canBlockGiven grants pcs pid oid gs) (Projection.controlsGiven grants pid gs)
 
 -- CR 702.9b: a creature with flying can't be blocked except by creatures with
 -- flying and/or reach (CR 702.17b).
@@ -170,10 +204,13 @@ legalBlockers pid gs = filter (\oid -> canBlock pid oid gs) (Projection.controls
 -- Flying restricts being blocked, never blocking. The question is asked of the
 -- ATTACKER first, and only then of the blocker.
 evasionAllows :: ObjectId -> ObjectId -> GameState -> Bool
-evasionAllows blocker attacker gs =
-  not (Projection.hasKeyword Keyword.Flying attacker gs)
-    || Projection.hasKeyword Keyword.Flying blocker gs
-    || Projection.hasKeyword Keyword.Reach blocker gs
+evasionAllows = evasionAllowsGiven Map.empty
+
+evasionAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+evasionAllowsGiven pcs blocker attacker gs =
+  not (Projection.hasKeywordGiven pcs Keyword.Flying attacker gs)
+    || Projection.hasKeywordGiven pcs Keyword.Flying blocker gs
+    || Projection.hasKeywordGiven pcs Keyword.Reach blocker gs
 
 -- CR 702.36b: a creature with fear can't be blocked except by artifact creatures
 -- and/or black creatures.
@@ -183,10 +220,13 @@ evasionAllows blocker attacker gs =
 -- the exception read the PROJECTION -- a creature made black by a CR 613 layer-5
 -- effect blocks legally, and a devoid creature with a black mana cost does not.
 fearAllows :: ObjectId -> ObjectId -> GameState -> Bool
-fearAllows blocker attacker gs =
-  not (Projection.hasKeyword Keyword.Fear attacker gs)
-    || Set.member CardType.Artifact (Projection.cardTypesOf blocker gs)
-    || Set.member Color.Black (Projection.colorsOf blocker gs)
+fearAllows = fearAllowsGiven Map.empty
+
+fearAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+fearAllowsGiven pcs blocker attacker gs =
+  not (Projection.hasKeywordGiven pcs Keyword.Fear attacker gs)
+    || Set.member CardType.Artifact (Projection.cardTypesGiven pcs blocker gs)
+    || Set.member Color.Black (Projection.colorsGiven pcs blocker gs)
 
 -- CR 509.1b asked of ONE (blocker, attacker) pair: may this creature block that
 -- one at all? This is also what CR 509.1c's requirements mean by "able to block"
@@ -202,13 +242,19 @@ fearAllows blocker attacker gs =
 -- SET blocking one attacker -- and when it lands it belongs in
 -- declarationAllowed, which is asked of the whole declaration, never here.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
-pairAllowed candidates attackers blocker attacker gs =
+pairAllowed = pairAllowedGiven Map.empty
+
+-- pairAllowed against a pre-projected board, which is what the callers below
+-- pass: this question is asked once per (blocker, attacker) PAIR, so each of its
+-- evasion reads was a fresh gather in a doubly nested loop (#200).
+pairAllowedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
+pairAllowedGiven pcs candidates attackers blocker attacker gs =
   -- CR 509.1a: the blocker must be one this player could block with at all, and
   -- the attacker must actually be attacking.
   List.elem blocker candidates
     && List.elem attacker attackers
-    && evasionAllows blocker attacker gs
-    && fearAllows blocker attacker gs
+    && evasionAllowsGiven pcs blocker attacker gs
+    && fearAllowsGiven pcs blocker attacker gs
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
 -- any are disobeyed the DECLARATION is illegal.
@@ -270,11 +316,21 @@ candidateDeclarations able candidates attackers =
 -- no partial function. Ties go to the EARLIER declaration in enumeration order;
 -- which one is picked matters only to forcedBlockDeclaration's broken-interpreter
 -- path, never to legality, which compares counts.
+--
+-- One grant walk and one whole-board projection for the whole search, threaded
+-- into the candidate list and into every pair `able` judges -- see canAttackGiven
+-- and Projection.projectGiven. Nothing between the projection and its uses can
+-- move: this is a pure function of one GameState. blockCeilingGiven is the half
+-- legalBlockDeclaration reaches, so that the two of them share one board rather
+-- than taking one apiece.
 blockCeiling :: PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId ObjectId)
-blockCeiling pid gs =
+blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+
+blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId ObjectId)
+blockCeilingGiven grants pcs pid gs =
   let attackers = Map.keys (Combat.attackers (GameState.combat gs))
-      candidates = legalBlockers pid gs
-      able blocker attacker = pairAllowed candidates attackers blocker attacker gs
+      candidates = legalBlockersGiven grants pcs pid gs
+      able blocker attacker = pairAllowedGiven pcs candidates attackers blocker attacker gs
       requirements = BlockRequirement.instances able candidates attackers gs
       better best declaration =
         if requirementsMet requirements declaration > requirementsMet requirements best
@@ -304,10 +360,13 @@ blockCeiling pid gs =
 -- (#343).
 legalBlockDeclaration :: PlayerId -> Map ObjectId ObjectId -> GameState -> Bool
 legalBlockDeclaration pid declaration gs =
-  let attackers = Map.keys (Combat.attackers (GameState.combat gs))
-      candidates = legalBlockers pid gs
-      able blocker attacker = pairAllowed candidates attackers blocker attacker gs
-      (requirements, best) = blockCeiling pid gs
+  -- Hoisted exactly as blockCeiling hoists, and for the same reason.
+  let grants = Projection.controlGrants gs
+      pcs = Projection.projectAll gs
+      attackers = Map.keys (Combat.attackers (GameState.combat gs))
+      candidates = legalBlockersGiven grants pcs pid gs
+      able blocker attacker = pairAllowedGiven pcs candidates attackers blocker attacker gs
+      (requirements, best) = blockCeilingGiven grants pcs pid gs
    in declarationAllowed able declaration
         && requirementsMet requirements declaration >= requirementsMet requirements best
 

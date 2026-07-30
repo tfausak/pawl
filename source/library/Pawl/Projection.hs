@@ -313,7 +313,15 @@ printedSupertypes oid gs = case Game.cardOf oid gs of
 -- the printed type line), and its projected controller (CR 613.1b; Nothing when
 -- the id is unknown -- e.g. a source that has left the battlefield).
 viewOfObject :: ObjectId -> GameState -> Filter.View
-viewOfObject oid gs = viewOfCharacteristics oid (project oid gs) (controllerOf oid gs) gs
+viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
+
+-- viewOfObject against a pre-projected board and a precomputed grant list -- the
+-- shape a caller filtering a whole pool of candidates wants, so that one
+-- projection and one grant walk serve every candidate instead of two per
+-- candidate. See projectGiven for what the board is and when it is valid.
+viewOfObjectGiven :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> ObjectId -> GameState -> Filter.View
+viewOfObjectGiven pcs grants oid gs =
+  viewOfCharacteristics oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) gs
 
 -- The ViewOf for callers OUTSIDE the CR 613 layer fold: a full projection of
 -- every object, layers fully applied. This is what every count wants once the
@@ -1590,6 +1598,50 @@ projectAll gs =
       forObject = projectFrom cands
    in Map.fromSet (\oid -> forObject oid gs) (GameState.battlefield gs)
 
+-- One object's characteristics out of a PRE-PROJECTED board -- the Map projectAll
+-- returns -- falling back to a fresh single-object projection for an id the board
+-- does not hold. Every `...Given` reader below is this plus one field read, and
+-- every plain `...Of` reader is one of those against Map.empty.
+--
+-- This is not an approximation of `project`, it IS `project`. Where the key
+-- exists, projectAll folded the SAME gathered candidate list `project` would
+-- rebuild for that object alone (see projectAll), so the two agree by
+-- construction. Where it does not, the id is not on the battlefield -- gather
+-- walks the battlefield only -- and projecting it here is the same work
+-- `project` would have done anyway. Sba.stillLegalEnchant's haddock argues the
+-- identical point for the SBA sweep's board.
+--
+-- The board is a SNAPSHOT of one GameState, so it is the right answer only while
+-- that state is the one being read. A caller hoists it inside a single pure pass
+-- over one `gs` and must re-project after any change to the state; every hoist
+-- in the engine sits in exactly such a pass (Sba.performStateBasedActions,
+-- Combat.legalAttackers, Mana.manaSources, Action.legalActions,
+-- Target.legalRecipients), and the monadic callers around them take a fresh
+-- State.get and so a fresh board.
+--
+-- Map.empty is the honest way to say "no snapshot": every read then projects for
+-- itself, which is the right cost for a lone query and the same answer either
+-- way.
+--
+-- The battlefield test is what keeps the fallback from COSTING anything. The
+-- board is built value-strict (Map.fromSet), so touching it at all projects every
+-- permanent -- and an id gather could never have reached is not worth that: a
+-- spell on the stack matched by a Filter (Target.legalRecipients' Pool.Spells
+-- arm) would otherwise force a whole-board projection to learn it is absent.
+-- Never a different answer, only a cheaper route to the same one: the board is
+-- keyed on GameState.battlefield of this same state, so an off-battlefield id
+-- could not have been a key. Map.null short-circuits it for the Map.empty
+-- callers, who are every plain reader above.
+projectGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> ProjectedCharacteristics
+projectGiven pcs oid gs =
+  let found =
+        if Map.null pcs || not (Set.member oid (GameState.battlefield gs))
+          then Nothing
+          else Map.lookup oid pcs
+   in case found of
+        Just pc -> pc
+        Nothing -> project oid gs
+
 powerOf :: ObjectId -> GameState -> Maybe Integer
 powerOf oid gs = PC.power (project oid gs)
 
@@ -1600,18 +1652,27 @@ toughnessOf oid gs = PC.toughness (project oid gs)
 -- keyword (see ProjectedCharacteristics.keywords for why the count is kept).
 -- Most readers want hasKeyword or totalToxic rather than the raw counts.
 keywordsOf :: ObjectId -> GameState -> Map Keyword Natural
-keywordsOf oid gs = PC.keywords (project oid gs)
+keywordsOf = keywordsGiven Map.empty
+
+keywordsGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Map Keyword Natural
+keywordsGiven pcs oid gs = PC.keywords (projectGiven pcs oid gs)
 
 -- CR 105.2 / 613.1e: an object's colours after the layer fold. The SOLE read
 -- point -- the closed half never reads Card.manaCost for colour, the same
 -- discipline keywordsOf established at M2a.
 colorsOf :: ObjectId -> GameState -> Set Color.Color
-colorsOf oid gs = PC.colors (project oid gs)
+colorsOf = colorsGiven Map.empty
+
+colorsGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Set Color.Color
+colorsGiven pcs oid gs = PC.colors (projectGiven pcs oid gs)
 
 -- CR 602 / 613.1f: an object's activated abilities after the layer system, the
 -- same projection posture as keywordsOf. A Humility'd creature has none.
 abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilitiesOf oid gs = PC.activatedAbilities (project oid gs)
+abilitiesOf = abilitiesGiven Map.empty
+
+abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilitiesGiven pcs oid gs = PC.activatedAbilities (projectGiven pcs oid gs)
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none.
@@ -1628,6 +1689,10 @@ replacementsOf oid gs = PC.replacementEffects (project oid gs)
 -- is sound only because the one way to acquire a replacement effect you were not
 -- printed with is `EntryR AsCopy` -- and a card with that arm is itself a base
 -- card with a replacement effect, so it keeps `baseHas` true for its own object.
+--
+-- Past the short-circuit this projects per permanent rather than threading one
+-- board (projectGiven), so a board holding any replacement effect at all pays a
+-- fresh gather for every permanent on it (#435).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect)]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -1656,7 +1721,10 @@ triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility Card.Type.Car
 triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Type.Subtype
-subtypesOf oid gs = PC.subtypes (project oid gs)
+subtypesOf = subtypesGiven Map.empty
+
+subtypesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Set Subtype.Type.Subtype
+subtypesGiven pcs oid gs = PC.subtypes (projectGiven pcs oid gs)
 
 -- CR 201.1 / 707.2: the object's projected name -- a Clone's is the name it
 -- copied, not "Clone".
@@ -1668,19 +1736,28 @@ supertypesOf :: ObjectId -> GameState -> Set Supertype.Supertype
 supertypesOf oid gs = PC.supertypes (project oid gs)
 
 cardTypesOf :: ObjectId -> GameState -> Set CardType.CardType
-cardTypesOf oid gs = PC.cardTypes (project oid gs)
+cardTypesOf = cardTypesGiven Map.empty
+
+cardTypesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Set CardType.CardType
+cardTypesGiven pcs oid gs = PC.cardTypes (projectGiven pcs oid gs)
 
 -- CR 613.1d: creature-ness is the projected card-type question, the same
 -- projection posture as keywordsOf. An Opalescence'd enchantment is a creature.
 isCreatureOf :: ObjectId -> GameState -> Bool
-isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)
+isCreatureOf = isCreatureGiven Map.empty
+
+isCreatureGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
+isCreatureGiven pcs oid gs = Set.member CardType.Creature (cardTypesGiven pcs oid gs)
 
 -- Membership, which DISCARDS the count -- and is exactly right for every
 -- keyword whose multiple instances the rules call redundant (CR 702.3c
 -- defender, CR 702.9c flying). A keyword that stacks is asked about with its
 -- own reader instead; totalToxic just below is the first.
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
-hasKeyword keyword oid gs = Map.member keyword (keywordsOf oid gs)
+hasKeyword = hasKeywordGiven Map.empty
+
+hasKeywordGiven :: Map ObjectId ProjectedCharacteristics -> Keyword -> ObjectId -> GameState -> Bool
+hasKeywordGiven pcs keyword oid gs = Map.member keyword (keywordsGiven pcs oid gs)
 
 -- CR 702.164b: "A creature's total toxic value is the sum of all N values of
 -- toxic abilities that creature has." Not hasKeyword's question -- toxic is
@@ -1851,9 +1928,16 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 -- the difference between linear and quadratic in the battlefield, in a function
 -- the state-based-action sweep calls at every priority boundary.
 controls :: PlayerId.PlayerId -> GameState -> [ObjectId]
-controls pid gs =
-  let grants = controlGrants gs
-   in filter (\oid -> controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs))
+controls pid gs = controlsGiven (controlGrants gs) pid gs
+
+-- controls with the grant list PRECOMPUTED, for a caller that then asks
+-- controllerOfGiven (or anything else built on the same list) about the
+-- permanents it hands back -- Combat.legalAttackers, Mana.manaSources and
+-- Action.legalActions all do, and threading the one list keeps the loop from
+-- rebuilding it per candidate on top of the rebuild this function already avoids.
+controlsGiven :: [ControlGrant] -> PlayerId.PlayerId -> GameState -> [ObjectId]
+controlsGiven grants pid gs =
+  filter (\oid -> controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs))
 
 -- CR 800.4a: does this stored effect give `pid` control of an object? The
 -- control-granting classification Pawl.Departure asks, so that the case on

@@ -42,6 +42,7 @@ import qualified Pawl.Type.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
@@ -163,12 +164,20 @@ producedTypes production = case production of
 -- them elides a prompt that has no content -- the one such elision that needs no
 -- judgement about what "indistinguishable" means.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
-manaTypesOf oid gs =
-  let fromSubtypes = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
+manaTypesOf = manaTypesOfGiven Map.empty
+
+-- The same list against a pre-projected board, for a caller asking it of every
+-- source a player controls -- manaSources below and payableResolutions both do,
+-- and each of the two projection reads here was a fresh gather per source (#200).
+-- See Projection.projectGiven for what the board is and why Map.empty above is
+-- the same answer.
+manaTypesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaType]
+manaTypesOfGiven pcs oid gs =
+  let fromSubtypes = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs))
       fromAbilities =
         concatMap
           (concatMap producedTypes . Maybe.mapMaybe Resolve.manaProduced . Modal.allEffects . ActivatedAbility.modal)
-          (filter isManaAbility (Projection.abilitiesOf oid gs))
+          (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in List.nub (fromSubtypes <> fromAbilities)
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
@@ -223,8 +232,27 @@ emptyManaPools gs =
 -- Untapped permanents this player controls that can produce mana (CR 109.4a:
 -- a mana ability's controller is determined as though it were on the stack --
 -- i.e. the permanent's controller, CR 110.2 -- not the object's owner).
+--
+-- ONE control-grant walk and ONE whole-board projection for the whole sweep,
+-- threaded into every question asked of every permanent -- the hoist
+-- Sba.performStateBasedActions takes for the CR 704.3 sweep and
+-- Projection.controls takes for the grant list. Unhoisted, each candidate cost as
+-- many as four fresh Projection.gathers -- two for its mana types alone
+-- (manaTypesOf reads subtypes and abilities separately), one for the card-type
+-- test and one for the haste read behind it -- plus a fresh grant walk, which
+-- made a function the priority loop reaches at every boundary quadratic in the
+-- battlefield (#200).
+--
+-- Projection.projectGiven carries the snapshot argument. It holds here because
+-- this is a pure function of one GameState: nothing can move between the
+-- projection and its uses, and payCost's loop -- the one caller that DOES change
+-- the state, by tapping -- takes a fresh State.get and so a fresh board on every
+-- pass.
 manaSources :: PlayerId -> GameState -> [ObjectId]
-manaSources pid gs =
+manaSources pid gs = manaSourcesGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+
+manaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
+manaSourcesGiven grants pcs pid gs =
   let -- CR 302.6: a sick creature can't use a {T} mana ability. A land is never
       -- sick-gated. (M3e mana abilities all cost {T}.) Keyed to `pid`: the
       -- creature must have settled under the player reaching for the mana, not
@@ -232,12 +260,12 @@ manaSources pid gs =
       -- applies here exactly as it does to any other {T} ability, which is what
       -- makes Act of Treason's rider pay off.
       notSickCreature oid =
-        not (Set.member CardType.Creature (Projection.cardTypesOf oid gs))
-          || Summoning.settledOrHasty pid oid gs
+        not (Set.member CardType.Creature (Projection.cardTypesGiven pcs oid gs))
+          || Summoning.settledOrHastyGiven pcs pid oid gs
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False
-        Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs)) && notSickCreature oid
-   in filter isSource (Projection.controls pid gs)
+        Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOfGiven pcs oid gs)) && notSickCreature oid
+   in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- Activate an object's intrinsic mana ability: tap it, add its mana. CR 605.3b:
 -- a mana ability does not use the stack, so this is immediate -- which is also
@@ -731,9 +759,14 @@ canPayCommitting pid committed cost gs = not (null (payableResolutions pid commi
 payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
 payableResolutions pid committed cost gs =
   let Mana.MkMana units = poolOf pid gs
+      -- The SAME board manaSources is judged against serves the per-source mana
+      -- types too, rather than a fresh projection per source on top of the sweep
+      -- (#200); see manaSources above for the hoist and its snapshot argument.
+      grants = Projection.controlGrants gs
+      pcs = Projection.projectAll gs
       supplies =
         fmap (Set.singleton . ManaUnit.manaType) units
-          <> fmap (\oid -> Set.fromList (manaTypesOf oid gs)) (manaSources pid gs)
+          <> fmap (\oid -> Set.fromList (manaTypesOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
       couldServe wanted = length (filter (not . Set.disjoint wanted) supplies)
       payable (demands, generic, life) =
         let -- A demand belongs to the set W exactly when every type that could

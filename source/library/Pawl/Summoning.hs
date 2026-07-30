@@ -9,6 +9,7 @@
 -- unrepresentable.
 module Pawl.Summoning where
 
+import qualified Data.Map.Strict as Map
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import Pawl.Type.GameState (GameState)
@@ -16,6 +17,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Sickness as Sickness
 
 -- CR 302.6: has `pid` controlled `oid` continuously since their most recent turn
@@ -32,8 +34,15 @@ import qualified Pawl.Type.Sickness as Sickness
 -- the tap symbol or the untap symbol". Haste is read through the projection, so
 -- a GRANTED haste (Act of Treason's rider) counts exactly as a printed one does.
 settledOrHasty :: PlayerId -> ObjectId -> GameState -> Bool
-settledOrHasty pid oid gs = case Game.lookupObject oid gs of
+settledOrHasty = settledOrHastyGiven Map.empty
+
+-- The same predicate against a pre-projected board, so a caller sweeping the
+-- battlefield reads haste out of the one projection it already took rather than
+-- projecting per creature (#200). See Projection.projectGiven for what the board
+-- is and why Map.empty above is the same answer.
+settledOrHastyGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> Bool
+settledOrHastyGiven pcs pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
     Object.sickness obj == Sickness.Settled pid
-      || Projection.hasKeyword Keyword.Haste oid gs
+      || Projection.hasKeywordGiven pcs Keyword.Haste oid gs
