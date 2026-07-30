@@ -1700,6 +1700,210 @@ effectRemovalTests registry =
           _ -> HU.assertFailure "fixture should give alice two Pikers and a Labyrinth, and bob a blocker"
     ]
 
+-- alice is mid-combat with Opalescence, Living Plane and a Goblin Piker, plus one
+-- Forest that Living Plane has made a 1/1 creature; bob defends with nothing but
+-- the two Swamps that pay for the Doom Blade in his hand. The board sits at the
+-- declare attackers step like every combatBoardOf board, so the ENGINE declares
+-- the attack: no test here writes the combat record.
+--
+-- Returns alice's three declared permanents in printing order alongside the
+-- Forest, which is added separately because it is not one of them.
+unmakeBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId)
+unmakeBoard opalescence livingPlane piker forest swamp doomBlade =
+  let (gs0, mine, _) = S.combatBoardOf [opalescence, livingPlane, piker] []
+      (land, gs1) = S.addCreature forest S.alice gs0
+      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addCreature swamp S.bob g))
+   in (snd (S.addHandCard doomBlade S.bob (addSwamps 2 gs1)), mine, land)
+
+-- alice attacks with `land` alone, nobody blocks, and whoever is offered a cast
+-- takes it and aims every target at `victim`. The shape of `steal` above, and it
+-- declines blocks for the same reason: bob's own lands are 1/1 creatures while
+-- Living Plane lives, so an aggressive blocker answer would route the attack
+-- through CR 509.1 and hide the question this asks.
+unmake :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+unmake land victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseAction {} -> S.castAnswer p
+  Prompt.DeclareAttackers _ _ ids -> filter (== land) ids
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- alice attacks with one Goblin Piker and holds the Doom Blade and the two
+-- Swamps that pay for it; bob defends with Opalescence, Living Plane and the
+-- Forest that Living Plane has made a 1/1 creature. The mirror of unmakeBoard,
+-- with the animator on the DEFENDING side so the creature that stops being one is
+-- a blocker.
+unblockBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId)
+unblockBoard opalescence livingPlane piker forest swamp doomBlade =
+  let (gs0, mine, theirs) = S.combatBoardOf [piker] [opalescence, livingPlane]
+      (land, gs1) = S.addCreature forest S.bob gs0
+      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addCreature swamp S.alice g))
+   in (snd (S.addHandCard doomBlade S.alice (addSwamps 2 gs1)), mine, theirs, land)
+
+-- Attack with `attacker` alone and cast nothing. The declare attackers step of
+-- the blocker leg is played under this, so alice's Swamps -- 1/1 creatures while
+-- Living Plane lives, and therefore legal attackers -- stay untapped to pay for
+-- the Doom Blade she casts a step later.
+attackOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackOnly attacker p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+  _ -> S.aggressiveAnswer p
+
+-- Block the first attacker with `blocker` alone and cast nothing: the control leg
+-- of the blocker case, where Living Plane is left alone and the block resolves
+-- into an ordinary trade.
+blockOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+blockOnly blocker p = case p of
+  Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
+    a : _ -> Map.singleton blocker a
+    [] -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- Block the first attacker with `blocker` alone, cast whenever a cast is offered,
+-- and aim every target at `victim`. Blocking with everything instead would put
+-- Living Plane -- a 4/4 creature while Opalescence is out -- in front of the
+-- attacker too, and killing it would then be a blocker LEAVING THE BATTLEFIELD,
+-- which is a different clause of CR 506.4.
+unblock :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+unblock blocker victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseAction {} -> S.castAnswer p
+  Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
+    a : _ -> Map.singleton blocker a
+    [] -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- CR 506.4: "A permanent is removed from combat if ... it's an attacking or
+-- blocking creature that ... stops being a creature."
+--
+-- The clause has no one-card producer, and does not need one: the rule asks about
+-- the permanent's creature-ness, not about how it was lost. Three pool cards make
+-- it happen through the layer system alone, and every oracle text below was
+-- checked against Scryfall.
+--
+--   * Living Plane ({2}{G}{G} World Enchantment, "All lands are 1/1 creatures
+--     that are still lands") is what makes a Forest able to attack or block.
+--   * Opalescence ({2}{W}{W} Enchantment, "Each other non-Aura enchantment is a
+--     creature in addition to its other types and has base power and base
+--     toughness each equal to its mana value") is what puts Living Plane itself
+--     within reach of a creature-removal spell. Without it nothing in the pool
+--     can touch an enchantment at instant speed, which is why this clause was
+--     filed card-driven rather than built speculatively (#246).
+--   * Doom Blade ({1}{B} Instant, "Destroy target nonblack creature") kills the
+--     green Living Plane in the priority round after the declaration.
+--
+-- CR 611.3b is what makes that enough: a static ability's continuous effect
+-- "applies at all times that the permanent generating it is on the battlefield",
+-- so Living Plane leaving takes the animation with it and the Forest stops being
+-- a creature WITHOUT leaving the battlefield. That is what makes this the types
+-- clause rather than CR 506.4's leaves-the-battlefield one, and each leg asserts
+-- the Forest is still on the battlefield to pin it.
+--
+-- Every leg runs whole steps through Engine.runStep and stops at the end of
+-- combat step, where CR 511.3 says the record still reads live.
+typeChangeRemovalTests :: Registry.Type.Registry -> Tasty.TestTree
+typeChangeRemovalTests registry =
+  Tasty.testGroup
+    "TypeChangeRemoval"
+    [ HU.testCase "CR 506.4 whole cards: an attacking Forest that stops being a creature is removed from combat" $ do
+        forest <- Registry.printing registry "Forest"
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        opalescence <- Registry.printing registry "Opalescence"
+        livingPlane <- Registry.printing registry "Living Plane"
+        doomBlade <- Registry.printing registry "Doom Blade"
+        case unmakeBoard opalescence livingPlane piker forest swamp doomBlade of
+          (gs, [_, plane, _], land) -> do
+            let atEnd = runToEndOfCombat (unmake land plane) gs
+                attackers = Combat.Type.attackers (GameState.combat atEnd)
+            HU.assertEqual "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase atEnd)
+            HU.assertBool "the Forest really was attacking: the declaration happened while it was a creature" (elem land (S.attackerDeclarationsOf atEnd))
+            HU.assertBool "the Doom Blade really did kill Living Plane" (not (S.onBattlefield plane atEnd))
+            HU.assertBool "CR 611.3b: so the Forest stopped being a creature" (not (Projection.isCreatureOf land atEnd))
+            HU.assertBool "and is still on the battlefield, so this is the types clause and not the leaves-the-battlefield one" (S.onBattlefield land atEnd)
+            -- The discriminating assertion: the unfixed engine leaves the Forest
+            -- in the record, still attacking a player it can no longer attack.
+            HU.assertBool "CR 506.4: it is no longer an attacking creature" (Map.notMember land attackers)
+            HU.assertEqual "CR 510.1: and bob takes nothing" (Just 20) (S.lifeOf S.bob atEnd)
+          _ -> HU.assertFailure "fixture should give alice Opalescence, Living Plane and a Piker",
+      HU.testCase "CR 506.4 the twin: the same Doom Blade on a creature that is not the animator leaves combat intact" $ do
+        -- The control leg, and the reason the case above is not passing for a
+        -- trivial reason. The SAME card resolves, the SAME settle runs, and a
+        -- creature really does die -- just not the one the Forest's creature-ness
+        -- hangs on. A sampler that cleared combat whenever anything died, or
+        -- whenever anything resolved, would take the Forest out here too.
+        forest <- Registry.printing registry "Forest"
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        opalescence <- Registry.printing registry "Opalescence"
+        livingPlane <- Registry.printing registry "Living Plane"
+        doomBlade <- Registry.printing registry "Doom Blade"
+        case unmakeBoard opalescence livingPlane piker forest swamp doomBlade of
+          (gs, [_, plane, homebody], land) -> do
+            let atEnd = runToEndOfCombat (unmake land homebody) gs
+                attackers = Combat.Type.attackers (GameState.combat atEnd)
+            HU.assertBool "the Piker that stayed home died instead" (not (S.onBattlefield homebody atEnd))
+            HU.assertBool "Living Plane survives" (S.onBattlefield plane atEnd)
+            HU.assertBool "so the Forest is still a creature" (Projection.isCreatureOf land atEnd)
+            HU.assertBool "and still attacking" (Map.member land attackers)
+            HU.assertEqual "so bob takes its 1" (Just 19) (S.lifeOf S.bob atEnd)
+          _ -> HU.assertFailure "fixture should give alice Opalescence, Living Plane and a Piker",
+      HU.testCase "CR 509.1h a BLOCKER that stops being a creature leaves the attacker blocked, so nothing is dealt combat damage" $ do
+        -- The blocker side of the same clause, through the same performer: the
+        -- Forest leaves the SET while the attacker's KEY survives, so the Piker
+        -- stays blocked and CR 510.1c gives it nobody to assign damage to.
+        --
+        -- This is the leg where the removal is observable as DAMAGE. An attacker
+        -- that stops being a creature loses its power along with its card type, so
+        -- Damage.attackerAssignment's Projection.powerOf already declines to
+        -- assign anything for it; a stale BLOCKER is screened only for liveness
+        -- (Damage's onBattlefield filter), so the unfixed engine marks the
+        -- attacker's 2 on a land that is no longer a creature at all.
+        --
+        -- The kill has to land after blocks are declared, so the declare attackers
+        -- step is played under an answerer that never casts and only the declare
+        -- blockers step onwards sees `unblock`.
+        forest <- Registry.printing registry "Forest"
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        opalescence <- Registry.printing registry "Opalescence"
+        livingPlane <- Registry.printing registry "Living Plane"
+        doomBlade <- Registry.printing registry "Doom Blade"
+        case unblockBoard opalescence livingPlane piker forest swamp doomBlade of
+          (gs, [attacker], [_, plane], land) -> do
+            let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackOnly attacker) gs
+                atEnd = runToEndOfCombat (unblock land plane) atBlockers
+                -- The control leg: the same board and the same block, with alice
+                -- never casting. The 2/1 Piker and the 1/1 Forest then trade.
+                traded = runToEndOfCombat (blockOnly land) atBlockers
+            HU.assertEqual "the leg hands over at the declare blockers step, so the block is declared before the kill" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase atBlockers)
+            HU.assertBool "the Doom Blade really did kill Living Plane" (not (S.onBattlefield plane atEnd))
+            HU.assertBool "CR 611.3b: so the Forest stopped being a creature" (not (Projection.isCreatureOf land atEnd))
+            HU.assertBool "and is still on the battlefield" (S.onBattlefield land atEnd)
+            -- The discriminating assertion: the unfixed engine leaves the Forest
+            -- in the blocker set and marks the Piker's 2 on it.
+            HU.assertEqual "CR 510.1c: nothing was dealt combat damage" (Just 0) (S.damageOf land atEnd)
+            HU.assertEqual "CR 506.4: the Forest is blocking nothing" Set.empty (Combat.blockersOf attacker atEnd)
+            HU.assertBool "CR 509.1h: but the attacker remains blocked" (Combat.isBlocked attacker atEnd)
+            HU.assertEqual "so bob takes nothing either" (Just 20) (S.lifeOf S.bob atEnd)
+            HU.assertBool "control leg: with Living Plane left alone the Piker and the Forest trade" (not (S.onBattlefield attacker traded) && not (S.onBattlefield land traded))
+          _ -> HU.assertFailure "fixture should give alice a Piker and bob Opalescence, Living Plane and a Forest"
+    ]
+
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
 -- chooses which defending player ... it's attacking ... Such creatures are
 -- 'attacking' but, for the purposes of trigger events and effects, they never
@@ -1784,6 +1988,7 @@ tests registry =
       blockRequirementTests registry,
       controlChangeSicknessTests registry,
       controlChangeRemovalTests registry,
+      typeChangeRemovalTests registry,
       effectRemovalTests registry,
       putOntoBattlefieldAttackingTests registry
     ]

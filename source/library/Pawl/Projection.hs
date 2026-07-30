@@ -1176,19 +1176,22 @@ data Aspect
 -- Controller and Types here. pawl does not derive it: attacking-ness is a stored
 -- combat record (CR 109.3 is emphatic that it is not a characteristic), CR 506.4
 -- is performed by EDITING that record, and the edit happens between projections
--- (Combat.removeControlChanged, from Engine.settleForPriority) rather than inside
--- one. So the record is a fixed INPUT to any single projection: applying one
+-- (Combat.removeChanged, from Engine.settleForPriority) rather than inside one.
+-- So the record is a fixed INPUT to any single projection: applying one
 -- modification before another cannot change what this arm answers, which is
--- exactly the question CR 613.8a asks. CR 506.4's "an effect specifically
--- removes it from combat" clause does not disturb that: Effect.RemoveFromCombat
--- edits the same record from Resolve.applyEffect, which is a RESOLUTION and so
--- between projections just as squarely as a settle is. The remaining clauses
--- (#246) arrive by one of those two doors as well.
+-- exactly the question CR 613.8a asks. That holds for the TYPES clause too, and
+-- it is the one that looks most like a dependency: a modification really can be
+-- what makes a permanent stop being a creature, but the removal it causes lands
+-- at the next settle, not inside the projection that noticed it. CR 506.4's "an
+-- effect specifically removes it from combat" clause does not disturb it either:
+-- Effect.RemoveFromCombat edits the same record from Resolve.applyEffect, which
+-- is a RESOLUTION and so between projections just as squarely as a settle is. The
+-- clauses that remain unbuilt (#246) arrive by one of those two doors as well.
 --
 -- What that costs is TIMING, not dependency: the rules remove the permanent the
--- instant control changes, and pawl removes it at the next settle. That window is
--- argued where the sampling happens. The effect clause has no such window at
--- all, because a resolving effect edits the record on the spot.
+-- instant control or creature-ness changes, and pawl removes it at the next
+-- settle. That window is argued where the sampling happens. The effect clause has
+-- no such window at all, because a resolving effect edits the record on the spot.
 filterReads :: Filter.Type.Filter -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
@@ -1748,6 +1751,15 @@ isCreatureOf = isCreatureGiven Map.empty
 
 isCreatureGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
 isCreatureGiven pcs oid gs = Set.member CardType.Creature (cardTypesGiven pcs oid gs)
+
+-- The same question against a PRECOMPUTED candidate list rather than a
+-- pre-projected board -- projectFrom's posture instead of projectGiven's. For a
+-- caller that asks about a HANDFUL of objects out of a whole battlefield
+-- (Combat.removeChanged's combatants), that is the cheaper of the two: one
+-- gather and one fold per object asked about, where projectAll would fold every
+-- permanent on the board. Same answer either way, by projectAll's own argument.
+isCreatureFrom :: [Gathered] -> ObjectId -> GameState -> Bool
+isCreatureFrom cands oid gs = Set.member CardType.Creature (PC.cardTypes (projectFrom cands oid gs))
 
 -- Membership, which DISCARDS the count -- and is exactly right for every
 -- keyword whose multiple instances the rules call redundant (CR 702.3c

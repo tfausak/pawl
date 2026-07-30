@@ -410,61 +410,80 @@ isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
 combatants :: Combat -> Set ObjectId
 combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.elems (Combat.blockers c)))
 
--- CR 506.4: "A permanent is removed from combat if ... its controller changes."
--- The one clause of that rule whose trigger is DERIVED state, which is why it is
--- a sampler and not a hook: a control change has no event to hang a removal on --
--- a control-granting static ability (Control Magic's SetControllerToSource) is
--- re-read live by the projection, and even a stored SetController is installed by
--- a resolution that never announces "control changed" (#198). The same shape, and
--- the same argument, as Engine.checkControlContinuity's CR 302.6 scan; Engine's
--- settleForPriority runs both, at every point the board can change.
+-- CR 506.4: "A permanent is removed from combat if ... its controller changes ...
+-- or if it's an attacking or blocking creature that ... stops being a creature."
 --
--- The TIMING that costs: the rules remove the permanent the instant control
--- changes, and this notices at the next settle. Nothing can see the difference.
--- CR 117.5 makes "whenever a player would get priority" the coarsest moment
--- anything observes the board, and the two readers of the combat record -- the
--- CR 510 damage steps and Filter.IsAttacking at targeting -- both sit behind a
--- priority grant, which settles first. The window that would open it is a single
--- resolution that changes control and then reads combat status in a LATER effect
--- of the same resolution; no card in the pool has one, and the settle loop is
--- where such a card's fix would go.
+-- The two clauses of that rule whose trigger is DERIVED state, which is why this
+-- is a sampler and not a hook. Neither has an event to hang a removal on: a
+-- control-granting static ability (Control Magic's SetControllerToSource) is
+-- re-read live by the projection, and even a stored SetController is installed by
+-- a resolution that never announces "control changed" (#198); creature-ness is
+-- the same, a CR 613 layer-4 answer that changes the moment the effect producing
+-- it appears or ends. The same shape, and the same argument, as
+-- Engine.checkControlContinuity's CR 302.6 scan; Engine's settleForPriority runs
+-- both, at every point the board can change.
+--
+-- The TIMING that costs: the rules remove the permanent the instant the
+-- characteristic changes, and this notices at the next settle. Nothing can see
+-- the difference. CR 117.5 makes "whenever a player would get priority" the
+-- coarsest moment anything observes the board, and the two readers of the combat
+-- record -- the CR 510 damage steps and Filter.IsAttacking at targeting -- both
+-- sit behind a priority grant, which settles first. The window that would open it
+-- is a single resolution that changes control or card types and then reads combat
+-- status in a LATER effect of the same resolution; no card in the pool has one,
+-- and the settle loop is where such a card's fix would go.
 --
 -- It only ever REMOVES. That asymmetry is what makes the sampling sound, exactly
--- as it is there: a discrepancy proves control changed, so removing is always
--- right, while putting a creature BACK when control returns would invent a
--- CR 506.4 the rules do not have -- removal from combat is permanent for that
--- combat phase (the glossary: "has no further involvement in that combat phase").
+-- as it is there: a discrepancy proves the characteristic changed, so removing is
+-- always right, while putting a creature BACK when control returns or the
+-- animation is recast would invent a CR 506.4 the rules do not have -- removal
+-- from combat is permanent for that combat phase (the glossary: "has no further
+-- involvement in that combat phase").
 --
--- Battlefield-scoped, so this stays the control-change clause and nothing else.
--- CR 110.1 makes a permanent something on the battlefield, and an object that has
--- LEFT it was already removed by that separate clause of CR 506.4 -- whose
--- implementation is elsewhere (Pawl.Departure, and Pawl.Damage's liveness filters
--- for the CR 509.1h key this must not disturb). Without the gate, an object gone
--- from GameState.objects would answer Nothing here and be swept up under the
--- wrong clause.
+-- Battlefield-scoped, so this stays these two clauses and nothing else. CR 110.1
+-- makes a permanent something on the battlefield, and an object that has LEFT it
+-- was already removed by that separate clause of CR 506.4 -- whose implementation
+-- is elsewhere (Pawl.Departure, and Pawl.Damage's liveness filters for the
+-- CR 509.1h key this must not disturb). Without the gate, an object gone from
+-- GameState.objects would answer Nothing to both questions here and be swept up
+-- under the wrong clause.
 --
--- Removal goes through Game.removeFromCombat, so a stolen ATTACKER takes its
--- blocked-ness with it (Map.delete) while a stolen BLOCKER leaves the attacker
+-- Removal goes through Game.removeFromCombat, so a removed ATTACKER takes its
+-- blocked-ness with it (Map.delete) while a removed BLOCKER leaves the attacker
 -- blocked with nothing blocking it (Set.delete inside a surviving key) --
 -- CR 509.1h's last sentence, argued in full at that function.
 --
--- A combatant with no entry in Combat.joinedUnder is left alone, because there is
--- nothing to compare it against and this only ever removes. Unreachable through
--- the engine: declareAttackers and declareBlockers write the snapshot in the same
--- update that puts the creature into the record.
+-- The types clause reads the creature card type ALONE, and that is exact today
+-- rather than a simplification of CR 506.4d/e: those two subrules are about a
+-- permanent that is also an attacked planeswalker or battle, and neither card
+-- type is modeled (#301, #302), so nothing in pawl's combat record is anything
+-- but a creature. CR 506.4's "becomes a battle" clause is unreachable for the
+-- same reason, and "phases out" for phasing's (#154).
 --
--- Nobody in combat short-circuits, which is most of the game: the grant list
--- costs a whole-battlefield scan (Projection.controlGrants), and this runs on
--- every settle pass alongside checkControlContinuity's own.
-removeControlChanged :: GameState -> GameState
-removeControlChanged gs =
+-- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
+-- clause, because there is nothing to compare it against and this only ever
+-- removes. Unreachable through the engine: declareAttackers and declareBlockers
+-- write the snapshot in the same update that puts the creature into the record.
+-- The types clause needs no such comparand -- CR 506.3 lets only a creature be
+-- declared, so every combatant was one, and "is it one now" is the whole test.
+--
+-- Nobody in combat short-circuits, which is most of the game: the grant list and
+-- the gathered candidate list each cost a whole-battlefield scan
+-- (Projection.controlGrants, Projection.gather), both hoisted out of the
+-- per-combatant loop, and this runs on every settle pass alongside
+-- checkControlContinuity's own.
+removeChanged :: GameState -> GameState
+removeChanged gs =
   let c = GameState.combat gs
       inCombat = combatants c
       grants = Projection.controlGrants gs
-      changed oid = case Map.lookup oid (Combat.joinedUnder c) of
+      cands = Projection.gather gs
+      controlChanged oid = case Map.lookup oid (Combat.joinedUnder c) of
         Nothing -> False
         Just who -> Projection.controllerOfGiven grants Set.empty oid gs /= Just who
+      stoppedBeingCreature oid = not (Projection.isCreatureFrom cands oid gs)
       onBattlefield oid = Set.member oid (GameState.battlefield gs)
+      changed oid = controlChanged oid || stoppedBeingCreature oid
       leaving = filter (\oid -> onBattlefield oid && changed oid) (Set.toList inCombat)
    in if Set.null inCombat
         then gs

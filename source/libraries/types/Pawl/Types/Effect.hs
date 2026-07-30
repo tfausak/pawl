@@ -309,7 +309,7 @@ data Effect card
     -- specifically removes it from combat." THIS is that effect -- the rule's one
     -- clause that a card ASKS for rather than a condition the engine has to
     -- notice, which is why it is an opcode and not a sampler like
-    -- Combat.removeControlChanged. Labyrinth of Skophos' "{4}, {T}: Remove target
+    -- Combat.removeChanged. Labyrinth of Skophos' "{4}, {T}: Remove target
     -- attacking or blocking creature from combat" is the card text it exists
     -- for; the slot's target is what leaves.
     --
