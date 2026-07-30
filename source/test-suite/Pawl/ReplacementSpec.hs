@@ -88,8 +88,9 @@ import qualified Test.Tasty.HUnit as HU
 answersFor :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> [Response.Response]
 answersFor answer gs game = snd (Replay.record answer gs game)
 
--- The single activated ability of a printing (Drudge Skeletons has exactly
--- one). Total: the empty-ability fallback is unreachable in this fixture.
+-- The single activated ability of a printing (Drudge Skeletons and Liquimetal
+-- Coating each have exactly one). Total: the empty-ability fallback is
+-- unreachable in this fixture.
 -- Same shape as ActivateSpec.theAbility -- duplicated per this test suite's
 -- existing convention of group-local helpers (ActivateSpec and ManaSpec
 -- already duplicate singleModeAbility the same way) rather than centralizing
@@ -135,6 +136,15 @@ raceAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 raceAnswer preferred victim p = case p of
   Prompt.ChooseReplacement _ _ sources -> maybe 0 Int.toNaturalSaturating (List.elemIndex preferred sources)
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  _ -> S.identityAnswer p
+
+-- Aim every target slot at one object. Recipient.ToObject, not ToCreature as
+-- raceAnswer above uses: both slots this answers -- Liquimetal Coating's and
+-- Skilled Animator's -- are Pool.Permanents, and a recipient tagged for the wrong
+-- pool is not in the legal set at all.
+aimObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   _ -> S.identityAnswer p
 
 countersOn :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
@@ -355,6 +365,87 @@ tests registry =
           HU.assertEqual "the Piker was exiled, not buried" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
           HU.assertEqual "the Piker's card is in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after))
           HU.assertEqual "and Rest in Peace exiled its own card too" 1 (length (Game.zoneMembers Zone.Exile S.alice after)),
+        -- The same CR 704.3 event, across the pass's OTHER seam. The case above
+        -- keeps both victims inside the pass's put-into-graveyard batch; this one
+        -- puts the second victim in the DESTRUCTION batch (CR 704.5g's lethal
+        -- marked damage), which Pawl.Sba performs after the buries. CR 704.3 makes
+        -- the two one event, so the destruction's graveyard move must see the same
+        -- board the buries did -- with Rest in Peace still on it.
+        --
+        -- Rest in Peace is again a 2/2 by Opalescence taken to 0/0 by two -1/-1
+        -- counters (CR 704.5f). The Piker keeps its printed 2/1 and takes 1
+        -- marked damage instead, so it is lethally damaged rather than
+        -- zero-toughness and CR 704.5g claims it.
+        HU.testCase "CR 704.3 a Rest in Peace the pass buries still exiles what the pass DESTROYS" $ do
+          opalescence <- Registry.printing registry "Opalescence"
+          restInPeace <- Registry.printing registry "Rest in Peace"
+          pikerPrinting <- Registry.printing registry "Goblin Piker"
+          let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
+              (rip, g1) = S.addCreature restInPeace S.alice g0
+              (piker, g2) = S.addCreature pikerPrinting S.bob g1
+              board = S.markDamage piker 1 (S.addCounter CounterKind.MinusOneMinusOne 2 rip g2)
+              after = S.settleSba board
+          HU.assertEqual "setup: Opalescence's 2/2 is a 0/0, so CR 704.5f buries it" (Just (0, 0)) (S.powerToughnessOf rip board)
+          HU.assertEqual "setup: the Piker is still a 2/1" (Just (2, 1)) (S.powerToughnessOf piker board)
+          HU.assertEqual "setup: with lethal damage marked, so CR 704.5g destroys it" (Just 1) (S.damageOf piker board)
+          HU.assertEqual "the Piker was exiled, not buried" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+          HU.assertEqual "the Piker's card is in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after))
+          HU.assertEqual "and Rest in Peace exiled its own card too" 1 (length (Game.zoneMembers Zone.Exile S.alice after)),
+        -- The other side of the coin above. Sharing the pass's board is what CR
+        -- 704.3 asks of the two halves' REPLACEMENT collection; it is not what it
+        -- asks of the destroy funnel's existence filter, which stays live. CR
+        -- 614.7 is why: "If a replacement effect would replace an event, but that
+        -- event never happens, the replacement effect simply doesn't do anything."
+        -- A permanent the pass's put-into-graveyard half has already moved is not
+        -- on the battlefield to be destroyed, so the destruction never happens and
+        -- a regeneration shield on it must be neither applied nor spent.
+        --
+        -- The one shape in the pool that reaches it: a permanent named by both
+        -- halves of one pass. CR 704.5f's victims can never also be CR 704.5g's
+        -- (Pawl.Sba's classify gives 704.5f priority) and Pawl.Sba already
+        -- excludes CR 704.5j's and CR 704.5k's by name, so an Aura -- named by CR
+        -- 704.5m in the first half and CR 704.5g in the second -- is all that is
+        -- left. Getting one takes Liquimetal Coating plus Skilled Animator, since
+        -- every printed enchantment animator excludes Auras: the Aura is made an
+        -- artifact first, then animated as one. See Pawl.AuraSpec's CR 303.4d case
+        -- for the same fixture proving the detach-then-bury order this builds on.
+        --
+        -- The shield is seeded rather than activated because CR 701.19a's shield
+        -- "protects the permanent" its effect names, and the only two producers in
+        -- the pool -- Drudge Skeletons and Uthden Troll -- name themselves. No Aura
+        -- prints one, so there is no gameplay route to a shield on this Aura.
+        HU.testCase "CR 614.7 an Aura the same pass buries is never offered to a regeneration shield" $ do
+          island <- Registry.printing registry "Island"
+          pikerPrinting <- Registry.printing registry "Goblin Piker"
+          unholyStrength <- Registry.printing registry "Unholy Strength"
+          coating <- Registry.printing registry "Liquimetal Coating"
+          animator <- Registry.printing registry "Skilled Animator"
+          let base = S.landsInPlay island 3 -- {2}{U} for the Animator
+              (creature, g1) = S.addCreature pikerPrinting S.alice base
+              (aura, g2) = S.addCreature unholyStrength S.alice g1
+              (coatingId, g3) = S.addCreature coating S.alice (S.attach aura creature g2)
+              ready = g3 {GameState.priority = Just S.alice}
+              activated = S.runPure (aimObject aura) ready (Activate.activateAbility S.alice coatingId (theAbility coating))
+              coated = S.runPure (aimObject aura) activated Stack.resolveTop
+              (withSpell, spellId) = S.handOne animator coated
+              entered = S.runPure (aimObject aura) withSpell (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+              triggered = S.runPure (aimObject aura) entered Engine.settleForPriority
+              animated = S.runPure (aimObject aura) triggered Stack.resolveTop
+              -- One pass, so the two state-based actions stay separately
+              -- observable: CR 704.5p unattaches the animated Aura here and CR
+              -- 704.5m buries it on the pass below.
+              unattachedNow = S.settleSba animated
+              -- Lethal damage on the 5/5 makes CR 704.5g name it too, so the next
+              -- pass names it in BOTH halves.
+              armed = S.addRegenShield aura (S.markDamage aura 5 unattachedNow)
+              after = S.settleSba armed
+          HU.assertEqual "setup: the Aura is an unattached 5/5" (Just (5, 5)) (S.powerToughnessOf aura armed)
+          HU.assertEqual "setup: attached to nothing, so CR 704.5m names it" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject aura armed))
+          HU.assertEqual "setup: with lethal damage, so CR 704.5g names it as well" (Just 5) (S.damageOf aura armed)
+          HU.assertEqual "setup: exactly one floating replacement, the shield" 1 (length (GameState.replacements armed))
+          HU.assertBool "CR 704.5m buried it" (not (Set.member aura (GameState.battlefield after)))
+          HU.assertEqual "in its owner's graveyard, not regenerated" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+          HU.assertEqual "and the shield was never spent on a destruction that did not happen" 1 (length (GameState.replacements after)),
         HU.testCase "CR 614.1a a move whose destination the pattern misses is untouched" $ do
           restInPeace <- Registry.printing registry "Rest in Peace"
           pikerPrinting <- Registry.printing registry "Goblin Piker"

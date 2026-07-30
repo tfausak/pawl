@@ -162,9 +162,11 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- changeZone for one member of a batch of moves that CR 608.2f or CR 704.3
 -- processes SIMULTANEOUSLY -- the destroy funnel's graveyard moves below, and CR
 -- 704.3's put-into-graveyard batch in Pawl.Sba. `asOf` is the board the batch
--- began in, which is what its members' CR 616.1 loops collect their replacement
--- candidates from; see Pawl.Replacement's applyReplacementsIn for why the loop
--- needs a board rather than a filter, and what stays live.
+-- began in -- or, when the batch is itself part of a larger simultaneous event,
+-- that event's (destroyInBatch below) -- which is what its members' CR 616.1
+-- loops collect their replacement candidates from; see Pawl.Replacement's
+-- applyReplacementsIn for why the loop needs a board rather than a filter, and
+-- what stays live.
 --
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and the ~30 callers that move a single object have no footing to
@@ -328,26 +330,73 @@ changeZoneAttaching asOf oid requestedDest seed = do
 -- 704.5d cease-to-exist still compose). Ungated for CR 701.19c "can't be
 -- regenerated" (#42).
 --
--- `gs` is the batch's whole footing, not just the CR 702.12b gate's: both CR
--- 616.1 loops each victim runs -- the destruction, and the put-into-graveyard
--- that follows it -- collect their candidates from it rather than from the board
--- the earlier victims have already left. So Rest in Peace, animated by
--- Opalescence and swept by Day of Judgment, exiles every card the sweep puts
--- into a graveyard and not merely the ones ahead of it in the sweep. Both loops
--- get the same board because both are parts of the one CR 608.2f event.
---
--- Only the graveyard move's loop can observe the difference today. The
--- destruction loop's only candidates are DestructionR, and every DestructionR in
--- the pool is a regeneration shield the Replace opcode put in the FLOATING store
--- -- which stays live for CR 614.3's use count -- rather than a permanent's
--- printed ability, so the frozen board holds nothing for it to find. It is
--- passed anyway because the rule, not the pool, is what says the two loops are
--- one event. See Pawl.Replacement's applyReplacementsIn for what the frozen
--- board covers and what stays live.
+-- This is the door for a batch that is a whole event to itself. destroyInBatch
+-- below is the door for one nested inside a larger simultaneous event, and
+-- destroyIn -- the shared body -- sets out which board each of its three readers
+-- gets.
 destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
-destroy regenerability oids = do
-  gs <- State.get
-  let doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid gs) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
+destroy = destroyIn Nothing
+
+-- destroy for a batch that is one PART of a larger simultaneous event, whose
+-- board is `asOf`. CR 704.3's state-based-action check is that event -- "the game
+-- checks for any of the listed conditions for state-based actions, then performs
+-- all applicable state-based actions simultaneously as a single event" -- and
+-- Pawl.Sba is the only caller: it performs CR 704.5f/j/k/m's put-into-graveyard
+-- batch and then CR 704.5g/h's destruction batch, which is a sequence only in the
+-- implementation. Both halves therefore stand on the board the PASS began in, so
+-- an animated Rest in Peace the pass itself buries still exiles the card of the
+-- creature the pass destroys.
+--
+-- A separate door rather than a `Maybe GameState` parameter on `destroy`, for the
+-- same reason changeZoneInBatch is one: every other caller -- the Destroy opcode
+-- in Pawl.Resolve and the test suite -- has no larger event to name, and for them
+-- the board the batch begins on IS the live one.
+destroyInBatch :: GameState -> Regenerability.Regenerability -> [ObjectId] -> Game ()
+destroyInBatch asOf = destroyIn (Just asOf)
+
+-- The shared body. Three separate readers of a board, and they do NOT all get the
+-- same one:
+--
+--   1. The CR 616.1 replacement loops -- the destruction's, and the
+--      put-into-graveyard that follows it -- collect from `gs`, the containing
+--      event's board. That is the CR 608.2f / 704.3 "single event" reading: the
+--      effects in force are the ones that existed before the event, so an effect
+--      belonging to a permanent the same event is removing still applies. Both
+--      loops get the same board because both are parts of the one event.
+--   2. The CR 702.12b gate reads `gs` too. Indestructibility is a fact about the
+--      permanent at the moment the event's conditions were judged; letting an
+--      earlier part of the same event change the answer would make it depend on
+--      an order CR 608.2f gives nobody the right to decide -- the same argument
+--      that makes the gate precede the batch's own moves, applied one level out.
+--      For the Pawl.Sba caller this asks the same board `destroyedBySba` asked,
+--      rather than second-guessing it from one the buries have already changed; a
+--      lone caller's `gs` IS the live board, so The Walls of Ba Sing Se under Day
+--      of Judgment is untouched.
+--   3. The existence filter reads `live`, NOT `gs`. This is CR 614.7 -- "If a
+--      replacement effect would replace an event, but that event never happens,
+--      the replacement effect simply doesn't do anything." An object an earlier
+--      part of the event has already put into a graveyard is not on the
+--      battlefield to be destroyed, so no destruction event happens for it and no
+--      regeneration shield may be offered one, let alone spend itself on it. The
+--      reachable shape is an Aura named by CR 704.5m and CR 704.5g in the same
+--      pass; Pawl.ReplacementSpec's "CR 614.7 an Aura the same pass buries is
+--      never offered to a regeneration shield" is the proof. Pawl.Sba already
+--      excludes its CR 704.5j and CR 704.5k victims by name for the same reason,
+--      from the other end.
+--
+-- Only the graveyard move's loop can observe (1) today. The destruction loop's
+-- only candidates are DestructionR, and every DestructionR in the pool is a
+-- regeneration shield the Replace opcode put in the FLOATING store -- which stays
+-- live for CR 614.3's use count -- rather than a permanent's printed ability, so
+-- the frozen board holds nothing for it to find. It is passed anyway because the
+-- rule, not the pool, is what says the two loops are one event. See
+-- Pawl.Replacement's applyReplacementsIn for what the frozen board covers and
+-- what stays live.
+destroyIn :: Maybe GameState -> Regenerability.Regenerability -> [ObjectId] -> Game ()
+destroyIn asOf regenerability oids = do
+  live <- State.get
+  let gs = Maybe.fromMaybe live asOf
+      doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid live) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
   Monad.forM_ doomed $ \oid -> do
     settled <- Replacement.resolveDestruction (Just gs) regenerability oid
     case settled of
