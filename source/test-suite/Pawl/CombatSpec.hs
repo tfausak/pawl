@@ -850,6 +850,11 @@ luring lure mine theirs =
 -- CR 509.1c, proved by Lure ("All creatures able to block enchanted creature do
 -- so") -- the pool's first blocking REQUIREMENT, and the first board on which
 -- declining to block is not a legal answer.
+--
+-- Prized Unicorn ("All creatures able to block this creature do so") is the second
+-- carrier, and the one CR 604.2's layer-6 strip needs: it is a CREATURE, so
+-- Humility's "each creature loses all abilities" reaches its requirement with no
+-- animator in between.
 blockRequirementTests :: Registry.Type.Registry -> Tasty.TestTree
 blockRequirementTests registry =
   Tasty.testGroup
@@ -952,6 +957,59 @@ blockRequirementTests registry =
         HU.assertEqual "bob took nothing" (Just 20) (S.lifeOf S.bob after)
         HU.assertEqual "alice's attacker is dead" 0 (S.creaturesInPlay S.alice after)
         HU.assertEqual "bob's blocker is dead" 0 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 509.1c declining to block a Prized Unicorn is illegal" $ do
+        -- The pool's second blocking requirement, and the first that names its OWN
+        -- SOURCE rather than an attachment: "all creatures able to block THIS
+        -- CREATURE do so" is Affected.Matching Filter.IsSource, matched against the
+        -- attacker's identity. No Aura and no animator anywhere -- the requirement
+        -- rides on a creature card. Fails against an implementation that only ever
+        -- resolves Affected.Attached.
+        prizedUnicorn <- Registry.printing registry "Prized Unicorn"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, theirs) = attacking [prizedUnicorn] [piker]
+        HU.assertBool "no blocks is illegal" (not (Combat.legalBlockDeclaration S.bob Map.empty gs))
+        case (mine, theirs) of
+          (a : _, b : _) ->
+            HU.assertBool "blocking the Unicorn is legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 509.1c a Prized Unicorn does not lure the OTHER attacker alongside it" $ do
+        -- IsSource is an identity test, not "every attacker this permanent
+        -- controls": with a Piker attacking beside the Unicorn, blocking the Piker
+        -- obeys nothing and the maximum is still attained only by blocking the
+        -- Unicorn. Fails against an implementation that mints a requirement per
+        -- attacker rather than per matching attacker.
+        prizedUnicorn <- Registry.printing registry "Prized Unicorn"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, theirs) = attacking [prizedUnicorn, piker] [piker]
+        case (mine, theirs) of
+          ([unicorn, other], b : _) -> do
+            HU.assertBool "blocking the Unicorn is legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b unicorn) gs)
+            HU.assertBool "blocking the other attacker instead is illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b other) gs))
+          _ -> HU.assertFailure "fixture should have two attackers and a blocker",
+      HU.testCase "CR 604.2 Humility strips a Prized Unicorn's block requirement, so declining becomes legal" $ do
+        -- CR 604.2: a static ability's continuous effect is active only while the
+        -- permanent "remains on the battlefield AND HAS THE ABILITY", so Humility's
+        -- CR 613.1f layer-6 LoseAllAbilities takes the requirement with it. Both
+        -- worlds are asserted on ONE board so the pair cannot drift: without
+        -- Humility declining is illegal, with it the empty declaration becomes a
+        -- legal answer. Fails against an implementation that reads
+        -- Card.blockRequirements off the printed card.
+        --
+        -- The third assertion is what keeps the second from passing vacuously: the
+        -- combat is still live under Humility -- the Unicorn is still attacking and
+        -- the (now 1/1) Piker is still able to block it -- so declining became legal
+        -- because the requirement went away, not because there was nothing to block.
+        prizedUnicorn <- Registry.printing registry "Prized Unicorn"
+        piker <- Registry.printing registry "Goblin Piker"
+        humility <- Registry.printing registry "Humility"
+        let (gs, mine, theirs) = attacking [prizedUnicorn] [piker]
+            underHumility = S.withHumility humility gs
+        HU.assertBool "without Humility, no blocks is illegal" (not (Combat.legalBlockDeclaration S.bob Map.empty gs))
+        HU.assertBool "under Humility, no blocks is legal" (Combat.legalBlockDeclaration S.bob Map.empty underHumility)
+        case (mine, theirs) of
+          (a : _, b : _) ->
+            HU.assertBool "and blocking is still legal, so the combat is still live" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) underHumility)
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
       HU.testCase "CR 303.4m a Lure that is not attached to anything requires nothing" $ do
         -- CR 303.4m reads the SOURCE's attachment, so an unattached Lure names no
         -- attacker and mints no requirement. The Aura stays ON the battlefield

@@ -49,21 +49,38 @@ instances ::
   GameState ->
   Set (ObjectId, ObjectId)
 instances able candidates attackers gs =
-  let -- Hoisted out of the walk exactly as Pawl.PlayerEffect.applying hoists it,
-      -- and unforced until some permanent actually declares a requirement -- so a
-      -- board with no Lure on it pays for no projection at all.
+  let -- Hoisted out of the walk exactly as Pawl.PlayerEffect.applying hoists them,
+      -- and both unforced until some permanent actually declares a requirement --
+      -- so a board carrying no requirement at all pays for no projection.
       setEffs = Projection.setLandSubtypeEffects gs
+      removed = Projection.abilityRemoval gs
       fromPermanent source = case Game.cardOf source gs of
         Nothing -> []
         Just card -> case Card.blockRequirements card of
           -- Every permanent in almost every game.
           [] -> []
           requirements ->
+            -- TWO ability losses, the same pair Pawl.PlayerEffect.applying asks
+            -- about for the other axis CR 613.11 reaches.
+            --
             -- CR 305.7: a land whose subtype has been SET to a basic type loses
-            -- its rules-text abilities, this one included. CR 604.2's OTHER way
-            -- to lose one -- a layer-6 LoseAllAbilities, CR 613.1f -- is not
-            -- checked here (#345).
-            if null setEffs || Projection.liveGiven setEffs Set.empty source gs
+            -- its rules-text abilities, this one included.
+            --
+            -- CR 604.2: a static ability's continuous effect is active only while
+            -- the permanent "remains on the battlefield and has the ability", so a
+            -- CR 613.1f layer-6 removal takes this one with it (Humility on Prized
+            -- Unicorn). CR 613.6's rescue -- an effect that has STARTED to apply
+            -- continues "even if the ability generating the effect is removed
+            -- during this process" -- cannot reach it: CR 613.11 applies a
+            -- requirement "after all other continuous effects have been applied",
+            -- so it has no layer to have started applying in. Nor could another
+            -- part of the same card's text have started on its behalf: a
+            -- requirement is its OWN carrier (Pawl.Type.BlockRequirement), never a
+            -- part of a StaticAbility, so CR 613.6's "the same set of objects in
+            -- each other applicable layer" has nothing here to hold together. The
+            -- cut is therefore unconditional.
+            if (null setEffs || Projection.liveGiven setEffs Set.empty source gs)
+              && not (removed source)
               then concatMap (fromRequirement source) requirements
               else []
       -- CR 613.11 puts these effects after every layer, so the affected set is

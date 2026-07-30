@@ -39,11 +39,21 @@ import Pawl.Type.Affected (Affected)
 -- requirement with nothing to unwind.
 newtype BlockRequirement = MkBlockRequirement
   { -- Which attacking creature every able creature must block. An Affected, and
-    -- not a bare ObjectId, because CR 611.2c makes this the same axis on both
-    -- carriers: an Aura's requirement names Affected.Attached (CR 303.4m, "an
-    -- ability of a permanent that refers to the 'enchanted [object]' refers to
-    -- whatever object that permanent is attached to"), while a resolution
-    -- effect's would name a fixed Affected.TheseObjects set.
+    -- not a bare ObjectId, because two printings in the pool already name that
+    -- creature two different ways: an Aura's requirement names Affected.Attached
+    -- (CR 303.4m, "an ability of a permanent that refers to the 'enchanted
+    -- [object]' refers to whatever object that permanent is attached to") --
+    -- Lure -- while a creature's names its own source, Affected.Matching
+    -- Filter.IsSource -- Prized Unicorn's "all creatures able to block THIS
+    -- CREATURE do so".
+    --
+    -- Neither is ever frozen, and CR 611.2c is why a resolution-created
+    -- requirement would not be either: a continuous effect that "doesn't modify
+    -- the characteristics or change the controller of any objects modifies the
+    -- rules of the game, so it can affect objects that weren't affected when
+    -- that continuous effect began", and CR 613.11 classifies a requirement as
+    -- exactly that kind of effect. So Affected.TheseObjects is the one arm this
+    -- field has no use for.
     attacker :: Affected
   }
   deriving (Eq, Ord, Show)

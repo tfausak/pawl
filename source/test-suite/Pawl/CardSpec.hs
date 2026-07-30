@@ -1698,8 +1698,42 @@ removeFromCombatCardTests registry =
           _ -> HU.assertFailure "expected exactly two activated abilities"
     ]
 
+-- CR 509.1c's blocking requirement on a CREATURE card rather than an Aura. Prized
+-- Unicorn is a {3}{G} 2/2 Creature -- Unicorn whose whole text is one line: "All
+-- creatures able to block this creature do so." (Magic 2010; name, cost, type
+-- line, oracle text and P/T checked against Scryfall.) Its shape is the whole
+-- point next to Lure's, above: the same field, the other Affected. The gameplay
+-- proof, including CR 604.2's layer-6 strip, is Pawl.CombatSpec's
+-- BlockRequirements group.
+blockRequirementCardTests :: Registry.Type.Registry -> Tasty.TestTree
+blockRequirementCardTests registry =
+  Tasty.testGroup
+    "BlockRequirements"
+    [ HU.testCase "Prized Unicorn is a {3}{G} 2/2 Unicorn whose only ability is a requirement naming ITSELF" $ do
+        p <- Registry.printing registry "Prized Unicorn"
+        let card = Printing.card p
+            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        HU.assertEqual "name" (Text.pack "Prized Unicorn") (Card.Type.name card)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, green])) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Creature) (TypeLine.types (Card.Type.typeLine card))
+        HU.assertEqual "subtypes" (Set.singleton Subtype.Unicorn) (TypeLine.subtypes (Card.Type.typeLine card))
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power card)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness card)
+        -- "THIS CREATURE", not "enchanted creature": the requirement names its own
+        -- source, which the predicate language already spells Filter.IsSource.
+        -- Lure's Affected.Attached is the contrast -- same field, the other
+        -- Affected -- and it is why Pawl.BlockRequirement resolves the attacker
+        -- through Projection.affects rather than reading an ObjectId.
+        HU.assertEqual
+          "one requirement, naming the source itself"
+          [BlockRequirement.MkBlockRequirement (Affected.Matching Filter.Type.IsSource)]
+          (Card.Type.blockRequirements card)
+        HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
+        HU.assertEqual "no spell effects" [] (Card.allEffects card)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry, blockRequirementCardTests registry]
