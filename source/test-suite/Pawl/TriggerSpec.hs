@@ -2177,7 +2177,7 @@ tramplingAnswer p = case p of
 -- state-based actions -- so a permanent that was on the battlefield when some
 -- OTHER event in the same batch happened, and is gone by the time the scan
 -- looks, has to be recovered from CR 608.2h last known information exactly as
--- the event's own object already was.
+-- CR 603.10a's look-back already recovers a departure event's own permanent.
 --
 -- Lightning Skelemental is the card: {B}{R}{R} Creature -- Elemental Skeleton
 -- 6/1, "Trample, haste / Whenever this creature deals combat damage to a
