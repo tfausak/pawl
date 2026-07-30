@@ -293,9 +293,10 @@ tests registry =
           ]
           (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
         HU.assertEqual
-          -- CR 702.70a's reserved "that player" slot, read by a card for the
-          -- first time: the discard names the slot Event.eventBindings stamps
-          -- for this condition, not a target and not the controller.
+          -- The reserved "that player" slot, read by a card for the first time
+          -- rather than by CR 702.70a's poisonous: the discard names the slot
+          -- Event.eventBindings stamps for the CR 510.1b combat-damage-to-a-
+          -- player condition, not a target and not the controller.
           "the damaged player discards two, then the Skelemental sacrifices itself"
           [ [(Optionality.Mandatory, [Effect.Discard Binding.triggerPlayer (Quantity.Literal 2)])],
             [(Optionality.Mandatory, [Effect.Sacrifice Binding.triggerSource])]
