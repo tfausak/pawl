@@ -964,11 +964,14 @@ legendarySpellTests registry =
 -- attacked this step. / Untap all creatures you control." Its payload is
 -- Aggravated Assault's untap clause, so nothing but the restriction is new.
 --
--- The board below is one alice Piker attacking bob, who defends with one TAPPED
--- Piker and holds Rally plus a Plains. alice holds a Rally and a Plains of her
--- own: she is in the same step, with the same mana, and the only thing she lacks
--- is having been attacked -- so a check that read the step alone would offer her
--- the cast.
+-- This fixture is the declare attackers step BEFORE the declaration: alice has
+-- one Piker able to attack, bob defends (CR 506.2) with one TAPPED Piker and
+-- holds Rally plus a Plains. Each test declares the attack itself, or does not,
+-- which is what makes the "you've been attacked" clause separable from the step.
+--
+-- alice holds a Rally and a Plains of her own: she is in the same step, with the
+-- same mana, and the only thing she lacks is having been attacked -- so a check
+-- that read the step alone would offer her the cast.
 rallyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 rallyBoard piker plains rally =
   let (gs0, _, theirs) = S.combatBoardOf [piker] [piker]
