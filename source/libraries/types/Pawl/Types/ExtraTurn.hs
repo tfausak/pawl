@@ -24,8 +24,10 @@ import Pawl.Types.PlayerId (PlayerId)
 --
 -- `source` is CR 113.7's source of the effect that created the turn, carried so
 -- that the skips can become ActiveReplacements naming it when the turn begins
--- (Pawl.Engine.Replacement.installTurnSkips). Savor the Moment is in a graveyard
--- by then, exactly as Fatigue is when its own skip matters.
+-- (Pawl.Engine.Replacement.installTurnSkips). CR 608.2n has put Savor the Moment
+-- into its owner's graveyard long before then -- "as the final part of an instant
+-- or sorcery spell's resolution, the spell is put into its owner's graveyard" --
+-- exactly as it has Fatigue by the time Fatigue's own skip matters.
 data ExtraTurn = MkExtraTurn
   { taker :: PlayerId,
     source :: ObjectId,

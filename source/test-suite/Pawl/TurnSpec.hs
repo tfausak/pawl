@@ -984,9 +984,12 @@ turnScopedSkipTests registry =
               (fmap (\e -> (ExtraTurn.taker e, ExtraTurn.skipped e)) (GameState.extraTurns resolved))
             HU.assertEqual "the extra turn is alice's" S.alice (GameState.activePlayer atExtra)
             HU.assertEqual "and it untapped nothing" tapped (tapStateOf piker afterExtra)
-            -- CR 614.10a: the skip named ONE turn and is gone with it. bob's turn
-            -- untaps BOB's permanents (CR 502.3 is about the active player's), so
-            -- it is alice's own next turn that has to put this right.
+            -- The skip named ONE turn (CR 500.11's "skip a step ... of that
+            -- turn", as Savor the Moment prints it) and is gone with it -- NOT CR
+            -- 614.10a's "next", which is the reading these cases exist to rule
+            -- out. bob's turn untaps BOB's permanents (CR 502.3 is about the
+            -- ACTIVE player's), so it is alice's own next turn that has to put
+            -- this right.
             HU.assertEqual "the turn after it is bob's" S.bob (GameState.activePlayer afterExtra)
             HU.assertEqual "which is not alice's untap step" tapped (tapStateOf piker (runTurns 1 afterExtra))
             HU.assertEqual "alice's next ordinary turn untaps it" untapped (tapStateOf piker (runTurns 2 afterExtra)),

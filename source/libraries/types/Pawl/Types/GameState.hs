@@ -182,8 +182,8 @@ data GameState = MkGameState
     -- are two entries: CR 500.7's "the extra turns are added one at a time" is
     -- what makes them countable rather than a set of players. Each entry also
     -- carries the steps and phases THAT turn skips (Pawl.Types.ExtraTurn), which
-    -- is how CR 500.11's "skip the untap step of that turn" names a turn without
-    -- a reference that could dangle.
+    -- is how a CR 500.11 skip printed as "the untap step of that turn" (Savor the
+    -- Moment) names a turn without a reference that could dangle.
     extraTurns :: [ExtraTurn],
     -- CR 500.7 / 103.1: while an EXTRA turn is under way, the seat the ordinary
     -- turn order resumes from -- the active player of the most recent turn that

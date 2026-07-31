@@ -1283,7 +1283,8 @@ cleanupException = do
 -- unless a card names the DRAW step, and none does -- Savor the Moment names the
 -- untap step, which the bound never mentioned. And it cannot outlive the turn it
 -- rode in on: installTurnSkips arms each row Uses.Once and Expiry.AtCleanup, so
--- CR 514.2's sweep ends whatever the turn did not spend.
+-- the cleanup sweep (Expiry.dropAtCleanup, and see installTurnSkips for why that
+-- expiry and not Never) ends whatever the turn did not spend.
 --
 -- CR 514.3a's extra CLEANUP steps are the one repetition that does not go through
 -- a draw step at all, so the library argument says nothing about them. They carry
