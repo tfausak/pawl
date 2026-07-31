@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Replay: record/replay transcript round-trips.
+-- Covers Pawl.Engine.Replay: record/replay transcript round-trips.
 module Pawl.ReplaySpec where
 
 import qualified Data.List as List
@@ -9,13 +9,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Decide as Decide
-import qualified Pawl.Engine as Engine
+import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
@@ -465,7 +465,7 @@ replayTests registry =
             ((_, replayed), desync) = Replay.replay gfLog start game
         HU.assertEqual "goldfish" gf replayed
         HU.assertEqual "no desync" Nothing desync,
-      -- #144. Pawl.Replay.defaultAnswer is deliberately total, so a transcript
+      -- #144. Pawl.Engine.Replay.defaultAnswer is deliberately total, so a transcript
       -- that has drifted out of step with the prompts the engine actually asks
       -- does not crash -- it silently answers everything from the fallback and
       -- plays out a DIFFERENT game. For Prompt.Concede that fallback is

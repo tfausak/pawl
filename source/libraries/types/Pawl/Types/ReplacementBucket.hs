@@ -4,7 +4,7 @@ module Pawl.Types.ReplacementBucket where
 -- HIGHEST non-empty bucket wins, and Ord here is ascending in the CR's own order,
 -- so "highest non-empty" is the minimum present.
 --
--- CopyOnEntry (616.1c) has a producer: Pawl.Replacement's bucketOf sends
+-- CopyOnEntry (616.1c) has a producer: Pawl.Engine.Replacement's bucketOf sends
 -- EntryR AsCopy there, splitting it from EntryR ChoiceOf, which stays in
 -- Other along with every other arm -- clone.json is the card that produces an
 -- AsCopy rewrite. The remaining three are classification with a documented

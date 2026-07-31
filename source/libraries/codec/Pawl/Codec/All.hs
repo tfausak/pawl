@@ -1,5 +1,5 @@
 -- | The sole authority for @Card ⇆ Json@ (§2 of the M3.5 spec), mirroring
--- 'Pawl.Resolve' (the sole @case@-on-@Effect@ home). Free @xToJson@\/@jsonToX@
+-- 'Pawl.Engine.Resolve' (the sole @case@-on-@Effect@ home). Free @xToJson@\/@jsonToX@
 -- functions -- no type classes -- over the transitive closure of @Card@'s
 -- fields. Every @Pawl.Types.*@ module stays JSON-free; casing on an effect's
 -- identity here is open-half machinery, not the rules core.
@@ -2081,7 +2081,7 @@ jsonToBindings value =
    in Map.fromList <$> listFrom decodeEntry value
 
 -- CR 611.2: the STORED duration, which unlike every other type in this module
--- never appears in card JSON -- a card carries a Duration and Pawl.Expiry.arm
+-- never appears in card JSON -- a card carries a Duration and Pawl.Engine.Expiry.arm
 -- turns it into this. The one thing that serialises an Expiry is a
 -- DelayedTrigger, below, because CR 603.7b lets a delayed ability state one.
 expiryToJson :: Expiry.Expiry -> Value

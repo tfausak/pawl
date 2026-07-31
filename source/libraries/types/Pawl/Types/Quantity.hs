@@ -41,7 +41,7 @@ data Quantity
     -- the speculative construction the project forbids.
     Power
   | -- CR 601.2b: X -- a value the caster chose while casting, read from the
-    -- object's binding environment (Pawl.Binding.variableX). One-shot only: a
+    -- object's binding environment (Pawl.Engine.Binding.variableX). One-shot only: a
     -- continuous effect must FREEZE this to a Literal when stored (Projection.hs
     -- note), which no M4a card exercises.
     X
@@ -49,8 +49,8 @@ data Quantity
     -- of Progress' "for each permanent destroyed this way", where the sweep's own
     -- Destroy writes how many it actually destroyed and this reads it back. Read
     -- from the binding environment of whichever object the evaluation is aimed at
-    -- -- for Pawl.Resolve, the effect's SOURCE, which is the same object the
-    -- producing effect wrote to (Pawl.Binding.amountOf, the channel X uses).
+    -- -- for Pawl.Engine.Resolve, the effect's SOURCE, which is the same object the
+    -- producing effect wrote to (Pawl.Engine.Binding.amountOf, the channel X uses).
     --
     -- Named InSlot rather than Bound because PlayerRef.InSlot and ObjectRef.InSlot
     -- already spell "read the binding at this slot" that way; a third reference
@@ -89,7 +89,7 @@ data Quantity
     --     all, so there is nothing for the seed to substitute and the Star
     --     reaches evaluate directly. Real: Primal Plasma (P5) is exactly this --
     --     its star gets a value from an as-enters REPLACEMENT (CR 208.2b), not a
-    --     CDA. See Pawl.Projection's doc comment above `baseColorsOf` for the
+    --     CDA. See Pawl.Engine.Projection's doc comment above `baseColorsOf` for the
     --     consequence in full (#76).
     Star
   | -- CR 208.2: composition, so a printed 1+* needs no constructor of its own.

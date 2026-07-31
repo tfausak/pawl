@@ -1,9 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Combat: attack/block legality, combat damage, and the combat
+-- Covers Pawl.Engine.Combat: attack/block legality, combat damage, and the combat
 -- keywords (flying, reach, defender, vigilance, haste, first/double strike).
--- Also Pawl.BlockRequirement, whose only consumer is Pawl.Combat's CR 509.1c
+-- Also Pawl.Engine.BlockRequirement, whose only consumer is Pawl.Engine.Combat's CR 509.1c
 -- check.
 module Pawl.CombatSpec where
 
@@ -14,17 +14,17 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
@@ -833,7 +833,7 @@ evasionTests registry =
     ]
 
 -- Declare attackers with everything, then put a Lure on the first attacker.
--- Attaching directly is S.attach's state-fixture posture -- Pawl.Cast can cast
+-- Attaching directly is S.attach's state-fixture posture -- Pawl.Engine.Cast can cast
 -- the Aura, but a combat fixture cannot reach a sorcery-speed cast mid-step --
 -- and the printing is the real Lure, never a synthetic.
 luring :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
@@ -1042,7 +1042,7 @@ cursing curse who mine theirs =
 -- and the first board on which declining to attack is not a legal answer.
 --
 -- The requirement sits ON TOP of CR 508.1a rather than beside it: "if able" is
--- Pawl.Combat.legalAttackers, so a creature that could not have attacked anyway
+-- Pawl.Engine.Combat.legalAttackers, so a creature that could not have attacked anyway
 -- carries no requirement and cannot make declining illegal. Half the group is
 -- that half.
 attackRequirementTests :: Registry.Registry -> Tasty.TestTree
@@ -1700,7 +1700,7 @@ skophosBoard labyrinth land who mine theirs =
 
 -- Fire the Labyrinth's removal ability once, aim it at `victim`, and pay the {4}
 -- with anything BUT the Labyrinth itself: CR 601.2g pays an activation's mana
--- before its components (Pawl.Activate), so tapping the land for its own {C}
+-- before its components (Pawl.Engine.Activate), so tapping the land for its own {C}
 -- would leave the {T} unpayable and revert the whole activation. Choosing around
 -- that is the player's job, not the engine's.
 --

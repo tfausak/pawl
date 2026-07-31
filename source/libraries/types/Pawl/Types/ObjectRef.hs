@@ -37,7 +37,7 @@ data ObjectRef
     -- that instruction. That is half of CR 608.2f's "each such action is
     -- processed simultaneously"; the other half is that whether each swept object
     -- is affected must be judged before any of them is, which belongs to the
-    -- opcode's funnel rather than to this type (Pawl.Event.destroy).
+    -- opcode's funnel rather than to this type (Pawl.Engine.Event.destroy).
     --
     -- A CONTINUOUS effect over a set must additionally freeze the swept set into
     -- the effect itself, because CR 611.2c fixes the affected set "when that

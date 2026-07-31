@@ -1,4 +1,4 @@
--- Covers Pawl.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
+-- Covers Pawl.Engine.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
 -- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 611.2a, 611.2b),
 -- and the two gate cards (Master Thief, Hag of Inner Weakness).
 module Pawl.ExpirySpec where
@@ -6,16 +6,16 @@ module Pawl.ExpirySpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Pawl.Condition as Condition
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Expiry as Expiry
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
@@ -215,7 +215,7 @@ whileEffect src target you gs =
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- Event.stateHolds's retired (you, source, cond, gs) shape, over the FULL
--- projection (outside the layer fold, per Pawl.Condition's spec) and the one
+-- projection (outside the layer fold, per Pawl.Engine.Condition's spec) and the one
 -- Condition S.youControlSource replaces StateCondition.YouControlSource with.
 holdsYouControlSource :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
 holdsYouControlSource you source gs =

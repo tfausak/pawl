@@ -5,10 +5,10 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Engine as Engine
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Deck as Deck

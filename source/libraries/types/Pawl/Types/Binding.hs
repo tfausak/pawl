@@ -26,7 +26,7 @@ data Binding = MkBinding
     -- Stored only under the reserved Binding.chosenModes slot. Nothing elsewhere.
     modes :: Maybe (Set ModeIndex),
     -- CR 707.2 / 707.5: the copiable-value snapshot a permanent copies AS IT
-    -- ENTERS (P2). Stored only under Pawl.Binding.copySource; the layer fold reads
+    -- ENTERS (P2). Stored only under Pawl.Engine.Binding.copySource; the layer fold reads
     -- it as the layer-1 seed. Nothing for a non-copy object.
     copy :: Maybe ProjectedCharacteristics
   }

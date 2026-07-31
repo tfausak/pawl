@@ -53,7 +53,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- toxic 1 twice, which a Set could not say (it collapsed the second grant).
     --
     -- Redundancy (CR 702.3c defender, CR 702.9c flying) is a fact about the
-    -- QUESTION the reader asks and not about what is stored: Pawl.Projection's
+    -- QUESTION the reader asks and not about what is stored: Pawl.Engine.Projection's
     -- hasKeyword asks membership, so a doubled flying is still just flying.
     keywords :: Map Keyword Natural,
     -- CR 105.2 / 613.1e layer 5: the object's colours after the layer system.

@@ -1,19 +1,19 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers the VM core: Pawl.Types.Program (the suspension interpreter) and
--- Pawl.Quantity (numeric evaluation).
+-- Pawl.Engine.Quantity (numeric evaluation).
 module Pawl.CoreSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Projection as Projection
-import qualified Pawl.Quantity as Quantity
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count.Type

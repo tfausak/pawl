@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers: Pawl.Replacement (the CR 616.1 loop, its buckets and its prompt) and
+-- Covers: Pawl.Engine.Replacement (the CR 616.1 loop, its buckets and its prompt) and
 -- the funnels that raise proposed events through it. Mostly gameplay-level --
 -- put a board together, cast or resolve, assert on game state -- but a case
 -- reaches for a more direct construction whenever gameplay cannot produce the
@@ -18,25 +18,25 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Damage as Damage
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Extra.Int as Int
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 
+import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replacement as Replacement
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
@@ -334,7 +334,7 @@ fatigueTests registry =
           }
       -- One draw step. Applied repeatedly, each call is alice's NEXT draw step:
       -- the store under test is not turn-scoped (Expiry.Never, and no sweep ends
-      -- it -- every Pawl.Expiry sweep keeps a Never), so what a real
+      -- it -- every Pawl.Engine.Expiry sweep keeps a Never), so what a real
       -- intervening turn would contribute is a longer log, not a different
       -- answer.
       runDraw gs = snd (Engine.runGamePure S.identityAnswer (atDraw gs) Engine.runStep)
@@ -602,9 +602,9 @@ tests registry =
   -- would only risk becoming a CI flake.
   Tasty.localOption (Tasty.mkTimeout 5000000) $
     Tasty.testGroup
-      "Pawl.Replacement"
-      [ -- P9: a pattern's permanent match runs through the lower Pawl.Filter over
-        -- the PROJECTED view, the same evaluator Pawl.Cost narrows sacrifices with
+      "Pawl.Engine.Replacement"
+      [ -- P9: a pattern's permanent match runs through the lower Pawl.Engine.Filter over
+        -- the PROJECTED view, the same evaluator Pawl.Engine.Cost narrows sacrifices with
         -- (#111 retired). CR 205.2b/300.2/613.1d: creature-ness is projected; the
         -- trivial filter And [] matches every permanent (what AnyPermanent was).
         HU.testCase "CR 614.1 matchesPermanent narrows a permanent through Filter.matches" $ do
@@ -678,7 +678,7 @@ tests registry =
         -- The same CR 704.3 event, across the pass's OTHER seam. The case above
         -- keeps both victims inside the pass's put-into-graveyard batch; this one
         -- puts the second victim in the DESTRUCTION batch (CR 704.5g's lethal
-        -- marked damage), which Pawl.Sba performs after the buries. CR 704.3 makes
+        -- marked damage), which Pawl.Engine.Sba performs after the buries. CR 704.3 makes
         -- the two one event, so the destruction's graveyard move must see the same
         -- board the buries did -- with Rest in Peace still on it.
         --
@@ -712,7 +712,7 @@ tests registry =
         --
         -- The one shape in the pool that reaches it: a permanent named by both
         -- halves of one pass. CR 704.5f's victims can never also be CR 704.5g's
-        -- (Pawl.Sba's classify gives 704.5f priority) and Pawl.Sba already
+        -- (Pawl.Engine.Sba's classify gives 704.5f priority) and Pawl.Engine.Sba already
         -- excludes CR 704.5j's and CR 704.5k's by name, so an Aura -- named by CR
         -- 704.5m in the first half and CR 704.5g in the second -- is all that is
         -- left. Getting one takes Liquimetal Coating plus Skilled Animator, since

@@ -10,9 +10,9 @@ import Pawl.Types.Subtype (Subtype)
 
 -- The open-half continuous-effect vocabulary -- its own leaf family (design.md's
 -- M3g note: "continuous-effect specifications, classified by layer"), distinct
--- from Effect. The ONLY module that may case on a constructor is Pawl.Projection
+-- from Effect. The ONLY module that may case on a constructor is Pawl.Engine.Projection
 -- (Projection.layer classifies it; Projection.applyModification applies it) --
--- the same standing Pawl.Resolve has over Effect. GainKeyword carries a Keyword,
+-- the same standing Pawl.Engine.Resolve has over Effect. GainKeyword carries a Keyword,
 -- a closed-half CITATION (casing on it is not an invariant violation -- see the
 -- M2a spec). P/T constructors carry signed Quantity (+3/+3 or a future -1/-1).
 -- No arm adds or removes a SUPERTYPE (#311), the case CR 205.4b is written for;

@@ -6,7 +6,7 @@ import Pawl.Types.Scope (Scope)
 
 -- A number derived from game state: a scope to fold over, a per-object predicate
 -- to keep by, and an aggregation. First-order and analyzable -- never a
--- predicate function -- and evaluated by one generic fold (Pawl.Count.evaluate)
+-- predicate function -- and evaluated by one generic fold (Pawl.Engine.Count.evaluate)
 -- that never learns which effect or card produced it.
 --
 -- This replaced a hand-carved variant per card (the retired

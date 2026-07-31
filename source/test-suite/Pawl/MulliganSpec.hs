@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Mulligan: the CR 103.5 opening-hand / mulligan process.
+-- Covers Pawl.Engine.Mulligan: the CR 103.5 opening-hand / mulligan process.
 module Pawl.MulliganSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -12,15 +12,15 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Game as Game
-import qualified Pawl.Mulligan as Mulligan
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
@@ -111,7 +111,7 @@ recordAlwaysMulligan p = case p of
 -- Alice's library in an explicit, non-uniform order of 20 pairwise-DISTINCT
 -- printings, so an individual library card can be told apart by its printed
 -- Card identity even after a CR 400.7 zone-change reincarnation:
--- Event.changeZone (Pawl.Event) mints every moved card a FRESH ObjectId --
+-- Event.changeZone (Pawl.Engine.Event) mints every moved card a FRESH ObjectId --
 -- mkObj there only resets zone/tapped/damage/sickness/bindings/counters/
 -- timestamp -- so a card's pre-move id is never equal to its post-move id,
 -- which is why an order test can't compare ObjectIds across the move. Source

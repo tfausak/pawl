@@ -12,7 +12,7 @@
 -- -- `delayedTests`. The CR 603.3b ordering prompt -- `orderingTests`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingTests`. The CR 603.4 / 608.2a intervening "if" --
--- `interveningTests`. Also Pawl.Keyword: CR
+-- `interveningTests`. Also Pawl.Engine.Keyword: CR
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousTests`. CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
@@ -47,29 +47,29 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Expiry as Expiry
-import qualified Pawl.Game as Game
-import qualified Pawl.Keyword as Keyword
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
 -- Aliased Condition.Type, not Condition, per the project-wide convention
--- (CardSpec's note): the evaluator module Pawl.Condition may later be imported
+-- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
 -- and must not collide.
 
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -663,7 +663,7 @@ historyTests registry =
           -- at the time. Scryfall's ruling says this explicitly: the count
           -- "includes ... creatures put into a graveyard before Khabál Ghoul
           -- entered the battlefield." This test cannot fail against today's
-          -- `Pawl.Quantity.countOf`, which takes no `ObjectId` at all and so
+          -- `Pawl.Engine.Quantity.countOf`, which takes no `ObjectId` at all and so
           -- has no way to scope the fold to the Ghoul's own lifetime -- it is
           -- a regression gate on the ruling, pinned ahead of that signature
           -- ever gaining one.
@@ -835,7 +835,7 @@ delayedTests registry =
           -- with the environment CAPTURED when the ability was armed, under
           -- Map.union -- left-biased, so the argument ORDER decides which side
           -- wins a collision on a reserved slot such as Binding.chosenModes. The
-          -- two DO collide in practice: Pawl.Cast builds an arming spell's
+          -- two DO collide in practice: Pawl.Engine.Cast builds an arming spell's
           -- bindings through the same Binding.fromChoices that stamps chosenModes
           -- whenever the spell chooses a mode, so a modal arming spell's captured
           -- environment carries a "modes" entry that belongs to the SPELL, not to
@@ -1313,8 +1313,8 @@ zombieTokenOf sarcomancy pikerFallback =
         [] -> Printing.card pikerFallback
 
 -- CR 702.70: poisonous -- the first keyword whose rule text IS a triggered
--- ability, so it is minted by Pawl.Keyword and gathered by the same
--- Pawl.Event.eventTriggers scan a printed trigger goes through, with the damaged
+-- ability, so it is minted by Pawl.Engine.Keyword and gathered by the same
+-- Pawl.Engine.Event.eventTriggers scan a printed trigger goes through, with the damaged
 -- player carried across in the reserved Binding.triggerPlayer slot.
 poisonousTests :: Registry.Registry -> Tasty.TestTree
 poisonousTests registry =

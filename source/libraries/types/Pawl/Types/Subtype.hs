@@ -87,8 +87,8 @@ data Subtype
     Curse
   | -- CR 205.3i: a LAND type, and the first NONBASIC one here -- Desert's own
     -- ("Land -- Desert"). The five land types above it are all basic (CR 305.6),
-    -- so this is the constructor that pulls Pawl.Subtype.isLandType and
-    -- Pawl.Mana.subtypeMana apart: a land type that grants no intrinsic mana
+    -- so this is the constructor that pulls Pawl.Engine.Subtype.isLandType and
+    -- Pawl.Engine.Mana.subtypeMana apart: a land type that grants no intrinsic mana
     -- ability. Appended at the END for the Ord-canonical reason Equipment states.
     Desert
   | -- CR 205.3m (a creature type; Bitterblossom's, and its token's). The first

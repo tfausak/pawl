@@ -17,7 +17,7 @@ import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
 -- pool. Rest in Peace is DATA (`ZoneChangeR (MkZoneChangePattern Graveyard
 -- Anyones AnyObject) Exile`), not a constructor; so is Fog, so is regeneration,
 -- so is Hardened Scales, and so is rule 702.34a's flashback exile
--- (Pawl.Keyword.flashbackExile, which differs from Rest in Peace only in its
+-- (Pawl.Engine.Keyword.flashbackExile, which differs from Rest in Peace only in its
 -- pattern). The scenario the first invariant forbids --
 -- `case effect of RedirectZoneChange Graveyard Exile -> restInPeace` -- is no
 -- longer expressible.
@@ -45,7 +45,7 @@ import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
 -- unbounded skip (Eon Hub) and a resolution's single-occurrence one share one
 -- constructor. A "next" field here would say the same thing in a second place.
 --
--- The sole rules-casing site is Pawl.Replacement (CR 616.1's loop). Pawl.Codec
+-- The sole rules-casing site is Pawl.Engine.Replacement (CR 616.1's loop). Pawl.Codec
 -- also cases on every constructor, but only as the JSON data boundary.
 data ReplacementEffect
   = ZoneChangeR ZoneChangePattern Zone

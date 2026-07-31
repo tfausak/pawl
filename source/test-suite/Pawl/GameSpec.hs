@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Game, Pawl.Engine, and Pawl.Action: zones and changeZone, legal
+-- Covers Pawl.Engine.Game, Pawl.Engine.Engine, and Pawl.Engine.Action: zones and changeZone, legal
 -- actions, object facts, engine steps, and engine-rule integration (priority
 -- rounds, the CR 103.8a draw skip, CR 514.2 discard, CR 704.5b deck-out).
 module Pawl.GameSpec where
@@ -14,23 +14,23 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Action as Action
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Decide as Decide
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
@@ -737,7 +737,7 @@ ruleTests registry =
         --
         -- CR 729.1a's isolation means a subgame's INTERNAL choices leave no trace
         -- in the parent's GameState -- but the interpreter TRANSCRIPT (every
-        -- Response, recorded by Pawl.Replay.record) is a top-level observable, and
+        -- Response, recorded by Pawl.Engine.Replay.record) is a top-level observable, and
         -- it DOES discriminate nesting depth: each subgame level's setup
         -- (subgameStateFrom -> startGameFromCards) shuffles every player's
         -- library once, and playSubgame's CR 729.5 funnel-back reshuffles the

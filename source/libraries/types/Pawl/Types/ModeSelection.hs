@@ -14,7 +14,7 @@ import Numeric.Natural (Natural)
 -- CR 702.42a's entwine is NOT one of those future constructors, and the
 -- distinction is the point: this type is what the card PRINTS -- Dream's Grip
 -- still says "Choose one --", ChooseExactly 1 -- while entwine is a decision
--- made as one particular cast is announced. Pawl.Cast substitutes
+-- made as one particular cast is announced. Pawl.Engine.Cast substitutes
 -- Modal.modeCount for this count for that cast alone; nothing rewrites the card.
 newtype ModeSelection
   = ChooseExactly Natural

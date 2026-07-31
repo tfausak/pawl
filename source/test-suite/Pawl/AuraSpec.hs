@@ -1,11 +1,11 @@
 -- Pattern matching on Pawl.Types.Prompt, a GADT, in aimAt below.
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Stack's Aura branch and Pawl.Resolve.targetsAllIllegal -- a
+-- Covers Pawl.Engine.Stack's Aura branch and Pawl.Engine.Resolve.targetsAllIllegal -- a
 -- resolving Aura spell either fizzles (CR 608.2b) or enters the battlefield
 -- already attached to its target (CR 303.4) -- together with the rest of the
--- attachment substrate that shares Object.attachedTo: Pawl.Resolve's Attach
--- opcode (CR 701.3) and Pawl.Sba's three attachment state-based actions
+-- attachment substrate that shares Object.attachedTo: Pawl.Engine.Resolve's Attach
+-- opcode (CR 701.3) and Pawl.Engine.Sba's three attachment state-based actions
 -- (CR 704.5m, 704.5n, 704.5p).
 module Pawl.AuraSpec where
 
@@ -13,21 +13,21 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -698,7 +698,7 @@ reattachTests registry =
       -- 303.4j is about and which no pair of cards could produce before.
       --
       -- CR 109.5 fixes whose "you" that is: the AURA's controller, not the moving
-      -- effect's. Pawl.Resolve.attachmentFor asks Target.legalRecipients with
+      -- effect's. Pawl.Engine.Resolve.attachmentFor asks Target.legalRecipients with
       -- Projection.controllerOf on the Aura for exactly that reason. Alice controls
       -- both cards here, so this board cannot tell the two readings apart -- nothing
       -- in the pool takes control of a noncreature artifact -- but attachmentFor is
@@ -1094,7 +1094,7 @@ auraTests registry =
       -- 109.5 makes that "you" the Aura's controller (enchant is a static ability,
       -- CR 702.5a), which is why the answer changes when control does.
       --
-      -- This is the case Pawl.Sba.stillLegalEnchant's Filter fallthrough exists for.
+      -- This is the case Pawl.Engine.Sba.stillLegalEnchant's Filter fallthrough exists for.
       -- Its Pool.Creatures-with-no-Filter reduction -- still a creature, on the
       -- battlefield, owned by a player still in the game -- would answer "legal"
       -- here, because none of those three facts changed.

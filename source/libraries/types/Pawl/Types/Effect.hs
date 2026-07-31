@@ -25,7 +25,7 @@ import Pawl.Types.Zone (Zone)
 
 -- The ISA (design.md section 1): first-order, non-recursive (in CONTROL FLOW --
 -- no loops, branches, or recursive calls; design.md line 38), no functions in any
--- field. The ONLY module that may case on a constructor is Pawl.Resolve -- the
+-- field. The ONLY module that may case on a constructor is Pawl.Engine.Resolve -- the
 -- rules core asks classifications, never identities.
 --
 -- The `card` parameter lets an opcode embed a card's characteristics (a created
@@ -99,7 +99,7 @@ data Effect card
     -- to its owner's graveyard via the changeZone funnel UNLESS it is
     -- indestructible. NOT MoveToZone slot Graveyard: the indestructible check is
     -- why this is its own opcode (Murder vs Darksteel Myr). Indestructible aside,
-    -- the destruction is itself interceptable: Pawl.Event.destroy offers a
+    -- the destruction is itself interceptable: Pawl.Engine.Event.destroy offers a
     -- WouldBeDestroyed event to the CR 616.1 replacement loop before the
     -- graveyard move, which is how a regeneration shield (CR 701.19a) intercepts
     -- it.
@@ -149,7 +149,7 @@ data Effect card
     --
     -- One opcode, not a targetless SacrificeSelf plus a slotted variant: "this
     -- creature" is expressible because Engine.placeOne binds the trigger's
-    -- SOURCE into the reserved Pawl.Binding.triggerSource slot, and "this
+    -- SOURCE into the reserved Pawl.Engine.Binding.triggerSource slot, and "this
     -- creature" recurs far too often to pay for a second opcode.
     Sacrifice SlotName
   | -- CR 701.3 / 702.6a: attach THIS permanent (the effect's source) to the
@@ -227,7 +227,7 @@ data Effect card
     -- a slot-only recipient needs a sibling opcode the first time a card says
     -- "you lose N life", and one opcode is easier to keep correct than two. The
     -- CR 704.5a state-based action that may follow is the existing one in
-    -- Pawl.Sba.
+    -- Pawl.Engine.Sba.
     --
     -- NOT a DealDamage aimed at a player. CR 119.2's "damage dealt to a player
     -- normally causes that player to lose that much life" runs one way only, so
@@ -288,7 +288,7 @@ data Effect card
     -- a regeneration shield is which event class the payload names, which is
     -- data. Targetless (a floating replacement watches a CLASS of events, not a
     -- chosen object) and unprompted. Resolve stores it into GameState.replacements
-    -- with this effect's SOURCE (CR 113.7) and a fresh timestamp; Pawl.Replacement
+    -- with this effect's SOURCE (CR 113.7) and a fresh timestamp; Pawl.Engine.Replacement
     -- applies it.
     Replace Duration Uses ReplacementEffect
   | -- CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
@@ -303,8 +303,8 @@ data Effect card
     -- ReplacementEffect written on a card cannot. Exactly the reason GainControl
     -- is its own opcode rather than a ModifyTarget carrying SetController --
     -- Resolve bakes the PlayerId, and the alternative (a slot name inside the
-    -- pattern, resolved later) would make Pawl.Resolve case on a
-    -- ReplacementEffect's identity, which Pawl.Replacement's header reserves to
+    -- pattern, resolved later) would make Pawl.Engine.Resolve case on a
+    -- ReplacementEffect's identity, which Pawl.Engine.Replacement's header reserves to
     -- itself.
     --
     -- No Duration and no Uses, unlike Replace: CR 614.10a's "next" IS the use
@@ -460,7 +460,7 @@ data Effect card
   | -- CR 725 (Palace Jailer): exile the slot's target UNTIL an opponent of the
     -- effect's controller becomes the monarch. The exile is the usual targeted
     -- move; the DURATION is the novelty -- the exiled incarnation is registered in
-    -- GameState.exiledUntilMonarch and returned by Pawl.Monarch's settle-loop
+    -- GameState.exiledUntilMonarch and returned by Pawl.Engine.Monarch's settle-loop
     -- sweep. NOT MoveToZone: that has no duration and schedules no return.
     ExileUntilMonarch SlotName
   | -- CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived

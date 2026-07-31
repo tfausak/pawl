@@ -18,27 +18,27 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Count as Count
-import qualified Pawl.Damage as Damage
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
+import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Sba as Sba
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Int as Int
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Game as Game
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
-import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Sba as Sba
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Slug as Slug
-import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -722,8 +722,8 @@ withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1
 
--- The one CR 103.5b performer (Pawl.Resolve.performHandAction), so a test
--- that only wants a game set up does not have to reach into Pawl.Resolve for it.
+-- The one CR 103.5b performer (Pawl.Engine.Resolve.performHandAction), so a test
+-- that only wants a game set up does not have to reach into Pawl.Engine.Resolve for it.
 performer :: HandActionPerformer.HandActionPerformer
 performer = Resolve.performHandAction
 
@@ -1066,7 +1066,7 @@ runPure :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.
 runPure answer gs game = snd (Engine.runGamePure answer gs game)
 
 -- runPure, keeping the action's RESULT alongside the final state -- the shape a
--- test needs when the door under test answers with a value (Pawl.Cost.pay's
+-- test needs when the door under test answers with a value (Pawl.Engine.Cost.pay's
 -- Payment) and not only with a board.
 runPureWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> (a, GameState.GameState)
 runPureWith = Engine.runGamePure
@@ -1280,7 +1280,7 @@ addCounter kind n oid gs =
 -- Tagged ToCreature, which is the tag the real attach paths would store: every
 -- Aura in this pool has a Pool.Creatures enchant spec, and Target's candidates
 -- for that pool are ToCreature -- so an SBA that re-checks the attachment against
--- the spec (Pawl.Sba.stillLegalEnchant) sees what casting would have left. The
+-- the spec (Pawl.Engine.Sba.stillLegalEnchant) sees what casting would have left. The
 -- callers that attach to a non-creature are testing rules that read only WHICH
 -- object is named (CR 704.5n, CR 704.5p, CR 400.7), never the tag.
 attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
@@ -1461,9 +1461,9 @@ spellOnStack printing pid gs =
           }
       )
 
--- Drive Pawl.Count.evaluate with the per-object quantity reader wired the way
--- the library wires it -- Pawl.Quantity.evaluate, which is where that knot is
--- tied (Pawl.Count cannot import it). Shared by every spec that drives the fold
+-- Drive Pawl.Engine.Count.evaluate with the per-object quantity reader wired the way
+-- the library wires it -- Pawl.Engine.Quantity.evaluate, which is where that knot is
+-- tied (Pawl.Engine.Count cannot import it). Shared by every spec that drives the fold
 -- directly, so the injection they test is the injection the engine makes.
 countOf ::
   Count.ViewOf ->
@@ -1474,7 +1474,7 @@ countOf ::
 countOf viewOf context gs = Count.evaluate viewOf (Quantity.evaluate viewOf context gs) context gs
 
 -- Shared by Pawl.CountSpec and Pawl.ConditionSpec: a stub ViewOf, so a
--- Pawl.Count.evaluate fold is exercised apart from any real projection. Every
+-- Pawl.Engine.Count.evaluate fold is exercised apart from any real projection. Every
 -- id gets a view carrying exactly the card types, subtypes and controller it
 -- was registered with; an id absent from the table has no view.
 stubView ::

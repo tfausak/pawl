@@ -1,4 +1,4 @@
--- Covers Pawl.Card: card data, type-line rules, every printing, and the D4
+-- Covers Pawl.Engine.Card: card data, type-line rules, every printing, and the D4
 -- dataflow lint.
 module Pawl.CardSpec where
 
@@ -10,29 +10,29 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Card as Card
 import qualified Pawl.Codec.All as Codec
 import qualified Pawl.Codec.Json as Json
-import qualified Pawl.Event as Event
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Event as Event
 -- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
 -- triggered ability's effects (Card.allEffects only reaches the spell).
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
-import qualified Pawl.Quantity as Quantity
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 -- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
--- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
+-- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Engine.Condition may
 -- later be imported and must not collide.
 
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -485,7 +485,7 @@ cardOffendsSharedZoneScope card =
 -- no-ops (Resolve's MoveToZone arm falls through to `pure ()`).
 --
 -- A SUBSET check, never the spell lint's equality, and that is forced rather
--- than chosen: Pawl.Binding.triggerSource's comment spells out that an
+-- than chosen: Pawl.Engine.Binding.triggerSource's comment spells out that an
 -- equality-style lint widened over an ability's modes is mutually unsatisfiable
 -- with the "a reserved slot is never a declared target slot" rule unless it
 -- first subtracts every reserved name from the read side. The delayed-ability
@@ -538,7 +538,7 @@ oneEffectTrigger condition effect =
       TriggeredAbility.intervening = Nothing
     }
 
--- Pawl.Binding's reserved slot names in full: the binding keys the engine
+-- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
 -- STAMPS rather than asks a player for. The whole module's list rather than a
 -- hand-picked subset, so a new reserved slot joins the declaration sweep below
 -- by being added here and nowhere else.
@@ -583,7 +583,7 @@ declaredTargetSlots card =
 --
 -- Declaring one is the SECOND INVARIANT's failure mode rather than a dataflow
 -- nicety: the slot is prompted (CR 601.2c) and the answer then thrown away. On
--- a triggered or delayed ability, Pawl.Engine stamps CR 113.7's `self` and CR
+-- a triggered or delayed ability, Pawl.Engine.Engine stamps CR 113.7's `self` and CR
 -- 109.5's `you` OVER the chosen targets, so the player is asked and overruled.
 -- CR 400.7e's `became` and CR 603.2's `thatPlayer` run the other way -- the
 -- chosen target wins the union and the event's own stamp is lost, so the
@@ -800,7 +800,7 @@ lintTests registry =
       -- TEST, never a trigger that silently never fires. Equality, not subset: a
       -- declared ability nothing arms is dead card text.
       --
-      -- SCOPE, same posture as Pawl.Binding's D4-lint-scope comment: this and the
+      -- SCOPE, same posture as Pawl.Engine.Binding's D4-lint-scope comment: this and the
       -- multi-token-binding lint below both walk `Card.allEffects`, which is
       -- `Modal.allEffects (Card.spell card)` -- a card's SPELL modes ONLY, never
       -- an activated or triggered ability's effects. An ArmDelayedTrigger placed
@@ -902,7 +902,7 @@ lintTests registry =
         let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
             offenders = filter (offends . Printing.card) ps
         HU.assertEqual "Aura iff enchant" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- Pawl.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
+      -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
       -- mode declaring it would be silently shadowed.
       -- #199: no card authors a layer-2 control modification into an effect that
       -- RESOLVES. SetControllerToSource is the payload-free constructor and is
@@ -911,7 +911,7 @@ lintTests registry =
       -- static abilities off Card.staticAbilities and never off stored effects, and
       -- Projection.applyModification's SetControllerToSource arm is the identity.
       -- A card authoring one would resolve, store the effect, and grant control to
-      -- no one -- there is nothing for CR 800.4a to end (see Pawl.Departure's
+      -- no one -- there is nothing for CR 800.4a to end (see Pawl.Engine.Departure's
       -- proofs).
       --
       -- BOTH control constructors, not just the payload-free one: baking a
@@ -921,7 +921,7 @@ lintTests registry =
       --
       -- Asked as an EQUALITY on Layer through Projection.layer -- the sanctioned
       -- classification -- rather than by casing on Modification, which only
-      -- Pawl.Projection may do. Layer.Control is exactly the two control
+      -- Pawl.Engine.Projection may do. Layer.Control is exactly the two control
       -- constructors, so this covers a third one automatically.
       --
       -- A codec-level rejection would be the wrong shape: jsonToModification is
@@ -1769,7 +1769,7 @@ cyclingCardTests registry =
         HU.assertEqual "cost" (costOf [ManaSymbol.Generic 4, blue, blue]) (Card.Type.manaCost c)
         -- Two keywords, one printed and one that mints an ability: rule 702.9's
         -- flying is read where evasion is asked about, and rule 702.29a's cycling
-        -- is minted by Pawl.Keyword.
+        -- is minted by Pawl.Engine.Keyword.
         HU.assertEqual
           "flying and Cycling {U}"
           (Set.fromList [Keyword.Flying, Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [blue])) []) Nothing])
@@ -1805,7 +1805,7 @@ cyclingCardTests registry =
         HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 4))) (Card.Type.toughness c)
         HU.assertEqual "subtypes" (Set.singleton Subtype.Beast) (TypeLine.subtypes (Card.Type.typeLine c))
         -- The card data carries the PRINTED cost and nothing else: rule 702.29a's
-        -- discard and draw are minted by Pawl.Keyword, never authored here.
+        -- discard and draw are minted by Pawl.Engine.Keyword, never authored here.
         HU.assertEqual
           "\"Cycling {2}\""
           (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []) Nothing))
@@ -1816,7 +1816,7 @@ cyclingCardTests registry =
 -- The pool's two world enchantments. Their abilities are ordinary -- a layer-6
 -- keyword grant and a layer-4/7b animation, both shapes the pool already had --
 -- and it is the SUPERTYPE on the type line that earns them their place: CR
--- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Sba.worldVictims),
+-- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Engine.Sba.worldVictims),
 -- and nothing else in the corpus carries it.
 worldCardTests :: Registry.Registry -> Tasty.TestTree
 worldCardTests registry =
@@ -2039,7 +2039,7 @@ blockRequirementCardTests registry =
         -- "THIS CREATURE", not "enchanted creature": the requirement names its own
         -- source, which the predicate language already spells Filter.IsSource.
         -- Lure's Affected.Attached is the contrast -- same field, the other
-        -- Affected -- and it is why Pawl.BlockRequirement resolves the attacker
+        -- Affected -- and it is why Pawl.Engine.BlockRequirement resolves the attacker
         -- through Projection.affects rather than reading an ObjectId.
         HU.assertEqual
           "one requirement, naming the source itself"

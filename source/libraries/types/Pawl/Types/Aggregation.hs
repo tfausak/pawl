@@ -19,7 +19,7 @@ data Aggregation quantity
     --
     -- NOT a sibling of the two above, which need only the matched set. This one
     -- also needs to know WHICH per-object quantity to read, and a Quantity is
-    -- what Pawl.Quantity.evaluate already reads against one object -- so the
+    -- what Pawl.Engine.Quantity.evaluate already reads against one object -- so the
     -- payload is the existing type rather than a narrower stand-in that would
     -- duplicate its arms.
     --

@@ -6,7 +6,7 @@ module Pawl.Types.Payment where
 --
 -- Runtime-only: a Payment is never card data and never serialized.
 --
--- Unpaid is always a COMPLETE no-op: Pawl.Cost.pay restores the state it was
+-- Unpaid is always a COMPLETE no-op: Pawl.Engine.Cost.pay restores the state it was
 -- entered with before returning it, so a caller never has to unwind a partial
 -- payment (mana spent, one component paid, the next one rejected).
 data Payment

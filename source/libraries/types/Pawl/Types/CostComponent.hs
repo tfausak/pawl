@@ -13,7 +13,7 @@ import Pawl.Types.Filter (Filter)
 -- The successor to Pawl.Types.AdditionalCost, whose two nullary inhabitants were
 -- named relative to that type ("Self"); here the object a cost is on is "This".
 --
--- Open-half card data. Pawl.Cost is the ONLY module that may case on it: the
+-- Open-half card data. Pawl.Engine.Cost is the ONLY module that may case on it: the
 -- rules core reads the classification (can this be paid? does it require the tap
 -- symbol?) and never the identity of a component.
 data CostComponent
@@ -29,7 +29,7 @@ data CostComponent
     -- activated ability with the tap symbol OR THE UNTAP SYMBOL in its activation
     -- cost can't be activated unless the creature has been under its controller's
     -- control continuously since their most recent turn began." So this joins
-    -- TapThis in Pawl.Cost.requiresSicknessCheck, not just in the payment.
+    -- TapThis in Pawl.Engine.Cost.requiresSicknessCheck, not just in the payment.
     UntapThis
   | -- CR 701.21a: sacrifice the object the cost is on -- its controller moves it
     -- from the battlefield directly to its owner's graveyard (Mindslaver).

@@ -15,7 +15,7 @@ import Numeric.Natural (Natural)
 -- left it deciding with strictly less information than the rules give a player
 -- at a table.
 --
--- Both fields are built by Pawl.Mulligan.offerFor, which is also what
+-- Both fields are built by Pawl.Engine.Mulligan.offerFor, which is also what
 -- takeMulligan bottoms by -- one function, so what the prompt promises and what
 -- the mulligan actually costs cannot drift apart.
 data MulliganOffer = MkMulliganOffer
@@ -24,7 +24,7 @@ data MulliganOffer = MkMulliganOffer
     taken :: Natural,
     -- CR 103.5 / 103.5c: how many cards this player would put on the bottom of
     -- their library if they mulligan now. Uncapped by hand size -- the redraw
-    -- has not happened yet, and Pawl.Mulligan.takeMulligan's own min against
+    -- has not happened yet, and Pawl.Engine.Mulligan.takeMulligan's own min against
     -- the redrawn hand is a totality guard, not a rule.
     bottomCount :: Natural
   }

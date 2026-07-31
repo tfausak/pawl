@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Cost and the three types it cases on (Pawl.Types.Cost,
+-- Covers Pawl.Engine.Cost and the three types it cases on (Pawl.Types.Cost,
 -- Pawl.Types.CostComponent, Pawl.Types.Payment), plus the two prompts the axis
 -- adds. CR 118: what a cost IS, what it takes to pay one, and the alternative
 -- and additional costs that change the answer.
@@ -16,21 +16,21 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Action as Action
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -148,7 +148,7 @@ doorTests registry =
           "still Nothing"
           Nothing
           (Cost.Type.mana (Cost.total S.alice bolt (Cost.Type.MkCost Nothing []) withBolt)),
-      -- The classification Pawl.Activate reads instead of matching a constructor.
+      -- The classification Pawl.Engine.Activate reads instead of matching a constructor.
       HU.testCase "CR 302.6 requiresSicknessCheck classifies a cost, and Greed's counterpart proves it" $ do
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
@@ -156,7 +156,7 @@ doorTests registry =
             skeletons = ActivatedAbility.cost (theAbility drudgeSkeletons)
         HU.assertBool "Llanowar Elves' {T} cost requires the tap symbol" (Cost.requiresSicknessCheck elves)
         HU.assertBool "Drudge Skeletons' {B} regenerate cost does not" (not (Cost.requiresSicknessCheck skeletons)),
-      -- Departure 1: Pawl.Activate does NOT route an ability cost through
+      -- Departure 1: Pawl.Engine.Activate does NOT route an ability cost through
       -- Cost.total. PlayerEffect.matchesSpell classifies an OBJECT, not a spell,
       -- so a noncreature PERMANENT matches Thalia's Not (HasCardType Creature)
       -- filter -- and Thalia taxes noncreature SPELLS, never abilities. Four Mountains
@@ -363,7 +363,7 @@ villageRitesTests registry =
             resolved = S.runPure S.identityAnswer cast Stack.resolveTop
         HU.assertEqual "no creature left on the battlefield" 0 (S.creaturesInPlay S.alice resolved)
         -- Plan-bug fix: CR 400.7 gives the sacrificed permanent a NEW
-        -- object id in the graveyard (Pawl.Event.changeZone), so the
+        -- object id in the graveyard (Pawl.Engine.Event.changeZone), so the
         -- brief's own membership check (the OLD battlefield id inside
         -- Zone.Graveyard) is unsatisfiable by construction -- it fails
         -- even against correct code, matching Pawl.TriggerSpec's own
@@ -625,7 +625,7 @@ longtuskCubTests registry =
     ]
 
 tests :: Registry.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, safeholdSentryTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
+tests registry = Tasty.testGroup "Pawl.Engine.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, safeholdSentryTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
 
 -- alice controls a Safehold Sentry and three Plains, all settled. `tapped` says
 -- whether the Sentry itself starts tapped -- which for a {Q} cost is the payable
@@ -749,7 +749,7 @@ catharticReunionTests registry =
         HU.assertBool "and no Cast is offered" (not (any isCastOfReunion (Action.legalActions S.alice gs))),
       HU.testCase "CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid" $ do
         -- The COST path's reject-not-repair, and deliberately the opposite of what
-        -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Cost.pay
+        -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Engine.Cost.pay
         -- restores the entry state and nothing at all happened. Three other cards
         -- makes the prompt real (hand > count), unlike the forced case above.
         mountain <- Registry.printing registry "Mountain"

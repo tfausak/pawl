@@ -57,7 +57,7 @@ data Object = MkObject
     -- what lets CR 303.4c's legality re-check hand the stored value straight back
     -- to Target.stillLegal -- the recipient a Pool's own candidates are tagged
     -- with is the recipient stored here, so the tag needs no re-deriving (see
-    -- Pawl.Sba.stillLegalEnchant).
+    -- Pawl.Engine.Sba.stillLegalEnchant).
     --
     -- BASE state, not projected: attachment is a fact about the object, and no CR
     -- 613 layer reads or writes it. Per-incarnation, like damage and counters:

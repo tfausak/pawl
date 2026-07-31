@@ -12,7 +12,7 @@ import Pawl.Types.Recipient (Recipient)
 -- infect (P10), then toxic. The M2c spec's §2 named lifelink and M4's
 -- combat-damage triggers as the growth vectors; the actual ones have all been
 -- deal-time RIDERS -- a fact about the source, captured as the damage is dealt
--- because it may be unaskable later. Pawl.Damage.damageEvent is where they are
+-- because it may be unaskable later. Pawl.Engine.Damage.damageEvent is where they are
 -- read.
 data DamageEvent = MkDamageEvent
   { source :: ObjectId,
@@ -30,8 +30,8 @@ data DamageEvent = MkDamageEvent
     -- abilities' Ns) when this damage was dealt. Captured the way the two bits
     -- above are, but NOT for their reason: rule 702.164 has no last-known-
     -- information clause of its own, so this one is uniformity, not citation --
-    -- see Pawl.Damage.damageEvent. Zero for a source without toxic. Read by
-    -- Pawl.Damage.applyDamage, and only for COMBAT damage dealt to a player --
+    -- see Pawl.Engine.Damage.damageEvent. Zero for a source without toxic. Read by
+    -- Pawl.Engine.Damage.applyDamage, and only for COMBAT damage dealt to a player --
     -- CR 120.3g scopes toxic to that alone, so a noncombat event carries the
     -- value and ignores it.
     dealtByToxic :: Natural,

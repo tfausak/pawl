@@ -7,22 +7,22 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Card as Card
 import qualified Pawl.Codec.All as Codec
 import qualified Pawl.Codec.Json as J
 import qualified Pawl.Decimal as Decimal
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
--- evaluator module Pawl.Filter is not imported here today, but the alias
+-- evaluator module Pawl.Engine.Filter is not imported here today, but the alias
 -- convention is fixed project-wide so a later import never collides.
 
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Number as Number
 import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
-import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationTiming as ActivationTiming

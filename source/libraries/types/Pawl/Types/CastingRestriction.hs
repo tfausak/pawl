@@ -12,14 +12,14 @@ import Pawl.Types.Phase (Phase)
 -- of it: a permission ALLOWS a cast the rules would refuse (Panglacial Wurm from a
 -- library, flashback from a graveyard), and a restriction WITHHOLDS one the rules
 -- would otherwise allow. CR 601.3 is one sentence with two independent halves, and
--- collapsing them into one list would leave Pawl.Cast unable to say which half an
+-- collapsing them into one list would leave Pawl.Engine.Cast unable to say which half an
 -- arm belongs to.
 --
 -- A LIST of these on a card, ALL of which must hold: the printed templates join
 -- their clauses with "and only if", and the rule's "no ... prohibits" is a
 -- conjunction over every prohibition in force.
 --
--- Open-half card data, classified rather than identified: Pawl.Cast is the only
+-- Open-half card data, classified rather than identified: Pawl.Engine.Cast is the only
 -- module that may case on it, exactly as it is the only reader of
 -- CastingPermission. Casing here is casing on a RESTRICTION's classification, not
 -- on an effect's identity.

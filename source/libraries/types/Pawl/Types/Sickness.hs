@@ -26,7 +26,7 @@ import Pawl.Types.PlayerId (PlayerId)
 --
 -- Everything else writes `Sick`: Event.changeZone and Event.createToken, because
 -- CR 400.7 makes each a new object no player has controlled for any time at all;
--- Pawl.Setup, for the cards a game starts with; and Resolve's GainControl arm,
+-- Pawl.Engine.Setup, for the cards a game starts with; and Resolve's GainControl arm,
 -- because control just moved.
 --
 -- The exception is an object built directly onto the stack or into the command

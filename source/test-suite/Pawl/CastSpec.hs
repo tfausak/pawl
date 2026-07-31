@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Cast and Pawl.Stack: cast timing, the stack, discard, and
+-- Covers Pawl.Engine.Cast and Pawl.Engine.Stack: cast timing, the stack, discard, and
 -- summoning sickness.
 module Pawl.CastSpec where
 
@@ -15,24 +15,24 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Action as Action
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Card as Card
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -1029,7 +1029,7 @@ fireboltTests registry =
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
--- (CR 704.5j) is Pawl.Sba's, and this one is Pawl.Cast's.
+-- (CR 704.5j) is Pawl.Engine.Sba's, and this one is Pawl.Engine.Cast's.
 --
 -- The proving card is a LABELED SYNTHETIC: "Synthetic Legendary Sorcery", a {0}
 -- legendary sorcery whose one effect is "you lose 3 life". No real legendary

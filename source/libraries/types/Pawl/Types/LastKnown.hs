@@ -6,7 +6,7 @@ import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 -- CR 608.2h: what an object WAS, filed under the id it had while it existed --
 -- "if it's no longer in that zone ... the effect uses the object's last known
 -- information". Written by the one zone-change funnel
--- (Pawl.Event.changeZoneAttaching) as the object ceases, from the same
+-- (Pawl.Engine.Event.changeZoneAttaching) as the object ceases, from the same
 -- pre-move state the GameEvent.Moved snapshot is taken against.
 --
 -- A record of TWO things rather than the characteristics alone, because CR

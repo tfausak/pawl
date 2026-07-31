@@ -109,7 +109,7 @@ A deep-embedded AST, loaded from files at runtime. Non-negotiable, for four reas
 3. Cards become inspectable, serializable, generable
 4. **Layer 3 becomes a tree transformation on a value you already have** — see §5
 
-Cards are still compiled-in Haskell values today (`Pawl.Card` — pure data, no
+Cards are still compiled-in Haskell values today (`Pawl.Engine.Card` — pure data, no
 lambdas, but Haskell modules all the same). **M3.5** is where this section is
 actually cashed: JSON files under `./data/cards/` become the source of truth.
 Until then the promise is declared, not redeemed.
@@ -319,7 +319,7 @@ Notes the letters' specs must not lose:
 between M3 and M4 and does **not** renumber M4–M7, which are cited by number
 throughout.)*
 
-Cards today are hand-written `Printing` values compiled into `Pawl.Card` — pure
+Cards today are hand-written `Printing` values compiled into `Pawl.Engine.Card` — pure
 data, no lambdas, but Haskell modules, which §2.7 names as not the end state.
 This milestone makes JSON the card representation and files the source of truth.
 **Zero opcodes, zero rules** — a representation change, and it is sequenced
@@ -340,7 +340,7 @@ Two steps, **A** then **B**:
   touch the engine loop.
 - **B — files become the source of truth.** Render every card to
   `./data/cards/<slug>.json` (slugified name or Gatherer ID — the spec picks
-  one), commit the files, and flip `Pawl.Card` from hand-written values to a
+  one), commit the files, and flip `Pawl.Engine.Card` from hand-written values to a
   loader that parses them. The invariant that makes B safe is A's property, now
   load-bearing: the committed files parse back to byte-identical cards.
   **"Runtime" is the test suite** — the loader serves the tests; there is no

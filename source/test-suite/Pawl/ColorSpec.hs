@@ -1,5 +1,5 @@
--- Covers: Pawl.Projection (an object's CR 613 layer-5 colour, including CR
--- 702.114a devoid and CR 111.3 token colour), Pawl.Target (NonblackCreatureTarget)
+-- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
+-- 702.114a devoid and CR 111.3 token colour), Pawl.Engine.Target (NonblackCreatureTarget)
 -- and the P3a colour gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon,
 -- Dragon Fodder), plus the CR 608.2b colour-change fizzle. Gameplay-level: each
 -- card is cast or resolved through the stack and the resulting game state is
@@ -7,18 +7,18 @@
 module Pawl.ColorSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState

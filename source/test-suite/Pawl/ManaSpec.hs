@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Mana: mana payment and castability. CR 118.13a's announcement lives
+-- Covers Pawl.Engine.Mana: mana payment and castability. CR 118.13a's announcement lives
 -- here too (Mana.announcePhyrexian), so the cases that reach it through
 -- Cast.castSpell and Activate.activateAbility are in this spec rather than in
 -- CastSpec or ActivateSpec -- the module under test is this one, and the two entry
@@ -16,18 +16,18 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
@@ -159,7 +159,7 @@ manaTests registry =
       -- type and A BASIC LAND TYPE", and CR 205.3i lists which of the land types
       -- those are: "Of that list, Forest, Island, Mountain, Plains, and Swamp are
       -- the basic land types." So a Desert is a land type with no mana of its own
-      -- -- the one constructor where this answer and Pawl.Subtype.isLandType's
+      -- -- the one constructor where this answer and Pawl.Engine.Subtype.isLandType's
       -- (asserted in Pawl.ProjectionSpec) come apart, and the reason they are two
       -- functions.
       HU.testCase "CR 305.6 Desert is a land type but not a BASIC one, so it grants no mana" $
@@ -1466,7 +1466,7 @@ pikerOn gs =
 -- to the process for casting a spell listed in rules 601.2b-i", and CR 118.13a
 -- names "the activation cost of an activated ability" in its own words -- so the
 -- announcement happens at CR 601.2b's position for an activation too. Until this
--- card there was nothing in the pool for Pawl.Activate's Cost.announce call to do.
+-- card there was nothing in the pool for Pawl.Engine.Activate's Cost.announce call to do.
 moltensteelTests :: Registry.Registry -> Tasty.TestTree
 moltensteelTests registry =
   Tasty.testGroup

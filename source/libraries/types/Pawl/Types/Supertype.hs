@@ -8,7 +8,7 @@ data Supertype
   = -- CR 205.4c: any land with this supertype is a basic land, and any land
     -- without it is nonbasic even if it has a basic land type.
     Basic
-  | -- CR 205.4d: subject to CR 704.5j's legend rule, which Pawl.Sba implements.
+  | -- CR 205.4d: subject to CR 704.5j's legend rule, which Pawl.Engine.Sba implements.
     -- CR 205.4e's OTHER rule -- a legendary instant or sorcery can't be cast
     -- unless you control a legendary creature or planeswalker -- is not
     -- checked (#307).
@@ -25,7 +25,7 @@ data Supertype
     -- (CR 107.4h), and whether a MANA was produced by a snow source (CR 106.3)
     -- -- is not modelled (#467).
     Snow
-  | -- CR 205.4f: subject to CR 704.5k's world rule, which Pawl.Sba implements
+  | -- CR 205.4f: subject to CR 704.5k's world rule, which Pawl.Engine.Sba implements
     -- (Sba.worldVictims). Unlike the legend rule that one asks nobody: it keeps
     -- the permanent that has had the supertype for the shortest time, which is
     -- a fact rather than a choice.

@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Activate: activating an ability onto the stack, summoning-sickness
+-- Covers Pawl.Engine.Activate: activating an ability onto the stack, summoning-sickness
 -- gating, and the CR 605 mana-ability exclusion from stack activations.
 module Pawl.ActivateSpec where
 
@@ -11,18 +11,18 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Action as Action
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Game as Game
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -94,7 +94,7 @@ singleModeAbility effects specs =
 tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
-    "Pawl.Activate"
+    "Pawl.Engine.Activate"
     [ printedActivationTimingTests registry,
       HU.testCase "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
         prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"

@@ -1,11 +1,11 @@
--- Covers Pawl.Types.Filter, Pawl.Types.PlayerRelation, Pawl.Filter.
+-- Covers Pawl.Types.Filter, Pawl.Types.PlayerRelation, Pawl.Engine.Filter.
 module Pawl.FilterSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Filter as Filter
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
--- Aliased Filter.Type, not Type, because the evaluator module Pawl.Filter
+-- Aliased Filter.Type, not Type, because the evaluator module Pawl.Engine.Filter
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
 import qualified Pawl.Types.Filter as Filter.Type
@@ -70,7 +70,7 @@ noPerspective = Filter.MkContext Nothing Nothing
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup
-    "Pawl.Filter"
+    "Pawl.Engine.Filter"
     [ HU.testCase "HasCardType matches when present" $
         HU.assertBool "creature" (Filter.matches self blackCreature (Filter.Type.HasCardType CardType.Creature)),
       HU.testCase "HasCardType fails when absent" $
@@ -283,7 +283,7 @@ tests =
           -- The pair that makes this a separate atom rather than a synonym: CR
           -- 303.4 attaches an Aura to "an object or player", so being attached to a
           -- permanent is strictly wider than being attached to a creature and the
-          -- implication runs one way only. Pawl.Projection fills both fields off the
+          -- implication runs one way only. Pawl.Engine.Projection fills both fields off the
           -- same Object.attachedTo, so the views a real board produces never carry
           -- the impossible combination -- but the matcher folds whatever it is
           -- given, and each atom must read its own field.
@@ -314,7 +314,7 @@ tests =
             . not
             $ Filter.matches self blackCreature Filter.Type.CanHostSubject,
           -- Vacuously False wherever no attach frames the match, which is every
-          -- view but the ones Pawl.Resolve's AttachTarget arm builds.
+          -- view but the ones Pawl.Engine.Resolve's AttachTarget arm builds.
           HU.testCase "a player candidate is vacuously false"
             . HU.assertBool "player"
             . not

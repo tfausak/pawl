@@ -22,7 +22,7 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 -- triggered ability will trigger only once -- the next time its trigger event
 -- occurs -- unless it has a stated duration, such as 'this turn.'" Nothing is
 -- that rule's default, and an entry carrying it is removed as it fires. Just an
--- expiry keeps the entry armed through firing, and one of Pawl.Expiry's sweeps
+-- expiry keeps the entry armed through firing, and one of Pawl.Engine.Expiry's sweeps
 -- is what eventually ends it -- CR 514.2's cleanup, for Full Throttle's "this
 -- turn".
 --
@@ -33,7 +33,7 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 --
 -- An Expiry and not a Duration, for the reason that type's own haddock gives:
 -- card data says "this turn", and the game remembers whose turn and when. It is
--- armed by Pawl.Expiry.arm exactly as a continuous effect's is.
+-- armed by Pawl.Engine.Expiry.arm exactly as a continuous effect's is.
 data DelayedTrigger = MkDelayedTrigger
   { ability :: TriggeredAbility Card,
     source :: ObjectId,

@@ -5,9 +5,9 @@ module Pawl.Types.CastingPermission where
 -- TriggerCondition shape). CastFromLibraryWhileSearching = Panglacial Wurm: "while
 -- you're searching your library, you may cast this from your library." A general
 -- "cast from the top of your library" (Garruk's Horde) is a future permission.
--- Only Pawl.Cast reads it, as a membership test per arm
+-- Only Pawl.Engine.Cast reads it, as a membership test per arm
 -- (permitsCastWhileSearching, permitsCastFromGraveyard). Two producers:
--- Card.castingPermissions (printed) and Pawl.Keyword.castingPermissionsOf (the
+-- Card.castingPermissions (printed) and Pawl.Engine.Keyword.castingPermissionsOf (the
 -- ones rule 702 gives a card for a keyword it holds).
 --
 -- OBJECT-scoped throughout: every arm is a permission a CARD grants about
@@ -19,9 +19,9 @@ data CastingPermission
   | -- CR 702.34a's first static ability, the half that "functions while the card
     -- is in a player's graveyard": "You may cast this card from your graveyard
     -- ... by paying [cost] rather than paying its mana cost." Produced by
-    -- Pawl.Keyword.castingPermissionsOf from the Flashback keyword, not printed
+    -- Pawl.Engine.Keyword.castingPermissionsOf from the Flashback keyword, not printed
     -- in card JSON -- but a constructor here rather than a keyword read at the
-    -- gate, so Pawl.Cast keeps asking "may this be cast from the graveyard?"
+    -- gate, so Pawl.Engine.Cast keeps asking "may this be cast from the graveyard?"
     -- and never "does this card have flashback?".
     CastFromGraveyard
   deriving (Eq, Ord, Show)

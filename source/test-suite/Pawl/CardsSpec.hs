@@ -7,10 +7,10 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import qualified Pawl.Binding as Binding
 import qualified Pawl.Codec.All as Codec
 import qualified Pawl.Codec.Json as Json
-import qualified Pawl.Mana as Mana
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
@@ -105,7 +105,7 @@ tests registry =
       -- The first card file whose keyword carries a payload that is not a
       -- number: rule 702.34a's flashback COST, which is where the whole ability
       -- lives -- Firebolt prints no alternativeCosts and no castingPermissions of
-      -- its own, and Pawl.Keyword derives all three of rule 702.34a's
+      -- its own, and Pawl.Engine.Keyword derives all three of rule 702.34a's
       -- consequences from this one value.
       HU.testCase "firebolt.json loads as a {R} Sorcery whose only keyword is flashback {4}{R}" $ do
         c <- Registry.card registry "Firebolt"
@@ -132,7 +132,7 @@ tests registry =
       -- costs or where it can be cast from. Two things this file pins:
       --
       --   * the printed selection is still ChooseExactly 1. Rule 702.42a widens
-      --     it "instead of just the number specified" at CAST time (Pawl.Cast),
+      --     it "instead of just the number specified" at CAST time (Pawl.Engine.Cast),
       --     so a card that printed 2 here would be a different card.
       --   * the two modes name DIFFERENT slots. Card.modesTargetSpecs unions the
       --     chosen modes' specs by slot name, and an entwined cast chooses both
@@ -441,7 +441,7 @@ tests registry =
       -- attacking creature. Activate only during the end of combat step."
       --
       -- Also the first NONBASIC land type in the pool (CR 205.3i), which is what
-      -- separates Pawl.Subtype.isLandType from Pawl.Mana.subtypeMana: Desert is
+      -- separates Pawl.Engine.Subtype.isLandType from Pawl.Engine.Mana.subtypeMana: Desert is
       -- a land type that grants no intrinsic mana ability, so the "{T}: Add {C}"
       -- asserted here has to be PRINTED, and it is.
       HU.testCase "desert.json loads as a Land -- Desert whose ping is gated to the end of combat step" $ do
@@ -460,7 +460,7 @@ tests registry =
         -- the following criteria: it doesn't require a target ..., it could add
         -- mana to a player's mana pool when it resolves, and it's not a loyalty
         -- ability." The ping targets, so the rider rides on the ability that is
-        -- NOT a mana ability -- which is why Pawl.Activate ever sees it at all.
+        -- NOT a mana ability -- which is why Pawl.Engine.Activate ever sees it at all.
         HU.assertEqual
           "one mana ability, one not"
           [True, False]

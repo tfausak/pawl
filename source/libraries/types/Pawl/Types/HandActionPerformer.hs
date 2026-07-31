@@ -14,9 +14,9 @@ import Pawl.Types.PlayerId (PlayerId)
 -- opening-hand window (CR 103.6), the second of which is explicitly not a
 -- mulligan, which is why the name is no longer MulliganPerformer.
 --
--- A PARAMETER rather than an import because Pawl.Resolve sits ABOVE
--- Pawl.Mulligan in the module graph (Effect.RestartGame -> Setup.restartGame ->
--- startGameFromCards -> openingHands), so Pawl.Mulligan importing Pawl.Resolve
+-- A PARAMETER rather than an import because Pawl.Engine.Resolve sits ABOVE
+-- Pawl.Engine.Mulligan in the module graph (Effect.RestartGame -> Setup.restartGame ->
+-- startGameFromCards -> openingHands), so Pawl.Engine.Mulligan importing Pawl.Engine.Resolve
 -- would close a cycle. That cycle is a fact about the RULES, not the layout: an
 -- opcode restarts a game, a game start draws opening hands, and drawing opening
 -- hands performs opcodes. The precedent is Resolve.resolveSpellWith, which takes

@@ -1,7 +1,7 @@
--- Covers Pawl.PlayerEffect and Pawl.Cost, plus the types they case on
+-- Covers Pawl.Engine.PlayerEffect and Pawl.Engine.Cost, plus the types they case on
 -- (Pawl.Types.PlayerEffect, PlayerScope, PlayerStaticAbility) and
 -- the stored carrier Pawl.Types.ActivePlayerEffect. The spell match runs through
--- the identity-blind Pawl.Filter over a Pawl.Types.Filter. CR 613.10/613.11: the
+-- the identity-blind Pawl.Engine.Filter over a Pawl.Types.Filter. CR 613.10/613.11: the
 -- continuous effects that affect PLAYERS and the RULES OF THE GAME, which sit
 -- outside the CR 613 layer system entirely.
 --
@@ -13,19 +13,19 @@ module Pawl.PlayerEffectSpec where
 
 import qualified Data.List as List
 import Numeric.Natural (Natural)
-import qualified Pawl.Action as Action
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Expiry as Expiry
-import qualified Pawl.Game as Game
-import qualified Pawl.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator Pawl.Filter already claims the alias Filter.
+-- the evaluator Pawl.Engine.Filter already claims the alias Filter.
 
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -557,7 +557,7 @@ medallionTests registry =
 -- base power and toughness 1/1." CR 604.2: a static ability's continuous effect
 -- is active only "as long as the permanent with the ability remains on the
 -- battlefield AND HAS THE ABILITY", so a CR 613.1f layer-6 removal takes the
--- player-affecting half of a card's text with it -- the axis Pawl.Projection
+-- player-affecting half of a card's text with it -- the axis Pawl.Engine.Projection
 -- already gates for the projected characteristics (abilitiesRemoved).
 --
 -- CR 613.6's rescue ("if an effect starts to apply in one layer ... it will

@@ -14,18 +14,18 @@ import Pawl.Types.Affected (Affected)
 --   * StaticAbility is Affected x Modification, and CR 613.1 makes the seven
 --     layers "a machine for computing an OBJECT's characteristics". A
 --     requirement is not a characteristic -- no Modification could express it,
---     and Pawl.Projection would have to carry something it can never apply.
+--     and Pawl.Engine.Projection would have to carry something it can never apply.
 --   * PlayerStaticAbility is PlayerScope x PlayerEffect, the CR 611.1 clause for
 --     an effect that "affects players or the rules of the game". This IS that
 --     clause -- CR 613.11's own example is "say that a creature must attack this
 --     turn if able" -- but PlayerScope names PLAYERS, and a blocking requirement
 --     names an ATTACKING CREATURE. Widening PlayerScope to objects would make
 --     "which players is this about" answer "an object", which every existing
---     reader (Pawl.PlayerEffect.inScope) would then have to defend against.
+--     reader (Pawl.Engine.PlayerEffect.inScope) would then have to defend against.
 --
 -- So this is its own carrier on its own axis, and it lands where CR 613.11 puts
--- it: after the layer system has run, never inside it. Pawl.BlockRequirement is
--- the only module that reads it; Pawl.Projection never sees it.
+-- it: after the layer system has run, never inside it. Pawl.Engine.BlockRequirement is
+-- the only module that reads it; Pawl.Engine.Projection never sees it.
 --
 -- ONE requirement shape, which is the one the pool prints: "all creatures able to
 -- block X do so". The two axes CR 509.1c implies -- WHICH creatures are required,

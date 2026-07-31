@@ -1,12 +1,12 @@
--- Covers Pawl.Condition, Pawl.Types.Condition and Pawl.Types.Comparison.
+-- Covers Pawl.Engine.Condition, Pawl.Types.Condition and Pawl.Types.Comparison.
 module Pawl.ConditionSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Condition as Condition
-import qualified Pawl.Count as Count
-import qualified Pawl.Filter as Filter
+import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Comparison as Comparison

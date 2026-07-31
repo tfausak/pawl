@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers modal casting: Pawl.Cast mode selection, Pawl.Resolve chosen-mode
+-- Covers modal casting: Pawl.Engine.Cast mode selection, Pawl.Engine.Resolve chosen-mode
 -- resolution.
 module Pawl.ModalSpec where
 
@@ -8,23 +8,23 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Card as Card
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -242,8 +242,8 @@ nonlandPermanentTargetTests registry =
           got
     ]
 
--- M4h task 2: the mode-scoped reader folds, lifted off Pawl.Card onto
--- Pawl.Modal (a card-free Modal card -> ... shape shared by the spell and,
+-- M4h task 2: the mode-scoped reader folds, lifted off Pawl.Engine.Card onto
+-- Pawl.Engine.Modal (a card-free Modal card -> ... shape shared by the spell and,
 -- later, both ability types). Card.Type.Card just fixes the ambiguous `card`
 -- type parameter -- these two Modes never mention a card value.
 modalReaderTests :: Tasty.TestTree

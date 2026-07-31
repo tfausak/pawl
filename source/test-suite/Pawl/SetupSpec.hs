@@ -1,4 +1,4 @@
--- Covers Pawl.Setup and Pawl.Types.Deck: setup, deck composition, opening hands.
+-- Covers Pawl.Engine.Setup and Pawl.Types.Deck: setup, deck composition, opening hands.
 module Pawl.SetupSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -10,15 +10,15 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Mulligan as Mulligan
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameState as GameState
@@ -408,7 +408,7 @@ subgameTests registry =
         HU.assertEqual "no object id collides (object count = survivors + returned cards)" (Map.size (GameState.objects after)) (battlefieldSurvivors + libCount S.alice + libCount S.bob)
         HU.assertEqual "the subgame genuinely minted fresh ids (drawCard's changeZone, CR 400.7)" True (GameState.nextObjectId finalSub > GameState.nextObjectId sub0)
         HU.assertEqual "the id supply advanced to exactly the subgame high-water mark" (GameState.nextObjectId finalSub) (GameState.nextObjectId after),
-      -- The gate's whole reason to exist (Pawl.Departure's continuesAfterDeparture
+      -- The gate's whole reason to exist (Pawl.Engine.Departure's continuesAfterDeparture
       -- doc comment): a two-player subgame's departure is caught by CR 104.2a
       -- before it can be observed, but a subgame seated with three or more still-
       -- playing parent players is itself CR 800.1 multiplayer, so a departure

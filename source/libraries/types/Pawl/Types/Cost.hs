@@ -16,7 +16,7 @@ import Pawl.Types.ManaCost (ManaCost)
 --                          attempting to pay an unpayable cost is an illegal
 --                          action." This is the same fact Card.manaCost's Maybe
 --                          already carries for CR 202.1 (a land), passed straight
---                          through by Pawl.Cost.costsFor.
+--                          through by Pawl.Engine.Cost.costsFor.
 --   Just (MkManaCost []) = {0}, which is real and payable. CR 118.5: "the action
 --                          necessary for a player to pay such a cost is the
 --                          player's acknowledgment that they are paying it";

@@ -1,34 +1,34 @@
 -- Pattern matching on Pawl.Types.Prompt, a GADT, in aimAtObject below.
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Projection: the layer fold -- CR 613 layer order, CR 613.7
+-- Covers Pawl.Engine.Projection: the layer fold -- CR 613 layer order, CR 613.7
 -- within-layer timestamp order, and the CR 613.8 dependency reorder that
 -- overrides it. Mostly directly-constructed continuous effects, so the engine is
 -- proven independently of any card wiring; the card-level proofs live alongside.
--- Also Pawl.Subtype, the CR 205.3i land-type classification the layer-4
+-- Also Pawl.Engine.Subtype, the CR 205.3i land-type classification the layer-4
 -- SetLandSubtype arm folds with.
 module Pawl.ProjectionSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
--- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+-- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Engine.Filter already claims
 -- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
--- aliased Subtype.Type below for the same reason, against Pawl.Subtype.
+-- aliased Subtype.Type below for the same reason, against Pawl.Engine.Subtype.
 
+import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replacement as Replacement
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
-import qualified Pawl.Subtype as Subtype
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
@@ -571,7 +571,7 @@ tests registry =
       -- CR 205.3i's list, directly: the classification the arm above folds with,
       -- and the boundary that makes "keeps its creature types" mean anything.
       -- Desert is in the list too, and is why this is not the same question as
-      -- Pawl.Mana.subtypeMana's CR 305.6 one: "Of that list, Forest, Island,
+      -- Pawl.Engine.Mana.subtypeMana's CR 305.6 one: "Of that list, Forest, Island,
       -- Mountain, Plains, and Swamp are the basic land types", so a Desert is a
       -- land type that grants no intrinsic mana ability. Pawl.ManaSpec pins the
       -- other half of that pair.

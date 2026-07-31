@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Damage and Pawl.Sba: the damage funnel, deathtouch, trample, and
+-- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, deathtouch, trample, and
 -- state-based actions. ((m2cPropertyTests cards) is deterministic fixture coverage, not
 -- QuickCheck properties.)
 module Pawl.DamageSpec where
@@ -13,20 +13,20 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Damage as Damage
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Expiry as Expiry
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Sba as Sba
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Integer as Integer
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Sba as Sba
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
@@ -1360,8 +1360,8 @@ m2cPropertyTests registry =
 
 -- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
 -- creature, or a planeswalker." Damage.damageRecipient is where a Recipient that
--- names a permanent GENERICALLY -- Pawl.Binding.became's entrant, which
--- Pawl.Event.eventBindings tags Recipient.ToObject because the trigger condition
+-- names a permanent GENERICALLY -- Pawl.Engine.Binding.became's entrant, which
+-- Pawl.Engine.Event.eventBindings tags Recipient.ToObject because the trigger condition
 -- says nothing about the entrant's card types -- gets classified before an
 -- effect can build a damage event out of it.
 --

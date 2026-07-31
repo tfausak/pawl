@@ -9,9 +9,9 @@ import Pawl.Types.ManaCost (ManaCost)
 -- analogue of Pawl.Types.Modification, and NOT a member of it: CR 613.1 makes the
 -- seven layers a machine for computing an OBJECT's characteristics, while CR
 -- 613.10 and 613.11 apply these AFTER that machine has run. There is no Layer
--- constructor here and Pawl.Projection never sees this type.
+-- constructor here and Pawl.Engine.Projection never sees this type.
 --
--- Open-half card data. Pawl.PlayerEffect is the ONLY module that may case on it.
+-- Open-half card data. Pawl.Engine.PlayerEffect is the ONLY module that may case on it.
 data PlayerEffect
   = -- CR 601.3 / Silence: this player can't cast spells at all.
     CantCastSpells
@@ -35,7 +35,7 @@ data PlayerEffect
     --
     -- An AMOUNT OF MANA rather than a bare number, because CR 118.7 reduces by
     -- mana of a stated type and not only by generic: the Medallion's {1} and
-    -- Edgewalker's {W}{B} are the same shape of thing. Pawl.Cost.applyAdjustments
+    -- Edgewalker's {W}{B} are the same shape of thing. Pawl.Engine.Cost.applyAdjustments
     -- reads it component by component -- generic off generic (CR 118.7a), each
     -- typed symbol off one matching typed symbol.
     --
