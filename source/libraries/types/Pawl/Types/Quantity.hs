@@ -48,8 +48,9 @@ data Quantity
   | -- A number an EARLIER effect of the same resolution bound into a slot -- Bane
     -- of Progress' "for each permanent destroyed this way", where the sweep's own
     -- Destroy writes how many it actually destroyed and this reads it back. Read
-    -- from the resolving object's binding environment (Pawl.Binding.amountOf), the
-    -- same channel X uses.
+    -- from the binding environment of whichever object the evaluation is aimed at
+    -- -- for Pawl.Resolve, the effect's SOURCE, which is the same object the
+    -- producing effect wrote to (Pawl.Binding.amountOf, the channel X uses).
     --
     -- Named InSlot rather than Bound because PlayerRef.InSlot and ObjectRef.InSlot
     -- already spell "read the binding at this slot" that way; a third reference

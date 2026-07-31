@@ -330,10 +330,11 @@ changeZoneAttaching asOf oid requestedDest seed = do
 -- 704.5d cease-to-exist still compose). Ungated for CR 701.19c "can't be
 -- regenerated" (#42).
 --
--- This is the door for a batch that is a whole event to itself. destroyInBatch
--- below is the door for one nested inside a larger simultaneous event, and
--- destroyIn -- the shared body -- sets out which board each of its three readers
--- gets.
+-- This is the door for a batch that is a whole event to itself and whose caller
+-- does not care what died. destroyReturning below is that same door for a caller
+-- that does, destroyInBatch is the door for a batch nested inside a larger
+-- simultaneous event, and destroyIn -- the shared body -- sets out which board
+-- each of its three readers gets.
 destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
 destroy regenerability oids = Monad.void (destroyIn Nothing regenerability oids)
 
