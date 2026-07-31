@@ -12,7 +12,9 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
+import qualified Pawl.Codec as Codec
 import qualified Pawl.Event as Event
+import qualified Pawl.Json as Json
 -- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
@@ -532,6 +534,36 @@ oneEffectTrigger condition effect =
       TriggeredAbility.intervening = Nothing
     }
 
+-- CR 111.4: "A spell or ability that creates a token sets both its name and its
+-- subtype(s). If the spell or ability doesn't specify the name of the token, its
+-- name is the same as its subtype(s) plus the word 'Token.'" True of every token
+-- this pool creates, because no card in it specifies a token name.
+--
+-- Compared against every PERMUTATION of the subtypes rather than one rendering,
+-- and that is forced rather than chosen: TypeLine.subtypes is a Set, so a
+-- multi-subtype token's printed word order ("Zombie Berserker Token", not
+-- "Berserker Zombie Token") is not recoverable from the card. The lint therefore
+-- pins which subtypes appear and never their order (#477). Permuting also keeps
+-- it correct for CR 205.3b's two-WORD creature types, which splitting the name
+-- on spaces would not. The factorial is bounded by a token's subtype count, at
+-- most two here.
+--
+-- Narrow this the first time a card DOES specify a token's name, at which point
+-- the rule supplies nothing and the name is whatever the card says: CR 111.9's
+-- legendary tokens ("create Boo, a legendary 1/1 red Hamster creature token"),
+-- CR 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles), and the
+-- copy tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter,
+-- "not Human Token or Doomed Dissenter Token") are each correctly named
+-- something this lint would reject.
+tokenNameOffends :: Card.Type.Card -> Bool
+tokenNameOffends token =
+  case traverse (fmap fst . Json.tag . Codec.subtypeToJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
+    Left _ -> True
+    Right subtypes ->
+      notElem
+        (Card.Type.name token)
+        (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
+
 -- The D4 dataflow lint: every slot an effect reads is declared, and every
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
@@ -608,6 +640,23 @@ lintTests registry =
                 (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
                 ps
         HU.assertEqual "X read iff {X} declared" [] (fmap (Card.Type.name . Printing.card) offenders),
+      HU.testCase "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
+        ps <- S.allPrintings registry
+        let tokensOf card = [token | Effect.Create _ token _ _ <- cardResolutionEffects card]
+            tokens = concatMap (tokensOf . Printing.card) ps
+        -- Guards the sweep against passing vacuously if Create ever moves out
+        -- from under cardResolutionEffects.
+        HU.assertBool "the pool creates tokens" (not (null tokens))
+        HU.assertEqual "no token is misnamed" [] (fmap Card.Type.name (filter tokenNameOffends tokens)),
+      HU.testCase "the lint itself catches a token named without the suffix" $ do
+        doomedTraveler <- Registry.printing registry "Doomed Traveler"
+        case [token | Effect.Create _ token _ _ <- cardResolutionEffects (Printing.card doomedTraveler)] of
+          [token] -> do
+            HU.assertBool "the real token passes" (not (tokenNameOffends token))
+            -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
+            -- the suffix dropped.
+            HU.assertBool "misnamed token detected" (tokenNameOffends token {Card.Type.name = Text.pack "Spirit"})
+          other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
       HU.testCase "the reserved X slot is never a declared target slot" $ do
         ps <- S.allPrintings registry
         let offenders =
