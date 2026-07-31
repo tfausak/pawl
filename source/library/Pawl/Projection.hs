@@ -465,9 +465,9 @@ viewOfCard card =
           Filter.attachedToCreature = False,
           -- CR 303.4 again: nor is it attached to a permanent, for the same reason.
           Filter.attachedToPermanent = False,
-          -- CR 701.3a: nothing can be attached to a card off the battlefield
-          -- either -- attaching puts a permanent "onto that object", and CR 110.1
-          -- makes only a battlefield object one.
+          -- CR 701.3a: only Pawl.Resolve's AttachTarget arm fills this field, and
+          -- its candidates are battlefield permanents, so a card in a library or a
+          -- hand is never asked whether an attach could land on it.
           Filter.canHostSubject = False,
           -- CR 111.6: "A token isn't a card." This builder describes a card in a
           -- zone the battlefield is not (a library search, viewUpTo's fallback),
@@ -529,12 +529,18 @@ viewOfCharacteristics oid pc controller gs =
       Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
         Nothing -> False
         Just host -> isCreatureOf host gs,
-      -- CR 303.4: the same stored attachment, asked a question that stops at the
-      -- attachment itself -- does it name an OBJECT (CR 110.1: a permanent) rather
-      -- than a player? Recipient.objectOf is that question, and unlike the field
-      -- above there is no second projection behind it, so this one need not be
-      -- lazy for the recursion reason (it still is, being a record field).
-      Filter.attachedToPermanent = Maybe.isJust (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf),
+      -- CR 303.4: the same stored attachment, asked a question that stops short of
+      -- the host's characteristics -- does the attachment name an object that is
+      -- on the battlefield, which CR 110.1 is the definition of a permanent, or a
+      -- player? Recipient.objectOf splits the two, and the battlefield membership
+      -- is what rules out a stale attachment to a host that has already left:
+      -- CR 704.5m buries such an Aura, but only on the next pass, and until then
+      -- it is attached to nothing that exists. Unlike the field above there is no
+      -- projection OF ANOTHER OBJECT behind this, so it carries no recursion
+      -- hazard and needs no laziness argument.
+      Filter.attachedToPermanent = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
+        Nothing -> False
+        Just host -> Set.member host (GameState.battlefield gs),
       -- CR 701.3a: filled only by Pawl.Resolve's AttachTarget arm, which is the
       -- one place that knows what is being moved. Every view this function builds
       -- is asked about some candidate in isolation, and "could the subject be

@@ -868,6 +868,30 @@ auraGraftTests registry =
         -- Not vacuous: the Graft's own slot rejects a permanent that is not an Aura
         -- at all on the very board where it accepts three that are.
         HU.assertEqual "and a plain creature is not an Aura" (Just False) (graftOffers creature),
+      -- The window CR 704.3 leaves open between a host leaving and the pass that
+      -- buries the Aura (CR 704.5m): the attachment is still recorded, and it
+      -- still names an object, but that object is no longer on the battlefield --
+      -- and CR 110.1 makes only a battlefield object a permanent. So "attached to
+      -- a permanent" is False, and the atom has to read the battlefield rather
+      -- than stopping at the stored recipient.
+      --
+      -- Not reachable while a player holds priority, because CR 704.3 runs the
+      -- pass first -- which is exactly why the state has to be built by hand here.
+      HU.testCase "CR 110.1 an Aura whose host has left the battlefield is not attached to a permanent" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        auraGraft <- Registry.printing registry "Aura Graft"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.alice base
+            (aura, g2) = S.addCreature unholyStrength S.alice g1
+            (gs, graft) = S.handOne auraGraft (S.attach aura creature g2)
+            bounced = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Hand)
+            offers g = fmap (Set.member (Recipient.ToObject aura) . (\spec -> Target.legalRecipients (Just S.alice) graft spec g)) (S.spellTargetSpec auraGraft)
+        HU.assertEqual "while the Piker is there the Aura is a legal target" (Just True) (offers gs)
+        -- CR 400.7 minted a new object in the hand, so the recipient the Aura
+        -- still holds names an id nothing on the battlefield answers to.
+        HU.assertBool "the Aura is still attached to the old id" (Maybe.isJust (Game.lookupObject aura bounced >>= Object.attachedTo))
+        HU.assertEqual "but it is no longer attached to a PERMANENT" (Just False) (offers bounced),
       -- "another permanent IT CAN ENCHANT" is a destination filter the card states,
       -- not a restatement of CR 303.4j: the Mountain here is a permanent, and CR
       -- 701.3b excludes only the Aura's current host, so a card reading just
@@ -934,10 +958,11 @@ auraGraftTests registry =
         HU.assertBool "and trample" (Projection.hasKeyword Keyword.Trample hers after)
         HU.assertEqual "bob's Mammoth was never a legal destination" (Just (3, 3)) (S.powerToughnessOf his after),
       -- Gatherer, 2004-10-04: "If there is no legal place to move the enchantment,
-      -- then it doesn't move but you still control it." CR 609.3's "does as much of
-      -- what's asked as it can" for the move half, with the control half unaffected
-      -- -- so the two clauses really are independent, which is the point of CR
-      -- 303.4e's "an Aura's controller is separate".
+      -- then it doesn't move but you still control it." CR 609.3 -- "if an effect
+      -- attempts to do something impossible, it does only as much as possible" --
+      -- for the move half, with the control half unaffected, so the two clauses
+      -- really are independent, which is the point of CR 303.4e's "an Aura's
+      -- controller is separate".
       HU.testCase "with no permanent it can enchant the Aura does not move, and alice still gains it" $ do
         island <- Registry.printing registry "Island"
         mountain <- Registry.printing registry "Mountain"

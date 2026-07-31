@@ -146,11 +146,10 @@ playerView pid =
       -- CR 303.4 again, for the same reason: Object.attachedTo is a field of the
       -- ATTACHED permanent, and a player is not one.
       attachedToPermanent = False,
-      -- CR 702.5d: an Aura that can enchant a player "can't be attached to
-      -- permanents", and one that cannot enchant a player cannot be attached to
-      -- this candidate either -- but neither answer is reachable here. Only
-      -- Pawl.Resolve's AttachTarget arm fills this field, and it builds its
-      -- candidate views off the battlefield rather than through this function.
+      -- CR 701.3a's question can be asked about a player -- CR 702.5d lets an
+      -- enchant-player Aura be attached to one -- but not here: the only site that
+      -- fills this field is Pawl.Resolve's AttachTarget arm, whose candidates are
+      -- battlefield permanents, so no player candidate ever carries an answer.
       canHostSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False
