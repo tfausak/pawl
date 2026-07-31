@@ -54,7 +54,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TapState as TapState
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
-import qualified Test.Tasty.QuickCheck as QC
 
 turnTests :: Tasty.TestTree
 turnTests =
@@ -84,8 +83,8 @@ turnTests =
           "and it goes IN FRONT of a CR 500.8 phase added after the ending phase"
           (Phase.Ending EndingStep.Cleanup Seq.<| Turn.combatAndMainPhase)
           (Turn.spliceExtraCleanup Turn.combatAndMainPhase),
-      QC.testProperty "a turn never revisits a phase" $
-        QC.property (length Turn.allPhases == length (dedupe Turn.allPhases))
+      HU.testCase "a turn never revisits a phase" $
+        HU.assertEqual "no repeats" Turn.allPhases (List.nub Turn.allPhases)
     ]
 
 turnDataTests :: Tasty.TestTree
@@ -1030,11 +1029,6 @@ turnScopedSkipTests registry =
             HU.assertEqual "Savor's is turn 3, and alice's" (3, S.alice) (GameState.turnNumber atSavorTurn, GameState.activePlayer atSavorTurn)
             HU.assertEqual "but Savor's own turn did NOT untap" tapped (tapStateOf piker afterSavorTurn)
         ]
-
-dedupe :: (Eq a) => [a] -> [a]
-dedupe xs = case xs of
-  [] -> []
-  h : t -> h : dedupe (filter (/= h) t)
 
 tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry, extraTurnTests registry, turnScopedSkipTests registry]
