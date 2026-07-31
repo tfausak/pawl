@@ -4,7 +4,7 @@ import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.AuraSpec as AuraSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec as CardSpec
-import qualified Pawl.CardsSpec as CardsSpec
+import qualified Pawl.CardsSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
 import qualified Pawl.ColorSpec
@@ -80,7 +80,6 @@ testTree registry =
   Tasty.testGroup
     "pawl"
     [ CardSpec.tests registry,
-      CardsSpec.tests registry,
       TurnSpec.tests registry,
       GameSpec.tests registry,
       DamageSpec.tests registry,
@@ -105,6 +104,7 @@ testTree registry =
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
 spec s registry = do
   Pawl.BindingSpec.spec s
+  Pawl.CardsSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
