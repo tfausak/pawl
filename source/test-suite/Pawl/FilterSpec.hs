@@ -259,8 +259,9 @@ tests =
             . HU.assertBool "subtype does not imply attachment"
             . not
             $ Filter.matches self (blackCreature {Filter.subtypes = Set.singleton Subtype.Aura}) Filter.Type.IsAttachedToCreature,
-          -- CR 303.4: a player is enchanted BY an Aura, never attached to
-          -- anything (#190).
+          -- CR 303.4b: a player is enchanted BY an Aura, never attached to
+          -- anything -- Object.attachedTo is a field of the attached permanent,
+          -- and a player is not one.
           HU.testCase "a player candidate is vacuously false"
             . HU.assertBool "player"
             . not
