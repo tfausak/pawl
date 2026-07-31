@@ -433,12 +433,12 @@ randomAnswer p = case p of
         (i, g') = Random.uniformR (0, length sources - 1) g
     State.put g'
     pure (pickFrom candidates i)
-  -- And the same for WHICH type a multi-type source makes, so a random game
+  -- And the same for WHICH yield a source with several makes, so a random game
   -- exercises every colour an any-colour source can produce.
   Prompt.ChooseManaYield _ _ _ candidates -> do
     g <- State.get
-    let types = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length types - 1) g
+    let yields = NonEmpty.toList candidates
+        (i, g') = Random.uniformR (0, length yields - 1) g
     State.put g'
     pure (pickFrom candidates i)
   -- CR 701.34a: a random subset of each offered list, so a random game explores
