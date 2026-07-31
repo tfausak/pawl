@@ -800,9 +800,10 @@ turnTakers n gs =
       let next = fst (runTurn S.identityAnswer gs)
        in GameState.activePlayer next : turnTakers (n - 1) next
 
--- CR 500.7's extra turns, end to end, through the one card in the pool that
--- creates any: Time Warp ({3}{U}{U} Sorcery, "Target player takes an extra turn
--- after this one.").
+-- CR 500.7's extra turns, end to end, through the card that creates one for
+-- ANOTHER player: Time Warp ({3}{U}{U} Sorcery, "Target player takes an extra
+-- turn after this one."). Savor the Moment creates one too, and what it adds --
+-- a skip scoped to that turn -- is turnScopedSkipTests below.
 extraTurnTests :: Registry.Registry -> Tasty.TestTree
 extraTurnTests registry =
   let boardOf n = do
