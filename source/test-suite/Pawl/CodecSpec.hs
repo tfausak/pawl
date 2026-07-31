@@ -255,6 +255,16 @@ tests registry =
             roundTrip "entwine {3}" keywordToJson jsonToKeyword (entwine 3)
             HU.assertBool "the cost is part of the encoding" (keywordToJson (entwine 1) /= keywordToJson (entwine 3))
             HU.assertBool "entwine {1} is not flashback {1}" (keywordToJson (entwine 1) /= keywordToJson (flashbackOf 1)),
+          -- CR 702.14a's "[type]" rides the constructor, so swampwalk and
+          -- islandwalk are DIFFERENT keywords and must encode differently -- a
+          -- Bog Wraith that decoded as an islandwalker would be blockable
+          -- exactly when it should not be.
+          HU.testCase "Keyword.Landwalk carries its land type" $ do
+            roundTrip "swampwalk" keywordToJson jsonToKeyword (Keyword.Landwalk Subtype.Swamp)
+            roundTrip "islandwalk" keywordToJson jsonToKeyword (Keyword.Landwalk Subtype.Island)
+            HU.assertBool
+              "swampwalk and islandwalk encode differently"
+              (keywordToJson (Keyword.Landwalk Subtype.Swamp) /= keywordToJson (Keyword.Landwalk Subtype.Island)),
           HU.testCase "CastingPermission" $ do
             roundTrip "library" castingPermissionToJson jsonToCastingPermission CastingPermission.CastFromLibraryWhileSearching
             roundTrip "graveyard" castingPermissionToJson jsonToCastingPermission CastingPermission.CastFromGraveyard,

@@ -104,4 +104,6 @@ data Subtype
     -- an artifact nor an enchantment, which is why Pawl.Engine.Subtype.isLandType
     -- and Pawl.Engine.Mana.subtypeMana both answer it negatively.
     Jace
+  | -- CR 205.3m (a creature type; Bog Wraith's).
+    Wraith
   deriving (Eq, Ord, Show)

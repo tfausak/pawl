@@ -324,6 +324,66 @@ fearAllowsGiven pcs blocker attacker gs =
     || Set.member CardType.Artifact (Projection.cardTypesGiven pcs blocker gs)
     || Set.member Color.Black (Projection.colorsGiven pcs blocker gs)
 
+-- CR 702.14c: "A creature with landwalk can't be blocked as long as the
+-- defending player controls at least one land with the specified land type (as
+-- in 'islandwalk')."
+--
+-- The BLOCKER is not an argument, and that is CR 702.14d stated in the type.
+-- "Landwalk abilities don't 'cancel' one another": its example is a player who
+-- controls a snow Forest AND a creature with snow forestwalk, and who still may
+-- not block a snow-forestwalker. Landwalk is a property of the defending
+-- player's LANDS, never a comparison between the two creatures -- unlike
+-- protection -- so a signature that could read the blocker is a signature that
+-- could answer 702.14d wrong.
+--
+-- The same asymmetry the other two evasion gates have (see evasionAllows):
+-- landwalk restricts being BLOCKED, so the question is asked of the ATTACKER.
+--
+-- Membership over the projection's keyword map, never its counts: CR 702.14e
+-- says "multiple instances of the same kind of landwalk on the same creature are
+-- redundant". The MAP rather than hasKeywordGiven, because CR 702.14a's "[type]"
+-- rides the constructor -- there is no single Keyword value to ask about, which
+-- is Projection.totalToxic's situation and takes its shape.
+--
+-- Only CR 702.14a's "usually a land type" case is implemented: a Subtype cannot
+-- say "nonbasic land", "artifact land" or "snow Swamp", so the other three
+-- clauses of CR 702.14c are unrepresentable (#499).
+landwalkAllows :: ObjectId -> GameState -> Bool
+landwalkAllows attacker gs = landwalkAllowsGiven (Projection.controlGrants gs) Map.empty attacker gs
+
+landwalkAllowsGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Bool
+landwalkAllowsGiven grants pcs attacker gs =
+  let -- A wildcard rather than an exhaustive case, the Keyword.flashbackCost
+      -- precedent: this asks about ONE named constructor rather than classifying
+      -- every keyword, so a new arm has nothing to say here.
+      landTypeOf keyword = case keyword of
+        Keyword.Landwalk subtype -> Just subtype
+        _ -> Nothing
+      walked = Maybe.mapMaybe landTypeOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
+      -- CR 506.2/CR 508.1b: which player this creature is attacking. Read off the
+      -- attack itself rather than off the blocker's controller, because CR 702.14c
+      -- names the DEFENDING PLAYER -- the one CR 509.1a's blocker is defending --
+      -- and those two coincide only while there is exactly one of them (CR 802,
+      -- #175). Nothing means the object is not attacking, so no landwalk of its
+      -- can restrict anything.
+      defendingPlayer = fmap (\(AttackTarget.OfPlayer pid) -> pid) (Map.lookup attacker (Combat.attackers (GameState.combat gs)))
+      -- CR 702.14c's "at least one land with the specified land type" -- both
+      -- halves of that phrase, because the rule states both. CR 205.3d ("an
+      -- object can't gain a subtype that doesn't correspond to one of that
+      -- object's types") is what makes the card-type half all but redundant, and
+      -- "all but" is why it is still asked: nothing in the projection enforces
+      -- 205.3d, so a Modification.AddLandSubtype aimed at a non-land would
+      -- otherwise be walked on.
+      --
+      -- Lazy, and load-bearing: this walks the whole battlefield, and `any` below
+      -- never forces it for an attacker without landwalk, which is every attacker
+      -- in almost every combat (#200).
+      defendersLands = foldMap (\pid -> Projection.controlsGiven grants pid gs) defendingPlayer
+      isLandOfType subtype oid =
+        Set.member CardType.Land (Projection.cardTypesGiven pcs oid gs)
+          && Set.member subtype (Projection.subtypesGiven pcs oid gs)
+   in not (any (\subtype -> any (isLandOfType subtype) defendersLands) walked)
+
 -- CR 509.1b asked of ONE (blocker, attacker) pair: may this creature block that
 -- one at all? This is also what CR 509.1c's requirements mean by "able to block"
 -- (Lure), which is why it is a named function and not a lambda inside the
@@ -333,24 +393,30 @@ fearAllowsGiven pcs blocker attacker gs =
 -- different evasion abilities are cumulative: an attacker with flying AND shadow
 -- admits only blockers that answer both.
 --
--- Every restriction in the pool today happens to be pairwise. Menace (CR 702.111b,
+-- Every restriction in the pool today is at most pairwise, and CR 702.14c's
+-- landwalk is less than that: it does not read the blocker at all. Menace (CR 702.111b,
 -- "can't be blocked except by two or more creatures") is not -- it constrains the
 -- SET blocking one attacker -- and when it lands it belongs in
 -- declarationAllowed, which is asked of the whole declaration, never here.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
-pairAllowed = pairAllowedGiven Map.empty
+pairAllowed candidates attackers blocker attacker gs =
+  pairAllowedGiven (Projection.controlGrants gs) Map.empty candidates attackers blocker attacker gs
 
 -- pairAllowed against a pre-projected board, which is what the callers below
 -- pass: this question is asked once per (blocker, attacker) PAIR, so each of its
--- evasion reads was a fresh gather in a doubly nested loop (#200).
-pairAllowedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
-pairAllowedGiven pcs candidates attackers blocker attacker gs =
+-- evasion reads was a fresh gather in a doubly nested loop (#200). The grant list
+-- is threaded for the same reason and on canBlockGiven's terms: an EMPTY pcs is a
+-- cache miss the projection recovers from, but an empty grant list is a wrong
+-- answer, so callers pass the real one.
+pairAllowedGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
+pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
   -- CR 509.1a: the blocker must be one this player could block with at all, and
   -- the attacker must actually be attacking.
   List.elem blocker candidates
     && List.elem attacker attackers
     && evasionAllowsGiven pcs blocker attacker gs
     && fearAllowsGiven pcs blocker attacker gs
+    && landwalkAllowsGiven grants pcs attacker gs
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
 -- any are disobeyed the DECLARATION is illegal.
@@ -358,9 +424,10 @@ pairAllowedGiven pcs candidates attackers blocker attacker gs =
 -- The unit of legality is the whole declaration, not the pair, and that is not a
 -- stylistic choice. Menace (CR 702.111b, one punchlist entry away) says a creature
 -- can't be blocked except by TWO OR MORE creatures -- a constraint on the SET
--- blocking an attacker, which no per-pair predicate can express. Only flying and
--- reach are pairwise; designing to them would be designing to the case that
--- misleads. See the M2a spec, section 3. So this stays a whole-declaration
+-- blocking an attacker, which no per-pair predicate can express. Every evasion
+-- ability the pool has -- flying, reach, fear, landwalk -- is pairwise or
+-- narrower; designing to them would be designing to the case that misleads. See
+-- the M2a spec, section 3. So this stays a whole-declaration
 -- function even though its body is currently a fold of pairAllowed: this is the
 -- seam a set-shaped restriction plugs into, and it is the seam blockCeiling's
 -- enumeration is filtered through.
@@ -426,7 +493,7 @@ blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedChara
 blockCeilingGiven grants pcs pid gs =
   let attackers = Map.keys (Combat.attackers (GameState.combat gs))
       candidates = legalBlockersGiven grants pcs pid gs
-      able blocker attacker = pairAllowedGiven pcs candidates attackers blocker attacker gs
+      able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
       requirements = BlockRequirement.instances able candidates attackers gs
       better best declaration =
         if requirementsMet requirements declaration > requirementsMet requirements best
@@ -461,7 +528,7 @@ legalBlockDeclaration pid declaration gs =
       pcs = Projection.projectAll gs
       attackers = Map.keys (Combat.attackers (GameState.combat gs))
       candidates = legalBlockersGiven grants pcs pid gs
-      able blocker attacker = pairAllowedGiven pcs candidates attackers blocker attacker gs
+      able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
       (requirements, best) = blockCeilingGiven grants pcs pid gs
    in declarationAllowed able declaration
         && requirementsMet requirements declaration >= requirementsMet requirements best

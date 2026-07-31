@@ -682,6 +682,13 @@ withFear oid gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
+-- CR 702.14c's "the defending player controls at least one land": bob's lands,
+-- put onto an already-attacking board. S.addCreature is any-printing rather than
+-- creature-only, which is how the CR 509.1a Mountain case below reaches a land
+-- too.
+withLands :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
+withLands lands gs = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs lands
+
 evasionTests :: Registry.Registry -> Tasty.TestTree
 evasionTests registry =
   Tasty.testGroup
@@ -829,6 +836,65 @@ evasionTests registry =
         case (mine, theirs) of
           (a : _, b : _) ->
             HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear b gs0))
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp" $ do
+        -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so
+        -- this asks about the keyword and no other text.
+        bogWraith <- Registry.printing registry "Bog Wraith"
+        piker <- Registry.printing registry "Goblin Piker"
+        swamp <- Registry.printing registry "Swamp"
+        let (gs0, mine, theirs) = attacking [bogWraith] [piker]
+        case (mine, theirs) of
+          (a : _, b : _) ->
+            HU.assertBool "illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [swamp] gs0)))
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.14c a swampwalker is blocked normally when the defending player's land is an Island" $ do
+        -- THE FALSIFIER, and the reason the case above cannot pass vacuously:
+        -- the same board with the wrong land. The declaration is legal AND the
+        -- block survives a real declare blockers step.
+        bogWraith <- Registry.printing registry "Bog Wraith"
+        piker <- Registry.printing registry "Goblin Piker"
+        island <- Registry.printing registry "Island"
+        let (gs0, mine, theirs) = attacking [bogWraith] [piker]
+            gs = withLands [island] gs0
+        case (mine, theirs) of
+          (a : _, b : _) -> do
+            HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)
+            let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+            HU.assertEqual "the block sticks" (Set.singleton b) (Combat.blockersOf a after)
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.14c the land type read is the PROJECTED one, so an Urborg'd Island is a Swamp" $ do
+        -- THE FALSIFIER for reading the defending player's lands off their
+        -- PRINTED type lines. Urborg, Tomb of Yawgmoth is "Each land is a Swamp
+        -- in addition to its other land types" -- a CR 613 layer-4
+        -- AddLandSubtype over every land -- so bob's Island is a Swamp and the
+        -- Wraith walks on it. Urborg is ALICE'S, so the only land bob controls
+        -- printed no Swamp at all.
+        bogWraith <- Registry.printing registry "Bog Wraith"
+        piker <- Registry.printing registry "Goblin Piker"
+        island <- Registry.printing registry "Island"
+        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+        let (gs0, mine, theirs) = attacking [bogWraith] [piker]
+            gs = snd (S.addCreature urborg S.alice (withLands [island] gs0))
+        case (mine, theirs) of
+          (a : _, b : _) ->
+            HU.assertBool "illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs))
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.14d swampwalk on the BLOCKER cancels nothing" $ do
+        -- CR 702.14d's own example, in swamps: the defending player controls the
+        -- named land AND a creature with the same landwalk, and still may not
+        -- block. Fails against any implementation that compares the attacker's
+        -- landwalk with the blocker's -- which is how protection reads, and is
+        -- the wrong shape here.
+        bogWraith <- Registry.printing registry "Bog Wraith"
+        swamp <- Registry.printing registry "Swamp"
+        let (gs0, mine, theirs) = attacking [bogWraith] [bogWraith]
+            gs = withLands [swamp] gs0
+        case (mine, theirs) of
+          (a : _, b : _) -> do
+            HU.assertBool "illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs))
+            let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+            HU.assertEqual "nobody blocks" Set.empty (Combat.blockersOf a after)
           _ -> HU.assertFailure "fixture should have an attacker and a blocker"
     ]
 
