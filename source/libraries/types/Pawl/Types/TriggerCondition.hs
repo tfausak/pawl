@@ -163,4 +163,25 @@ data TriggerCondition
     -- battlefield), and reads the ARRIVING incarnation; this one is battlefield
     -- to graveyard, functions on the battlefield, and reads the DEPARTING one.
     SelfDies
+  | -- CR 701.6a: "whenever a spell or ability you control counters a spell" --
+    -- Baral, Chief of Compliance's. Matched against GameEvent.SpellCountered,
+    -- whose Countering carries the controller of the spell or ability that DID
+    -- the countering; the PlayerRelation reads that player against CR 109.5's
+    -- "you", the ability's controller (CR 603.3a).
+    --
+    -- NOT self-scoped, and the shape is PlayerDiscards' rather than any Self-
+    -- condition's: the bearer is a bystander watching a counterspell it controls
+    -- resolve somewhere else, so nothing about the bearer is part of the match.
+    -- Baral is a creature and the countering is done by an instant.
+    --
+    -- The relation is on the COUNTERING side, never on the countered spell's.
+    -- The printed sentence has one "you" in it and it modifies "a spell or
+    -- ability", so whose spell was countered is not asked -- Baral triggers on
+    -- countering its own controller's spell just as readily.
+    --
+    -- Only a countered SPELL fires this, which is the printed word rather than
+    -- an omission: rule 701.6a's subject is "a spell or ability", and Baral's
+    -- own object is "counters a spell". No effect in this pool can target an
+    -- ability on the stack, so nothing can counter one either (#486).
+    SpellOrAbilityCounters PlayerRelation
   deriving (Eq, Ord, Show)

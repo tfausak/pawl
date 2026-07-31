@@ -1752,7 +1752,15 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through
       -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
-      (Just recipient, True) -> mapM_ Event.counter $ Recipient.objectOf recipient
+      --
+      -- The funnel is handed THIS object and its controller, which is what
+      -- Baral, Chief of Compliance's "whenever a spell or ability you control
+      -- counters a spell" reads off the event it records -- CR 113.7a's source
+      -- and CR 109.5's "you". Passed rather than left to be re-derived, because
+      -- by the time the CR 117.5 trigger scan runs, a countering spell has gone
+      -- to its owner's graveyard and a countering ability has ceased to exist
+      -- (CR 608.2n); see Pawl.Types.Countering.
+      (Just recipient, True) -> mapM_ (Event.counter source controller) $ Recipient.objectOf recipient
       _ -> pure ()
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get

@@ -1,5 +1,6 @@
 module Pawl.Types.GameEvent where
 
+import Pawl.Types.Countering (Countering)
 import Pawl.Types.DamageEvent (DamageEvent)
 import Pawl.Types.DiscardCause (DiscardCause)
 import Pawl.Types.ObjectId (ObjectId)
@@ -126,4 +127,25 @@ data GameEvent
     -- ability it caused is on the stack -- need a per-object flag that no card
     -- in the pool asks for (#185, #282).
     Revealed PlayerId !ProjectedCharacteristics
+  | -- CR 701.6a: a spell was COUNTERED -- "to counter a spell or ability means to
+    -- cancel it, removing it from the stack. It doesn't resolve and none of its
+    -- effects occur." Emitted by Pawl.Engine.Event.counter, the one funnel every
+    -- countering in the engine goes through, alongside the Moved event that same
+    -- removal records.
+    --
+    -- Distinct from that Moved event, and the whole reason this constructor
+    -- exists. Rule 701.6a's last sentence sends the countered spell to its
+    -- owner's graveyard, and CR 608.2n sends a spell that RESOLVED to the very
+    -- same place: "as the final part of an instant or sorcery spell's
+    -- resolution, the spell is put into its owner's graveyard." A reader
+    -- matching the stack-to-graveyard zone pair therefore cannot tell the two
+    -- apart -- and a discard or a mill lands a card in a graveyard too. What
+    -- happened is not derivable from where the card went, so it is recorded.
+    --
+    -- Emitted ONLY where a counter actually happened. CR 113.6g's "can't be
+    -- countered" functions on the stack and CR 101.2 makes the "can't" win, so a
+    -- spell that says it was never countered: Event.counter returns before this
+    -- is recorded, and CR 603.2g is the rule that makes that mandatory -- "an
+    -- event that's prevented or replaced won't trigger anything."
+    SpellCountered Countering
   deriving (Eq, Ord, Show)

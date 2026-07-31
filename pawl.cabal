@@ -85,6 +85,7 @@ library codec
     Pawl.Codec.CostComponent
     Pawl.Codec.Count
     Pawl.Codec.Counterability
+    Pawl.Codec.Countering
     Pawl.Codec.CounterKind
     Pawl.Codec.CounterPattern
     Pawl.Codec.DamageEvent
@@ -387,6 +388,7 @@ library types
     Pawl.Types.CostComponent
     Pawl.Types.Count
     Pawl.Types.Counterability
+    Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern
     Pawl.Types.DamageEvent

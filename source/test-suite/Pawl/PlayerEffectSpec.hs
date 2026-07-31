@@ -141,7 +141,7 @@ ruleOfLawTests registry =
         case GameState.stack cast of
           [] -> HU.assertFailure "expected the spell on the stack"
           top : _ -> do
-            let countered = S.runPure S.identityAnswer cast (Event.counter top)
+            let countered = S.runPure S.identityAnswer cast (Event.counter S.noSource S.bob top)
             HU.assertEqual "the stack is empty again" [] (GameState.stack countered)
             HU.assertBool "still prohibited" (PlayerEffect.prohibitsCasting S.alice countered),
       -- The effect is RE-DERIVED from the battlefield on every read, so there

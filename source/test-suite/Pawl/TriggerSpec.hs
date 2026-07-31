@@ -33,6 +33,8 @@
 -- `kindredTests`.
 -- Flash -- `aetherFlashTests`. CR 701.9a's discard trigger, and CR 702.29d's
 -- "only once when a card is cycled", with Megrim -- `discardTriggerTests`.
+-- CR 701.6a's countering trigger, and the CR 113.6g gate that keeps it silent,
+-- with Baral, Chief of Compliance -- `counterTriggerTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -80,6 +82,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
@@ -117,6 +120,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -1658,6 +1662,155 @@ discardTriggerTests registry =
           (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority))
     ]
 
+-- CR 701.6a: "to counter a spell or ability means to cancel it, removing it from
+-- the stack. It doesn't resolve and none of its effects occur. A countered spell
+-- is put into its owner's graveyard." Nothing in the pool triggered on that
+-- until Baral, Chief of Compliance, {1}{U} Legendary Creature -- Human Wizard
+-- 1/3: "Instant and sorcery spells you cast cost {1} less to cast. / Whenever a
+-- spell or ability you control counters a spell, you may draw a card. If you do,
+-- discard a card."
+--
+-- The condition is hard because the graveyard cannot answer it. Rule 701.6a's
+-- last sentence and CR 608.2n send a spell to the same place -- "as the final
+-- part of an instant or sorcery spell's resolution, the spell is put into its
+-- owner's graveyard" -- so the stack-to-graveyard zone change a countering
+-- records is indistinguishable from the one an ordinary resolution records. The
+-- three cases below are that distinction, from three sides: the countering
+-- fires, a countering that CR 113.6g stopped does not, and a resolution into the
+-- very same graveyard does not.
+--
+-- bob controls the Baral and casts the Cancel throughout, so CR 109.5 fixes its
+-- "you" as bob (CR 603.3a) and every countered spell is alice's.
+--
+-- Baral's reflexive "if you do" is one Optional mode over both instructions
+-- (#487), so `Exercises` below draws AND discards.
+counterTriggerTests :: Registry.Registry -> Tasty.TestTree
+counterTriggerTests registry =
+  let -- bob: a Baral, three Islands, one card in his library and a Cancel in
+      -- hand. alice: `victim` on the stack. bob's library and hand each hold
+      -- exactly one card, so the draw and the discard are both countable, and CR
+      -- 701.9b has nothing to ask (a one-card hand discards forced, #63).
+      board victim island cancel baral spare =
+        let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
+            withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) withBaral [1 .. (3 :: Int)]
+            (_, withLibrary) = S.addLibraryCard spare S.bob withLands
+            (victimId, onStack) = S.spellOnStack victim S.alice withLibrary
+            (cancelId, gs) = S.addHandCard cancel S.bob onStack
+         in (victimId, cancelId, gs)
+      -- Targets the spell already on the stack, and takes rule 603.5's "may".
+      answerWith victimId p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject victimId)) sets
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+   in Tasty.testGroup
+        "CounterTrigger"
+        [ HU.testCase "CR 701.6a whole cards: bob's Cancel counters alice's spell, and Baral draws then discards" $ do
+            island <- Registry.printing registry "Island"
+            cancel <- Registry.printing registry "Cancel"
+            baral <- Registry.printing registry "Baral, Chief of Compliance"
+            piker <- Registry.printing registry "Goblin Piker"
+            mountain <- Registry.printing registry "Mountain"
+            let (victimId, cancelId, gs) = board piker island cancel baral mountain
+                answer :: Prompt.Prompt r -> r
+                answer = answerWith victimId
+                cast = S.runPure answer gs (Cast.castSpell S.bob cancelId)
+                countered = S.runPure answer cast Stack.resolveTop
+                placed = S.runPure answer countered Engine.settleForPriority
+                after = S.runPure answer placed Stack.resolveTop
+            HU.assertEqual "the victim was countered into alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice countered))
+            HU.assertEqual "and never reached the battlefield" 0 (S.creaturesInPlay S.alice countered)
+            HU.assertEqual "Baral's trigger is the only thing on the stack" 1 (length (GameState.stack placed))
+            -- The trigger LANDED, not merely fired: bob's one library card was
+            -- drawn (library empty) and then discarded (his graveyard holds the
+            -- Cancel and that card, and his hand is empty again).
+            HU.assertEqual "bob drew his only library card" 0 (length (Game.zoneMembers Zone.Library S.bob after))
+            HU.assertEqual "and discarded it, beside the spent Cancel" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+            HU.assertEqual "so bob's hand is empty again" 0 (S.handSize S.bob after)
+            HU.assertEqual "the stack is empty" 0 (length (GameState.stack after)),
+          -- THE composition case, and the reason the pair exists. CR 113.6g: "an
+          -- object's ability that states it can't be countered ... functions on
+          -- the stack", and CR 101.2 makes the "can't" win -- so Rending Volley
+          -- is not countered, no countering event happens, and Baral has nothing
+          -- to see. The falsifier for an implementation that recorded the event
+          -- before the gate, or that read the zone change instead.
+          --
+          -- Rending Volley rather than Blurred Mongoose (which issue #43
+          -- proposed): the Mongoose also prints shroud, and CR 702.18 is
+          -- unimplemented (#488), so it could not be modelled faithfully. Both
+          -- cards reach this gate the same way -- through Card.counterability,
+          -- read off the spell on the stack.
+          HU.testCase "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
+            island <- Registry.printing registry "Island"
+            cancel <- Registry.printing registry "Cancel"
+            baral <- Registry.printing registry "Baral, Chief of Compliance"
+            rendingVolley <- Registry.printing registry "Rending Volley"
+            mountain <- Registry.printing registry "Mountain"
+            let (victimId, cancelId, gs) = board rendingVolley island cancel baral mountain
+                answer :: Prompt.Prompt r -> r
+                answer = answerWith victimId
+                cast = S.runPure answer gs (Cast.castSpell S.bob cancelId)
+                resolved = S.runPure answer cast Stack.resolveTop
+                placed = S.runPure answer resolved Engine.settleForPriority
+            -- CR 101.2 from the other side: the Cancel itself was not stopped.
+            -- It targeted legally (CR 113.6g grants no shroud), resolved, did
+            -- nothing, and CR 608.2n put it into bob's graveyard.
+            HU.assertEqual "Rending Volley is still on the stack, alone" [victimId] (GameState.stack placed)
+            HU.assertEqual "the spent Cancel is bob's only graveyard card" 1 (length (Game.zoneMembers Zone.Graveyard S.bob placed))
+            HU.assertEqual "bob drew nothing" 1 (length (Game.zoneMembers Zone.Library S.bob placed))
+            HU.assertEqual "and discarded nothing" 0 (S.handSize S.bob placed),
+          -- The negative that keeps the first case from passing vacuously. CR
+          -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
+          -- zone change rule 701.6a's countering makes -- so an implementation
+          -- that matched the zone pair rather than the recorded countering would
+          -- fire here too.
+          HU.testCase "CR 608.2n bob's own Bolt resolving into that same graveyard fires nothing" $ do
+            mountain <- Registry.printing registry "Mountain"
+            baral <- Registry.printing registry "Baral, Chief of Compliance"
+            bolt <- Registry.printing registry "Lightning Bolt"
+            let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
+                withLand = snd (S.addCreature mountain S.bob withBaral)
+                (_, withLibrary) = S.addLibraryCard mountain S.bob withLand
+                (boltId, gs) = S.addHandCard bolt S.bob withLibrary
+                answer :: Prompt.Prompt r -> r
+                answer p = case p of
+                  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+                  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                  _ -> S.identityAnswer p
+                cast = S.runPure answer gs (Cast.castSpell S.bob boltId)
+                resolved = S.runPure answer cast Stack.resolveTop
+                placed = S.runPure answer resolved Engine.settleForPriority
+            HU.assertEqual "the Bolt really did resolve into bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+            HU.assertEqual "alice took 3, so it resolved rather than fizzling" (fmap (subtract 3) (S.lifeOf S.alice gs)) (S.lifeOf S.alice resolved)
+            HU.assertEqual "nothing was put on the stack" [] (GameState.stack placed)
+            HU.assertEqual "bob drew nothing" 1 (length (Game.zoneMembers Zone.Library S.bob placed))
+            HU.assertEqual "and discarded nothing" 0 (S.handSize S.bob placed),
+          -- Baral's OTHER half, and the reason the board above gives bob exactly
+          -- three Islands: "instant and sorcery spells you cast cost {1} less to
+          -- cast" (CR 601.2f's cost reductions) turns Cancel's {1}{U}{U} into
+          -- {U}{U}, so one Island is still untapped once it is paid for.
+          HU.testCase "CR 601.2f Baral's reduction leaves an Island untapped after Cancel is cast" $ do
+            island <- Registry.printing registry "Island"
+            cancel <- Registry.printing registry "Cancel"
+            baral <- Registry.printing registry "Baral, Chief of Compliance"
+            piker <- Registry.printing registry "Goblin Piker"
+            mountain <- Registry.printing registry "Mountain"
+            let (victimId, cancelId, gs) = board piker island cancel baral mountain
+                answer :: Prompt.Prompt r -> r
+                answer = answerWith victimId
+                cast = S.runPure answer gs (Cast.castSpell S.bob cancelId)
+                untapped g =
+                  length
+                    [ oid
+                    | oid <- Game.zoneMembers Zone.Battlefield S.bob g,
+                      Just obj <- [Game.lookupObject oid g],
+                      Object.tapped obj == TapState.Untapped,
+                      Object.zone obj == Zone.Battlefield
+                    ]
+            -- Three Islands and the Baral start untapped; paying {U}{U} taps two.
+            HU.assertEqual "four untapped permanents before" 4 (untapped gs)
+            HU.assertEqual "two after, so only two Islands were tapped" 2 (untapped cast)
+        ]
+
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
 -- enters, you gain 1 life", the card that proves it. Its effect names nothing
@@ -2012,6 +2165,8 @@ representativeEvent cond =
         TriggerCondition.SelfAttacks _ -> GameEvent.AttackerDeclared departed
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> moved Zone.Library Zone.Graveyard
         TriggerCondition.SelfDies -> moved Zone.Battlefield Zone.Graveyard
+        TriggerCondition.SpellOrAbilityCounters _ ->
+          GameEvent.SpellCountered (Countering.MkCountering departed arrived S.alice)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -2028,7 +2183,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
-    TriggerCondition.SelfDies
+    TriggerCondition.SelfDies,
+    TriggerCondition.SpellOrAbilityCounters PlayerRelation.You
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -2593,4 +2749,4 @@ kindredTests registry =
         ]
 
 tests :: Registry.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry, kindredTests registry, discardTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry, kindredTests registry, discardTriggerTests registry, counterTriggerTests registry]

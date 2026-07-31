@@ -95,6 +95,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -1016,6 +1017,21 @@ tests registry =
             roundTrip "sa1" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn),
           HU.testCase "GameEvent.AttackerDeclared round-trips" $
             roundTrip "ad" gameEventToJson jsonToGameEvent (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3)),
+          -- CR 701.6a's event. Three DISTINCT payload values, two of them
+          -- ObjectIds: a trip that swapped the countered spell for the countering
+          -- source would survive equal ids and fail here.
+          HU.testCase "GameEvent.SpellCountered round-trips" $
+            roundTrip
+              "countered"
+              gameEventToJson
+              jsonToGameEvent
+              (GameEvent.SpellCountered (Countering.MkCountering (ObjectId.MkObjectId 4) (ObjectId.MkObjectId 5) S.bob)),
+          -- Both relations, for the reason the discard condition's case gives:
+          -- the PlayerRelation is the whole content of Baral, Chief of
+          -- Compliance's "a spell or ability YOU CONTROL counters a spell".
+          HU.testCase "TriggerCondition.SpellOrAbilityCounters round-trips both relations" $ do
+            roundTrip "socy" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SpellOrAbilityCounters PlayerRelation.You)
+            roundTrip "soco" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SpellOrAbilityCounters PlayerRelation.Opponent),
           -- Create's TokenEntry is ELIDED when it is the CR 110.5b default, so
           -- the round trip has to hold for all four shapes the encoder emits --
           -- and the two three-element ones (a slot, or an entry) are told apart
