@@ -7,10 +7,10 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Codec as Codec
-import qualified Pawl.Json as Json
-import qualified Pawl.Mana as Mana
+import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.Printing (printingToJson)
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
@@ -54,7 +54,6 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
@@ -86,7 +85,7 @@ modeShapes m =
     (\mode -> (Mode.optionality mode, Foldable.toList (Mode.effects mode)))
     (Foldable.toList (Modal.modes m))
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Pawl.CardsSpec"
@@ -106,7 +105,7 @@ tests registry =
       -- The first card file whose keyword carries a payload that is not a
       -- number: rule 702.34a's flashback COST, which is where the whole ability
       -- lives -- Firebolt prints no alternativeCosts and no castingPermissions of
-      -- its own, and Pawl.Keyword derives all three of rule 702.34a's
+      -- its own, and Pawl.Engine.Keyword derives all three of rule 702.34a's
       -- consequences from this one value.
       HU.testCase "firebolt.json loads as a {R} Sorcery whose only keyword is flashback {4}{R}" $ do
         c <- Registry.card registry "Firebolt"
@@ -133,7 +132,7 @@ tests registry =
       -- costs or where it can be cast from. Two things this file pins:
       --
       --   * the printed selection is still ChooseExactly 1. Rule 702.42a widens
-      --     it "instead of just the number specified" at CAST time (Pawl.Cast),
+      --     it "instead of just the number specified" at CAST time (Pawl.Engine.Cast),
       --     so a card that printed 2 here would be a different card.
       --   * the two modes name DIFFERENT slots. Card.modesTargetSpecs unions the
       --     chosen modes' specs by slot name, and an entwined cast chooses both
@@ -442,7 +441,7 @@ tests registry =
       -- attacking creature. Activate only during the end of combat step."
       --
       -- Also the first NONBASIC land type in the pool (CR 205.3i), which is what
-      -- separates Pawl.Subtype.isLandType from Pawl.Mana.subtypeMana: Desert is
+      -- separates Pawl.Engine.Subtype.isLandType from Pawl.Engine.Mana.subtypeMana: Desert is
       -- a land type that grants no intrinsic mana ability, so the "{T}: Add {C}"
       -- asserted here has to be PRINTED, and it is.
       HU.testCase "desert.json loads as a Land -- Desert whose ping is gated to the end of combat step" $ do
@@ -461,7 +460,7 @@ tests registry =
         -- the following criteria: it doesn't require a target ..., it could add
         -- mana to a player's mana pool when it resolves, and it's not a loyalty
         -- ability." The ping targets, so the rider rides on the ability that is
-        -- NOT a mana ability -- which is why Pawl.Activate ever sees it at all.
+        -- NOT a mana ability -- which is why Pawl.Engine.Activate ever sees it at all.
         HU.assertEqual
           "one mana ability, one not"
           [True, False]
@@ -783,10 +782,10 @@ tests registry =
         HU.assertEqual "nothing of it is a static or a replacement" ([], []) (CardT.staticAbilities c, CardT.replacementEffects c)
     ]
 
-checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
+checkFile :: Registry.Registry -> Printing.Printing -> HU.Assertion
 checkFile registry p = do
   let slug = slugOf p
-  let path = Registry.Type.root registry <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
+  let path = Registry.root registry <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
   -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
   -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
   -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".
@@ -805,4 +804,4 @@ checkFile registry p = do
           -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
           -- this can never quietly regress into a byte comparison: every file would
           -- fail at once.
-          HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))
+          HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (printingToJson p))

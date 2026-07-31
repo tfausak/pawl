@@ -1,19 +1,19 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers the VM core: Pawl.Types.Program (the suspension interpreter) and
--- Pawl.Quantity (numeric evaluation).
+-- Pawl.Engine.Quantity (numeric evaluation).
 module Pawl.CoreSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Projection as Projection
-import qualified Pawl.Quantity as Quantity
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count.Type
@@ -26,7 +26,6 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Quantity as Quantity.Type
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -94,7 +93,7 @@ noView _ = Nothing
 noContext :: Filter.Context
 noContext = Filter.MkContext Nothing Nothing
 
-quantityTests :: Registry.Type.Registry -> Tasty.TestTree
+quantityTests :: Registry.Registry -> Tasty.TestTree
 quantityTests registry =
   Tasty.testGroup
     "Quantity"
@@ -192,5 +191,5 @@ quantityTests registry =
           (Quantity.evaluate viewOfThree noContext three (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Core" [programTests, quantityTests registry]

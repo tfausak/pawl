@@ -17,7 +17,7 @@ import Pawl.Types.Phase (Phase)
 -- That last sentence is load-bearing and easy to get wrong: the check must NOT
 -- consult casting prohibitions (Rule of Law, Silence). For SorcerySpeed it is
 -- three facts about the game state and nothing else. DuringPhase below is held
--- to the same discipline, and for the same reason -- Pawl.Activate.timingOk
+-- to the same discipline, and for the same reason -- Pawl.Engine.Activate.timingOk
 -- reads GameState.phase and never Pawl.Types.CastingRestriction.
 --
 -- Deliberately NOT a synonym for Pawl.Types.CastingRestriction, which carries an
@@ -31,7 +31,7 @@ import Pawl.Types.Phase (Phase)
 --      an ability no default window beyond "any time you have priority", and
 --      AnyTime is that default stated as an arm. One type cannot be both.
 --   2. CR 307.5's last two sentences forbid the two readers agreeing --
---      Pawl.Cast must consult casting prohibitions and Pawl.Activate must not.
+--      Pawl.Engine.Cast must consult casting prohibitions and Pawl.Engine.Activate must not.
 --   3. No ONE card in the pool prints both shapes -- Rally the Troops prints the
 --      casting side, Desert the ability side -- so nothing forces the merge.
 --

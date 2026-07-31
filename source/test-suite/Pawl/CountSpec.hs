@@ -1,4 +1,4 @@
--- Covers Pawl.Count, Pawl.Types.Count, Pawl.Types.Scope, Pawl.Types.PlayerRef,
+-- Covers Pawl.Engine.Count, Pawl.Types.Count, Pawl.Types.Scope, Pawl.Types.PlayerRef,
 -- Pawl.Types.EventShape and Pawl.Types.Aggregation. Unit-level: the fold is driven
 -- against a stubbed ViewOf so the evaluator is tested apart from the projection
 -- that supplies it (Pawl.PowerToughnessSpec covers the wiring). The one
@@ -11,13 +11,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Count as Count
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardType as CardType
@@ -33,7 +33,6 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -49,7 +48,7 @@ swampsYouControl =
     (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
     Aggregation.Objects
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Count"

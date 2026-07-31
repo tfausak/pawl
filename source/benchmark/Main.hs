@@ -5,10 +5,10 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Engine as Engine
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Deck as Deck
@@ -19,7 +19,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Registry as Registry.Type
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Test.Tasty.Bench as Bench
@@ -232,7 +231,7 @@ fighting deck n =
 
 -- The redDeck recipe (name -> count), loaded from the registry -- the proof
 -- that files -> parse -> a real game works end-to-end.
-loadRedDeck :: Registry.Type.Registry -> IO Deck.Deck
+loadRedDeck :: Registry.Registry -> IO Deck.Deck
 loadRedDeck registry = do
   mountain <- Registry.printing registry "Mountain"
   piker <- Registry.printing registry "Goblin Piker"
@@ -271,7 +270,7 @@ loadRedDeck registry = do
 -- damage cycle on essentially every one of those 108 turns -- nothing ever
 -- dies, so combat never tapers off the way it does against the red mirror's
 -- 1/2 Bird Maidens, which gang-block and kill the lead attacker.
-loadControlDeck :: Registry.Type.Registry -> IO Deck.Deck
+loadControlDeck :: Registry.Registry -> IO Deck.Deck
 loadControlDeck registry = do
   island <- Registry.printing registry "Island"
   myr <- Registry.printing registry "Darksteel Myr"
@@ -301,7 +300,7 @@ loadControlDeck registry = do
 -- same way: 4 and 4 at the end here, 5 and 3 there, because each Control Magic
 -- that resolves steals one. That drift is the Aura's own doing and is part of
 -- what the pair measures, not a flaw in the control.
-loadNoAuraDeck :: Registry.Type.Registry -> IO Deck.Deck
+loadNoAuraDeck :: Registry.Registry -> IO Deck.Deck
 loadNoAuraDeck registry = do
   island <- Registry.printing registry "Island"
   myr <- Registry.printing registry "Darksteel Myr"

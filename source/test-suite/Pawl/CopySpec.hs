@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers: Pawl.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
--- from inside Pawl.Event's changeZone), the P2 copy gate (Clone). Gameplay-level:
+-- Covers: Pawl.Engine.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
+-- from inside Pawl.Engine.Event's changeZone), the P2 copy gate (Clone). Gameplay-level:
 -- Clone enters via the zone-change funnel and its projected characteristics are
 -- asserted.
 module Pawl.CopySpec where
@@ -12,13 +12,13 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -27,7 +27,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -72,7 +71,7 @@ resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> G
 resolveAndSettle answer gs =
   snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Copy"

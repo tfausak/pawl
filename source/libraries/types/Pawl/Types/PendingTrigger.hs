@@ -9,8 +9,8 @@ import Pawl.Types.TriggerSource (TriggerSource)
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 
 -- CR 603.3: an ability that has TRIGGERED but is not yet on the stack. Gathered
--- by Pawl.Event (and, for CR 725.2's sourceless pair, by Pawl.Monarch) at the CR
--- 117.5 boundary, ordered and placed by Pawl.Engine.
+-- by Pawl.Engine.Event (and, for CR 725.2's sourceless pair, by Pawl.Engine.Monarch) at the CR
+-- 117.5 boundary, ordered and placed by Pawl.Engine.Engine.
 --
 -- `source` is what the ability hangs on -- the object it belongs to (CR 113.7),
 -- or nothing at all for the monarch's inherent abilities (CR 725.2). Both kinds

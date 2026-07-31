@@ -3,7 +3,7 @@ module Pawl.Types.PhaseSelector where
 import Pawl.Types.Phase (Phase)
 
 -- CR 500.11 / 614.10: which step-or-phase a skip names, and which one
--- Pawl.Engine offers up as it is about to begin. The two sides of CR 614.1b are
+-- Pawl.Engine.Engine offers up as it is about to begin. The two sides of CR 614.1b are
 -- compared by EQUALITY on this type, so a pattern that names a phase can never
 -- be confused with one that names a step of it.
 --
@@ -26,7 +26,7 @@ import Pawl.Types.Phase (Phase)
 --
 -- Vocabulary on a finished axis, which is why all three stepped phases are here
 -- while only the combat one has a producer in the pool: CR 500.1 fixes the set at
--- three, and Pawl.Turn.phaseBeginningAt has to answer for every Phase regardless.
+-- three, and Pawl.Engine.Turn.phaseBeginningAt has to answer for every Phase regardless.
 data PhaseSelector
   = Step Phase
   | BeginningPhase

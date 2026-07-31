@@ -1,10 +1,10 @@
--- Covers: Pawl.Types.Binding, Pawl.Binding
+-- Covers: Pawl.Types.Binding, Pawl.Engine.Binding
 module Pawl.BindingSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Binding as Binding
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -34,7 +34,7 @@ sampleSnapshot =
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup
-    "Pawl.Binding"
+    "Pawl.Engine.Binding"
     [ HU.testCase "fromChoices merges a shared slot's target and subtypes" $
         let slot = SlotName.MkSlotName (Text.pack "target")
             r = Recipient.ToPlayer S.alice

@@ -57,7 +57,6 @@ import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.TriggerSpec as TriggerSpec
 import qualified Pawl.TurnSpec as TurnSpec
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -75,7 +74,7 @@ tasty =
       Spec.it = \s -> Writer.tell . List.singleton . HU.testCase s
     }
 
-testTree :: Registry.Type.Registry -> Tasty.TestTree
+testTree :: Registry.Registry -> Tasty.TestTree
 testTree registry =
   Tasty.testGroup
     "pawl"

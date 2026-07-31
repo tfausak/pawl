@@ -9,7 +9,7 @@ import Pawl.Types.Supertype (Supertype)
 -- A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
 -- predicate over one candidate -- an object, or (CR 115.1) a player, since a
 -- target may be either -- expressed as data and evaluated by one generic
--- matcher (Pawl.Filter.matches) that never learns which effect produced it. Its
+-- matcher (Pawl.Engine.Filter.matches) that never learns which effect produced it. Its
 -- atoms case on CHARACTERISTICS (card type, supertype, colour, subtype, power,
 -- controller, and for a player candidate its identity) -- exactly as the rules
 -- already case on a CardType -- and on a handful of things CR 109.3 says are NOT
@@ -89,7 +89,7 @@ data Filter
     -- same kind of act as reading a card type. Casing on an EFFECT's identity is
     -- what the invariant forbids, and this arm does not do it.
     --
-    -- NOT the same question as "is something blocking it": Pawl.Combat.isBlocked
+    -- NOT the same question as "is something blocking it": Pawl.Engine.Combat.isBlocked
     -- asks whether an ATTACKER has an entry in Combat.blockers, and this asks
     -- whether the candidate is a MEMBER of some attacker's set. CR 509.1h's last
     -- sentence is what keeps the two apart -- "a creature remains blocked even if
@@ -147,7 +147,7 @@ data Filter
     -- difference from the atom above.
     --
     -- Nullary for IsAttachedToCreature's reason and one more of its own. #356's
-    -- general `AttachedTo Filter` needs a RECURSIVE Pawl.Filter.View -- a
+    -- general `AttachedTo Filter` needs a RECURSIVE Pawl.Engine.Filter.View -- a
     -- candidate's view would have to carry its host's -- which #356 records as a
     -- bigger structural change than any card justifies, and which would also make
     -- that record's derived Eq and Show diverge on a cyclic attachment. This atom
@@ -163,7 +163,7 @@ data Filter
     --
     -- Context-relative in exactly the way IsSource and ControlledBy are: the
     -- Filter value carries no object id, and the answer comes from what the caller
-    -- supplies. The subject arrives through Pawl.Filter.View rather than through
+    -- supplies. The subject arrives through Pawl.Engine.Filter.View rather than through
     -- Context, because the answer is per-candidate and needs the game state --
     -- which is the same footing `attachedToCreature` is on, and Context has
     -- neither. Vacuously False wherever no attach frames the match, the posture
@@ -198,7 +198,7 @@ data Filter
     -- Unlike those two it is not merely uncharacteristic but IMMUTABLE: CR 111.3
     -- makes a token's effect-defined values "functionally equivalent" to printed
     -- ones, so nothing in CR 613 can turn a card into a token or back. That is
-    -- what lets Pawl.Projection.filterReads declare it as reading nothing.
+    -- what lets Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsToken
   | And [Filter]
   | Or [Filter]

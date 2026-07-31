@@ -1,8 +1,8 @@
 module Pawl.DecideSpec where
 
 import qualified Data.Map.Strict as Map
-import qualified Pawl.Decide as Decide
-import qualified Pawl.Setup as Setup
+import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.GameState as GameState
@@ -12,7 +12,7 @@ import qualified Test.Tasty.HUnit as HU
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup
-    "Pawl.Decide"
+    "Pawl.Engine.Decide"
     [ HU.testCase "CR 722: with no control, a player decides for themselves" $
         let gs = Setup.emptyGame S.bothPlayers
          in HU.assertEqual "alice decides for alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.alice gs),

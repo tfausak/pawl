@@ -9,7 +9,8 @@ category: Game
 license: 0BSD
 maintainer: Taylor Fausak
 license-file: LICENSE.txt
-data-files: data/cards/*.json
+data-dir: data
+data-files: cards/*.json
 extra-doc-files:
   CHANGELOG.md
   README.md
@@ -45,20 +46,183 @@ common library
 
 common executable
   import: library
-  build-depends: pawl
   ghc-options: -rtsopts
+
+-- JSON encoders and decoders for Pawl's types.
+library codec
+  import: library
+  build-depends:
+    containers ^>=0.8,
+    parsec ^>=3.1.18,
+    pawl:decimal,
+    pawl:extra,
+    pawl:json,
+    pawl:types,
+    text ^>=2.1.3,
+
+  hs-source-dirs: source/libraries/codec
+  -- cabal-gild: discover source/libraries/codec
+  exposed-modules:
+    Pawl.Codec.AbilityName
+    Pawl.Codec.ActivatedAbility
+    Pawl.Codec.ActivationTiming
+    Pawl.Codec.Affected
+    Pawl.Codec.Aggregation
+    Pawl.Codec.AttackRequirement
+    Pawl.Codec.BeginningStep
+    Pawl.Codec.Binding
+    Pawl.Codec.BlockRequirement
+    Pawl.Codec.Card
+    Pawl.Codec.CardType
+    Pawl.Codec.CastingPermission
+    Pawl.Codec.CastingRestriction
+    Pawl.Codec.Color
+    Pawl.Codec.CombatStep
+    Pawl.Codec.Comparison
+    Pawl.Codec.Condition
+    Pawl.Codec.ControllerRelation
+    Pawl.Codec.Cost
+    Pawl.Codec.CostComponent
+    Pawl.Codec.Count
+    Pawl.Codec.Counterability
+    Pawl.Codec.CounterKind
+    Pawl.Codec.CounterPattern
+    Pawl.Codec.DamageEvent
+    Pawl.Codec.DamageKind
+    Pawl.Codec.DamagePattern
+    Pawl.Codec.DamageRewrite
+    Pawl.Codec.DelayedTrigger
+    Pawl.Codec.DestructionRewrite
+    Pawl.Codec.DiscardCause
+    Pawl.Codec.Duration
+    Pawl.Codec.Effect
+    Pawl.Codec.EndingStep
+    Pawl.Codec.EntryOption
+    Pawl.Codec.EntryRewrite
+    Pawl.Codec.EventShape
+    Pawl.Codec.Expiry
+    Pawl.Codec.ExtraPhase
+    Pawl.Codec.Filter
+    Pawl.Codec.GameEvent
+    Pawl.Codec.Json
+    Pawl.Codec.Keyword
+    Pawl.Codec.ManaCost
+    Pawl.Codec.ManaProduction
+    Pawl.Codec.ManaSymbol
+    Pawl.Codec.ManaType
+    Pawl.Codec.Modal
+    Pawl.Codec.Mode
+    Pawl.Codec.ModeIndex
+    Pawl.Codec.ModeSelection
+    Pawl.Codec.Modification
+    Pawl.Codec.MonarchTarget
+    Pawl.Codec.ObjectId
+    Pawl.Codec.ObjectRef
+    Pawl.Codec.Optionality
+    Pawl.Codec.Phase
+    Pawl.Codec.PhasePattern
+    Pawl.Codec.PhaseSelector
+    Pawl.Codec.PlayerCounterKind
+    Pawl.Codec.PlayerEffect
+    Pawl.Codec.PlayerId
+    Pawl.Codec.PlayerRef
+    Pawl.Codec.PlayerRelation
+    Pawl.Codec.PlayerScope
+    Pawl.Codec.PlayerStaticAbility
+    Pawl.Codec.Pool
+    Pawl.Codec.Power
+    Pawl.Codec.Printing
+    Pawl.Codec.ProjectedCharacteristics
+    Pawl.Codec.Quantity
+    Pawl.Codec.Recipient
+    Pawl.Codec.Regenerability
+    Pawl.Codec.ReplacementEffect
+    Pawl.Codec.Scaling
+    Pawl.Codec.Scope
+    Pawl.Codec.SearchDestination
+    Pawl.Codec.SlotName
+    Pawl.Codec.StaticAbility
+    Pawl.Codec.Subtype
+    Pawl.Codec.Supertype
+    Pawl.Codec.TapState
+    Pawl.Codec.TargetSpec
+    Pawl.Codec.TokenEntry
+    Pawl.Codec.TokenPattern
+    Pawl.Codec.Toughness
+    Pawl.Codec.TriggerCondition
+    Pawl.Codec.TriggeredAbility
+    Pawl.Codec.TriggerFrequency
+    Pawl.Codec.TurnScope
+    Pawl.Codec.TypeLine
+    Pawl.Codec.Uses
+    Pawl.Codec.Zone
+    Pawl.Codec.ZoneChange
+    Pawl.Codec.ZoneChangePattern
+    Pawl.Codec.ZoneChangeSubject
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
 -- scientific packages.
 library decimal
   import: library
-  build-depends: pawl:spec
+  build-depends:
+    pawl:spec
+
+  hs-source-dirs: source/libraries/decimal
   -- cabal-gild: discover source/libraries/decimal
   exposed-modules:
     Pawl.Decimal
     Pawl.DecimalSpec
 
-  hs-source-dirs: source/libraries/decimal
+-- The game engine itself.
+library engine
+  import: library
+  build-depends:
+    containers ^>=0.8,
+    pawl:extra,
+    pawl:types,
+    text ^>=2.1.3,
+    transformers ^>=0.6.1,
+
+  hs-source-dirs: source/libraries/engine
+  -- cabal-gild: discover source/libraries/engine
+  exposed-modules:
+    Pawl.Engine.Action
+    Pawl.Engine.Activate
+    Pawl.Engine.AttackRequirement
+    Pawl.Engine.Binding
+    Pawl.Engine.BlockRequirement
+    Pawl.Engine.Card
+    Pawl.Engine.Cast
+    Pawl.Engine.Combat
+    Pawl.Engine.Condition
+    Pawl.Engine.Cost
+    Pawl.Engine.Count
+    Pawl.Engine.Damage
+    Pawl.Engine.Decide
+    Pawl.Engine.Departure
+    Pawl.Engine.Engine
+    Pawl.Engine.Event
+    Pawl.Engine.Expiry
+    Pawl.Engine.Filter
+    Pawl.Engine.Game
+    Pawl.Engine.Keyword
+    Pawl.Engine.Mana
+    Pawl.Engine.Modal
+    Pawl.Engine.Monarch
+    Pawl.Engine.Mulligan
+    Pawl.Engine.PlayerEffect
+    Pawl.Engine.Projection
+    Pawl.Engine.Quantity
+    Pawl.Engine.Replacement
+    Pawl.Engine.Replay
+    Pawl.Engine.Resolve
+    Pawl.Engine.Sba
+    Pawl.Engine.Setup
+    Pawl.Engine.Stack
+    Pawl.Engine.Subtype
+    Pawl.Engine.Summoning
+    Pawl.Engine.Target
+    Pawl.Engine.Turn
 
 -- The catalog of every exception Pawl can throw, and nothing else.
 library exceptions
@@ -67,14 +231,13 @@ library exceptions
     pawl:slug,
     text ^>=2.1.3,
 
+  hs-source-dirs: source/libraries/exceptions
   -- cabal-gild: discover source/libraries/exceptions
   exposed-modules:
     Pawl.Exceptions.CorruptCard
     Pawl.Exceptions.MisfiledCard
     Pawl.Exceptions.MissingRoot
     Pawl.Exceptions.UnknownCard
-
-  hs-source-dirs: source/libraries/exceptions
 
 -- Quality of life improvements for packages Pawl doesn't own, in the spirit of
 -- Neil Mitchell's extra package.
@@ -86,6 +249,7 @@ library extra
     pawl:spec,
     text ^>=2.1.3,
 
+  hs-source-dirs: source/libraries/extra
   -- cabal-gild: discover source/libraries/extra
   exposed-modules:
     Pawl.Extra.Builder
@@ -107,9 +271,8 @@ library extra
     Pawl.Extra.Semigroup
     Pawl.Extra.SemigroupSpec
 
-  hs-source-dirs: source/libraries/extra
-
--- RFC compliant JSON types and codecs. Similar to aeson, but much simpler.
+-- RFC compliant JSON types, encoders, and decoders. Similar to aeson, but much
+-- simpler.
 library json
   import: library
   build-depends:
@@ -120,6 +283,7 @@ library json
     pawl:spec,
     text ^>=2.1.3,
 
+  hs-source-dirs: source/libraries/json
   -- cabal-gild: discover source/libraries/json
   exposed-modules:
     Pawl.Json.Array
@@ -139,39 +303,58 @@ library json
     Pawl.Json.Value
     Pawl.Json.ValueSpec
 
-  hs-source-dirs: source/libraries/json
+-- The registry provides a way to load and cache card data from disk.
+library registry
+  import: library
+  build-depends:
+    bytestring ^>=0.12.2,
+    containers ^>=0.8,
+    directory ^>=1.3.10,
+    pawl:codec,
+    pawl:exceptions,
+    pawl:slug,
+    pawl:types,
+    text ^>=2.1.3,
 
--- Slugifying text: a card name in, a file-name key out.
+  hs-source-dirs: source/libraries/registry
+  autogen-modules: Paths_pawl
+  other-modules: Paths_pawl
+  -- cabal-gild: discover source/libraries/registry
+  exposed-modules:
+    Pawl.Registry
+
+-- Converts text (card names) into slugs, which can be used for convenient file
+-- names.
 library slug
   import: library
   build-depends:
     pawl:spec,
     text ^>=2.1.3,
 
+  hs-source-dirs: source/libraries/slug
   -- cabal-gild: discover source/libraries/slug
   exposed-modules:
     Pawl.Slug
     Pawl.SlugSpec
 
-  hs-source-dirs: source/libraries/slug
-
--- An abstract testing interface, identical to the heck package. Base-only, which
--- is why every other sublibrary can afford to expose its specs.
+-- An abstract testing interface, identical to the heck package. Base-only,
+-- which is why every other sublibrary can afford to expose its specs.
 library spec
   import: library
-  -- cabal-gild: discover source/libraries/spec
-  exposed-modules: Pawl.Spec
   hs-source-dirs: source/libraries/spec
+  -- cabal-gild: discover source/libraries/spec
+  exposed-modules:
+    Pawl.Spec
 
--- All of the type definitions, without any behavior.
+-- All of Pawl's type definitions, without any associated behavior.
 library types
   import: library
   build-depends:
     containers ^>=0.8,
-    pawl:slug,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
+  hs-source-dirs: source/libraries/types
   -- cabal-gild: discover source/libraries/types
   exposed-modules:
     Pawl.Types.AbilityName
@@ -279,7 +462,6 @@ library types
     Pawl.Types.Quantity
     Pawl.Types.Recipient
     Pawl.Types.Regenerability
-    Pawl.Types.Registry
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate
     Pawl.Types.ReplacementEffect
@@ -314,75 +496,6 @@ library types
     Pawl.Types.ZoneChangePattern
     Pawl.Types.ZoneChangeSubject
 
-  hs-source-dirs: source/libraries/types
-
--- The engine: the comprehensive rules, plus the codec and registry that load
--- cards as data. Belongs in a sublibrary of its own, and will get one once a
--- second consumer (a client, a CLI) exists to make the split pay.
-library
-  import: library
-  autogen-modules: Paths_pawl
-  build-depends:
-    bytestring ^>=0.12,
-    containers ^>=0.8,
-    directory ^>=1.3.10,
-    parsec ^>=3.1.18,
-    pawl:decimal,
-    pawl:exceptions,
-    pawl:extra,
-    pawl:json,
-    pawl:slug,
-    pawl:types,
-    text ^>=2.1.3,
-    transformers ^>=0.6.1,
-
-  -- cabal-gild: discover source/library
-  exposed-modules:
-    Pawl
-    Pawl.Action
-    Pawl.Activate
-    Pawl.AttackRequirement
-    Pawl.Binding
-    Pawl.BlockRequirement
-    Pawl.Card
-    Pawl.Cast
-    Pawl.Codec
-    Pawl.Combat
-    Pawl.Condition
-    Pawl.Cost
-    Pawl.Count
-    Pawl.Damage
-    Pawl.Decide
-    Pawl.Departure
-    Pawl.Engine
-    Pawl.Event
-    Pawl.Expiry
-    Pawl.Filter
-    Pawl.Game
-    Pawl.Json
-    Pawl.Keyword
-    Pawl.Mana
-    Pawl.Modal
-    Pawl.Monarch
-    Pawl.Mulligan
-    Pawl.PlayerEffect
-    Pawl.Projection
-    Pawl.Quantity
-    Pawl.Registry
-    Pawl.Replacement
-    Pawl.Replay
-    Pawl.Resolve
-    Pawl.Sba
-    Pawl.Setup
-    Pawl.Stack
-    Pawl.Subtype
-    Pawl.Summoning
-    Pawl.Target
-    Pawl.Turn
-
-  hs-source-dirs: source/library
-  other-modules: Paths_pawl
-
 executable pawl
   import: executable
   ghc-options: -threaded
@@ -392,13 +505,16 @@ executable pawl
 test-suite pawl-test-suite
   import: executable
   build-depends:
-    bytestring ^>=0.12,
+    bytestring ^>=0.12.2,
     containers ^>=0.8,
     directory ^>=1.3.10,
+    pawl:codec,
     pawl:decimal,
+    pawl:engine,
     pawl:exceptions,
     pawl:extra,
     pawl:json,
+    pawl:registry,
     pawl:slug,
     pawl:spec,
     pawl:types,
@@ -458,6 +574,8 @@ benchmark pawl-benchmark
   import: executable
   build-depends:
     containers ^>=0.8,
+    pawl:engine,
+    pawl:registry,
     pawl:types,
     tasty-bench ^>=0.5.1,
 

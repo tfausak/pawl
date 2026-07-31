@@ -27,7 +27,7 @@ import Pawl.Types.Filter (Filter)
 --
 -- A keyword is not necessarily a STATIC ability: rule 702.70 spells poisonous
 -- out as a TRIGGERED one. What it grants is still a citation and not an effect
--- identity, so Pawl.Keyword may read this constructor and mint rule 702.70a's
+-- identity, so Pawl.Engine.Keyword may read this constructor and mint rule 702.70a's
 -- ability from it -- see that module.
 --
 -- Multiplicity is NOT this type's problem: an object can have the same keyword
@@ -51,13 +51,13 @@ data Keyword
     --
     -- The cost rides the constructor, as Flashback's does, because rule 702.29a
     -- states it as part of the keyword rather than as separate card text.
-    -- Pawl.Keyword.handAbilitiesOf mints the whole ability from this one value.
+    -- Pawl.Engine.Keyword.handAbilitiesOf mints the whole ability from this one value.
     --
     -- The "functions only while ... in a player's hand" half is NOT a field
     -- here. Rule 702.29b is explicit that the ability itself exists everywhere
     -- ("it continues to exist while the object is on the battlefield and in all
     -- other zones"), so the zone is a question the READER asks --
-    -- Pawl.Activate.abilitiesFor -- exactly as Pawl.Cost.costsFor asks it of
+    -- Pawl.Engine.Activate.abilitiesFor -- exactly as Pawl.Engine.Cost.costsFor asks it of
     -- rule 702.34a's flashback cost.
     --
     -- Typecycling (702.29e) is this same ability with a library search in place
@@ -88,9 +88,9 @@ data Keyword
     -- states it as part of the keyword rather than as separate card text. It is
     -- deliberately NOT a Card.alternativeCosts entry: that list is
     -- unconditioned, so a flashback cost placed there would also be payable from
-    -- the HAND. Pawl.Keyword turns this one value into all three of rule
+    -- the HAND. Pawl.Engine.Keyword turns this one value into all three of rule
     -- 702.34a's consequences -- the cost (Keyword.flashbackCost, read by
-    -- Pawl.Cost.costsFor only in the graveyard), the permission
+    -- Pawl.Engine.Cost.costsFor only in the graveyard), the permission
     -- (Keyword.castingPermissionsOf) and the exile replacement
     -- (Keyword.flashbackExile).
     Flashback Cost
@@ -110,7 +110,7 @@ data Keyword
     -- intentions to pay any or all of those costs").
     --
     -- The MODE-WIDENING half is not a field either. Rule 702.42a fixes it
-    -- completely -- "all modes", never some other number -- so Pawl.Cast reads
+    -- completely -- "all modes", never some other number -- so Pawl.Engine.Cast reads
     -- the payload's own mode count (Modal.modeCount) rather than a number
     -- restated here, and Pawl.Types.ModeSelection stays what the card PRINTS.
     Entwine Cost
@@ -119,7 +119,7 @@ data Keyword
     -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the
     -- N values are NOT summed: CR 702.70b says each instance triggers
     -- separately, so `Poisonous 1` twice is two abilities and two triggers --
-    -- which is what Pawl.Keyword.triggeredAbilitiesOf builds from the
+    -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds from the
     -- projection's per-keyword count.
     Poisonous Natural
   | Infect -- 702.90
@@ -127,7 +127,7 @@ data Keyword
   | -- 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
     -- a number." N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over
-    -- every toxic ability the creature has (Pawl.Projection.totalToxic) --
+    -- every toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --
     -- including two with the same N, which the projection counts separately.
     Toxic Natural
   deriving (Eq, Ord, Show)

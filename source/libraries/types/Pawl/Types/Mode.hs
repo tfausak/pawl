@@ -16,7 +16,7 @@ import Pawl.Types.TargetSpec (TargetSpec)
 --
 -- `optionality` is CR 603.5's printed "may", covering the whole effect list --
 -- see Pawl.Types.Optionality for why the flag rides the mode rather than wrapping
--- effects, and Pawl.Resolve.resolveModes for where the choice is asked. A
+-- effects, and Pawl.Engine.Resolve.resolveModes for where the choice is asked. A
 -- non-modal card's single mode is its whole instruction list, which is exactly
 -- what "you may [everything this ability says]" means.
 data Mode card = MkMode

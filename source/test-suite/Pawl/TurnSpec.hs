@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Turn: turn structure, the phase schedule, the CR 508.8 skips, and
+-- Covers Pawl.Engine.Turn: turn structure, the phase schedule, the CR 508.8 skips, and
 -- CR 500.8's added phases -- Aggravated Assault and Relentless Assault for the
 -- combat-and-main pair, Aurelia, the Warleader for one added from INSIDE a
 -- combat phase, and Full Throttle for two combat phases and none of main.
@@ -16,17 +16,17 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Game as Game
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -48,7 +48,6 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.TapState as TapState
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -162,7 +161,7 @@ turnDataTests =
               (Turn.dropRestOfPhase (Phase.Combat CombatStep.BeginningOfCombat) remaining)
     ]
 
-skipTests :: Registry.Type.Registry -> Tasty.TestTree
+skipTests :: Registry.Registry -> Tasty.TestTree
 skipTests registry =
   Tasty.testGroup
     "Skip"
@@ -482,7 +481,7 @@ castAndResolveWith answer spell gs =
 -- main phase. Activate only as a sorcery.) and Relentless Assault ({2}{R}{R}:
 -- Untap all creatures that attacked this turn. After this main phase, there is
 -- an additional combat phase followed by an additional main phase.)
-extraPhaseTests :: Registry.Type.Registry -> Tasty.TestTree
+extraPhaseTests :: Registry.Registry -> Tasty.TestTree
 extraPhaseTests registry =
   Tasty.testGroup
     "ExtraPhase"
@@ -781,7 +780,7 @@ turnTakers n gs =
 -- CR 500.7's extra turns, end to end, through the one card in the pool that
 -- creates any: Time Warp ({3}{U}{U} Sorcery, "Target player takes an extra turn
 -- after this one.").
-extraTurnTests :: Registry.Type.Registry -> Tasty.TestTree
+extraTurnTests :: Registry.Registry -> Tasty.TestTree
 extraTurnTests registry =
   let boardOf n = do
         island <- Registry.printing registry "Island"
@@ -879,5 +878,5 @@ dedupe xs = case xs of
   [] -> []
   h : t -> h : dedupe (filter (/= h) t)
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry, extraTurnTests registry]

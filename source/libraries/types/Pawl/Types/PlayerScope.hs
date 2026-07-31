@@ -2,7 +2,7 @@ module Pawl.Types.PlayerScope where
 
 -- Which players a Pawl.Types.PlayerEffect applies to: the player-side analogue of
 -- Pawl.Types.Affected, and much smaller because CR 109.5 fixes what "you" means.
--- Resolved against the effect's CONTROLLER by Pawl.PlayerEffect.inScope.
+-- Resolved against the effect's CONTROLLER by Pawl.Engine.PlayerEffect.inScope.
 --
 -- The scope is always resolved DYNAMICALLY, on both carriers. CR 611.2c's first
 -- sentence freezes a stored effect's object set -- which is what every stored
@@ -20,7 +20,7 @@ data PlayerScope
   | -- Every other player. Not a two-player shortcut: CR 806.1 has a
     -- free-for-all's players compete as individuals against each other, so
     -- every other player is an opponent by construction; CR 102.2 says the
-    -- same thing for two players. `Pawl.PlayerEffect.inScope`'s
+    -- same thing for two players. `Pawl.Engine.PlayerEffect.inScope`'s
     -- `pid /= controller` is the one predicate that serves both. CR 102.3 is
     -- the ONE reading this is wrong for -- a teammate is not an opponent --
     -- and pawl has no teams to express (#175).

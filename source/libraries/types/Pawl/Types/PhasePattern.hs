@@ -21,7 +21,7 @@ import Pawl.Types.PlayerId (PlayerId)
 -- and the event's PlayerId goes unread. Just is Fatigue's "TARGET PLAYER skips
 -- their next draw step": the skipped step is the named player's, which for a
 -- step of the turn means it applies only on that player's own turn
--- (Pawl.Replacement.applies compares it against ProposedEvent.WouldBeginPhase's
+-- (Pawl.Engine.Replacement.applies compares it against ProposedEvent.WouldBeginPhase's
 -- active player).
 --
 -- The PlayerId is BAKED at resolution, by Resolve.applyEffect's SkipNextPhase

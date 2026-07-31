@@ -42,7 +42,7 @@ data Combat = MkCombat
     -- 510.4 says verbatim.
     struckFirst :: Maybe (Set ObjectId),
     -- CR 506.4: who controlled each combatant AS IT JOINED combat -- the
-    -- comparand Pawl.Combat.removeChanged needs to answer "if its
+    -- comparand Pawl.Engine.Combat.removeChanged needs to answer "if its
     -- controller changes". Keyed by the creature, so one map covers attackers
     -- and blockers alike; written by declareAttackers and declareBlockers, the
     -- only two things that put a creature into this record.
@@ -64,8 +64,8 @@ data Combat = MkCombat
     joinedUnder :: Map ObjectId PlayerId,
     -- CR 508.8: whether one or more creatures have joined this combat as
     -- attackers -- "declared as attackers or put onto the battlefield attacking".
-    -- Written by Pawl.Combat.declareAttackers and
-    -- Pawl.Combat.putOntoBattlefieldAttacking, the two things that can do either,
+    -- Written by Pawl.Engine.Combat.declareAttackers and
+    -- Pawl.Engine.Combat.putOntoBattlefieldAttacking, the two things that can do either,
     -- and by nothing else.
     --
     -- SEPARATE from `attackers`, and monotone within the combat phase, because
@@ -84,15 +84,15 @@ data Combat = MkCombat
     --
     -- Its lifetime is this record's, which is exact rather than lucky. CR 508.8
     -- scopes the question to one declare attackers step; a combat phase has
-    -- exactly one of those, and Pawl.Combat.clearCombat resets the record as each
+    -- exactly one of those, and Pawl.Engine.Combat.clearCombat resets the record as each
     -- end of combat step ends (CR 511.3), so a CR 500.8 additional combat phase
     -- asks the question again from False.
     attackersJoined :: Bool,
     -- CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
     -- a turn-based action immediately after the beginning of combat step begins
-    -- (CR 703.4h, CR 507.1) by Pawl.Combat.chooseDefender.
+    -- (CR 703.4h, CR 507.1) by Pawl.Engine.Combat.chooseDefender.
     --
-    -- Nothing before that action has run, and again once Pawl.Combat.clearCombat
+    -- Nothing before that action has run, and again once Pawl.Engine.Combat.clearCombat
     -- has run. The RULES scope the designation to the combat phase -- CR 506.2's
     -- sentences all begin "During the combat phase" -- and CR 703.4h makes the
     -- choice per beginning-of-combat step, so a turn with a second combat phase

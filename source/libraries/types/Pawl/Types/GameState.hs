@@ -32,7 +32,7 @@ data GameState = MkGameState
     exile :: Set ObjectId,
     -- CR 400.1: the command zone -- a shared collection (not per-player), keyed
     -- into `objects` like `battlefield`/`exile`. Emblems live here; their static
-    -- abilities are gathered live by the projection (Pawl.Projection.gather).
+    -- abilities are gathered live by the projection (Pawl.Engine.Projection.gather).
     command :: Set ObjectId,
     stack :: [ObjectId],
     players :: Map PlayerId Player,
@@ -85,25 +85,25 @@ data GameState = MkGameState
     -- CR 603.7: delayed triggered abilities awaiting their event, in creation
     -- order. Appended by Resolve's ArmDelayedTrigger; an entry is removed as it
     -- fires (CR 603.7b) unless it states a duration, in which case one of the
-    -- Pawl.Expiry sweeps ends it instead. NOT cleared at turn handoff -- "at the
+    -- Pawl.Engine.Expiry sweeps ends it instead. NOT cleared at turn handoff -- "at the
     -- beginning of the next end step" survives into the next turn if this turn's
     -- end step passed before the ability was armed, and a stated duration is the
     -- entry's own business rather than the handoff's.
     delayedTriggers :: Seq DelayedTrigger,
     -- CR 611.2: stored continuous effects from resolutions (Giant Growth,
-    -- Serpent's Gift), each with an expiry the Pawl.Expiry sweeps consult.
+    -- Serpent's Gift), each with an expiry the Pawl.Engine.Expiry sweeps consult.
     -- Static-ability effects are NOT here -- the projection re-derives those live.
     continuousEffects :: [ContinuousEffect],
     -- CR 614.3 / 615.3: floating replacement effects from resolutions (Fog's
     -- prevention, Drudge Skeletons' regeneration shield), each with an expiry the
-    -- Pawl.Expiry sweeps consult (CR 514.2) and a use count (CR 614.3). The event-pipeline
+    -- Pawl.Engine.Expiry sweeps consult (CR 514.2) and a use count (CR 614.3). The event-pipeline
     -- analog of continuousEffects; a permanent's STATIC replacement abilities are
-    -- not here -- the projection re-derives those live. Pawl.Replacement reads it.
+    -- not here -- the projection re-derives those live. Pawl.Engine.Replacement reads it.
     replacements :: [ActiveReplacement],
     -- CR 611.1 / 613.11: stored PLAYER and RULES-modifying continuous effects
-    -- from resolutions (Silence), each with an expiry the Pawl.Expiry sweeps
+    -- from resolutions (Silence), each with an expiry the Pawl.Engine.Expiry sweeps
     -- consult. The third carrier sharing that vocabulary. A permanent's printed
-    -- player abilities are NOT here -- Pawl.PlayerEffect re-derives those live.
+    -- player abilities are NOT here -- Pawl.Engine.PlayerEffect re-derives those live.
     playerEffects :: [ActivePlayerEffect],
     -- The seating order -- CR 800.5 (or CR 806.3 for Grand Melee) only says
     -- players determine SOME seating order, "by any mutually agreeable

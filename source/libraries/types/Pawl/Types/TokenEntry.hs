@@ -26,7 +26,7 @@ import Pawl.Types.TapState (TapState)
 -- say WHAT the tokens attack. CR 508.4's parenthetical -- "unless the effect that
 -- put it onto the battlefield specifies what it's attacking" -- is the other
 -- case, and no card in the pool is it; whom they attack is chosen as they enter,
--- by Pawl.Combat.putOntoBattlefieldAttacking.
+-- by Pawl.Engine.Combat.putOntoBattlefieldAttacking.
 data TokenEntry = MkTokenEntry
   { tapped :: TapState,
     attacking :: Bool

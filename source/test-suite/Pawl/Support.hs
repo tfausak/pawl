@@ -18,27 +18,27 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Count as Count
-import qualified Pawl.Damage as Damage
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
+import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Sba as Sba
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Int as Int
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Game as Game
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
-import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Sba as Sba
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Slug as Slug
-import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -85,7 +85,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Scope as Scope
@@ -135,24 +134,24 @@ fourPlayers = alice NonEmpty.:| [bob, carol, dave]
 fourPlayerGame :: GameState.GameState
 fourPlayerGame = Setup.emptyGame fourPlayers
 
-redRed :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+redRed :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed registry = do
   deck <- Cards.redDeck registry
   pure (Setup.mirror deck bothPlayers)
 
-greenBlack :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+greenBlack :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 greenBlack registry = do
   green <- Cards.greenDeck registry
   black <- Cards.blackDeck registry
   pure ((alice, green) NonEmpty.:| [(bob, black)])
 
-blueBlack :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+blueBlack :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 blueBlack registry = do
   blue <- Cards.blueDeck registry
   black <- Cards.blackDeck registry
   pure ((alice, blue) NonEmpty.:| [(bob, black)])
 
-matchups :: Registry.Type.Registry -> IO [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
+matchups :: Registry.Registry -> IO [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
 matchups registry = do
   rr <- redRed registry
   gb <- greenBlack registry
@@ -166,7 +165,7 @@ matchups registry = do
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable
 -- lands-only-decks property.
-landsOnly :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+landsOnly :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 landsOnly registry = do
   mountain <- Registry.printing registry "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
@@ -175,7 +174,7 @@ landsOnly registry = do
 -- reachable loss condition is CR 704.5b deck-out and the only reachable end is
 -- CR 104.2a's last player standing. The seat count is what makes it a falsifier:
 -- at two players the first deck-out ends the game, at three it must not.
-threePlayerLandsOnly :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threePlayerLandsOnly :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 threePlayerLandsOnly registry = do
   mountain <- Registry.printing registry "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) threePlayers)
@@ -184,7 +183,7 @@ threePlayerLandsOnly registry = do
 -- carol. Setup.mirror is already NonEmpty-shaped, so the seat count is the only
 -- difference. The three-seat setup rules (CR 103.5c's free first mulligan, CR
 -- 103.8c's first draw) are what this exists to exercise.
-threeWayMirror :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threeWayMirror :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 threeWayMirror registry = do
   deck <- Cards.redDeck registry
   pure (Setup.mirror deck threePlayers)
@@ -723,8 +722,8 @@ withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1
 
--- The one CR 103.5b performer (Pawl.Resolve.performHandAction), so a test
--- that only wants a game set up does not have to reach into Pawl.Resolve for it.
+-- The one CR 103.5b performer (Pawl.Engine.Resolve.performHandAction), so a test
+-- that only wants a game set up does not have to reach into Pawl.Engine.Resolve for it.
 performer :: HandActionPerformer.HandActionPerformer
 performer = Resolve.performHandAction
 
@@ -1067,7 +1066,7 @@ runPure :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.
 runPure answer gs game = snd (Engine.runGamePure answer gs game)
 
 -- runPure, keeping the action's RESULT alongside the final state -- the shape a
--- test needs when the door under test answers with a value (Pawl.Cost.pay's
+-- test needs when the door under test answers with a value (Pawl.Engine.Cost.pay's
 -- Payment) and not only with a board.
 runPureWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> (a, GameState.GameState)
 runPureWith = Engine.runGamePure
@@ -1281,7 +1280,7 @@ addCounter kind n oid gs =
 -- Tagged ToCreature, which is the tag the real attach paths would store: every
 -- Aura in this pool has a Pool.Creatures enchant spec, and Target's candidates
 -- for that pool are ToCreature -- so an SBA that re-checks the attachment against
--- the spec (Pawl.Sba.stillLegalEnchant) sees what casting would have left. The
+-- the spec (Pawl.Engine.Sba.stillLegalEnchant) sees what casting would have left. The
 -- callers that attach to a non-creature are testing rules that read only WHICH
 -- object is named (CR 704.5n, CR 704.5p, CR 400.7), never the tag.
 attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
@@ -1462,9 +1461,9 @@ spellOnStack printing pid gs =
           }
       )
 
--- Drive Pawl.Count.evaluate with the per-object quantity reader wired the way
--- the library wires it -- Pawl.Quantity.evaluate, which is where that knot is
--- tied (Pawl.Count cannot import it). Shared by every spec that drives the fold
+-- Drive Pawl.Engine.Count.evaluate with the per-object quantity reader wired the way
+-- the library wires it -- Pawl.Engine.Quantity.evaluate, which is where that knot is
+-- tied (Pawl.Engine.Count cannot import it). Shared by every spec that drives the fold
 -- directly, so the injection they test is the injection the engine makes.
 countOf ::
   Count.ViewOf ->
@@ -1475,7 +1474,7 @@ countOf ::
 countOf viewOf context gs = Count.evaluate viewOf (Quantity.evaluate viewOf context gs) context gs
 
 -- Shared by Pawl.CountSpec and Pawl.ConditionSpec: a stub ViewOf, so a
--- Pawl.Count.evaluate fold is exercised apart from any real projection. Every
+-- Pawl.Engine.Count.evaluate fold is exercised apart from any real projection. Every
 -- id gets a view carrying exactly the card types, subtypes and controller it
 -- was registered with; an id absent from the table has no view.
 stubView ::
@@ -1510,8 +1509,8 @@ stubView table oid =
 -- exactly the file a hand-kept list forgets. Kept as a String list because that
 -- is what the sweeps feed back to Registry.card; the enumeration itself is the
 -- library's since #167.
-corpusSlugs :: Registry.Type.Registry -> IO [String]
+corpusSlugs :: Registry.Registry -> IO [String]
 corpusSlugs registry = fmap (fmap (Text.unpack . Slug.unwrap)) (Registry.slugs registry)
 
-allPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
+allPrintings :: Registry.Registry -> IO [Printing.Printing]
 allPrintings = Registry.printings

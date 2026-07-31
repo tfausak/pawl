@@ -17,7 +17,7 @@ data DiscardCause
     -- effect, a cost component naming cards, or CR 514.1's cleanup step.
     Ordinary
   | -- CR 702.29c: "'When you cycle this card' means 'When you discard this card
-    -- to pay an activation cost of a cycling ability.'" Recorded by Pawl.Cost's
+    -- to pay an activation cost of a cycling ability.'" Recorded by Pawl.Engine.Cost's
     -- DiscardThis component -- see that arm for what it cannot see.
     ToPayCyclingCost
   deriving (Eq, Ord, Show)

@@ -1,16 +1,16 @@
--- Covers Pawl.Departure: who is still in the game, and the CR 104.2a/104.3
+-- Covers Pawl.Engine.Departure: who is still in the game, and the CR 104.2a/104.3
 -- consequences of leaving it.
 module Pawl.DepartureSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Sba as Sba
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Sba as Sba
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
@@ -21,7 +21,6 @@ import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone
@@ -31,7 +30,7 @@ import qualified Test.Tasty.HUnit as HU
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Departure"
@@ -48,7 +47,7 @@ tests registry =
         let gs = (Setup.emptyGame S.bothPlayers) {GameState.result = Just Result.Drawn}
             after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
          in HU.assertEqual "the first result stands" (Just Result.Drawn) (GameState.result after),
-      -- #142: the SAME precedence, through the OTHER door. Pawl.Sba settles its
+      -- #142: the SAME precedence, through the OTHER door. Pawl.Engine.Sba settles its
       -- own outcome at the end of a state-based-action pass; before this it used
       -- the opposite order from leaveGame, so a pass could replace a result the
       -- game had already reached. Set up a decided draw alongside a player who
@@ -260,7 +259,7 @@ tests registry =
         HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone),
       -- CR 800.4a with control from a STATIC ability (CR 613.1b) rather than a
       -- stored effect -- the third source of control, which the clause-3 and
-      -- clause-4 proofs in Pawl.Departure have to survive. Alice owns AND
+      -- clause-4 proofs in Pawl.Engine.Departure have to survive. Alice owns AND
       -- controls the Control Magic, so clause 1 carries it out of the game with
       -- her and the static ability goes with its source (CR 611.3b); clause 2
       -- never has to look at it.

@@ -12,7 +12,7 @@
 -- -- `delayedTests`. The CR 603.3b ordering prompt -- `orderingTests`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingTests`. The CR 603.4 / 608.2a intervening "if" --
--- `interveningTests`. Also Pawl.Keyword: CR
+-- `interveningTests`. Also Pawl.Engine.Keyword: CR
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousTests`. CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
@@ -47,25 +47,29 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Expiry as Expiry
-import qualified Pawl.Game as Game
-import qualified Pawl.Keyword as Keyword
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+-- Aliased Condition.Type, not Condition, per the project-wide convention
+-- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
+-- and must not collide.
+
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -73,9 +77,6 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
--- Aliased Condition.Type, not Condition, per the project-wide convention
--- (CardSpec's note): the evaluator module Pawl.Condition may later be imported
--- and must not collide.
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -113,7 +114,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
@@ -143,7 +143,7 @@ castWave tidalWave island =
    in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid)))
 
 -- CR 608.2i: the log records; it is never emptied by a reader.
-logTests :: Registry.Type.Registry -> Tasty.TestTree
+logTests :: Registry.Registry -> Tasty.TestTree
 logTests registry =
   Tasty.testGroup
     "EventLog"
@@ -211,7 +211,7 @@ logTests registry =
     ]
 
 -- CR 603.2b / 603.6a: a step begins, and EVERY permanent is checked.
-scanTests :: Registry.Type.Registry -> Tasty.TestTree
+scanTests :: Registry.Registry -> Tasty.TestTree
 scanTests registry =
   Tasty.testGroup
     "Scan"
@@ -397,7 +397,7 @@ scanTests registry =
     ]
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
-sacrificeTests :: Registry.Type.Registry -> Tasty.TestTree
+sacrificeTests :: Registry.Registry -> Tasty.TestTree
 sacrificeTests registry =
   Tasty.testGroup
     "Sacrifice"
@@ -476,7 +476,7 @@ sacrificeTests registry =
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
 -- shape ("a player controlling no permanents of a particular card type"), chosen
 -- by the rulebook to illustrate the rule.
-stateTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+stateTriggerTests :: Registry.Registry -> Tasty.TestTree
 stateTriggerTests registry =
   let triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
       isTriggerObject gs oid = case Game.lookupObject oid gs of
@@ -616,7 +616,7 @@ stateTriggerTests registry =
 -- Scryfall's only ruling on the card is the design in one sentence: the count
 -- "includes creature tokens ... as well as creatures put into a graveyard before
 -- Khabál Ghoul entered the battlefield."
-historyTests :: Registry.Type.Registry -> Tasty.TestTree
+historyTests :: Registry.Registry -> Tasty.TestTree
 historyTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs =
@@ -663,7 +663,7 @@ historyTests registry =
           -- at the time. Scryfall's ruling says this explicitly: the count
           -- "includes ... creatures put into a graveyard before Khabál Ghoul
           -- entered the battlefield." This test cannot fail against today's
-          -- `Pawl.Quantity.countOf`, which takes no `ObjectId` at all and so
+          -- `Pawl.Engine.Quantity.countOf`, which takes no `ObjectId` at all and so
           -- has no way to scope the fold to the Ghoul's own lifetime -- it is
           -- a regression gate on the ruling, pinned ahead of that signature
           -- ever gaining one.
@@ -704,7 +704,7 @@ historyTests registry =
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
 -- delayed ability -- "it" must survive the resolution that armed it.
-delayedTests :: Registry.Type.Registry -> Tasty.TestTree
+delayedTests :: Registry.Registry -> Tasty.TestTree
 delayedTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -835,7 +835,7 @@ delayedTests registry =
           -- with the environment CAPTURED when the ability was armed, under
           -- Map.union -- left-biased, so the argument ORDER decides which side
           -- wins a collision on a reserved slot such as Binding.chosenModes. The
-          -- two DO collide in practice: Pawl.Cast builds an arming spell's
+          -- two DO collide in practice: Pawl.Engine.Cast builds an arming spell's
           -- bindings through the same Binding.fromChoices that stamps chosenModes
           -- whenever the spell chooses a mode, so a modal arming spell's captured
           -- environment carries a "modes" entry that belongs to the SPELL, not to
@@ -969,7 +969,7 @@ delayedTests registry =
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an
 -- order that changes the answer.
-orderingTests :: Registry.Type.Registry -> Tasty.TestTree
+orderingTests :: Registry.Registry -> Tasty.TestTree
 orderingTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -1115,7 +1115,7 @@ orderingTests registry =
 -- collision is reachable from the pool: Palace Jailer crowns its controller, and
 -- Khabál Ghoul triggers "at the beginning of each end step", so one player's end
 -- step fires her Ghoul's trigger and the monarch's inherent draw in one batch.
-monarchOrderingTests :: Registry.Type.Registry -> Tasty.TestTree
+monarchOrderingTests :: Registry.Registry -> Tasty.TestTree
 monarchOrderingTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -1241,7 +1241,7 @@ monarchOrderingTests registry =
 -- Sarcomancy {B} Enchantment: "When this enchantment enters, create a 2/2 black
 -- Zombie creature token. At the beginning of your upkeep, if there are no Zombies
 -- on the battlefield, this enchantment deals 1 damage to you."
-interveningTests :: Registry.Type.Registry -> Tasty.TestTree
+interveningTests :: Registry.Registry -> Tasty.TestTree
 interveningTests registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
@@ -1313,10 +1313,10 @@ zombieTokenOf sarcomancy pikerFallback =
         [] -> Printing.card pikerFallback
 
 -- CR 702.70: poisonous -- the first keyword whose rule text IS a triggered
--- ability, so it is minted by Pawl.Keyword and gathered by the same
--- Pawl.Event.eventTriggers scan a printed trigger goes through, with the damaged
+-- ability, so it is minted by Pawl.Engine.Keyword and gathered by the same
+-- Pawl.Engine.Event.eventTriggers scan a printed trigger goes through, with the damaged
 -- player carried across in the reserved Binding.triggerPlayer slot.
-poisonousTests :: Registry.Type.Registry -> Tasty.TestTree
+poisonousTests :: Registry.Registry -> Tasty.TestTree
 poisonousTests registry =
   let -- Hang `n` Auras off `host`, each owned by alice. Attached directly rather
       -- than cast: the cast path is proved once, by the whole-card test below.
@@ -1482,7 +1482,7 @@ poisonousTests registry =
 -- "When you cycle this card, target creature gains flying until end of turn".
 -- The trigger is mandatory and its effect is Serpent's Gift's exact shape, so
 -- the only new thing any test below can be passing on is the trigger itself.
-cyclingTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingTriggerTests :: Registry.Registry -> Tasty.TestTree
 cyclingTriggerTests registry =
   Tasty.testGroup
     "CyclingTrigger"
@@ -1580,7 +1580,7 @@ cyclingTriggerTests registry =
 --
 -- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
 -- every "an opponent" below is alice.
-discardTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+discardTriggerTests :: Registry.Registry -> Tasty.TestTree
 discardTriggerTests registry =
   Tasty.testGroup
     "DiscardTrigger"
@@ -1664,7 +1664,7 @@ discardTriggerTests registry =
 -- about the entering creature, so these cases isolate the trigger CONDITION;
 -- its "another" is Filter.Not Filter.IsSource inside the condition's own
 -- Filter, never a second exclusion mechanism (#163).
-permanentEntersTests :: Registry.Type.Registry -> Tasty.TestTree
+permanentEntersTests :: Registry.Registry -> Tasty.TestTree
 permanentEntersTests registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
@@ -1785,7 +1785,7 @@ permanentEntersTests registry =
 -- Narcomoeba; Soul Warden rides along in the same graveyard as the control,
 -- because its CR 603.6a trigger functions ONLY on the battlefield and so must
 -- stay silent even when a creature enters right in front of it.
-graveyardTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+graveyardTriggerTests :: Registry.Registry -> Tasty.TestTree
 graveyardTriggerTests registry =
   let -- alice: one Island in play (Tome Scour's {U}), Tome Scour in hand, and a
       -- three-card library of Narcomoeba, Soul Warden and a Goblin Piker. Five
@@ -1887,7 +1887,7 @@ graveyardTriggerTests registry =
 -- the time the scan runs, the Traveler is a card in a graveyard with a fresh id
 -- (CR 400.7) and nothing is on the battlefield to find -- which is what makes
 -- the token appearing at all the discriminating assertion here.
-diesTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+diesTriggerTests :: Registry.Registry -> Tasty.TestTree
 diesTriggerTests registry =
   let -- alice: one Mountain (Lightning Bolt's {R}), a Doomed Traveler in play,
       -- and the Bolt in hand. S.identityAnswer targets the least Recipient, and
@@ -2055,7 +2055,7 @@ everyTriggerCondition =
 -- arriving card, because SelfPutIntoGraveyardFromLibrary matches on the
 -- ARRIVING incarnation; here it is not, because CR 603.10a makes this condition
 -- match on the DEPARTING one. That contrast is why there are two slots.
-becameSlotTests :: Registry.Type.Registry -> Tasty.TestTree
+becameSlotTests :: Registry.Registry -> Tasty.TestTree
 becameSlotTests registry =
   let -- alice: one Mountain (Lightning Bolt's {R}), the Cockroaches in play, and
       -- the Bolt in hand. S.identityAnswer targets the least Recipient, and
@@ -2172,7 +2172,7 @@ becameSlotTests registry =
 -- Bad Moon supplies the third power, and it does so through the LAYERS
 -- (CR 613.4c, layer 7c), which is what makes the graveyard card's printed value
 -- visibly the wrong answer rather than merely a different route to the same one.
-lookBackInterveningTests :: Registry.Type.Registry -> Tasty.TestTree
+lookBackInterveningTests :: Registry.Registry -> Tasty.TestTree
 lookBackInterveningTests registry =
   let berserkerBoard withBadMoon = do
         mountain <- Registry.printing registry "Mountain"
@@ -2239,7 +2239,7 @@ lookBackInterveningTests registry =
 -- settle. CR 603.6a checks every battlefield permanent against the event, and it
 -- reads each one's PROJECTION -- so a Blood Moon that has already made the
 -- Fountain a Mountain leaves nothing there to trigger.
-strippedTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+strippedTriggerTests :: Registry.Registry -> Tasty.TestTree
 strippedTriggerTests registry =
   let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
@@ -2301,7 +2301,7 @@ tramplingAnswer p = case p of
 -- put the trigger's event and the bearer's death in ONE batch: the excess
 -- reaches bob while the blocker's damage kills the Skelemental at the very next
 -- CR 704.5g check, before any player gets priority.
-bystanderTests :: Registry.Type.Registry -> Tasty.TestTree
+bystanderTests :: Registry.Registry -> Tasty.TestTree
 bystanderTests registry =
   Tasty.testGroup
     "Bystander"
@@ -2392,7 +2392,7 @@ bystanderTests registry =
 -- Creature -- Ogre Warrior 3/3, defender) are the pair: identical costs and
 -- colors, so two Mountains cast either, and the ONLY difference the test can be
 -- reading is the toughness the 2 damage is measured against.
-aetherFlashTests :: Registry.Type.Registry -> Tasty.TestTree
+aetherFlashTests :: Registry.Registry -> Tasty.TestTree
 aetherFlashTests registry =
   let -- alice: Aether Flash already on the battlefield and two Mountains, with
       -- one creature card in hand. Casting it is the only thing on offer, so
@@ -2526,7 +2526,7 @@ aetherFlashTests registry =
 -- upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token
 -- with flying." The pool's first KINDRED card (CR 308), and so the first object
 -- of any kind that carries a creature type without being a creature.
-kindredTests :: Registry.Type.Registry -> Tasty.TestTree
+kindredTests :: Registry.Registry -> Tasty.TestTree
 kindredTests registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
@@ -2592,5 +2592,5 @@ kindredTests registry =
               other -> HU.assertFailure ("expected exactly one token beside Bitterblossom, got " <> show (length other) <> " other permanents")
         ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry, kindredTests registry, discardTriggerTests registry]

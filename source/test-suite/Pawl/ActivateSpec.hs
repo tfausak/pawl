@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Activate: activating an ability onto the stack, summoning-sickness
+-- Covers Pawl.Engine.Activate: activating an ability onto the stack, summoning-sickness
 -- gating, and the CR 605 mana-ability exclusion from stack activations.
 module Pawl.ActivateSpec where
 
@@ -11,18 +11,18 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Action as Action
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Filter as Filter
-import qualified Pawl.Game as Game
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -53,7 +53,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
@@ -92,10 +91,10 @@ singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpe
 singleModeAbility effects specs =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
-    "Pawl.Activate"
+    "Pawl.Engine.Activate"
     [ printedActivationTimingTests registry,
       HU.testCase "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
         prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
@@ -360,7 +359,7 @@ aimAt who p = case p of
 -- the stack, "otherwise, it will check that information when it resolves. In both
 -- instances, if the source is no longer in the zone it's expected to be in, its
 -- last known information is used."
-lastKnownTests :: Registry.Type.Registry -> Tasty.TestTree
+lastKnownTests :: Registry.Registry -> Tasty.TestTree
 lastKnownTests registry =
   Tasty.testGroup
     "LastKnownInformation"
@@ -431,7 +430,7 @@ lastKnownTests registry =
 -- Alice holds it, two Forests pay the {2}, and her library has a card to draw --
 -- otherwise CR 704.5b would end the game around the assertion rather than the
 -- draw being observable.
-cyclingBoard :: Registry.Type.Registry -> IO (ObjectId.ObjectId, GameState.GameState)
+cyclingBoard :: Registry.Registry -> IO (ObjectId.ObjectId, GameState.GameState)
 cyclingBoard registry = do
   mauler <- Registry.printing registry "Barkhide Mauler"
   forest <- Registry.printing registry "Forest"
@@ -440,7 +439,7 @@ cyclingBoard registry = do
       (g1, oid) = S.handOne mauler g0
   pure (oid, g1 {GameState.priority = Just S.alice})
 
-cyclingTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingTests :: Registry.Registry -> Tasty.TestTree
 cyclingTests registry =
   Tasty.testGroup
     "Cycling"
@@ -775,7 +774,7 @@ pingAnswer p = case p of
     [] -> A.Pass
   _ -> S.aggressiveAnswer p
 
-printedActivationTimingTests :: Registry.Type.Registry -> Tasty.TestTree
+printedActivationTimingTests :: Registry.Registry -> Tasty.TestTree
 printedActivationTimingTests registry =
   Tasty.testGroup
     "PrintedActivationTiming"

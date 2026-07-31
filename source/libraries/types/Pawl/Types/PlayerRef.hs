@@ -8,7 +8,7 @@ import Pawl.Types.SlotName (SlotName)
 --
 -- Deliberately NOT Pawl.Types.PlayerScope, which is You | Opponents | EachPlayer
 -- and looks like the same type. PlayerScope is resolved against a controller and
--- nothing else (Pawl.PlayerEffect.inScope); this can also name a binding slot,
+-- nothing else (Pawl.Engine.PlayerEffect.inScope); this can also name a binding slot,
 -- which PlayerEffect has no way to answer. Adding InSlot there would give
 -- Pawl.Types.PlayerEffect a constructor its evaluator cannot resolve.
 data PlayerRef

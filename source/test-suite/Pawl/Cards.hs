@@ -8,9 +8,8 @@ module Pawl.Cards where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Types.Deck as Deck
-import qualified Pawl.Types.Registry as Registry.Type
 
-redDeck :: Registry.Type.Registry -> IO Deck.Deck
+redDeck :: Registry.Registry -> IO Deck.Deck
 redDeck registry = do
   mountain <- Registry.printing registry "Mountain"
   piker <- Registry.printing registry "Goblin Piker"
@@ -40,7 +39,7 @@ redDeck registry = do
         (chaosCharm, 4)
       ]
 
-greenDeck :: Registry.Type.Registry -> IO Deck.Deck
+greenDeck :: Registry.Registry -> IO Deck.Deck
 greenDeck registry = do
   forest <- Registry.printing registry "Forest"
   warMammoth <- Registry.printing registry "War Mammoth"
@@ -66,7 +65,7 @@ greenDeck registry = do
 -- Blue, no creatures: Divination accelerates its own deck-out, Unsummon bounces
 -- the opponent's creatures, Tome Scour mills them. Gives bounce/draw/mill random
 -- coverage (M4b fast follow).
-blueDeck :: Registry.Type.Registry -> IO Deck.Deck
+blueDeck :: Registry.Registry -> IO Deck.Deck
 blueDeck registry = do
   island <- Registry.printing registry "Island"
   unsummon <- Registry.printing registry "Unsummon"
@@ -80,7 +79,7 @@ blueDeck registry = do
         (tomeScour, 4)
       ]
 
-blackDeck :: Registry.Type.Registry -> IO Deck.Deck
+blackDeck :: Registry.Registry -> IO Deck.Deck
 blackDeck registry = do
   swamp <- Registry.printing registry "Swamp"
   typhoidRats <- Registry.printing registry "Typhoid Rats"

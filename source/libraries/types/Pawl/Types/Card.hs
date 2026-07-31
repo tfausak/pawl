@@ -42,11 +42,11 @@ data Card = MkCard
     -- (contrast CR 702.3c/702.9c) -- it arises after the layer fold, and
     -- Pawl.Types.ProjectedCharacteristics.keywords counts it there.
     --
-    -- The closed half must read this through Pawl.Projection.keywordsOf, never
+    -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3. The exception is a
     -- keyword whose ability functions in a zone the CR 613 layer system does not
-    -- reach -- rule 702.34a's flashback, read here by Pawl.Cast and Pawl.Cost
-    -- via Pawl.Keyword while the card sits in a graveyard -- which is the same
+    -- reach -- rule 702.34a's flashback, read here by Pawl.Engine.Cast and Pawl.Engine.Cost
+    -- via Pawl.Engine.Keyword while the card sits in a graveyard -- which is the same
     -- carve-out castingPermissions and additionalCosts below already take.
     keywords :: Set Keyword,
     -- CR 204.1/204.2: the colour indicator printed left of the type line. An
@@ -55,14 +55,14 @@ data Card = MkCard
     -- alone. This is also where a TOKEN's colour lives: CR 111.3 makes the
     -- creating effect's stated characteristics "functionally equivalent to the
     -- characteristic values that are printed on a card", and a token has no mana
-    -- cost. Read through Pawl.Projection.colorsOf, never directly.
+    -- cost. Read through Pawl.Engine.Projection.colorsOf, never directly.
     colorIndicator :: Set Color,
     -- CR 604.3 / 208.2a: this card's characteristic-defining P/T ability -- the
     -- quantity a printed star (Quantity.Star) in its power/toughness box stands
     -- for. Nothing for every card without a star. A CDA is an ABILITY, not a
     -- number: the projection seeds it unevaluated so a copy acquires the ability
     -- (CR 707.2a) and layer 7a recomputes it on every projection. Read through
-    -- Pawl.Projection, never directly.
+    -- Pawl.Engine.Projection, never directly.
     characteristicPT :: Maybe Quantity,
     -- CR 604.1/604.2: this card's static continuous abilities (Humility). Empty
     -- for everything but the few printings that generate a continuous effect just
@@ -76,16 +76,16 @@ data Card = MkCard
     spell :: Modal Card,
     -- CR 602: this card's printed activated abilities. Empty for all but the few
     -- printings that grant one. The closed half reads these through
-    -- Pawl.Projection.abilitiesOf (Task 9), never directly: layer 6 (Humility)
+    -- Pawl.Engine.Projection.abilitiesOf (Task 9), never directly: layer 6 (Humility)
     -- removes abilities.
     activatedAbilities :: [ActivatedAbility Card],
     -- CR 614: this card's replacement effects, active while it is on the
-    -- battlefield. Read through Pawl.Projection.replacementsOf (never directly)
+    -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never directly)
     -- so layer 6 LoseAllAbilities strips them uniformly. Empty for all but Rest
     -- in Peace.
     replacementEffects :: [ReplacementEffect],
     -- CR 603: this card's triggered abilities, read through
-    -- Pawl.Projection.triggeredAbilitiesOf. Empty for all but Rest in Peace.
+    -- Pawl.Engine.Projection.triggeredAbilitiesOf. Empty for all but Rest in Peace.
     triggeredAbilities :: [TriggeredAbility Card],
     -- CR 603.7: this card's DELAYED triggered abilities, keyed by name -- the
     -- payloads an Effect.ArmDelayedTrigger in this card's own text arms. Card
@@ -104,7 +104,7 @@ data Card = MkCard
     --
     -- Not the whole list: rule 702.34a gives a card with flashback a
     -- cast-from-your-graveyard permission that is never printed here, which
-    -- Pawl.Keyword.castingPermissionsOf mints from the keyword. Pawl.Cast
+    -- Pawl.Engine.Keyword.castingPermissionsOf mints from the keyword. Pawl.Engine.Cast
     -- (permissionsOf) is the one place the two are put together; a reader that
     -- wants every permission a card has must do the same.
     castingPermissions :: [CastingPermission],
@@ -117,7 +117,7 @@ data Card = MkCard
     -- The mirror of castingPermissions above, running the other way, which is why
     -- it is a second field and not more arms on that one: CR 601.3 is one sentence
     -- with two halves ("a rule or effect allows" / "no rule or effect prohibits"),
-    -- and Pawl.Cast has to know which half an entry belongs to. ALL of these must
+    -- and Pawl.Engine.Cast has to know which half an entry belongs to. ALL of these must
     -- hold for a cast to be legal, where one permission suffices.
     --
     -- Read directly from the card and never through the projection, the
@@ -131,7 +131,7 @@ data Card = MkCard
     -- and the other producer CR 601.3's "rule or effect" names. A prohibition
     -- aimed at a PLAYER -- Rule of Law, Silence -- is a continuous effect on the
     -- CR 613.11 axis (playerAbilities / Effect.AffectPlayers, read by
-    -- Pawl.PlayerEffect); every entry here is a card restricting only itself.
+    -- Pawl.Engine.PlayerEffect); every entry here is a card restricting only itself.
     castingRestrictions :: [CastingRestriction],
     -- CR 702.5a: this card's `enchant` ability -- "Enchant [object or player]"
     -- -- which "restricts what an Aura spell can target and what an Aura can
@@ -170,7 +170,7 @@ data Card = MkCard
     -- A LIST because a card may print more than one, not because more than one
     -- may be paid: CR 118.9a says "only one alternative cost can be applied to
     -- any one spell as it's being cast", which is what makes
-    -- Pawl.Cost.costsFor's list a list of CANDIDATES the caster picks from.
+    -- Pawl.Engine.Cost.costsFor's list a list of CANDIDATES the caster picks from.
     --
     -- Each carries its OWN mana part, which is how CR 118.6a's second sentence
     -- ("if an alternative cost is applied to an unpayable cost ... the
@@ -187,19 +187,19 @@ data Card = MkCard
     -- UNCONDITIONED, which is why rule 702.34a's flashback cost is deliberately
     -- NOT one of these: a cost here is payable wherever the card can be cast
     -- from, and flashback's may be paid only from the graveyard. It rides its
-    -- keyword instead, and Pawl.Cost.costsFor offers it by zone.
+    -- keyword instead, and Pawl.Engine.Cost.costsFor offers it by zone.
     alternativeCosts :: [Cost],
     -- CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary
     -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put
-    -- OUTSIDE the layer system, so these are read by Pawl.PlayerEffect and never
-    -- by Pawl.Projection. Empty for every other printing.
+    -- OUTSIDE the layer system, so these are read by Pawl.Engine.PlayerEffect and never
+    -- by Pawl.Engine.Projection. Empty for every other printing.
     playerAbilities :: [PlayerStaticAbility],
     -- CR 604.1/604.2 / 509.1c: this card's printed BLOCKING REQUIREMENTS -- "all
     -- creatures able to block enchanted creature do so" (Lure). The THIRD
     -- printed-static-ability field, alongside staticAbilities and
     -- playerAbilities; Pawl.Types.BlockRequirement argues why neither of those two
-    -- can hold one. Read by Pawl.BlockRequirement and never by Pawl.Projection,
+    -- can hold one. Read by Pawl.Engine.BlockRequirement and never by Pawl.Engine.Projection,
     -- since CR 613.11 applies these after the layer system rather than inside it.
     -- Empty for every other printing.
     blockRequirements :: [BlockRequirement],
@@ -207,7 +207,7 @@ data Card = MkCard
     -- "creatures enchanted player controls attack each combat if able" (Curse of
     -- the Nightly Hunt). The FOURTH printed-static-ability field, and the twin of
     -- blockRequirements on the other side of the combat phase; read by
-    -- Pawl.AttackRequirement and never by Pawl.Projection, since CR 613.11 applies
+    -- Pawl.Engine.AttackRequirement and never by Pawl.Engine.Projection, since CR 613.11 applies
     -- these after the layer system rather than inside it. Empty for every other
     -- printing.
     attackRequirements :: [AttackRequirement],

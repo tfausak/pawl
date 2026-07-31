@@ -27,7 +27,7 @@ import Pawl.Types.Timestamp (Timestamp)
 -- stored-set analogue of Affected.TheseObjects here, and PlayerScope is the same
 -- type on both carriers.
 --
--- `expiry` decides when a Pawl.Expiry sweep drops it (CR 514.2, 611.2a, 611.2b).
+-- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a, 611.2b).
 -- Only AtCleanup has a producer: no card arms While or AtTurnOf on this carrier,
 -- so those two sweeps run against hand-built fixtures alone (#97).
 --

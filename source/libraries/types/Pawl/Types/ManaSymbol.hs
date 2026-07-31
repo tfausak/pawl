@@ -37,8 +37,8 @@ data ManaSymbol
     -- not where they go.
     --
     -- This is the symbol that two mana can pay, and so the one that broke the
-    -- one-supply-per-demand shape Pawl.Mana's payment used to rest on.
-    -- Pawl.Mana.resolutions is what absorbs it: CR 601.2b's "nonhybrid equivalent
+    -- one-supply-per-demand shape Pawl.Engine.Mana's payment used to rest on.
+    -- Pawl.Engine.Mana.resolutions is what absorbs it: CR 601.2b's "nonhybrid equivalent
     -- cost" is enumerated above the search, so each symbol is still paid one way
     -- at a time and nothing below ever sees a demand that eats two units.
     MonocoloredHybrid ManaType
@@ -50,17 +50,17 @@ data ManaSymbol
     -- white, {U/P} is blue, {B/P} is black, {R/P} is red, and {G/P} is green."
     -- Those five are the whole list -- there is no colourless Phyrexian symbol to
     -- represent -- so `Phyrexian Colorless` stays unsayable rather than being a
-    -- case every reader of the colour has to rule out. Pawl.Projection's
+    -- case every reader of the colour has to rule out. Pawl.Engine.Projection's
     -- symbolColors is the one that cashes it: CR 202.2d makes the OBJECT that
     -- colour, so Mutagenic Growth is green even when 2 life paid for it and no
     -- green mana was ever made.
     --
     -- The two ways are not two mana. Unlike the hybrids above, one of them spends
-    -- no mana at all, so Pawl.Mana's cost resolution carries an amount of LIFE
+    -- no mana at all, so Pawl.Engine.Mana's cost resolution carries an amount of LIFE
     -- alongside its demands, and CR 119.4's floor ("only if their life total is
     -- greater than or equal to the amount of the payment") is what decides
     -- whether that way is open. WHICH way is taken is the player's, announced as
-    -- they propose the spell (CR 118.13a) by Pawl.Mana's announcePhyrexian, so
+    -- they propose the spell (CR 118.13a) by Pawl.Engine.Mana's announcePhyrexian, so
     -- this symbol is gone before the cost is paid at all.
     --
     -- CR 107.4f's OTHER half -- the ten hybrid Phyrexian symbols, "{G/U/P}", paid

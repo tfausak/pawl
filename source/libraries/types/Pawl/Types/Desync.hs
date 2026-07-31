@@ -4,9 +4,9 @@ import Numeric.Natural (Natural)
 import Pawl.Types.Response (Response)
 
 -- Where a recorded transcript stopped answering the prompts the engine actually
--- asked. Pawl.Replay.replay returns the FIRST one, if any.
+-- asked. Pawl.Engine.Replay.replay returns the FIRST one, if any.
 --
--- Reporting it at all is the point. Pawl.Replay.defaultAnswer is deliberately
+-- Reporting it at all is the point. Pawl.Engine.Replay.defaultAnswer is deliberately
 -- total, which is what keeps replay free of a partial escape; the price is that
 -- a drifted transcript plays out a DIFFERENT game in silence. For most prompts
 -- that under- or over-fills a choice, but a dropped Prompt.Concede changes who
@@ -16,9 +16,9 @@ import Pawl.Types.Response (Response)
 -- Structural, and so replay-only: an interpreter is `Prompt r -> m r`, and the
 -- GADT's return type stops a LIVE answerer handing back the wrong shape at all.
 -- Only a transcript can mismatch, because it stores an untyped Response that
--- Pawl.Replay.decode has to turn back into an `r`. An answer that is well-typed
+-- Pawl.Engine.Replay.decode has to turn back into an `r`. An answer that is well-typed
 -- but ILLEGAL is a different failure, and is handled where it is asked rather
--- than here -- see Pawl.Engine.priorityLoop's "FILTERED, NOT TRUSTED".
+-- than here -- see Pawl.Engine.Engine.priorityLoop's "FILTERED, NOT TRUSTED".
 --
 -- Only the first, because from that point on every answer comes from
 -- defaultAnswer: the run has stopped being a replay of the recorded game, and

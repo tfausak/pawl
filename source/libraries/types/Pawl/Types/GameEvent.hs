@@ -36,7 +36,7 @@ data GameEvent
   | -- CR 603.2b: a phase or step began, on whose turn (the active player). What
     -- both an "at the beginning of each end step" step trigger and a CR 603.7
     -- delayed ability match against -- the second consumer is
-    -- Pawl.Event.delayedPending (Tidal Wave's "sacrifice it at the beginning of
+    -- Pawl.Engine.Event.delayedPending (Tidal Wave's "sacrifice it at the beginning of
     -- the next end step" depends on it).
     StepBegan Phase PlayerId
   | -- CR 601.2i: a player cast a spell. The event Rule of Law counts, and the
@@ -53,7 +53,7 @@ data GameEvent
     -- monarch" trigger.
     BecameMonarch PlayerId
   | -- CR 701.9a: a card was DISCARDED -- "to discard a card, move it from its
-    -- owner's hand to that player's graveyard". Emitted by Pawl.Event.discard,
+    -- owner's hand to that player's graveyard". Emitted by Pawl.Engine.Event.discard,
     -- the one funnel every discard in the engine goes through, alongside the
     -- Moved event that same move records.
     --
@@ -94,8 +94,8 @@ data GameEvent
     -- rather than reading Combat.attackers. CR 508.3a's last sentence -- "such
     -- abilities won't trigger if a creature is put onto the battlefield
     -- attacking" -- makes the two indistinguishable in the combat record and
-    -- distinct here: only Pawl.Combat.declareAttackers appends this, and
-    -- Pawl.Combat.putOntoBattlefieldAttacking deliberately does not.
+    -- distinct here: only Pawl.Engine.Combat.declareAttackers appends this, and
+    -- Pawl.Engine.Combat.putOntoBattlefieldAttacking deliberately does not.
     AttackerDeclared ObjectId
   | -- CR 701.20a: a player revealed a card -- "show that card to all players for
     -- a brief time."

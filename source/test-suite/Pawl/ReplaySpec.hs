@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Replay: record/replay transcript round-trips.
+-- Covers Pawl.Engine.Replay: record/replay transcript round-trips.
 module Pawl.ReplaySpec where
 
 import qualified Data.List as List
@@ -9,13 +9,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Decide as Decide
-import qualified Pawl.Engine as Engine
+import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
@@ -42,7 +42,6 @@ import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SlotName as SlotName
@@ -436,7 +435,7 @@ concedeAnswer p = case p of
 -- playLandAnswer (whose choices differ from Replay's exhausted-transcript
 -- fallback, keeping the assertions below honest: the transcript has to
 -- actually carry the decisions).
-recordedGame :: Registry.Type.Registry -> IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
+recordedGame :: Registry.Registry -> IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
 recordedGame registry = do
   matchup <- S.redRed registry
   let start = Setup.emptyGame (fmap fst matchup)
@@ -444,7 +443,7 @@ recordedGame registry = do
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
   pure (start, game, recorded, transcript)
 
-replayTests :: Registry.Type.Registry -> Tasty.TestTree
+replayTests :: Registry.Registry -> Tasty.TestTree
 replayTests registry =
   Tasty.testGroup
     "Replay"
@@ -466,7 +465,7 @@ replayTests registry =
             ((_, replayed), desync) = Replay.replay gfLog start game
         HU.assertEqual "goldfish" gf replayed
         HU.assertEqual "no desync" Nothing desync,
-      -- #144. Pawl.Replay.defaultAnswer is deliberately total, so a transcript
+      -- #144. Pawl.Engine.Replay.defaultAnswer is deliberately total, so a transcript
       -- that has drifted out of step with the prompts the engine actually asks
       -- does not crash -- it silently answers everything from the fallback and
       -- plays out a DIFFERENT game. For Prompt.Concede that fallback is
@@ -524,5 +523,5 @@ replayTests registry =
           _ -> HU.assertFailure "Aether Channeler must have exactly one triggered ability"
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Replay" [replayTests registry, combatReplayTests]

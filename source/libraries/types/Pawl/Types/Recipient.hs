@@ -26,8 +26,8 @@ data Recipient
 -- two object arms are the same answer to it and every caller that wants "which
 -- object" would otherwise re-case on both. Sits beside the type for the reason
 -- Binding.empty does: it is a fact about the shape, not about the game, and
--- callers on both sides of the module graph need it (Pawl.Projection cannot
--- import Pawl.Resolve, where this used to live).
+-- callers on both sides of the module graph need it (Pawl.Engine.Projection cannot
+-- import Pawl.Engine.Resolve, where this used to live).
 objectOf :: Recipient -> Maybe ObjectId
 objectOf r = case r of
   ToCreature oid -> Just oid

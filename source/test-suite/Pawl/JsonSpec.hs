@@ -6,7 +6,7 @@ module Pawl.JsonSpec where
 
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Text as Text
-import qualified Pawl.Json as J
+import qualified Pawl.Codec.Json as J
 import qualified Pawl.Json.Value as Value
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU

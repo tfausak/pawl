@@ -7,10 +7,10 @@ module Pawl.Types.ExtraPhase where
 -- phase, Aurelia, the Warleader adds only a combat phase, and Full Throttle adds
 -- two combat phases and no main phase.
 --
--- A whole PHASE, never a step: what Pawl.Turn.expandExtraPhase inserts for
+-- A whole PHASE, never a step: what Pawl.Engine.Turn.expandExtraPhase inserts for
 -- ExtraCombat is CR 506.1's five steps in order, and for ExtraMain is the single
 -- stepless main phase CR 505.2 describes. So the effect's payload says what the
--- card says, and the rules detail of what a phase is made of stays in Pawl.Turn.
+-- card says, and the rules detail of what a phase is made of stays in Pawl.Engine.Turn.
 data ExtraPhase
   = -- CR 506.1's five steps: beginning of combat, declare attackers, declare
     -- blockers, combat damage, end of combat.

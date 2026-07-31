@@ -268,7 +268,7 @@ data Prompt r where
   -- recorded -- the choice really is made as the object enters. The legal set
   -- excludes anything entering in the same batch (CR 614.12a: a sibling
   -- entering at the same time is not yet "on the battlefield" when the choice
-  -- is made; see Pawl.Replacement's applyReplacementsIn).
+  -- is made; see Pawl.Engine.Replacement's applyReplacementsIn).
   ChooseCopyTarget :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Prompt (Maybe ObjectId)
   -- CR 208.2b / 614.1c: as an object enters, its controller chooses among the
   -- shapes an "as this creature enters, it becomes your choice of ..." ability
@@ -416,7 +416,7 @@ data Prompt r where
   -- paid as it's being cast ... the player announces their intentions to pay any
   -- or all of those costs." Issued after the modes and before X and targets, at
   -- 601.2b's own position. The ObjectId is the spell; the [Cost] is the PAYABLE
-  -- candidates (the engine pre-filters: each candidate from Pawl.Cost.costsFor,
+  -- candidates (the engine pre-filters: each candidate from Pawl.Engine.Cost.costsFor,
   -- run through total, then tested with canPay at the CR 601.2b X=0 floor).
   --
   -- CR 118.9b makes an alternative cost optional, so a player who can afford both
@@ -501,7 +501,7 @@ data Prompt r where
   -- distinguishable game states, and the engine does not make a player's choice.
   -- The one case where it is not asked is where nothing is being decided: an
   -- ability whose targets are ALL illegal never reaches this prompt, because CR
-  -- 608.2b removes it from the stack first (Pawl.Resolve's fizzle). That covers
+  -- 608.2b removes it from the stack first (Pawl.Engine.Resolve's fizzle). That covers
   -- every optional card in the pool, all of which are single-mode; a MODAL
   -- payload mixing a live mode with a dead optional one would reach this prompt
   -- with nothing to decide (#336).

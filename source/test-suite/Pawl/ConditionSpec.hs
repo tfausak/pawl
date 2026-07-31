@@ -1,12 +1,12 @@
--- Covers Pawl.Condition, Pawl.Types.Condition and Pawl.Types.Comparison.
+-- Covers Pawl.Engine.Condition, Pawl.Types.Condition and Pawl.Types.Comparison.
 module Pawl.ConditionSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Condition as Condition
-import qualified Pawl.Count as Count
-import qualified Pawl.Filter as Filter
+import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Comparison as Comparison
@@ -19,7 +19,6 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
@@ -59,7 +58,7 @@ check swamp n comparison threshold =
         (ObjectId.MkObjectId 0)
         (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Condition"

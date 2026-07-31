@@ -6,7 +6,7 @@ module Pawl.Types.PlayerRelation where
 -- is every player who is not the perspective -- CR 806.1 in a free-for-all, CR
 -- 102.2 in a two-player game, the same predicate either way. CR 102.3's teams
 -- are the ONE reading it is wrong for, and pawl has none to express (#175).
--- Resolved at Pawl.Count.playersFor and Pawl.Filter.matches.
+-- Resolved at Pawl.Engine.Count.playersFor and Pawl.Engine.Filter.matches.
 data PlayerRelation
   = You
   | Opponent

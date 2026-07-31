@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Cost and the three types it cases on (Pawl.Types.Cost,
+-- Covers Pawl.Engine.Cost and the three types it cases on (Pawl.Types.Cost,
 -- Pawl.Types.CostComponent, Pawl.Types.Payment), plus the two prompts the axis
 -- adds. CR 118: what a cost IS, what it takes to pay one, and the alternative
 -- and additional costs that change the answer.
@@ -16,18 +16,21 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Action as Action
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Cost as Cost
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
+
+import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Replay as Replay
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -39,8 +42,6 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.EndingStep as EndingStep
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -58,7 +59,6 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Status as Status
@@ -76,7 +76,7 @@ theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
 
-doorTests :: Registry.Type.Registry -> Tasty.TestTree
+doorTests :: Registry.Registry -> Tasty.TestTree
 doorTests registry =
   Tasty.testGroup
     "Door"
@@ -148,7 +148,7 @@ doorTests registry =
           "still Nothing"
           Nothing
           (Cost.Type.mana (Cost.total S.alice bolt (Cost.Type.MkCost Nothing []) withBolt)),
-      -- The classification Pawl.Activate reads instead of matching a constructor.
+      -- The classification Pawl.Engine.Activate reads instead of matching a constructor.
       HU.testCase "CR 302.6 requiresSicknessCheck classifies a cost, and Greed's counterpart proves it" $ do
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
@@ -156,7 +156,7 @@ doorTests registry =
             skeletons = ActivatedAbility.cost (theAbility drudgeSkeletons)
         HU.assertBool "Llanowar Elves' {T} cost requires the tap symbol" (Cost.requiresSicknessCheck elves)
         HU.assertBool "Drudge Skeletons' {B} regenerate cost does not" (not (Cost.requiresSicknessCheck skeletons)),
-      -- Departure 1: Pawl.Activate does NOT route an ability cost through
+      -- Departure 1: Pawl.Engine.Activate does NOT route an ability cost through
       -- Cost.total. PlayerEffect.matchesSpell classifies an OBJECT, not a spell,
       -- so a noncreature PERMANENT matches Thalia's Not (HasCardType Creature)
       -- filter -- and Thalia taxes noncreature SPELLS, never abilities. Four Mountains
@@ -234,7 +234,7 @@ greedBoard swamp greed piker life =
           }
       )
 
-greedTests :: Registry.Type.Registry -> Tasty.TestTree
+greedTests :: Registry.Registry -> Tasty.TestTree
 greedTests registry =
   let isActivate a = case a of
         Action.Type.Activate _ _ -> True
@@ -350,7 +350,7 @@ villageRitesBoard swamp piker villageRites n =
 -- Its one ruling: "You must sacrifice exactly one creature to cast this spell;
 -- you can't cast it without sacrificing a creature, and you can't sacrifice
 -- additional creatures."
-villageRitesTests :: Registry.Type.Registry -> Tasty.TestTree
+villageRitesTests :: Registry.Registry -> Tasty.TestTree
 villageRitesTests registry =
   Tasty.testGroup
     "Village Rites"
@@ -363,7 +363,7 @@ villageRitesTests registry =
             resolved = S.runPure S.identityAnswer cast Stack.resolveTop
         HU.assertEqual "no creature left on the battlefield" 0 (S.creaturesInPlay S.alice resolved)
         -- Plan-bug fix: CR 400.7 gives the sacrificed permanent a NEW
-        -- object id in the graveyard (Pawl.Event.changeZone), so the
+        -- object id in the graveyard (Pawl.Engine.Event.changeZone), so the
         -- brief's own membership check (the OLD battlefield id inside
         -- Zone.Graveyard) is unsatisfiable by construction -- it fails
         -- even against correct code, matching Pawl.TriggerSpec's own
@@ -461,7 +461,7 @@ fireblastBoard mountain fireblastPrinting n tap =
 -- this spell's mana cost. Fireblast deals 4 damage to any target."
 --
 -- Scryfall returned no rulings for this card.
-fireblastTests :: Registry.Type.Registry -> Tasty.TestTree
+fireblastTests :: Registry.Registry -> Tasty.TestTree
 fireblastTests registry =
   Tasty.testGroup
     "Fireblast"
@@ -530,7 +530,7 @@ crossCheckWithPriority gs =
       GameState.priority = Just S.alice
     }
 
-crossCheckTests :: Registry.Type.Registry -> Tasty.TestTree
+crossCheckTests :: Registry.Registry -> Tasty.TestTree
 crossCheckTests registry =
   Tasty.testGroup
     "CrossChecks"
@@ -596,7 +596,7 @@ crossCheckTests registry =
 -- feeds an energy-paid pump (CR 118 / 122.6). The ability is extracted via the
 -- file-local total `theAbility` (no partial functions); the card-characteristics
 -- case guards that the extraction sees a real ability.
-longtuskCubTests :: Registry.Type.Registry -> Tasty.TestTree
+longtuskCubTests :: Registry.Registry -> Tasty.TestTree
 longtuskCubTests registry =
   Tasty.testGroup
     "LongtuskCub"
@@ -624,8 +624,8 @@ longtuskCubTests registry =
         HU.assertEqual "alice gained two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, safeholdSentryTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
+tests :: Registry.Registry -> Tasty.TestTree
+tests registry = Tasty.testGroup "Pawl.Engine.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, safeholdSentryTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
 
 -- alice controls a Safehold Sentry and three Plains, all settled. `tapped` says
 -- whether the Sentry itself starts tapped -- which for a {Q} cost is the payable
@@ -646,7 +646,7 @@ sentryBoard plains safeholdSentry tapped =
 
 -- Safehold Sentry {1}{W} Creature -- Elf Warrior 2/2: "{2}{W}, {Q}: This creature
 -- gets +0/+2 until end of turn." The card CR 107.6's untap symbol was waiting for.
-safeholdSentryTests :: Registry.Type.Registry -> Tasty.TestTree
+safeholdSentryTests :: Registry.Registry -> Tasty.TestTree
 safeholdSentryTests registry =
   Tasty.testGroup
     "Safehold Sentry"
@@ -715,7 +715,7 @@ noDiscardAnswer p = case p of
 -- Cathartic Reunion {1}{R} Sorcery: "As an additional cost to cast this spell,
 -- discard two cards. Draw three cards." The card CR 601.2f's "discarding cards"
 -- clause was waiting for.
-catharticReunionTests :: Registry.Type.Registry -> Tasty.TestTree
+catharticReunionTests :: Registry.Registry -> Tasty.TestTree
 catharticReunionTests registry =
   Tasty.testGroup
     "Cathartic Reunion"
@@ -749,7 +749,7 @@ catharticReunionTests registry =
         HU.assertBool "and no Cast is offered" (not (any isCastOfReunion (Action.legalActions S.alice gs))),
       HU.testCase "CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid" $ do
         -- The COST path's reject-not-repair, and deliberately the opposite of what
-        -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Cost.pay
+        -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Engine.Cost.pay
         -- restores the entry state and nothing at all happened. Three other cards
         -- makes the prompt real (hand > count), unlike the forced case above.
         mountain <- Registry.printing registry "Mountain"

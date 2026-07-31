@@ -7,7 +7,7 @@ import Pawl.Types.PlayerRelation (PlayerRelation)
 import Pawl.Types.TriggerFrequency (TriggerFrequency)
 import Pawl.Types.TurnScope (TurnScope)
 
--- CR 603.2: the pattern that fires a triggered ability. Only Pawl.Event may case
+-- CR 603.2: the pattern that fires a triggered ability. Only Pawl.Engine.Event may case
 -- on it for RULES purposes; Pawl.Codec also cases on every constructor, but only
 -- as the JSON data boundary (encode/decode), not to decide game behaviour.
 data TriggerCondition
@@ -19,7 +19,7 @@ data TriggerCondition
     -- rewritten as `PermanentEnters IsSource`: this arm is a bare comparison of
     -- ids, while that one has to READ the entrant's characteristics, and reading
     -- them can come up empty for an entrant that ceased without a zone change
-    -- ever filing last known information (see Pawl.Event.matchesTrigger).
+    -- ever filing last known information (see Pawl.Engine.Event.matchesTrigger).
     SelfEnters
   | -- CR 603.6a's SECOND written form, in the same breath as the first:
     -- "Whenever a [type] enters, . . ." -- fires when ANY permanent the Filter
@@ -43,13 +43,13 @@ data TriggerCondition
   | -- CR 603.8: a STATE trigger -- it fires whenever its condition is true, not
     -- when an event occurs. "It doesn't trigger again until the ability has
     -- resolved, has been countered, or has otherwise left the stack", which is why
-    -- Pawl.Event derives armedness from the stack rather than storing it.
+    -- Pawl.Engine.Event derives armedness from the stack rather than storing it.
     StateIs Condition
   | -- CR 603.2 / 509-510: the bearer dealt combat damage to a player. Rides P4's
     -- event history -- combat damage already records a DamageDealt event.
     SelfDealsCombatDamageToPlayer
   | -- CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
-    -- (any creature); matched only via Pawl.Monarch.inherentMatch, never through a
+    -- (any creature); matched only via Pawl.Engine.Monarch.inherentMatch, never through a
     -- card's bearer. Rides P4's DamageDealt history.
     CreatureDealtCombatDamageToMonarch
   | -- CR 702.29c: "'When you cycle this card' means 'When you discard this card
@@ -152,7 +152,7 @@ data TriggerCondition
     --
     -- The arriving incarnation is not lost, though: CR 400.7e lets the ability
     -- "find the new object that it became in the zone it moved to", and
-    -- Pawl.Event.eventBindings binds that id under Pawl.Binding.became. So the
+    -- Pawl.Engine.Event.eventBindings binds that id under Pawl.Engine.Binding.became. So the
     -- bearer and the object the payload acts on are deliberately two different
     -- ids, and the one printed word "it" means whichever of them the sentence
     -- is about.

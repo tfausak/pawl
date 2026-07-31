@@ -11,7 +11,7 @@ import Pawl.Types.Uses (Uses)
 -- projection re-derives a permanent's static replacement abilities live, while
 -- these are stored because the object that made them may be long gone.
 --
--- `expiry` decides when a sweep drops it (Pawl.Expiry; CR 514.2). No card in the
+-- `expiry` decides when a sweep drops it (Pawl.Engine.Expiry; CR 514.2). No card in the
 -- pool arms a floating replacement to anything but AtCleanup or Never, so the
 -- conditional (CR 611.2b) and turn-relative (CR 611.2a) expiries reach this
 -- carrier only through hand-built test fixtures, and AtTurnOf on a replacement
@@ -24,10 +24,10 @@ import Pawl.Types.Uses (Uses)
 -- CR 615.7 genuinely needs the BATCH SHAPE to change: it allocates ONE shield
 -- across simultaneous sources, with the recipient choosing which EVENT it
 -- prevents -- a choice with no batch to be made over as long as
--- Pawl.Damage.applyDamage keeps running each DamageEvent through its own
--- independent CR 616.1 loop (Pawl.Replacement.loop), one event at a time.
+-- Pawl.Engine.Damage.applyDamage keeps running each DamageEvent through its own
+-- independent CR 616.1 loop (Pawl.Engine.Replacement.loop), one event at a time.
 --
--- CR 615.13's blocker is NARROWER than that. Pawl.Damage.applyDamage already
+-- CR 615.13's blocker is NARROWER than that. Pawl.Engine.Damage.applyDamage already
 -- holds the whole batch -- it is the one thing calling resolveDamage once per
 -- event -- so the per-event unit does not need to change. What blocks 615.13 is
 -- that resolveDamage :: DamageEvent -> Game (Maybe DamageEvent) reports only

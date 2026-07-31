@@ -7,7 +7,7 @@ import Pawl.Types.Quantity (Quantity)
 -- and one vocabulary: a state trigger's condition (CR 603.8, checked at every
 -- CR 117.5 boundary), an intervening "if" (CR 603.4 when the trigger event
 -- occurs, CR 608.2a again on resolution), and a "for as long as" duration
--- (CR 611.2b, Pawl.Expiry.arm and Pawl.Expiry.sweepConditional).
+-- (CR 611.2b, Pawl.Engine.Expiry.arm and Pawl.Engine.Expiry.sweepConditional).
 --
 -- Exactly ONE constructor: there is no escape hatch. CR 611.2b's "for as long as
 -- you control this creature" is a source-restricted count of one
@@ -30,8 +30,8 @@ import Pawl.Types.Quantity (Quantity)
 --
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
 -- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. An
--- InSlot count stored that way outlives its slot binding: Pawl.Count.playersFor
--- then yields Nothing, and Pawl.Condition.holds collapses that to False
+-- InSlot count stored that way outlives its slot binding: Pawl.Engine.Count.playersFor
+-- then yields Nothing, and Pawl.Engine.Condition.holds collapses that to False
 -- silently (#159).
 data Condition = MkCondition Quantity Comparison Quantity
   deriving (Eq, Ord, Show)

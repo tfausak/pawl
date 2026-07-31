@@ -1,4 +1,4 @@
--- Covers Pawl.Card: card data, type-line rules, every printing, and the D4
+-- Covers Pawl.Engine.Card: card data, type-line rules, every printing, and the D4
 -- dataflow lint.
 module Pawl.CardSpec where
 
@@ -10,22 +10,29 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Binding as Binding
-import qualified Pawl.Card as Card
-import qualified Pawl.Codec as Codec
-import qualified Pawl.Event as Event
-import qualified Pawl.Json as Json
+import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.Subtype (subtypeToJson)
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Event as Event
 -- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
 -- triggered ability's effects (Card.allEffects only reaches the spell).
-import qualified Pawl.Mana as Mana
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
-import qualified Pawl.Quantity as Quantity
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
+-- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
+-- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Engine.Condition may
+-- later be imported and must not collide.
+
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
+
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -38,9 +45,6 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Comparison as Comparison
--- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
--- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
--- later be imported and must not collide.
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -48,8 +52,6 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
@@ -74,7 +76,6 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
@@ -97,7 +98,7 @@ import qualified Test.Tasty.HUnit as HU
 costOf :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
 costOf symbols = Just (ManaCost.MkManaCost symbols)
 
-m2aCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m2aCardTests :: Registry.Registry -> Tasty.TestTree
 m2aCardTests registry =
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       green = ManaSymbol.OfType (ManaType.Colored Color.Green)
@@ -186,7 +187,7 @@ m2aCardTests registry =
               S.m2aKeywords
         ]
 
-cardTests :: Registry.Type.Registry -> Tasty.TestTree
+cardTests :: Registry.Registry -> Tasty.TestTree
 cardTests registry =
   Tasty.testGroup
     "Card"
@@ -484,7 +485,7 @@ cardOffendsSharedZoneScope card =
 -- no-ops (Resolve's MoveToZone arm falls through to `pure ()`).
 --
 -- A SUBSET check, never the spell lint's equality, and that is forced rather
--- than chosen: Pawl.Binding.triggerSource's comment spells out that an
+-- than chosen: Pawl.Engine.Binding.triggerSource's comment spells out that an
 -- equality-style lint widened over an ability's modes is mutually unsatisfiable
 -- with the "a reserved slot is never a declared target slot" rule unless it
 -- first subtracts every reserved name from the read side. The delayed-ability
@@ -537,7 +538,7 @@ oneEffectTrigger condition effect =
       TriggeredAbility.intervening = Nothing
     }
 
--- Pawl.Binding's reserved slot names in full: the binding keys the engine
+-- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
 -- STAMPS rather than asks a player for. The whole module's list rather than a
 -- hand-picked subset, so a new reserved slot joins the declaration sweep below
 -- by being added here and nowhere else.
@@ -582,7 +583,7 @@ declaredTargetSlots card =
 --
 -- Declaring one is the SECOND INVARIANT's failure mode rather than a dataflow
 -- nicety: the slot is prompted (CR 601.2c) and the answer then thrown away. On
--- a triggered or delayed ability, Pawl.Engine stamps CR 113.7's `self` and CR
+-- a triggered or delayed ability, Pawl.Engine.Engine stamps CR 113.7's `self` and CR
 -- 109.5's `you` OVER the chosen targets, so the player is asked and overruled.
 -- CR 400.7e's `became` and CR 603.2's `thatPlayer` run the other way -- the
 -- chosen target wins the union and the event's own stamp is lost, so the
@@ -614,7 +615,7 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 -- something this lint would reject.
 tokenNameOffends :: Card.Type.Card -> Bool
 tokenNameOffends token =
-  case traverse (fmap fst . Json.tag . Codec.subtypeToJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
+  case traverse (fmap fst . Json.tag . subtypeToJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
     Left _ -> True
     Right subtypes ->
       notElem
@@ -625,7 +626,7 @@ tokenNameOffends token =
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
 -- pool. Loosen to superset if such a card ever lands.
-lintTests :: Registry.Type.Registry -> Tasty.TestTree
+lintTests :: Registry.Registry -> Tasty.TestTree
 lintTests registry =
   Tasty.testGroup
     "Lint"
@@ -663,7 +664,7 @@ lintTests registry =
       -- it is the identity on every stem -- read the listing directly, because
       -- Registry.slugs has already normalized the evidence away.
       HU.testCase "every file name in data/cards is already a slug" $ do
-        entries <- Directory.listDirectory (Registry.Type.root registry)
+        entries <- Directory.listDirectory (Registry.root registry)
         let stems = fmap (reverse . drop (length ".json") . reverse) (filter (List.isSuffixOf ".json") entries)
         HU.assertBool "the corpus is not empty" (not (null stems))
         mapM_
@@ -799,7 +800,7 @@ lintTests registry =
       -- TEST, never a trigger that silently never fires. Equality, not subset: a
       -- declared ability nothing arms is dead card text.
       --
-      -- SCOPE, same posture as Pawl.Binding's D4-lint-scope comment: this and the
+      -- SCOPE, same posture as Pawl.Engine.Binding's D4-lint-scope comment: this and the
       -- multi-token-binding lint below both walk `Card.allEffects`, which is
       -- `Modal.allEffects (Card.spell card)` -- a card's SPELL modes ONLY, never
       -- an activated or triggered ability's effects. An ArmDelayedTrigger placed
@@ -901,7 +902,7 @@ lintTests registry =
         let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
             offenders = filter (offends . Printing.card) ps
         HU.assertEqual "Aura iff enchant" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- Pawl.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
+      -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
       -- mode declaring it would be silently shadowed.
       -- #199: no card authors a layer-2 control modification into an effect that
       -- RESOLVES. SetControllerToSource is the payload-free constructor and is
@@ -910,7 +911,7 @@ lintTests registry =
       -- static abilities off Card.staticAbilities and never off stored effects, and
       -- Projection.applyModification's SetControllerToSource arm is the identity.
       -- A card authoring one would resolve, store the effect, and grant control to
-      -- no one -- there is nothing for CR 800.4a to end (see Pawl.Departure's
+      -- no one -- there is nothing for CR 800.4a to end (see Pawl.Engine.Departure's
       -- proofs).
       --
       -- BOTH control constructors, not just the payload-free one: baking a
@@ -920,7 +921,7 @@ lintTests registry =
       --
       -- Asked as an EQUALITY on Layer through Projection.layer -- the sanctioned
       -- classification -- rather than by casing on Modification, which only
-      -- Pawl.Projection may do. Layer.Control is exactly the two control
+      -- Pawl.Engine.Projection may do. Layer.Control is exactly the two control
       -- constructors, so this covers a third one automatically.
       --
       -- A codec-level rejection would be the wrong shape: jsonToModification is
@@ -939,7 +940,7 @@ lintTests registry =
         HU.assertEqual "the enchant slot is never hand-declared" [] (fmap (Card.Type.name . Printing.card) offenders)
     ]
 
-m2bCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m2bCardTests :: Registry.Registry -> Tasty.TestTree
 m2bCardTests registry =
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       gs0 = Setup.emptyGame S.bothPlayers
@@ -982,7 +983,7 @@ m2bCardTests registry =
             HU.assertEqual "raptor body" (bodyOf piker) (bodyOf ridgetopRaptor)
         ]
 
-m2cCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m2cCardTests :: Registry.Registry -> Tasty.TestTree
 m2cCardTests registry =
   Tasty.testGroup
     "M2cCards"
@@ -1002,7 +1003,7 @@ m2cCardTests registry =
         HU.assertEqual "keywords" (Set.singleton Keyword.Trample) (Card.Type.keywords c)
     ]
 
-basicLandTests :: Registry.Type.Registry -> Tasty.TestTree
+basicLandTests :: Registry.Registry -> Tasty.TestTree
 basicLandTests registry =
   Tasty.testGroup
     "BasicLand"
@@ -1032,7 +1033,7 @@ basicLandTests registry =
           (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
     ]
 
-m3cCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m3cCardTests :: Registry.Registry -> Tasty.TestTree
 m3cCardTests registry =
   Tasty.testGroup
     "M3cCards"
@@ -1043,7 +1044,7 @@ m3cCardTests registry =
         HU.assertBool "not a permanent target" (Map.null (Card.allTargetSpecs card))
     ]
 
-m3eCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m3eCardTests :: Registry.Registry -> Tasty.TestTree
 m3eCardTests registry =
   Tasty.testGroup
     "M3eCards"
@@ -1059,7 +1060,7 @@ m3eCardTests registry =
           _ -> HU.assertFailure "expected exactly one ability"
     ]
 
-m4bCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m4bCardTests :: Registry.Registry -> Tasty.TestTree
 m4bCardTests registry =
   Tasty.testGroup
     "M4bCards"
@@ -1233,7 +1234,7 @@ m4bCardTests registry =
         HU.assertEqual "six" 6 (Quantity.manaValueOf (Printing.card flameJavelin))
     ]
 
-m45p6CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m45p6CardTests :: Registry.Registry -> Tasty.TestTree
 m45p6CardTests registry =
   Tasty.testGroup
     "M45p6Cards"
@@ -1294,7 +1295,7 @@ m45p6CardTests registry =
           _ -> HU.assertFailure "expected exactly one triggered ability"
     ]
 
-m45p7CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m45p7CardTests :: Registry.Registry -> Tasty.TestTree
 m45p7CardTests registry =
   Tasty.testGroup
     "M4.5 P7"
@@ -1413,7 +1414,7 @@ m45p7CardTests registry =
         HU.assertEqual "no target slots" Map.empty (Card.allTargetSpecs c)
     ]
 
-m45p11CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m45p11CardTests :: Registry.Registry -> Tasty.TestTree
 m45p11CardTests registry =
   Tasty.testGroup
     "M4.5 P11"
@@ -1431,7 +1432,7 @@ m45p11CardTests registry =
 -- fails here rather than surfacing as a behavioural oddity somewhere downstream.
 -- Master Thief's ForAsLongAs is pinned this way in m45p6CardTests; this is
 -- Barbarian Outcast's StateIs, which had only behavioural coverage (#165).
-m55CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m55CardTests :: Registry.Registry -> Tasty.TestTree
 m55CardTests registry =
   Tasty.testGroup
     "M5.5"
@@ -1483,7 +1484,7 @@ m55CardTests registry =
 
 -- The Auras phase (a) gate card: CR 303.4m's Attached affected-set, proven by a
 -- real Aura on a real creature rather than a synthetic fixture.
-auraCardTests :: Registry.Type.Registry -> Tasty.TestTree
+auraCardTests :: Registry.Registry -> Tasty.TestTree
 auraCardTests registry =
   Tasty.testGroup
     "Auras"
@@ -1638,7 +1639,7 @@ sourceOnBattlefield =
 -- -- every printed enchantment animator excludes Auras by name; and March of the
 -- Machines animates every noncreature artifact at once, which is the card CR
 -- 613.6 exists for (#233).
-animatorCardTests :: Registry.Type.Registry -> Tasty.TestTree
+animatorCardTests :: Registry.Registry -> Tasty.TestTree
 animatorCardTests registry =
   Tasty.testGroup
     "Animators"
@@ -1756,7 +1757,7 @@ animatorCardTests registry =
 -- CR 702.29: the pool's first cycling card. Barkhide Mauler is a vanilla 4/4
 -- whose only text is the keyword, so nothing else about it can stand in for the
 -- keyword when a cycling test passes.
-cyclingCardTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingCardTests :: Registry.Registry -> Tasty.TestTree
 cyclingCardTests registry =
   Tasty.testGroup
     "Cycling"
@@ -1768,7 +1769,7 @@ cyclingCardTests registry =
         HU.assertEqual "cost" (costOf [ManaSymbol.Generic 4, blue, blue]) (Card.Type.manaCost c)
         -- Two keywords, one printed and one that mints an ability: rule 702.9's
         -- flying is read where evasion is asked about, and rule 702.29a's cycling
-        -- is minted by Pawl.Keyword.
+        -- is minted by Pawl.Engine.Keyword.
         HU.assertEqual
           "flying and Cycling {U}"
           (Set.fromList [Keyword.Flying, Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [blue])) []) Nothing])
@@ -1804,7 +1805,7 @@ cyclingCardTests registry =
         HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 4))) (Card.Type.toughness c)
         HU.assertEqual "subtypes" (Set.singleton Subtype.Beast) (TypeLine.subtypes (Card.Type.typeLine c))
         -- The card data carries the PRINTED cost and nothing else: rule 702.29a's
-        -- discard and draw are minted by Pawl.Keyword, never authored here.
+        -- discard and draw are minted by Pawl.Engine.Keyword, never authored here.
         HU.assertEqual
           "\"Cycling {2}\""
           (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []) Nothing))
@@ -1815,9 +1816,9 @@ cyclingCardTests registry =
 -- The pool's two world enchantments. Their abilities are ordinary -- a layer-6
 -- keyword grant and a layer-4/7b animation, both shapes the pool already had --
 -- and it is the SUPERTYPE on the type line that earns them their place: CR
--- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Sba.worldVictims),
+-- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Engine.Sba.worldVictims),
 -- and nothing else in the corpus carries it.
-worldCardTests :: Registry.Type.Registry -> Tasty.TestTree
+worldCardTests :: Registry.Registry -> Tasty.TestTree
 worldCardTests registry =
   Tasty.testGroup
     "WorldEnchantments"
@@ -1861,7 +1862,7 @@ worldCardTests registry =
 
 -- CR 701.20: the cards that say "reveal" in their own text, as opposed to
 -- inheriting it from a keyword the way Ash Barrens' typecycling does.
-revealCardTests :: Registry.Type.Registry -> Tasty.TestTree
+revealCardTests :: Registry.Registry -> Tasty.TestTree
 revealCardTests registry =
   Tasty.testGroup
     "Reveal"
@@ -1895,7 +1896,7 @@ revealCardTests registry =
 -- ability triggers on a permanent OTHER than itself entering, and its effect
 -- names nothing about the newcomer, so the card is a clean witness for the
 -- trigger condition alone.
-entersCardTests :: Registry.Type.Registry -> Tasty.TestTree
+entersCardTests :: Registry.Registry -> Tasty.TestTree
 entersCardTests registry =
   Tasty.testGroup
     "Enters"
@@ -1931,7 +1932,7 @@ entersCardTests registry =
           abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities))
     ]
 
-unspentManaCardTests :: Registry.Type.Registry -> Tasty.TestTree
+unspentManaCardTests :: Registry.Registry -> Tasty.TestTree
 unspentManaCardTests registry =
   Tasty.testGroup
     "Unspent mana"
@@ -1952,7 +1953,7 @@ unspentManaCardTests registry =
           (Card.Type.playerAbilities c)
     ]
 
-phyrexianCardTests :: Registry.Type.Registry -> Tasty.TestTree
+phyrexianCardTests :: Registry.Registry -> Tasty.TestTree
 phyrexianCardTests registry =
   Tasty.testGroup
     "Phyrexian"
@@ -1981,7 +1982,7 @@ phyrexianCardTests registry =
 -- "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking creature from
 -- combat." (Murders at Karlov Manor Commander; oracle text checked against
 -- Scryfall.) The gameplay proof is Pawl.CombatSpec's EffectRemoval group.
-removeFromCombatCardTests :: Registry.Type.Registry -> Tasty.TestTree
+removeFromCombatCardTests :: Registry.Registry -> Tasty.TestTree
 removeFromCombatCardTests registry =
   Tasty.testGroup
     "RemoveFromCombat"
@@ -2021,7 +2022,7 @@ removeFromCombatCardTests registry =
 -- point next to Lure's, above: the same field, the other Affected. The gameplay
 -- proof, including CR 604.2's layer-6 strip, is Pawl.CombatSpec's
 -- BlockRequirements group.
-blockRequirementCardTests :: Registry.Type.Registry -> Tasty.TestTree
+blockRequirementCardTests :: Registry.Registry -> Tasty.TestTree
 blockRequirementCardTests registry =
   Tasty.testGroup
     "BlockRequirements"
@@ -2038,7 +2039,7 @@ blockRequirementCardTests registry =
         -- "THIS CREATURE", not "enchanted creature": the requirement names its own
         -- source, which the predicate language already spells Filter.IsSource.
         -- Lure's Affected.Attached is the contrast -- same field, the other
-        -- Affected -- and it is why Pawl.BlockRequirement resolves the attacker
+        -- Affected -- and it is why Pawl.Engine.BlockRequirement resolves the attacker
         -- through Projection.affects rather than reading an ObjectId.
         HU.assertEqual
           "one requirement, naming the source itself"
@@ -2056,7 +2057,7 @@ blockRequirementCardTests registry =
 -- Aura reaching the same set through the same Affected, carried on a field the
 -- CR 613 layer system never reads. The gameplay proof is Pawl.CombatSpec's
 -- AttackRequirements group.
-attackRequirementCardTests :: Registry.Type.Registry -> Tasty.TestTree
+attackRequirementCardTests :: Registry.Registry -> Tasty.TestTree
 attackRequirementCardTests registry =
   Tasty.testGroup
     "AttackRequirements"
@@ -2086,7 +2087,7 @@ attackRequirementCardTests registry =
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"

@@ -1,0 +1,24 @@
+-- | The @PlayerStaticAbility ⇆ Json@ codec (#481).
+module Pawl.Codec.PlayerStaticAbility where
+
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.PlayerEffect (jsonToPlayerEffect, playerEffectToJson)
+import Pawl.Codec.PlayerScope (jsonToPlayerScope, playerScopeToJson)
+import Pawl.Json.Value (Value)
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+
+playerStaticAbilityToJson :: PlayerStaticAbility.PlayerStaticAbility -> Value
+playerStaticAbilityToJson pa =
+  Json.jObject
+    [ (Text.pack "scope", playerScopeToJson (PlayerStaticAbility.scope pa)),
+      (Text.pack "effect", playerEffectToJson (PlayerStaticAbility.effect pa))
+    ]
+
+jsonToPlayerStaticAbility :: Value -> Either Text PlayerStaticAbility.PlayerStaticAbility
+jsonToPlayerStaticAbility value = do
+  ps <- Json.asObject value
+  s <- Json.field (Text.pack "scope") ps >>= jsonToPlayerScope
+  e <- Json.field (Text.pack "effect") ps >>= jsonToPlayerEffect
+  pure (PlayerStaticAbility.MkPlayerStaticAbility s e)

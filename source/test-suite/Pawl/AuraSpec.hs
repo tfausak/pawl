@@ -1,11 +1,11 @@
 -- Pattern matching on Pawl.Types.Prompt, a GADT, in aimAt below.
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Stack's Aura branch and Pawl.Resolve.targetsAllIllegal -- a
+-- Covers Pawl.Engine.Stack's Aura branch and Pawl.Engine.Resolve.targetsAllIllegal -- a
 -- resolving Aura spell either fizzles (CR 608.2b) or enters the battlefield
 -- already attached to its target (CR 303.4) -- together with the rest of the
--- attachment substrate that shares Object.attachedTo: Pawl.Resolve's Attach
--- opcode (CR 701.3) and Pawl.Sba's three attachment state-based actions
+-- attachment substrate that shares Object.attachedTo: Pawl.Engine.Resolve's Attach
+-- opcode (CR 701.3) and Pawl.Engine.Sba's three attachment state-based actions
 -- (CR 704.5m, 704.5n, 704.5p).
 module Pawl.AuraSpec where
 
@@ -13,21 +13,21 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Activate as Activate
-import qualified Pawl.Cast as Cast
-import qualified Pawl.Combat as Combat
-import qualified Pawl.Departure as Departure
-import qualified Pawl.Engine as Engine
-import qualified Pawl.Event as Event
-import qualified Pawl.Game as Game
-import qualified Pawl.Modal as Modal
-import qualified Pawl.Projection as Projection
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Setup as Setup
-import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -41,7 +41,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -55,7 +54,7 @@ import qualified Test.Tasty.HUnit as HU
 -- and CR 704.5n's detach-rather-than-bury state-based action (#193). The
 -- Reattach group below is the same keyword action aimed the other way, at a
 -- permanent the effect TARGETS rather than at its own source.
-equipmentTests :: Registry.Type.Registry -> Tasty.TestTree
+equipmentTests :: Registry.Registry -> Tasty.TestTree
 equipmentTests registry =
   Tasty.testGroup
     "Equipment"
@@ -221,7 +220,7 @@ aimAt oid p = case p of
 -- CR 704.5p, the sibling of CR 704.5n above: 704.5n asks whether the HOST is
 -- still legal, and this asks whether the attached permanent may be attached to
 -- anything at all. Both detach and leave the permanent on the battlefield.
-unattachableTests :: Registry.Type.Registry -> Tasty.TestTree
+unattachableTests :: Registry.Registry -> Tasty.TestTree
 unattachableTests registry =
   Tasty.testGroup
     "Unattachable"
@@ -352,7 +351,7 @@ unattachableTests registry =
 -- BOTH halves of an enchant-player Aura: the Pool.Players enchant spec, which
 -- Card.enchant could already express, and a static ability whose affected set is
 -- reached THROUGH the enchanted player (Affected.AttachedPlayerControls).
-enchantPlayerTests :: Registry.Type.Registry -> Tasty.TestTree
+enchantPlayerTests :: Registry.Registry -> Tasty.TestTree
 enchantPlayerTests registry =
   Tasty.testGroup
     "EnchantPlayer"
@@ -438,7 +437,7 @@ enchantPlayerTests registry =
               (Target.legalRecipients (Just S.alice) crownId spec gs)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry, unattachableTests registry, reattachTests registry, auraGraftTests registry, enchantPlayerTests registry]
 
 -- Answers every target slot with one fixed recipient, deferring everything else
@@ -502,7 +501,7 @@ crownTargetSpec printing = case Card.Type.activatedAbilities (Printing.card prin
 -- opcode that moves an Aura already on the battlefield, which the Auras unit left
 -- unbuilt. Crown of the Ages is the proving card -- "{4}, {T}: Attach target Aura
 -- attached to a creature to another creature".
-reattachTests :: Registry.Type.Registry -> Tasty.TestTree
+reattachTests :: Registry.Registry -> Tasty.TestTree
 reattachTests registry =
   Tasty.testGroup
     "Reattach"
@@ -699,7 +698,7 @@ reattachTests registry =
       -- 303.4j is about and which no pair of cards could produce before.
       --
       -- CR 109.5 fixes whose "you" that is: the AURA's controller, not the moving
-      -- effect's. Pawl.Resolve.attachmentFor asks Target.legalRecipients with
+      -- effect's. Pawl.Engine.Resolve.attachmentFor asks Target.legalRecipients with
       -- Projection.controllerOf on the Aura for exactly that reason. Alice controls
       -- both cards here, so this board cannot tell the two readings apart -- nothing
       -- in the pool takes control of a noncreature artifact -- but attachmentFor is
@@ -773,7 +772,7 @@ reattachTests registry =
 -- which is the backstop for a card that does NOT say it: the Crown offers a
 -- creature its Aura may not enchant and the move then fails, where Aura Graft may
 -- not offer one at all. The pair of cards is what keeps the two apart.
-auraGraftTests :: Registry.Type.Registry -> Tasty.TestTree
+auraGraftTests :: Registry.Registry -> Tasty.TestTree
 auraGraftTests registry =
   Tasty.testGroup
     "AuraGraft"
@@ -985,7 +984,7 @@ auraGraftTests registry =
         HU.assertEqual "so the creature it holds is hers" (Just S.alice) (Projection.controllerOf host after)
     ]
 
-auraTests :: Registry.Type.Registry -> Tasty.TestTree
+auraTests :: Registry.Registry -> Tasty.TestTree
 auraTests registry =
   Tasty.testGroup
     "Aura"
@@ -1095,7 +1094,7 @@ auraTests registry =
       -- 109.5 makes that "you" the Aura's controller (enchant is a static ability,
       -- CR 702.5a), which is why the answer changes when control does.
       --
-      -- This is the case Pawl.Sba.stillLegalEnchant's Filter fallthrough exists for.
+      -- This is the case Pawl.Engine.Sba.stillLegalEnchant's Filter fallthrough exists for.
       -- Its Pool.Creatures-with-no-Filter reduction -- still a creature, on the
       -- battlefield, owned by a player still in the game -- would answer "legal"
       -- here, because none of those three facts changed.
