@@ -323,11 +323,19 @@ affects source oid a partial gs = case a of
   -- CR 109.5 fixes "you" as the effect's source's controller, and being the set
   -- the enchanted player controls does not move that. Curse of Death's Hold's
   -- filter is a bare card type, so nothing forces it today either.
+  --
+  -- The candidate's controller is bound ONCE and used twice (the comparison and
+  -- the view), because controllerOf is the un-hoisted variant -- it rebuilds
+  -- controlGrants, a whole-board walk, on every call. That still costs one such
+  -- walk per candidate per layer this set is asked in, which the Matching arm
+  -- above avoids only by leaving the same call an unforced thunk. Hoisting it out
+  -- of `affects` would mean threading the grant list through every caller.
   Affected.AttachedPlayerControls f -> case Game.lookupObject source gs >>= Object.attachedTo of
     Just (Recipient.ToPlayer pid) ->
-      Set.member oid (GameState.battlefield gs)
-        && controllerOf oid gs == Just pid
-        && Filter.matches (Filter.MkContext (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
+      let controller = controllerOf oid gs
+       in Set.member oid (GameState.battlefield gs)
+            && controller == Just pid
+            && Filter.matches (Filter.MkContext (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller gs) f
     _ -> False
 
 -- CR 205.4a: supertypes are read from the printed type line -- no Modification
@@ -1299,10 +1307,11 @@ modificationWrites m = case m of
   Modification.SetControllerToSource -> Set.singleton Controller
 
 -- Could another effect move this one's affected set at all? The structural half
--- of projectWith's movableReads: only a Matching set is a predicate over
--- characteristics that something else can change. A TheseObjects set names ids
--- (CR 611.2c) and an Attached one reads its source's attachment off the game
--- state (CR 303.4m).
+-- of projectWith's movableReads: a set is movable when something a modification
+-- writes selects it -- a Matching set's predicate over characteristics, or an
+-- AttachedPlayerControls set's controller (CR 613.1b). A TheseObjects set names
+-- ids (CR 611.2c) and an Attached one reads its source's attachment off the game
+-- state (CR 303.4m), and no modification writes either.
 staticallyMovable :: Gathered -> Bool
 staticallyMovable c = case gAffected c of
   Affected.Matching _ -> True

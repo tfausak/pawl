@@ -689,11 +689,11 @@ cease abilId gs =
 -- that spec is the AURA's controller, not the moving effect's -- proven by
 -- Pawl.AuraSpec's "CR 303.4j whole cards", where Crown of the Ages cannot move
 -- Setessan Training ("Enchant creature you control") onto an opponent's
--- creature. An Aura with no enchant ability answers False and cannot arise: the
+-- creature. An Aura with no enchant ability answers Nothing and cannot arise: the
 -- Pawl.CardSpec lint family holds the Aura-iff-enchant biconditional in both
 -- directions.
 --
--- The Aura branch's first conjunct is CR 303.4d's "An Aura that's also a creature
+-- The Aura branch's first test is CR 303.4d's "An Aura that's also a creature
 -- can't enchant anything" -- the RESTRICTION half of that rule, whose
 -- state-based half is Pawl.Sba.cannotBeAttached. Unreachable in this pool (such
 -- an Aura is detached by CR 704.5p and buried by CR 704.5m before any player
@@ -702,8 +702,9 @@ cease abilId gs =
 -- reconfigure exception (CR 702.151b) that nothing here can express, and the
 -- Equipment path is not this change's to alter (#193).
 --
--- The `src /= target` conjunct is CR 301.5c ("An Equipment can't equip itself")
--- and CR 303.4d ("An Aura can't enchant itself") at once.
+-- The first guard -- the destination naming `src` itself -- is CR 301.5c ("An
+-- Equipment can't equip itself") and CR 303.4d ("An Aura can't enchant itself")
+-- at once.
 --
 -- Nothing for a source that is neither, which is CR 701.3b's third sentence: "If
 -- an effect tries to attach an object that isn't an Aura, Equipment, or
