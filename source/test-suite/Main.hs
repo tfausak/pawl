@@ -57,7 +57,7 @@ import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.TriggerSpec as TriggerSpec
-import qualified Pawl.TurnSpec as TurnSpec
+import qualified Pawl.TurnSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -80,7 +80,6 @@ testTree registry =
   Tasty.testGroup
     "pawl"
     [ CardSpec.tests registry,
-      TurnSpec.tests registry,
       GameSpec.tests registry,
       DamageSpec.tests registry,
       PropertySpec.tests registry,
@@ -142,3 +141,4 @@ spec s registry = do
   Pawl.ReplaySpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.TurnSpec.spec s registry
