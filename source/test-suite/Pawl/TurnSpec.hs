@@ -6,8 +6,9 @@
 -- combat-and-main pair, Aurelia, the Warleader for one added from INSIDE a
 -- combat phase, and Full Throttle for two combat phases and none of main.
 --
--- Also CR 500.7's extra TURNS, which Engine.handoffTurn deals out -- Time Warp,
--- the pool's one creator of any.
+-- Also CR 500.7's extra TURNS, which Engine.handoffTurn deals out -- Time Warp
+-- and Savor the Moment, the pool's creators of any -- and with Savor the Moment
+-- CR 500.11's skip scoped to ONE of them.
 module Pawl.TurnSpec where
 
 import qualified Data.Foldable as Foldable
@@ -887,10 +888,126 @@ extraTurnTests registry =
             HU.assertEqual "added in APNAP order, so taken in reverse" [S.alice, S.bob] (GameState.extraTurns after)
         ]
 
+-- alice in her precombat main phase with priority, eight untapped Islands
+-- (Savor the Moment's {1}{U}{U} plus Time Warp's {3}{U}{U}, so both can be cast
+-- in the one main phase), one TAPPED creature of hers, and both spells in hand.
+-- Libraries stocked because these cases run several whole turns and each one's
+-- draw step takes a card.
+--
+-- The tapped creature is the observable. CR 502.3: "the active player determines
+-- which permanents they control will untap. Then they untap them all
+-- simultaneously." So a turn whose untap step happened leaves it untapped and a
+-- turn whose untap step was skipped leaves it tapped -- and unlike the Islands,
+-- nothing in these cases taps or untaps it for any other reason.
+savorBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId, ObjectId)
+savorBoard island savor warp piker =
+  let (bystander, withPiker) = S.addCreature piker S.alice (S.landsInPlay island 8)
+      (savorId, withSavor) = S.addHandCard savor S.alice withPiker
+      (warpId, withWarp) = S.addHandCard warp S.alice withSavor
+      stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
+   in ( (stock (stock (S.tapObject bystander withWarp) S.alice) S.bob)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        savorId,
+        warpId,
+        bystander
+      )
+
+-- Run `n` whole turns. `runTurn` stops at the handoff, so the board it hands
+-- back is positioned AT the next turn's untap step with that step not yet run --
+-- which is why each assertion below is read after the turn it is about has been
+-- run by one more call, not after the call that begins it.
+runTurns :: Int -> GameState.GameState -> GameState.GameState
+runTurns n gs = if n <= 0 then gs else runTurns (n - 1) (fst (runTurn S.identityAnswer gs))
+
+tapStateOf :: ObjectId -> GameState.GameState -> Maybe TapState.TapState
+tapStateOf oid = fmap Object.tapped . Game.lookupObject oid
+
+-- CR 500.11's skip scoped to ONE identified turn, through the only card in the
+-- pool that writes one: Savor the Moment ({1}{U}{U} Sorcery, "Take an extra turn
+-- after this one. Skip the untap step of that turn.").
+--
+-- The whole point of the group is the second case. "Skip the untap step of that
+-- turn" is NOT "skip your next untap step": CR 500.7's last sentence -- "the most
+-- recently created turn will be taken first" -- lets another extra turn be
+-- created after this one and taken BEFORE it, and the printed card skips the
+-- untap step of the turn IT made, not of whichever turn comes next. Two cards
+-- already in the pool reach that divergence.
+turnScopedSkipTests :: Registry.Registry -> Tasty.TestTree
+turnScopedSkipTests registry =
+  let boardOf = do
+        island <- Registry.printing registry "Island"
+        savor <- Registry.printing registry "Savor the Moment"
+        warp <- Registry.printing registry "Time Warp"
+        piker <- Registry.printing registry "Goblin Piker"
+        pure (savorBoard island savor warp piker)
+      tapped = Just TapState.Tapped
+      untapped = Just TapState.Untapped
+   in Tasty.testGroup
+        "TurnScopedSkip"
+        [ -- The control that keeps the two below from passing vacuously: an extra
+          -- turn carrying NO skip runs its untap step like any other turn.
+          HU.testCase "CR 502.3 the control: an extra turn with no skip untaps" $ do
+            (gs, _, warp, piker) <- boardOf
+            let resolved = castAndResolveWith (aimPlayer S.alice) warp gs
+                atExtra = runTurns 1 resolved
+                afterExtra = runTurns 1 atExtra
+            HU.assertEqual "the extra turn is alice's" S.alice (GameState.activePlayer atExtra)
+            HU.assertEqual "still tapped going into it" tapped (tapStateOf piker atExtra)
+            HU.assertEqual "and Time Warp's extra turn untaps it" untapped (tapStateOf piker afterExtra),
+          HU.testCase "CR 500.11 whole card: Savor the Moment's extra turn skips its untap step" $ do
+            (gs, savor, _, piker) <- boardOf
+            let resolved = castAndResolve savor gs
+                atExtra = runTurns 1 resolved
+                -- CR 500.11: "to skip a step, phase, or turn is to proceed past
+                -- it as though it didn't exist", and CR 614.1b replaces it with
+                -- nothing -- so CR 502.3's turn-based action never happens.
+                afterExtra = runTurns 1 atExtra
+            HU.assertEqual "one turn was created" 1 (length (GameState.extraTurns resolved))
+            HU.assertEqual "the extra turn is alice's" S.alice (GameState.activePlayer atExtra)
+            HU.assertEqual "and it untapped nothing" tapped (tapStateOf piker afterExtra)
+            -- CR 614.10a: the skip named ONE turn and is gone with it. bob's turn
+            -- untaps BOB's permanents (CR 502.3 is about the active player's), so
+            -- it is alice's own next turn that has to put this right.
+            HU.assertEqual "the turn after it is bob's" S.bob (GameState.activePlayer afterExtra)
+            HU.assertEqual "which is not alice's untap step" tapped (tapStateOf piker (runTurns 1 afterExtra))
+            HU.assertEqual "alice's next ordinary turn untaps it" untapped (tapStateOf piker (runTurns 2 afterExtra)),
+          -- THE PROVING CASE. Savor the Moment creates extra turn A; Time Warp,
+          -- cast after it in the same turn, creates extra turn B. CR 500.7: "the
+          -- most recently created turn will be taken first", so B is taken first
+          -- and A second -- and the skip belongs to A.
+          --
+          -- Fails against a "skip your NEXT untap step" reading, which is what
+          -- Effect.SkipNextPhase's CR 614.10a floating replacement would give: it
+          -- would take B's untap step (the next one there is) and leave A's
+          -- alone, inverting both assertions below.
+          HU.testCase "CR 500.7 the skip stays on Savor's own extra turn, not on a later-created one" $ do
+            (gs, savor, warp, piker) <- boardOf
+            let resolved = castAndResolveWith (aimPlayer S.alice) warp (castAndResolve savor gs)
+                atWarpTurn = runTurns 1 resolved
+                -- Time Warp's turn has now run, and Savor's is the one about to
+                -- begin. Re-tapped so Savor's turn has something to untap, as
+                -- attacking with it would have left it (CR 506.4/508.1f).
+                atSavorTurn = S.tapObject piker (runTurns 1 atWarpTurn)
+                afterSavorTurn = runTurns 1 atSavorTurn
+            HU.assertEqual "two extra turns are pending" 2 (length (GameState.extraTurns resolved))
+            HU.assertEqual "Time Warp's turn is taken first, and is alice's" S.alice (GameState.activePlayer atWarpTurn)
+            HU.assertEqual "and it DID untap" untapped (tapStateOf piker (runTurns 1 atWarpTurn))
+            HU.assertEqual "Savor's turn is taken second, and is alice's" S.alice (GameState.activePlayer atSavorTurn)
+            HU.assertEqual "but Savor's own turn did NOT untap" tapped (tapStateOf piker afterSavorTurn)
+        ]
+
 dedupe :: (Eq a) => [a] -> [a]
 dedupe xs = case xs of
   [] -> []
   h : t -> h : dedupe (filter (/= h) t)
 
 tests :: Registry.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry, extraTurnTests registry]
+tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry, extraTurnTests registry, turnScopedSkipTests registry]
