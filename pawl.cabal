@@ -182,6 +182,7 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
     Pawl.Types.Aggregation
+    Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
@@ -337,6 +338,7 @@ library
     Pawl
     Pawl.Action
     Pawl.Activate
+    Pawl.AttackRequirement
     Pawl.Binding
     Pawl.BlockRequirement
     Pawl.Card

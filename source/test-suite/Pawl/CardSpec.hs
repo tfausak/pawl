@@ -29,6 +29,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
@@ -263,6 +264,7 @@ cardTests registry =
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.blockRequirements = [],
+                  Card.Type.attackRequirements = [],
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
@@ -1871,8 +1873,46 @@ blockRequirementCardTests registry =
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
     ]
 
+-- CR 508.1d's attacking requirement, the twin of the blocking one above. Curse of
+-- the Nightly Hunt is a {2}{R} Enchantment -- Aura Curse reading "Enchant player.
+-- Creatures enchanted player controls attack each combat if able." (Commander
+-- Anthology 2018; name, cost, type line and oracle text checked against Scryfall.)
+-- Its shape is the point next to Curse of Death's Hold's: the same enchant-player
+-- Aura reaching the same set through the same Affected, carried on a field the
+-- CR 613 layer system never reads. The gameplay proof is Pawl.CombatSpec's
+-- AttackRequirements group.
+attackRequirementCardTests :: Registry.Type.Registry -> Tasty.TestTree
+attackRequirementCardTests registry =
+  Tasty.testGroup
+    "AttackRequirements"
+    [ HU.testCase "Curse of the Nightly Hunt is a {2}{R} Aura Curse whose only ability is a CR 508.1d attacking requirement" $ do
+        p <- Registry.printing registry "Curse of the Nightly Hunt"
+        let card = Printing.card p
+            red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        HU.assertEqual "name" (Text.pack "Curse of the Nightly Hunt") (Card.Type.name card)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red])) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
+        -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Aura, Subtype.Curse]) (TypeLine.subtypes (Card.Type.typeLine card))
+        HU.assertBool "is an Aura" (Card.isAura card)
+        -- CR 702.5d: "Enchant player", the whole player pool.
+        HU.assertEqual "enchant player" (Just (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.Type.enchant card)
+        -- "CREATURES ENCHANTED PLAYER CONTROLS attack each combat if able": the
+        -- requirement names its SUBJECT, where Lure's names the attacker to be
+        -- blocked. Same Affected as Curse of Death's Hold, different field --
+        -- which is what says this changes no characteristic.
+        HU.assertEqual
+          "one requirement, over the enchanted player's creatures"
+          [AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature))]
+          (Card.Type.attackRequirements card)
+        HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
+        HU.assertEqual "and requires no block" [] (Card.Type.blockRequirements card)
+        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+        HU.assertEqual "no spell effects" [] (Card.allEffects card)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry, blockRequirementCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry, blockRequirementCardTests registry, attackRequirementCardTests registry]

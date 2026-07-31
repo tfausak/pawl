@@ -1022,6 +1022,154 @@ blockRequirementTests registry =
         HU.assertBool "no blocks is legal" (Combat.legalBlockDeclaration S.bob Map.empty withAura)
     ]
 
+-- A combat board that has NOT yet declared attackers, with Curse of the Nightly
+-- Hunt on the battlefield attached to `who`. The attacking twin of `luring`, and
+-- the two differ exactly where the rules do: a blocking requirement is checked
+-- after attackers exist, an attacking one before.
+--
+-- The Curse goes on the ACTIVE player, which is where it bites: "creatures
+-- enchanted player controls attack each combat if able" says nothing until the
+-- enchanted player has a declare attackers step of their own. Its controller is
+-- alice in every case below and never matters -- CR 508.1d asks the active player
+-- about their own creatures, not about whose ability is talking.
+cursing :: Printing.Printing -> PlayerId.PlayerId -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+cursing curse who mine theirs =
+  let (gs, ours, yours) = S.combatBoardOf mine theirs
+      (aura, withAura) = S.addCreature curse S.alice gs
+   in (S.attachTo aura (Recipient.ToPlayer who) withAura, ours, yours)
+
+-- CR 508.1d, proved by Curse of the Nightly Hunt ("Creatures enchanted player
+-- controls attack each combat if able") -- the pool's first attacking REQUIREMENT,
+-- and the first board on which declining to attack is not a legal answer.
+--
+-- The requirement sits ON TOP of CR 508.1a rather than beside it: "if able" is
+-- Pawl.Combat.legalAttackers, so a creature that could not have attacked anyway
+-- carries no requirement and cannot make declining illegal. Half the group is
+-- that half.
+attackRequirementTests :: Registry.Type.Registry -> Tasty.TestTree
+attackRequirementTests registry =
+  Tasty.testGroup
+    "AttackRequirements"
+    [ HU.testCase "CR 508.1d declining to attack under a Curse of the Nightly Hunt is illegal" $ do
+        -- THE FALSIFIER for a restrictions-only reading of CR 508.1: the empty
+        -- declaration disobeys no restriction, which is exactly why 508.1d is a
+        -- maximization and not a per-creature check.
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = cursing curse S.alice [piker] []
+        HU.assertBool "no attack is illegal" (not (Combat.legalAttackDeclaration S.alice [] gs)),
+      HU.testCase "CR 508.1 the same board WITHOUT the Curse lets the active player decline" $ do
+        -- The control for the test above, and the reason it is not vacuous:
+        -- attacking is optional by default (CR 508.1a chooses "which creatures,
+        -- IF ANY"), so the Curse is what changed the answer.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = S.combatBoardOf [piker] []
+        HU.assertBool "no attack is legal" (Combat.legalAttackDeclaration S.alice [] gs),
+      HU.testCase "CR 508.1d attacking with the required creature is legal" $ do
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = cursing curse S.alice [piker] []
+        case mine of
+          a : _ -> HU.assertBool "attacking is legal" (Combat.legalAttackDeclaration S.alice [a] gs)
+          _ -> HU.assertFailure "fixture should have a creature",
+      HU.testCase "CR 303.4m the Curse requires the ENCHANTED player's creatures, not the active player's" $ do
+        -- Affected.AttachedPlayerControls read for the wrong player is the bug
+        -- this catches: with the Curse on bob, alice's creatures are outside its
+        -- set entirely and she may still decline. bob's own creatures are not a
+        -- second requirement either -- CR 508.1a's candidates are the ACTIVE
+        -- player's, so a nonactive player's creature is never "able" to attack.
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = cursing curse S.bob [piker] [piker]
+        HU.assertBool "no attack is legal" (Combat.legalAttackDeclaration S.alice [] gs),
+      HU.testCase "CR 508.1a a TAPPED creature is not able to attack, so the Curse does not require it" $ do
+        -- "If able" doing its work, on the clause CR 508.1a states first: the
+        -- chosen creatures "must be untapped", so a tapped one is never a
+        -- candidate and carries no requirement.
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = cursing curse S.alice [piker] []
+        case mine of
+          a : _ -> HU.assertBool "no attack is legal" (Combat.legalAttackDeclaration S.alice [] (S.tapObject a gs))
+          _ -> HU.assertFailure "fixture should have a creature",
+      HU.testCase "CR 302.6 a summoning sick creature is not able to attack, so the Curse does not require it" $ do
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = cursing curse S.alice [piker] []
+        case mine of
+          a : _ ->
+            let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) a (GameState.objects gs)}
+             in HU.assertBool "no attack is legal" (Combat.legalAttackDeclaration S.alice [] sick)
+          _ -> HU.assertFailure "fixture should have a creature",
+      HU.testCase "CR 702.3b a Wall of Stone is not required to attack, but the Piker beside it is" $ do
+        -- Defender is the one printed CR 508.1c restriction in the pool, and it
+        -- reaches the requirement through the same candidate list. Both creatures
+        -- on ONE board, so a blanket "nothing is required" bug cannot pass: the
+        -- Piker alone attains the maximum, and the Wall neither adds to it nor is
+        -- allowed to attack.
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = cursing curse S.alice [wallOfStone, piker] []
+        case mine of
+          [wall, p] -> do
+            HU.assertBool "no attack is illegal" (not (Combat.legalAttackDeclaration S.alice [] gs))
+            HU.assertBool "the Piker alone is legal" (Combat.legalAttackDeclaration S.alice [p] gs)
+            HU.assertBool "the Wall may not attack at all" (not (Combat.legalAttackDeclaration S.alice [wall, p] gs))
+          _ -> HU.assertFailure "fixture should have a Wall and a Piker",
+      HU.testCase "CR 508.1d with two able creatures BOTH are required to attack" $ do
+        -- One Curse over two creatures is TWO requirements, not one -- CR 508.1d
+        -- checks "each creature they control". Attacking with one obeys one of
+        -- two and is illegal; attacking with both attains the maximum.
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = cursing curse S.alice [piker, piker] []
+        case mine of
+          [first, second] -> do
+            HU.assertBool "one attacker is not enough" (not (Combat.legalAttackDeclaration S.alice [first] gs))
+            HU.assertBool "both attackers is legal" (Combat.legalAttackDeclaration S.alice [first, second] gs)
+          _ -> HU.assertFailure "fixture should have two creatures",
+      HU.testCase "CR 303.4m a Curse that is not attached to anything requires nothing" $ do
+        -- CR 303.4m reads the SOURCE's attachment, so an unattached Curse names no
+        -- player and mints no requirement. The Aura stays ON the battlefield
+        -- throughout, so this is not a test that removing it works -- CR 704.5m
+        -- would bury it, and no state-based-action pass is run here.
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = S.combatBoardOf [piker] []
+            withAura = snd (S.addCreature curse S.alice gs)
+        HU.assertBool "no attack is legal" (Combat.legalAttackDeclaration S.alice [] withAura),
+      HU.testCase "CR 508.1d whole cards: a Curse forces an attack through a real declare attackers step" $ do
+        -- The gameplay-level case, run through Engine.runStep -- the priority loop
+        -- and the CR 703.4c turn-based action, not a direct call -- with an
+        -- interpreter that declines to attack. Declining is now an illegal answer,
+        -- and the maximum leaves the rules forcing the attack rather than the
+        -- engine choosing it.
+        --
+        -- Precise rather than vacuous, and both worlds are asserted. WITHOUT the
+        -- Curse the declining interpreter attacks with nothing and bob stays at
+        -- 20; WITH it the Piker attacks, taps, and bob takes 2.
+        curse <- Registry.printing registry "Curse of the Nightly Hunt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = cursing curse S.alice [piker] []
+            (plain, _, _) = S.combatBoardOf [piker] []
+            declining :: Prompt.Prompt r -> r
+            declining p = case p of
+              Prompt.DeclareAttackers {} -> []
+              _ -> S.aggressiveAnswer p
+            after = S.runCombat declining gs
+            control = S.runCombat declining plain
+        HU.assertEqual "without the Curse, bob takes nothing" (Just 20) (S.lifeOf S.bob control)
+        HU.assertEqual "with it, bob takes two" (Just 18) (S.lifeOf S.bob after)
+        case mine of
+          a : _ -> do
+            HU.assertEqual "and the creature really was declared" [a] (S.attackerDeclarationsOf after)
+            -- CR 508.1f: declaring taps it. The forced declaration is a real one,
+            -- not a bookkeeping entry.
+            HU.assertEqual "and tapped" (Just TapState.Tapped) (tapStateOf a after)
+          _ -> HU.assertFailure "fixture should have a creature"
+    ]
+
 vigilanceTests :: Registry.Type.Registry -> Tasty.TestTree
 vigilanceTests registry =
   Tasty.testGroup
@@ -1987,6 +2135,7 @@ tests registry =
       hasteTests registry,
       evasionTests registry,
       blockRequirementTests registry,
+      attackRequirementTests registry,
       controlChangeSicknessTests registry,
       controlChangeRemovalTests registry,
       typeChangeRemovalTests registry,

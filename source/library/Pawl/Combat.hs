@@ -168,6 +168,9 @@ legalAttackers pid gs =
       pcs = Projection.projectAll gs
    in filter (\oid -> canAttackGiven grants pcs pid oid gs) (Projection.controlsGiven grants pid gs)
 
+legalAttackDeclaration :: PlayerId -> [ObjectId] -> GameState -> Bool
+legalAttackDeclaration pid chosen gs = all (\oid -> List.elem oid (legalAttackers pid gs)) chosen
+
 -- CR 509.1a: a blocking creature must be untapped and controlled by the
 -- defending player.
 --
