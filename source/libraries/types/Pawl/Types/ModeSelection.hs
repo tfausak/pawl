@@ -10,6 +10,12 @@ import Numeric.Natural (Natural)
 -- are future constructors. A newtype for now; becomes `data` when a second
 -- constructor (e.g. ChooseAtLeast, escalate/pawprint per CR 700.2d/700.2i) lands.
 -- Do NOT add an hlint ignore.
+--
+-- CR 702.42a's entwine is NOT one of those future constructors, and the
+-- distinction is the point: this type is what the card PRINTS -- Dream's Grip
+-- still says "Choose one --", ChooseExactly 1 -- while entwine is a decision
+-- made as one particular cast is announced. Pawl.Cast substitutes
+-- Modal.modeCount for this count for that cast alone; nothing rewrites the card.
 newtype ModeSelection
   = ChooseExactly Natural
   deriving (Eq, Ord, Show)

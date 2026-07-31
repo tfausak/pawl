@@ -36,6 +36,9 @@ allEffects m = concat (modeEffects m)
 
 -- The union of every mode's target specs (slot names unique by authoring
 -- discipline; the D4 lint enforces per-mode resolution).
+--
+-- Nothing rejects a card whose two modes declare the SAME slot name, which this
+-- union would silently collapse into one (#475).
 allTargetSpecs :: Modal.Modal card -> Map SlotName TargetSpec
 allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.modes m)))
 
@@ -66,7 +69,10 @@ chosenModes chosen m =
 modesEffects :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
 modesEffects chosen m = concatMap (Foldable.toList . Mode.effects . snd) (chosenModes chosen m)
 
--- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union).
+-- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union). Two modes may
+-- be chosen at once (CR 702.42a's entwine), and nothing rejects a card whose
+-- modes declare the same slot name, which this union would silently collapse
+-- into one (#475).
 modesTargetSpecs :: Set ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSpec
 modesTargetSpecs chosen m =
   let specsAt (ModeIndex.MkModeIndex n) =

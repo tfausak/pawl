@@ -26,6 +26,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -156,6 +157,44 @@ affordableX :: PlayerId -> ObjectId -> GameState -> Cost -> Natural
 affordableX pid oid gs cost =
   let climb x = if payableCostAt (x + 1) pid oid gs cost then climb (x + 1) else x
    in if Cost.hasVariable cost then climb 0 else 0
+
+-- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
+-- this modal spell's modes -- "You may choose all modes of this spell instead of
+-- just the number specified. If you do, you pay an additional [cost]" -- or
+-- Nothing when entwining is not on offer at all.
+--
+-- Three conditions, and each is a different rule:
+--
+--   1. The card HAS entwine. Rule 702.42a is a static ability of the spell
+--      itself, so it is read off the card's printed keywords (Keyword.entwineCost)
+--      one step before CR 601.2a moves it to the stack.
+--   2. Every printed mode is LEGAL. CR 700.2a: "If one of the modes would be
+--      illegal (due to an inability to choose legal targets, for example), that
+--      mode can't be chosen." Choosing ALL modes is therefore not open when one
+--      of them cannot be chosen. Unobservable for Dream's Grip, whose two modes
+--      declare the same target spec and so are fillable together or not at all,
+--      and written anyway: without it an entwined cast would announce fewer
+--      modes than rule 702.42a says it chose, and castSpell's own size check
+--      would turn the whole cast into a silent no-op.
+--   3. Some candidate cost PLUS this one is payable -- CR 601.2f's "plus all
+--      additional costs", measured with the same payableCost predicate
+--      castability was gated on, at CR 601.2b's X=0 floor. An option the player
+--      cannot take is not offered, which is the same posture ChooseCost takes
+--      towards an unaffordable alternative.
+--
+-- WHICH candidate will carry the cost is not decided here: this answers only
+-- whether SOME route pays it, and castSpell narrows the candidates to the routes
+-- that really do once the answer is in.
+entwineOffer :: PlayerId -> ObjectId -> GameState -> Maybe Cost
+entwineOffer pid oid gs = case Game.cardOf oid gs of
+  Nothing -> Nothing
+  Just card -> do
+    cost <- Keyword.entwineCost (Card.Type.keywords card)
+    let modal = Card.Type.spell card
+        legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) modal gs
+    Monad.guard (Natural.length legal == Modal.modeCount modal)
+    Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) (Cost.costsFor oid gs))
+    pure cost
 
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
@@ -425,13 +464,44 @@ castSpell pid oid = do
     Nothing -> pure ()
     Just card -> do
       let decider = Decide.deciderFor pid gs
-          legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) (Card.Type.spell card) gs
-          count = Modal.selectionCount (Card.Type.spell card)
+          modal = Card.Type.spell card
+          legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) modal gs
+      -- CR 702.42a: entwine, asked FIRST -- before the mode choice CR 601.2b
+      -- lists first -- because rule 702.42a states the widened selection and the
+      -- extra payment as ONE decision ("You may choose all modes of this spell
+      -- instead of just the number specified. If you do, you pay an additional
+      -- [cost]"). A player who entwines has thereby announced their mode choice,
+      -- so there is nothing left for ChooseModes to ask; a player who declines
+      -- is asked the ordinary question one line below, in 601.2b's own order.
+      --
+      -- The choice is never made for them. entwineOffer answers Nothing when the
+      -- option does not exist -- no entwine, an illegal mode (CR 700.2a), or no
+      -- payable route -- and that is the ONLY elision here: where the option
+      -- does exist, both answers are offered and the engine takes neither.
+      --
+      -- The answer is carried as the additional Cost itself rather than as a
+      -- flag, so the two things it changes -- the mode count just below and the
+      -- candidate costs further down -- read the same value.
+      entwined <- case entwineOffer pid oid gs of
+        Nothing -> pure Nothing
+        Just extra -> do
+          decision <- Trans.lift (Program.prompt (Prompt.ChooseEntwine decider pid oid extra))
+          pure $ case decision of
+            EntwineDecision.Entwines -> Just extra
+            EntwineDecision.Declines -> Nothing
+      -- CR 700.2 normally, CR 702.42a's "all modes" when the entwine cost is
+      -- being paid. The printed ModeSelection is untouched either way: entwine
+      -- overrides the count for this ONE cast, it does not reprint the card.
+      let count = case entwined of
+            Just _ -> Modal.modeCount modal
+            Nothing -> Modal.selectionCount modal
       -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
       -- unprompted) exactly when there is nothing to choose -- as many legal
       -- modes as the selection demands or fewer (a non-modal card's one mode,
       -- or a modal card whose only-just-fillable modes leave no real
-      -- choice), #50.
+      -- choice), #50. An entwined cast is always in that case: entwineOffer has
+      -- already established that every mode is legal, so `legal` has exactly
+      -- `count` members and CR 702.42a's "all modes" is the only answer.
       chosenModes <-
         if Natural.length legal <= count
           then pure legal
@@ -445,7 +515,14 @@ castSpell pid oid = do
         -- is really choosing); one payable candidate is forced and unprompted.
         -- Reject-not-repair: an answer outside the offered set makes the whole
         -- cast a no-op.
-        let payable = filter (payableCost pid oid gs) (Cost.costsFor oid gs)
+        --
+        -- CR 601.2f: "the total cost is the mana cost or alternative cost (as
+        -- determined in rule 601.2b), PLUS ALL ADDITIONAL COSTS". An announced
+        -- entwine is added to every candidate before the payability filter, so
+        -- the routes offered are the ones that can actually pay it -- CR 118.9d
+        -- is what makes it apply to an alternative cost too. What the caster
+        -- then chooses between, and what is finally paid, already carries it.
+        let payable = filter (payableCost pid oid gs) (fmap (\candidate -> maybe candidate (Cost.plus candidate) entwined) (Cost.costsFor oid gs))
         Monad.unless (null payable) $ do
           chosenCost <- case payable of
             [only] -> pure only

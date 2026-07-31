@@ -276,9 +276,8 @@ flashbackCost keywords =
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above:
 -- this asks about ONE named constructor rather than classifying every keyword.
 --
--- Nothing beyond the FIRST entwine cost is reachable, the same shape and the
--- same gap flashbackCost records: a card printing two entwine abilities is
--- expressible and unrepresented, and no printing does it (#294).
+-- Nothing beyond the FIRST entwine cost is reachable: a card printing two
+-- entwine abilities is expressible and unrepresented (#474).
 entwineCost :: Set Keyword -> Maybe Cost
 entwineCost keywords =
   let costOf keyword = case keyword of
