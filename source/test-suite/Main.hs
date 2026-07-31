@@ -3,7 +3,7 @@ import qualified Data.List as List
 import qualified Pawl.ActivateSpec
 import qualified Pawl.AuraSpec
 import qualified Pawl.BindingSpec
-import qualified Pawl.CardSpec as CardSpec
+import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.CodecSpec
@@ -79,8 +79,7 @@ testTree :: Registry.Registry -> Tasty.TestTree
 testTree registry =
   Tasty.testGroup
     "pawl"
-    ( [ CardSpec.tests registry,
-        PropertySpec.tests registry,
+    ( [ PropertySpec.tests registry,
         Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
       ]
         -- Pawl.ReplacementSpec is wired separately because its timeout is a
@@ -99,6 +98,7 @@ spec s registry = do
   Pawl.ActivateSpec.spec s registry
   Pawl.AuraSpec.spec s registry
   Pawl.BindingSpec.spec s
+  Pawl.CardSpec.spec s registry
   Pawl.CardsSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.CodecSpec.spec s registry

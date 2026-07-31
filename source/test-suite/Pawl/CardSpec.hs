@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
+import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
@@ -90,199 +91,195 @@ import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 import qualified System.Directory as Directory
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.HUnit as HU
 
 -- Not red-specific despite its first callers: just the Maybe wrapper every
 -- printed mana cost needs (CR 202.1).
 costOf :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
 costOf symbols = Just (ManaCost.MkManaCost symbols)
 
-m2aCardTests :: Registry.Registry -> Tasty.TestTree
-m2aCardTests registry =
+m2aCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m2aCardSpec s registry = Spec.describe s "M2aCards" $ do
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       green = ManaSymbol.OfType (ManaType.Colored Color.Green)
       black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-   in Tasty.testGroup
-        "M2aCards"
-        [ HU.testCase "Bird Maiden is a {2}{R} 1/2 Human Bird with flying" $ do
-            birdMaiden <- Registry.printing registry "Bird Maiden"
-            let c = Printing.card birdMaiden
-            HU.assertEqual "name" (Text.pack "Bird Maiden") (Card.Type.name c)
-            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
-            HU.assertEqual
-              "subtypes"
-              (Set.fromList [Subtype.Human, Subtype.Bird])
-              (TypeLine.subtypes (Card.Type.typeLine c)),
-          HU.testCase "Nimble Birdsticker is a {2}{R} 2/3 Goblin with reach" $ do
-            nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
-            let c = Printing.card nimbleBirdsticker
-            HU.assertEqual "name" (Text.pack "Nimble Birdsticker") (Card.Type.name c)
-            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c),
-          HU.testCase "Ogre Sentry is a {1}{R} 3/3 Ogre Warrior with defender" $ do
-            ogreSentry <- Registry.printing registry "Ogre Sentry"
-            let c = Printing.card ogreSentry
-            HU.assertEqual "name" (Text.pack "Ogre Sentry") (Card.Type.name c)
-            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, red]) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c),
-          HU.testCase "Windseeker Centaur is a {1}{R}{R} 2/2 Centaur with vigilance" $ do
-            windseekerCentaur <- Registry.printing registry "Windseeker Centaur"
-            let c = Printing.card windseekerCentaur
-            HU.assertEqual "name" (Text.pack "Windseeker Centaur") (Card.Type.name c)
-            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, red, red]) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c),
-          HU.testCase "Goblin Chariot is a {2}{R} 2/2 Goblin Warrior with haste" $ do
-            goblinChariot <- Registry.printing registry "Goblin Chariot"
-            let c = Printing.card goblinChariot
-            HU.assertEqual "name" (Text.pack "Goblin Chariot") (Card.Type.name c)
-            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c),
-          HU.testCase "Glistener Elf is a {G} 1/1 Phyrexian Elf Warrior with infect" $ do
-            glistenerElf <- Registry.printing registry "Glistener Elf"
-            let c = Printing.card glistenerElf
-            HU.assertEqual "name" (Text.pack "Glistener Elf") (Card.Type.name c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-            HU.assertBool "has infect" (elem Keyword.Infect (Card.Type.keywords c))
-            HU.assertEqual "subtypes" (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Warrior]) (TypeLine.subtypes (Card.Type.typeLine c)),
-          HU.testCase "Branchblight Stalker is a {1}{G} 3/1 Phyrexian Elf Scout with toxic 2" $ do
-            stalker <- Registry.printing registry "Branchblight Stalker"
-            let c = Printing.card stalker
-            HU.assertEqual "name" (Text.pack "Branchblight Stalker") (Card.Type.name c)
-            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, green]) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-            HU.assertEqual "toxic 2, and nothing else" (Set.singleton (Keyword.Toxic 2)) (Card.Type.keywords c)
-            HU.assertEqual "subtypes" (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Scout]) (TypeLine.subtypes (Card.Type.typeLine c)),
-          -- "Enchanted creature has poisonous 3", so the keyword is on the
-          -- Aura's layer-6 GRANT and not in its own printed keyword set -- the
-          -- distinction the assertions below draw.
-          HU.testCase "Snake Cult Initiation is a {3}{B} Aura granting poisonous 3" $ do
-            initiation <- Registry.printing registry "Snake Cult Initiation"
-            let c = Printing.card initiation
-            HU.assertEqual "name" (Text.pack "Snake Cult Initiation") (Card.Type.name c)
-            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, black]) (Card.Type.manaCost c)
-            HU.assertBool "is an Aura" (Card.isAura c)
-            HU.assertEqual "no printed keywords of its own" Set.empty (Card.Type.keywords c)
-            HU.assertEqual
-              "one static ability: the enchanted creature gains poisonous 3"
-              [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword (Keyword.Poisonous 3)))]
-              (Card.Type.staticAbilities c),
-          HU.testCase "every M2a printing carries exactly its keyword" $
-            mapM_
-              ( \(name, keyword) -> do
-                  p <- Registry.printing registry name
-                  let c = Printing.card p
-                  HU.assertBool "creature" (Card.isCreature c)
-                  HU.assertBool "not land" (not (Card.isLand c))
-                  HU.assertEqual "exactly this keyword" (Set.singleton keyword) (Card.Type.keywords c)
-              )
-              S.m2aKeywords
-        ]
+  Spec.it s "Bird Maiden is a {2}{R} 1/2 Human Bird with flying" $ do
+    birdMaiden <- Registry.printing registry "Bird Maiden"
+    let c = Printing.card birdMaiden
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Bird Maiden")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, red])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+    Spec.assertEqWith
+      s
+      "subtypes"
+      (TypeLine.subtypes (Card.Type.typeLine c))
+      (Set.fromList [Subtype.Human, Subtype.Bird])
+  Spec.it s "Nimble Birdsticker is a {2}{R} 2/3 Goblin with reach" $ do
+    nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
+    let c = Printing.card nimbleBirdsticker
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Nimble Birdsticker")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, red])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
+  Spec.it s "Ogre Sentry is a {1}{R} 3/3 Ogre Warrior with defender" $ do
+    ogreSentry <- Registry.printing registry "Ogre Sentry"
+    let c = Printing.card ogreSentry
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Ogre Sentry")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1, red])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 3)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
+  Spec.it s "Windseeker Centaur is a {1}{R}{R} 2/2 Centaur with vigilance" $ do
+    windseekerCentaur <- Registry.printing registry "Windseeker Centaur"
+    let c = Printing.card windseekerCentaur
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Windseeker Centaur")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1, red, red])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+  Spec.it s "Goblin Chariot is a {2}{R} 2/2 Goblin Warrior with haste" $ do
+    goblinChariot <- Registry.printing registry "Goblin Chariot"
+    let c = Printing.card goblinChariot
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Goblin Chariot")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, red])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+  Spec.it s "Glistener Elf is a {G} 1/1 Phyrexian Elf Warrior with infect" $ do
+    glistenerElf <- Registry.printing registry "Glistener Elf"
+    let c = Printing.card glistenerElf
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Glistener Elf")
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertBool s (elem Keyword.Infect (Card.Type.keywords c)) "has infect"
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Warrior])
+  Spec.it s "Branchblight Stalker is a {1}{G} 3/1 Phyrexian Elf Scout with toxic 2" $ do
+    stalker <- Registry.printing registry "Branchblight Stalker"
+    let c = Printing.card stalker
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Branchblight Stalker")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1, green])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 3)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "toxic 2, and nothing else" (Card.Type.keywords c) (Set.singleton (Keyword.Toxic 2))
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Scout])
+  -- "Enchanted creature has poisonous 3", so the keyword is on the
+  -- Aura's layer-6 GRANT and not in its own printed keyword set -- the
+  -- distinction the assertions below draw.
+  Spec.it s "Snake Cult Initiation is a {3}{B} Aura granting poisonous 3" $ do
+    initiation <- Registry.printing registry "Snake Cult Initiation"
+    let c = Printing.card initiation
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Snake Cult Initiation")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, black])
+    Spec.assertBool s (Card.isAura c) "is an Aura"
+    Spec.assertEqWith s "no printed keywords of its own" (Card.Type.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "one static ability: the enchanted creature gains poisonous 3"
+      (Card.Type.staticAbilities c)
+      [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword (Keyword.Poisonous 3)))]
+  Spec.it s "every M2a printing carries exactly its keyword" $
+    mapM_
+      ( \(name, keyword) -> do
+          p <- Registry.printing registry name
+          let c = Printing.card p
+          Spec.assertBool s (Card.isCreature c) "creature"
+          Spec.assertBool s (not (Card.isLand c)) "not land"
+          Spec.assertEqWith s "exactly this keyword" (Card.Type.keywords c) (Set.singleton keyword)
+      )
+      S.m2aKeywords
 
-cardTests :: Registry.Registry -> Tasty.TestTree
-cardTests registry =
-  Tasty.testGroup
-    "Card"
-    [ HU.testCase "Mountain printing is named Mountain" $ do
-        mountain <- Registry.printing registry "Mountain"
-        HU.assertEqual "name" (Text.pack "Mountain") (Card.Type.name (Printing.card mountain)),
-      HU.testCase "Mountain is a Land" $ do
-        mountain <- Registry.printing registry "Mountain"
-        HU.assertBool "isLand" (Card.isLand (Printing.card mountain)),
-      HU.testCase "Mountain has the Mountain subtype" $ do
-        mountain <- Registry.printing registry "Mountain"
-        HU.assertBool "subtype" (Set.member Subtype.Mountain (TypeLine.subtypes (Card.Type.typeLine (Printing.card mountain)))),
-      HU.testCase "Mountain type line contains Land" $ do
-        mountain <- Registry.printing registry "Mountain"
-        HU.assertBool "cardtype" (Set.member CardType.Land (TypeLine.types (Card.Type.typeLine (Printing.card mountain)))),
-      -- CR 202.1: a land has no mana cost. Not a zero cost -- no cost at all.
-      HU.testCase "Mountain has no mana cost" $ do
-        mountain <- Registry.printing registry "Mountain"
-        HU.assertEqual "no cost" Nothing (Card.Type.manaCost (Printing.card mountain)),
-      HU.testCase "Mountain has no power or toughness" $ do
-        mountain <- Registry.printing registry "Mountain"
-        HU.assertEqual "power" Nothing (Card.Type.power (Printing.card mountain))
-        HU.assertEqual "toughness" Nothing (Card.Type.toughness (Printing.card mountain)),
-      HU.testCase "Piker printing is named Goblin Piker" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card piker)),
-      HU.testCase "Piker costs {1}{R}" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        HU.assertEqual
-          "cost"
-          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
-          (Card.Type.manaCost (Printing.card piker)),
-      HU.testCase "Piker is a 2/1" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (Printing.card piker))
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness (Printing.card piker)),
-      HU.testCase "Piker is a Goblin Warrior" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        HU.assertEqual
-          "subtypes"
-          (Set.fromList [Subtype.Goblin, Subtype.Warrior])
-          (TypeLine.subtypes (Card.Type.typeLine (Printing.card piker))),
-      HU.testCase "Piker is a creature and not a land" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        HU.assertBool "creature" (Card.isCreature (Printing.card piker))
-        HU.assertBool "not land" (not (Card.isLand (Printing.card piker))),
-      -- CR 110.1: the classification resolution turns on. Never card identity.
-      HU.testCase "CR 110.1 both a Piker and a Mountain are permanents" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        mountain <- Registry.printing registry "Mountain"
-        HU.assertBool "piker" (Card.isPermanent (Printing.card piker))
-        HU.assertBool "mountain" (Card.isPermanent (Printing.card mountain)),
-      HU.testCase "CR 110.1 an instant is not a permanent type" $
-        let instantLine =
-              TypeLine.MkTypeLine
-                { TypeLine.supertypes = Set.empty,
-                  TypeLine.types = Set.singleton CardType.Instant,
-                  TypeLine.subtypes = Set.empty
-                }
-            card =
-              Card.Type.MkCard
-                { Card.Type.name = Text.pack "Some Instant",
-                  Card.Type.manaCost = Nothing,
-                  Card.Type.typeLine = instantLine,
-                  Card.Type.power = Nothing,
-                  Card.Type.toughness = Nothing,
-                  Card.Type.loyalty = Nothing,
-                  Card.Type.keywords = Set.empty,
-                  Card.Type.colorIndicator = Set.empty,
-                  Card.Type.staticAbilities = [],
-                  Card.Type.spell = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
-                  Card.Type.activatedAbilities = [],
-                  Card.Type.replacementEffects = [],
-                  Card.Type.triggeredAbilities = [],
-                  Card.Type.delayedAbilities = Map.empty,
-                  Card.Type.castingPermissions = [],
-                  Card.Type.castingRestrictions = [],
-                  Card.Type.characteristicPT = Nothing,
-                  Card.Type.playerAbilities = [],
-                  Card.Type.blockRequirements = [],
-                  Card.Type.attackRequirements = [],
-                  Card.Type.mulliganAction = [],
-                  Card.Type.openingHandAction = [],
-                  Card.Type.additionalCosts = [],
-                  Card.Type.alternativeCosts = [],
-                  Card.Type.enchant = Nothing,
-                  Card.Type.counterability = Counterability.Counterable
-                }
-         in do
-              HU.assertBool "not a permanent" (not (Card.isPermanent card))
-              HU.assertBool "an instant" (Card.isInstant card),
-      HU.testCase "a Piker is not an instant" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        HU.assertBool "creature" (not (Card.isInstant (Printing.card piker)))
-    ]
+cardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+cardSpec s registry = Spec.describe s "Card" $ do
+  Spec.it s "Mountain printing is named Mountain" $ do
+    mountain <- Registry.printing registry "Mountain"
+    Spec.assertEqWith s "name" (Card.Type.name (Printing.card mountain)) (Text.pack "Mountain")
+  Spec.it s "Mountain is a Land" $ do
+    mountain <- Registry.printing registry "Mountain"
+    Spec.assertBool s (Card.isLand (Printing.card mountain)) "isLand"
+  Spec.it s "Mountain has the Mountain subtype" $ do
+    mountain <- Registry.printing registry "Mountain"
+    Spec.assertBool s (Set.member Subtype.Mountain (TypeLine.subtypes (Card.Type.typeLine (Printing.card mountain)))) "subtype"
+  Spec.it s "Mountain type line contains Land" $ do
+    mountain <- Registry.printing registry "Mountain"
+    Spec.assertBool s (Set.member CardType.Land (TypeLine.types (Card.Type.typeLine (Printing.card mountain)))) "cardtype"
+  -- CR 202.1: a land has no mana cost. Not a zero cost -- no cost at all.
+  Spec.it s "Mountain has no mana cost" $ do
+    mountain <- Registry.printing registry "Mountain"
+    Spec.assertEqWith s "no cost" (Card.Type.manaCost (Printing.card mountain)) Nothing
+  Spec.it s "Mountain has no power or toughness" $ do
+    mountain <- Registry.printing registry "Mountain"
+    Spec.assertEqWith s "power" (Card.Type.power (Printing.card mountain)) Nothing
+    Spec.assertEqWith s "toughness" (Card.Type.toughness (Printing.card mountain)) Nothing
+  Spec.it s "Piker printing is named Goblin Piker" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    Spec.assertEqWith s "name" (Card.Type.name (Printing.card piker)) (Text.pack "Goblin Piker")
+  Spec.it s "Piker costs {1}{R}" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    Spec.assertEqWith
+      s
+      "cost"
+      (Card.Type.manaCost (Printing.card piker))
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
+  Spec.it s "Piker is a 2/1" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    Spec.assertEqWith s "power" (Card.Type.power (Printing.card piker)) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness (Printing.card piker)) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+  Spec.it s "Piker is a Goblin Warrior" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    Spec.assertEqWith
+      s
+      "subtypes"
+      (TypeLine.subtypes (Card.Type.typeLine (Printing.card piker)))
+      (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+  Spec.it s "Piker is a creature and not a land" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    Spec.assertBool s (Card.isCreature (Printing.card piker)) "creature"
+    Spec.assertBool s (not (Card.isLand (Printing.card piker))) "not land"
+  -- CR 110.1: the classification resolution turns on. Never card identity.
+  Spec.it s "CR 110.1 both a Piker and a Mountain are permanents" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- Registry.printing registry "Mountain"
+    Spec.assertBool s (Card.isPermanent (Printing.card piker)) "piker"
+    Spec.assertBool s (Card.isPermanent (Printing.card mountain)) "mountain"
+  Spec.it s "CR 110.1 an instant is not a permanent type" $
+    let instantLine =
+          TypeLine.MkTypeLine
+            { TypeLine.supertypes = Set.empty,
+              TypeLine.types = Set.singleton CardType.Instant,
+              TypeLine.subtypes = Set.empty
+            }
+        card =
+          Card.Type.MkCard
+            { Card.Type.name = Text.pack "Some Instant",
+              Card.Type.manaCost = Nothing,
+              Card.Type.typeLine = instantLine,
+              Card.Type.power = Nothing,
+              Card.Type.toughness = Nothing,
+              Card.Type.loyalty = Nothing,
+              Card.Type.keywords = Set.empty,
+              Card.Type.colorIndicator = Set.empty,
+              Card.Type.staticAbilities = [],
+              Card.Type.spell = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
+              Card.Type.activatedAbilities = [],
+              Card.Type.replacementEffects = [],
+              Card.Type.triggeredAbilities = [],
+              Card.Type.delayedAbilities = Map.empty,
+              Card.Type.castingPermissions = [],
+              Card.Type.castingRestrictions = [],
+              Card.Type.characteristicPT = Nothing,
+              Card.Type.playerAbilities = [],
+              Card.Type.blockRequirements = [],
+              Card.Type.attackRequirements = [],
+              Card.Type.mulliganAction = [],
+              Card.Type.openingHandAction = [],
+              Card.Type.additionalCosts = [],
+              Card.Type.alternativeCosts = [],
+              Card.Type.enchant = Nothing,
+              Card.Type.counterability = Counterability.Counterable
+            }
+     in do
+          Spec.assertBool s (not (Card.isPermanent card)) "not a permanent"
+          Spec.assertBool s (Card.isInstant card) "an instant"
+  Spec.it s "a Piker is not an instant" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    Spec.assertBool s (not (Card.isInstant (Printing.card piker))) "creature"
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*).
@@ -630,1007 +627,1010 @@ tokenNameOffends token =
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
 -- pool. Loosen to superset if such a card ever lands.
-lintTests :: Registry.Registry -> Tasty.TestTree
-lintTests registry =
-  Tasty.testGroup
-    "Lint"
-    [ HU.testCase "every mode's slot reads equal its declared slots" $ do
-        ps <- S.allPrintings registry
-        let modeOffends m =
-              let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
-                  reads_ = Set.unions (fmap Resolve.slotsOf (Foldable.toList (Mode.effects m)))
-               in -- A slot DEFINED in this mode (a Create's minted token, or a
-                  -- PlaySubgame's bound subgame outcome) and then read by a later
-                  -- effect is legitimate dataflow, not an undeclared target -- the
-                  -- same definedSlots exemption the delayed-ability lint below uses.
-                  Set.difference reads_ defined /= Map.keysSet (Mode.targetSpecs m)
-            cardOffends card =
-              any modeOffends (Modal.modes (Card.Type.spell card))
-            offenders =
-              filter
-                (cardOffends . Printing.card)
-                ps
-        HU.assertEqual "no dangling or unused slots" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "every file in data/cards loads, and its card is named by its file name" $ do
-        -- The registry checks name-against-file-name on each load (Pawl.Registry.load),
-        -- so sweeping the listing is the whole assertion: a stray file, a file whose
-        -- card was renamed, and a file that no test happens to name all fail here.
-        -- A hand-kept list is exactly what forgets the file nobody loads.
-        slugs <- S.corpusSlugs registry
-        HU.assertBool "the corpus is not empty" (not (null slugs))
-        mapM_ (Registry.card registry) slugs,
-      -- The other direction: Registry.card slugifies the NAME it is asked for,
-      -- then builds a path from that slug -- so a file whose stem is not itself a
-      -- slugify fixed point is never opened by that path; a lookup would quietly
-      -- open some OTHER file (or none) instead of raising the mismatch above.
-      -- Every committed file name must therefore already be its own slug.
-      -- Slug.fromText normalizes rather than validates, so the assertion is that
-      -- it is the identity on every stem -- read the listing directly, because
-      -- Registry.slugs has already normalized the evidence away.
-      HU.testCase "every file name in data/cards is already a slug" $ do
-        entries <- Directory.listDirectory (Registry.root registry)
-        let stems = fmap (reverse . drop (length ".json") . reverse) (filter (List.isSuffixOf ".json") entries)
-        HU.assertBool "the corpus is not empty" (not (null stems))
-        mapM_
-          ( \stem ->
-              HU.assertEqual
-                ("file name is its own slug: " <> stem)
-                (Text.pack stem)
-                (Slug.unwrap (Slug.fromText (Text.pack stem)))
-          )
-          stems,
-      HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $ do
-        blaze <- Registry.printing registry "Blaze"
-        let card = Printing.card blaze
-            red = ManaSymbol.OfType (ManaType.Colored Color.Red)
-        HU.assertEqual "name" (Text.pack "Blaze") (Card.Type.name card)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Variable, red])) (Card.Type.manaCost card)
-        HU.assertBool "sorcery, not instant" (not (Card.isInstant card))
-        HU.assertEqual "one AnyTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) (Card.allTargetSpecs card)
-        HU.assertEqual "effect deals X" [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X] (Card.allEffects card),
-      HU.testCase "the lint itself catches a dangling reference" $
-        let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
-         in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),
-      HU.testCase "every printing that reads X declares {X}, and vice versa" $ do
-        ps <- S.allPrintings registry
-        let readsX c = Resolve.readsX (Card.allEffects c)
-            hasVariable c = case Card.Type.manaCost c of
-              Nothing -> False
-              Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
-            offenders =
-              filter
-                (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
-                ps
-        HU.assertEqual "X read iff {X} declared" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
-        ps <- S.allPrintings registry
-        let tokensOf card = [token | Effect.Create _ token _ _ <- cardResolutionEffects card]
-            tokens = concatMap (tokensOf . Printing.card) ps
-        -- Guards the sweep against passing vacuously if Create ever moves out
-        -- from under cardResolutionEffects.
-        HU.assertBool "the pool creates tokens" (not (null tokens))
-        HU.assertEqual "no token is misnamed" [] (fmap Card.Type.name (filter tokenNameOffends tokens)),
-      HU.testCase "the lint itself catches a token named without the suffix" $ do
-        doomedTraveler <- Registry.printing registry "Doomed Traveler"
-        case [token | Effect.Create _ token _ _ <- cardResolutionEffects (Printing.card doomedTraveler)] of
-          [token] -> do
-            HU.assertBool "the real token passes" (not (tokenNameOffends token))
-            -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
-            -- the suffix dropped.
-            HU.assertBool "misnamed token detected" (tokenNameOffends token {Card.Type.name = Text.pack "Spirit"})
-          other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
-      -- ONE sweep over the whole reserved set, replacing the five per-name
-      -- cases this grew out of. Those five each filtered on
-      -- Card.allTargetSpecs, so they saw a card's spell modes and enchant slot
-      -- and nothing else; they also covered only five of the seven reserved
-      -- names, leaving `copySource` and `thatPlayer` with no declaration case
-      -- at all. See reservedDeclarations for why declaring one is a discarded
-      -- prompt rather than a naming quibble.
-      HU.testCase "no reserved binding slot is ever a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offends = not . Set.null . reservedDeclarations
-            offenders = filter (offends . Printing.card) ps
-        HU.assertEqual "no card declares a reserved slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- The sweep above passes VACUOUSLY: no committed card declares a reserved
-      -- slot anywhere, so on its own it proves nothing about the lint. Proven
-      -- here instead against hand-built offenders, in the posture the
-      -- triggered-read self-test below uses -- never a card file, because a
-      -- misauthored card must not be loadable -- one per ability carrier the
-      -- sweep gained, each grafted onto a real card that has that kind of
-      -- ability.
-      --
-      -- Each carrier is asserted TWICE: the sweep sees the offender, and
-      -- Card.allTargetSpecs -- the spell-modes-and-enchant view the five old
-      -- cases filtered on -- does not. The second half is the regression guard:
-      -- it is the hole itself, and it fails if the sweep is ever narrowed back.
-      HU.testCase "the lint itself catches an ability that declares a reserved slot" $ do
-        roaches <- Registry.printing registry "Endless Cockroaches"
-        sorcerer <- Registry.printing registry "Prodigal Sorcerer"
-        tidalWave <- Registry.printing registry "Tidal Wave"
-        let -- A one-mode, effectless modal declaring exactly one target slot.
-            declaring slot =
-              Modal.MkModal
-                (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory))
-                (ModeSelection.ChooseExactly 1)
-            withTriggered slot card =
-              card
-                { Card.Type.triggeredAbilities =
-                    [ TriggeredAbility.MkTriggeredAbility
-                        { TriggeredAbility.condition = TriggerCondition.SelfDies,
-                          TriggeredAbility.modal = declaring slot,
-                          TriggeredAbility.intervening = Nothing
-                        }
-                    ]
-                }
-            withActivated slot card =
-              card {Card.Type.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = declaring slot}) (Card.Type.activatedAbilities card)}
-            withDelayed slot card =
-              card {Card.Type.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Card.Type.delayedAbilities card)}
-            catches slot graft printing =
-              let card = graft slot (Printing.card printing)
-               in (reservedDeclarations card, Map.member slot (Card.allTargetSpecs card))
-        HU.assertEqual
-          "CR 109.5 you declared on a triggered ability is caught, and the spell-modes view misses it"
-          (Set.singleton Binding.you, False)
-          (catches Binding.you withTriggered roaches)
-        HU.assertEqual
-          "CR 113.7 self declared on an activated ability is caught, and the spell-modes view misses it"
-          (Set.singleton Binding.triggerSource, False)
-          (catches Binding.triggerSource withActivated sorcerer)
-        HU.assertEqual
-          "CR 400.7e became declared on a delayed ability is caught, and the spell-modes view misses it"
-          (Set.singleton Binding.became, False)
-          (catches Binding.became withDelayed tidalWave)
-        -- Not vacuous the other way either: the sweep reaches an ability's
-        -- ORDINARY slots, which Card.allTargetSpecs cannot see -- Prodigal
-        -- Sorcerer's spell is a creature's empty mode, so its "target" is
-        -- declared by its activated ability alone.
-        let target = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual
-          "an activated ability's ordinary slot is in the sweep but not the spell-modes view"
-          (True, False)
-          (Set.member target (declaredTargetSlots (Printing.card sorcerer)), Map.member target (Card.allTargetSpecs (Printing.card sorcerer)))
-        HU.assertEqual
-          "and the three real cards declare no reserved slot"
-          [Set.empty, Set.empty, Set.empty]
-          (fmap (reservedDeclarations . Printing.card) [roaches, sorcerer, tidalWave]),
-      HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $ do
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
-        let card = Printing.card lightningBolt
-        HU.assertBool "an instant" (Card.isInstant card)
-        HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) (Card.allTargetSpecs card),
-      -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
-      -- ArmDelayedTrigger naming an ability the card does not declare is a FAILING
-      -- TEST, never a trigger that silently never fires. Equality, not subset: a
-      -- declared ability nothing arms is dead card text.
-      --
-      -- SCOPE, same posture as Pawl.Engine.Binding's D4-lint-scope comment: this and the
-      -- multi-token-binding lint below both walk `Card.allEffects`, which is
-      -- `Modal.allEffects (Card.spell card)` -- a card's SPELL modes ONLY, never
-      -- an activated or triggered ability's effects. An ArmDelayedTrigger placed
-      -- inside an activated/triggered ability is therefore invisible to THIS
-      -- lint's "every armed name is declared" half; if the card also declares no
-      -- matching entry, the dangling arm passes silently. The reverse direction --
-      -- a declared entry nothing arms, because the arm lives in an ability the
-      -- lint can't see -- still fails loudly, which is the safe way round. No card
-      -- in this pool arms from inside an ability today (only Tidal Wave arms
-      -- anything, and it arms from its spell mode); widening the lint to
-      -- non-spell modes is a separate, deliberately out-of-scope change.
-      HU.testCase "every armed delayed ability is declared, and every declared one is armed" $ do
-        ps <- S.allPrintings registry
-        let cardOffends card =
-              Resolve.armedAbilities (Card.allEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
-            offenders = filter (cardOffends . Printing.card) ps
-        HU.assertEqual "no dangling or unused delayed abilities" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- Every slot a delayed ability READS must be one the arming card DEFINES:
-      -- the reserved trigger-source slot, or a token bound by a Create.
-      HU.testCase "every slot a delayed ability reads is bound by its card" $ do
-        ps <- S.allPrintings registry
-        let cardOffends card =
-              let available = Set.insert Binding.triggerSource (Resolve.definedSlots (Card.allEffects card))
-                  wanted = Set.unions (fmap Resolve.slotsOf (Card.delayedEffects card))
-               in not (Set.isSubsetOf wanted available)
-            offenders = filter (cardOffends . Printing.card) ps
-        HU.assertEqual "no dangling delayed-ability slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- The same subset shape over a card's TRIGGERED abilities, which is where
-      -- the condition-specific reserved slots live -- CR 400.7e's `became` and
-      -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
-      -- side and for why this cannot be an equality check.
-      --
-      -- No ACTIVATED-ability counterpart of this read check exists (#479).
-      HU.testCase "every slot a triggered ability reads is bound for its condition" $ do
-        ps <- S.allPrintings registry
-        let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
-            offenders = filter (cardOffends . Printing.card) ps
-        HU.assertEqual "no dangling triggered-ability slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- The sweep above passes VACUOUSLY: no committed card misauthors the
-      -- pairing, so the sweep proves nothing about the lint. Both directions are
-      -- proven here instead, against a hand-built offender (never a card file --
-      -- a misauthored card must not be loadable) and against the real pairing.
-      --
-      -- Both reserved event slots, because a classification that answered "every
-      -- slot, always" would pass the offending half of either one alone.
-      HU.testCase "the lint itself catches a reserved event slot the condition never binds" $ do
-        roaches <- Registry.printing registry "Endless Cockroaches"
-        let -- Endless Cockroaches' own payload: "return it to its owner's hand".
-            returnIt = Effect.MoveToZone Binding.became Zone.Hand
-            -- Rule 702.70a's shape, as a targetless read of "that player".
-            thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
-        HU.assertBool
-          "CR 400.7e became under an enters trigger is rejected"
-          (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfEnters returnIt))
-        HU.assertBool
-          "and under a dies trigger it is accepted"
-          (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies returnIt)))
-        HU.assertBool
-          "CR 702.70a thatPlayer under a dies trigger is rejected"
-          (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies thatPlayerDraws))
-        HU.assertBool
-          "and under a combat-damage trigger it is accepted"
-          (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDealsCombatDamageToPlayer thatPlayerDraws)))
-        HU.assertBool
-          "the real card's dies trigger is accepted"
-          (not (any triggeredAbilityOffends (Card.Type.triggeredAbilities (Printing.card roaches)))),
-      -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
-      -- of them. Rejected rather than guessed (#53).
-      HU.testCase "no Create binds a slot while making more than one token" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Resolve.bindsSeveralTokens . Card.allEffects . Printing.card)
-                ps
-        HU.assertEqual "no multi-token binding" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
-      -- exile, command) must pair with PlayerRef.EachPlayer -- the type
-      -- permits any PlayerRef there, but only EachPlayer is meaningful for a
-      -- zone no player owns individually (#161).
-      HU.testCase "every InZone Count over a shared zone pairs with EachPlayer" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (cardOffendsSharedZoneScope . Printing.card)
-                ps
-        HU.assertEqual "no shared-zone scope with a non-EachPlayer ref" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "a card with no enchant ability declares no enchant slot" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        let card = Printing.card piker
-        HU.assertEqual "no enchant spec" Nothing (Card.Type.enchant card)
-        HU.assertBool "not an Aura" (not (Card.isAura card))
-        HU.assertEqual "no enchant slot" Map.empty (Card.enchantSpecs card),
-      -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
-      -- target and could never be cast; a non-Aura with enchant declares a restriction
-      -- nothing reads. The D4 lint cannot see either, because it walks
-      -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
-      HU.testCase "a card is an Aura iff it declares an enchant ability" $ do
-        ps <- S.allPrintings registry
-        let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
-            offenders = filter (offends . Printing.card) ps
-        HU.assertEqual "Aura iff enchant" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
-      -- mode declaring it would be silently shadowed.
-      -- #199: no card authors a layer-2 control modification into an effect that
-      -- RESOLVES. SetControllerToSource is the payload-free constructor and is
-      -- INERT when stored: Projection.controllerOfGiven's storedSetter matches only
-      -- Modification.SetController, Projection.controlGrants reads control-granting
-      -- static abilities off Card.staticAbilities and never off stored effects, and
-      -- Projection.applyModification's SetControllerToSource arm is the identity.
-      -- A card authoring one would resolve, store the effect, and grant control to
-      -- no one -- there is nothing for CR 800.4a to end (see Pawl.Engine.Departure's
-      -- proofs).
-      --
-      -- BOTH control constructors, not just the payload-free one: baking a
-      -- PlayerId into static card text is equally unreal, since a card cannot
-      -- know who is playing. Control on a card belongs on a STATIC ability
-      -- (Control Magic), which the projection re-derives and never stores.
-      --
-      -- Asked as an EQUALITY on Layer through Projection.layer -- the sanctioned
-      -- classification -- rather than by casing on Modification, which only
-      -- Pawl.Engine.Projection may do. Layer.Control is exactly the two control
-      -- constructors, so this covers a third one automatically.
-      --
-      -- A codec-level rejection would be the wrong shape: jsonToModification is
-      -- shared with staticAbilities, which Control Magic legitimately uses.
-      HU.testCase "no card authors a control modification into a resolving effect (#199)" $ do
-        ps <- S.allPrintings registry
-        let offends effect = case effect of
-              Effect.ModifyTarget _ modification _ -> Projection.layer modification == Layer.Control
-              _ -> False
-            offenders = filter (any offends . cardResolutionEffects . Printing.card) ps
-        HU.assertEqual "control belongs on a static ability, never in a stored effect" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
-      -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
-      -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
-      -- to place and would be buried by CR 704.5i the instant it entered; a
-      -- non-planeswalker with a printed loyalty carries a number no rule reads.
-      --
-      -- Projection.intrinsicReplacementsOf's own comment leans on this in both
-      -- directions, which is why it is a lint and not a per-card assertion.
-      HU.testCase "a card is a planeswalker iff it has a printed loyalty" $ do
-        ps <- S.allPrintings registry
-        let isPlaneswalker c = Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine c))
-            offends c = isPlaneswalker c /= Maybe.isJust (Card.Type.loyalty c)
-            offenders = filter (offends . Printing.card) ps
-        HU.assertEqual "planeswalker iff loyalty" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "no mode declares a slot named enchant" $ do
-        ps <- S.allPrintings registry
-        let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))
-            offenders = filter (offends . Printing.card) ps
-        HU.assertEqual "the enchant slot is never hand-declared" [] (fmap (Card.Type.name . Printing.card) offenders)
-    ]
+lintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+lintSpec s registry = Spec.describe s "Lint" $ do
+  Spec.it s "every mode's slot reads equal its declared slots" $ do
+    ps <- S.allPrintings registry
+    let modeOffends m =
+          let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
+              reads_ = Set.unions (fmap Resolve.slotsOf (Foldable.toList (Mode.effects m)))
+           in -- A slot DEFINED in this mode (a Create's minted token, or a
+              -- PlaySubgame's bound subgame outcome) and then read by a later
+              -- effect is legitimate dataflow, not an undeclared target -- the
+              -- same definedSlots exemption the delayed-ability lint below uses.
+              Set.difference reads_ defined /= Map.keysSet (Mode.targetSpecs m)
+        cardOffends card =
+          any modeOffends (Modal.modes (Card.Type.spell card))
+        offenders =
+          filter
+            (cardOffends . Printing.card)
+            ps
+    Spec.assertEqWith s "no dangling or unused slots" (fmap (Card.Type.name . Printing.card) offenders) []
+  Spec.it s "every file in data/cards loads, and its card is named by its file name" $ do
+    -- The registry checks name-against-file-name on each load (Pawl.Registry.load),
+    -- so sweeping the listing is the whole assertion: a stray file, a file whose
+    -- card was renamed, and a file that no test happens to name all fail here.
+    -- A hand-kept list is exactly what forgets the file nobody loads.
+    slugs <- S.corpusSlugs registry
+    Spec.assertBool s (not (null slugs)) "the corpus is not empty"
+    mapM_ (Registry.card registry) slugs
+  -- The other direction: Registry.card slugifies the NAME it is asked for,
+  -- then builds a path from that slug -- so a file whose stem is not itself a
+  -- slugify fixed point is never opened by that path; a lookup would quietly
+  -- open some OTHER file (or none) instead of raising the mismatch above.
+  -- Every committed file name must therefore already be its own slug.
+  -- Slug.fromText normalizes rather than validates, so the assertion is that
+  -- it is the identity on every stem -- read the listing directly, because
+  -- Registry.slugs has already normalized the evidence away.
+  Spec.it s "every file name in data/cards is already a slug" $ do
+    entries <- Directory.listDirectory (Registry.root registry)
+    let stems = fmap (reverse . drop (length ".json") . reverse) (filter (List.isSuffixOf ".json") entries)
+    Spec.assertBool s (not (null stems)) "the corpus is not empty"
+    mapM_
+      ( \stem ->
+          Spec.assertEqWith
+            s
+            ("file name is its own slug: " <> stem)
+            (Slug.unwrap (Slug.fromText (Text.pack stem)))
+            (Text.pack stem)
+      )
+      stems
+  Spec.it s "Blaze is a {X}{R} Sorcery dealing X to any target" $ do
+    blaze <- Registry.printing registry "Blaze"
+    let card = Printing.card blaze
+        red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Blaze")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Variable, red]))
+    Spec.assertBool s (not (Card.isInstant card)) "sorcery, not instant"
+    Spec.assertEqWith s "one AnyTarget slot" (Card.allTargetSpecs card) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
+    Spec.assertEqWith s "effect deals X" (Card.allEffects card) [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X]
+  Spec.it s "the lint itself catches a dangling reference" $
+    let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
+     in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
+  Spec.it s "every printing that reads X declares {X}, and vice versa" $ do
+    ps <- S.allPrintings registry
+    let readsX c = Resolve.readsX (Card.allEffects c)
+        hasVariable c = case Card.Type.manaCost c of
+          Nothing -> False
+          Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
+        offenders =
+          filter
+            (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
+            ps
+    Spec.assertEqWith s "X read iff {X} declared" (fmap (Card.Type.name . Printing.card) offenders) []
+  Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
+    ps <- S.allPrintings registry
+    let tokensOf card = [token | Effect.Create _ token _ _ <- cardResolutionEffects card]
+        tokens = concatMap (tokensOf . Printing.card) ps
+    -- Guards the sweep against passing vacuously if Create ever moves out
+    -- from under cardResolutionEffects.
+    Spec.assertBool s (not (null tokens)) "the pool creates tokens"
+    Spec.assertEqWith s "no token is misnamed" (fmap Card.Type.name (filter tokenNameOffends tokens)) []
+  Spec.it s "the lint itself catches a token named without the suffix" $ do
+    doomedTraveler <- Registry.printing registry "Doomed Traveler"
+    case [token | Effect.Create _ token _ _ <- cardResolutionEffects (Printing.card doomedTraveler)] of
+      [token] -> do
+        Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
+        -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
+        -- the suffix dropped.
+        Spec.assertBool s (tokenNameOffends token {Card.Type.name = Text.pack "Spirit"}) "misnamed token detected"
+      other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
+  -- ONE sweep over the whole reserved set, replacing the five per-name
+  -- cases this grew out of. Those five each filtered on
+  -- Card.allTargetSpecs, so they saw a card's spell modes and enchant slot
+  -- and nothing else; they also covered only five of the seven reserved
+  -- names, leaving `copySource` and `thatPlayer` with no declaration case
+  -- at all. See reservedDeclarations for why declaring one is a discarded
+  -- prompt rather than a naming quibble.
+  Spec.it s "no reserved binding slot is ever a declared target slot" $ do
+    ps <- S.allPrintings registry
+    let offends = not . Set.null . reservedDeclarations
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertEqWith s "no card declares a reserved slot" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The sweep above passes VACUOUSLY: no committed card declares a reserved
+  -- slot anywhere, so on its own it proves nothing about the lint. Proven
+  -- here instead against hand-built offenders, in the posture the
+  -- triggered-read self-test below uses -- never a card file, because a
+  -- misauthored card must not be loadable -- one per ability carrier the
+  -- sweep gained, each grafted onto a real card that has that kind of
+  -- ability.
+  --
+  -- Each carrier is asserted TWICE: the sweep sees the offender, and
+  -- Card.allTargetSpecs -- the spell-modes-and-enchant view the five old
+  -- cases filtered on -- does not. The second half is the regression guard:
+  -- it is the hole itself, and it fails if the sweep is ever narrowed back.
+  Spec.it s "the lint itself catches an ability that declares a reserved slot" $ do
+    roaches <- Registry.printing registry "Endless Cockroaches"
+    sorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    tidalWave <- Registry.printing registry "Tidal Wave"
+    let -- A one-mode, effectless modal declaring exactly one target slot.
+        declaring slot =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory))
+            (ModeSelection.ChooseExactly 1)
+        withTriggered slot card =
+          card
+            { Card.Type.triggeredAbilities =
+                [ TriggeredAbility.MkTriggeredAbility
+                    { TriggeredAbility.condition = TriggerCondition.SelfDies,
+                      TriggeredAbility.modal = declaring slot,
+                      TriggeredAbility.intervening = Nothing
+                    }
+                ]
+            }
+        withActivated slot card =
+          card {Card.Type.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = declaring slot}) (Card.Type.activatedAbilities card)}
+        withDelayed slot card =
+          card {Card.Type.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Card.Type.delayedAbilities card)}
+        catches slot graft printing =
+          let card = graft slot (Printing.card printing)
+           in (reservedDeclarations card, Map.member slot (Card.allTargetSpecs card))
+    Spec.assertEqWith
+      s
+      "CR 109.5 you declared on a triggered ability is caught, and the spell-modes view misses it"
+      (catches Binding.you withTriggered roaches)
+      (Set.singleton Binding.you, False)
+    Spec.assertEqWith
+      s
+      "CR 113.7 self declared on an activated ability is caught, and the spell-modes view misses it"
+      (catches Binding.triggerSource withActivated sorcerer)
+      (Set.singleton Binding.triggerSource, False)
+    Spec.assertEqWith
+      s
+      "CR 400.7e became declared on a delayed ability is caught, and the spell-modes view misses it"
+      (catches Binding.became withDelayed tidalWave)
+      (Set.singleton Binding.became, False)
+    -- Not vacuous the other way either: the sweep reaches an ability's
+    -- ORDINARY slots, which Card.allTargetSpecs cannot see -- Prodigal
+    -- Sorcerer's spell is a creature's empty mode, so its "target" is
+    -- declared by its activated ability alone.
+    let target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith
+      s
+      "an activated ability's ordinary slot is in the sweep but not the spell-modes view"
+      (Set.member target (declaredTargetSlots (Printing.card sorcerer)), Map.member target (Card.allTargetSpecs (Printing.card sorcerer)))
+      (True, False)
+    Spec.assertEqWith
+      s
+      "and the three real cards declare no reserved slot"
+      (fmap (reservedDeclarations . Printing.card) [roaches, sorcerer, tidalWave])
+      [Set.empty, Set.empty, Set.empty]
+  Spec.it s "Lightning Bolt is in the red pool with one AnyTarget slot" $ do
+    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    let card = Printing.card lightningBolt
+    Spec.assertBool s (Card.isInstant card) "an instant"
+    Spec.assertEqWith s "one slot" (Card.allTargetSpecs card) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
+  -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
+  -- ArmDelayedTrigger naming an ability the card does not declare is a FAILING
+  -- TEST, never a trigger that silently never fires. Equality, not subset: a
+  -- declared ability nothing arms is dead card text.
+  --
+  -- SCOPE, same posture as Pawl.Engine.Binding's D4-lint-scope comment: this and the
+  -- multi-token-binding lint below both walk `Card.allEffects`, which is
+  -- `Modal.allEffects (Card.spell card)` -- a card's SPELL modes ONLY, never
+  -- an activated or triggered ability's effects. An ArmDelayedTrigger placed
+  -- inside an activated/triggered ability is therefore invisible to THIS
+  -- lint's "every armed name is declared" half; if the card also declares no
+  -- matching entry, the dangling arm passes silently. The reverse direction --
+  -- a declared entry nothing arms, because the arm lives in an ability the
+  -- lint can't see -- still fails loudly, which is the safe way round. No card
+  -- in this pool arms from inside an ability today (only Tidal Wave arms
+  -- anything, and it arms from its spell mode); widening the lint to
+  -- non-spell modes is a separate, deliberately out-of-scope change.
+  Spec.it s "every armed delayed ability is declared, and every declared one is armed" $ do
+    ps <- S.allPrintings registry
+    let cardOffends card =
+          Resolve.armedAbilities (Card.allEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
+        offenders = filter (cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- Every slot a delayed ability READS must be one the arming card DEFINES:
+  -- the reserved trigger-source slot, or a token bound by a Create.
+  Spec.it s "every slot a delayed ability reads is bound by its card" $ do
+    ps <- S.allPrintings registry
+    let cardOffends card =
+          let available = Set.insert Binding.triggerSource (Resolve.definedSlots (Card.allEffects card))
+              wanted = Set.unions (fmap Resolve.slotsOf (Card.delayedEffects card))
+           in not (Set.isSubsetOf wanted available)
+        offenders = filter (cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The same subset shape over a card's TRIGGERED abilities, which is where
+  -- the condition-specific reserved slots live -- CR 400.7e's `became` and
+  -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
+  -- side and for why this cannot be an equality check.
+  --
+  -- No ACTIVATED-ability counterpart of this read check exists (#479).
+  Spec.it s "every slot a triggered ability reads is bound for its condition" $ do
+    ps <- S.allPrintings registry
+    let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
+        offenders = filter (cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling triggered-ability slot" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The sweep above passes VACUOUSLY: no committed card misauthors the
+  -- pairing, so the sweep proves nothing about the lint. Both directions are
+  -- proven here instead, against a hand-built offender (never a card file --
+  -- a misauthored card must not be loadable) and against the real pairing.
+  --
+  -- Both reserved event slots, because a classification that answered "every
+  -- slot, always" would pass the offending half of either one alone.
+  Spec.it s "the lint itself catches a reserved event slot the condition never binds" $ do
+    roaches <- Registry.printing registry "Endless Cockroaches"
+    let -- Endless Cockroaches' own payload: "return it to its owner's hand".
+        returnIt = Effect.MoveToZone Binding.became Zone.Hand
+        -- Rule 702.70a's shape, as a targetless read of "that player".
+        thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfEnters returnIt))
+      "CR 400.7e became under an enters trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies returnIt)))
+      "and under a dies trigger it is accepted"
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies thatPlayerDraws))
+      "CR 702.70a thatPlayer under a dies trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDealsCombatDamageToPlayer thatPlayerDraws)))
+      "and under a combat-damage trigger it is accepted"
+    Spec.assertBool
+      s
+      (not (any triggeredAbilityOffends (Card.Type.triggeredAbilities (Printing.card roaches))))
+      "the real card's dies trigger is accepted"
+  -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
+  -- of them. Rejected rather than guessed (#53).
+  Spec.it s "no Create binds a slot while making more than one token" $ do
+    ps <- S.allPrintings registry
+    let offenders =
+          filter
+            (Resolve.bindsSeveralTokens . Card.allEffects . Printing.card)
+            ps
+    Spec.assertEqWith s "no multi-token binding" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
+  -- exile, command) must pair with PlayerRef.EachPlayer -- the type
+  -- permits any PlayerRef there, but only EachPlayer is meaningful for a
+  -- zone no player owns individually (#161).
+  Spec.it s "every InZone Count over a shared zone pairs with EachPlayer" $ do
+    ps <- S.allPrintings registry
+    let offenders =
+          filter
+            (cardOffendsSharedZoneScope . Printing.card)
+            ps
+    Spec.assertEqWith s "no shared-zone scope with a non-EachPlayer ref" (fmap (Card.Type.name . Printing.card) offenders) []
+  Spec.it s "a card with no enchant ability declares no enchant slot" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    let card = Printing.card piker
+    Spec.assertEqWith s "no enchant spec" (Card.Type.enchant card) Nothing
+    Spec.assertBool s (not (Card.isAura card)) "not an Aura"
+    Spec.assertEqWith s "no enchant slot" (Card.enchantSpecs card) Map.empty
+  -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
+  -- target and could never be cast; a non-Aura with enchant declares a restriction
+  -- nothing reads. The D4 lint cannot see either, because it walks
+  -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
+  Spec.it s "a card is an Aura iff it declares an enchant ability" $ do
+    ps <- S.allPrintings registry
+    let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertEqWith s "Aura iff enchant" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
+  -- mode declaring it would be silently shadowed.
+  -- #199: no card authors a layer-2 control modification into an effect that
+  -- RESOLVES. SetControllerToSource is the payload-free constructor and is
+  -- INERT when stored: Projection.controllerOfGiven's storedSetter matches only
+  -- Modification.SetController, Projection.controlGrants reads control-granting
+  -- static abilities off Card.staticAbilities and never off stored effects, and
+  -- Projection.applyModification's SetControllerToSource arm is the identity.
+  -- A card authoring one would resolve, store the effect, and grant control to
+  -- no one -- there is nothing for CR 800.4a to end (see Pawl.Engine.Departure's
+  -- proofs).
+  --
+  -- BOTH control constructors, not just the payload-free one: baking a
+  -- PlayerId into static card text is equally unreal, since a card cannot
+  -- know who is playing. Control on a card belongs on a STATIC ability
+  -- (Control Magic), which the projection re-derives and never stores.
+  --
+  -- Asked as an EQUALITY on Layer through Projection.layer -- the sanctioned
+  -- classification -- rather than by casing on Modification, which only
+  -- Pawl.Engine.Projection may do. Layer.Control is exactly the two control
+  -- constructors, so this covers a third one automatically.
+  --
+  -- A codec-level rejection would be the wrong shape: jsonToModification is
+  -- shared with staticAbilities, which Control Magic legitimately uses.
+  Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
+    ps <- S.allPrintings registry
+    let offends effect = case effect of
+          Effect.ModifyTarget _ modification _ -> Projection.layer modification == Layer.Control
+          _ -> False
+        offenders = filter (any offends . cardResolutionEffects . Printing.card) ps
+    Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
+  -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
+  -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
+  -- to place and would be buried by CR 704.5i the instant it entered; a
+  -- non-planeswalker with a printed loyalty carries a number no rule reads.
+  --
+  -- Projection.intrinsicReplacementsOf's own comment leans on this in both
+  -- directions, which is why it is a lint and not a per-card assertion.
+  Spec.it s "a card is a planeswalker iff it has a printed loyalty" $ do
+    ps <- S.allPrintings registry
+    let isPlaneswalker c = Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine c))
+        offends c = isPlaneswalker c /= Maybe.isJust (Card.Type.loyalty c)
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertEqWith s "planeswalker iff loyalty" (fmap (Card.Type.name . Printing.card) offenders) []
+  Spec.it s "no mode declares a slot named enchant" $ do
+    ps <- S.allPrintings registry
+    let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertEqWith s "the enchant slot is never hand-declared" (fmap (Card.Type.name . Printing.card) offenders) []
 
-m2bCardTests :: Registry.Registry -> Tasty.TestTree
-m2bCardTests registry =
+m2bCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m2bCardSpec s registry = Spec.describe s "M2bCards" $ do
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       gs0 = Setup.emptyGame S.bothPlayers
-   in Tasty.testGroup
-        "M2bCards"
-        [ HU.testCase "Sabretooth Tiger is a {2}{R} 2/1 Cat with first strike" $ do
-            sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
-            let c = Printing.card sabretoothTiger
-            HU.assertEqual "name" (Text.pack "Sabretooth Tiger") (Card.Type.name c)
-            HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red])) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-            HU.assertEqual "subtypes" (Set.singleton Subtype.Cat) (TypeLine.subtypes (Card.Type.typeLine c))
-            HU.assertEqual "keyword" (Set.singleton Keyword.FirstStrike) (Card.Type.keywords c),
-          HU.testCase "Ridgetop Raptor is a {3}{R} 2/1 Dinosaur Beast with double strike" $ do
-            ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
-            let c = Printing.card ridgetopRaptor
-            HU.assertEqual "name" (Text.pack "Ridgetop Raptor") (Card.Type.name c)
-            HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, red])) (Card.Type.manaCost c)
-            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-            HU.assertEqual "subtypes" (Set.fromList [Subtype.Dinosaur, Subtype.Beast]) (TypeLine.subtypes (Card.Type.typeLine c))
-            HU.assertEqual "keyword" (Set.singleton Keyword.DoubleStrike) (Card.Type.keywords c),
-          HU.testCase "the tiger has first strike through the projection" $ do
-            sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
-            let (oid, gs) = S.addCreature sabretoothTiger S.alice gs0
-            HU.assertBool "first strike" (Projection.hasKeyword Keyword.FirstStrike oid gs)
-            HU.assertBool "not double strike" (not (Projection.hasKeyword Keyword.DoubleStrike oid gs)),
-          HU.testCase "the raptor has double strike through the projection" $ do
-            ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
-            let (oid, gs) = S.addCreature ridgetopRaptor S.alice gs0
-            HU.assertBool "double strike" (Projection.hasKeyword Keyword.DoubleStrike oid gs)
-            HU.assertBool "not first strike" (not (Projection.hasKeyword Keyword.FirstStrike oid gs)),
-          HU.testCase "both are 2/1s, the same body as a Piker" $ do
-            piker <- Registry.printing registry "Goblin Piker"
-            sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
-            ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
-            let bodyOf p = (Card.Type.power (Printing.card p), Card.Type.toughness (Printing.card p))
-            HU.assertEqual "tiger body" (bodyOf piker) (bodyOf sabretoothTiger)
-            HU.assertEqual "raptor body" (bodyOf piker) (bodyOf ridgetopRaptor)
-        ]
+  Spec.it s "Sabretooth Tiger is a {2}{R} 2/1 Cat with first strike" $ do
+    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
+    let c = Printing.card sabretoothTiger
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Sabretooth Tiger")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]))
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.singleton Subtype.Cat)
+    Spec.assertEqWith s "keyword" (Card.Type.keywords c) (Set.singleton Keyword.FirstStrike)
+  Spec.it s "Ridgetop Raptor is a {3}{R} 2/1 Dinosaur Beast with double strike" $ do
+    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
+    let c = Printing.card ridgetopRaptor
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Ridgetop Raptor")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, red]))
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Dinosaur, Subtype.Beast])
+    Spec.assertEqWith s "keyword" (Card.Type.keywords c) (Set.singleton Keyword.DoubleStrike)
+  Spec.it s "the tiger has first strike through the projection" $ do
+    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
+    let (oid, gs) = S.addCreature sabretoothTiger S.alice gs0
+    Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike oid gs) "first strike"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike oid gs)) "not double strike"
+  Spec.it s "the raptor has double strike through the projection" $ do
+    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
+    let (oid, gs) = S.addCreature ridgetopRaptor S.alice gs0
+    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike oid gs) "double strike"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike oid gs)) "not first strike"
+  Spec.it s "both are 2/1s, the same body as a Piker" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
+    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
+    let bodyOf p = (Card.Type.power (Printing.card p), Card.Type.toughness (Printing.card p))
+    Spec.assertEqWith s "tiger body" (bodyOf sabretoothTiger) (bodyOf piker)
+    Spec.assertEqWith s "raptor body" (bodyOf ridgetopRaptor) (bodyOf piker)
 
-m2cCardTests :: Registry.Registry -> Tasty.TestTree
-m2cCardTests registry =
-  Tasty.testGroup
-    "M2cCards"
-    [ HU.testCase "Typhoid Rats is a {B} 1/1 Rat with deathtouch" $ do
-        typhoidRats <- Registry.printing registry "Typhoid Rats"
-        let c = Printing.card typhoidRats
-        HU.assertEqual "name" (Text.pack "Typhoid Rats") (Card.Type.name c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-        HU.assertEqual "keywords" (Set.singleton Keyword.Deathtouch) (Card.Type.keywords c),
-      HU.testCase "War Mammoth is a {3}{G} 3/3 Elephant with trample" $ do
-        warMammoth <- Registry.printing registry "War Mammoth"
-        let c = Printing.card warMammoth
-        HU.assertEqual "name" (Text.pack "War Mammoth") (Card.Type.name c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c)
-        HU.assertEqual "keywords" (Set.singleton Keyword.Trample) (Card.Type.keywords c)
-    ]
+m2cCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m2cCardSpec s registry = Spec.describe s "M2cCards" $ do
+  Spec.it s "Typhoid Rats is a {B} 1/1 Rat with deathtouch" $ do
+    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    let c = Printing.card typhoidRats
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Typhoid Rats")
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "keywords" (Card.Type.keywords c) (Set.singleton Keyword.Deathtouch)
+  Spec.it s "War Mammoth is a {3}{G} 3/3 Elephant with trample" $ do
+    warMammoth <- Registry.printing registry "War Mammoth"
+    let c = Printing.card warMammoth
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "War Mammoth")
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 3)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
+    Spec.assertEqWith s "keywords" (Card.Type.keywords c) (Set.singleton Keyword.Trample)
 
-basicLandTests :: Registry.Registry -> Tasty.TestTree
-basicLandTests registry =
-  Tasty.testGroup
-    "BasicLand"
-    [ HU.testCase "CR 305.6 a Swamp's intrinsic ability is black mana" $
-        HU.assertEqual
-          "black"
-          (Just (ManaType.Colored Color.Black))
-          (Mana.subtypeMana Subtype.Swamp),
-      HU.testCase "CR 305.6 a Forest's intrinsic ability is green mana" $
-        HU.assertEqual
-          "green"
-          (Just (ManaType.Colored Color.Green))
-          (Mana.subtypeMana Subtype.Forest),
-      HU.testCase "swampPrinting is a basic Swamp land" $ do
-        swamp <- Registry.printing registry "Swamp"
-        let c = Printing.card swamp
-        HU.assertBool "land" (Card.isLand c)
-        HU.assertBool
-          "swamp subtype"
-          (Set.member Subtype.Swamp (TypeLine.subtypes (Card.Type.typeLine c))),
-      HU.testCase "forestPrinting is a basic Forest land" $ do
-        forest <- Registry.printing registry "Forest"
-        let c = Printing.card forest
-        HU.assertBool "land" (Card.isLand c)
-        HU.assertBool
-          "forest subtype"
-          (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
-    ]
+basicLandSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+basicLandSpec s registry = Spec.describe s "BasicLand" $ do
+  Spec.it s "CR 305.6 a Swamp's intrinsic ability is black mana" $
+    Spec.assertEqWith
+      s
+      "black"
+      (Mana.subtypeMana Subtype.Swamp)
+      (Just (ManaType.Colored Color.Black))
+  Spec.it s "CR 305.6 a Forest's intrinsic ability is green mana" $
+    Spec.assertEqWith
+      s
+      "green"
+      (Mana.subtypeMana Subtype.Forest)
+      (Just (ManaType.Colored Color.Green))
+  Spec.it s "swampPrinting is a basic Swamp land" $ do
+    swamp <- Registry.printing registry "Swamp"
+    let c = Printing.card swamp
+    Spec.assertBool s (Card.isLand c) "land"
+    Spec.assertBool
+      s
+      (Set.member Subtype.Swamp (TypeLine.subtypes (Card.Type.typeLine c)))
+      "swamp subtype"
+  Spec.it s "forestPrinting is a basic Forest land" $ do
+    forest <- Registry.printing registry "Forest"
+    let c = Printing.card forest
+    Spec.assertBool s (Card.isLand c) "land"
+    Spec.assertBool
+      s
+      (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
+      "forest subtype"
 
-m3cCardTests :: Registry.Registry -> Tasty.TestTree
-m3cCardTests registry =
-  Tasty.testGroup
-    "M3cCards"
-    [ HU.testCase "Blood Moon is a {2}{R} enchantment with one SetLandSubtype static ability" $ do
-        bloodMoon <- Registry.printing registry "Blood Moon"
-        let card = Printing.card bloodMoon
-        HU.assertEqual "one static ability" 1 (length (Card.Type.staticAbilities card))
-        HU.assertBool "not a permanent target" (Map.null (Card.allTargetSpecs card))
-    ]
+m3cCardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+m3cCardSpec s registry = Spec.describe s "M3cCards" $ do
+  Spec.it s "Blood Moon is a {2}{R} enchantment with one SetLandSubtype static ability" $ do
+    bloodMoon <- Registry.printing registry "Blood Moon"
+    let card = Printing.card bloodMoon
+    Spec.assertEqWith s "one static ability" (length (Card.Type.staticAbilities card)) 1
+    Spec.assertBool s (Map.null (Card.allTargetSpecs card)) "not a permanent target"
 
-m3eCardTests :: Registry.Registry -> Tasty.TestTree
-m3eCardTests registry =
-  Tasty.testGroup
-    "M3eCards"
-    [ HU.testCase "Prodigal Sorcerer has one non-mana activated ability" $ do
-        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-        case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
-          [ab] -> HU.assertBool "not a mana ability" (not (Mana.isManaAbility ab))
-          _ -> HU.assertFailure "expected exactly one ability",
-      HU.testCase "Llanowar Elves has one mana activated ability" $ do
-        llanowarElves <- Registry.printing registry "Llanowar Elves"
-        case Card.Type.activatedAbilities (Printing.card llanowarElves) of
-          [ab] -> HU.assertBool "mana ability" (Mana.isManaAbility ab)
-          _ -> HU.assertFailure "expected exactly one ability"
-    ]
+m3eCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m3eCardSpec s registry = Spec.describe s "M3eCards" $ do
+  Spec.it s "Prodigal Sorcerer has one non-mana activated ability" $ do
+    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
+      [ab] -> Spec.assertBool s (not (Mana.isManaAbility ab)) "not a mana ability"
+      _ -> Spec.assertFailure s "expected exactly one ability"
+  Spec.it s "Llanowar Elves has one mana activated ability" $ do
+    llanowarElves <- Registry.printing registry "Llanowar Elves"
+    case Card.Type.activatedAbilities (Printing.card llanowarElves) of
+      [ab] -> Spec.assertBool s (Mana.isManaAbility ab) "mana ability"
+      _ -> Spec.assertFailure s "expected exactly one ability"
 
-m4bCardTests :: Registry.Registry -> Tasty.TestTree
-m4bCardTests registry =
-  Tasty.testGroup
-    "M4bCards"
-    [ HU.testCase "Darksteel Myr is a {3} 0/1 Artifact Creature with indestructible" $ do
-        darksteelMyr <- Registry.printing registry "Darksteel Myr"
-        let c = Printing.card darksteelMyr
-        HU.assertEqual "name" (Text.pack "Darksteel Myr") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 0))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-        HU.assertEqual "keyword" (Set.singleton Keyword.Indestructible) (Card.Type.keywords c),
-      -- #113: both P9 gate cards end "It can't be regenerated", and the clause was
-      -- omitted from their data while nothing could honour it. It is data now.
-      HU.testCase "CR 701.19c Terror and Reprisal both carry the can't-be-regenerated rider" $ do
-        terror <- Registry.printing registry "Terror"
-        reprisal <- Registry.printing registry "Reprisal"
-        let riders c = [r | Effect.Destroy _ r _ <- Card.allEffects (Printing.card c)]
-        HU.assertEqual "Terror" [Regenerability.CantBeRegenerated] (riders terror)
-        HU.assertEqual "Reprisal" [Regenerability.CantBeRegenerated] (riders reprisal),
-      HU.testCase "Murder is a {1}{B}{B} Instant that destroys a target creature" $ do
-        murder <- Registry.printing registry "Murder"
-        let c = Printing.card murder
-            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
-        HU.assertBool "an instant" (Card.isInstant c)
-        -- Murder carries no CR 701.19c rider, unlike Terror and Reprisal.
-        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing] (Card.allEffects c)
-        HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
-      -- Murder's opposite number on the one axis this pair exists to pin: the
-      -- SAME Destroy opcode, with the SAME CR 701.19c rider, differing only in
-      -- whether its ObjectRef names a cast-time slot or a resolution-time set.
-      -- CR 115.10a is why the second declares no target spec: "Unless that object
-      -- or player is identified by the word 'target' ..., it's not a target."
-      HU.testCase "Day of Judgment is a {2}{W}{W} Sorcery that destroys every creature and targets nothing" $ do
-        dayOfJudgment <- Registry.printing registry "Day of Judgment"
-        let c = Printing.card dayOfJudgment
-            white = ManaSymbol.OfType (ManaType.Colored Color.White)
-        HU.assertEqual "name" (Text.pack "Day of Judgment") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white, white])) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Sorcery) (TypeLine.types (Card.Type.typeLine c))
-        -- CR 109.2 supplies the battlefield and the word "permanent"; the card
-        -- text is only "all creatures", so the Filter is only HasCardType.
-        HU.assertEqual
-          "one Destroy over the creatures, with no can't-be-regenerated rider"
-          [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing]
-          (Card.allEffects c)
-        HU.assertEqual "and no target spec at all" Map.empty (Card.allTargetSpecs c),
-      -- The pool's counterweight to Day of Judgment: a creature that grants
-      -- indestructible to OTHERS and does not have it itself, so it is destroyed
-      -- by the same sweep as the permanents it protects. CR 608.2f is what makes
-      -- that pairing say something -- the grant is still in force when every
-      -- victim's CR 702.12b gate is judged, so the granter dies alone.
-      --
-      -- "Other permanents you control" needs no new filter vocabulary: `Not
-      -- IsSource` is the same spelling of "other" Opalescence's card text uses,
-      -- and `ControlledBy You` the same "you control" Ashaya's does.
-      HU.testCase "The Walls of Ba Sing Se is an {8} 0/30 Legendary Artifact Creature granting indestructible to OTHER permanents you control" $ do
-        walls <- Registry.printing registry "The Walls of Ba Sing Se"
-        let c = Printing.card walls
-        HU.assertEqual "name" (Text.pack "The Walls of Ba Sing Se") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 8])) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 0))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 30))) (Card.Type.toughness c)
-        HU.assertEqual "types" (Set.fromList [CardType.Artifact, CardType.Creature]) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "supertypes" (Set.singleton Supertype.Legendary) (TypeLine.supertypes (Card.Type.typeLine c))
-        -- Defender is printed on the card; Indestructible is NOT -- the whole
-        -- point is that the granter does not benefit from its own grant.
-        HU.assertEqual "printed keywords" (Set.singleton Keyword.Defender) (Card.Type.keywords c)
-        HU.assertEqual
-          "\"Other permanents you control have indestructible\""
-          [ StaticAbility.MkStaticAbility
-              ( Affected.Matching
-                  ( Filter.Type.And
-                      [ Filter.Type.Not Filter.Type.IsSource,
-                        Filter.Type.ControlledBy PlayerRelation.You
-                      ]
-                  )
+m4bCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
+  Spec.it s "Darksteel Myr is a {3} 0/1 Artifact Creature with indestructible" $ do
+    darksteelMyr <- Registry.printing registry "Darksteel Myr"
+    let c = Printing.card darksteelMyr
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Darksteel Myr")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]))
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 0)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "keyword" (Card.Type.keywords c) (Set.singleton Keyword.Indestructible)
+  -- #113: both P9 gate cards end "It can't be regenerated", and the clause was
+  -- omitted from their data while nothing could honour it. It is data now.
+  Spec.it s "CR 701.19c Terror and Reprisal both carry the can't-be-regenerated rider" $ do
+    terror <- Registry.printing registry "Terror"
+    reprisal <- Registry.printing registry "Reprisal"
+    let riders c = [r | Effect.Destroy _ r _ <- Card.allEffects (Printing.card c)]
+    Spec.assertEqWith s "Terror" (riders terror) [Regenerability.CantBeRegenerated]
+    Spec.assertEqWith s "Reprisal" (riders reprisal) [Regenerability.CantBeRegenerated]
+  Spec.it s "Murder is a {1}{B}{B} Instant that destroys a target creature" $ do
+    murder <- Registry.printing registry "Murder"
+    let c = Printing.card murder
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black]))
+    Spec.assertBool s (Card.isInstant c) "an instant"
+    -- Murder carries no CR 701.19c rider, unlike Terror and Reprisal.
+    Spec.assertEqWith s "effect destroys the target slot" (Card.allEffects c) [Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing]
+    Spec.assertEqWith s "one CreatureTarget slot" (Card.allTargetSpecs c) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
+  -- Murder's opposite number on the one axis this pair exists to pin: the
+  -- SAME Destroy opcode, with the SAME CR 701.19c rider, differing only in
+  -- whether its ObjectRef names a cast-time slot or a resolution-time set.
+  -- CR 115.10a is why the second declares no target spec: "Unless that object
+  -- or player is identified by the word 'target' ..., it's not a target."
+  Spec.it s "Day of Judgment is a {2}{W}{W} Sorcery that destroys every creature and targets nothing" $ do
+    dayOfJudgment <- Registry.printing registry "Day of Judgment"
+    let c = Printing.card dayOfJudgment
+        white = ManaSymbol.OfType (ManaType.Colored Color.White)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Day of Judgment")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white, white]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Sorcery)
+    -- CR 109.2 supplies the battlefield and the word "permanent"; the card
+    -- text is only "all creatures", so the Filter is only HasCardType.
+    Spec.assertEqWith
+      s
+      "one Destroy over the creatures, with no can't-be-regenerated rider"
+      (Card.allEffects c)
+      [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing]
+    Spec.assertEqWith s "and no target spec at all" (Card.allTargetSpecs c) Map.empty
+  -- The pool's counterweight to Day of Judgment: a creature that grants
+  -- indestructible to OTHERS and does not have it itself, so it is destroyed
+  -- by the same sweep as the permanents it protects. CR 608.2f is what makes
+  -- that pairing say something -- the grant is still in force when every
+  -- victim's CR 702.12b gate is judged, so the granter dies alone.
+  --
+  -- "Other permanents you control" needs no new filter vocabulary: `Not
+  -- IsSource` is the same spelling of "other" Opalescence's card text uses,
+  -- and `ControlledBy You` the same "you control" Ashaya's does.
+  Spec.it s "The Walls of Ba Sing Se is an {8} 0/30 Legendary Artifact Creature granting indestructible to OTHER permanents you control" $ do
+    walls <- Registry.printing registry "The Walls of Ba Sing Se"
+    let c = Printing.card walls
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "The Walls of Ba Sing Se")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 8]))
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 0)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 30)))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.fromList [CardType.Artifact, CardType.Creature])
+    Spec.assertEqWith s "supertypes" (TypeLine.supertypes (Card.Type.typeLine c)) (Set.singleton Supertype.Legendary)
+    -- Defender is printed on the card; Indestructible is NOT -- the whole
+    -- point is that the granter does not benefit from its own grant.
+    Spec.assertEqWith s "printed keywords" (Card.Type.keywords c) (Set.singleton Keyword.Defender)
+    Spec.assertEqWith
+      s
+      "\"Other permanents you control have indestructible\""
+      (Card.Type.staticAbilities c)
+      [ StaticAbility.MkStaticAbility
+          ( Affected.Matching
+              ( Filter.Type.And
+                  [ Filter.Type.Not Filter.Type.IsSource,
+                    Filter.Type.ControlledBy PlayerRelation.You
+                  ]
               )
-              (NonEmpty.singleton (Modification.GainKeyword Keyword.Indestructible))
-          ]
-          (Card.Type.staticAbilities c),
-      HU.testCase "Unsummon is a {U} Instant that bounces a target creature to hand" $ do
-        unsummon <- Registry.printing registry "Unsummon"
-        let c = Printing.card unsummon
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
-        HU.assertEqual "effect returns to hand" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand] (Card.allEffects c),
-      -- Three modifications on ONE target, in printed order. Spelled out rather
-      -- than spot-checked because the toxic 1 grant is what makes this card the
-      -- CR 702.164b proof in DamageSpec: a card that granted toxic 2 by mistake
-      -- would still add up to the poison that test expects.
-      HU.testCase "Aspirant's Ascent is a {U} Instant granting +1/+3, flying and toxic 1" $ do
-        ascent <- Registry.printing registry "Aspirant's Ascent"
-        let c = Printing.card ascent
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-            target = SlotName.MkSlotName (Text.pack "target")
-            untilEot = Effect.ModifyTarget Duration.UntilEndOfTurn
-            targetRef = ObjectRef.InSlot target
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
-        HU.assertBool "an instant" (Card.isInstant c)
-        HU.assertEqual
-          "effects, in printed order"
-          [ untilEot (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 3)) targetRef,
-            untilEot (Modification.GainKeyword Keyword.Flying) targetRef,
-            untilEot (Modification.GainKeyword (Keyword.Toxic 1)) targetRef
-          ]
-          (Card.allEffects c)
-        HU.assertEqual "one creature slot, shared by all three" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
-      HU.testCase "Angelic Edict is a {4}{W} Sorcery exiling a creature or enchantment" $ do
-        angelicEdict <- Registry.printing registry "Angelic Edict"
-        let c = Printing.card angelicEdict
-        HU.assertBool "not an instant" (not (Card.isInstant c))
-        HU.assertEqual "effect exiles" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile] (Card.allEffects c)
-        HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment])))) (Card.allTargetSpecs c),
-      HU.testCase "Divination is a {2}{U} Sorcery that draws two cards with no target" $ do
-        divination <- Registry.printing registry "Divination"
-        let c = Printing.card divination
-        HU.assertEqual "effect draws two" [Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 2)] (Card.allEffects c)
-        HU.assertBool "no target slots" (Map.null (Card.allTargetSpecs c)),
-      HU.testCase "Tome Scour is a {U} Sorcery milling five from a target player" $ do
-        tomeScour <- Registry.printing registry "Tome Scour"
-        let c = Printing.card tomeScour
-        HU.assertEqual "effect mills five" [Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 5)] (Card.allEffects c)
-        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
-      HU.testCase "Mind Rot is a {2}{B} Sorcery making a target player discard two" $ do
-        mindRot <- Registry.printing registry "Mind Rot"
-        let c = Printing.card mindRot
-        HU.assertEqual "effect discards two" [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)] (Card.allEffects c)
-        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
-      -- Two effects of DIFFERENT opcodes reading one slot, in printed order --
-      -- the pin that a rewrite reordering the mode's effect list, or splitting
-      -- the clauses across two slots, would break.
-      HU.testCase "Sign in Blood is a {B}{B} Sorcery drawing two and making one target player lose two life" $ do
-        signInBlood <- Registry.printing registry "Sign in Blood"
-        let c = Printing.card signInBlood
-            target = SlotName.MkSlotName (Text.pack "target")
-            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [black, black])) (Card.Type.manaCost c)
-        HU.assertBool "not an instant" (not (Card.isInstant c))
-        HU.assertEqual
-          "draws first, then loses life"
-          [ Effect.Draw (PlayerRef.InSlot target) (Quantity.Type.Literal 2),
-            Effect.LoseLife (PlayerRef.InSlot target) (Quantity.Type.Literal 2)
-          ]
-          (Card.allEffects c)
-        HU.assertEqual "one PlayerTarget slot, shared by both" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
-      -- CR 202.3f: "When calculating the mana value of an object with a hybrid
-      -- mana symbol in its mana cost, use the largest component of each hybrid
-      -- symbol." Both halves of {R/G} are one mana, so the largest is 1 and
-      -- {R/G}{R/G} is mana value 2 -- not 4 (both halves) and not 0 (neither).
-      HU.testCase "Burning-Tree Emissary's two hybrid symbols make mana value 2" $ do
-        burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
-        HU.assertEqual "two" 2 (Quantity.manaValueOf (Printing.card burningTreeEmissary)),
-      HU.testCase "Flame Javelin is a {2/R}{2/R}{2/R} Instant dealing 4 to any target" $ do
-        flameJavelin <- Registry.printing registry "Flame Javelin"
-        let c = Printing.card flameJavelin
-            twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
-            target = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Flame Javelin") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [twoOrRed, twoOrRed, twoOrRed]) (Card.Type.manaCost c)
-        HU.assertBool "an instant" (Card.isInstant c)
-        HU.assertEqual "effect deals four" [Effect.DealDamage target (Quantity.Type.Literal 4)] (Card.allEffects c)
-        HU.assertEqual "one AnyTarget slot" (Map.singleton target (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) (Card.allTargetSpecs c),
-      -- CR 202.3f again, whose own worked example is this card's cost: "The mana
-      -- value of a card with mana cost {2/B}{2/B}{2/B} is 6." The generic half is
-      -- the larger one, so a monocolored hybrid contributes 2 and not the 1 every
-      -- other typed symbol contributes -- the detail that silently corrupts every
-      -- mana-value reading downstream if it is wrong.
-      HU.testCase "Flame Javelin's three monocolored hybrid symbols make mana value 6, not 3" $ do
-        flameJavelin <- Registry.printing registry "Flame Javelin"
-        HU.assertEqual "six" 6 (Quantity.manaValueOf (Printing.card flameJavelin))
-    ]
+          )
+          (NonEmpty.singleton (Modification.GainKeyword Keyword.Indestructible))
+      ]
+  Spec.it s "Unsummon is a {U} Instant that bounces a target creature to hand" $ do
+    unsummon <- Registry.printing registry "Unsummon"
+    let c = Printing.card unsummon
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [blue]))
+    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand]
+  -- Three modifications on ONE target, in printed order. Spelled out rather
+  -- than spot-checked because the toxic 1 grant is what makes this card the
+  -- CR 702.164b proof in DamageSpec: a card that granted toxic 2 by mistake
+  -- would still add up to the poison that test expects.
+  Spec.it s "Aspirant's Ascent is a {U} Instant granting +1/+3, flying and toxic 1" $ do
+    ascent <- Registry.printing registry "Aspirant's Ascent"
+    let c = Printing.card ascent
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        target = SlotName.MkSlotName (Text.pack "target")
+        untilEot = Effect.ModifyTarget Duration.UntilEndOfTurn
+        targetRef = ObjectRef.InSlot target
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [blue]))
+    Spec.assertBool s (Card.isInstant c) "an instant"
+    Spec.assertEqWith
+      s
+      "effects, in printed order"
+      (Card.allEffects c)
+      [ untilEot (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 3)) targetRef,
+        untilEot (Modification.GainKeyword Keyword.Flying) targetRef,
+        untilEot (Modification.GainKeyword (Keyword.Toxic 1)) targetRef
+      ]
+    Spec.assertEqWith s "one creature slot, shared by all three" (Card.allTargetSpecs c) (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
+  Spec.it s "Angelic Edict is a {4}{W} Sorcery exiling a creature or enchantment" $ do
+    angelicEdict <- Registry.printing registry "Angelic Edict"
+    let c = Printing.card angelicEdict
+    Spec.assertBool s (not (Card.isInstant c)) "not an instant"
+    Spec.assertEqWith s "effect exiles" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile]
+    Spec.assertEqWith s "creature-or-enchantment slot" (Card.allTargetSpecs c) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment]))))
+  Spec.it s "Divination is a {2}{U} Sorcery that draws two cards with no target" $ do
+    divination <- Registry.printing registry "Divination"
+    let c = Printing.card divination
+    Spec.assertEqWith s "effect draws two" (Card.allEffects c) [Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 2)]
+    Spec.assertBool s (Map.null (Card.allTargetSpecs c)) "no target slots"
+  Spec.it s "Tome Scour is a {U} Sorcery milling five from a target player" $ do
+    tomeScour <- Registry.printing registry "Tome Scour"
+    let c = Printing.card tomeScour
+    Spec.assertEqWith s "effect mills five" (Card.allEffects c) [Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 5)]
+    Spec.assertEqWith s "one PlayerTarget slot" (Card.allTargetSpecs c) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing))
+  Spec.it s "Mind Rot is a {2}{B} Sorcery making a target player discard two" $ do
+    mindRot <- Registry.printing registry "Mind Rot"
+    let c = Printing.card mindRot
+    Spec.assertEqWith s "effect discards two" (Card.allEffects c) [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)]
+    Spec.assertEqWith s "one PlayerTarget slot" (Card.allTargetSpecs c) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing))
+  -- Two effects of DIFFERENT opcodes reading one slot, in printed order --
+  -- the pin that a rewrite reordering the mode's effect list, or splitting
+  -- the clauses across two slots, would break.
+  Spec.it s "Sign in Blood is a {B}{B} Sorcery drawing two and making one target player lose two life" $ do
+    signInBlood <- Registry.printing registry "Sign in Blood"
+    let c = Printing.card signInBlood
+        target = SlotName.MkSlotName (Text.pack "target")
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [black, black]))
+    Spec.assertBool s (not (Card.isInstant c)) "not an instant"
+    Spec.assertEqWith
+      s
+      "draws first, then loses life"
+      (Card.allEffects c)
+      [ Effect.Draw (PlayerRef.InSlot target) (Quantity.Type.Literal 2),
+        Effect.LoseLife (PlayerRef.InSlot target) (Quantity.Type.Literal 2)
+      ]
+    Spec.assertEqWith s "one PlayerTarget slot, shared by both" (Card.allTargetSpecs c) (Map.singleton target (TargetSpec.MkTargetSpec Pool.Players Nothing))
+  -- CR 202.3f: "When calculating the mana value of an object with a hybrid
+  -- mana symbol in its mana cost, use the largest component of each hybrid
+  -- symbol." Both halves of {R/G} are one mana, so the largest is 1 and
+  -- {R/G}{R/G} is mana value 2 -- not 4 (both halves) and not 0 (neither).
+  Spec.it s "Burning-Tree Emissary's two hybrid symbols make mana value 2" $ do
+    burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
+    Spec.assertEqWith s "two" (Quantity.manaValueOf (Printing.card burningTreeEmissary)) 2
+  Spec.it s "Flame Javelin is a {2/R}{2/R}{2/R} Instant dealing 4 to any target" $ do
+    flameJavelin <- Registry.printing registry "Flame Javelin"
+    let c = Printing.card flameJavelin
+        twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Flame Javelin")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [twoOrRed, twoOrRed, twoOrRed])
+    Spec.assertBool s (Card.isInstant c) "an instant"
+    Spec.assertEqWith s "effect deals four" (Card.allEffects c) [Effect.DealDamage target (Quantity.Type.Literal 4)]
+    Spec.assertEqWith s "one AnyTarget slot" (Card.allTargetSpecs c) (Map.singleton target (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
+  -- CR 202.3f again, whose own worked example is this card's cost: "The mana
+  -- value of a card with mana cost {2/B}{2/B}{2/B} is 6." The generic half is
+  -- the larger one, so a monocolored hybrid contributes 2 and not the 1 every
+  -- other typed symbol contributes -- the detail that silently corrupts every
+  -- mana-value reading downstream if it is wrong.
+  Spec.it s "Flame Javelin's three monocolored hybrid symbols make mana value 6, not 3" $ do
+    flameJavelin <- Registry.printing registry "Flame Javelin"
+    Spec.assertEqWith s "six" (Quantity.manaValueOf (Printing.card flameJavelin)) 6
 
-m45p6CardTests :: Registry.Registry -> Tasty.TestTree
-m45p6CardTests registry =
-  Tasty.testGroup
-    "M45p6Cards"
-    [ HU.testCase "Master Thief is a {2}{U}{U} 2/2 Human Rogue whose ETB steals an artifact" $ do
-        masterThief <- Registry.printing registry "Master Thief"
-        let c = Printing.card masterThief
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-            slot = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Master Thief") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue, blue])) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
-        HU.assertEqual "types" (Set.singleton CardType.Creature) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Rogue]) (TypeLine.subtypes (Card.Type.typeLine c))
-        case Card.Type.triggeredAbilities c of
-          [ab] -> do
-            HU.assertEqual "enters trigger" TriggerCondition.SelfEnters (TriggeredAbility.condition ab)
-            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
-              [m] -> do
-                HU.assertEqual
-                  "one GainControl effect with a conditional duration"
-                  [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) (ObjectRef.InSlot slot)]
-                  (Foldable.toList (Mode.effects m))
-                HU.assertEqual
-                  "one ArtifactTarget slot"
-                  (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))))
-                  (Mode.targetSpecs m)
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one triggered ability",
-      HU.testCase "Hag of Inner Weakness is a {2}{B} 2/2 Hag Warlock with an upkeep -2/-1 trigger" $ do
-        hagOfInnerWeakness <- Registry.printing registry "Hag of Inner Weakness"
-        let c = Printing.card hagOfInnerWeakness
-            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-            slot = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Hag of Inner Weakness") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, black])) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
-        HU.assertEqual "types" (Set.singleton CardType.Creature) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Hag, Subtype.Warlock]) (TypeLine.subtypes (Card.Type.typeLine c))
-        case Card.Type.triggeredAbilities c of
-          [ab] -> do
-            HU.assertEqual
-              "beginning of your upkeep"
-              (TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
-              (TriggeredAbility.condition ab)
-            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
-              [m] -> do
-                HU.assertEqual
-                  "-2/-1 until your next turn"
-                  [Effect.ModifyTarget Duration.UntilYourNextTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) (ObjectRef.InSlot slot)]
-                  (Foldable.toList (Mode.effects m))
-                HU.assertEqual
-                  "one OpponentCreatureTarget slot"
-                  (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))))
-                  (Mode.targetSpecs m)
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one triggered ability"
-    ]
+m45p6CardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m45p6CardSpec s registry = Spec.describe s "M45p6Cards" $ do
+  Spec.it s "Master Thief is a {2}{U}{U} 2/2 Human Rogue whose ETB steals an artifact" $ do
+    masterThief <- Registry.printing registry "Master Thief"
+    let c = Printing.card masterThief
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        slot = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Master Thief")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue, blue]))
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Creature)
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Human, Subtype.Rogue])
+    case Card.Type.triggeredAbilities c of
+      [ab] -> do
+        Spec.assertEqWith s "enters trigger" (TriggeredAbility.condition ab) TriggerCondition.SelfEnters
+        case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+          [m] -> do
+            Spec.assertEqWith
+              s
+              "one GainControl effect with a conditional duration"
+              (Foldable.toList (Mode.effects m))
+              [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) (ObjectRef.InSlot slot)]
+            Spec.assertEqWith
+              s
+              "one ArtifactTarget slot"
+              (Mode.targetSpecs m)
+              (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))))
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one triggered ability"
+  Spec.it s "Hag of Inner Weakness is a {2}{B} 2/2 Hag Warlock with an upkeep -2/-1 trigger" $ do
+    hagOfInnerWeakness <- Registry.printing registry "Hag of Inner Weakness"
+    let c = Printing.card hagOfInnerWeakness
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        slot = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Hag of Inner Weakness")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, black]))
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Creature)
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Hag, Subtype.Warlock])
+    case Card.Type.triggeredAbilities c of
+      [ab] -> do
+        Spec.assertEqWith
+          s
+          "beginning of your upkeep"
+          (TriggeredAbility.condition ab)
+          (TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
+        case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+          [m] -> do
+            Spec.assertEqWith
+              s
+              "-2/-1 until your next turn"
+              (Foldable.toList (Mode.effects m))
+              [Effect.ModifyTarget Duration.UntilYourNextTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) (ObjectRef.InSlot slot)]
+            Spec.assertEqWith
+              s
+              "one OpponentCreatureTarget slot"
+              (Mode.targetSpecs m)
+              (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))))
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one triggered ability"
 
-m45p7CardTests :: Registry.Registry -> Tasty.TestTree
-m45p7CardTests registry =
-  Tasty.testGroup
-    "M4.5 P7"
-    [ HU.testCase "Rule of Law is a {2}{W} enchantment with one EachPlayer CantCastMoreThan 1 player ability" $ do
-        ruleOfLaw <- Registry.printing registry "Rule of Law"
-        let c = Printing.card ruleOfLaw
-            white = ManaSymbol.OfType (ManaType.Colored Color.White)
-        HU.assertEqual "name" (Text.pack "Rule of Law") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white])) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "no object-axis static abilities" [] (Card.Type.staticAbilities c)
-        HU.assertEqual
-          "one player ability"
-          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1)]
-          (Card.Type.playerAbilities c),
-      HU.testCase "Thalia is a {1}{W} 2/1 Legendary Human Soldier with first strike and one IncreaseSpellCost ability" $ do
-        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-        let c = Printing.card thalia
-            white = ManaSymbol.OfType (ManaType.Colored Color.White)
-        HU.assertEqual "name" (Text.pack "Thalia, Guardian of Thraben") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white])) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-        HU.assertEqual "supertypes" (Set.singleton Supertype.Legendary) (TypeLine.supertypes (Card.Type.typeLine c))
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Soldier]) (TypeLine.subtypes (Card.Type.typeLine c))
-        HU.assertEqual "keywords" (Set.singleton Keyword.FirstStrike) (Card.Type.keywords c)
-        HU.assertEqual
-          "one player ability"
-          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.IncreaseSpellCost (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)) 1)]
-          (Card.Type.playerAbilities c),
-      HU.testCase "Sapphire Medallion is a {2} artifact with one You ReduceSpellCost Blue ability" $ do
-        sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-        let c = Printing.card sapphireMedallion
-        HU.assertEqual "name" (Text.pack "Sapphire Medallion") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual
-          "one player ability"
-          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))]
-          (Card.Type.playerAbilities c),
-      -- The reduction that NAMES a mana type, as against the Medallion's generic
-      -- one: "Cleric spells you cast cost {W}{B} less to cast."
-      HU.testCase "Edgewalker is a {1}{W}{B} Human Cleric with one You ReduceSpellCost {W}{B} ability" $ do
-        edgewalker <- Registry.printing registry "Edgewalker"
-        let c = Printing.card edgewalker
-            white = ManaSymbol.OfType (ManaType.Colored Color.White)
-            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-        HU.assertEqual "name" (Text.pack "Edgewalker") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black])) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Creature) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Cleric]) (TypeLine.subtypes (Card.Type.typeLine c))
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
-        HU.assertEqual
-          "one player ability"
-          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [white, black]))]
-          (Card.Type.playerAbilities c),
-      HU.testCase "Reliquary Tower is a land with a You NoMaximumHandSize ability and a {T} colorless mana ability" $ do
-        reliquaryTower <- Registry.printing registry "Reliquary Tower"
-        let c = Printing.card reliquaryTower
-        HU.assertEqual "name" (Text.pack "Reliquary Tower") (Card.Type.name c)
-        HU.assertEqual "no mana cost" Nothing (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "not basic" Set.empty (TypeLine.supertypes (Card.Type.typeLine c))
-        HU.assertEqual
-          "one player ability"
-          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.NoMaximumHandSize]
-          (Card.Type.playerAbilities c)
-        case Card.Type.activatedAbilities c of
-          [ab] -> do
-            HU.assertEqual "tap cost only" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
-            HU.assertEqual "a real {0} mana cost, not an unpayable one (CR 118.5a/118.6)" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost ab))
-            case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
-              [m] -> HU.assertEqual "adds colorless" [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)] (Foldable.toList (Mode.effects m))
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one activated ability",
-      -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. /
-      -- {T}: Add {C}." A nonbasic land whose whole text box is rules-text
-      -- abilities of two different kinds, which is what CR 305.7's strip needs
-      -- to reach (Pawl.TriggerSpec).
-      HU.testCase "Radiant Fountain is a nonbasic land with a SelfEnters life gain and a {T} colorless mana ability" $ do
-        radiantFountain <- Registry.printing registry "Radiant Fountain"
-        let c = Printing.card radiantFountain
-        HU.assertEqual "name" (Text.pack "Radiant Fountain") (Card.Type.name c)
-        HU.assertEqual "no mana cost" Nothing (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "not basic, so Blood Moon reaches it (CR 305.8)" Set.empty (TypeLine.supertypes (Card.Type.typeLine c))
-        HU.assertEqual "no land types of its own" Set.empty (TypeLine.subtypes (Card.Type.typeLine c))
-        HU.assertEqual "no player abilities" [] (Card.Type.playerAbilities c)
-        case Card.Type.triggeredAbilities c of
-          [ab] -> do
-            HU.assertEqual "on its own entry (CR 603.6a)" TriggerCondition.SelfEnters (TriggeredAbility.condition ab)
-            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
-              [m] -> HU.assertEqual "you gain 2" [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 2)] (Foldable.toList (Mode.effects m))
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one triggered ability"
-        case Card.Type.activatedAbilities c of
-          [ab] -> do
-            HU.assertEqual "tap cost only" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
-            case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
-              [m] -> HU.assertEqual "adds colorless" [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)] (Foldable.toList (Mode.effects m))
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one activated ability",
-      HU.testCase "Silence is a {W} instant whose one effect is AffectPlayers UntilEndOfTurn Opponents CantCastSpells" $ do
-        silence <- Registry.printing registry "Silence"
-        let c = Printing.card silence
-            white = ManaSymbol.OfType (ManaType.Colored Color.White)
-        HU.assertEqual "name" (Text.pack "Silence") (Card.Type.name c)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [white])) (Card.Type.manaCost c)
-        HU.assertBool "an instant" (Card.isInstant c)
-        HU.assertEqual "no player abilities: it is not a permanent" [] (Card.Type.playerAbilities c)
-        HU.assertEqual
-          "one targetless opcode"
-          [Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells]
-          (Card.allEffects c)
-        HU.assertEqual "no target slots" Map.empty (Card.allTargetSpecs c)
-    ]
+m45p7CardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
+  Spec.it s "Rule of Law is a {2}{W} enchantment with one EachPlayer CantCastMoreThan 1 player ability" $ do
+    ruleOfLaw <- Registry.printing registry "Rule of Law"
+    let c = Printing.card ruleOfLaw
+        white = ManaSymbol.OfType (ManaType.Colored Color.White)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Rule of Law")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith s "no object-axis static abilities" (Card.Type.staticAbilities c) []
+    Spec.assertEqWith
+      s
+      "one player ability"
+      (Card.Type.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1)]
+  Spec.it s "Thalia is a {1}{W} 2/1 Legendary Human Soldier with first strike and one IncreaseSpellCost ability" $ do
+    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+    let c = Printing.card thalia
+        white = ManaSymbol.OfType (ManaType.Colored Color.White)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Thalia, Guardian of Thraben")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "supertypes" (TypeLine.supertypes (Card.Type.typeLine c)) (Set.singleton Supertype.Legendary)
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Human, Subtype.Soldier])
+    Spec.assertEqWith s "keywords" (Card.Type.keywords c) (Set.singleton Keyword.FirstStrike)
+    Spec.assertEqWith
+      s
+      "one player ability"
+      (Card.Type.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.IncreaseSpellCost (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)) 1)]
+  Spec.it s "Sapphire Medallion is a {2} artifact with one You ReduceSpellCost Blue ability" $ do
+    sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
+    let c = Printing.card sapphireMedallion
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Sapphire Medallion")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
+    Spec.assertEqWith
+      s
+      "one player ability"
+      (Card.Type.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))]
+  -- The reduction that NAMES a mana type, as against the Medallion's generic
+  -- one: "Cleric spells you cast cost {W}{B} less to cast."
+  Spec.it s "Edgewalker is a {1}{W}{B} Human Cleric with one You ReduceSpellCost {W}{B} ability" $ do
+    edgewalker <- Registry.printing registry "Edgewalker"
+    let c = Printing.card edgewalker
+        white = ManaSymbol.OfType (ManaType.Colored Color.White)
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Edgewalker")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Creature)
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Human, Subtype.Cleric])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+    Spec.assertEqWith
+      s
+      "one player ability"
+      (Card.Type.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [white, black]))]
+  Spec.it s "Reliquary Tower is a land with a You NoMaximumHandSize ability and a {T} colorless mana ability" $ do
+    reliquaryTower <- Registry.printing registry "Reliquary Tower"
+    let c = Printing.card reliquaryTower
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Reliquary Tower")
+    Spec.assertEqWith s "no mana cost" (Card.Type.manaCost c) Nothing
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
+    Spec.assertEqWith s "not basic" (TypeLine.supertypes (Card.Type.typeLine c)) Set.empty
+    Spec.assertEqWith
+      s
+      "one player ability"
+      (Card.Type.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.NoMaximumHandSize]
+    case Card.Type.activatedAbilities c of
+      [ab] -> do
+        Spec.assertEqWith s "tap cost only" (Cost.Type.components (ActivatedAbility.cost ab)) [CostComponent.TapThis]
+        Spec.assertEqWith s "a real {0} mana cost, not an unpayable one (CR 118.5a/118.6)" (Cost.Type.mana (ActivatedAbility.cost ab)) (Just (ManaCost.MkManaCost []))
+        case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
+          [m] -> Spec.assertEqWith s "adds colorless" (Foldable.toList (Mode.effects m)) [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)]
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one activated ability"
+  -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. /
+  -- {T}: Add {C}." A nonbasic land whose whole text box is rules-text
+  -- abilities of two different kinds, which is what CR 305.7's strip needs
+  -- to reach (Pawl.TriggerSpec).
+  Spec.it s "Radiant Fountain is a nonbasic land with a SelfEnters life gain and a {T} colorless mana ability" $ do
+    radiantFountain <- Registry.printing registry "Radiant Fountain"
+    let c = Printing.card radiantFountain
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Radiant Fountain")
+    Spec.assertEqWith s "no mana cost" (Card.Type.manaCost c) Nothing
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
+    Spec.assertEqWith s "not basic, so Blood Moon reaches it (CR 305.8)" (TypeLine.supertypes (Card.Type.typeLine c)) Set.empty
+    Spec.assertEqWith s "no land types of its own" (TypeLine.subtypes (Card.Type.typeLine c)) Set.empty
+    Spec.assertEqWith s "no player abilities" (Card.Type.playerAbilities c) []
+    case Card.Type.triggeredAbilities c of
+      [ab] -> do
+        Spec.assertEqWith s "on its own entry (CR 603.6a)" (TriggeredAbility.condition ab) TriggerCondition.SelfEnters
+        case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+          [m] -> Spec.assertEqWith s "you gain 2" (Foldable.toList (Mode.effects m)) [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 2)]
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one triggered ability"
+    case Card.Type.activatedAbilities c of
+      [ab] -> do
+        Spec.assertEqWith s "tap cost only" (Cost.Type.components (ActivatedAbility.cost ab)) [CostComponent.TapThis]
+        case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
+          [m] -> Spec.assertEqWith s "adds colorless" (Foldable.toList (Mode.effects m)) [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)]
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one activated ability"
+  Spec.it s "Silence is a {W} instant whose one effect is AffectPlayers UntilEndOfTurn Opponents CantCastSpells" $ do
+    silence <- Registry.printing registry "Silence"
+    let c = Printing.card silence
+        white = ManaSymbol.OfType (ManaType.Colored Color.White)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Silence")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [white]))
+    Spec.assertBool s (Card.isInstant c) "an instant"
+    Spec.assertEqWith s "no player abilities: it is not a permanent" (Card.Type.playerAbilities c) []
+    Spec.assertEqWith
+      s
+      "one targetless opcode"
+      (Card.allEffects c)
+      [Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells]
+    Spec.assertEqWith s "no target slots" (Card.allTargetSpecs c) Map.empty
 
-m45p11CardTests :: Registry.Registry -> Tasty.TestTree
-m45p11CardTests registry =
-  Tasty.testGroup
-    "M4.5 P11"
-    [ HU.testCase "Palace Jailer is a {2}{W}{W} 2/2 Human Soldier with two ETB triggers" $ do
-        palaceJailer <- Registry.printing registry "Palace Jailer"
-        let c = Printing.card palaceJailer
-        HU.assertEqual "name" (Text.pack "Palace Jailer") (Card.Type.name c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
-        HU.assertEqual "two triggered abilities" 2 (length (Card.Type.triggeredAbilities c))
-    ]
+m45p11CardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+m45p11CardSpec s registry = Spec.describe s "M4.5 P11" $ do
+  Spec.it s "Palace Jailer is a {2}{W}{W} 2/2 Human Soldier with two ETB triggers" $ do
+    palaceJailer <- Registry.printing registry "Palace Jailer"
+    let c = Printing.card palaceJailer
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Palace Jailer")
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "two triggered abilities" (length (Card.Type.triggeredAbilities c)) 2
 
 -- M5.5 pinned the migrated per-card conditions at the CODEC level: the decoded
 -- card must equal the Condition the fixture spells out, so a decoding regression
 -- fails here rather than surfacing as a behavioural oddity somewhere downstream.
--- Master Thief's ForAsLongAs is pinned this way in m45p6CardTests; this is
+-- Master Thief's ForAsLongAs is pinned this way in m45p6CardSpec; this is
 -- Barbarian Outcast's StateIs, which had only behavioural coverage (#165).
-m55CardTests :: Registry.Registry -> Tasty.TestTree
-m55CardTests registry =
-  Tasty.testGroup
-    "M5.5"
-    [ HU.testCase "Barbarian Outcast's state trigger is a Count of exactly 0 Swamps you control (CR 603.8)" $ do
-        barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-        let c = Printing.card barbarianOutcast
-        HU.assertEqual "name" (Text.pack "Barbarian Outcast") (Card.Type.name c)
-        case Card.Type.triggeredAbilities c of
-          [ab] -> do
-            HU.assertEqual
-              "the decoded condition is S.youControlNoSwamps"
-              (TriggerCondition.StateIs S.youControlNoSwamps)
-              (TriggeredAbility.condition ab)
-            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
-              [m] -> HU.assertEqual "one Sacrifice self effect" [Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))] (Foldable.toList (Mode.effects m))
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one triggered ability",
-      -- The Aggregation.Greatest gate card (#254). The pin that matters is the
-      -- SHAPE: one Draw whose Quantity is a Count, with the per-member quantity
-      -- inside the AGGREGATION rather than beside it -- the arrangement that
-      -- makes "the greatest mana value among artifacts you control" one value
-      -- and not a card-specific opcode.
-      HU.testCase "One with the Machine is a {3}{U} Sorcery drawing the greatest mana value among artifacts you control" $ do
-        oneWithTheMachine <- Registry.printing registry "One with the Machine"
-        let c = Printing.card oneWithTheMachine
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-        HU.assertEqual "name" (Text.pack "One with the Machine") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, blue]) (Card.Type.manaCost c)
-        HU.assertBool "sorcery, not instant" (not (Card.isInstant c))
-        HU.assertEqual
-          "one Draw aimed at the caster, counting the battlefield"
-          [ Effect.Draw
-              (PlayerRef.Relative PlayerRelation.You)
-              ( Quantity.Type.Count
-                  ( Count.Type.MkCount
-                      (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-                      ( Filter.Type.And
-                          [ Filter.Type.HasCardType CardType.Artifact,
-                            Filter.Type.ControlledBy PlayerRelation.You
-                          ]
-                      )
-                      (Aggregation.Greatest Quantity.Type.ManaValue)
+m55CardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m55CardSpec s registry = Spec.describe s "M5.5" $ do
+  Spec.it s "Barbarian Outcast's state trigger is a Count of exactly 0 Swamps you control (CR 603.8)" $ do
+    barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+    let c = Printing.card barbarianOutcast
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Barbarian Outcast")
+    case Card.Type.triggeredAbilities c of
+      [ab] -> do
+        Spec.assertEqWith
+          s
+          "the decoded condition is S.youControlNoSwamps"
+          (TriggeredAbility.condition ab)
+          (TriggerCondition.StateIs S.youControlNoSwamps)
+        case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+          [m] -> Spec.assertEqWith s "one Sacrifice self effect" (Foldable.toList (Mode.effects m)) [Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))]
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one triggered ability"
+  -- The Aggregation.Greatest gate card (#254). The pin that matters is the
+  -- SHAPE: one Draw whose Quantity is a Count, with the per-member quantity
+  -- inside the AGGREGATION rather than beside it -- the arrangement that
+  -- makes "the greatest mana value among artifacts you control" one value
+  -- and not a card-specific opcode.
+  Spec.it s "One with the Machine is a {3}{U} Sorcery drawing the greatest mana value among artifacts you control" $ do
+    oneWithTheMachine <- Registry.printing registry "One with the Machine"
+    let c = Printing.card oneWithTheMachine
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "One with the Machine")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, blue])
+    Spec.assertBool s (not (Card.isInstant c)) "sorcery, not instant"
+    Spec.assertEqWith
+      s
+      "one Draw aimed at the caster, counting the battlefield"
+      (Card.allEffects c)
+      [ Effect.Draw
+          (PlayerRef.Relative PlayerRelation.You)
+          ( Quantity.Type.Count
+              ( Count.Type.MkCount
+                  (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                  ( Filter.Type.And
+                      [ Filter.Type.HasCardType CardType.Artifact,
+                        Filter.Type.ControlledBy PlayerRelation.You
+                      ]
                   )
+                  (Aggregation.Greatest Quantity.Type.ManaValue)
               )
-          ]
-          (Card.allEffects c)
-        HU.assertEqual "and no target slots" Map.empty (Card.allTargetSpecs c)
-    ]
+          )
+      ]
+    Spec.assertEqWith s "and no target slots" (Card.allTargetSpecs c) Map.empty
 
 -- The Auras phase (a) gate card: CR 303.4m's Attached affected-set, proven by a
 -- real Aura on a real creature rather than a synthetic fixture.
-auraCardTests :: Registry.Registry -> Tasty.TestTree
-auraCardTests registry =
-  Tasty.testGroup
-    "Auras"
-    [ HU.testCase "Unholy Strength is a {B} Aura enchanting a creature for +2/+1" $ do
-        p <- Registry.printing registry "Unholy Strength"
-        let card = Printing.card p
-            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [black])) (Card.Type.manaCost card)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
-        HU.assertEqual "subtypes" (Set.singleton Subtype.Aura) (TypeLine.subtypes (Card.Type.typeLine card))
-        HU.assertBool "is an Aura" (Card.isAura card)
-        -- CR 702.5a: "Enchant creature" -- the whole creature pool, unnarrowed.
-        HU.assertEqual "enchant creature" (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.Type.enchant card)
-        -- CR 303.4m: "enchanted creature gets +2/+1" -- layer 7c on whatever it is
-        -- attached to.
-        HU.assertEqual
-          "one +2/+1 static ability on the enchanted permanent"
-          [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1)))]
-          (Card.Type.staticAbilities card)
-        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
-        HU.assertEqual "no spell effects" [] (Card.allEffects card),
-      -- The pool's first CR 509.1c blocking requirement, and the first card whose
-      -- whole ability lives on neither staticAbilities nor playerAbilities --
-      -- which is the correction this file's presence records.
-      HU.testCase "Lure is a {1}{G}{G} Aura whose only ability is a CR 509.1c blocking requirement" $ do
-        p <- Registry.printing registry "Lure"
-        let card = Printing.card p
-            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-        HU.assertEqual "name" (Text.pack "Lure") (Card.Type.name card)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green, green])) (Card.Type.manaCost card)
-        HU.assertEqual "subtypes" (Set.singleton Subtype.Aura) (TypeLine.subtypes (Card.Type.typeLine card))
-        HU.assertEqual "enchant creature" (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.Type.enchant card)
-        -- CR 303.4m: "all creatures able to block ENCHANTED CREATURE do so".
-        HU.assertEqual
-          "one requirement, naming whatever the Aura is attached to"
-          [BlockRequirement.MkBlockRequirement Affected.Attached]
-          (Card.Type.blockRequirements card)
-        HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
-        HU.assertEqual "no spell effects" [] (Card.allEffects card),
-      -- Not an Aura itself, but the only card in the pool that MOVES one: CR
-      -- 701.3's Attach keyword action aimed at a permanent already on the
-      -- battlefield. Its shape is the whole design argument -- one target slot for
-      -- the Aura, no slot at all for the destination.
-      HU.testCase "Crown of the Ages is a {2} artifact whose {4},{T} ability moves an Aura" $ do
-        p <- Registry.printing registry "Crown of the Ages"
-        let c = Printing.card p
-            target = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Crown of the Ages") (Card.Type.name c)
-        -- The {4} is the ACTIVATION cost; the card itself costs {2}.
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2]) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "no enchant ability: it is not an Aura" Nothing (Card.Type.enchant c)
-        case Card.Type.activatedAbilities c of
-          [ab] -> do
-            HU.assertEqual "tap cost" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
-            HU.assertEqual "plus {4}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) (Cost.Type.mana (ActivatedAbility.cost ab))
-            case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
-              [m] -> do
-                -- "to another CREATURE" is the destination filter, and it is a
-                -- bare Filter rather than a target spec: CR 701.3 / the card's own
-                -- ruling, "this only targets the Aura and not either creature".
-                HU.assertEqual
-                  "CR 701.3: attach the targeted permanent to a chosen creature"
-                  [Effect.AttachTarget target (Filter.Type.HasCardType CardType.Creature)]
-                  (Foldable.toList (Mode.effects m))
-                -- "target Aura attached to a creature" -- the one slot, and the
-                -- only place IsAttachedToCreature appears in the pool.
-                HU.assertEqual
-                  "CR 115.1: one target slot, an Aura on a creature"
-                  (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]))))
-                  (Mode.targetSpecs m)
-              ms -> HU.assertFailure ("expected one mode, got " <> show (length ms))
-          abs_ -> HU.assertFailure ("expected one activated ability, got " <> show (length abs_)),
-      -- CR 702.5d's gate card: the first Aura in the pool whose enchant ability
-      -- names a PLAYER, and the first affected set reached through one.
-      HU.testCase "Curse of Death's Hold is a {3}{B}{B} Aura Curse enchanting a player for -1/-1" $ do
-        p <- Registry.printing registry "Curse of Death's Hold"
-        let card = Printing.card p
-            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-        HU.assertEqual "name" (Text.pack "Curse of Death's Hold") (Card.Type.name card)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, black, black]) (Card.Type.manaCost card)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
-        -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Aura, Subtype.Curse]) (TypeLine.subtypes (Card.Type.typeLine card))
-        HU.assertBool "is an Aura" (Card.isAura card)
-        -- CR 702.5d: "Enchant player" -- the whole player pool, unnarrowed, which
-        -- is what lets it target and be attached to a player and nothing else.
-        HU.assertEqual "enchant player" (Just (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.Type.enchant card)
-        -- CR 303.4m through the enchanted PLAYER: "creatures enchanted player
-        -- controls get -1/-1", layer 7c on a set the Aura is not attached to.
-        HU.assertEqual
-          "one -1/-1 static ability on the enchanted player's creatures"
-          [StaticAbility.MkStaticAbility (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)) (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal (-1))))]
-          (Card.Type.staticAbilities card)
-        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
-        HU.assertEqual "no spell effects" [] (Card.allEffects card),
-      -- The second Effect.AttachTarget producer in the pool, and the shape is the
-      -- design argument: ONE target slot for the Aura (CR 601.2c -- Gatherer is
-      -- explicit for Crown of the Ages that "this only targets the Aura"), two
-      -- effects in the order written (CR 608.2c), and a destination Filter that
-      -- asks about the SUBJECT rather than about the candidate.
-      HU.testCase "Aura Graft is a {1}{U} instant that gains an Aura and then moves it" $ do
-        p <- Registry.printing registry "Aura Graft"
-        let card = Printing.card p
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-            target = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Aura Graft") (Card.Type.name card)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, blue]) (Card.Type.manaCost card)
-        HU.assertEqual "types" (Set.singleton CardType.Instant) (TypeLine.types (Card.Type.typeLine card))
-        HU.assertEqual "no enchant ability: it is not an Aura itself" Nothing (Card.Type.enchant card)
-        case Foldable.toList (Modal.modes (Card.Type.spell card)) of
+auraCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+auraCardSpec s registry = Spec.describe s "Auras" $ do
+  Spec.it s "Unholy Strength is a {B} Aura enchanting a creature for +2/+1" $ do
+    p <- Registry.printing registry "Unholy Strength"
+    let card = Printing.card p
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [black]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.singleton Subtype.Aura)
+    Spec.assertBool s (Card.isAura card) "is an Aura"
+    -- CR 702.5a: "Enchant creature" -- the whole creature pool, unnarrowed.
+    Spec.assertEqWith s "enchant creature" (Card.Type.enchant card) (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
+    -- CR 303.4m: "enchanted creature gets +2/+1" -- layer 7c on whatever it is
+    -- attached to.
+    Spec.assertEqWith
+      s
+      "one +2/+1 static ability on the enchanted permanent"
+      (Card.Type.staticAbilities card)
+      [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1)))]
+    -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+    Spec.assertEqWith s "no spell effects" (Card.allEffects card) []
+  -- The pool's first CR 509.1c blocking requirement, and the first card whose
+  -- whole ability lives on neither staticAbilities nor playerAbilities --
+  -- which is the correction this file's presence records.
+  Spec.it s "Lure is a {1}{G}{G} Aura whose only ability is a CR 509.1c blocking requirement" $ do
+    p <- Registry.printing registry "Lure"
+    let card = Printing.card p
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Lure")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green, green]))
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.singleton Subtype.Aura)
+    Spec.assertEqWith s "enchant creature" (Card.Type.enchant card) (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
+    -- CR 303.4m: "all creatures able to block ENCHANTED CREATURE do so".
+    Spec.assertEqWith
+      s
+      "one requirement, naming whatever the Aura is attached to"
+      (Card.Type.blockRequirements card)
+      [BlockRequirement.MkBlockRequirement Affected.Attached]
+    Spec.assertEqWith s "and it modifies no characteristic" (Card.Type.staticAbilities card) []
+    Spec.assertEqWith s "no spell effects" (Card.allEffects card) []
+  -- Not an Aura itself, but the only card in the pool that MOVES one: CR
+  -- 701.3's Attach keyword action aimed at a permanent already on the
+  -- battlefield. Its shape is the whole design argument -- one target slot for
+  -- the Aura, no slot at all for the destination.
+  Spec.it s "Crown of the Ages is a {2} artifact whose {4},{T} ability moves an Aura" $ do
+    p <- Registry.printing registry "Crown of the Ages"
+    let c = Printing.card p
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Crown of the Ages")
+    -- The {4} is the ACTIVATION cost; the card itself costs {2}.
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
+    Spec.assertEqWith s "no enchant ability: it is not an Aura" (Card.Type.enchant c) Nothing
+    case Card.Type.activatedAbilities c of
+      [ab] -> do
+        Spec.assertEqWith s "tap cost" (Cost.Type.components (ActivatedAbility.cost ab)) [CostComponent.TapThis]
+        Spec.assertEqWith s "plus {4}" (Cost.Type.mana (ActivatedAbility.cost ab)) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
+        case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
           [m] -> do
-            -- Gatherer, 2007-07-15: "Aura Graft's effect has no duration", so the
-            -- control change is Duration.Indefinite rather than end of turn.
-            HU.assertEqual
-              "gain control indefinitely, then attach"
-              [ Effect.GainControl Duration.Indefinite (ObjectRef.InSlot target),
-                Effect.AttachTarget target Filter.Type.CanHostSubject
-              ]
+            -- "to another CREATURE" is the destination filter, and it is a
+            -- bare Filter rather than a target spec: CR 701.3 / the card's own
+            -- ruling, "this only targets the Aura and not either creature".
+            Spec.assertEqWith
+              s
+              "CR 701.3: attach the targeted permanent to a chosen creature"
               (Foldable.toList (Mode.effects m))
-            -- "target Aura THAT'S ATTACHED TO A PERMANENT" -- the one slot, and the
-            -- only place IsAttachedToPermanent appears in the pool.
-            HU.assertEqual
-              "CR 115.1: one target slot, an Aura on a permanent"
-              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToPermanent]))))
+              [Effect.AttachTarget target (Filter.Type.HasCardType CardType.Creature)]
+            -- "target Aura attached to a creature" -- the one slot, and the
+            -- only place IsAttachedToCreature appears in the pool.
+            Spec.assertEqWith
+              s
+              "CR 115.1: one target slot, an Aura on a creature"
               (Mode.targetSpecs m)
-          ms -> HU.assertFailure ("expected one mode, got " <> show (length ms))
-    ]
+              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]))))
+          ms -> Spec.assertFailure s ("expected one mode, got " <> show (length ms))
+      abs_ -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abs_))
+  -- CR 702.5d's gate card: the first Aura in the pool whose enchant ability
+  -- names a PLAYER, and the first affected set reached through one.
+  Spec.it s "Curse of Death's Hold is a {3}{B}{B} Aura Curse enchanting a player for -1/-1" $ do
+    p <- Registry.printing registry "Curse of Death's Hold"
+    let card = Printing.card p
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Curse of Death's Hold")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (costOf [ManaSymbol.Generic 3, black, black])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Enchantment)
+    -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.fromList [Subtype.Aura, Subtype.Curse])
+    Spec.assertBool s (Card.isAura card) "is an Aura"
+    -- CR 702.5d: "Enchant player" -- the whole player pool, unnarrowed, which
+    -- is what lets it target and be attached to a player and nothing else.
+    Spec.assertEqWith s "enchant player" (Card.Type.enchant card) (Just (TargetSpec.MkTargetSpec Pool.Players Nothing))
+    -- CR 303.4m through the enchanted PLAYER: "creatures enchanted player
+    -- controls get -1/-1", layer 7c on a set the Aura is not attached to.
+    Spec.assertEqWith
+      s
+      "one -1/-1 static ability on the enchanted player's creatures"
+      (Card.Type.staticAbilities card)
+      [StaticAbility.MkStaticAbility (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)) (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal (-1))))]
+    -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+    Spec.assertEqWith s "no spell effects" (Card.allEffects card) []
+  -- The second Effect.AttachTarget producer in the pool, and the shape is the
+  -- design argument: ONE target slot for the Aura (CR 601.2c -- Gatherer is
+  -- explicit for Crown of the Ages that "this only targets the Aura"), two
+  -- effects in the order written (CR 608.2c), and a destination Filter that
+  -- asks about the SUBJECT rather than about the candidate.
+  Spec.it s "Aura Graft is a {1}{U} instant that gains an Aura and then moves it" $ do
+    p <- Registry.printing registry "Aura Graft"
+    let card = Printing.card p
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Aura Graft")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (costOf [ManaSymbol.Generic 1, blue])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Instant)
+    Spec.assertEqWith s "no enchant ability: it is not an Aura itself" (Card.Type.enchant card) Nothing
+    case Foldable.toList (Modal.modes (Card.Type.spell card)) of
+      [m] -> do
+        -- Gatherer, 2007-07-15: "Aura Graft's effect has no duration", so the
+        -- control change is Duration.Indefinite rather than end of turn.
+        Spec.assertEqWith
+          s
+          "gain control indefinitely, then attach"
+          (Foldable.toList (Mode.effects m))
+          [ Effect.GainControl Duration.Indefinite (ObjectRef.InSlot target),
+            Effect.AttachTarget target Filter.Type.CanHostSubject
+          ]
+        -- "target Aura THAT'S ATTACHED TO A PERMANENT" -- the one slot, and the
+        -- only place IsAttachedToPermanent appears in the pool.
+        Spec.assertEqWith
+          s
+          "CR 115.1: one target slot, an Aura on a permanent"
+          (Mode.targetSpecs m)
+          (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToPermanent]))))
+      ms -> Spec.assertFailure s ("expected one mode, got " <> show (length ms))
 
 -- Skilled Animator's "for as long as this creature remains on the battlefield",
 -- as an ordinary count. The sibling of S.youControlSource with the CR 109.5
@@ -1657,381 +1657,377 @@ sourceOnBattlefield =
 -- -- every printed enchantment animator excludes Auras by name; and March of the
 -- Machines animates every noncreature artifact at once, which is the card CR
 -- 613.6 exists for (#233).
-animatorCardTests :: Registry.Registry -> Tasty.TestTree
-animatorCardTests registry =
-  Tasty.testGroup
-    "Animators"
-    [ -- The CR 613.6 gate card (#233), and the pin that matters is the SHAPE: one
-      -- static ability with three parts, not three abilities. Its affected set
-      -- reads a card type its own layer-4 part changes, so the parts have to stay
-      -- one effect or the layer-7b part loses the set.
-      HU.testCase "March of the Machines is a {3}{U} enchantment: ONE ability, three parts, one affected set" $ do
-        p <- Registry.printing registry "March of the Machines"
-        let c = Printing.card p
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-            noncreatureArtifact =
-              Affected.Matching
-                ( Filter.Type.And
-                    [ Filter.Type.HasCardType CardType.Artifact,
-                      Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
-                    ]
-                )
-        HU.assertEqual "name" (Text.pack "March of the Machines") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, blue]) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual
-          "\"is an artifact creature with power and toughness each equal to its mana value\""
-          [ StaticAbility.MkStaticAbility
-              noncreatureArtifact
-              ( Modification.AddCardType CardType.Artifact
-                  NonEmpty.:| [ Modification.AddCardType CardType.Creature,
-                                Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue
-                              ]
-              )
-          ]
-          (Card.Type.staticAbilities c),
-      -- The same shape, arrived at from the other direction: Humility and
-      -- Opalescence were each TWO abilities before #233 and are now one with two
-      -- parts. Nothing observable changed for them -- their filters read card types
-      -- they do not themselves change -- but the model has to be uniform, and this
-      -- is the pin that keeps a future card from re-splitting them.
-      HU.testCase "Humility and Opalescence are each one two-part ability, not two abilities" $ do
-        humility <- Registry.printing registry "Humility"
-        opalescence <- Registry.printing registry "Opalescence"
-        let partsOf p = fmap (NonEmpty.toList . StaticAbility.modifications) (Card.Type.staticAbilities (Printing.card p))
-        HU.assertEqual
-          "CR 613.1f + CR 613.4b: lose all abilities, base 1/1"
-          [[Modification.LoseAllAbilities, Modification.SetBasePowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)]]
-          (partsOf humility)
-        HU.assertEqual
-          "CR 613.1d + CR 613.4b: becomes a creature, base P/T its mana value"
-          [[Modification.AddCardType CardType.Creature, Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue]]
-          (partsOf opalescence),
-      HU.testCase "Liquimetal Coating is a {2} artifact whose {T} ability makes any permanent an artifact" $ do
-        p <- Registry.printing registry "Liquimetal Coating"
-        let c = Printing.card p
-            target = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Liquimetal Coating") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2]) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
-        case Card.Type.activatedAbilities c of
-          [ab] -> do
-            -- CR 107.5: the tap symbol is the entire activation cost.
-            HU.assertEqual "tap cost only" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
-            HU.assertEqual "and no mana" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost ab))
-            case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
-              [m] -> do
-                HU.assertEqual
-                  "CR 613.1d: one layer-4 addition, until end of turn"
-                  [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target)]
-                  (Foldable.toList (Mode.effects m))
-                -- "Target permanent", unnarrowed -- the Aura the CR 303.4d case
-                -- needs is a legal target precisely because there is no filter.
-                HU.assertEqual
-                  "CR 115.1: one target slot, any permanent"
-                  (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents Nothing))
-                  (Mode.targetSpecs m)
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one activated ability",
-      HU.testCase "Skilled Animator is a {2}{U} 1/3 Human Artificer whose ETB animates an artifact you control" $ do
-        p <- Registry.printing registry "Skilled Animator"
-        let c = Printing.card p
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-            target = SlotName.MkSlotName (Text.pack "target")
-            duration = Duration.ForAsLongAs sourceOnBattlefield
-        HU.assertEqual "name" (Text.pack "Skilled Animator") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, blue]) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c)
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Artificer]) (TypeLine.subtypes (Card.Type.typeLine c))
-        case Card.Type.triggeredAbilities c of
-          [ab] -> do
-            HU.assertEqual "CR 603.6a: it triggers on entering" TriggerCondition.SelfEnters (TriggeredAbility.condition ab)
-            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
-              [m] -> do
-                -- "becomes an artifact creature with base power and toughness
-                -- 5/5" is one printed effect that applies in two layers -- CR
-                -- 613.1d for the added card types, CR 613.4b for the base P/T --
-                -- so it decomposes into one Modification per layer. CR 613.6
-                -- ("it will continue to be applied to the same set of objects in
-                -- each other applicable layer") costs nothing across that split
-                -- here: each part locks the same CR 611.2c one-object set at
-                -- resolution, so there is no set left to disagree about.
-                HU.assertEqual
-                  "three parts, all on the target, all for the same duration"
-                  [ Effect.ModifyTarget duration (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target),
-                    Effect.ModifyTarget duration (Modification.AddCardType CardType.Creature) (ObjectRef.InSlot target),
-                    Effect.ModifyTarget duration (Modification.SetBasePowerToughness (Quantity.Type.Literal 5) (Quantity.Type.Literal 5)) (ObjectRef.InSlot target)
-                  ]
-                  (Foldable.toList (Mode.effects m))
-                HU.assertEqual
-                  "CR 115.1: one target slot, an artifact you control"
-                  (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasCardType CardType.Artifact, Filter.Type.ControlledBy PlayerRelation.You]))))
-                  (Mode.targetSpecs m)
-              _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one triggered ability"
-    ]
+animatorCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+animatorCardSpec s registry = Spec.describe s "Animators" $ do
+  -- The CR 613.6 gate card (#233), and the pin that matters is the SHAPE: one
+  -- static ability with three parts, not three abilities. Its affected set
+  -- reads a card type its own layer-4 part changes, so the parts have to stay
+  -- one effect or the layer-7b part loses the set.
+  Spec.it s "March of the Machines is a {3}{U} enchantment: ONE ability, three parts, one affected set" $ do
+    p <- Registry.printing registry "March of the Machines"
+    let c = Printing.card p
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        noncreatureArtifact =
+          Affected.Matching
+            ( Filter.Type.And
+                [ Filter.Type.HasCardType CardType.Artifact,
+                  Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
+                ]
+            )
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "March of the Machines")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, blue])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith
+      s
+      "\"is an artifact creature with power and toughness each equal to its mana value\""
+      (Card.Type.staticAbilities c)
+      [ StaticAbility.MkStaticAbility
+          noncreatureArtifact
+          ( Modification.AddCardType CardType.Artifact
+              NonEmpty.:| [ Modification.AddCardType CardType.Creature,
+                            Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue
+                          ]
+          )
+      ]
+  -- The same shape, arrived at from the other direction: Humility and
+  -- Opalescence were each TWO abilities before #233 and are now one with two
+  -- parts. Nothing observable changed for them -- their filters read card types
+  -- they do not themselves change -- but the model has to be uniform, and this
+  -- is the pin that keeps a future card from re-splitting them.
+  Spec.it s "Humility and Opalescence are each one two-part ability, not two abilities" $ do
+    humility <- Registry.printing registry "Humility"
+    opalescence <- Registry.printing registry "Opalescence"
+    let partsOf p = fmap (NonEmpty.toList . StaticAbility.modifications) (Card.Type.staticAbilities (Printing.card p))
+    Spec.assertEqWith
+      s
+      "CR 613.1f + CR 613.4b: lose all abilities, base 1/1"
+      (partsOf humility)
+      [[Modification.LoseAllAbilities, Modification.SetBasePowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)]]
+    Spec.assertEqWith
+      s
+      "CR 613.1d + CR 613.4b: becomes a creature, base P/T its mana value"
+      (partsOf opalescence)
+      [[Modification.AddCardType CardType.Creature, Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue]]
+  Spec.it s "Liquimetal Coating is a {2} artifact whose {T} ability makes any permanent an artifact" $ do
+    p <- Registry.printing registry "Liquimetal Coating"
+    let c = Printing.card p
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Liquimetal Coating")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
+    case Card.Type.activatedAbilities c of
+      [ab] -> do
+        -- CR 107.5: the tap symbol is the entire activation cost.
+        Spec.assertEqWith s "tap cost only" (Cost.Type.components (ActivatedAbility.cost ab)) [CostComponent.TapThis]
+        Spec.assertEqWith s "and no mana" (Cost.Type.mana (ActivatedAbility.cost ab)) (Just (ManaCost.MkManaCost []))
+        case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
+          [m] -> do
+            Spec.assertEqWith
+              s
+              "CR 613.1d: one layer-4 addition, until end of turn"
+              (Foldable.toList (Mode.effects m))
+              [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target)]
+            -- "Target permanent", unnarrowed -- the Aura the CR 303.4d case
+            -- needs is a legal target precisely because there is no filter.
+            Spec.assertEqWith
+              s
+              "CR 115.1: one target slot, any permanent"
+              (Mode.targetSpecs m)
+              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents Nothing))
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one activated ability"
+  Spec.it s "Skilled Animator is a {2}{U} 1/3 Human Artificer whose ETB animates an artifact you control" $ do
+    p <- Registry.printing registry "Skilled Animator"
+    let c = Printing.card p
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        target = SlotName.MkSlotName (Text.pack "target")
+        duration = Duration.ForAsLongAs sourceOnBattlefield
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Skilled Animator")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, blue])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Human, Subtype.Artificer])
+    case Card.Type.triggeredAbilities c of
+      [ab] -> do
+        Spec.assertEqWith s "CR 603.6a: it triggers on entering" (TriggeredAbility.condition ab) TriggerCondition.SelfEnters
+        case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+          [m] -> do
+            -- "becomes an artifact creature with base power and toughness
+            -- 5/5" is one printed effect that applies in two layers -- CR
+            -- 613.1d for the added card types, CR 613.4b for the base P/T --
+            -- so it decomposes into one Modification per layer. CR 613.6
+            -- ("it will continue to be applied to the same set of objects in
+            -- each other applicable layer") costs nothing across that split
+            -- here: each part locks the same CR 611.2c one-object set at
+            -- resolution, so there is no set left to disagree about.
+            Spec.assertEqWith
+              s
+              "three parts, all on the target, all for the same duration"
+              (Foldable.toList (Mode.effects m))
+              [ Effect.ModifyTarget duration (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target),
+                Effect.ModifyTarget duration (Modification.AddCardType CardType.Creature) (ObjectRef.InSlot target),
+                Effect.ModifyTarget duration (Modification.SetBasePowerToughness (Quantity.Type.Literal 5) (Quantity.Type.Literal 5)) (ObjectRef.InSlot target)
+              ]
+            Spec.assertEqWith
+              s
+              "CR 115.1: one target slot, an artifact you control"
+              (Mode.targetSpecs m)
+              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasCardType CardType.Artifact, Filter.Type.ControlledBy PlayerRelation.You]))))
+          _ -> Spec.assertFailure s "expected exactly one mode"
+      _ -> Spec.assertFailure s "expected exactly one triggered ability"
 
 -- CR 702.29: the pool's first cycling card. Barkhide Mauler is a vanilla 4/4
 -- whose only text is the keyword, so nothing else about it can stand in for the
 -- keyword when a cycling test passes.
-cyclingCardTests :: Registry.Registry -> Tasty.TestTree
-cyclingCardTests registry =
-  Tasty.testGroup
-    "Cycling"
-    [ HU.testCase "Windcaller Aven is a {4}{U}{U} 4/3 with flying, Cycling {U} and a cycling trigger" $ do
-        p <- Registry.printing registry "Windcaller Aven"
-        let c = Printing.card p
-            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-        HU.assertEqual "name" (Text.pack "Windcaller Aven") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 4, blue, blue]) (Card.Type.manaCost c)
-        -- Two keywords, one printed and one that mints an ability: rule 702.9's
-        -- flying is read where evasion is asked about, and rule 702.29a's cycling
-        -- is minted by Pawl.Engine.Keyword.
-        HU.assertEqual
-          "flying and Cycling {U}"
-          (Set.fromList [Keyword.Flying, Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [blue])) []) Nothing])
-          (Card.Type.keywords c)
-        case Card.Type.triggeredAbilities c of
-          [ability] ->
-            HU.assertEqual
-              "CR 702.29c: it triggers on being cycled"
-              TriggerCondition.SelfCycled
-              (TriggeredAbility.condition ability)
-          abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities)),
-      HU.testCase "Ash Barrens is a Land with {T}: Add {C} and basic landcycling {1}" $ do
-        p <- Registry.printing registry "Ash Barrens"
-        let c = Printing.card p
-            basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
-        HU.assertEqual "name" (Text.pack "Ash Barrens") (Card.Type.name c)
-        HU.assertEqual "a land, with no mana cost (CR 202.1)" Nothing (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
-        -- CR 702.29e's "[type]" is a Filter, and "basic land" is why: the same
-        -- two-atom filter Evolving Wilds' search carries.
-        HU.assertEqual
-          "basic landcycling {1}"
-          (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []) (Just basicLand)))
-          (Card.Type.keywords c)
-        HU.assertEqual "one activated ability, its own mana ability" 1 (length (Card.Type.activatedAbilities c)),
-      HU.testCase "Barkhide Mauler is a {4}{G} 4/4 Beast whose only text is Cycling {2}" $ do
-        p <- Registry.printing registry "Barkhide Mauler"
-        let c = Printing.card p
-            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-        HU.assertEqual "name" (Text.pack "Barkhide Mauler") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 4, green]) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 4))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 4))) (Card.Type.toughness c)
-        HU.assertEqual "subtypes" (Set.singleton Subtype.Beast) (TypeLine.subtypes (Card.Type.typeLine c))
-        -- The card data carries the PRINTED cost and nothing else: rule 702.29a's
-        -- discard and draw are minted by Pawl.Engine.Keyword, never authored here.
-        HU.assertEqual
-          "\"Cycling {2}\""
-          (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []) Nothing))
-          (Card.Type.keywords c)
-        HU.assertEqual "and no activated ability of its own" [] (Card.Type.activatedAbilities c)
-    ]
+cyclingCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+cyclingCardSpec s registry = Spec.describe s "Cycling" $ do
+  Spec.it s "Windcaller Aven is a {4}{U}{U} 4/3 with flying, Cycling {U} and a cycling trigger" $ do
+    p <- Registry.printing registry "Windcaller Aven"
+    let c = Printing.card p
+        blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Windcaller Aven")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 4, blue, blue])
+    -- Two keywords, one printed and one that mints an ability: rule 702.9's
+    -- flying is read where evasion is asked about, and rule 702.29a's cycling
+    -- is minted by Pawl.Engine.Keyword.
+    Spec.assertEqWith
+      s
+      "flying and Cycling {U}"
+      (Card.Type.keywords c)
+      (Set.fromList [Keyword.Flying, Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [blue])) []) Nothing])
+    case Card.Type.triggeredAbilities c of
+      [ability] ->
+        Spec.assertEqWith
+          s
+          "CR 702.29c: it triggers on being cycled"
+          (TriggeredAbility.condition ability)
+          TriggerCondition.SelfCycled
+      abilities -> Spec.assertFailure s ("expected one triggered ability, got " <> show (length abilities))
+  Spec.it s "Ash Barrens is a Land with {T}: Add {C} and basic landcycling {1}" $ do
+    p <- Registry.printing registry "Ash Barrens"
+    let c = Printing.card p
+        basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Ash Barrens")
+    Spec.assertEqWith s "a land, with no mana cost (CR 202.1)" (Card.Type.manaCost c) Nothing
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
+    -- CR 702.29e's "[type]" is a Filter, and "basic land" is why: the same
+    -- two-atom filter Evolving Wilds' search carries.
+    Spec.assertEqWith
+      s
+      "basic landcycling {1}"
+      (Card.Type.keywords c)
+      (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []) (Just basicLand)))
+    Spec.assertEqWith s "one activated ability, its own mana ability" (length (Card.Type.activatedAbilities c)) 1
+  Spec.it s "Barkhide Mauler is a {4}{G} 4/4 Beast whose only text is Cycling {2}" $ do
+    p <- Registry.printing registry "Barkhide Mauler"
+    let c = Printing.card p
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Barkhide Mauler")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 4, green])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 4)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 4)))
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.singleton Subtype.Beast)
+    -- The card data carries the PRINTED cost and nothing else: rule 702.29a's
+    -- discard and draw are minted by Pawl.Engine.Keyword, never authored here.
+    Spec.assertEqWith
+      s
+      "\"Cycling {2}\""
+      (Card.Type.keywords c)
+      (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []) Nothing))
+    Spec.assertEqWith s "and no activated ability of its own" (Card.Type.activatedAbilities c) []
 
 -- The pool's two world enchantments. Their abilities are ordinary -- a layer-6
 -- keyword grant and a layer-4/7b animation, both shapes the pool already had --
 -- and it is the SUPERTYPE on the type line that earns them their place: CR
 -- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Engine.Sba.worldVictims),
 -- and nothing else in the corpus carries it.
-worldCardTests :: Registry.Registry -> Tasty.TestTree
-worldCardTests registry =
-  Tasty.testGroup
-    "WorldEnchantments"
-    [ HU.testCase "Concordant Crossroads is a {G} world enchantment giving all creatures haste" $ do
-        p <- Registry.printing registry "Concordant Crossroads"
-        let c = Printing.card p
-            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-        HU.assertEqual "name" (Text.pack "Concordant Crossroads") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [green]) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "CR 205.4f: the supertype the world rule reads" (Set.singleton Supertype.World) (TypeLine.supertypes (Card.Type.typeLine c))
-        HU.assertEqual
-          "\"All creatures have haste\""
-          [ StaticAbility.MkStaticAbility
-              (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
-              (Modification.GainKeyword Keyword.Haste NonEmpty.:| [])
-          ]
-          (Card.Type.staticAbilities c),
-      HU.testCase "Living Plane is a {2}{G}{G} world enchantment making every land a 1/1 creature" $ do
-        p <- Registry.printing registry "Living Plane"
-        let c = Printing.card p
-            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-        HU.assertEqual "name" (Text.pack "Living Plane") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, green, green]) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "CR 205.4f: the supertype the world rule reads" (Set.singleton Supertype.World) (TypeLine.supertypes (Card.Type.typeLine c))
-        -- ONE ability with two parts, not two abilities (#233) -- the shape
-        -- every animator in the pool has. CR 613.6 costs this one nothing
-        -- either way, unlike March of the Machines: its affected set reads a
-        -- card type ("all lands") that its own layer-4 part does not change.
-        HU.assertEqual
-          "\"All lands are 1/1 creatures that are still lands\""
-          [ StaticAbility.MkStaticAbility
-              (Affected.Matching (Filter.Type.HasCardType CardType.Land))
-              ( Modification.AddCardType CardType.Creature
-                  NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)]
-              )
-          ]
-          (Card.Type.staticAbilities c)
-    ]
+worldCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+worldCardSpec s registry = Spec.describe s "WorldEnchantments" $ do
+  Spec.it s "Concordant Crossroads is a {G} world enchantment giving all creatures haste" $ do
+    p <- Registry.printing registry "Concordant Crossroads"
+    let c = Printing.card p
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Concordant Crossroads")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [green])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith s "CR 205.4f: the supertype the world rule reads" (TypeLine.supertypes (Card.Type.typeLine c)) (Set.singleton Supertype.World)
+    Spec.assertEqWith
+      s
+      "\"All creatures have haste\""
+      (Card.Type.staticAbilities c)
+      [ StaticAbility.MkStaticAbility
+          (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
+          (Modification.GainKeyword Keyword.Haste NonEmpty.:| [])
+      ]
+  Spec.it s "Living Plane is a {2}{G}{G} world enchantment making every land a 1/1 creature" $ do
+    p <- Registry.printing registry "Living Plane"
+    let c = Printing.card p
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Living Plane")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, green, green])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith s "CR 205.4f: the supertype the world rule reads" (TypeLine.supertypes (Card.Type.typeLine c)) (Set.singleton Supertype.World)
+    -- ONE ability with two parts, not two abilities (#233) -- the shape
+    -- every animator in the pool has. CR 613.6 costs this one nothing
+    -- either way, unlike March of the Machines: its affected set reads a
+    -- card type ("all lands") that its own layer-4 part does not change.
+    Spec.assertEqWith
+      s
+      "\"All lands are 1/1 creatures that are still lands\""
+      (Card.Type.staticAbilities c)
+      [ StaticAbility.MkStaticAbility
+          (Affected.Matching (Filter.Type.HasCardType CardType.Land))
+          ( Modification.AddCardType CardType.Creature
+              NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)]
+          )
+      ]
 
 -- CR 701.20: the cards that say "reveal" in their own text, as opposed to
 -- inheriting it from a keyword the way Ash Barrens' typecycling does.
-revealCardTests :: Registry.Registry -> Tasty.TestTree
-revealCardTests registry =
-  Tasty.testGroup
-    "Reveal"
-    [ HU.testCase "Braidwood Sextant is a {1} Artifact whose {2}, {T}, Sacrifice fetches a revealed basic land" $ do
-        p <- Registry.printing registry "Braidwood Sextant"
-        let c = Printing.card p
-            basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
-        HU.assertEqual "name" (Text.pack "Braidwood Sextant") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1]) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
-        case Card.Type.activatedAbilities c of
-          [ability] -> do
-            HU.assertEqual
-              "\"{2}, {T}, Sacrifice this artifact\""
-              (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [CostComponent.TapThis, CostComponent.SacrificeThis])
-              (ActivatedAbility.cost ability)
-            -- The whole point of the card, in the destination: "reveal that
-            -- card, put it into your hand" is ONE instruction (CR 701.23e), and
-            -- the same filter Evolving Wilds and Ash Barrens carry.
-            case Foldable.toList (Modal.modes (ActivatedAbility.modal ability)) of
-              [m] ->
-                HU.assertEqual
-                  "\"Search your library for a basic land card, reveal that card, put it into your hand\""
-                  [Effect.Search basicLand SearchDestination.RevealThenHand]
-                  (Foldable.toList (Mode.effects m))
-              modes -> HU.assertFailure ("expected one mode, got " <> show (length modes))
-          abilities -> HU.assertFailure ("expected one activated ability, got " <> show (length abilities))
-    ]
+revealCardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+revealCardSpec s registry = Spec.describe s "Reveal" $ do
+  Spec.it s "Braidwood Sextant is a {1} Artifact whose {2}, {T}, Sacrifice fetches a revealed basic land" $ do
+    p <- Registry.printing registry "Braidwood Sextant"
+    let c = Printing.card p
+        basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Braidwood Sextant")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
+    case Card.Type.activatedAbilities c of
+      [ability] -> do
+        Spec.assertEqWith
+          s
+          "\"{2}, {T}, Sacrifice this artifact\""
+          (ActivatedAbility.cost ability)
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [CostComponent.TapThis, CostComponent.SacrificeThis])
+        -- The whole point of the card, in the destination: "reveal that
+        -- card, put it into your hand" is ONE instruction (CR 701.23e), and
+        -- the same filter Evolving Wilds and Ash Barrens carry.
+        case Foldable.toList (Modal.modes (ActivatedAbility.modal ability)) of
+          [m] ->
+            Spec.assertEqWith
+              s
+              "\"Search your library for a basic land card, reveal that card, put it into your hand\""
+              (Foldable.toList (Mode.effects m))
+              [Effect.Search basicLand SearchDestination.RevealThenHand]
+          modes -> Spec.assertFailure s ("expected one mode, got " <> show (length modes))
+      abilities -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abilities))
 
 -- CR 603.6a's second written form. Soul Warden is the pool's first card whose
 -- ability triggers on a permanent OTHER than itself entering, and its effect
 -- names nothing about the newcomer, so the card is a clean witness for the
 -- trigger condition alone.
-entersCardTests :: Registry.Registry -> Tasty.TestTree
-entersCardTests registry =
-  Tasty.testGroup
-    "Enters"
-    [ HU.testCase "Soul Warden is a {W} 1/1 Human Cleric whose trigger reads \"whenever ANOTHER creature enters\"" $ do
-        p <- Registry.printing registry "Soul Warden"
-        let c = Printing.card p
-            white = ManaSymbol.OfType (ManaType.Colored Color.White)
-        HU.assertEqual "name" (Text.pack "Soul Warden") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [white]) (Card.Type.manaCost c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Cleric]) (TypeLine.subtypes (Card.Type.typeLine c))
-        case Card.Type.triggeredAbilities c of
-          [ability] -> do
-            -- "another" is `Not IsSource` INSIDE the condition's Filter, which
-            -- is the one spelling Filter.IsSource fixes for it (#163) -- there
-            -- is no exclusion flag beside the Filter to get out of step with.
-            HU.assertEqual
-              "CR 603.6a: whenever another creature enters"
-              (TriggerCondition.PermanentEnters (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsSource]))
-              (TriggeredAbility.condition ability)
-            HU.assertEqual "no intervening \"if\" (CR 603.4)" Nothing (TriggeredAbility.intervening ability)
-            case Foldable.toList (Modal.modes (TriggeredAbility.modal ability)) of
-              [m] -> do
-                -- CR 109.5's "you": the ability's controller, and no target
-                -- slot at all -- the effect never reads the entering creature.
-                HU.assertEqual
-                  "\"you gain 1 life\""
-                  [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1)]
-                  (Foldable.toList (Mode.effects m))
-                HU.assertEqual "targetless" Map.empty (Mode.targetSpecs m)
-              modes -> HU.assertFailure ("expected one mode, got " <> show (length modes))
-          abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities))
-    ]
+entersCardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+entersCardSpec s registry = Spec.describe s "Enters" $ do
+  Spec.it s "Soul Warden is a {W} 1/1 Human Cleric whose trigger reads \"whenever ANOTHER creature enters\"" $ do
+    p <- Registry.printing registry "Soul Warden"
+    let c = Printing.card p
+        white = ManaSymbol.OfType (ManaType.Colored Color.White)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Soul Warden")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [white])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Human, Subtype.Cleric])
+    case Card.Type.triggeredAbilities c of
+      [ability] -> do
+        -- "another" is `Not IsSource` INSIDE the condition's Filter, which
+        -- is the one spelling Filter.IsSource fixes for it (#163) -- there
+        -- is no exclusion flag beside the Filter to get out of step with.
+        Spec.assertEqWith
+          s
+          "CR 603.6a: whenever another creature enters"
+          (TriggeredAbility.condition ability)
+          (TriggerCondition.PermanentEnters (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsSource]))
+        Spec.assertEqWith s "no intervening \"if\" (CR 603.4)" (TriggeredAbility.intervening ability) Nothing
+        case Foldable.toList (Modal.modes (TriggeredAbility.modal ability)) of
+          [m] -> do
+            -- CR 109.5's "you": the ability's controller, and no target
+            -- slot at all -- the effect never reads the entering creature.
+            Spec.assertEqWith
+              s
+              "\"you gain 1 life\""
+              (Foldable.toList (Mode.effects m))
+              [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1)]
+            Spec.assertEqWith s "targetless" (Mode.targetSpecs m) Map.empty
+          modes -> Spec.assertFailure s ("expected one mode, got " <> show (length modes))
+      abilities -> Spec.assertFailure s ("expected one triggered ability, got " <> show (length abilities))
 
-unspentManaCardTests :: Registry.Registry -> Tasty.TestTree
-unspentManaCardTests registry =
-  Tasty.testGroup
-    "Unspent mana"
-    [ -- The modern Oracle wording is "don't LOSE unspent mana", CR 106.4's verb,
-      -- not "mana pools don't empty" -- and it is symmetric, which is why the
-      -- scope is EachPlayer and the effect needs no mana-type argument.
-      HU.testCase "Upwelling is a {3}{G} Enchantment with one EachPlayer DontLoseUnspentMana ability" $ do
-        p <- Registry.printing registry "Upwelling"
-        let c = Printing.card p
-            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-        HU.assertEqual "name" (Text.pack "Upwelling") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, green]) (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "no object-axis static abilities" [] (Card.Type.staticAbilities c)
-        HU.assertEqual
-          "one player ability"
-          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer PlayerEffect.DontLoseUnspentMana]
-          (Card.Type.playerAbilities c)
-    ]
+unspentManaCardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+unspentManaCardSpec s registry = Spec.describe s "Unspent mana" $ do
+  -- The modern Oracle wording is "don't LOSE unspent mana", CR 106.4's verb,
+  -- not "mana pools don't empty" -- and it is symmetric, which is why the
+  -- scope is EachPlayer and the effect needs no mana-type argument.
+  Spec.it s "Upwelling is a {3}{G} Enchantment with one EachPlayer DontLoseUnspentMana ability" $ do
+    p <- Registry.printing registry "Upwelling"
+    let c = Printing.card p
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Upwelling")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, green])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith s "no object-axis static abilities" (Card.Type.staticAbilities c) []
+    Spec.assertEqWith
+      s
+      "one player ability"
+      (Card.Type.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer PlayerEffect.DontLoseUnspentMana]
 
-phyrexianCardTests :: Registry.Registry -> Tasty.TestTree
-phyrexianCardTests registry =
-  Tasty.testGroup
-    "Phyrexian"
-    [ HU.testCase "Mutagenic Growth is a {G/P} Instant giving target creature +2/+2" $ do
-        p <- Registry.printing registry "Mutagenic Growth"
-        let c = Printing.card p
-            target = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Mutagenic Growth") (Card.Type.name c)
-        HU.assertEqual "cost" (costOf [ManaSymbol.Phyrexian Color.Green]) (Card.Type.manaCost c)
-        HU.assertBool "an instant" (Card.isInstant c)
-        HU.assertEqual
-          "+2/+2 until end of turn"
-          [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) (ObjectRef.InSlot target)]
-          (Card.allEffects c)
-        HU.assertEqual "one creature slot" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
-      -- CR 202.3g: "Each Phyrexian mana symbol in a card's mana cost contributes
-      -- 1 to its mana value." Not 2 (the life half is not mana at all, so CR
-      -- 202.3f's "largest component" reading does not apply) and not 0.
-      HU.testCase "CR 202.3g Mutagenic Growth's Phyrexian symbol makes mana value 1" $ do
-        p <- Registry.printing registry "Mutagenic Growth"
-        HU.assertEqual "one" 1 (Quantity.manaValueOf (Printing.card p))
-    ]
+phyrexianCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+phyrexianCardSpec s registry = Spec.describe s "Phyrexian" $ do
+  Spec.it s "Mutagenic Growth is a {G/P} Instant giving target creature +2/+2" $ do
+    p <- Registry.printing registry "Mutagenic Growth"
+    let c = Printing.card p
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Mutagenic Growth")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Phyrexian Color.Green])
+    Spec.assertBool s (Card.isInstant c) "an instant"
+    Spec.assertEqWith
+      s
+      "+2/+2 until end of turn"
+      (Card.allEffects c)
+      [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) (ObjectRef.InSlot target)]
+    Spec.assertEqWith s "one creature slot" (Card.allTargetSpecs c) (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
+  -- CR 202.3g: "Each Phyrexian mana symbol in a card's mana cost contributes
+  -- 1 to its mana value." Not 2 (the life half is not mana at all, so CR
+  -- 202.3f's "largest component" reading does not apply) and not 0.
+  Spec.it s "CR 202.3g Mutagenic Growth's Phyrexian symbol makes mana value 1" $ do
+    p <- Registry.printing registry "Mutagenic Growth"
+    Spec.assertEqWith s "one" (Quantity.manaValueOf (Printing.card p)) 1
 
 -- CR 506.4's "an effect specifically removes it from combat", as printed.
 -- Labyrinth of Skophos is a Land with two activated abilities and no mana cost:
 -- "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking creature from
 -- combat." (Murders at Karlov Manor Commander; oracle text checked against
 -- Scryfall.) The gameplay proof is Pawl.CombatSpec's EffectRemoval group.
-removeFromCombatCardTests :: Registry.Registry -> Tasty.TestTree
-removeFromCombatCardTests registry =
-  Tasty.testGroup
-    "RemoveFromCombat"
-    [ HU.testCase "Labyrinth of Skophos is a Land with a {T} colorless mana ability and a {4}, {T} removal ability" $ do
-        labyrinth <- Registry.printing registry "Labyrinth of Skophos"
-        let c = Printing.card labyrinth
-            target = SlotName.MkSlotName (Text.pack "target")
-        HU.assertEqual "name" (Text.pack "Labyrinth of Skophos") (Card.Type.name c)
-        HU.assertEqual "no mana cost" Nothing (Card.Type.manaCost c)
-        HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
-        HU.assertEqual "not basic, so Blood Moon reaches it (CR 305.8)" Set.empty (TypeLine.supertypes (Card.Type.typeLine c))
-        HU.assertEqual "no land types of its own" Set.empty (TypeLine.subtypes (Card.Type.typeLine c))
-        HU.assertEqual "nothing on the spell half: a land is never cast (CR 305.1)" [] (Card.allEffects c)
-        case Card.Type.activatedAbilities c of
-          [mana, removal] -> do
-            -- CR 605.1a: the mana half. Tap only, one colorless.
-            HU.assertEqual "the mana ability's cost is the tap alone" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost mana))
-            HU.assertEqual "and it names no mana" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost mana))
-            HU.assertEqual "adds colorless" [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)] (Modal.allEffects (ActivatedAbility.modal mana))
-            -- The removal half: {4} on top of the same tap.
-            HU.assertEqual "the removal ability taps too" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost removal))
-            HU.assertEqual "and costs {4}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) (Cost.Type.mana (ActivatedAbility.cost removal))
-            HU.assertEqual "removes the target from combat" [Effect.RemoveFromCombat target] (Modal.allEffects (ActivatedAbility.modal removal))
-            -- CR 508.1k / CR 509.1g: "attacking or blocking" is two atoms under
-            -- one Or, over the creature pool.
-            HU.assertEqual
-              "target attacking or blocking creature"
-              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Or [Filter.Type.IsAttacking, Filter.Type.IsBlocking]))))
-              (Modal.allTargetSpecs (ActivatedAbility.modal removal))
-          _ -> HU.assertFailure "expected exactly two activated abilities"
-    ]
+removeFromCombatCardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+removeFromCombatCardSpec s registry = Spec.describe s "RemoveFromCombat" $ do
+  Spec.it s "Labyrinth of Skophos is a Land with a {T} colorless mana ability and a {4}, {T} removal ability" $ do
+    labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+    let c = Printing.card labyrinth
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Labyrinth of Skophos")
+    Spec.assertEqWith s "no mana cost" (Card.Type.manaCost c) Nothing
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
+    Spec.assertEqWith s "not basic, so Blood Moon reaches it (CR 305.8)" (TypeLine.supertypes (Card.Type.typeLine c)) Set.empty
+    Spec.assertEqWith s "no land types of its own" (TypeLine.subtypes (Card.Type.typeLine c)) Set.empty
+    Spec.assertEqWith s "nothing on the spell half: a land is never cast (CR 305.1)" (Card.allEffects c) []
+    case Card.Type.activatedAbilities c of
+      [mana, removal] -> do
+        -- CR 605.1a: the mana half. Tap only, one colorless.
+        Spec.assertEqWith s "the mana ability's cost is the tap alone" (Cost.Type.components (ActivatedAbility.cost mana)) [CostComponent.TapThis]
+        Spec.assertEqWith s "and it names no mana" (Cost.Type.mana (ActivatedAbility.cost mana)) (Just (ManaCost.MkManaCost []))
+        Spec.assertEqWith s "adds colorless" (Modal.allEffects (ActivatedAbility.modal mana)) [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)]
+        -- The removal half: {4} on top of the same tap.
+        Spec.assertEqWith s "the removal ability taps too" (Cost.Type.components (ActivatedAbility.cost removal)) [CostComponent.TapThis]
+        Spec.assertEqWith s "and costs {4}" (Cost.Type.mana (ActivatedAbility.cost removal)) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
+        Spec.assertEqWith s "removes the target from combat" (Modal.allEffects (ActivatedAbility.modal removal)) [Effect.RemoveFromCombat target]
+        -- CR 508.1k / CR 509.1g: "attacking or blocking" is two atoms under
+        -- one Or, over the creature pool.
+        Spec.assertEqWith
+          s
+          "target attacking or blocking creature"
+          (Modal.allTargetSpecs (ActivatedAbility.modal removal))
+          (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Or [Filter.Type.IsAttacking, Filter.Type.IsBlocking]))))
+      _ -> Spec.assertFailure s "expected exactly two activated abilities"
 
 -- CR 509.1c's blocking requirement on a CREATURE card rather than an Aura. Prized
 -- Unicorn is a {3}{G} 2/2 Creature -- Unicorn whose whole text is one line: "All
@@ -2040,32 +2036,30 @@ removeFromCombatCardTests registry =
 -- point next to Lure's, above: the same field, the other Affected. The gameplay
 -- proof, including CR 604.2's layer-6 strip, is Pawl.CombatSpec's
 -- BlockRequirements group.
-blockRequirementCardTests :: Registry.Registry -> Tasty.TestTree
-blockRequirementCardTests registry =
-  Tasty.testGroup
-    "BlockRequirements"
-    [ HU.testCase "Prized Unicorn is a {3}{G} 2/2 Unicorn whose only ability is a requirement naming ITSELF" $ do
-        p <- Registry.printing registry "Prized Unicorn"
-        let card = Printing.card p
-            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-        HU.assertEqual "name" (Text.pack "Prized Unicorn") (Card.Type.name card)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, green])) (Card.Type.manaCost card)
-        HU.assertEqual "types" (Set.singleton CardType.Creature) (TypeLine.types (Card.Type.typeLine card))
-        HU.assertEqual "subtypes" (Set.singleton Subtype.Unicorn) (TypeLine.subtypes (Card.Type.typeLine card))
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power card)
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness card)
-        -- "THIS CREATURE", not "enchanted creature": the requirement names its own
-        -- source, which the predicate language already spells Filter.IsSource.
-        -- Lure's Affected.Attached is the contrast -- same field, the other
-        -- Affected -- and it is why Pawl.Engine.BlockRequirement resolves the attacker
-        -- through Projection.affects rather than reading an ObjectId.
-        HU.assertEqual
-          "one requirement, naming the source itself"
-          [BlockRequirement.MkBlockRequirement (Affected.Matching Filter.Type.IsSource)]
-          (Card.Type.blockRequirements card)
-        HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
-        HU.assertEqual "no spell effects" [] (Card.allEffects card)
-    ]
+blockRequirementCardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+blockRequirementCardSpec s registry = Spec.describe s "BlockRequirements" $ do
+  Spec.it s "Prized Unicorn is a {3}{G} 2/2 Unicorn whose only ability is a requirement naming ITSELF" $ do
+    p <- Registry.printing registry "Prized Unicorn"
+    let card = Printing.card p
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Prized Unicorn")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, green]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Creature)
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.singleton Subtype.Unicorn)
+    Spec.assertEqWith s "power" (Card.Type.power card) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness card) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+    -- "THIS CREATURE", not "enchanted creature": the requirement names its own
+    -- source, which the predicate language already spells Filter.IsSource.
+    -- Lure's Affected.Attached is the contrast -- same field, the other
+    -- Affected -- and it is why Pawl.Engine.BlockRequirement resolves the attacker
+    -- through Projection.affects rather than reading an ObjectId.
+    Spec.assertEqWith
+      s
+      "one requirement, naming the source itself"
+      (Card.Type.blockRequirements card)
+      [BlockRequirement.MkBlockRequirement (Affected.Matching Filter.Type.IsSource)]
+    Spec.assertEqWith s "and it modifies no characteristic" (Card.Type.staticAbilities card) []
+    Spec.assertEqWith s "no spell effects" (Card.allEffects card) []
 
 -- CR 508.1d's attacking requirement, the twin of the blocking one above. Curse of
 -- the Nightly Hunt is a {2}{R} Enchantment -- Aura Curse reading "Enchant player.
@@ -2075,38 +2069,57 @@ blockRequirementCardTests registry =
 -- Aura reaching the same set through the same Affected, carried on a field the
 -- CR 613 layer system never reads. The gameplay proof is Pawl.CombatSpec's
 -- AttackRequirements group.
-attackRequirementCardTests :: Registry.Registry -> Tasty.TestTree
-attackRequirementCardTests registry =
-  Tasty.testGroup
-    "AttackRequirements"
-    [ HU.testCase "Curse of the Nightly Hunt is a {2}{R} Aura Curse whose only ability is a CR 508.1d attacking requirement" $ do
-        p <- Registry.printing registry "Curse of the Nightly Hunt"
-        let card = Printing.card p
-            red = ManaSymbol.OfType (ManaType.Colored Color.Red)
-        HU.assertEqual "name" (Text.pack "Curse of the Nightly Hunt") (Card.Type.name card)
-        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red])) (Card.Type.manaCost card)
-        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
-        -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Aura, Subtype.Curse]) (TypeLine.subtypes (Card.Type.typeLine card))
-        HU.assertBool "is an Aura" (Card.isAura card)
-        -- CR 702.5d: "Enchant player", the whole player pool.
-        HU.assertEqual "enchant player" (Just (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.Type.enchant card)
-        -- "CREATURES ENCHANTED PLAYER CONTROLS attack each combat if able": the
-        -- requirement names its SUBJECT, where Lure's names the attacker to be
-        -- blocked. Same Affected as Curse of Death's Hold, different field --
-        -- which is what says this changes no characteristic.
-        HU.assertEqual
-          "one requirement, over the enchanted player's creatures"
-          [AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature))]
-          (Card.Type.attackRequirements card)
-        HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
-        HU.assertEqual "and requires no block" [] (Card.Type.blockRequirements card)
-        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
-        HU.assertEqual "no spell effects" [] (Card.allEffects card)
-    ]
+attackRequirementCardSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+attackRequirementCardSpec s registry = Spec.describe s "AttackRequirements" $ do
+  Spec.it s "Curse of the Nightly Hunt is a {2}{R} Aura Curse whose only ability is a CR 508.1d attacking requirement" $ do
+    p <- Registry.printing registry "Curse of the Nightly Hunt"
+    let card = Printing.card p
+        red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Curse of the Nightly Hunt")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Enchantment)
+    -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.fromList [Subtype.Aura, Subtype.Curse])
+    Spec.assertBool s (Card.isAura card) "is an Aura"
+    -- CR 702.5d: "Enchant player", the whole player pool.
+    Spec.assertEqWith s "enchant player" (Card.Type.enchant card) (Just (TargetSpec.MkTargetSpec Pool.Players Nothing))
+    -- "CREATURES ENCHANTED PLAYER CONTROLS attack each combat if able": the
+    -- requirement names its SUBJECT, where Lure's names the attacker to be
+    -- blocked. Same Affected as Curse of Death's Hold, different field --
+    -- which is what says this changes no characteristic.
+    Spec.assertEqWith
+      s
+      "one requirement, over the enchanted player's creatures"
+      (Card.Type.attackRequirements card)
+      [AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature))]
+    Spec.assertEqWith s "and it modifies no characteristic" (Card.Type.staticAbilities card) []
+    Spec.assertEqWith s "and requires no block" (Card.Type.blockRequirements card) []
+    -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+    Spec.assertEqWith s "no spell effects" (Card.allEffects card) []
 
-tests :: Registry.Registry -> Tasty.TestTree
-tests registry =
-  Tasty.testGroup
-    "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry, blockRequirementCardTests registry, attackRequirementCardTests registry]
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
+  cardSpec s registry
+  lintSpec s registry
+  m2aCardSpec s registry
+  m2bCardSpec s registry
+  m2cCardSpec s registry
+  basicLandSpec s registry
+  m3cCardSpec s registry
+  m3eCardSpec s registry
+  m4bCardSpec s registry
+  m45p6CardSpec s registry
+  m45p7CardSpec s registry
+  m45p11CardSpec s registry
+  m55CardSpec s registry
+  auraCardSpec s registry
+  animatorCardSpec s registry
+  worldCardSpec s registry
+  cyclingCardSpec s registry
+  revealCardSpec s registry
+  entersCardSpec s registry
+  unspentManaCardSpec s registry
+  phyrexianCardSpec s registry
+  removeFromCombatCardSpec s registry
+  blockRequirementCardSpec s registry
+  attackRequirementCardSpec s registry
