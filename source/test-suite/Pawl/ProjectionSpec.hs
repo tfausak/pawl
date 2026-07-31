@@ -325,9 +325,10 @@ tests registry =
           (fmap ContinuousEffect.modification (GameState.continuousEffects gs))
         -- And it stays frozen across later passes: a state-based-action pass
         -- reprojects everything, and CR 514.2 is what finally ends it.
-        HU.assertEqual "still 6/5 after an SBA pass" (Just 6) (Projection.powerOf pikerId (S.settleSba gs))
+        let afterSba = S.settleSba gs
+        HU.assertEqual "still 6/5 after an SBA pass" (Just 6, Just 5) (Projection.powerOf pikerId afterSba, Projection.toughnessOf pikerId afterSba)
         let afterCleanup = snd (Engine.runGamePure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
-        HU.assertEqual "CR 514.2 back to 2/1 at cleanup" (Just 2) (Projection.powerOf pikerId afterCleanup),
+        HU.assertEqual "CR 514.2 back to 2/1 at cleanup" (Just 2, Just 1) (Projection.powerOf pikerId afterCleanup, Projection.toughnessOf pikerId afterCleanup),
       -- The freeze's own contract, read off the function rather than the board.
       -- CR 608.2h gives the effect ONE moment to determine its answer, so a
       -- quantity with no answer at that moment has none to defer to: the whole
