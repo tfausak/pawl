@@ -1,5 +1,4 @@
--- | The @CounterKind ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @CounterKind ⇆ Json@ codec (#481).
 module Pawl.Codec.CounterKind where
 
 import Data.Text (Text)

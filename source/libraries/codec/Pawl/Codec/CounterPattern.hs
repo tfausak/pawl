@@ -1,5 +1,4 @@
--- | The @CounterPattern ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @CounterPattern ⇆ Json@ codec (#481).
 module Pawl.Codec.CounterPattern where
 
 import Data.Text (Text)

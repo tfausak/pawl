@@ -1,5 +1,4 @@
--- | The @ManaSymbol ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @ManaSymbol ⇆ Json@ codec (#481).
 module Pawl.Codec.ManaSymbol where
 
 import Data.Text (Text)

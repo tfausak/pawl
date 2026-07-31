@@ -1,5 +1,4 @@
--- | The @Optionality ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Optionality ⇆ Json@ codec (#481).
 module Pawl.Codec.Optionality where
 
 import Data.Text (Text)

@@ -1,5 +1,4 @@
--- | The @Toughness ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Toughness ⇆ Json@ codec (#481).
 module Pawl.Codec.Toughness where
 
 import Data.Text (Text)

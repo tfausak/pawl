@@ -1,5 +1,4 @@
--- | The @ManaCost ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @ManaCost ⇆ Json@ codec (#481).
 module Pawl.Codec.ManaCost where
 
 import Data.Text (Text)

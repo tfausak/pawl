@@ -1,5 +1,4 @@
--- | The @TapState ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @TapState ⇆ Json@ codec (#481).
 module Pawl.Codec.TapState where
 
 import Data.Text (Text)

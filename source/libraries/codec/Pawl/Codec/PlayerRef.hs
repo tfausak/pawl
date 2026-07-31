@@ -1,5 +1,4 @@
--- | The @PlayerRef ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @PlayerRef ⇆ Json@ codec (#481).
 module Pawl.Codec.PlayerRef where
 
 import Data.Text (Text)

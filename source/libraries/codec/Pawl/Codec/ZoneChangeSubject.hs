@@ -1,5 +1,4 @@
--- | The @ZoneChangeSubject ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @ZoneChangeSubject ⇆ Json@ codec (#481).
 module Pawl.Codec.ZoneChangeSubject where
 
 import Data.Text (Text)

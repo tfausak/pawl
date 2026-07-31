@@ -1,5 +1,4 @@
--- | The @Aggregation ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Aggregation ⇆ Json@ codec (#481).
 module Pawl.Codec.Aggregation where
 
 import Data.Text (Text)

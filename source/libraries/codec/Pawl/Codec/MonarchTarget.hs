@@ -1,5 +1,4 @@
--- | The @MonarchTarget ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @MonarchTarget ⇆ Json@ codec (#481).
 module Pawl.Codec.MonarchTarget where
 
 import Data.Text (Text)

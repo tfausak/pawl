@@ -1,5 +1,4 @@
--- | The @EntryOption ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @EntryOption ⇆ Json@ codec (#481).
 module Pawl.Codec.EntryOption where
 
 import Data.Text (Text)

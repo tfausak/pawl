@@ -1,5 +1,4 @@
--- | The @ActivatedAbility ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @ActivatedAbility ⇆ Json@ codec (#481).
 module Pawl.Codec.ActivatedAbility where
 
 import Data.Text (Text)

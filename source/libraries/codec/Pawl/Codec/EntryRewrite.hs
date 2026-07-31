@@ -1,5 +1,4 @@
--- | The @EntryRewrite ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @EntryRewrite ⇆ Json@ codec (#481).
 module Pawl.Codec.EntryRewrite where
 
 import Data.Text (Text)

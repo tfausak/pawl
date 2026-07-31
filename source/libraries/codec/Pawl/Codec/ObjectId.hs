@@ -1,5 +1,4 @@
--- | The @ObjectId ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @ObjectId ⇆ Json@ codec (#481).
 module Pawl.Codec.ObjectId where
 
 import Data.Text (Text)

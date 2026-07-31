@@ -1,5 +1,4 @@
--- | The @StaticAbility ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @StaticAbility ⇆ Json@ codec (#481).
 module Pawl.Codec.StaticAbility where
 
 import Data.Text (Text)

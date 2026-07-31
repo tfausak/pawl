@@ -1,5 +1,4 @@
--- | The @CostComponent ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @CostComponent ⇆ Json@ codec (#481).
 module Pawl.Codec.CostComponent where
 
 import Data.Text (Text)

@@ -1,5 +1,4 @@
--- | The @Condition ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Condition ⇆ Json@ codec (#481).
 module Pawl.Codec.Condition where
 
 import Data.Text (Text)

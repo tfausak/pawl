@@ -1,5 +1,4 @@
--- | The @DamagePattern ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @DamagePattern ⇆ Json@ codec (#481).
 module Pawl.Codec.DamagePattern where
 
 import Data.Text (Text)

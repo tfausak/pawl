@@ -1,5 +1,4 @@
--- | The @PhaseSelector ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @PhaseSelector ⇆ Json@ codec (#481).
 module Pawl.Codec.PhaseSelector where
 
 import Data.Text (Text)

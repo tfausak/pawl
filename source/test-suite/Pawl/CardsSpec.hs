@@ -7,8 +7,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import qualified Pawl.Codec.All as Codec
 import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.Printing (printingToJson)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Registry as Registry
@@ -804,4 +804,4 @@ checkFile registry p = do
           -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
           -- this can never quietly regress into a byte comparison: every file would
           -- fail at once.
-          HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))
+          HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (printingToJson p))

@@ -1,5 +1,4 @@
--- | The @Recipient ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Recipient ⇆ Json@ codec (#481).
 module Pawl.Codec.Recipient where
 
 import Data.Text (Text)

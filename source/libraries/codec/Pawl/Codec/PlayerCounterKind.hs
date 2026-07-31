@@ -1,5 +1,4 @@
--- | The @PlayerCounterKind ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @PlayerCounterKind ⇆ Json@ codec (#481).
 module Pawl.Codec.PlayerCounterKind where
 
 import Data.Text (Text)

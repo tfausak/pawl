@@ -1,5 +1,4 @@
--- | The @BlockRequirement ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @BlockRequirement ⇆ Json@ codec (#481).
 module Pawl.Codec.BlockRequirement where
 
 import Data.Text (Text)

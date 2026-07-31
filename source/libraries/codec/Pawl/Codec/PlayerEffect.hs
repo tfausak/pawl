@@ -1,5 +1,4 @@
--- | The @PlayerEffect ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @PlayerEffect ⇆ Json@ codec (#481).
 module Pawl.Codec.PlayerEffect where
 
 import Data.Text (Text)

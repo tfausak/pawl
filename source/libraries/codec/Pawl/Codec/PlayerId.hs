@@ -1,5 +1,4 @@
--- | The @PlayerId ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @PlayerId ⇆ Json@ codec (#481).
 module Pawl.Codec.PlayerId where
 
 import Data.Text (Text)

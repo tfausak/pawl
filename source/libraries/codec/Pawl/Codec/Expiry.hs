@@ -1,5 +1,4 @@
--- | The @Expiry ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Expiry ⇆ Json@ codec (#481).
 module Pawl.Codec.Expiry where
 
 import Data.Text (Text)

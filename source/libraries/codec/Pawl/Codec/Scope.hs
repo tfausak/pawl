@@ -1,5 +1,4 @@
--- | The @Scope ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Scope ⇆ Json@ codec (#481).
 module Pawl.Codec.Scope where
 
 import Data.Text (Text)

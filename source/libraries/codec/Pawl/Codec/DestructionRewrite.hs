@@ -1,5 +1,4 @@
--- | The @DestructionRewrite ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @DestructionRewrite ⇆ Json@ codec (#481).
 module Pawl.Codec.DestructionRewrite where
 
 import Data.Text (Text)

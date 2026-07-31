@@ -1,5 +1,4 @@
--- | The @Mode ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Mode ⇆ Json@ codec (#481).
 module Pawl.Codec.Mode where
 
 import Data.Text (Text)

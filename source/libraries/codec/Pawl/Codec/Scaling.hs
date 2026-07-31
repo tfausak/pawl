@@ -1,5 +1,4 @@
--- | The @Scaling ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Scaling ⇆ Json@ codec (#481).
 module Pawl.Codec.Scaling where
 
 import Data.Text (Text)

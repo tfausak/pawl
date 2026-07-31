@@ -1,5 +1,4 @@
--- | The @Filter ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Filter ⇆ Json@ codec (#481).
 module Pawl.Codec.Filter where
 
 import Data.Text (Text)

@@ -1,5 +1,4 @@
--- | The @Power ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Power ⇆ Json@ codec (#481).
 module Pawl.Codec.Power where
 
 import Data.Text (Text)

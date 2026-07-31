@@ -1,5 +1,4 @@
--- | The @ObjectRef ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @ObjectRef ⇆ Json@ codec (#481).
 module Pawl.Codec.ObjectRef where
 
 import Data.Text (Text)

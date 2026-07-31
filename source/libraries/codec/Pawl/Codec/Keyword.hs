@@ -1,5 +1,4 @@
--- | The @Keyword ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Keyword ⇆ Json@ codec (#481).
 module Pawl.Codec.Keyword where
 
 import Data.Text (Text)

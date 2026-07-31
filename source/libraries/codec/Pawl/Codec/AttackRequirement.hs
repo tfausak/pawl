@@ -1,5 +1,4 @@
--- | The @AttackRequirement ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @AttackRequirement ⇆ Json@ codec (#481).
 module Pawl.Codec.AttackRequirement where
 
 import Data.Text (Text)

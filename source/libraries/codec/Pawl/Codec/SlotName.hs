@@ -1,5 +1,4 @@
--- | The @SlotName ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @SlotName ⇆ Json@ codec (#481).
 module Pawl.Codec.SlotName where
 
 import Data.Text (Text)

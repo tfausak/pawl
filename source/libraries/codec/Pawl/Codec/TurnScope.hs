@@ -1,5 +1,4 @@
--- | The @TurnScope ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @TurnScope ⇆ Json@ codec (#481).
 module Pawl.Codec.TurnScope where
 
 import Data.Text (Text)

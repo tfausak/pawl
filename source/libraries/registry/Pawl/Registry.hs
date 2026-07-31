@@ -22,7 +22,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Paths_pawl as Paths
-import qualified Pawl.Codec.All as Codec
+import Pawl.Codec.Card (jsonToCard)
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Exceptions.CorruptCard as CorruptCard
 import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
@@ -154,7 +154,7 @@ load registry slug =
           Right bytes -> case Encoding.decodeUtf8' bytes of
             Left err -> corrupt (Text.pack ("not valid UTF-8: " <> show err))
             Right contents ->
-              case Json.parse contents >>= Codec.jsonToCard of
+              case Json.parse contents >>= jsonToCard of
                 Left err -> corrupt err
                 Right c ->
                   let actual = Slug.fromText (Card.name c)

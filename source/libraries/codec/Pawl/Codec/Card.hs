@@ -1,5 +1,4 @@
--- | The @Card ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Card ⇆ Json@ codec (#481).
 module Pawl.Codec.Card where
 
 import qualified Data.Map.Strict as Map

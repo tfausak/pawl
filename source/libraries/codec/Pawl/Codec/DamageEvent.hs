@@ -1,5 +1,4 @@
--- | The @DamageEvent ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @DamageEvent ⇆ Json@ codec (#481).
 module Pawl.Codec.DamageEvent where
 
 import Data.Text (Text)

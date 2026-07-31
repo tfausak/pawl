@@ -1,5 +1,4 @@
--- | The @CastingPermission ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @CastingPermission ⇆ Json@ codec (#481).
 module Pawl.Codec.CastingPermission where
 
 import Data.Text (Text)

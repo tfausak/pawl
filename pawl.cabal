@@ -68,9 +68,9 @@ library codec
     Pawl.Codec.ActivationTiming
     Pawl.Codec.Affected
     Pawl.Codec.Aggregation
-    Pawl.Codec.All
     Pawl.Codec.AttackRequirement
     Pawl.Codec.BeginningStep
+    Pawl.Codec.Binding
     Pawl.Codec.BlockRequirement
     Pawl.Codec.Card
     Pawl.Codec.CardType
@@ -91,6 +91,7 @@ library codec
     Pawl.Codec.DamageKind
     Pawl.Codec.DamagePattern
     Pawl.Codec.DamageRewrite
+    Pawl.Codec.DelayedTrigger
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DiscardCause
     Pawl.Codec.Duration
@@ -102,6 +103,7 @@ library codec
     Pawl.Codec.Expiry
     Pawl.Codec.ExtraPhase
     Pawl.Codec.Filter
+    Pawl.Codec.GameEvent
     Pawl.Codec.Json
     Pawl.Codec.Keyword
     Pawl.Codec.ManaCost
@@ -129,6 +131,8 @@ library codec
     Pawl.Codec.PlayerStaticAbility
     Pawl.Codec.Pool
     Pawl.Codec.Power
+    Pawl.Codec.Printing
+    Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.Quantity
     Pawl.Codec.Recipient
     Pawl.Codec.Regenerability

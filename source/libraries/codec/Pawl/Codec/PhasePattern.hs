@@ -1,5 +1,4 @@
--- | The @PhasePattern ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @PhasePattern ⇆ Json@ codec (#481).
 module Pawl.Codec.PhasePattern where
 
 import Data.Text (Text)

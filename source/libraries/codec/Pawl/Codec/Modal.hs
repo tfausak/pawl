@@ -1,5 +1,4 @@
--- | The @Modal ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Modal ⇆ Json@ codec (#481).
 module Pawl.Codec.Modal where
 
 import qualified Data.Sequence as Seq

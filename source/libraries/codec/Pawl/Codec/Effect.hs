@@ -1,5 +1,4 @@
--- | The @Effect ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Effect ⇆ Json@ codec (#481).
 module Pawl.Codec.Effect where
 
 import qualified Data.Maybe as Maybe

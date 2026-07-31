@@ -1,5 +1,4 @@
--- | The @TypeLine ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @TypeLine ⇆ Json@ codec (#481).
 module Pawl.Codec.TypeLine where
 
 import Data.Text (Text)

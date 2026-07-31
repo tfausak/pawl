@@ -1,5 +1,4 @@
--- | The @CardType ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @CardType ⇆ Json@ codec (#481).
 module Pawl.Codec.CardType where
 
 import Data.Text (Text)

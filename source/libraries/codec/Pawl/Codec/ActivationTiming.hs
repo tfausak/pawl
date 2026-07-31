@@ -1,5 +1,4 @@
--- | The @ActivationTiming ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @ActivationTiming ⇆ Json@ codec (#481).
 module Pawl.Codec.ActivationTiming where
 
 import Data.Text (Text)

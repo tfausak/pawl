@@ -1,5 +1,4 @@
--- | The @SearchDestination ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @SearchDestination ⇆ Json@ codec (#481).
 module Pawl.Codec.SearchDestination where
 
 import Data.Text (Text)

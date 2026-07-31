@@ -1,5 +1,4 @@
--- | The @Modification ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Modification ⇆ Json@ codec (#481).
 module Pawl.Codec.Modification where
 
 import Data.Text (Text)

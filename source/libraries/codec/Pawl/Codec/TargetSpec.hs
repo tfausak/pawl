@@ -1,5 +1,4 @@
--- | The @TargetSpec ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @TargetSpec ⇆ Json@ codec (#481).
 module Pawl.Codec.TargetSpec where
 
 import qualified Data.Map.Strict as Map

@@ -1,5 +1,4 @@
--- | The @EndingStep ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @EndingStep ⇆ Json@ codec (#481).
 module Pawl.Codec.EndingStep where
 
 import Data.Text (Text)

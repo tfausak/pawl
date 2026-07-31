@@ -1,5 +1,4 @@
--- | The @Color ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Color ⇆ Json@ codec (#481).
 module Pawl.Codec.Color where
 
 import Data.Text (Text)

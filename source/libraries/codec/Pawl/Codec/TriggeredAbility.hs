@@ -1,5 +1,4 @@
--- | The @TriggeredAbility ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @TriggeredAbility ⇆ Json@ codec (#481).
 module Pawl.Codec.TriggeredAbility where
 
 import qualified Data.Map.Strict as Map

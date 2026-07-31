@@ -1,5 +1,4 @@
--- | The @BeginningStep ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @BeginningStep ⇆ Json@ codec (#481).
 module Pawl.Codec.BeginningStep where
 
 import Data.Text (Text)

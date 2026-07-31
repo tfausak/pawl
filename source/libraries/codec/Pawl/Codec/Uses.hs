@@ -1,5 +1,4 @@
--- | The @Uses ⇆ Json@ codec, split out of the former
--- Pawl.Codec.All (#481).
+-- | The @Uses ⇆ Json@ codec (#481).
 module Pawl.Codec.Uses where
 
 import Data.Text (Text)
