@@ -673,6 +673,18 @@ solRingTests registry =
         let (_, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
         HU.assertBool "{2} is affordable" (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs)
         HU.assertBool "{3} is not" (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)),
+      -- Both supplies a Sol Ring contributes are COLORLESS, so they swell the
+      -- generic count and serve no typed demand. Discriminating against a supply
+      -- model that merely counted a source twice without keeping its types: that
+      -- one passes the first assertion and fails the second.
+      HU.testCase "CR 118.3 a Sol Ring and a Mountain pay {2}{R}, but not {R}{R}" $ do
+        solRing <- Registry.printing registry "Sol Ring"
+        mountain <- Registry.printing registry "Mountain"
+        let (_, g1) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+            (_, gs) = S.addCreature mountain S.alice g1
+            red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        HU.assertBool "{2}{R} is affordable" (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]) gs)
+        HU.assertBool "{R}{R} is not" (not (Mana.canPay S.alice (ManaCost.MkManaCost [red, red]) gs)),
       -- The gameplay-level proof (design.md section 4): a real spell cast end to
       -- end off a single permanent, which no one-mana-per-source engine can do.
       HU.testCase "CR 601.2g Sapphire Medallion is cast off a lone Sol Ring" $ do
@@ -684,9 +696,11 @@ solRingTests registry =
         HU.assertEqual "the Sol Ring is tapped" 1 (S.tappedCount S.alice resolved)
         HU.assertEqual "and both mana were spent" 0 (poolSize S.alice resolved),
       -- The elision side of the invariant: Sol Ring offers exactly one yield, so
-      -- there is nothing to ask. A Birds of Paradise, one line down in the same
-      -- helper, still asks.
-      HU.testCase "CR 605 Sol Ring's single yield is not put to its controller" $ do
+      -- there is nothing to ask -- and NOT because its two mana are the same
+      -- type, which would be the engine choosing. "CR 605 a single-yield source
+      -- is not asked what to produce" above is the counterpart that keeps a real
+      -- choice asked.
+      HU.testCase "CR 605 Sol Ring is not asked what to produce" $ do
         solRing <- Registry.printing registry "Sol Ring"
         let countingAnswer :: Prompt.Prompt r -> State.State Int r
             countingAnswer p = case p of
