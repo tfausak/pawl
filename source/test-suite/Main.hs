@@ -14,7 +14,7 @@ import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
-import qualified Pawl.DamageSpec as DamageSpec
+import qualified Pawl.DamageSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec
@@ -80,7 +80,6 @@ testTree registry =
   Tasty.testGroup
     "pawl"
     [ CardSpec.tests registry,
-      DamageSpec.tests registry,
       PropertySpec.tests registry,
       CodecSpec.tests registry,
       ResolveSpec.tests registry,
@@ -105,6 +104,7 @@ spec s registry = do
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry
+  Pawl.DamageSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
   Pawl.DepartureSpec.spec s registry
