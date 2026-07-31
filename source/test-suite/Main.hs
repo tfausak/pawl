@@ -1,6 +1,6 @@
 import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
-import qualified Pawl.ActivateSpec as ActivateSpec
+import qualified Pawl.ActivateSpec
 import qualified Pawl.AuraSpec as AuraSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec as CardSpec
@@ -90,7 +90,6 @@ testTree registry =
       ResolveSpec.tests registry,
       ProjectionSpec.tests registry,
       PlayerEffectSpec.tests registry,
-      ActivateSpec.tests registry,
       ReplacementSpec.tests registry,
       TriggerSpec.tests registry,
       AuraSpec.tests registry,
@@ -101,6 +100,7 @@ testTree registry =
 -- IO action. The rest stay polymorphic in the assertion monad.
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
 spec s registry = do
+  Pawl.ActivateSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardsSpec.spec s registry
   Pawl.ColorSpec.spec s registry
