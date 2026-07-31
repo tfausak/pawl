@@ -26,6 +26,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
@@ -314,6 +315,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Dragon -> "Dragon"
   Subtype.Unicorn -> "Unicorn"
   Subtype.Curse -> "Curse"
+  Subtype.Desert -> "Desert"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -371,7 +373,8 @@ jsonToSubtype =
       (Text.pack "Thopter", Subtype.Thopter),
       (Text.pack "Dragon", Subtype.Dragon),
       (Text.pack "Unicorn", Subtype.Unicorn),
-      (Text.pack "Curse", Subtype.Curse)
+      (Text.pack "Curse", Subtype.Curse),
+      (Text.pack "Desert", Subtype.Desert)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -619,6 +622,8 @@ filterToJson filter_ = case filter_ of
   Filter.IsBlocking -> nullary (Text.pack "IsBlocking")
   Filter.AttackedThisTurn -> nullary (Text.pack "AttackedThisTurn")
   Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
+  Filter.IsAttachedToPermanent -> nullary (Text.pack "IsAttachedToPermanent")
+  Filter.CanHostSubject -> nullary (Text.pack "CanHostSubject")
   Filter.IsToken -> nullary (Text.pack "IsToken")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (MkArray (fmap filterToJson fs))))
   Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (MkArray (fmap filterToJson fs))))
@@ -640,6 +645,8 @@ jsonToFilter value = do
     ("IsBlocking", _) -> Right Filter.IsBlocking
     ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
+    ("IsAttachedToPermanent", _) -> Right Filter.IsAttachedToPermanent
+    ("CanHostSubject", _) -> Right Filter.CanHostSubject
     ("IsToken", _) -> Right Filter.IsToken
     ("And", Just (Array (MkArray vs))) -> Filter.And <$> traverse jsonToFilter vs
     ("Or", Just (Array (MkArray vs))) -> Filter.Or <$> traverse jsonToFilter vs
@@ -1248,6 +1255,7 @@ quantityToJson q = case q of
   Quantity.ManaValue -> nullary (Text.pack "ManaValue")
   Quantity.Power -> nullary (Text.pack "Power")
   Quantity.X -> nullary (Text.pack "X")
+  Quantity.InSlot s -> Json.tagged (Text.pack "InSlot") (Just (slotNameToJson s))
   Quantity.Star -> nullary (Text.pack "Star")
   Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array (MkArray [quantityToJson a, quantityToJson b])))
   Quantity.Count c -> countToJson c
@@ -1260,6 +1268,7 @@ jsonToQuantity value = do
     ("ManaValue", _) -> Right Quantity.ManaValue
     ("Power", _) -> Right Quantity.Power
     ("X", _) -> Right Quantity.X
+    ("InSlot", Just v) -> Quantity.InSlot <$> jsonToSlotName v
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Array (MkArray [x, y]))) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
     -- jsonToCount re-derives the tag from the WHOLE value (see the comment on
@@ -1599,7 +1608,12 @@ effectToJson e = case e of
   Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [slotNameToJson slot, filterToJson f, quantityToJson q])))
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
-  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array (MkArray [objectRefToJson s, regenerabilityToJson r])))
+  -- The bound-count slot is ELIDED when absent, the posture Create's TokenEntry
+  -- and ArmDelayedTrigger's duration take, so every card that says nothing about
+  -- counting its sweep stays byte-for-byte as it was written.
+  Effect.Destroy s r ms ->
+    Json.tagged (Text.pack "Destroy") . Just . Array . MkArray $
+      [objectRefToJson s, regenerabilityToJson r] <> fmap slotNameToJson (Maybe.maybeToList ms)
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
@@ -1668,8 +1682,9 @@ jsonToEffect value = do
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> case mv of
-      Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv
-      _ -> Left (Text.pack "Destroy expects [objectRef, regenerability]")
+      Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv <*> pure Nothing
+      Just (Array (MkArray [sv, rv, nv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv <*> (Just <$> jsonToSlotName nv)
+      _ -> Left (Text.pack "Destroy expects [objectRef, regenerability], optionally with a slot")
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
     "RemoveFromCombat" -> withValue mv (fmap Effect.RemoveFromCombat . jsonToSlotName)
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
@@ -1812,6 +1827,19 @@ jsonToBlockRequirement value = do
   a <- Json.field (Text.pack "attacker") ps >>= jsonToAffected
   pure (BlockRequirement.MkBlockRequirement a)
 
+-- The key is "subject" and not "attacker": CR 508.1d's requirement names the
+-- creatures REQUIRED to attack, where CR 509.1c's names the attacker to be
+-- blocked. Same shape, opposite axis (Pawl.Types.AttackRequirement).
+attackRequirementToJson :: AttackRequirement.AttackRequirement -> Value
+attackRequirementToJson ar =
+  Json.jObject [(Text.pack "subject", affectedToJson (AttackRequirement.subject ar))]
+
+jsonToAttackRequirement :: Value -> Either Text AttackRequirement.AttackRequirement
+jsonToAttackRequirement value = do
+  ps <- Json.asObject value
+  a <- Json.field (Text.pack "subject") ps >>= jsonToAffected
+  pure (AttackRequirement.MkAttackRequirement a)
+
 costToJson :: Cost.Cost -> Value
 costToJson c =
   Json.jObject
@@ -1840,21 +1868,26 @@ activatedAbilityToJson aa =
       -- takes, and it leaves every card without one byte-identical.
       <> ( case ActivatedAbility.timing aa of
              ActivationTiming.AnyTime -> []
-             ActivationTiming.SorcerySpeed -> [(Text.pack "timing", activationTimingToJson (ActivatedAbility.timing aa))]
+             _ -> [(Text.pack "timing", activationTimingToJson (ActivatedAbility.timing aa))]
          )
 
+-- Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a phase,
+-- the shape costComponentToJson takes. AnyTime and SorcerySpeed still render as
+-- the bare tag they always did, so every committed card file is unchanged.
 activationTimingToJson :: ActivationTiming.ActivationTiming -> Value
-activationTimingToJson t = nullary . Text.pack $ case t of
-  ActivationTiming.AnyTime -> "AnyTime"
-  ActivationTiming.SorcerySpeed -> "SorcerySpeed"
+activationTimingToJson t = case t of
+  ActivationTiming.AnyTime -> nullary (Text.pack "AnyTime")
+  ActivationTiming.SorcerySpeed -> nullary (Text.pack "SorcerySpeed")
+  ActivationTiming.DuringPhase p -> Json.tagged (Text.pack "DuringPhase") (Just (phaseToJson p))
 
 jsonToActivationTiming :: Value -> Either Text ActivationTiming.ActivationTiming
-jsonToActivationTiming =
-  decodeNullary
-    (Text.pack "ActivationTiming")
-    [ (Text.pack "AnyTime", ActivationTiming.AnyTime),
-      (Text.pack "SorcerySpeed", ActivationTiming.SorcerySpeed)
-    ]
+jsonToActivationTiming value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("AnyTime", _) -> Right ActivationTiming.AnyTime
+    ("SorcerySpeed", _) -> Right ActivationTiming.SorcerySpeed
+    ("DuringPhase", Just v) -> ActivationTiming.DuringPhase <$> jsonToPhase v
+    _ -> Left (Text.pack "unknown ActivationTiming: " <> t)
 
 jsonToActivatedAbility :: Value -> Either Text (ActivatedAbility.ActivatedAbility CardT.Card)
 jsonToActivatedAbility value = do
@@ -2183,6 +2216,10 @@ cardToJson c =
                then []
                else [(Text.pack "blockRequirements", listTo blockRequirementToJson (CardT.blockRequirements c))]
            )
+        <> ( if null (CardT.attackRequirements c)
+               then []
+               else [(Text.pack "attackRequirements", listTo attackRequirementToJson (CardT.attackRequirements c))]
+           )
         <> ( if null (CardT.additionalCosts c)
                then []
                else [(Text.pack "additionalCosts", listTo costComponentToJson (CardT.additionalCosts c))]
@@ -2267,6 +2304,7 @@ jsonToCard value = do
   delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
   playerAbilities <- listFromDefault jsonToPlayerStaticAbility (getOpt (Text.pack "playerAbilities") ps)
   blockRequirements <- listFromDefault jsonToBlockRequirement (getOpt (Text.pack "blockRequirements") ps)
+  attackRequirements <- listFromDefault jsonToAttackRequirement (getOpt (Text.pack "attackRequirements") ps)
   additionalCosts <- listFromDefault jsonToCostComponent (getOpt (Text.pack "additionalCosts") ps)
   alternativeCosts <- listFromDefault jsonToCost (getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- listFromDefault jsonToEffect (getOpt (Text.pack "mulliganAction") ps)
@@ -2293,6 +2331,7 @@ jsonToCard value = do
         CardT.delayedAbilities = delayed,
         CardT.playerAbilities = playerAbilities,
         CardT.blockRequirements = blockRequirements,
+        CardT.attackRequirements = attackRequirements,
         CardT.additionalCosts = additionalCosts,
         CardT.alternativeCosts = alternativeCosts,
         CardT.mulliganAction = mulliganAction,

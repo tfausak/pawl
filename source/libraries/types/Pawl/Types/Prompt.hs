@@ -376,10 +376,12 @@ data Prompt r where
   -- CHOOSE, not target. Crown of the Ages' ruling is explicit -- "This only
   -- targets the Aura and not either creature" -- so a destination is offered no
   -- matter whose it is and no matter whether it can be targeted, and nothing here
-  -- is re-checked under CR 608.2b. The engine deliberately does NOT pre-filter to
-  -- destinations the move would be LEGAL for: "another creature" is the whole of
-  -- what the card says, and narrowing it further would answer CR 303.4j's
-  -- question on the player's behalf.
+  -- is re-checked under CR 608.2b. The offer is the card's TEXT and nothing more:
+  -- Crown of the Ages says "another creature" and gets every creature, including
+  -- ones CR 303.4j will then refuse to move the Aura onto, because narrowing past
+  -- what the card says would answer that rule's question on the player's behalf.
+  -- Aura Graft says "another permanent IT CAN ENCHANT" and gets only the legal
+  -- ones, because that is what ITS text says (Filter.CanHostSubject).
   --
   -- Elided at exactly one candidate, the ChooseManaSource posture: the effect is
   -- mandatory ("Attach ... to another creature", no "may"), so a single

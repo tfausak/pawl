@@ -13,6 +13,7 @@ module Pawl.Count where
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Filter as Filter
@@ -65,6 +66,17 @@ evaluate viewOf quantityOf context gs (Count.Type.MkCount scope predicate aggreg
     let views = Maybe.mapMaybe (snapshotView shape) (Foldable.toList (GameState.events gs))
         kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
      in aggregate quantityOf aggregation kept
+
+-- The binding slots the per-member quantity of a count reads, with the reader
+-- INJECTED for the module-cycle reason QuantityOf is injected above: Pawl.Quantity
+-- imports this module, so nothing here can call Pawl.Quantity.slots. Only
+-- Aggregation.Greatest carries a quantity; the other two aggregate the matched set
+-- alone and so read no slot. The Scope and the Filter hold no slot name at all.
+slots :: (quantity -> Set slot) -> Count.Type.Count quantity -> Set slot
+slots slotsOfQuantity (Count.Type.MkCount _ _ aggregation) = case aggregation of
+  Aggregation.Objects -> Set.empty
+  Aggregation.DistinctCardTypes -> Set.empty
+  Aggregation.Greatest quantity -> slotsOfQuantity quantity
 
 keep :: Filter.Type.Filter -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of
@@ -173,6 +185,12 @@ snapshotView shape event = case event of
                 -- explicitly), and the snapshot records no attachment either --
                 -- so IsAttachedToCreature is vacuously False here too.
                 Filter.attachedToCreature = False,
+                -- Nor whether that attachment was to a permanent rather than a
+                -- player (CR 303.4), for the same reason.
+                Filter.attachedToPermanent = False,
+                -- And no attach is being performed over a past event, so there is
+                -- no subject for CanHostSubject to be about (CR 701.3a).
+                Filter.canHostSubject = False,
                 -- Nor is what a permanent is represented by (CR 111.6: a token
                 -- "isn't a card"), and the snapshot records characteristics only
                 -- -- so IsToken is vacuously False over a past event, the third
