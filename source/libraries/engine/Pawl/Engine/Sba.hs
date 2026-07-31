@@ -104,14 +104,18 @@ zeroToughness pc =
 -- planeswalker on the battlefield always has CR 306.5b's counters unless
 -- something removed them.
 --
--- The isPlaneswalker guard is load-bearing rather than defensive: any permanent
--- may carry loyalty counters (a stray Proliferate would put none there, but CR
--- 122.1e binds the loyalty READING to planeswalkers), and CR 704.5i must not
--- bury a creature that happens to hold zero of them.
+-- The card-type guard is load-bearing rather than defensive, and in the opposite
+-- direction to zeroToughness's: Object.counters is keyed by kind for EVERY
+-- permanent, so absent this guard every creature on the battlefield would read as
+-- having loyalty 0 and be buried. CR 122.1e is what confines the reading -- "the
+-- number of loyalty counters on a PLANESWALKER on the battlefield indicates how
+-- much loyalty it has".
 zeroLoyalty :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
 zeroLoyalty gs pc oid =
   Set.member CardType.Planeswalker (PC.cardTypes pc)
-    && maybe True ((== 0) . Map.findWithDefault 0 CounterKind.Loyalty . Object.counters) (Game.lookupObject oid gs)
+    && case Game.lookupObject oid gs of
+      Nothing -> False
+      Just obj -> Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj) == 0
 
 -- CR 704.5g/h: a creature destroyed by lethal marked damage or by a deathtouch
 -- source. A DESTRUCTION -- indestructible-gated (CR 700.4) and regeneration-

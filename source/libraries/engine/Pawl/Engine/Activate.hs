@@ -404,10 +404,9 @@ activateAbility pid srcId ability = do
           case payment of
             -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
             -- activated, which is the whole of the once-per-turn limit's storage
-            -- (see loyaltyOk above). Recorded here rather than at the
-            -- announcement so that a rejected activation leaves no record --
-            -- though the Unpaid arm's State.put would undo it either way, since
-            -- the log lives in the state this function restores.
+            -- (see loyaltyOk above). Every path that rejects the activation
+            -- restores `before`, and the log lives in that state, so no rejected
+            -- activation can leave a record behind wherever this sits.
             Payment.Paid ->
               Monad.when
                 (Cost.isLoyaltyCost (ActivatedAbility.cost ability))

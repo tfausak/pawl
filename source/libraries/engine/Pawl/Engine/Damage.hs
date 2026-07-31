@@ -311,7 +311,7 @@ applyDamage events = do
         Recipient.ToCreature oid ->
           if DamageEvent.dealtByInfect ev
             then -- CR 120.3d / 702.90c: -1/-1 counters, no marked damage. Added
-            -- directly (not via Event.putCounters): this is a consequence of
+            -- directly (not via Replacement.putCounters): this is a consequence of
             -- a damage event that already ran the CR 616 replacement loop, so
             -- a "would put -1/-1 from infect" CR 614 sub-replacement is out of
             -- scope (#122).

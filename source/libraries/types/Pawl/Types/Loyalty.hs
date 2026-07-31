@@ -14,9 +14,10 @@ import Numeric.Natural (Natural)
 -- in Object.counters and never a value of this type.
 --
 -- Natural, not Quantity, and not a signed number. Power and Toughness wrap
--- Quantity because CR 208.2a's printed star is a characteristic-defining
--- ability; no rule makes loyalty characteristic-defining, and a printed loyalty
--- is a number in a box. A printed X loyalty (Nissa, Steward of Elements) is a
+-- Quantity because CR 208.2 gives some creature cards "power and/or toughness
+-- that includes a star (*)", which CR 208.2a makes a characteristic-defining
+-- ability; no rule gives loyalty a star, and CR 306.5a calls it a number in a
+-- box. A printed X loyalty (Nissa, Steward of Elements) is a
 -- separate capability -- it needs the value of X chosen as the spell was cast --
 -- and is unrepresentable here (#495).
 newtype Loyalty = MkLoyalty

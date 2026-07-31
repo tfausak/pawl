@@ -34,7 +34,7 @@ data EntryRewrite
     -- printed loyalty number.' This ability creates a replacement effect (see
     -- rule 614.1c)."
     --
-    -- The counters are placed through Pawl.Engine.Event.putCounters, the CR 122.6
+    -- The counters are placed through Pawl.Engine.Replacement.putCounters, the CR 122.6
     -- funnel, and NOT written into the copiable snapshot the two arms above
     -- write to: counters are not characteristics (CR 122.1, "counters are not
     -- objects and have no characteristics") and CR 707.2 excludes them from the

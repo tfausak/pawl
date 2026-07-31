@@ -1057,6 +1057,18 @@ legendarySpellTests registry =
             board = snd (S.addCreature thalia S.alice gs)
         HU.assertBool "castable" (Cast.castable S.alice oid board)
         HU.assertBool "and offered as a legal action" (elem (A.Cast oid) (Action.legalActions S.alice board)),
+      -- Rule 205.4e's SECOND disjunct, "or a legendary planeswalker". Jace
+      -- Beleren is the pool's only one, and it is not a creature -- so this case
+      -- fails for any reading that collapsed the rule onto the creature limb.
+      HU.testCase "CR 205.4e castable while its caster controls a legendary planeswalker" $ do
+        mountain <- Registry.printing registry "Mountain"
+        jace <- Registry.printing registry "Jace Beleren"
+        sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+        let (oid, gs) = inHandWith mountain sorcery 1
+            board = snd (S.addCreature jace S.alice gs)
+        HU.assertBool "not a creature" (not (Card.isCreature (Printing.card jace)))
+        HU.assertBool "castable" (Cast.castable S.alice oid board)
+        HU.assertBool "and offered as a legal action" (elem (A.Cast oid) (Action.legalActions S.alice board)),
       HU.testCase "CR 205.4e not castable with no legendary permanent at all" $ do
         mountain <- Registry.printing registry "Mountain"
         sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"

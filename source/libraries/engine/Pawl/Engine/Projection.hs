@@ -1813,10 +1813,9 @@ abilitiesGiven pcs oid gs = PC.activatedAbilities (projectGiven pcs oid gs)
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none.
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]
-replacementsOf oid gs = replacementsFrom (project oid gs)
-
-replacementsFrom :: ProjectedCharacteristics -> [ReplacementEffect]
-replacementsFrom pc = PC.replacementEffects pc <> intrinsicReplacementsOf pc
+replacementsOf oid gs =
+  let pc = project oid gs
+   in PC.replacementEffects pc <> intrinsicReplacementsOf pc
 
 -- CR 306.5b: "A planeswalker has the intrinsic ability 'This permanent enters
 -- with a number of loyalty counters on it equal to its printed loyalty number.'

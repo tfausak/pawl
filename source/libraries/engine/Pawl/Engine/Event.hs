@@ -449,7 +449,8 @@ destroyIn asOf regenerability oids = do
         pure (Just target)
 
 -- The single spell-countering funnel (CR 701.6 -- not to be confused with
--- `putCounters` above, CR 122.6's placement of counter markers). A countered
+-- Pawl.Engine.Replacement.putCounters, CR 122.6's placement of counter
+-- markers). A countered
 -- spell is removed from the stack and put into its owner's graveyard (CR
 -- 701.6a) through the changeZone funnel -- so Rest in Peace's redirect
 -- (graveyard->exile) and CR 400.7's new incarnation still compose, exactly as

@@ -577,13 +577,15 @@ payComponent pid oid component = case component of
     State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})
     pure Payment.Paid
   -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
-  -- through Event.putCounters, which is the CR 614 funnel: CR 614.16 admits a
-  -- counter-scaling replacement (Doubling Season, Hardened Scales) only "if the
+  -- through Replacement.putCounters, which is the CR 614 funnel: CR 614.16 admits
+  -- a counter-scaling replacement (Doubling Season, Hardened Scales) only "if the
   -- effect of a resolving spell or ability ... puts a counter on a permanent",
-  -- and paying a cost is neither. The counters CR 306.5b's enters-with
-  -- replacement places DO go through that funnel -- see
-  -- Pawl.Engine.Replacement's EntryR arm -- which is what makes Doubling Season
-  -- double a planeswalker's starting loyalty and leave its +1 alone.
+  -- and a cost is not an effect. The counters CR 306.5b's enters-with replacement
+  -- places DO go through that funnel -- CR 614.16's next clause covers them,
+  -- "they also apply if another replacement or prevention effect does so, even if
+  -- the original event being modified wasn't itself an effect" -- which is what
+  -- makes Doubling Season double a planeswalker's starting loyalty and leave its
+  -- +1 alone.
   CostComponent.AddLoyaltyToThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
     pure Payment.Paid

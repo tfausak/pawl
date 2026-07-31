@@ -154,6 +154,31 @@ tests registry =
         HU.assertBool
           "the +2 is not offered"
           (all (`notElem` Action.legalActions S.alice theirTurn) (activation jaceId plusTwo jace)),
+      -- The proof that CR 306.5b's counters go through the CR 122.6 funnel rather
+      -- than straight onto the object. CR 614.16's second sentence is the rule:
+      -- a counter-scaling replacement applies "even if the original event being
+      -- modified wasn't itself an effect", and CR 306.5b's entry counters are
+      -- placed by a replacement effect.
+      HU.testCase "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty" $ do
+        island <- Registry.printing registry "Island"
+        jace <- Registry.printing registry "Jace Beleren"
+        doublingSeason <- Registry.printing registry "Doubling Season"
+        let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
+            after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+        HU.assertEqual "three doubled to six" 6 (S.counterOf CounterKind.Loyalty (theJace after) after),
+      -- The other half of the same rule, and the reason the two placements are
+      -- deliberately different code paths: CR 614.16's FIRST sentence limits a
+      -- counter-scaling replacement to counters an EFFECT puts on, and CR 606.4's
+      -- loyalty symbol is a cost. Doubling Season's own ruling says so.
+      HU.testCase "CR 614.16 Doubling Season does not double a loyalty ability's own cost" $ do
+        island <- Registry.printing registry "Island"
+        jace <- Registry.printing registry "Jace Beleren"
+        doublingSeason <- Registry.printing registry "Doubling Season"
+        let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
+            board = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+            jaceId = theJace board
+            after = useAbility plusTwo jace jaceId board
+        HU.assertEqual "six plus two, not six plus four" 8 (S.counterOf CounterKind.Loyalty jaceId after),
       HU.testCase "CR 704.5i three -1s across three turns bury Jace in his owner's graveyard" $ do
         island <- Registry.printing registry "Island"
         jace <- Registry.printing registry "Jace Beleren"
