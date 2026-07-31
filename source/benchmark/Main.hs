@@ -69,7 +69,7 @@ alwaysPass p = case p of
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -113,7 +113,7 @@ castAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -157,7 +157,7 @@ fightAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids

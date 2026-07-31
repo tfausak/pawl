@@ -147,44 +147,97 @@ producedTypes production = case production of
       ManaType.Colored
       [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
 
--- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
--- PLUS every projected activated ability that is a mana ability (CR 605.1a),
--- resolved inline at payment and never on the stack. Read through the projection
--- (abilitiesOf), so Humility (layer 6) strips a creature's mana ability too --
--- and so does CR 305.7 at layer 4, which is what swaps a Blood Moon'd Reliquary
--- Tower's printed "{T}: Add {C}" for the Mountain's {R} rather than adding to it.
+-- CR 106.12: "To 'tap [a permanent] for mana' is to activate a mana ability of
+-- that permanent that includes the {T} symbol in its activation cost." Every
+-- such ROUTE an object offers, as the mana ONE activation of it adds: its
+-- intrinsic subtype mana (CR 305.6), one route per basic land type, PLUS one
+-- route per MODE (CR 700.2) of every projected activated ability that is a mana
+-- ability (CR 605.1a), resolved inline at payment and never on the stack.
 --
--- These are OPTIONS, not a yield: the object produces ONE of them when tapped
--- (tapForMana), so a five-entry list is Birds of Paradise offering five colours,
--- not a source adding five mana. An ability whose one mode adds mana TWICE is
--- therefore misread here, and under-produces (#238) -- no card in the pool does
--- it.
+-- The nesting is the whole point. The OUTER list is the options -- which ability
+-- of this permanent, and which of its modes. The INNER list is that one
+-- activation's YIELD, its AddMana effects in printed order (CR 608.2c). Sol
+-- Ring's "{T}: Add {C}{C}" is one option adding two mana; Birds of Paradise is
+-- one option adding one mana of a colour still to be chosen; an Urborg'd
+-- Mountain is two options of one mana each.
 --
--- Deduplicated. Two routes to the same type (an Urborg'd Swamp is a Swamp twice
--- over) are indistinguishable options producing an identical unit, so collapsing
--- them elides a prompt that has no content -- the one such elision that needs no
--- judgement about what "indistinguishable" means.
-manaTypesOf :: ObjectId -> GameState -> [ManaType]
-manaTypesOf = manaTypesOfGiven Map.empty
+-- Read through the projection (abilitiesOf), so Humility (layer 6) strips a
+-- creature's mana ability too -- and so does CR 305.7 at layer 4, which is what
+-- swaps a Blood Moon'd Reliquary Tower's printed "{T}: Add {C}" for the
+-- Mountain's {R} rather than adding to it.
+--
+-- One route per mode, rather than one per combination of modes, because CR
+-- 700.2's selection is "choose exactly one" for every mana ability in the pool.
+-- An ability that chose two modes at once would make a route the CONCATENATION
+-- of the chosen modes' yields, and the options the size-n subsets of its modes
+-- (#449). A mode adding no mana contributes an empty route, which is a legal but
+-- pointless activation and costs the reader nothing below: it is one more option
+-- offering no mana, and the supply model ignores it.
+manaRoutesOf :: ObjectId -> GameState -> [[ManaProduction]]
+manaRoutesOf = manaRoutesOfGiven Map.empty
 
--- The same list against a pre-projected board, for a caller asking it of every
--- source a player controls -- manaSources below and payableResolutions both do,
--- and each of the two projection reads here was a fresh gather per source (#200).
--- See Projection.projectGiven for what the board is and why Map.empty above is
--- the same answer.
-manaTypesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaType]
-manaTypesOfGiven pcs oid gs =
-  let fromSubtypes = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs))
-      fromAbilities =
-        concatMap
-          (concatMap producedTypes . Maybe.mapMaybe Resolve.manaProduced . Modal.allEffects . ActivatedAbility.modal)
-          (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
-   in List.nub (fromSubtypes <> fromAbilities)
+-- The same routes against a pre-projected board, for a caller asking them of
+-- every source a player controls -- manaSources below and payableResolutions
+-- both do, and each of the two projection reads here was a fresh gather per
+-- source (#200). See Projection.projectGiven for what the board is and why
+-- Map.empty above is the same answer.
+manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [[ManaProduction]]
+manaRoutesOfGiven pcs oid gs =
+  let fromSubtypes =
+        fmap
+          (\manaType -> [ManaProduction.OfType manaType])
+          (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
+      modeRoutes ability =
+        fmap (Maybe.mapMaybe Resolve.manaProduced) (Modal.modeEffects (ActivatedAbility.modal ability))
+      fromAbilities = concatMap modeRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
+   in fromSubtypes <> fromAbilities
+
+-- What tapping this object for mana could actually put in a pool: every route
+-- above with each of its ManaProduction choices resolved to a concrete type, so
+-- one entry per (route, colour choice) pair. `traverse` over the list
+-- applicative is that product -- Birds of Paradise's one route becomes CR
+-- 105.4's five one-mana yields.
+--
+-- A Mana rather than a list of types because that is what a yield IS: some mana,
+-- headed for a pool (CR 106.4). tapForMana adds the chosen one whole.
+--
+-- Deduplicated by the WHOLE yield. Two routes producing identical mana (an
+-- Urborg'd Swamp is a Swamp twice over) are indistinguishable options -- no cost
+-- and no rider tells two of this permanent's mana abilities apart yet (#238) --
+-- so collapsing them elides a prompt with no content. Deliberately order-
+-- sensitive: {R} then {B} and {B} then {R} are left as two options rather than
+-- merged, which can only ever ASK where a set-valued dedup would not, and no
+-- card in the pool produces either.
+manaYieldsOf :: ObjectId -> GameState -> [Mana]
+manaYieldsOf = manaYieldsOfGiven Map.empty
+
+manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
+manaYieldsOfGiven pcs oid gs =
+  let asMana manaTypes = Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType}) manaTypes)
+   in List.nub (fmap asMana (concatMap (traverse producedTypes) (manaRoutesOfGiven pcs oid gs)))
+
+-- The types in one yield, in order. The one place Mana is unwrapped for reading
+-- rather than for spending.
+typesOf :: Mana -> [ManaType]
+typesOf (Mana.MkMana units) = fmap ManaUnit.manaType units
+
+-- CR 106.7's shape: every mana type this object COULD produce, flattened across
+-- its yields and deduplicated. A strictly weaker question than manaYieldsOf --
+-- it says nothing about how MUCH a single activation adds, so a Sol Ring answers
+-- [{C}] here and yields {C}{C} there. Kept apart deliberately: the two were one
+-- function while every source added exactly one mana, and conflating them is
+-- what made Sol Ring read as a choice between two singles (#238).
+manaTypesOf :: ObjectId -> GameState -> [ManaType]
+manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
 -- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
--- predicate read at two sites: manaTypesOf includes a mana ability as a source
+-- predicate read at two sites: manaRoutesOf includes a mana ability as a source
 -- (Task 6); Action.legalActions excludes it from the stack (Task 5).
+--
+-- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
+-- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even
+-- where the game state stops it producing.
 isManaAbility :: ActivatedAbility.ActivatedAbility Card.Card -> Bool
 isManaAbility ab =
   not (null (Maybe.mapMaybe Resolve.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
@@ -238,8 +291,8 @@ emptyManaPools gs =
 -- threaded into every question asked of every permanent -- the hoist
 -- Sba.performStateBasedActions takes for the CR 704.3 sweep and
 -- Projection.controls takes for the grant list. Unhoisted, each candidate cost as
--- many as four fresh Projection.gathers -- two for its mana types alone
--- (manaTypesOf reads subtypes and abilities separately), one for the card-type
+-- many as four fresh Projection.gathers -- two for its mana routes alone
+-- (manaRoutesOf reads subtypes and abilities separately), one for the card-type
 -- test and one for the haste read behind it -- plus a fresh grant walk, which
 -- made a function the priority loop reaches at every boundary quadratic in the
 -- battlefield (#200).
@@ -265,23 +318,29 @@ manaSourcesGiven grants pcs pid gs =
           || Summoning.settledOrHastyGiven pcs pid oid gs
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False
-        Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOfGiven pcs oid gs)) && notSickCreature oid
+        Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaRoutesOfGiven pcs oid gs)) && notSickCreature oid
    in filter isSource (Projection.controlsGiven grants pid gs)
 
--- Activate an object's intrinsic mana ability: tap it, add its mana. CR 605.3b:
--- a mana ability does not use the stack, so this is immediate -- which is also
--- why the colour choice is made HERE and not by Resolve.
+-- CR 106.12: tap an object for mana -- add the mana one activation of one of its
+-- mana abilities yields, and tap it. CR 605.3b: a mana ability does not use the
+-- stack, so this is immediate -- which is also why the colour choice is made
+-- HERE and not by Resolve.
 --
--- Monadic because of that choice. A Mountain produces exactly one type and is
+-- Monadic because of that choice. A Mountain offers exactly one yield and is
 -- never asked; a Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR
 -- 305.6/305.7) both offer several, and the engine never picks for the player.
 -- Which SOURCE to tap is a separate question, and payCost asks it.
+--
+-- The whole yield lands, so Sol Ring's "{T}: Add {C}{C}" adds two units from one
+-- activation. What this still does NOT do is run the ability's own activation
+-- cost or its riders: CR 602.2b routes an activation through CR 601.2b-i, and
+-- this taps directly instead (#238).
 tapForMana :: ObjectId -> Game ()
 tapForMana oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
-    Just obj -> case manaTypesOf oid gs of
+    Just obj -> case manaYieldsOf oid gs of
       [] -> pure ()
       first : rest -> do
         -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
@@ -290,26 +349,29 @@ tapForMana oid = do
         -- choice. Falls back to owner in the impossible case lookupObject just
         -- proved oid exists but controllerOf returns Nothing.
         let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-        produced <- chooseManaType controller oid (first NonEmpty.:| rest) gs
+        chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
         let tapped = obj {Object.tapped = TapState.Tapped}
             gs1 = gs {GameState.objects = Map.insert oid tapped (GameState.objects gs)}
-        State.put (addMana controller [ManaUnit.MkManaUnit {ManaUnit.manaType = produced}] gs1)
+        case chosen of
+          Mana.MkMana produced -> State.put (addMana controller produced gs1)
 
--- Which type this source produces.
+-- Which mana this source produces -- which of its mana abilities, in which mode,
+-- and which colour each of that mode's AddMana effects makes, asked as ONE
+-- question because the answer is one yield.
 --
--- Elided exactly when the source offers ONE type, where no choice exists --
--- manaTypesOf has already collapsed duplicate routes to the same type, so a
--- remaining list of two is two genuinely different mana.
+-- Elided exactly when the source offers ONE yield, where no choice exists --
+-- manaYieldsOf has already collapsed routes producing identical mana, so a
+-- remaining list of two is two genuinely different yields.
 --
 -- FILTERED, NOT TRUSTED, the posture chooseSource and Cost.payComponents take:
 -- an answer outside the offered set is rejected and the head used instead. Here
--- that is not merely hygiene -- honouring a type the source cannot make would
+-- that is not merely hygiene -- honouring a yield the source cannot make would
 -- mint mana out of nothing.
-chooseManaType :: PlayerId -> ObjectId -> NonEmpty.NonEmpty ManaType -> GameState -> Game ManaType
-chooseManaType pid oid candidates gs = case candidates of
+chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty Mana -> GameState -> Game Mana
+chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
   _ -> do
-    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaType (Decide.deciderFor pid gs) pid oid candidates))
+    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid candidates))
     pure $
       if List.elem answer (NonEmpty.toList candidates)
         then answer
@@ -720,10 +782,10 @@ canPayCommitting pid committed cost gs = not (null (payableResolutions pid commi
 --
 -- So it is an assignment question, and it is answered exactly. Model each
 -- available mana as a SUPPLY carrying the set of types it could be -- a pool
--- unit is its own type; an untapped source is everything manaTypesOf offers,
--- because tapping it yields exactly one mana of one of them. Each typed symbol
--- of the cost is a DEMAND for a specific type; generic symbols demand a count
--- and nothing more.
+-- unit is its own type; an untapped source contributes ONE SUPPLY PER MANA IT
+-- ADDS, which is what sourceSupplies below reads off its yields. Each typed
+-- symbol of the cost is a DEMAND for a specific type; generic symbols demand a
+-- count and nothing more.
 --
 -- A RESOLVED cost is payable exactly when all three hold:
 --
@@ -757,6 +819,26 @@ canPayCommitting pid committed cost gs = not (null (payableResolutions pid commi
 -- rides on the same enumeration: its life way is a resolution with one fewer
 -- demand, so neither clause has to learn about a symbol that consumes no supply
 -- at all.
+-- One untapped source's contribution to the supply side, as a supply per mana it
+-- would add: the Nth supply is every type the Nth mana of any of its yields
+-- could be. `transpose` is exactly that read, and its ragged case -- yields of
+-- different LENGTHS -- takes the longest, so a source is counted for the most
+-- mana any one activation of it adds.
+--
+-- EXACT wherever the pool reaches it, and the two cases are worth separating. A
+-- source with ONE yield (Sol Ring, Birds of Paradise, a Forest) has nothing to
+-- mix, and a source whose yields are all ONE mana (an Urborg'd Mountain) has one
+-- supply carrying their union, which is what the whole model was before Sol Ring.
+-- What it OVER-counts is a source offering several multi-mana yields: transposing
+-- lets the first mana come from one yield and the second from another, and
+-- letting the longest yield set the count credits a source with mana the yield
+-- the player actually picks may not add. Over-permissive, deliberately -- an
+-- unpayable payment fails and rolls back (CR 601.2h, payCost), while
+-- under-counting would withhold an action the player was entitled to. No card in
+-- the pool has two yields of which either adds more than one mana (#450).
+sourceSupplies :: [Mana] -> [Set.Set ManaType]
+sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
+
 payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
 payableResolutions pid committed cost gs =
   let Mana.MkMana units = poolOf pid gs
@@ -767,7 +849,7 @@ payableResolutions pid committed cost gs =
       pcs = Projection.projectAll gs
       supplies =
         fmap (Set.singleton . ManaUnit.manaType) units
-          <> fmap (\oid -> Set.fromList (manaTypesOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
+          <> concatMap (\oid -> sourceSupplies (manaYieldsOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
       couldServe wanted = length (filter (not . Set.disjoint wanted) supplies)
       payable (demands, generic, life) =
         let -- A demand belongs to the set W exactly when every type that could

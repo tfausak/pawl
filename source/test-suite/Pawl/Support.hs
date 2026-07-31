@@ -199,7 +199,7 @@ identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -248,7 +248,7 @@ castAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -308,7 +308,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
@@ -368,7 +368,7 @@ playLandAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -435,7 +435,7 @@ randomAnswer p = case p of
     pure (pickFrom candidates i)
   -- And the same for WHICH type a multi-type source makes, so a random game
   -- exercises every colour an any-colour source can produce.
-  Prompt.ChooseManaType _ _ _ candidates -> do
+  Prompt.ChooseManaYield _ _ _ candidates -> do
     g <- State.get
     let types = NonEmpty.toList candidates
         (i, g') = Random.uniformR (0, length types - 1) g
