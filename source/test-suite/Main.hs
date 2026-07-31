@@ -41,7 +41,7 @@ import qualified Pawl.Json.StringSpec
 import qualified Pawl.Json.ValueSpec
 import qualified Pawl.JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
-import qualified Pawl.ModalSpec as ModalSpec
+import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec as MulliganSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
@@ -99,7 +99,6 @@ testTree registry =
       PowerToughnessSpec.tests registry,
       PlayerEffectSpec.tests registry,
       ActivateSpec.tests registry,
-      ModalSpec.tests registry,
       ReplacementSpec.tests registry,
       TriggerSpec.tests registry,
       AuraSpec.tests registry,
@@ -139,6 +138,7 @@ spec s registry = do
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
   Pawl.JsonSpec.spec s
+  Pawl.ModalSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.RegistrySpec.spec s
   Pawl.SlugSpec.spec s
