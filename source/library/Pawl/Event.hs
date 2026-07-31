@@ -615,10 +615,11 @@ drawCard pid = do
 -- The move goes through changeZoneReturning, the CR 400.7 funnel, so a discarded
 -- card gets a new incarnation and Rest in Peace's redirect composes. The EVENT is
 -- what this function adds over calling that funnel directly, and it is not
--- redundant with the Moved event the move records: a card put into a graveyard
--- from a hand has not necessarily been discarded, and a discard CR 614 redirects
--- elsewhere is still a discard. A discard trigger reads this record and never
--- the zone pair.
+-- redundant with the Moved event the move records: CR 701.9c speaks of a card
+-- that "is discarded, but an effect causes it to be put into a hidden zone
+-- instead of into its owner's graveyard", so a discard the CR 614 loop redirected
+-- is still a discard while its Moved event no longer reads hand-to-graveyard. A
+-- discard trigger reads this record and never the zone pair.
 --
 -- Recorded only when the move COMPLETED. `Nothing` is an unknown id or a CR
 -- 616.1 loop that cancelled the move, and CR 603.2g is why that must record

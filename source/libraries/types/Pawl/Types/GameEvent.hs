@@ -78,9 +78,13 @@ data GameEvent
     -- is nothing to match twice.
     --
     -- Distinct from the Moved event the same discard also records: that one is
-    -- the zone change (CR 400.7), and this one is what the change WAS. A card
-    -- put into a graveyard from a hand is not necessarily discarded, and a
-    -- discard that CR 614 redirects somewhere else is still a discard.
+    -- the zone change (CR 400.7), and this one is what the change WAS. Keeping
+    -- the two apart is what survives a CR 614 replacement of the destination,
+    -- and CR 701.9c is the rule that says it must: "if a card IS DISCARDED, but
+    -- an effect causes it to be put into a hidden zone instead of into its
+    -- owner's graveyard ..." -- a card the replacement sent elsewhere has still
+    -- been discarded, so a reader matching the hand-to-graveyard zone pair would
+    -- lose exactly the case Rest in Peace creates.
     Discarded PlayerId ObjectId DiscardCause
   | -- CR 508.2b: an attacker was DECLARED -- one entry per creature the active
     -- player chose in CR 508.1's turn-based action. What "whenever this creature
