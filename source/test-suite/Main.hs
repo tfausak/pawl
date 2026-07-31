@@ -1,7 +1,7 @@
 import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
 import qualified Pawl.ActivateSpec
-import qualified Pawl.AuraSpec as AuraSpec
+import qualified Pawl.AuraSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CardsSpec
@@ -92,7 +92,6 @@ testTree registry =
       PlayerEffectSpec.tests registry,
       ReplacementSpec.tests registry,
       TriggerSpec.tests registry,
-      AuraSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
     ]
 
@@ -101,6 +100,7 @@ testTree registry =
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
 spec s registry = do
   Pawl.ActivateSpec.spec s registry
+  Pawl.AuraSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardsSpec.spec s registry
   Pawl.ColorSpec.spec s registry
