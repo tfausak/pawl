@@ -3,6 +3,7 @@ module Pawl.CardsSpec where
 
 import qualified Data.ByteString as ByteString
 import qualified Data.Foldable as Foldable
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
@@ -23,6 +24,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -366,7 +368,41 @@ tests registry =
           "target player takes an extra turn after this one"
           [(Optionality.Mandatory, [Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")))])]
           (modeShapes (CardT.spell c))
-        HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c)
+        HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c),
+      -- The pool's first card whose ENTERS trigger acts on the permanent that
+      -- entered. Soul Warden shares the condition and names nothing about the
+      -- entrant; endless-cockroaches.json shares the slot but reads it from a
+      -- look-back dies trigger, where the entrant is another incarnation of the
+      -- bearer itself. Aether Flash is where CR 400.7e's "the new object that it
+      -- became" is a wholly different card from the ability's source.
+      --
+      -- The Filter is a bare HasCardType Creature, with no Not IsSource: the
+      -- printed text says "a creature", not "another creature", and an
+      -- enchantment could not match a creature filter anyway.
+      HU.testCase "aether-flash.json loads as a {2}{R}{R} enchantment dealing 2 to the creature that entered" $ do
+        c <- Registry.card registry "Aether Flash"
+        HU.assertEqual "name" (Text.pack "Aether Flash") (CardT.name c)
+        HU.assertEqual
+          "{2}{R}{R}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red), ManaSymbol.OfType (ManaType.Colored Color.Red)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "Enchantment"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Enchantment) Set.empty)
+          (CardT.typeLine c)
+        HU.assertEqual "no power or toughness" (Nothing, Nothing) (CardT.power c, CardT.toughness c)
+        HU.assertEqual
+          "one trigger, on any creature entering"
+          [TriggerCondition.PermanentEnters (Filter.HasCardType CardType.Creature)]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "dealing 2 damage to the became slot"
+          [[(Optionality.Mandatory, [Effect.DealDamage Binding.became (Quantity.Literal 2)])]]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "and it targets nothing"
+          [[Map.empty]]
+          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion

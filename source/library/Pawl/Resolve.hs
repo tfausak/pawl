@@ -858,7 +858,15 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    -- CR 120.1a: a slot may name something damage cannot be dealt to at all. A
+    -- slot bound by Pawl.Event.eventBindings names a permanent GENERICALLY --
+    -- Aether Flash's entrant under Pawl.Binding.became, tagged from a trigger
+    -- condition that said nothing about card types -- so what it names is
+    -- classified by Damage.damageRecipient before any event is built, and an
+    -- entrant that is no longer a creature (gone by resolution, CR 608.2h) makes
+    -- this a no-op rather than a damage event nothing can apply. This is the
+    -- only site that can hand applyDamage a generically named recipient.
+    case (Map.lookup slot chosen >>= Damage.damageRecipient gs, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Quantity.evaluate viewOf context gs source quantity of
         -- An unevaluable quantity is a no-op, the powerOf posture.
         Nothing -> pure ()
