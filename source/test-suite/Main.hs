@@ -52,7 +52,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec
-import qualified Pawl.ResolveSpec as ResolveSpec
+import qualified Pawl.ResolveSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
@@ -81,7 +81,6 @@ testTree registry =
     "pawl"
     [ CardSpec.tests registry,
       PropertySpec.tests registry,
-      ResolveSpec.tests registry,
       ReplacementSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
     ]
@@ -138,6 +137,7 @@ spec s registry = do
   Pawl.ProjectionSpec.spec s registry
   Pawl.RegistrySpec.spec s
   Pawl.ReplaySpec.spec s registry
+  Pawl.ResolveSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
   Pawl.TriggerSpec.spec s registry
