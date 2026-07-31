@@ -351,6 +351,21 @@ tests registry =
             )
           ]
           (modeShapes (CardT.spell c))
+        HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c),
+      -- CR 500.7: the pool's one creator of an extra turn. "Target player takes
+      -- an extra turn after this one" -- so the recipient is a TARGET, which is
+      -- what makes an opponent's extra turn expressible at all.
+      HU.testCase "time-warp.json loads as a {3}{U}{U} sorcery whose only effect is a TakeExtraTurn" $ do
+        c <- Registry.card registry "Time Warp"
+        HU.assertEqual "name" (Text.pack "Time Warp") (CardT.name c)
+        HU.assertEqual
+          "{3}{U}{U}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Blue), ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "target player takes an extra turn after this one"
+          [(Optionality.Mandatory, [Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")))])]
+          (modeShapes (CardT.spell c))
         HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c)
     ]
 

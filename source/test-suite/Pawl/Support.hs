@@ -1382,7 +1382,9 @@ oneMountainState mountain ph =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
-          GameState.exiledUntilMonarch = Map.empty
+          GameState.exiledUntilMonarch = Map.empty,
+          GameState.extraTurns = [],
+          GameState.turnAnchor = Nothing
         }
 
 drawStep :: Game.Type.Game ()

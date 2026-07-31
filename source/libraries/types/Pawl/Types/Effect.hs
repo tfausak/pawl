@@ -448,4 +448,23 @@ data Effect card
     -- all of them, and one with none sacrifices nothing -- "as much as possible",
     -- and forced, so neither case is prompted.
     PlayerSacrifices SlotName Filter Quantity
+  | -- CR 500.7: "Some effects can give a player extra turns. They do this by
+    -- adding the turns directly after the specified turn." The players the
+    -- PlayerRef names each get one extra turn, added directly after the turn
+    -- this resolves in. Time Warp's "target player takes an extra turn after
+    -- this one" is `InSlot`, reading a slot that TARGETING filled (CR 601.2c).
+    --
+    -- PlayerRef rather than the bare SlotName Mill and Discard take, for the
+    -- reason Draw's own comment gives: the next card whose extra turn is its
+    -- caster's ("Take an extra turn after this one") is `Relative You` and needs
+    -- no sibling opcode to say so.
+    --
+    -- No count and no "which turn": every printed extra-turn card adds ONE turn
+    -- directly after the current one, and CR 500.7's "if a player is given
+    -- multiple extra turns, the extra turns are added one at a time" is about
+    -- several such effects rather than one effect adding several. WHERE the
+    -- turns go and in what order they are taken is Engine.handoffTurn's
+    -- question, which reads GameState.extraTurns as the stack CR 500.7's last
+    -- sentence describes.
+    TakeExtraTurn PlayerRef
   deriving (Eq, Ord, Show)

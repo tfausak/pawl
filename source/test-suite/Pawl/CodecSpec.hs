@@ -321,6 +321,11 @@ tests registry =
           HU.testCase "SkipNextPhase" $ do
             roundTrip "skip slot" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Phase.Beginning BeginningStep.DrawStep))
             roundTrip "skip you" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (Phase.Beginning BeginningStep.Untap)),
+          -- CR 500.7: Time Warp's slot read, plus the self-scoped arm a "take an
+          -- extra turn after this one" card would write.
+          HU.testCase "TakeExtraTurn" $ do
+            roundTrip "extra turn slot" Codec.effectToJson Codec.jsonToEffect (Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "extra turn you" Codec.effectToJson Codec.jsonToEffect (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You)),
           -- Every PlayerRef shape the opcode accepts: the self-scoped one every
           -- card in the pool uses, and the slot read CR 702.70a's "that player"
           -- needs.
