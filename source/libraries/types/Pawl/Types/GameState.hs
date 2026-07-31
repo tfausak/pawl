@@ -169,6 +169,29 @@ data GameState = MkGameState
     -- that a CHANGE of crown can be told from an opponent merely holding it (see
     -- MonarchWatch). Not an Expiry: the Expiry sweeps are delete-and-recompute
     -- and cannot perform the return zone change.
-    exiledUntilMonarch :: Map ObjectId MonarchWatch
+    exiledUntilMonarch :: Map ObjectId MonarchWatch,
+    -- CR 500.7: the extra turns that have been created and not yet taken, MOST
+    -- RECENTLY CREATED FIRST -- "the most recently created turn will be taken
+    -- first". A stack, not a queue, and a list precisely because the style guide
+    -- reserves lists for stacks (GameState.stack is the other one). Pushed by
+    -- Resolve's TakeExtraTurn arm, popped by Engine.handoffTurn before the
+    -- seating order is consulted at all.
+    --
+    -- One entry per turn, so two effects giving one player an extra turn each
+    -- are two entries: CR 500.7's "the extra turns are added one at a time" is
+    -- what makes them countable rather than a set of players.
+    extraTurns :: [PlayerId],
+    -- CR 500.7 / 103.1: while an EXTRA turn is under way, the seat the ordinary
+    -- turn order resumes from -- the active player of the most recent turn that
+    -- was not an extra one. Nothing on an ordinary turn, where that seat IS
+    -- GameState.activePlayer and there is nothing to remember.
+    --
+    -- CR 500.7 adds a turn "directly after the specified turn" and takes nothing
+    -- away, so the turn that would have followed the specified turn still
+    -- follows it. Anchoring the CR 103.1 walk on activePlayer instead would make
+    -- an extra turn CONSUME the taker's ordinary turn whenever the two are
+    -- different players -- Time Warp aimed at an opponent, which is exactly what
+    -- Pawl.TurnSpec's "bob's own turn still follows" case pins.
+    turnAnchor :: Maybe PlayerId
   }
   deriving (Eq, Show)

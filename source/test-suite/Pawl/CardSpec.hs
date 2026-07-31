@@ -391,6 +391,7 @@ effectCounts effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
+  Effect.TakeExtraTurn _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its

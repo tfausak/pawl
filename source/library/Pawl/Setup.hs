@@ -91,7 +91,9 @@ emptyGame order =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
-          GameState.exiledUntilMonarch = Map.empty
+          GameState.exiledUntilMonarch = Map.empty,
+          GameState.extraTurns = [],
+          GameState.turnAnchor = Nothing
         }
 
 createCard :: PlayerId -> Printing -> Game ObjectId
@@ -269,7 +271,12 @@ restartGame perform starter = do
             GameState.pendingControl = Map.empty,
             GameState.activeControl = Nothing,
             GameState.monarch = Nothing,
-            GameState.exiledUntilMonarch = Map.empty
+            GameState.exiledUntilMonarch = Map.empty,
+            -- CR 727.1: the game that scheduled them has ended, so no extra turn
+            -- survives into the new one -- cleared exactly as every other
+            -- transient field is.
+            GameState.extraTurns = [],
+            GameState.turnAnchor = Nothing
           }
   startGameFromCards perform
 
@@ -375,7 +382,13 @@ subgameStateFrom starter parent =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
-          GameState.exiledUntilMonarch = Map.empty
+          GameState.exiledUntilMonarch = Map.empty,
+          -- CR 729.1a: the subgame is its own game and starts from turn 1, so
+          -- the main game's pending extra turns are not in it. The main game's
+          -- own copy is untouched -- the parent state sits in the outer frame --
+          -- so they are still waiting when the subgame ends.
+          GameState.extraTurns = [],
+          GameState.turnAnchor = Nothing
         }
 
 -- CR 729.5: at the end of a subgame, each player takes all traditional cards

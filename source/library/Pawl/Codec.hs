@@ -1606,6 +1606,7 @@ effectToJson e = case e of
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
   Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson f])))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
+  Effect.TakeExtraTurn r -> Json.tagged (Text.pack "TakeExtraTurn") (Just (playerRefToJson r))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -1701,6 +1702,7 @@ jsonToEffect value = do
       Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
       _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
     "PlaySubgame" -> withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
+    "TakeExtraTurn" -> withValue mv (fmap Effect.TakeExtraTurn . jsonToPlayerRef)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

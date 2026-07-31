@@ -150,6 +150,8 @@ slotsOf effect = case effect of
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Set.empty
+  -- The PlayerRef may name a target slot -- Time Warp's "target player".
+  Effect.TakeExtraTurn ref -> playerRefSlots ref
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -197,6 +199,7 @@ readsX = any effectReadsX
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
+      Effect.TakeExtraTurn _ -> False
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
 -- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
@@ -245,6 +248,7 @@ manaProduced effect = case effect of
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
+  Effect.TakeExtraTurn _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -288,6 +292,7 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
+  Effect.TakeExtraTurn _ -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -404,6 +409,8 @@ rewriteEffect pairs effect = case effect of
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
+  -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
+  Effect.TakeExtraTurn _ -> effect
 
 -- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
 -- an unchosen mode's effects never resolve), with every text-change affecting it
@@ -1789,6 +1796,30 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                           GameState.objects = Map.adjust sicken target (GameState.objects gs1)
                         }
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.TakeExtraTurn ref -> do
+    gs <- State.get
+    let named = playerRefPlayers chosen legality controller gs ref
+        -- CR 500.7: "If multiple players are given extra turns, the extra turns
+        -- are added one at a time, in APNAP order (see rule 101.4)." The
+        -- intersection is Draw's, for Draw's reasons: apnapOrder supplies the
+        -- ORDER and `named` the MEMBERSHIP, so a seat the rotation still names
+        -- but playerRefPlayers does not -- a departed player, who stopped being
+        -- one at CR 102.1 while keeping their seat -- gets no turn. A departed
+        -- player named through a TARGET slot can still get an entry, since that
+        -- arm reads the slot rather than the roster; CR 800.4k catches it at the
+        -- handoff, where the turn simply does not begin.
+        --
+        -- Observable, not cosmetic: the pushes below are what CR 500.7's last
+        -- sentence then reverses, so APNAP order is what decides which of two
+        -- players takes their extra turn first.
+        takers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+    -- CR 500.7: "the extra turns are added ONE AT A TIME ... the MOST RECENTLY
+    -- CREATED turn will be taken first." So each taker is pushed onto the head
+    -- in turn, and the last one pushed is the first one Engine.handoffTurn pops
+    -- -- a stack, not a queue. A second TakeExtraTurn resolving later in the
+    -- same turn lands in front of this one's entries for the same reason, which
+    -- is the half of the rule that two Time Warps exercise.
+    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (flip (:)) (GameState.extraTurns g) takers})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
