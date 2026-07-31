@@ -43,6 +43,7 @@ import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ModalSpec as ModalSpec
 import qualified Pawl.MulliganSpec as MulliganSpec
+import qualified Pawl.PlaneswalkerSpec as PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
@@ -106,6 +107,7 @@ testTree registry =
       PowerToughnessSpec.tests registry,
       PlayerEffectSpec.tests registry,
       ActivateSpec.tests registry,
+      PlaneswalkerSpec.tests registry,
       ModalSpec.tests registry,
       CopySpec.tests registry,
       ReplacementSpec.tests registry,

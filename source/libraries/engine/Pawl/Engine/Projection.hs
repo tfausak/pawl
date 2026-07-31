@@ -25,6 +25,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -34,6 +35,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -48,6 +50,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
@@ -594,6 +597,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.colors = Set.empty,
         PC.power = Nothing,
         PC.toughness = Nothing,
+        PC.loyalty = Nothing,
         PC.characteristicPT = Nothing,
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
@@ -629,6 +633,9 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
             PC.toughness = case Card.Type.toughness card of
               Nothing -> Nothing
               Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
+            -- CR 306.5a: a literal number, so it is copied through rather than
+            -- evaluated the way the two Quantity-valued fields above are.
+            PC.loyalty = Card.Type.loyalty card,
             PC.characteristicPT = seedCharacteristicPT card,
             PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
             PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
@@ -1238,6 +1245,11 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               CounterKind.Keyword kw -> List.genericReplicate n (at Layer.Ability (Modification.GainKeyword kw))
               CounterKind.PlusOnePlusOne -> []
               CounterKind.MinusOneMinusOne -> []
+              -- CR 122.1e: a loyalty counter grants nothing. It "indicates how
+              -- much loyalty" a planeswalker has, and no CR 613 layer reads
+              -- loyalty at all -- CR 704.5i's state-based action and CR 606.6's
+              -- activation gate count Object.counters directly instead.
+              CounterKind.Loyalty -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
@@ -1281,7 +1293,7 @@ data Aspect
 -- Effect.RemoveFromCombat edits the same record from Resolve.applyEffect, which
 -- is a RESOLUTION and so between projections just as squarely as a settle is. The
 -- clauses that remain unbuilt -- phasing (#154), and the ones about an attacked
--- planeswalker or battle (#301, #302) -- arrive by one of those two doors as well.
+-- planeswalker or battle (#493, #302) -- arrive by one of those two doors as well.
 --
 -- What that costs is TIMING, not dependency: the rules remove the permanent the
 -- instant control or creature-ness changes, and pawl removes it at the next
@@ -1801,7 +1813,44 @@ abilitiesGiven pcs oid gs = PC.activatedAbilities (projectGiven pcs oid gs)
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none.
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]
-replacementsOf oid gs = PC.replacementEffects (project oid gs)
+replacementsOf oid gs =
+  let pc = project oid gs
+   in PC.replacementEffects pc <> intrinsicReplacementsOf pc
+
+-- CR 306.5b: "A planeswalker has the intrinsic ability 'This permanent enters
+-- with a number of loyalty counters on it equal to its printed loyalty number.'
+-- This ability creates a replacement effect (see rule 614.1c)."
+--
+-- MINTED from the finished projection rather than stored on the card, the posture
+-- Pawl.Engine.Mana.subtypeMana takes for CR 305.6's intrinsic mana ability and
+-- Pawl.Engine.Keyword.triggeredAbilitiesOf takes for CR 702.70's poisonous. Three
+-- consequences, all of them the rules':
+--
+--   * It is keyed on the PROJECTED card type, so a permanent that became a
+--     planeswalker is judged as one and a card that is a planeswalker only on
+--     paper is not.
+--   * It reads the PROJECTED loyalty, which CR 707.2 makes a copiable value -- so
+--     a Clone entering as a copy of a planeswalker enters with the COPY's printed
+--     loyalty. That is CR 707.5's "if the text that's being copied includes any
+--     abilities that replace the enters-the-battlefield event (such as 'enters
+--     with' ...), those abilities will take effect", and it falls out of the mint
+--     rather than needing machinery, because the loop re-collects each iteration
+--     (CR 616.1f) and finds the newly-stamped loyalty.
+--   * Minting AFTER the layer fold puts it out of reach of layer 6's
+--     LoseAllAbilities, which empties PC.replacementEffects. That is deliberate
+--     and matches the two precedents above: CR 306.5b gives the ability to a
+--     planeswalker as a rule, and the card type is what layer 6 would have to take
+--     away for it to stop.
+--
+-- Nothing for a planeswalker with no printed loyalty, which is unrepresentable
+-- today anyway: the CardSpec lint holds "planeswalker iff loyalty" in both
+-- directions.
+intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
+intrinsicReplacementsOf pc =
+  [ ReplacementEffect.EntryR (EntryRewrite.WithCounters CounterKind.Loyalty n)
+  | Set.member CardType.Planeswalker (PC.cardTypes pc),
+    Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
+  ]
 
 -- CR 614.6: every replacement effect active on the battlefield, PAIRED WITH ITS
 -- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
@@ -1822,7 +1871,13 @@ replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       baseHas oid = case Game.cardOf oid gs of
         Nothing -> False
-        Just card -> not (null (Card.Type.replacementEffects card))
+        -- The planeswalker disjunct is what keeps CR 306.5b's INTRINSIC
+        -- replacement inside the short-circuit: it is minted from the projection
+        -- and so appears in no base card's list, and without this a board whose
+        -- only replacement effect is a planeswalker's loyalty would answer [].
+        Just card ->
+          not (null (Card.Type.replacementEffects card))
+            || Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine card))
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []

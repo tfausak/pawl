@@ -1,8 +1,8 @@
 module Pawl.Types.CardType where
 
--- CR 205.2a lists fifteen card types. The eight missing ones are Planeswalker
--- (#301), Battle (#302), and the six command-zone residents in #131 -- Dungeon,
--- Plane, Phenomenon, Vanguard, Scheme and Conspiracy.
+-- CR 205.2a lists fifteen card types. The seven missing ones are Battle (#302)
+-- and the six command-zone residents in #131 -- Dungeon, Plane, Phenomenon,
+-- Vanguard, Scheme and Conspiracy.
 --
 -- Ord here is DECLARATION ORDER, and a card file stores its type set in that
 -- order (Pawl.CardsSpec's whole-pool round trip compares the arrays), so a new
@@ -36,4 +36,20 @@ data CardType
     -- "tribal" cards need no second name here: they are errata'd to kindred in
     -- the Oracle reference, which is what the card files transcribe.
     Kindred
+  | -- CR 306: a planeswalker, one of CR 110.4's six permanent types. Jace
+    -- Beleren is the first printing.
+    --
+    -- The card type is what the rest of CR 306 hangs off, and every clause of it
+    -- is a closed-half read of this constructor rather than of any effect: CR
+    -- 306.5b's intrinsic "enters with loyalty counters" replacement
+    -- (Pawl.Engine.Projection.intrinsicReplacementsOf), CR 606's loyalty
+    -- abilities (Pawl.Engine.Cost.isLoyaltyCost) and CR 704.5i's zero-loyalty
+    -- state-based action (Pawl.Engine.Sba.zeroLoyalty).
+    --
+    -- Two clauses of CR 306 need nothing built. CR 306.4's planeswalker
+    -- uniqueness rule "has been removed and planeswalker cards printed before
+    -- this change have received errata in the Oracle card reference to have the
+    -- legendary supertype", so Pawl.Engine.Sba's CR 704.5j legend rule already
+    -- covers it. CR 306.7's damage redirection "has been removed" outright.
+    Planeswalker
   deriving (Eq, Ord, Show)

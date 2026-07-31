@@ -164,7 +164,8 @@ data Prompt r where
   -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b
   -- calls for a per-creature announcement only if that player controls a
   -- planeswalker, protects a battle, or the game lets the active player attack
-  -- multiple other players -- none of which this pool can produce (#59).
+  -- multiple other players. A defending player can control a planeswalker now
+  -- (Jace Beleren), but AttackTarget has no arm to name one (#493, #59).
   DeclareAttackers :: Decider -> PlayerId -> [ObjectId] -> Prompt [ObjectId]
   -- CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attacker it blocks.

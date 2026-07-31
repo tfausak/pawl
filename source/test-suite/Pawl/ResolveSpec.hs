@@ -549,6 +549,7 @@ resolveTests registry =
                   Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
+                  Card.Type.loyalty = Nothing,
                   Card.Type.keywords = Set.empty,
                   Card.Type.colorIndicator = Set.empty,
                   Card.Type.staticAbilities = [],
@@ -968,6 +969,7 @@ resolveTests registry =
                   Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
+                  Card.Type.loyalty = Nothing,
                   Card.Type.keywords = Set.empty,
                   Card.Type.colorIndicator = Set.empty,
                   Card.Type.staticAbilities = [],
@@ -1029,6 +1031,7 @@ resolveTests registry =
                   Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
+                  Card.Type.loyalty = Nothing,
                   Card.Type.keywords = Set.empty,
                   Card.Type.colorIndicator = Set.empty,
                   Card.Type.staticAbilities = [],
@@ -2429,7 +2432,7 @@ proliferateTests registry =
             after = proliferate proliferatesNothing src gs
         HU.assertEqual "the creature is untouched" 2 (S.counterOf CounterKind.PlusOnePlusOne src after)
         HU.assertEqual "bob is untouched" 3 (S.playerCounterOf PlayerCounterKind.Poison S.bob after),
-      -- The counter placement rides Event.putCounters, so CR 614's counter
+      -- The counter placement rides Replacement.putCounters, so CR 614's counter
       -- replacements get their opportunity -- proliferate is not a side door that
       -- bypasses Hardened Scales.
       HU.testCase "CR 614 Hardened Scales applies to the counter proliferate adds" $ do

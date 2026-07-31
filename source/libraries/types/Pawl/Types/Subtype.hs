@@ -98,6 +98,12 @@ data Subtype
     Faerie
   | -- CR 205.3m (a creature type; Stonehorn Dignitary's).
     Rhino
+  | -- CR 205.3j: a PLANESWALKER type -- "Planeswalker subtypes are always a
+    -- single word and are listed after a long dash" (CR 306.3). Jace Beleren's.
+    -- The first subtype in this type that belongs to neither a creature, a land,
+    -- an artifact nor an enchantment, which is why Pawl.Engine.Subtype.isLandType
+    -- and Pawl.Engine.Mana.subtypeMana both answer it negatively.
+    Jace
   | -- CR 205.3m (a creature type; Bog Wraith's).
     Wraith
   deriving (Eq, Ord, Show)

@@ -107,6 +107,7 @@ library codec
     Pawl.Codec.GameEvent
     Pawl.Codec.Json
     Pawl.Codec.Keyword
+    Pawl.Codec.Loyalty
     Pawl.Codec.ManaCost
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaSymbol
@@ -421,6 +422,7 @@ library types
     Pawl.Types.Keyword
     Pawl.Types.LastKnown
     Pawl.Types.Layer
+    Pawl.Types.Loyalty
     Pawl.Types.Mana
     Pawl.Types.ManaCost
     Pawl.Types.ManaProduction
@@ -558,6 +560,7 @@ test-suite pawl-test-suite
     Pawl.ManaSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
+    Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec

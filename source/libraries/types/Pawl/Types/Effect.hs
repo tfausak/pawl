@@ -494,7 +494,7 @@ data Effect card
     -- SlotName.
     --
     -- Nullary: rule 701.34a fixes the count at one per kind, with no quantity,
-    -- kind or scope left to vary. Object counters ride Event.putCounters, so CR
+    -- kind or scope left to vary. Object counters ride Replacement.putCounters, so CR
     -- 614's counter replacements (Hardened Scales, Doubling Season) get their
     -- opportunity; player counters are added directly, matching
     -- GainPlayerCounters and gapped for the same reason (#122).

@@ -15,6 +15,7 @@ import Pawl.Types.CostComponent (CostComponent)
 import Pawl.Types.Counterability (Counterability)
 import Pawl.Types.Effect (Effect)
 import Pawl.Types.Keyword (Keyword)
+import Pawl.Types.Loyalty (Loyalty)
 import Pawl.Types.ManaCost (ManaCost)
 import Pawl.Types.Modal (Modal)
 import Pawl.Types.PlayerStaticAbility (PlayerStaticAbility)
@@ -35,6 +36,18 @@ data Card = MkCard
     -- Only creatures have these.
     power :: Maybe Power,
     toughness :: Maybe Toughness,
+    -- CR 306.5 / 306.5a: "Loyalty is a characteristic only planeswalkers have",
+    -- and a planeswalker card's is "the number printed in its lower right
+    -- corner". Nothing for every card that is not a planeswalker; the CardSpec
+    -- lint family holds that biconditional in both directions.
+    --
+    -- The sibling of power/toughness above, and read the same way: through
+    -- Pawl.Engine.Projection (ProjectedCharacteristics.loyalty), never directly,
+    -- because CR 707.2 lists loyalty among the copiable values a Clone acquires.
+    -- What reads it is CR 306.5b's intrinsic enters-with replacement, which needs
+    -- the loyalty of the permanent as it WOULD exist on the battlefield (CR
+    -- 614.12) rather than the loyalty printed on whatever card is underneath.
+    loyalty :: Maybe Loyalty,
     -- CR 702. A Set because this is PRINTED text: a card names each keyword
     -- ability it has once, so there is no printed multiplicity to lose. Where
     -- multiplicity does arise -- the same ability twice, once printed and once

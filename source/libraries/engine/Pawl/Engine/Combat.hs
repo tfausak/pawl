@@ -618,10 +618,11 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 --
 -- The types clause reads the creature card type ALONE, and that is exact today
 -- rather than a simplification of CR 506.4d/e: those two subrules are about a
--- permanent that is also an attacked planeswalker or battle, and neither card
--- type is modeled (#301, #302), so nothing in pawl's combat record is anything
--- but a creature. CR 506.4's "becomes a battle" clause is unreachable for the
--- same reason, and "phases out" for phasing's (#154).
+-- permanent that is also an ATTACKED planeswalker or battle, and nothing can be
+-- one -- a planeswalker cannot be attacked (#493) and there is no battle card
+-- type (#302) -- so nothing in pawl's combat record is anything but a creature.
+-- CR 506.4's "becomes a battle" clause is unreachable for the same reason, and
+-- "phases out" for phasing's (#154).
 --
 -- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
 -- clause, because there is nothing to compare it against and this only ever
@@ -746,9 +747,14 @@ declareAttackers pid = do
     Just defender ->
       -- CR 508.1b asks for a per-creature announcement only if the defending
       -- player controls a planeswalker, protects a battle, or the game lets the
-      -- active player attack multiple other players. None of the three exists
-      -- here, so every chosen creature attacks the one defending player and no
-      -- second prompt is issued (#59).
+      -- active player attack multiple other players. Every chosen creature
+      -- attacks the one defending player and no second prompt is issued (#59).
+      --
+      -- The planeswalker limb is no longer vacuous: a defending player CAN
+      -- control one now (Jace Beleren). What is missing is the other half of CR
+      -- 306.6 -- AttackTarget has no OfPlaneswalker arm to announce (#493) -- so
+      -- the prompt is elided because there is nothing to offer, not because the
+      -- rules leave nothing to ask.
       Monad.unless (null candidates) $ do
         let decider = Decide.deciderFor pid gs
         chosen <- Trans.lift (Program.prompt (Prompt.DeclareAttackers decider pid candidates))
@@ -870,7 +876,8 @@ declareAttackers pid = do
 --
 -- CR 508.4's CHOICE is not prompted, because there is exactly one candidate: one
 -- defending player (CR 506.2 at two seats; CR 802's attack-multiple-players
--- option is unavailable, #175), no planeswalkers (#301) and no battles (#302).
+-- option is unavailable, #175), no ATTACKABLE planeswalkers (the card type
+-- exists, but CR 306.6 does not, #493) and no battles (#302).
 -- Hanweir Garrison's own ruling is what makes the choice real once any of those
 -- lands -- "You choose which player, planeswalker, or battle each token is
 -- attacking as you create the tokens ... the tokens don't both have to attack the

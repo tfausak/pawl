@@ -27,7 +27,6 @@ import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
 import Pawl.Types.DamageEvent (DamageEvent)
@@ -95,6 +94,7 @@ movedOf event = case event of
   -- rule 701.6a's last sentence causes; this one says the move WAS a countering
   -- and carries no ZoneChange of its own. Exactly the Discarded arm's case.
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -108,6 +108,7 @@ damageOf event = case event of
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
 
 -- The caster an event describes, if it is a cast (CR 601.2i).
 castOf :: GameEvent -> Maybe PlayerId
@@ -121,6 +122,7 @@ castOf event = case event of
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
@@ -134,6 +136,7 @@ revealOf event = case event of
   GameEvent.Discarded {} -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
@@ -445,30 +448,9 @@ destroyIn asOf regenerability oids = do
         changeZoneInBatch gs target Zone.Graveyard
         pure (Just target)
 
--- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
--- permanent -- not to be confused with `counter` below, CR 701.6's countering
--- of a spell). Before P5 the PutCounters opcode edited Object.counters in
--- place with no funnel at all, so there was nothing for a replacement to
--- intercept.
---
--- CR 122.6 makes this the right single seam: "Some spells and abilities refer to
--- counters being put on an object. This refers to putting counters on that object
--- while it's on the battlefield and also to an object that's given counters as it
--- enters the battlefield." A zero count after the loop puts nothing on.
-putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game ()
-putCounters oid kind n = do
-  resolved <- Replacement.resolveCounters oid kind n
-  case resolved of
-    Nothing -> pure ()
-    Just (target, settledKind, settledCount) ->
-      Monad.when (settledCount > 0)
-        . State.modify'
-        $ \gs ->
-          let bump obj = obj {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters obj)}
-           in gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
-
 -- The single spell-countering funnel (CR 701.6 -- not to be confused with
--- `putCounters` above, CR 122.6's placement of counter markers). A countered
+-- Pawl.Engine.Replacement.putCounters, CR 122.6's placement of counter
+-- markers). A countered
 -- spell is removed from the stack and put into its owner's graveyard (CR
 -- 701.6a) through the changeZone funnel -- so Rest in Peace's redirect
 -- (graveyard->exile) and CR 400.7's new incarnation still compose, exactly as
@@ -772,6 +754,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
   -- entered the battlefield. The bearer frames the match rather than being it --
   -- it is the Filter.Context's source (so `Not IsSource` is Soul Warden's
@@ -824,6 +807,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -838,6 +822,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -858,6 +843,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Engine.Monarch.inherentMatch, not here.
@@ -882,6 +868,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
   -- ability's controller (CR 603.3a), and Megrim's "an opponent" is every other
@@ -911,6 +898,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
   -- declaration event and not against Combat.attackers, which is what keeps the
   -- same rule's last sentence true -- "such abilities won't trigger if a creature
@@ -943,6 +931,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 603.6: a zone-change trigger, matched on BOTH ends of the move -- library
   -- to graveyard. The bearer is the incarnation the card became on arrival, and
   -- that is CR 400.7e rather than an accident of which id the log happens to
@@ -969,6 +958,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 603.6c narrowed by CR 700.4 ("the term dies means 'is put into a
   -- graveyard from the battlefield'"): the bearer was put into a graveyard from
   -- the battlefield. Both ends are load-bearing, as they are for
@@ -998,6 +988,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event --
   -- Countering.controller, captured as the counter happened -- and CR 109.5
@@ -1025,6 +1016,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is
@@ -1388,6 +1380,7 @@ eventTriggers events gs =
         GameEvent.Revealed _ _ -> Map.empty
         GameEvent.AttackerDeclared _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.LoyaltyAbilityActivated _ -> Map.empty
       -- CR 603.10's first sentence, per EVENT: for each event in the batch, the
       -- permanents that were still on the battlefield when it happened and have
       -- left by the CR 117.5 boundary. One entry per event, aligned with
@@ -1462,6 +1455,7 @@ eventTriggers events gs =
         GameEvent.Revealed _ _ -> Map.empty
         GameEvent.AttackerDeclared _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.LoyaltyAbilityActivated _ -> Map.empty
       -- CR 113.6k: the last candidate source -- every card in every graveyard
       -- that carries at least one ability CR 113.6k puts there. The one source
       -- that widens the SCANNED ZONE rather than recovering an object a single

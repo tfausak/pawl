@@ -144,6 +144,10 @@ subtypeMana subtype = case subtype of
   -- it.
   Subtype.Faerie -> Nothing
   Subtype.Rhino -> Nothing
+  -- CR 205.3j: a planeswalker type, so CR 305.6's intrinsic mana ability --
+  -- which reaches "an object with the land card type and a basic land type" --
+  -- never applies to it.
+  Subtype.Jace -> Nothing
   Subtype.Wraith -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
@@ -253,7 +257,9 @@ manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
--- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
+-- doesn't target and is not itself a loyalty ability (CR 606.2, which
+-- Pawl.Engine.Cost.isLoyaltyCost answers; no loyalty ability in the pool adds
+-- mana, so the clause is inert rather than checked here). The ABI
 -- predicate read at two sites: manaRoutesOfGiven includes a mana ability as a
 -- source (Task 6); Action.legalActions excludes it from the stack (Task 5).
 --

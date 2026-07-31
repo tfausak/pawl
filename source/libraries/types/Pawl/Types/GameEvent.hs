@@ -148,4 +148,28 @@ data GameEvent
     -- returns before this is recorded, and CR 603.2g is the rule that makes that
     -- mandatory: "an event that's prevented or replaced won't trigger anything."
     SpellCountered Countering
+  | -- CR 606.3: a LOYALTY ability of this permanent was activated. The record CR
+    -- 606.3's once-per-permanent-per-turn limit is read out of -- "A player may
+    -- activate a loyalty ability of a permanent they control ... only if no
+    -- player has previously activated a loyalty ability of that permanent that
+    -- turn."
+    --
+    -- A look-back read of the log rather than a stamp on the object, the posture
+    -- Filter.AttackedThisTurn's haddock states in as many words. "That turn" then
+    -- falls out for free: Pawl.Engine.Engine.beginTurnOf clears the log at the
+    -- handoff, so the limit expires without anything having to reset it -- and a
+    -- skipped untap step (CR 500.11) cannot strand it, which a per-turn flag
+    -- cleared at untap could.
+    --
+    -- The ObjectId is the SOURCE PERMANENT, not the ability object CR 602.2a put
+    -- on the stack: CR 606.3 asks about "that permanent". CR 400.7 mints a fresh
+    -- id on every zone change, which is exactly right here -- a planeswalker that
+    -- flickered is a new permanent and may activate a loyalty ability again.
+    --
+    -- Recorded only for a LOYALTY ability (Pawl.Engine.Cost.isLoyaltyCost), not
+    -- for every activation. A permanent with both a loyalty ability and an
+    -- ordinary one must not have the ordinary one count against CR 606.3, and no
+    -- rule asks "did this permanent activate any ability this turn"; the day one
+    -- does, that is a sibling constructor and not a widening of this one.
+    LoyaltyAbilityActivated ObjectId
   deriving (Eq, Ord, Show)

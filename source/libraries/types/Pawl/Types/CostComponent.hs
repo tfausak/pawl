@@ -95,4 +95,31 @@ data CostComponent
     -- 601.2f time, and a variable-amount energy cost is not representable
     -- (#121).
     PayEnergy Natural
+  | -- CR 606.4: "The cost to activate a loyalty ability of a permanent is to put
+    -- on or remove from that permanent a certain number of loyalty counters, as
+    -- shown by the loyalty symbol in the ability's cost." Jace Beleren's `+2`.
+    --
+    -- "That permanent" is the rule's own wording, which is why this carries no
+    -- recipient and takes the "This" suffix SacrificeThis and DiscardThis take: a
+    -- loyalty symbol names the object the cost is on and offers nothing to
+    -- choose.
+    --
+    -- TWO arms rather than one signed number. CR 606.4 is a disjunction ("put on
+    -- OR remove from"), CR 606.6 gates only the removing half, and the split
+    -- keeps loyalty out of the numeric tower entirely -- a signed count would
+    -- need a conversion at every use, and .hlint.yaml bans the unchecked ones for
+    -- exactly the reason that would bite here. What the split gives up is CR
+    -- 606.5's combination of several loyalty costs into one (#496); no printing
+    -- has two.
+    --
+    -- A Natural and not a Quantity, for the reason PayLife and PayEnergy give: a
+    -- cost has no binding environment at CR 601.2f time.
+    AddLoyaltyToThis Natural
+  | -- CR 606.4's other half: Jace Beleren's `-1` and `-10`. The arm CR 606.6
+    -- gates -- "A loyalty ability with a negative loyalty cost, taking into
+    -- account any additional costs, can't be activated unless the permanent has
+    -- at least that many loyalty counters on it" -- which
+    -- Pawl.Engine.Cost.canPayComponent answers by counting CounterKind.Loyalty on
+    -- the source.
+    RemoveLoyaltyFromThis Natural
   deriving (Eq, Ord, Show)

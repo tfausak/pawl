@@ -222,3 +222,4 @@ snapshotView shape event = case event of
   -- would be nothing to build a view from. The arm becomes a real view the day
   -- an EventShape names countering (#162).
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing

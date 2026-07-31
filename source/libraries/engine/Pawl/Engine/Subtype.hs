@@ -89,6 +89,9 @@ isLandType subtype = case subtype of
   -- only question this function asks.
   Subtype.Faerie -> False
   Subtype.Rhino -> False
+  -- CR 205.3j: a planeswalker type. CR 205.3c -- "each subtype is correlated to
+  -- its appropriate card type" -- is why it is never a land type.
+  Subtype.Jace -> False
   -- CR 205.3m: a creature type (Bog Wraith's). Not a land type -- which is worth
   -- saying out loud here, because Bog Wraith is also the pool's first card with
   -- landwalk, and the land type its keyword NAMES is Swamp rather than this.

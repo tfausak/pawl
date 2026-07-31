@@ -1,5 +1,6 @@
 module Pawl.Engine.Activate where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
@@ -22,6 +23,7 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -182,6 +184,35 @@ timingOk pid ability gs = case ActivatedAbility.timing ability of
   -- read, which is the whole of the paragraph above.
   ActivationTiming.DuringPhase phase -> GameState.phase gs == phase
 
+-- CR 606.3: "A player may activate a loyalty ability of a permanent they control
+-- any time they have priority and the stack is empty during a main phase of their
+-- turn, but only if no player has previously activated a loyalty ability of that
+-- permanent that turn." CR 306.5d says the same thing for planeswalkers.
+--
+-- Vacuously true for every ability that is not a loyalty ability, which is what
+-- makes this a conjunct rather than an arm of timingOk: CR 606.3 is a rule about
+-- what a COST contains (CR 606.2), not a timing rider a card prints, so it is
+-- derived from the cost through Pawl.Engine.Cost.isLoyaltyCost and never read off
+-- Pawl.Types.ActivationTiming. That type documents that it carries ONE rider and
+-- never several (#456); CR 606.3 is two clauses, and this is why it needs neither.
+--
+-- The window is Turn.sorcerySpeedWindow verbatim, not a near-copy: CR 606.3's
+-- first clause and CR 307.5's restricted case are the same three facts -- priority
+-- (which only the priority holder is asked, so it is not re-checked), a main phase
+-- of that player's turn, and an empty stack.
+--
+-- The once-per-turn clause is a fold over the CR 608.2i log rather than a stamp,
+-- and it is keyed on the PERMANENT and not on the player: the rule says "no
+-- player has previously activated", so an opponent who somehow activated it first
+-- has used the permanent's one activation.
+loyaltyOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+loyaltyOk pid srcId ability gs =
+  not (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
+    || (Turn.sorcerySpeedWindow pid gs && not (loyaltyActivatedThisTurn srcId gs))
+
+loyaltyActivatedThisTurn :: ObjectId -> GameState -> Bool
+loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (GameState.events gs)
+
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability (mana abilities are handled at
 -- payment, not the stack), the whole activation cost is payable (CR 118.3), the
@@ -212,6 +243,7 @@ activatableGiven grants pcs pid srcId ability gs =
     && not (Mana.isManaAbility ability)
     && sicknessOkGiven pcs pid srcId ability gs
     && timingOk pid ability gs
+    && loyaltyOk pid srcId ability gs
     && Natural.length (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
       >= Modal.selectionCount (ActivatedAbility.modal ability)
     && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
@@ -370,5 +402,13 @@ activateAbility pid srcId ability = do
           -- the stack -- when it happens.
           payment <- Cost.pay pid srcId announcedCost
           case payment of
-            Payment.Paid -> pure ()
+            -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
+            -- activated, which is the whole of the once-per-turn limit's storage
+            -- (see loyaltyOk above). Every path that rejects the activation
+            -- restores `before`, and the log lives in that state, so no rejected
+            -- activation can leave a record behind wherever this sits.
+            Payment.Paid ->
+              Monad.when
+                (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
+                (State.modify' (Event.recordEvent (GameEvent.LoyaltyAbilityActivated srcId)))
             Payment.Unpaid -> State.put before

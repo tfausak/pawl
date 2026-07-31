@@ -115,6 +115,10 @@ isPermanentType cardType = case cardType of
   -- Bitterblossom is a permanent through its Enchantment, which is exactly what
   -- CR 308.1 says.
   CardType.Kindred -> False
+  -- CR 110.4 / CR 306.2: a planeswalker is one of the six permanent types, and
+  -- "when a planeswalker spell resolves, its controller puts it onto the
+  -- battlefield under their control".
+  CardType.Planeswalker -> True
 
 -- The classification resolution dispatches on (CR 608.3). This is the whole
 -- reason the engine never needs to know WHICH card is resolving.
