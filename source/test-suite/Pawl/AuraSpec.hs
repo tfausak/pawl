@@ -42,6 +42,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
@@ -438,7 +439,7 @@ enchantPlayerTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry, unattachableTests registry, reattachTests registry, enchantPlayerTests registry]
+tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry, unattachableTests registry, reattachTests registry, auraGraftTests registry, enchantPlayerTests registry]
 
 -- Answers every target slot with one fixed recipient, deferring everything else
 -- to S.identityAnswer. aimAt above does the same for a Pool.Permanents slot
@@ -752,6 +753,209 @@ reattachTests registry =
             HU.assertBool "with trample (CR 702.19)" (Projection.hasKeyword Keyword.Trample mine moved)
             HU.assertEqual "and the Piker is a plain 2/1" (Just (2, 1)) (S.powerToughnessOf host moved)
           _ -> HU.assertFailure "the fixture wanted one Aura on the Piker, one Crown on the battlefield, and one printed ability"
+    ]
+
+-- CR 303.4e's half of the CR 701.3 Attach work: an effect that changes the AURA's
+-- own controller and moves it in one resolution. Aura Graft is the proving card --
+-- "Gain control of target Aura that's attached to a permanent. Attach it to
+-- another permanent it can enchant" -- and each of its three clauses is a
+-- different thing from Crown of the Ages' above.
+--
+-- "target Aura THAT'S ATTACHED TO A PERMANENT" is wider than the Crown's "attached
+-- to a creature" and narrower than "attached to anything": CR 303.4 attaches an
+-- Aura to "an object or player", so an enchant-player Aura is out.
+--
+-- "another permanent IT CAN ENCHANT" is a destination restriction the card states
+-- in its own text, and it asks about the SUBJECT's enchant ability rather than
+-- about the candidate -- Filter.CanHostSubject. Not the same thing as CR 303.4j,
+-- which is the backstop for a card that does NOT say it: the Crown offers a
+-- creature its Aura may not enchant and the move then fails, where Aura Graft may
+-- not offer one at all. The pair of cards is what keeps the two apart.
+auraGraftTests :: Registry.Type.Registry -> Tasty.TestTree
+auraGraftTests registry =
+  Tasty.testGroup
+    "AuraGraft"
+    [ -- The gameplay-level proof design.md section 4 asks for, and the one the
+      -- control clause exists for: CR 303.4e says an Aura's controller is separate
+      -- from the enchanted object's, so gaining the Aura and moving it are two
+      -- changes -- and Control Magic's own static ability then hands the NEW host
+      -- to the Aura's new controller. Three permanents change hands off one spell:
+      -- alice takes the Aura, takes the Mammoth it lands on, and gets her own
+      -- Piker back because the Aura left it.
+      HU.testCase "CR 303.4e whole cards: Aura Graft takes bob's Control Magic and the creature it moves onto" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        controlMagic <- Registry.printing registry "Control Magic"
+        auraGraft <- Registry.printing registry "Aura Graft"
+        -- {1}{U} for the Graft.
+        let base0 = S.landsInPlay island 2
+            (host, base1) = S.addCreature piker S.alice base0
+            (prize, base2) = S.addCreature warMammoth S.bob base1
+            -- A second candidate, so the destination is a real Prompt.ChooseAttachment
+            -- choice rather than the single-candidate elision.
+            (decoy, base3) = S.addCreature piker S.bob base2
+            (aura, base4) = S.addCreature controlMagic S.bob base3
+            stolen = S.attach aura host base4
+            (gs, graft) = S.handOne auraGraft stolen
+            cast = snd (Engine.runGamePure (moveAura aura prize) gs (Cast.castSpell S.alice graft))
+            after = snd (Engine.runGamePure (moveAura aura prize) cast Stack.resolveTop)
+            settled = S.settleSba (S.settleSba after)
+        HU.assertEqual "before: bob's Control Magic holds alice's Piker" (Just S.bob) (Projection.controllerOf host stolen)
+        HU.assertEqual "before: bob controls the Mammoth too" (Just S.bob) (Projection.controllerOf prize stolen)
+        HU.assertEqual "before: and the Aura itself" (Just S.bob) (Projection.controllerOf aura stolen)
+        -- CR 303.4e: the Aura's controller changed, and it is the thing the spell
+        -- gained -- not the permanent it was attached to.
+        HU.assertEqual "alice controls the Aura now" (Just S.alice) (Projection.controllerOf aura after)
+        HU.assertEqual "and it sits on the Mammoth (CR 701.3a)" (Just (Just (Recipient.ToCreature prize))) (fmap Object.attachedTo (Game.lookupObject aura after))
+        -- CR 613.1b: Control Magic's SetControllerToSource reads the AURA's
+        -- controller, so the creature follows the Aura to alice.
+        HU.assertEqual "so alice controls the Mammoth" (Just S.alice) (Projection.controllerOf prize after)
+        HU.assertEqual "and her own Piker is hers again" (Just S.alice) (Projection.controllerOf host after)
+        HU.assertEqual "the creature nobody chose stays bob's" (Just S.bob) (Projection.controllerOf decoy after)
+        -- CR 302.6: alice has not controlled the Mammoth continuously since her
+        -- turn began. Nothing re-Sicks it -- the control came from a static
+        -- ability, not from the GainControl opcode -- but Object.sickness names
+        -- the player it settled under, so the answer is right anyway.
+        HU.assertBool "the Mammoth cannot attack for her yet" (not (Combat.canAttack S.alice prize after))
+        -- CR 302.6 speaks only of creatures, so the re-Sick the GainControl arm
+        -- applies to the Aura is inert -- pinned here because an enchantment is the
+        -- first thing that opcode has been aimed at.
+        HU.assertEqual "the Aura is re-Sicked all the same" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject aura after))
+        -- CR 704.5m: it landed on a creature, which its enchant ability admits.
+        HU.assertBool "and it survives the state-based actions" (Set.member aura (GameState.battlefield settled)),
+      -- "target Aura THAT'S ATTACHED TO A PERMANENT" (CR 601.2c), spelled
+      -- `And [HasSubtype Aura, IsAttachedToPermanent]`. Three boundaries at once,
+      -- all four Auras on one board: an Aura on a noncreature permanent is in --
+      -- which is what makes the atom wider than the Crown's IsAttachedToCreature --
+      -- an Aura on a PLAYER is out (CR 303.4: an Aura is attached to "an object or
+      -- player", and only one of those is a permanent), and an unattached one is
+      -- out.
+      --
+      -- The Aura on a land is hand-built, as the Crown's own filter test above
+      -- hand-builds one: CR 704.5m would bury it on the next state-based-action
+      -- pass, so no sequence of card plays leaves one standing to be targeted.
+      HU.testCase "CR 601.2c Aura Graft targets an Aura on any permanent, where Crown of the Ages needs one on a creature" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        curse <- Registry.printing registry "Curse of Death's Hold"
+        crown <- Registry.printing registry "Crown of the Ages"
+        auraGraft <- Registry.printing registry "Aura Graft"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.alice base
+            (land, g2) = S.addCreature mountain S.alice g1
+            (onCreature, g3) = S.addCreature unholyStrength S.alice g2
+            (onLand, g4) = S.addCreature unholyStrength S.alice g3
+            (loose, g5) = S.addCreature unholyStrength S.alice g4
+            (onPlayer, g6) = S.addCreature curse S.alice g5
+            (crownId, g7) = S.addCreature crown S.alice g6
+            (gs, graft) = S.handOne auraGraft g7
+            attached =
+              S.attachTo onPlayer (Recipient.ToPlayer S.bob) $
+                S.attach onLand land (S.attach onCreature creature gs)
+            graftOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\spec -> Target.legalRecipients (Just S.alice) graft spec attached)) (S.spellTargetSpec auraGraft)
+            crownOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\spec -> Target.legalRecipients (Just S.alice) crownId spec attached)) (crownTargetSpec crown)
+        HU.assertEqual "an Aura on a creature is a legal target" (Just True) (graftOffers onCreature)
+        HU.assertEqual "and so is one on a land" (Just True) (graftOffers onLand)
+        -- The pair that makes IsAttachedToPermanent do work the Crown's atom
+        -- cannot: one board, one Aura, two cards, two answers.
+        HU.assertEqual "which Crown of the Ages will not have" (Just False) (crownOffers onLand)
+        HU.assertEqual "an Aura on a PLAYER is not attached to a permanent" (Just False) (graftOffers onPlayer)
+        HU.assertEqual "nor is an unattached one" (Just False) (graftOffers loose)
+        -- Not vacuous: the Graft's own slot rejects a permanent that is not an Aura
+        -- at all on the very board where it accepts three that are.
+        HU.assertEqual "and a plain creature is not an Aura" (Just False) (graftOffers creature),
+      -- "another permanent IT CAN ENCHANT" is a destination filter the card states,
+      -- not a restatement of CR 303.4j: the Mountain here is a permanent, and CR
+      -- 701.3b excludes only the Aura's current host, so a card reading just
+      -- "another permanent" would offer it. Aura Graft does not, which is what this
+      -- pins -- answering Prompt.ChooseAttachment with the Mountain cannot make the
+      -- Aura go there, because the Mountain was never in the offer.
+      --
+      -- The two readings differ here and only here. Under "the clause is
+      -- reminder-like" the Mountain is offered, the answer takes it, and CR 303.4j
+      -- leaves the Aura on the Piker; under "the clause is the filter" the Mammoth
+      -- is the sole candidate and the Aura moves. Gatherer's 2004-10-04 ruling is
+      -- the tiebreak -- "if there is no legal place to move the enchantment, then
+      -- it doesn't move" -- which is a sentence about LEGAL PLACES being what the
+      -- card looks for.
+      HU.testCase "the destination filter offers only a permanent the Aura can enchant, so a Mountain is never a destination" $ do
+        island <- Registry.printing registry "Island"
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        auraGraft <- Registry.printing registry "Aura Graft"
+        -- Gatherer, 2007-07-15: "You can target an Aura you already control just to
+        -- move that Aura to a new permanent."
+        let base0 = S.landsInPlay island 2
+            (host, base1) = S.addCreature piker S.alice base0
+            (land, base2) = S.addCreature mountain S.alice base1
+            (elsewhere, base3) = S.addCreature warMammoth S.alice base2
+            (aura, base4) = S.addCreature unholyStrength S.alice base3
+            onPiker = S.attach aura host base4
+            (gs, graft) = S.handOne auraGraft onPiker
+            cast = snd (Engine.runGamePure (moveAura aura land) gs (Cast.castSpell S.alice graft))
+            after = snd (Engine.runGamePure (moveAura aura land) cast Stack.resolveTop)
+        HU.assertEqual "before, the Piker carries the +2/+1" (Just (4, 2)) (S.powerToughnessOf host onPiker)
+        HU.assertEqual "the Aura went to the Mammoth, not the Mountain" (Just (Just (Recipient.ToCreature elsewhere))) (fmap Object.attachedTo (Game.lookupObject aura after))
+        HU.assertEqual "so the Mammoth is 3/3 + 2/+1" (Just (5, 4)) (S.powerToughnessOf elsewhere after)
+        HU.assertEqual "and the Piker is a plain 2/1" (Just (2, 1)) (S.powerToughnessOf host after),
+      -- CR 608.2c: "the spell or ability's controller follows its instructions in
+      -- the order written". The control change is the FIRST instruction, so by the
+      -- time the destination is chosen the Aura is alice's -- and CR 109.5 makes
+      -- the "you" in Setessan Training's "Enchant creature you control" the Aura's
+      -- controller, which is now her.
+      --
+      -- Discriminating with no prompt at all: exactly one destination is legal
+      -- under each reading of the order, and they are different creatures. Run the
+      -- attach first and the Aura lands on bob's Mammoth.
+      HU.testCase "CR 608.2c the control change lands before the destination is chosen, so 'creature you control' means alice's" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        setessanTraining <- Registry.printing registry "Setessan Training"
+        auraGraft <- Registry.printing registry "Aura Graft"
+        let base0 = S.landsInPlay island 2
+            (host, base1) = S.addCreature piker S.bob base0
+            (his, base2) = S.addCreature warMammoth S.bob base1
+            (hers, base3) = S.addCreature piker S.alice base2
+            (aura, base4) = S.addCreature setessanTraining S.bob base3
+            onHis = S.attach aura host base4
+            (gs, graft) = S.handOne auraGraft onHis
+            cast = snd (Engine.runGamePure (moveAura aura his) gs (Cast.castSpell S.alice graft))
+            after = snd (Engine.runGamePure (moveAura aura his) cast Stack.resolveTop)
+        HU.assertEqual "alice controls the Aura" (Just S.alice) (Projection.controllerOf aura after)
+        HU.assertEqual "so it moved to HER creature" (Just (Just (Recipient.ToCreature hers))) (fmap Object.attachedTo (Game.lookupObject aura after))
+        HU.assertEqual "which now has +1/+0" (Just (3, 1)) (S.powerToughnessOf hers after)
+        HU.assertBool "and trample" (Projection.hasKeyword Keyword.Trample hers after)
+        HU.assertEqual "bob's Mammoth was never a legal destination" (Just (3, 3)) (S.powerToughnessOf his after),
+      -- Gatherer, 2004-10-04: "If there is no legal place to move the enchantment,
+      -- then it doesn't move but you still control it." CR 609.3's "does as much of
+      -- what's asked as it can" for the move half, with the control half unaffected
+      -- -- so the two clauses really are independent, which is the point of CR
+      -- 303.4e's "an Aura's controller is separate".
+      HU.testCase "with no permanent it can enchant the Aura does not move, and alice still gains it" $ do
+        island <- Registry.printing registry "Island"
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        auraGraft <- Registry.printing registry "Aura Graft"
+        let base0 = S.landsInPlay island 2
+            (host, base1) = S.addCreature piker S.alice base0
+            (_, base2) = S.addCreature mountain S.alice base1
+            (aura, base3) = S.addCreature controlMagic S.bob base2
+            stolen = S.attach aura host base3
+            (gs, graft) = S.handOne auraGraft stolen
+            cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject aura)) gs (Cast.castSpell S.alice graft))
+            after = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject aura)) cast Stack.resolveTop)
+            stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
+        HU.assertEqual "it is still on the only creature there is" (Just (Just (Recipient.ToCreature host))) (fmap Object.attachedTo (Game.lookupObject aura after))
+        -- CR 701.3c restamps only a permanent that actually moved.
+        HU.assertEqual "and was not restamped" (stampOf stolen) (stampOf after)
+        HU.assertEqual "but alice controls it" (Just S.alice) (Projection.controllerOf aura after)
+        HU.assertEqual "so the creature it holds is hers" (Just S.alice) (Projection.controllerOf host after)
     ]
 
 auraTests :: Registry.Type.Registry -> Tasty.TestTree
