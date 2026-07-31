@@ -83,3 +83,4 @@ isLandType subtype = case subtype of
   Subtype.Unicorn -> False
   -- CR 205.3h: an enchantment type.
   Subtype.Curse -> False
+  Subtype.Rhino -> False

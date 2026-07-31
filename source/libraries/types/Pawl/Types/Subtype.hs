@@ -85,4 +85,6 @@ data Subtype
     -- whether a permanent is a Curse -- so it exists to make the printed type
     -- line faithful, the way Nightmare's Horse does.
     Curse
+  | -- CR 205.3m (a creature type; Stonehorn Dignitary's).
+    Rhino
   deriving (Eq, Ord, Show)

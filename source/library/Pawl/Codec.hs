@@ -313,6 +313,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Dragon -> "Dragon"
   Subtype.Unicorn -> "Unicorn"
   Subtype.Curse -> "Curse"
+  Subtype.Rhino -> "Rhino"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -370,7 +371,8 @@ jsonToSubtype =
       (Text.pack "Thopter", Subtype.Thopter),
       (Text.pack "Dragon", Subtype.Dragon),
       (Text.pack "Unicorn", Subtype.Unicorn),
-      (Text.pack "Curse", Subtype.Curse)
+      (Text.pack "Curse", Subtype.Curse),
+      (Text.pack "Rhino", Subtype.Rhino)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
