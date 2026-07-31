@@ -19,6 +19,7 @@ import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -34,6 +35,8 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -951,11 +954,135 @@ legendarySpellTests registry =
         HU.assertEqual "alice lost 3 life" (Just 17) (S.lifeOf S.alice resolved)
     ]
 
+-- CR 601.3: "A player can begin to cast a spell only if a rule or effect allows
+-- that player to cast it and no rule or effect prohibits that player from casting
+-- it." The PROHIBITION half, printed on a card about itself -- the direction
+-- opposite to every CastingPermission, which grants a cast the rules would refuse.
+--
+-- Rally the Troops ({W} instant, Portal Three Kingdoms) is the proving card:
+-- "Cast this spell only during the declare attackers step and only if you've been
+-- attacked this step. / Untap all creatures you control." Its payload is
+-- Aggravated Assault's untap clause, so nothing but the restriction is new.
+--
+-- This fixture is the declare attackers step BEFORE the declaration: alice has
+-- one Piker able to attack, bob defends (CR 506.2) with one TAPPED Piker and
+-- holds Rally plus a Plains. Each test declares the attack itself, or does not,
+-- which is what makes the "you've been attacked" clause separable from the step.
+--
+-- alice holds a Rally and a Plains of her own: she is in the same step, with the
+-- same mana, and the only thing she lacks is having been attacked -- so a check
+-- that read the step alone would offer her the cast.
+rallyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+rallyBoard piker plains rally =
+  let (gs0, _, theirs) = S.combatBoardOf [piker] [piker]
+      (_, gs1) = S.addCreature plains S.bob gs0
+      (bobsRally, gs2) = S.addHandCard rally S.bob gs1
+      (_, gs3) = S.addCreature plains S.alice gs2
+      (alicesRally, gs4) = S.addHandCard rally S.alice gs3
+      tapped = foldr S.tapObject gs4 theirs
+   in case theirs of
+        bobsPiker : _ -> (bobsRally, alicesRally, bobsPiker, tapped)
+        -- combatBoardOf returns one id per printing given, so this is
+        -- unreachable; a bogus id fails the assertions rather than the suite.
+        [] -> (bobsRally, alicesRally, S.noSource, tapped)
+
+printedCastingRestrictionTests :: Registry.Type.Registry -> Tasty.TestTree
+printedCastingRestrictionTests registry =
+  Tasty.testGroup
+    "PrintedCastingRestriction"
+    [ -- Both clauses satisfied: bob is the defending player (CR 506.2), attackers
+      -- have joined (CR 508.8), and the game is in the declare attackers step.
+      HU.testCase "CR 601.3 castable once bob has been attacked in the declare attackers step" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        plains <- Registry.printing registry "Plains"
+        rally <- Registry.printing registry "Rally the Troops"
+        let (bobsRally, _, _, board) = rallyBoard piker plains rally
+            attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+        HU.assertBool "castable" (Cast.castable S.bob bobsRally attacked)
+        HU.assertBool "and offered as a legal action" (elem (A.Cast bobsRally) (Action.legalActions S.bob attacked)),
+      -- The "only if you've been attacked this step" clause, isolated: the step is
+      -- right and nobody has attacked yet.
+      HU.testCase "CR 601.3 not castable in the declare attackers step before attackers are declared" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        plains <- Registry.printing registry "Plains"
+        rally <- Registry.printing registry "Rally the Troops"
+        let (bobsRally, _, _, board) = rallyBoard piker plains rally
+        HU.assertBool "not castable" (not (Cast.castable S.bob bobsRally board))
+        HU.assertBool "and not offered" (notElem (A.Cast bobsRally) (Action.legalActions S.bob board)),
+      -- The same clause from the other side, and the reason the check cannot be a
+      -- question about the step alone: Eightfold Maze's ruling is "To cast it, a
+      -- creature needs to have attacked _you_", and nothing attacked alice.
+      HU.testCase "CR 601.3 the ATTACKING player is not offered it in the same step" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        plains <- Registry.printing registry "Plains"
+        rally <- Registry.printing registry "Rally the Troops"
+        let (_, alicesRally, _, board) = rallyBoard piker plains rally
+            attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+        HU.assertBool "not castable" (not (Cast.castable S.alice alicesRally attacked))
+        HU.assertBool "and not offered" (notElem (A.Cast alicesRally) (Action.legalActions S.alice attacked)),
+      -- The "only during the declare attackers step" clause, isolated: bob HAS
+      -- been attacked -- CR 511.3 keeps the combat record live until the end of
+      -- combat step ends -- and the window has passed.
+      --
+      -- Carries its own control, in the same step and for the same player: bob's
+      -- Bolt is still offered, so what stops the Rally is the clause and not the
+      -- step being closed to bob altogether.
+      HU.testCase "CR 601.3 not castable in the declare blockers step, though bob was attacked" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        plains <- Registry.printing registry "Plains"
+        rally <- Registry.printing registry "Rally the Troops"
+        mountain <- Registry.printing registry "Mountain"
+        bolt <- Registry.printing registry "Lightning Bolt"
+        let (bobsRally, _, _, board) = rallyBoard piker plains rally
+            (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
+            attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
+            later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
+        HU.assertBool "still attacked" (Combat.Type.attackersJoined (GameState.combat later))
+        HU.assertBool "not castable" (not (Cast.castable S.bob bobsRally later))
+        HU.assertBool "and not offered" (notElem (A.Cast bobsRally) (Action.legalActions S.bob later))
+        HU.assertBool "bob's unrestricted instant still is" (elem (A.Cast boltId) (Action.legalActions S.bob later)),
+      -- CR 117.1a is not what is stopping it: an unrestricted instant with the
+      -- same cost, in the same hand, in the same step, is castable. Without this
+      -- the negatives above would also pass on an engine that refused every cast
+      -- in the declare attackers step.
+      HU.testCase "CR 117.1a an unrestricted instant is castable in the same step" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        plains <- Registry.printing registry "Plains"
+        rally <- Registry.printing registry "Rally the Troops"
+        mountain <- Registry.printing registry "Mountain"
+        bolt <- Registry.printing registry "Lightning Bolt"
+        let (_, _, _, board) = rallyBoard piker plains rally
+            (boltId, withBolt) = S.addHandCard bolt S.alice (snd (S.addCreature mountain S.alice board))
+        HU.assertBool "castable" (Cast.castable S.alice boltId withBolt)
+        HU.assertBool "and offered as a legal action" (elem (A.Cast boltId) (Action.legalActions S.alice withBolt)),
+      -- Gameplay level, through the stack: the permitted cast resolves and its
+      -- effect lands, so the gate is a gate and not a silent no-op.
+      HU.testCase "CR 601.3 the permitted cast resolves and untaps bob's creatures" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        plains <- Registry.printing registry "Plains"
+        rally <- Registry.printing registry "Rally the Troops"
+        let (bobsRally, _, bobsPiker, board) = rallyBoard piker plains rally
+            attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+            cast = S.runPure S.identityAnswer attacked (Cast.castSpell S.bob bobsRally)
+            resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+        HU.assertEqual "tapped before" (Just TapState.Tapped) (tapStateOf bobsPiker attacked)
+        HU.assertEqual "untapped after" (Just TapState.Untapped) (tapStateOf bobsPiker resolved)
+        -- "creatures YOU control" is the CASTER's, not everyone's. CR 508.1f taps
+        -- alice's attacker as it is declared, and alice's only other permanent is
+        -- an untapped Plains, so her tapped count is exactly her attacker -- before
+        -- the spell and after it.
+        HU.assertEqual "alice's attacker was tapped to attack" 1 (S.tappedCount S.alice attacked)
+        HU.assertEqual "and Rally did not untap it" 1 (S.tappedCount S.alice resolved)
+    ]
+
+tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
+tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Cast"
-    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry, fireboltTests registry, legendarySpellTests registry]
+    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry, fireboltTests registry, legendarySpellTests registry, printedCastingRestrictionTests registry]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

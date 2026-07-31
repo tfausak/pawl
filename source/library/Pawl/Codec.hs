@@ -32,6 +32,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
@@ -1075,6 +1076,19 @@ jsonToCastingPermission =
     [ (Text.pack "CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching),
       (Text.pack "CastFromGraveyard", CastingPermission.CastFromGraveyard)
     ]
+
+castingRestrictionToJson :: CastingRestriction.CastingRestriction -> Value
+castingRestrictionToJson r = case r of
+  CastingRestriction.DuringPhase p -> Json.tagged (Text.pack "DuringPhase") (Just (phaseToJson p))
+  CastingRestriction.AttackedThisStep -> nullary (Text.pack "AttackedThisStep")
+
+jsonToCastingRestriction :: Value -> Either Text CastingRestriction.CastingRestriction
+jsonToCastingRestriction value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("DuringPhase", Just v) -> CastingRestriction.DuringPhase <$> jsonToPhase v
+    ("AttackedThisStep", _) -> Right CastingRestriction.AttackedThisStep
+    _ -> Left (Text.pack "unknown CastingRestriction: " <> t)
 
 -- Newtypes -------------------------------------------------------------------
 
@@ -2173,6 +2187,14 @@ cardToJson c =
                Nothing -> []
                Just spec -> [(Text.pack "enchant", targetSpecToJson spec)]
            )
+        -- Omitted when empty, unlike the required `castingPermissions` key it
+        -- mirrors: one card in the pool prints a casting restriction, and a
+        -- required key would have meant editing every other card file to say
+        -- nothing.
+        <> ( if null (CardT.castingRestrictions c)
+               then []
+               else [(Text.pack "castingRestrictions", listTo castingRestrictionToJson (CardT.castingRestrictions c))]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -2215,6 +2237,7 @@ jsonToCard value = do
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
+  restrictions <- listFromDefault jsonToCastingRestriction (getOpt (Text.pack "castingRestrictions") ps)
   colorIndicator <- setFromDefault jsonToColor (getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
   delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
@@ -2240,6 +2263,7 @@ jsonToCard value = do
         CardT.replacementEffects = replacements,
         CardT.triggeredAbilities = triggered,
         CardT.castingPermissions = permissions,
+        CardT.castingRestrictions = restrictions,
         CardT.colorIndicator = colorIndicator,
         CardT.characteristicPT = characteristicPT,
         CardT.delayedAbilities = delayed,
