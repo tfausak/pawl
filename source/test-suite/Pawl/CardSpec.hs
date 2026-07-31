@@ -388,6 +388,7 @@ effectCounts effect = case effect of
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
+  Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration

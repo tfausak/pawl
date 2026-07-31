@@ -36,12 +36,20 @@ allEffects m = concat (modeEffects m)
 
 -- The union of every mode's target specs (slot names unique by authoring
 -- discipline; the D4 lint enforces per-mode resolution).
+--
+-- Nothing rejects a card whose two modes declare the SAME slot name, which this
+-- union would silently collapse into one (#475).
 allTargetSpecs :: Modal.Modal card -> Map SlotName TargetSpec
 allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.modes m)))
 
 -- CR 608.2c/700.2: the CHOSEN modes themselves, each with its own index, in
 -- ModeIndex order (the Set is already sorted). Out-of-range indices contribute
 -- nothing (total via Seq.lookup).
+--
+-- The ORDER is what CR 702.42b demands of an entwined spell -- "follow the text
+-- of each of the modes in the order written on the card when the spell resolves"
+-- -- and it costs nothing extra: ModeIndex order IS printed order, and
+-- Set.toAscList is already sorted. Pawl.Resolve.resolveModes walks this list.
 --
 -- Modes rather than a flat effect list because a mode is the unit CR 603.5's
 -- "may" covers (Mode.optionality) and the unit CR 700.2c scopes targets to, so a
@@ -61,7 +69,10 @@ chosenModes chosen m =
 modesEffects :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
 modesEffects chosen m = concatMap (Foldable.toList . Mode.effects . snd) (chosenModes chosen m)
 
--- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union).
+-- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union). Two modes may
+-- be chosen at once (CR 702.42a's entwine), and nothing rejects a card whose
+-- modes declare the same slot name, which this union would silently collapse
+-- into one (#475).
 modesTargetSpecs :: Set ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSpec
 modesTargetSpecs chosen m =
   let specsAt (ModeIndex.MkModeIndex n) =
@@ -78,3 +89,10 @@ modeTargetSpecs (ModeIndex.MkModeIndex n) m =
 selectionCount :: Modal.Modal card -> Natural
 selectionCount m = case Modal.selection m of
   ModeSelection.ChooseExactly n -> n
+
+-- How many modes are PRINTED, which is not the same question as how many the
+-- selection demands. CR 702.42a's entwine is what asks it: "you may choose all
+-- modes of this spell instead of just the number specified", so this is the
+-- count Pawl.Cast substitutes for selectionCount when the entwine cost is paid.
+modeCount :: Modal.Modal card -> Natural
+modeCount = Natural.length . Modal.modes

@@ -39,6 +39,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
@@ -124,6 +125,50 @@ tests registry =
           (CardT.keywords c)
         HU.assertEqual "no printed alternative cost" [] (CardT.alternativeCosts c)
         HU.assertEqual "no printed casting permission" [] (CardT.castingPermissions c),
+      -- The first card file with entwine (CR 702.42), and so the first whose
+      -- keyword payload changes how many MODES the spell has rather than what it
+      -- costs or where it can be cast from. Two things this file pins:
+      --
+      --   * the printed selection is still ChooseExactly 1. Rule 702.42a widens
+      --     it "instead of just the number specified" at CAST time (Pawl.Cast),
+      --     so a card that printed 2 here would be a different card.
+      --   * the two modes name DIFFERENT slots. Card.modesTargetSpecs unions the
+      --     chosen modes' specs by slot name, and an entwined cast chooses both
+      --     -- so a shared name would fuse the two targets into one and make
+      --     "tap one permanent and untap another" impossible to cast.
+      HU.testCase "dreams-grip.json loads as a {U} Instant with entwine {1} over a tap mode and an untap mode" $ do
+        c <- Registry.card registry "Dream's Grip"
+        HU.assertEqual "name" (Text.pack "Dream's Grip") (CardT.name c)
+        HU.assertEqual "{U}" (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Instant"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty)
+          (CardT.typeLine c)
+        HU.assertEqual
+          "one keyword: entwine {1}"
+          ( Set.singleton
+              ( Keyword.Entwine
+                  Cost.MkCost
+                    { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                      Cost.components = []
+                    }
+              )
+          )
+          (CardT.keywords c)
+        HU.assertEqual "no printed additional cost: the entwine cost is the keyword's, and optional" [] (CardT.additionalCosts c)
+        HU.assertEqual "the printed selection is still choose one" (ModeSelection.ChooseExactly 1) (Modal.selection (CardT.spell c))
+        HU.assertEqual
+          "tap first, then untap -- the printed order CR 702.42b resolves in"
+          [ (Optionality.Mandatory, [Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "tapped")))]),
+            (Optionality.Mandatory, [Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "untapped")))])
+          ]
+          (modeShapes (CardT.spell c))
+        HU.assertEqual
+          "each mode targets any permanent, through a slot of its own"
+          [ Map.singleton (SlotName.MkSlotName (Text.pack "tapped")) (TargetSpec.MkTargetSpec Pool.Permanents Nothing),
+            Map.singleton (SlotName.MkSlotName (Text.pack "untapped")) (TargetSpec.MkTargetSpec Pool.Permanents Nothing)
+          ]
+          (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c)))),
       -- The first card file whose mode prints a "may" (CR 603.5), and so the
       -- first to carry an `optionality` key at all. Its SPELL half is mandatory
       -- in the same file, which is what proves the key is per-mode rather than

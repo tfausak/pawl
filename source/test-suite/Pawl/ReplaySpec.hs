@@ -24,6 +24,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Mana as Mana
@@ -92,6 +93,49 @@ combatReplayTests =
                 p = Prompt.ChooseModes decider S.alice oid legal 1
                 answer = Set.singleton (ModeIndex.MkModeIndex 1)
              in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          -- CR 702.42a: whether the entwine cost was paid decides how many modes
+          -- the spell has, so a transcript that lost it would replay a different
+          -- spell. Both answers are checked: a decode that ignored the response
+          -- and returned a fixed value would pass one leg by accident.
+          HU.testCase "ChooseEntwine records and replays an EntwineDecision" $
+            let entwineCost =
+                  Cost.Type.MkCost
+                    { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                      Cost.Type.components = []
+                    }
+                p = Prompt.ChooseEntwine decider S.alice oid entwineCost
+             in do
+                  HU.assertEqual
+                    "entwining round trips"
+                    (Just EntwineDecision.Entwines)
+                    (Replay.decode p (Replay.encode p EntwineDecision.Entwines))
+                  HU.assertEqual
+                    "declining round trips"
+                    (Just EntwineDecision.Declines)
+                    (Replay.decode p (Replay.encode p EntwineDecision.Declines))
+                  -- Discriminating: fails if ChooseEntwine reuses another
+                  -- two-valued response rather than getting its own constructor.
+                  HU.assertEqual
+                    "an optional decision is not an entwine announcement"
+                    Nothing
+                    (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)),
+          HU.testCase "a short transcript declines entwine" $
+            -- CR 702.42a: declining is always legal and costs nothing, so it is
+            -- the least-eventful fallback when a transcript runs short.
+            HU.assertEqual
+              "declines"
+              EntwineDecision.Declines
+              ( Replay.defaultAnswer
+                  ( Prompt.ChooseEntwine
+                      decider
+                      S.alice
+                      oid
+                      Cost.Type.MkCost
+                        { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                          Cost.Type.components = []
+                        }
+                  )
+              ),
           HU.testCase "ChooseCopyTarget records and replays a Maybe ObjectId" $
             let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
                 answer = Just (ObjectId.MkObjectId 7)

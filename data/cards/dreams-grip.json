@@ -1,0 +1,88 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Entwine",
+      "value": {
+        "components": [],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 1
+          }
+        ]
+      }
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Dream's Grip",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "Tap",
+            "value": "tapped"
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "tapped",
+            "spec": {
+              "pool": {
+                "type": "Permanents"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "effects": [
+          {
+            "type": "Untap",
+            "value": "untapped"
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "untapped",
+            "spec": {
+              "pool": {
+                "type": "Permanents"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}
