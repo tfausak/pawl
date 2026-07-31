@@ -125,9 +125,24 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- to the card that left the battlefield checks for it only in the first zone
 -- that it went to."
 --
--- A SECOND name for what one printed word calls "it", and the two are not
--- interchangeable. CR 400.7 mints a fresh id on every zone change, so a
--- leaves-the-battlefield trigger has two objects to talk about at once:
+-- ONE slot for both directions of a zone change, because CR 400.7e is one rule
+-- about whatever moved, not a rule about the ability's bearer:
+--
+--   * a DEPARTURE, where the mover is the bearer -- Endless Cockroaches' "when
+--     this creature dies, return it to its owner's hand". The paragraphs below
+--     are about this case, which is the hard one.
+--   * an ENTRY, where the mover is generally NOT the bearer -- Aether Flash's
+--     "whenever a creature enters, this enchantment deals 2 damage to it".
+--     Here `triggerSource` is the enchantment and this slot is the entrant, so
+--     the two name unrelated objects and nothing has to be told apart. The
+--     entrant may still be gone by the time the ability resolves (CR 608.2h),
+--     which is what makes an effect reading this slot have to tolerate an id
+--     that no longer resolves either way.
+--
+-- For the departure direction it is a SECOND name for what one printed word
+-- calls "it", and the two are not interchangeable. CR 400.7 mints a fresh id on
+-- every zone change, so a leaves-the-battlefield trigger has two objects to
+-- talk about at once:
 --
 --   * `triggerSource` above is CR 113.7a's SOURCE -- the permanent as it was on
 --     the battlefield, which CR 603.10a's look-back is about and which
