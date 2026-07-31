@@ -527,6 +527,51 @@ oneEffectTrigger condition effect =
       TriggeredAbility.intervening = Nothing
     }
 
+-- Pawl.Binding's reserved slot names in full: the binding keys the engine
+-- STAMPS rather than asks a player for. The whole module's list rather than a
+-- hand-picked subset, so a new reserved slot joins the declaration sweep below
+-- by being added here and nowhere else.
+reservedSlots :: Set.Set SlotName.SlotName
+reservedSlots =
+  Set.fromList
+    [ Binding.variableX,
+      Binding.chosenModes,
+      Binding.copySource,
+      Binding.triggerSource,
+      Binding.you,
+      Binding.triggerPlayer,
+      Binding.became
+    ]
+
+-- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
+-- enchant slot (Card.allTargetSpecs), and its activated, triggered and delayed
+-- abilities' modes.
+--
+-- All four carriers, because all four ask the same question at different
+-- moments. CR 601.2c is the question ("the player announces their choice of an
+-- appropriate object or player for each target the spell requires"); CR 602.2b
+-- makes activating an ability follow "rules 601.2b-i"; CR 603.3d makes putting
+-- a triggered ability on the stack "identical to the process for casting a
+-- spell listed in rules 601.2c-d"; and CR 603.7's delayed abilities are
+-- triggered abilities, placed by that same rule. A lint about what DECLARING a
+-- slot means therefore has to range over all four, not over the spell alone.
+declaredTargetSlots :: Card.Type.Card -> Set.Set SlotName.SlotName
+declaredTargetSlots card = Map.keysSet (Card.allTargetSpecs card)
+
+-- The reserved names a card declares as target slots -- empty for every card
+-- authored correctly, which is the whole of the sweep's assertion.
+--
+-- Declaring one is the SECOND INVARIANT's failure mode rather than a dataflow
+-- nicety: the slot is prompted (CR 601.2c) and the answer then thrown away. On
+-- a triggered or delayed ability, Pawl.Engine stamps CR 113.7's `self` and CR
+-- 109.5's `you` OVER the chosen targets, so the player is asked and overruled.
+-- CR 400.7e's `became` and CR 603.2's `thatPlayer` run the other way -- the
+-- chosen target wins the union and the event's own stamp is lost, so the
+-- payload silently reads the answer to a question about something else. Either
+-- way the engine asked a question it did not use.
+reservedDeclarations :: Card.Type.Card -> Set.Set SlotName.SlotName
+reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
+
 -- The D4 dataflow lint: every slot an effect reads is declared, and every
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
@@ -603,49 +648,81 @@ lintTests registry =
                 (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
                 ps
         HU.assertEqual "X read iff {X} declared" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved X slot is never a declared target slot" $ do
+      -- ONE sweep over the whole reserved set, replacing the five per-name
+      -- cases this grew out of. Those five each filtered on
+      -- Card.allTargetSpecs, so they saw a card's spell modes and enchant slot
+      -- and nothing else; they also covered only five of the seven reserved
+      -- names, leaving `copySource` and `thatPlayer` with no declaration case
+      -- at all. See reservedDeclarations for why declaring one is a discarded
+      -- prompt rather than a naming quibble.
+      HU.testCase "no reserved binding slot is ever a declared target slot" $ do
         ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.variableX . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the X slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved modes slot is never a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.chosenModes . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the modes slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved trigger-source slot is never a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.triggerSource . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the self slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved you slot is never a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.you . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the you slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- CR 400.7e's arriving incarnation is stamped by Event.eventBindings, not
-      -- chosen, so a card declaring it as a target spec would be prompted for a
-      -- target and then have the answer clobbered. Same SCOPE limit as the three
-      -- above -- Card.allTargetSpecs walks a card's SPELL modes only, so a
-      -- triggered ability declaring the slot still slips through, which is the
-      -- gap Pawl.Binding's `you` comment documents for the whole family (#428).
-      -- The READ direction over a triggered ability's modes is a separate lint,
-      -- below.
-      HU.testCase "the reserved became slot is never a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.became . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the became slot" [] (fmap (Card.Type.name . Printing.card) offenders),
+        let offends = not . Set.null . reservedDeclarations
+            offenders = filter (offends . Printing.card) ps
+        HU.assertEqual "no card declares a reserved slot" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- The sweep above passes VACUOUSLY: no committed card declares a reserved
+      -- slot anywhere, so on its own it proves nothing about the lint. Proven
+      -- here instead against hand-built offenders, in the posture the
+      -- triggered-read self-test below uses -- never a card file, because a
+      -- misauthored card must not be loadable -- one per ability carrier the
+      -- sweep gained, each grafted onto a real card that has that kind of
+      -- ability.
+      --
+      -- Each carrier is asserted TWICE: the sweep sees the offender, and
+      -- Card.allTargetSpecs -- the spell-modes-and-enchant view the five old
+      -- cases filtered on -- does not. The second half is the regression guard:
+      -- it is the hole itself, and it fails if the sweep is ever narrowed back.
+      HU.testCase "the lint itself catches an ability that declares a reserved slot" $ do
+        roaches <- Registry.printing registry "Endless Cockroaches"
+        sorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        tidalWave <- Registry.printing registry "Tidal Wave"
+        let -- A one-mode, effectless modal declaring exactly one target slot.
+            declaring slot =
+              Modal.MkModal
+                (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory))
+                (ModeSelection.ChooseExactly 1)
+            withTriggered slot card =
+              card
+                { Card.Type.triggeredAbilities =
+                    [ TriggeredAbility.MkTriggeredAbility
+                        { TriggeredAbility.condition = TriggerCondition.SelfDies,
+                          TriggeredAbility.modal = declaring slot,
+                          TriggeredAbility.intervening = Nothing
+                        }
+                    ]
+                }
+            withActivated slot card =
+              card {Card.Type.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = declaring slot}) (Card.Type.activatedAbilities card)}
+            withDelayed slot card =
+              card {Card.Type.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Card.Type.delayedAbilities card)}
+            catches slot graft printing =
+              let card = graft slot (Printing.card printing)
+               in (reservedDeclarations card, Map.member slot (Card.allTargetSpecs card))
+        HU.assertEqual
+          "CR 109.5 you declared on a triggered ability is caught, and the spell-modes view misses it"
+          (Set.singleton Binding.you, False)
+          (catches Binding.you withTriggered roaches)
+        HU.assertEqual
+          "CR 113.7 self declared on an activated ability is caught, and the spell-modes view misses it"
+          (Set.singleton Binding.triggerSource, False)
+          (catches Binding.triggerSource withActivated sorcerer)
+        HU.assertEqual
+          "CR 400.7e became declared on a delayed ability is caught, and the spell-modes view misses it"
+          (Set.singleton Binding.became, False)
+          (catches Binding.became withDelayed tidalWave)
+        -- Not vacuous the other way either: the sweep reaches an ability's
+        -- ORDINARY slots, which Card.allTargetSpecs cannot see -- Prodigal
+        -- Sorcerer's spell is a creature's empty mode, so its "target" is
+        -- declared by its activated ability alone.
+        let target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual
+          "an activated ability's ordinary slot is in the sweep but not the spell-modes view"
+          (True, False)
+          (Set.member target (declaredTargetSlots (Printing.card sorcerer)), Map.member target (Card.allTargetSpecs (Printing.card sorcerer)))
+        HU.assertEqual
+          "and the three real cards declare no reserved slot"
+          [Set.empty, Set.empty, Set.empty]
+          (fmap (reservedDeclarations . Printing.card) [roaches, sorcerer, tidalWave]),
       HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $ do
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         let card = Printing.card lightningBolt
