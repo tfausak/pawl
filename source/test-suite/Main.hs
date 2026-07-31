@@ -9,13 +9,13 @@ import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
 import qualified Pawl.ColorSpec as ColorSpec
 import qualified Pawl.CombatSpec as CombatSpec
-import qualified Pawl.ConditionSpec as ConditionSpec
+import qualified Pawl.ConditionSpec
 import qualified Pawl.CopySpec as CopySpec
 import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.CostSpec as CostSpec
 import qualified Pawl.CountSpec as CountSpec
 import qualified Pawl.DamageSpec as DamageSpec
-import qualified Pawl.DecideSpec as DecideSpec
+import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec as DepartureSpec
 import qualified Pawl.EventSpec as EventSpec
@@ -88,7 +88,6 @@ testTree registry =
       SetupSpec.tests registry,
       MulliganSpec.tests registry,
       DamageSpec.tests registry,
-      DecideSpec.tests,
       DepartureSpec.tests registry,
       EventSpec.tests registry,
       ExpirySpec.tests registry,
@@ -101,7 +100,6 @@ testTree registry =
       CostSpec.tests registry,
       CombatSpec.tests registry,
       CountSpec.tests registry,
-      ConditionSpec.tests registry,
       ResolveSpec.tests registry,
       ProjectionSpec.tests registry,
       PowerToughnessSpec.tests registry,
@@ -116,11 +114,15 @@ testTree registry =
       FilterSpec.tests,
       RegistrySpec.tests,
       AuraSpec.tests registry,
-      Tasty.testGroup "spec" . Writer.execWriter $ spec tasty
+      Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
     ]
 
-spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
-spec s = do
+-- Specs that reach for card data are pinned to IO, since Registry.printing is an
+-- IO action. The rest stay polymorphic in the assertion monad.
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec s registry = do
+  Pawl.ConditionSpec.spec s registry
+  Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
   Pawl.Extra.BuilderSpec.spec s
   Pawl.Extra.EitherSpec.spec s
