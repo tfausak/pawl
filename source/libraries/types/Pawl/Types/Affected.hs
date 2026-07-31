@@ -32,4 +32,25 @@ data Affected
     -- if the permanent with the ability isn't an Aura", so there is nothing to
     -- parameterize.
     Attached
+  | -- CR 303.4b / 303.4m: the objects matching the Filter that the ENCHANTED
+    -- PLAYER controls -- Curse of Death's Hold's "creatures enchanted player
+    -- controls". The player-side twin of Attached, and a separate arm rather
+    -- than a payload on it because the two name different things: Attached names
+    -- the attached-to object ITSELF, while an enchant-player Aura (CR 702.5d) is
+    -- attached to no object at all and reaches the battlefield only through the
+    -- player it enchants.
+    --
+    -- Dynamic in BOTH of its inputs, and re-derived each projection like the
+    -- other two dynamic sets: the source's attachment can change, and so can who
+    -- controls a candidate (CR 613.1b's layer 2 is applied before the layers this
+    -- set feeds).
+    --
+    -- The set is EMPTY when the source is unattached or attached to an object
+    -- rather than a player -- the posture Attached takes toward an unattached
+    -- source.
+    --
+    -- Filtered rather than payload-free, unlike Attached: "creatures enchanted
+    -- player controls" narrows by card type, and CR 303.4m's phrase names only
+    -- whose permanents they are.
+    AttachedPlayerControls Filter
   deriving (Eq, Ord, Show)

@@ -311,6 +311,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Thopter -> "Thopter"
   Subtype.Dragon -> "Dragon"
   Subtype.Unicorn -> "Unicorn"
+  Subtype.Curse -> "Curse"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -367,7 +368,8 @@ jsonToSubtype =
       (Text.pack "Berserker", Subtype.Berserker),
       (Text.pack "Thopter", Subtype.Thopter),
       (Text.pack "Dragon", Subtype.Dragon),
-      (Text.pack "Unicorn", Subtype.Unicorn)
+      (Text.pack "Unicorn", Subtype.Unicorn),
+      (Text.pack "Curse", Subtype.Curse)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -1309,6 +1311,7 @@ affectedToJson a = case a of
   Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (setTo objectIdToJson ids))
   Affected.Matching f -> Json.tagged (Text.pack "Matching") (Just (filterToJson f))
   Affected.Attached -> Json.tagged (Text.pack "Attached") Nothing
+  Affected.AttachedPlayerControls f -> Json.tagged (Text.pack "AttachedPlayerControls") (Just (filterToJson f))
 
 jsonToAffected :: Value -> Either Text Affected.Affected
 jsonToAffected value = do
@@ -1317,6 +1320,7 @@ jsonToAffected value = do
     "TheseObjects" -> withValue mv (fmap Affected.TheseObjects . setFrom jsonToObjectId)
     "Matching" -> withValue mv (fmap Affected.Matching . jsonToFilter)
     "Attached" -> pure Affected.Attached
+    "AttachedPlayerControls" -> withValue mv (fmap Affected.AttachedPlayerControls . jsonToFilter)
     _ -> Left (Text.pack "unknown Affected: " <> t)
 
 recipientToJson :: Recipient.Recipient -> Value

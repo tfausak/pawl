@@ -681,6 +681,7 @@ continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
   Affected.Matching _ -> False
   Affected.Attached -> False
+  Affected.AttachedPlayerControls _ -> False
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 -- Object id 998 is a stand-in source: nothing in these tests reads the
@@ -1260,8 +1261,21 @@ addCounter kind n oid gs =
 -- (the shape addCreature and withEffect already have), not a synthetic card --
 -- every printing a caller passes is real. Type-agnostic on purpose: CR 400.7's
 -- reset is a property of the field, so the CR 400.7 test does not need an Aura.
+--
+-- Tagged ToCreature, which is the tag the real attach paths would store: every
+-- Aura in this pool has a Pool.Creatures enchant spec, and Target's candidates
+-- for that pool are ToCreature -- so an SBA that re-checks the attachment against
+-- the spec (Pawl.Sba.stillLegalEnchant) sees what casting would have left. The
+-- callers that attach to a non-creature are testing rules that read only WHICH
+-- object is named (CR 704.5n, CR 704.5p, CR 400.7), never the tag.
 attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-attach rider host gs =
+attach rider host = attachTo rider (Recipient.ToCreature host)
+
+-- attach, to whatever a Recipient names -- CR 303.4's "attached to an object or
+-- player". The door an enchant-player Aura (CR 702.5d) needs, since no ObjectId
+-- names its host.
+attachTo :: ObjectId.ObjectId -> Recipient.Recipient -> GameState.GameState -> GameState.GameState
+attachTo rider host gs =
   let set obj = obj {Object.attachedTo = Just host}
    in gs {GameState.objects = Map.adjust set rider (GameState.objects gs)}
 
