@@ -242,14 +242,16 @@ tests registry =
             roundTrip "m3" Codec.modificationToJson Codec.jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island),
           HU.testCase "SetControllerToSource" $
             roundTrip "m4" Codec.modificationToJson Codec.jsonToModification Modification.SetControllerToSource,
-          HU.testCase "Affected round-trips (TheseObjects, Matching, and Matching's \"each other\" shape)" $
+          HU.testCase "Affected round-trips (TheseObjects, Matching, Matching's \"each other\" shape, and AttachedPlayerControls)" $
             mapM_
               (roundTrip "affected" Codec.affectedToJson Codec.jsonToAffected)
               [ Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]),
                 Affected.Matching (Filter.Type.HasCardType CardType.Creature),
                 -- Opalescence's shape: its own "each other" card text (not a
                 -- rule) as Not IsSource.
-                Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain), Filter.Type.Not Filter.Type.IsSource])
+                Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain), Filter.Type.Not Filter.Type.IsSource]),
+                -- CR 303.4m through a player: Curse of Death's Hold's shape.
+                Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)
               ]
         ],
       Tasty.testGroup

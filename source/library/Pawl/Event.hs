@@ -197,7 +197,7 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 --
 -- `asOf` is the CR 608.2f / 704.3 batch board changeZoneInBatch above supplies,
 -- and Nothing for every other caller.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> Game (Maybe ObjectId)
 changeZoneAttaching asOf oid requestedDest seed = do
   gs <- State.get
   case Game.lookupObject oid gs of

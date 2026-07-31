@@ -127,8 +127,12 @@ destroyedBySba gs pc oid =
 -- Equipment whose creature dies THIS pass therefore detaches on the NEXT one,
 -- exactly as an Aura falls off on the next one.
 --
--- CR 704.5n's "or to a player" clause is unreachable: Object.attachedTo names an
--- object, so an Equipment attached to a player cannot be represented (#190).
+-- CR 704.5n's "or to a player" clause is expressible but has no producer: no
+-- effect in this pool attaches an Equipment to a player (CR 301.5 lets an
+-- Equipment be attached only to a creature, and Pawl.Resolve.attachmentFor
+-- refuses anything else). Written anyway, as the `Nothing` a player host yields from
+-- Recipient.objectOf -- there is no host object to be a creature, so the rule
+-- detaches it.
 --
 -- Guarded on the PROJECTED subtype, so a permanent that stops being an Equipment
 -- while attached stops matching here; cannotBeAttached below is the CR 704.5p
@@ -142,7 +146,7 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
       let isEquipment = case Map.lookup oid pcs of
             Nothing -> False
             Just pc -> Set.member Subtype.Equipment (PC.subtypes pc)
-          hostIsCreature = case Map.lookup host pcs of
+          hostIsCreature = case Recipient.objectOf host >>= (\h -> Map.lookup h pcs) of
             Nothing -> False
             Just pc -> Set.member CardType.Creature (PC.cardTypes pc)
        in isEquipment && not hostIsCreature
@@ -174,9 +178,9 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- Two clauses of the rule have no constructor to case on and are therefore
 -- unreachable rather than elided: there is no CardType.Battle (both "battle"
--- halves) and no Subtype.Fortification. So is "or to a player", for the same
--- reason it is unreachable in CR 704.5n -- Object.attachedTo names an object
--- (#190).
+-- halves) and no Subtype.Fortification. "Or to a player" needs no clause at all
+-- here: this rule asks only whether the attached permanent may be attached to
+-- ANYTHING, so the `Just _` below covers an object and a player alike.
 --
 -- This is also where CR 303.4d's second clause -- "An Aura that's also a creature
 -- can't enchant anything. If this occurs somehow, the Aura becomes unattached,
@@ -189,7 +193,7 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- CR 303.4d's clause is a RESTRICTION as well as a state-based action ("can't
 -- enchant anything"), and only the state-based half lives here. The restriction
--- half is Pawl.Resolve.attachLegal's first Aura conjunct, which refuses to attach
+-- half is Pawl.Resolve.attachmentFor's first Aura conjunct, which refuses to attach
 -- an Aura that is also a creature to anything.
 cannotBeAttached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
@@ -213,6 +217,16 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- Three clauses: unattached, attached to an id that is no longer a permanent, and
 -- attached to one its own enchant ability no longer admits (CR 303.4c's "as
 -- defined by its enchant ability and other applicable effects").
+--
+-- CR 303.4c's own wording splits that last clause differently -- "the object it
+-- was attached to no longer exists, or the player it was attached to has left the
+-- game" -- and both halves land in the SAME place here, because a pool's
+-- candidate list already excludes them: Target.creatureRecipients scans the
+-- battlefield of players still in the game, and Target.playerRecipients IS
+-- Game.stillPlaying. So an enchant-player Aura (CR 702.5d) whose player has left
+-- is illegal by the same test that judges every other Aura, with no player-only
+-- branch. Pawl.AuraSpec's "the player it was attached to has left the game" case
+-- is the proof.
 --
 -- The third clause goes through stillLegalEnchant below rather than calling
 -- Target.stillLegal directly, so that the common enchant spec is answered off
@@ -248,12 +262,12 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
       Nothing -> False
       Just obj -> case Object.attachedTo obj of
         Nothing -> True
-        Just target ->
-          target == oid
-            || not (stillLegalEnchant pcs gs oid spec target)
+        Just recipient ->
+          Recipient.objectOf recipient == Just oid
+            || not (stillLegalEnchant pcs gs oid spec recipient)
 
--- CR 303.4c / 608.2b: is `target` still a legal recipient for the enchanting
--- Aura `source`'s spec? Answered off `pcs` -- the pre-pass projection every other
+-- CR 303.4c / 608.2b: is `recipient` still a legal one for the enchanting Aura
+-- `source`'s spec? Answered off `pcs` -- the pre-pass projection every other
 -- classification in performStateBasedActions shares (CR 704.4 simultaneity) --
 -- for the one spec shape that reduces to a lookup, and by the general
 -- Target.stillLegal for every other.
@@ -280,8 +294,10 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 -- "you" the AURA's controller (enchant is a static ability, CR 702.5a), so the
 -- answer changes when an opponent steals the enchanted creature even though the
 -- reduction's three facts all still hold. Pawl.AuraSpec's Control Magic case is
--- the proof. A non-Creatures pool still has no producer (a second enchant pool,
--- CR 702.5d's enchant-player Auras, is #190).
+-- the proof. CR 702.5d's enchant-player Auras are the second producer: Curse of
+-- Death's Hold's Pool.Players spec falls through, and Target.playerRecipients IS
+-- Game.stillPlaying, so CR 303.4c's "the player it was attached to has left the
+-- game" is answered by the general path with no clause of its own.
 --
 -- So the fallthrough pays the per-Aura re-projection the reduction above exists to
 -- avoid -- but only for the Auras whose spec the reduction cannot serve, and `pcs`
@@ -290,15 +306,20 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 -- `pcs` would mean answering Filter.matches against the pre-pass projection
 -- instead of a fresh one, which is #430.
 --
--- That fallback is general in its POOL and FILTER, not in its recipient TAG: it
--- still hard-codes Recipient.ToCreature, which is what Pool.Creatures produces
--- (Target.creatureRecipients). A Pool.Permanents enchant spec tags candidates
--- ToObject instead, so the membership test would fail and wrongly bury the Aura.
--- The tag must be derived from the spec's own Pool before a second enchant pool
--- exists (#190).
-stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSpec.TargetSpec -> ObjectId -> Bool
-stillLegalEnchant pcs gs source spec target = case spec of
-  TargetSpec.MkTargetSpec Pool.Creatures Nothing ->
+-- That fallback is general in its recipient TAG as well as in its pool and
+-- filter, and that is the whole reason Object.attachedTo stores a Recipient: the
+-- tag is the one the Aura's own pool produced when it attached, so a Pool.Players
+-- spec is judged against ToPlayer candidates and a Pool.Permanents one against
+-- ToObject candidates, with nothing here to keep in step. Re-deriving the tag
+-- from the Pool would have been the alternative, and it would have had to be
+-- taught every pool separately.
+--
+-- The fast arm is therefore matched on the PAIR, not on the spec alone: it is a
+-- reduction of Pool.Creatures' candidate list specifically, so a recipient of any
+-- other shape falls through rather than being read as an object id it is not.
+stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSpec.TargetSpec -> Recipient.Recipient -> Bool
+stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
+  (TargetSpec.MkTargetSpec Pool.Creatures Nothing, Recipient.ToCreature target) ->
     case Map.lookup target pcs of
       Nothing -> False
       Just pc ->
@@ -308,7 +329,7 @@ stillLegalEnchant pcs gs source spec target = case spec of
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   -- The Aura is on the battlefield when this SBA asks, so its controller is
   -- live -- the CR 608.2b case this perspective exists for cannot arise here.
-  _ -> Target.stillLegal (Projection.controllerOf source gs) source (Recipient.ToCreature target) spec gs
+  _ -> Target.stillLegal (Projection.controllerOf source gs) source recipient spec gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the
