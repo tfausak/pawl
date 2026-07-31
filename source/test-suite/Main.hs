@@ -7,7 +7,7 @@ import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CardsSpec as CardsSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
-import qualified Pawl.ColorSpec as ColorSpec
+import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec as CombatSpec
 import qualified Pawl.ConditionSpec
 import qualified Pawl.CopySpec
@@ -43,7 +43,7 @@ import qualified Pawl.JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ModalSpec as ModalSpec
 import qualified Pawl.MulliganSpec as MulliganSpec
-import qualified Pawl.PlaneswalkerSpec as PlaneswalkerSpec
+import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
@@ -102,10 +102,8 @@ testTree registry =
       PowerToughnessSpec.tests registry,
       PlayerEffectSpec.tests registry,
       ActivateSpec.tests registry,
-      PlaneswalkerSpec.tests registry,
       ModalSpec.tests registry,
       ReplacementSpec.tests registry,
-      ColorSpec.tests registry,
       TriggerSpec.tests registry,
       FilterSpec.tests,
       AuraSpec.tests registry,
@@ -117,6 +115,7 @@ testTree registry =
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
 spec s registry = do
   Pawl.BindingSpec.spec s
+  Pawl.ColorSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CoreSpec.spec s registry
@@ -140,5 +139,6 @@ spec s registry = do
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
   Pawl.JsonSpec.spec s
+  Pawl.PlaneswalkerSpec.spec s registry
   Pawl.RegistrySpec.spec s
   Pawl.SlugSpec.spec s

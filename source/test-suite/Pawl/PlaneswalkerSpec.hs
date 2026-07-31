@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -30,8 +31,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Zone as Zone
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.HUnit as HU
 
 -- Jace Beleren's abilities in printed order: +2, -1, -10. Indexed rather than
 -- taken with a `head` the way every other spec's `theAbility` is, because this is
@@ -97,98 +96,106 @@ alicesNextTurn gs =
       back = S.runPure S.identityAnswer bobs Engine.handoffTurn
    in back {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
 
-tests :: Registry.Registry -> Tasty.TestTree
-tests registry =
-  Tasty.testGroup
-    "Planeswalker"
-    [ HU.testCase "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        let (jaceId, after) = jaceOnBattlefield island jace
-        HU.assertBool "on the battlefield" (Set.member jaceId (GameState.battlefield after))
-        HU.assertEqual "loyalty 3" 3 (S.counterOf CounterKind.Loyalty jaceId after),
-      HU.testCase "CR 606.4 the +2 adds two loyalty counters and each player draws" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        let (jaceId, board) = jaceOnBattlefield island jace
-            after = useAbility plusTwo jace jaceId board
-        HU.assertEqual "loyalty 3 + 2" 5 (S.counterOf CounterKind.Loyalty jaceId after)
-        HU.assertEqual "alice drew" 1 (S.handSize S.alice after)
-        HU.assertEqual "bob drew too" 1 (S.handSize S.bob after),
-      HU.testCase "CR 606.4 the -1 removes a loyalty counter and the targeted player draws" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        let (jaceId, board) = jaceOnBattlefield island jace
-            after = useAbility minusOne jace jaceId board
-        HU.assertEqual "loyalty 3 - 1" 2 (S.counterOf CounterKind.Loyalty jaceId after)
-        HU.assertEqual "exactly one player drew exactly one card" 1 (S.handSize S.alice after + S.handSize S.bob after),
-      HU.testCase "CR 606.6 the -10 is not offered at 3 loyalty, while the other two are" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        let (jaceId, board) = jaceOnBattlefield island jace
-            offered = Action.legalActions S.alice board
-            isOffered i = not (null (activation jaceId i jace)) && all (`elem` offered) (activation jaceId i jace)
-        HU.assertBool "the +2 is offered" (isOffered plusTwo)
-        HU.assertBool "the -1 is offered" (isOffered minusOne)
-        HU.assertBool "the -10 is NOT offered" (not (isOffered minusTen))
-        HU.assertBool
-          "and it is not activatable either"
-          (not (any (\ab -> Activate.activatable S.alice jaceId ab board) (abilityAt minusTen jace))),
-      HU.testCase "CR 606.3 a second loyalty ability is not offered in the same turn" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        let (jaceId, board) = jaceOnBattlefield island jace
-            after = useAbility plusTwo jace jaceId board
-            offered = Action.legalActions S.alice after
-        HU.assertEqual "the +2 resolved" 5 (S.counterOf CounterKind.Loyalty jaceId after)
-        HU.assertBool "the +2 is not offered again" (all (`notElem` offered) (activation jaceId plusTwo jace))
-        HU.assertBool "and neither is the -1" (all (`notElem` offered) (activation jaceId minusOne jace))
-        HU.assertBool
-          "but the limit expires with the turn"
-          (all (`elem` Action.legalActions S.alice (alicesNextTurn after)) (activation jaceId plusTwo jace)),
-      HU.testCase "CR 606.3 a loyalty ability is not offered on an opponent's turn" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        let (jaceId, board) = jaceOnBattlefield island jace
-            theirTurn = board {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
-        HU.assertBool
-          "the +2 is not offered"
-          (all (`notElem` Action.legalActions S.alice theirTurn) (activation jaceId plusTwo jace)),
-      -- The proof that CR 306.5b's counters go through the CR 122.6 funnel rather
-      -- than straight onto the object. CR 614.16's second sentence is the rule:
-      -- a counter-scaling replacement applies "even if the original event being
-      -- modified wasn't itself an effect", and CR 306.5b's entry counters are
-      -- placed by a replacement effect.
-      HU.testCase "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        doublingSeason <- Registry.printing registry "Doubling Season"
-        let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-            after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
-        HU.assertEqual "three doubled to six" 6 (S.counterOf CounterKind.Loyalty (theJace after) after),
-      -- The other half of the same rule, and the reason the two placements are
-      -- deliberately different code paths: CR 614.16's FIRST sentence limits a
-      -- counter-scaling replacement to counters an EFFECT puts on, and CR 606.4's
-      -- loyalty symbol is a cost. Doubling Season's own ruling says so.
-      HU.testCase "CR 614.16 Doubling Season does not double a loyalty ability's own cost" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        doublingSeason <- Registry.printing registry "Doubling Season"
-        let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-            board = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
-            jaceId = theJace board
-            after = useAbility plusTwo jace jaceId board
-        HU.assertEqual "six plus two, not six plus four" 8 (S.counterOf CounterKind.Loyalty jaceId after),
-      HU.testCase "CR 704.5i three -1s across three turns bury Jace in his owner's graveyard" $ do
-        island <- Registry.printing registry "Island"
-        jace <- Registry.printing registry "Jace Beleren"
-        let (jaceId, board) = jaceOnBattlefield island jace
-            turn gs = S.settleSba (alicesNextTurn (useAbility minusOne jace jaceId gs))
-            afterOne = turn board
-            afterTwo = turn afterOne
-            afterThree = turn afterTwo
-        HU.assertEqual "loyalty 2 after one activation" 2 (S.counterOf CounterKind.Loyalty jaceId afterOne)
-        HU.assertEqual "loyalty 1 after two" 1 (S.counterOf CounterKind.Loyalty jaceId afterTwo)
-        HU.assertBool "off the battlefield after three" (not (Set.member jaceId (GameState.battlefield afterThree)))
-        HU.assertEqual "in its owner's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice afterThree))
-    ]
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
+  Spec.it s "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    let (jaceId, after) = jaceOnBattlefield island jace
+    Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "on the battlefield"
+    Spec.assertEqWith s "loyalty 3" (S.counterOf CounterKind.Loyalty jaceId after) 3
+
+  Spec.it s "CR 606.4 the +2 adds two loyalty counters and each player draws" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        after = useAbility plusTwo jace jaceId board
+    Spec.assertEqWith s "loyalty 3 + 2" (S.counterOf CounterKind.Loyalty jaceId after) 5
+    Spec.assertEqWith s "alice drew" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "bob drew too" (S.handSize S.bob after) 1
+
+  Spec.it s "CR 606.4 the -1 removes a loyalty counter and the targeted player draws" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        after = useAbility minusOne jace jaceId board
+    Spec.assertEqWith s "loyalty 3 - 1" (S.counterOf CounterKind.Loyalty jaceId after) 2
+    Spec.assertEqWith s "exactly one player drew exactly one card" (S.handSize S.alice after + S.handSize S.bob after) 1
+
+  Spec.it s "CR 606.6 the -10 is not offered at 3 loyalty, while the other two are" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        offered = Action.legalActions S.alice board
+        isOffered i = not (null (activation jaceId i jace)) && all (`elem` offered) (activation jaceId i jace)
+    Spec.assertBool s (isOffered plusTwo) "the +2 is offered"
+    Spec.assertBool s (isOffered minusOne) "the -1 is offered"
+    Spec.assertBool s (not (isOffered minusTen)) "the -10 is NOT offered"
+    Spec.assertBool
+      s
+      (not (any (\ab -> Activate.activatable S.alice jaceId ab board) (abilityAt minusTen jace)))
+      "and it is not activatable either"
+
+  Spec.it s "CR 606.3 a second loyalty ability is not offered in the same turn" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        after = useAbility plusTwo jace jaceId board
+        offered = Action.legalActions S.alice after
+    Spec.assertEqWith s "the +2 resolved" (S.counterOf CounterKind.Loyalty jaceId after) 5
+    Spec.assertBool s (all (`notElem` offered) (activation jaceId plusTwo jace)) "the +2 is not offered again"
+    Spec.assertBool s (all (`notElem` offered) (activation jaceId minusOne jace)) "and neither is the -1"
+    Spec.assertBool
+      s
+      (all (`elem` Action.legalActions S.alice (alicesNextTurn after)) (activation jaceId plusTwo jace))
+      "but the limit expires with the turn"
+
+  Spec.it s "CR 606.3 a loyalty ability is not offered on an opponent's turn" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        theirTurn = board {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
+    Spec.assertBool
+      s
+      (all (`notElem` Action.legalActions S.alice theirTurn) (activation jaceId plusTwo jace))
+      "the +2 is not offered"
+
+  -- The proof that CR 306.5b's counters go through the CR 122.6 funnel rather
+  -- than straight onto the object. CR 614.16's second sentence is the rule:
+  -- a counter-scaling replacement applies "even if the original event being
+  -- modified wasn't itself an effect", and CR 306.5b's entry counters are
+  -- placed by a replacement effect.
+  Spec.it s "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    doublingSeason <- Registry.printing registry "Doubling Season"
+    let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
+        after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+    Spec.assertEqWith s "three doubled to six" (S.counterOf CounterKind.Loyalty (theJace after) after) 6
+
+  -- The other half of the same rule, and the reason the two placements are
+  -- deliberately different code paths: CR 614.16's FIRST sentence limits a
+  -- counter-scaling replacement to counters an EFFECT puts on, and CR 606.4's
+  -- loyalty symbol is a cost. Doubling Season's own ruling says so.
+  Spec.it s "CR 614.16 Doubling Season does not double a loyalty ability's own cost" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    doublingSeason <- Registry.printing registry "Doubling Season"
+    let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
+        board = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+        jaceId = theJace board
+        after = useAbility plusTwo jace jaceId board
+    Spec.assertEqWith s "six plus two, not six plus four" (S.counterOf CounterKind.Loyalty jaceId after) 8
+
+  Spec.it s "CR 704.5i three -1s across three turns bury Jace in his owner's graveyard" $ do
+    island <- Registry.printing registry "Island"
+    jace <- Registry.printing registry "Jace Beleren"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        turn gs = S.settleSba (alicesNextTurn (useAbility minusOne jace jaceId gs))
+        afterOne = turn board
+        afterTwo = turn afterOne
+        afterThree = turn afterTwo
+    Spec.assertEqWith s "loyalty 2 after one activation" (S.counterOf CounterKind.Loyalty jaceId afterOne) 2
+    Spec.assertEqWith s "loyalty 1 after two" (S.counterOf CounterKind.Loyalty jaceId afterTwo) 1
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield afterThree))) "off the battlefield after three"
+    Spec.assertEqWith s "in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice afterThree)) 1
