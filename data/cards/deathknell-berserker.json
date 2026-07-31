@@ -81,7 +81,7 @@
                     ],
                     "keywords": [],
                     "manaCost": null,
-                    "name": "Zombie Berserker",
+                    "name": "Zombie Berserker Token",
                     "power": {
                       "type": "Literal",
                       "value": 2

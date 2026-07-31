@@ -10,6 +10,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Combat as Combat
@@ -106,9 +107,14 @@ objectRefSlots ref = case ref of
 -- semantics (design.md section 1). Everything else asks classifications. The
 -- executor itself arrives with resolution; slotsOf is the read half of the
 -- dataflow lint.
+--
+-- Every arm carrying a Quantity unions Quantity.slots over it, because a
+-- Quantity.InSlot is a slot READ like any other -- the value half of the same
+-- dataflow the SlotName fields carry. X is not one of those reads (Quantity.slots
+-- says why); Resolve.readsX below is X's own half of the contract.
 slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
-  Effect.DealDamage slot _ -> Set.singleton slot
+  Effect.DealDamage slot quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.ModifyTarget _ _ slot -> Set.singleton slot
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
@@ -116,27 +122,30 @@ slotsOf effect = case effect of
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
-  Effect.PlayerSacrifices slot _ _ -> Set.singleton slot
+  Effect.PlayerSacrifices slot _ quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
-  Effect.Destroy ref _ -> objectRefSlots ref
+  -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
+  -- so it belongs to definedSlots below and must not appear here -- Create's and
+  -- PlaySubgame's slots take the same posture.
+  Effect.Destroy ref _ _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.RemoveFromCombat slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
-  Effect.Draw ref _ -> playerRefSlots ref
-  Effect.Mill slot _ -> Set.singleton slot
-  Effect.Discard slot _ -> Set.singleton slot
-  Effect.LoseLife ref _ -> playerRefSlots ref
-  Effect.GainLife ref _ -> playerRefSlots ref
+  Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.Mill slot quantity -> Set.insert slot (Quantity.slots quantity)
+  Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
+  Effect.LoseLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.GainLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
-  -- lint must not see it here.
-  Effect.Create {} -> Set.empty
+  -- lint must not see it here. Its Quantity is a read like every other.
+  Effect.Create quantity _ _ _ -> Quantity.slots quantity
   Effect.Replace {} -> Set.empty
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
   Effect.Counter slot -> Set.singleton slot
-  Effect.PutCounters _ _ slot -> Set.singleton slot
-  Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
+  Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
+  Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Untap ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ slot -> Set.singleton slot
@@ -315,12 +324,14 @@ armedAbilities effects =
    in Set.fromList (Maybe.mapMaybe named effects)
 
 -- The slots an effect list DEFINES rather than reads: a Create that names the
--- token it mints (CR 603.7c's "it"). The write half of the same lint.
+-- token it mints (CR 603.7c's "it"), a PlaySubgame that names its loser, a
+-- Destroy that names how many it destroyed. The write half of the same lint.
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
 definedSlots effects =
   let bound effect = case effect of
         Effect.Create _ _ _ mSlot -> mSlot
         Effect.PlaySubgame slot -> Just slot
+        Effect.Destroy _ _ mSlot -> mSlot
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe bound effects)
 
@@ -371,7 +382,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy ref regenerability -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability
+  Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
   Effect.Sacrifice _ -> effect
   Effect.RemoveFromCombat _ -> effect
   Effect.MoveToZone {} -> effect
@@ -1051,7 +1062,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy ref regenerability -> do
+  Effect.Destroy ref regenerability mSlot -> do
     gs <- State.get
     -- CR 701.8: destroy them through the single funnel -- indestructible (CR
     -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide. The
@@ -1064,7 +1075,23 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     -- 702.12b gate is judged (Event.destroy) alike. An illegal slot (CR 608.2b),
     -- a non-object recipient, or a set that matched nothing all arrive here as
     -- the empty list and destroy nothing -- one path, not three.
-    Event.destroy regenerability (objectRefObjects legality chosen controller source gs ref)
+    destroyed <- Event.destroyReturning regenerability (objectRefObjects legality chosen controller source gs ref)
+    -- CR 701.8b: "destroyed this way" is what the funnel DESTROYED, never what
+    -- the sweep named -- an indestructible permanent (CR 702.12b) and one a
+    -- regeneration shield saved (CR 701.8c) were both named and neither was
+    -- destroyed, and the rule's last sentence is explicit that a permanent that
+    -- reached a graveyard any other way "hasn't been 'destroyed'". Bound onto
+    -- this effect's SOURCE so a later effect of the same resolution reads it as
+    -- Quantity.InSlot, which is Bane of Progress' rider; the read goes through
+    -- live GameState rather than the `chosen` snapshot, so it works on the
+    -- ability path as well as the spell one.
+    --
+    -- Bound even when nothing was destroyed. Zero is an answer -- "for each
+    -- permanent destroyed this way" of nothing is no counters -- where leaving
+    -- the slot unbound would make the rider's quantity UNEVALUABLE, which is a
+    -- different thing that Resolve's arms happen to treat the same way today.
+    Monad.forM_ mSlot $ \slot ->
+      State.modify' (bindAmountSlot source slot (Natural.length destroyed))
   Effect.Sacrifice slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
@@ -1568,6 +1595,16 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         Just subject -> do
           gs <- State.get
           let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
+              -- One candidate's view, with the one field a projection cannot fill:
+              -- whether the SUBJECT could legally be attached here (CR 701.3a).
+              -- The answer comes from attachmentFor -- the same function the move
+              -- itself goes through below, so an offer and a move cannot disagree
+              -- -- and the field is lazy, so a filter that never names the atom
+              -- pays nothing for it.
+              viewOf oid =
+                (Projection.viewOfObject oid gs)
+                  { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
+                  }
               -- The destinations the card's own TEXT admits: battlefield
               -- permanents matching the Filter, less the one the subject already
               -- holds. That exclusion is CR 701.3b's second sentence -- attaching
@@ -1575,10 +1612,12 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- and it is also how Crown of the Ages' "ANOTHER creature" is
               -- spelled, so a card omitting the word would behave identically.
               --
-              -- Deliberately NOT narrowed to destinations the move would be
-              -- LEGAL for. "Another creature" is the whole of what the card says;
-              -- pre-filtering past it would answer CR 303.4j's question on the
-              -- player's behalf, and CR 303.4j exists precisely because the
+              -- Narrowed to destinations the move would be LEGAL for only when the
+              -- card SAYS so, which is Filter.CanHostSubject's whole job: Aura
+              -- Graft's "another permanent IT CAN ENCHANT" narrows, and Crown of
+              -- the Ages' bare "another creature" does not. Narrowing a filter
+              -- that does not carry the atom would answer CR 303.4j's question on
+              -- the player's behalf, and CR 303.4j exists precisely because the
               -- choice can land somewhere the subject may not go.
               --
               -- Ascending, so both the elision below and a transcript are
@@ -1589,7 +1628,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               candidates =
                 List.sort
                   ( filter
-                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (Projection.viewOfObject oid gs) filter_)
+                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (viewOf oid) filter_)
                       (Set.toList (GameState.battlefield gs))
                   )
           case candidates of
@@ -1943,6 +1982,21 @@ noSubgame = pure Result.Drawn
 bindLoserSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
 bindLoserSlot holder slot loser gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer loser) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
+-- CR 701.8b: bind how many permanents a destruction actually destroyed into
+-- `slot` on `holder`, so a later effect of the same resolution can read it as
+-- Quantity.InSlot. The third of the same shape, after bindSlot (an object) and
+-- bindLoserSlot (a player); this one binds a NUMBER, which rides the binding
+-- field CR 601.2b's chosen X rides.
+--
+-- Left behind on the holder after the resolution ends, exactly as the other two
+-- are. Harmless and unreadable: only an effect naming this slot can see it, the
+-- D4 lint makes every such read live under an effect list that also BINDS it,
+-- and a second sweep on the same holder overwrites the value before reading it.
+bindAmountSlot :: ObjectId -> SlotName -> Natural -> GameState -> GameState
+bindAmountSlot holder slot n gs =
+  let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- CR 701.23: do to a found card what the search said -- a move for every
