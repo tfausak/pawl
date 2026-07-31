@@ -28,6 +28,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -40,6 +41,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
@@ -637,6 +639,71 @@ tests registry =
           "and it targets nothing"
           [[Map.empty]]
           (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The pool's first CONTINUOUS effect over a filter-selected set (CR
+      -- 611.2c). Day of Judgment's EachMatching feeds a one-shot; this one feeds
+      -- an effect that is stored and keeps applying, so the sweep's RESULT has to
+      -- be frozen at resolution -- see Pawl.ResolveSpec's TrumpetBlast group.
+      --
+      -- The filter spells "attacking creatures" as And [HasCardType Creature,
+      -- IsAttacking] rather than IsAttacking alone: an EachMatching has no Pool
+      -- to narrow it (CR 109.2 gives it the whole battlefield), so the card type
+      -- the printed text names has to be in the filter. Kill Shot writes the same
+      -- two halves as Pool.Creatures plus a filter, because a TargetSpec has a
+      -- pool.
+      HU.testCase "trumpet-blast.json loads as a {2}{R} instant pumping every attacking creature" $ do
+        c <- Registry.card registry "Trumpet Blast"
+        HU.assertEqual "name" (Text.pack "Trumpet Blast") (CardT.name c)
+        HU.assertEqual "{2}{R}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Instant"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty)
+          (CardT.typeLine c)
+        HU.assertEqual
+          "attacking creatures get +2/+0 until end of turn"
+          [ ( Optionality.Mandatory,
+              [ Effect.ModifyTarget
+                  Duration.UntilEndOfTurn
+                  (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0))
+                  (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking]))
+              ]
+            )
+          ]
+          (modeShapes (CardT.spell c))
+        -- CR 115.10a: no "target" anywhere on the card, so no target spec and
+        -- nothing for CR 608.2b to fizzle.
+        HU.assertEqual "and it targets nothing" [Map.empty] (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c)))),
+      -- The control-side twin of trumpet-blast.json, and the other half of what
+      -- CR 611.2c names: a resolution effect that CHANGES THE CONTROLLER of a
+      -- filter-selected set. Its duration is Indefinite because the card states
+      -- none -- CR 611.2a: "If no duration is stated, it lasts until the end of
+      -- the game" -- which is the one place this card differs from Act of
+      -- Treason's UntilEndOfTurn.
+      --
+      -- The filter is a bare HasCardType Enchantment: the card says "all
+      -- enchantments", with no "you don't control" and no "other", and the Thief
+      -- itself is in a graveyard by the time the trigger resolves.
+      HU.testCase "aura-thief.json loads as a {3}{U} 2/2 flying Illusion whose dies trigger takes every enchantment" $ do
+        c <- Registry.card registry "Aura Thief"
+        HU.assertEqual "name" (Text.pack "Aura Thief") (CardT.name c)
+        HU.assertEqual "{3}{U}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Blue)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Illusion"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Illusion))
+          (CardT.typeLine c)
+        HU.assertEqual "2/2" (Just (Power.MkPower (Quantity.Literal 2)), Just (Toughness.MkToughness (Quantity.Literal 2))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual "flying, and nothing else" (Set.singleton Keyword.Flying) (CardT.keywords c)
+        HU.assertEqual
+          "one trigger, on dying"
+          [TriggerCondition.SelfDies]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "gaining control of every enchantment, for good"
+          [ [ ( Optionality.Mandatory,
+                [Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment))]
+              )
+            ]
+          ]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
       -- The pool's first card whose mass effect has a RIDER reading the sweep
       -- back: "destroy all artifacts and enchantments. Put a +1/+1 counter on
       -- this creature for each permanent destroyed this way." The two halves are

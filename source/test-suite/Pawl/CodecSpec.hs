@@ -300,8 +300,12 @@ tests registry =
         "effect"
         [ HU.testCase "DealDamage" $
             roundTrip "e1" Codec.effectToJson Codec.jsonToEffect (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)),
-          HU.testCase "ModifyTarget" $
-            roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (SlotName.MkSlotName (Text.pack "t"))),
+          -- ModifyTarget takes the same untagged ObjectRef Destroy and Untap do,
+          -- so both arms have to survive the trip: Giant Growth's slot and
+          -- Trumpet Blast's filter-selected set.
+          HU.testCase "ModifyTarget round-trips both ObjectRef arms" $ do
+            roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))))
+            roundTrip "e2b" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching Filter.Type.IsAttacking)),
           HU.testCase "AddMana" $
             roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))),
           HU.testCase "AddMana of any color" $
@@ -322,6 +326,12 @@ tests registry =
           HU.testCase "Untap round-trips both ObjectRef arms" $ do
             roundTrip "e4d" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
             roundTrip "e4e" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))),
+          -- GainControl's own two arms: Act of Treason's slot and Aura Thief's
+          -- "all enchantments". Its Duration is what tells the two cards apart on
+          -- the wire, so both durations ride along.
+          HU.testCase "GainControl round-trips both ObjectRef arms" $ do
+            roundTrip "e4f" Codec.effectToJson Codec.jsonToEffect (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "e4g" Codec.effectToJson Codec.jsonToEffect (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Enchantment))),
           -- CR 701.26a's Tap is Untap's mirror and shares its wire shape, so the
           -- two must not collapse into one tag: Dream's Grip prints both modes
           -- on one card and a decoder that confused them would silently swap
