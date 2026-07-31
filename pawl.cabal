@@ -209,7 +209,7 @@ library json
     Pawl.Json.Value
     Pawl.Json.ValueSpec
 
--- TODO
+-- The registry provides a way to load and cache card data from disk.
 library registry
   import: library
   build-depends:
