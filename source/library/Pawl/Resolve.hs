@@ -828,6 +828,14 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 -- between -- so a caller hands the whole list to its funnel as one batch rather
 -- than calling it once per element. Event.destroy's haddock has that half.
 --
+-- The two callers that store a CONTINUOUS effect -- ModifyTarget and GainControl
+-- -- take a further obligation from CR 611.2c: "the set of objects it affects is
+-- determined when that continuous effect begins. After that point, the set won't
+-- change." This answer is that determination, and those arms freeze it into the
+-- stored effect as Affected.TheseObjects rather than keeping the Filter around.
+-- Nothing here enforces that; it is stated so a third storing caller does not
+-- reach for Affected.Matching, which is a STATIC ability's dynamic set.
+--
 -- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
 -- determination of the order of those actions"), then ascending ObjectId within
 -- a controller. That second key is the engine's, not the resolving controller's
