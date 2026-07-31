@@ -17,8 +17,8 @@ import qualified Pawl.CountSpec as CountSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
-import qualified Pawl.DepartureSpec as DepartureSpec
-import qualified Pawl.EventSpec as EventSpec
+import qualified Pawl.DepartureSpec
+import qualified Pawl.EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
 import qualified Pawl.Extra.BuilderSpec
 import qualified Pawl.Extra.EitherSpec
@@ -86,8 +86,6 @@ testTree registry =
       SetupSpec.tests registry,
       MulliganSpec.tests registry,
       DamageSpec.tests registry,
-      DepartureSpec.tests registry,
-      EventSpec.tests registry,
       ExpirySpec.tests registry,
       ReplaySpec.tests registry,
       PropertySpec.tests registry,
@@ -121,6 +119,8 @@ spec s registry = do
   Pawl.CoreSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
+  Pawl.DepartureSpec.spec s registry
+  Pawl.EventSpec.spec s registry
   Pawl.Extra.BuilderSpec.spec s
   Pawl.Extra.EitherSpec.spec s
   Pawl.Extra.IntSpec.spec s
