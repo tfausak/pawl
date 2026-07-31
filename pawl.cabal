@@ -190,6 +190,7 @@ library types
     Pawl.Types.Card
     Pawl.Types.CardType
     Pawl.Types.CastingPermission
+    Pawl.Types.CastingRestriction
     Pawl.Types.Color
     Pawl.Types.Combat
     Pawl.Types.CombatStep

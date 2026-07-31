@@ -111,8 +111,9 @@ you = SlotName.MkSlotName (Text.pack "you")
 --
 -- That an effect READING this slot sits under a condition that binds it IS
 -- enforced, by Pawl.Event.eventBindingSlots and CardSpec's "every slot a
--- triggered ability reads is bound for its condition": only CR 702.70a's
--- combat-damage condition stamps it, so reading it under any other is a failing
+-- triggered ability reads is bound for its condition": only CR 510.1b's
+-- combat-damage-to-a-player condition stamps it -- which poisonous is one
+-- printing of, not the owner of -- so reading it under any other is a failing
 -- test rather than a silent no-op.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")

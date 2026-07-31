@@ -150,6 +150,8 @@ slotsOf effect = case effect of
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Set.empty
+  -- The PlayerRef may name a target slot -- Time Warp's "target player".
+  Effect.TakeExtraTurn ref -> playerRefSlots ref
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -197,11 +199,13 @@ readsX = any effectReadsX
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
+      Effect.TakeExtraTurn _ -> False
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
 -- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
--- to keep mana abilities off the stack, and by Mana.manaTypesOf to enumerate what
--- a source could produce. Casing on Effect is Resolve's charter.
+-- to keep mana abilities off the stack, and by Mana.manaRoutesOfGiven to
+-- enumerate what one activation of a source would add. Casing on Effect is
+-- Resolve's charter.
 --
 -- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
 -- asks whether the ability "could add mana", which an unresolved colour choice
@@ -245,6 +249,7 @@ manaProduced effect = case effect of
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
+  Effect.TakeExtraTurn _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -288,6 +293,7 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
+  Effect.TakeExtraTurn _ -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -404,6 +410,8 @@ rewriteEffect pairs effect = case effect of
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
+  -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
+  Effect.TakeExtraTurn _ -> effect
 
 -- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
 -- an unchosen mode's effects never resolve), with every text-change affecting it
@@ -689,11 +697,11 @@ cease abilId gs =
 -- that spec is the AURA's controller, not the moving effect's -- proven by
 -- Pawl.AuraSpec's "CR 303.4j whole cards", where Crown of the Ages cannot move
 -- Setessan Training ("Enchant creature you control") onto an opponent's
--- creature. An Aura with no enchant ability answers False and cannot arise: the
+-- creature. An Aura with no enchant ability answers Nothing and cannot arise: the
 -- Pawl.CardSpec lint family holds the Aura-iff-enchant biconditional in both
 -- directions.
 --
--- The Aura branch's first conjunct is CR 303.4d's "An Aura that's also a creature
+-- The Aura branch's first test is CR 303.4d's "An Aura that's also a creature
 -- can't enchant anything" -- the RESTRICTION half of that rule, whose
 -- state-based half is Pawl.Sba.cannotBeAttached. Unreachable in this pool (such
 -- an Aura is detached by CR 704.5p and buried by CR 704.5m before any player
@@ -702,28 +710,53 @@ cease abilId gs =
 -- reconfigure exception (CR 702.151b) that nothing here can express, and the
 -- Equipment path is not this change's to alter (#193).
 --
--- The `src /= target` conjunct is CR 301.5c ("An Equipment can't equip itself")
--- and CR 303.4d ("An Aura can't enchant itself") at once.
+-- The first guard -- the destination naming `src` itself -- is CR 301.5c ("An
+-- Equipment can't equip itself") and CR 303.4d ("An Aura can't enchant itself")
+-- at once.
 --
--- False for a source that is neither, which is CR 701.3b's third sentence: "If
+-- Nothing for a source that is neither, which is CR 701.3b's third sentence: "If
 -- an effect tries to attach an object that isn't an Aura, Equipment, or
 -- Fortification to another object or player, the effect does nothing and the
 -- first object doesn't move." There is no Subtype.Fortification to case on.
-attachLegal :: ObjectId -> ObjectId -> GameState -> Bool
-attachLegal src target gs
-  | src == target = False
-  | Set.member Subtype.Equipment subtypes = Projection.isCreatureOf target gs
+--
+-- Answers with the RECIPIENT to store rather than with a Bool, because CR 303.4
+-- attachment is to "an object or player" and Object.attachedTo records which --
+-- and the tag it records has to be the one the moving permanent's OWN rules
+-- reference that destination by, not the one the moving EFFECT happened to
+-- target it with. A Pool.Players enchant spec produces ToPlayer candidates and a
+-- Pool.Permanents one produces ToObject candidates; taking the answer from the
+-- spec's own candidate list is what keeps Pawl.Sba's CR 303.4c re-check able to
+-- compare the stored value against that same list later. `destination` is
+-- therefore matched by WHICH object or player it names, not by how the caller
+-- tagged it.
+attachmentFor :: ObjectId -> Recipient -> GameState -> Maybe Recipient
+attachmentFor src destination gs
+  | Recipient.objectOf destination == Just src = Nothing
+  -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
+  -- which is also why a player destination falls to Nothing here rather than
+  -- getting a branch of its own.
+  | Set.member Subtype.Equipment subtypes = case Recipient.objectOf destination of
+      Just oid | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
+      _ -> Nothing
   | Set.member Subtype.Aura subtypes =
-      not (Projection.isCreatureOf src gs)
-        && case Game.cardOf src gs >>= Card.Type.enchant of
-          Nothing -> False
+      if Projection.isCreatureOf src gs
+        then Nothing
+        else case Game.cardOf src gs >>= Card.Type.enchant of
+          Nothing -> Nothing
           Just spec ->
-            any
-              (\r -> recipientObject r == Just target)
-              (Target.legalRecipients (Projection.controllerOf src gs) src spec gs)
-  | otherwise = False
+            List.find
+              (names destination)
+              (Set.toList (Target.legalRecipients (Projection.controllerOf src gs) src spec gs))
+  | otherwise = Nothing
   where
     subtypes = Projection.subtypesOf src gs
+    -- Same object, or same player, however either was tagged. Two object tags
+    -- (ToCreature / ToObject) name one object; ToPlayer is the only player tag,
+    -- so those compare whole.
+    names a b = case (Recipient.objectOf a, Recipient.objectOf b) of
+      (Just x, Just y) -> x == y
+      (Nothing, Nothing) -> a == b
+      _ -> False
 
 -- The players a PlayerRef names DURING a resolution, read from the slots this
 -- resolution filled rather than from the source's bindings (which is what
@@ -804,7 +837,7 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 objectRefObjects :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
 objectRefObjects legality chosen controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-    (Just recipient, True) -> Maybe.maybeToList (recipientObject recipient)
+    (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
     _ -> []
   ObjectRef.EachMatching filter_ ->
     let context = Filter.MkContext (Just controller) (Just source)
@@ -847,7 +880,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.ModifyTarget duration modification slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
+        (Just recipient, True) -> case Recipient.objectOf recipient of
           Nothing -> gs
           Just target -> case Expiry.arm controller source duration gs of
             -- CR 611.2b: the duration never started, so the effect does nothing
@@ -878,7 +911,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of
         (Just recipient, True, Just (from, to)) ->
-          case recipientObject recipient of
+          case Recipient.objectOf recipient of
             Nothing -> gs
             -- CR 611.2a: the opcode states no duration, so the effect "lasts
             -- until the end of the game" -- Duration.Indefinite, armed through
@@ -1034,7 +1067,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     Event.destroy regenerability (objectRefObjects legality chosen controller source gs ref)
   Effect.Sacrifice slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient cannot be sacrificed
         -- CR 701.21: through the single funnel, which is NOT Event.destroy --
         -- CR 701.21a: sacrificing is not destroying. The sacrificing player is
@@ -1047,7 +1080,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.RemoveFromCombat slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
+        (Just recipient, True) -> case Recipient.objectOf recipient of
           Nothing -> gs -- a player recipient is not in combat
           -- CR 506.4: through Game.removeFromCombat, the one performer of every
           -- clause of that rule -- so this clause takes CR 509.1h's asymmetry
@@ -1064,7 +1097,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         _ -> gs
   Effect.MoveToZone slot zone ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
         Just target -> Event.changeZone target zone
@@ -1481,7 +1514,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           -- creature), read from the reserved trigger-source slot.
           MonarchTarget.ControllerOfSource ->
             Map.lookup Binding.triggerSource chosen
-              >>= recipientObject
+              >>= Recipient.objectOf
               >>= (\o -> Projection.controllerOf o gs)
     case newMonarch of
       Nothing -> pure ()
@@ -1497,25 +1530,30 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- moves the slot's TARGET instead.
   Effect.Attach slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
-        Nothing -> pure () -- a player recipient: CR 702.5d's enchant-player is unrepresentable (#190)
-        Just target -> do
-          gs <- State.get
-          let alreadyThere = case Game.lookupObject source gs of
-                Nothing -> False
-                Just obj -> Object.attachedTo obj == Just target
-          -- CR 701.3b, both sentences: an attach that cannot legally be performed
-          -- does not move the permanent at all (it stays where it was rather than
-          -- becoming unattached), and attaching it to what it is ALREADY attached
-          -- to "does nothing" -- which matters because of the restamp below.
-          Monad.when (attachLegal source target gs && not alreadyThere) $ do
-            gs1 <- State.get
-            -- CR 701.3c: attaching to a DIFFERENT object gives it a new timestamp.
-            -- Not cosmetic -- CR 613.7 orders layer effects by it, so two things
-            -- modifying one creature apply in attach order.
-            let (ts, gs2) = Game.freshTimestamp gs1
-                move o = o {Object.attachedTo = Just target, Object.timestamp = ts}
-            State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
+      (Just recipient, True) -> do
+        gs <- State.get
+        -- The slot's recipient is a PROPOSED destination; what gets stored is the
+        -- recipient the moving permanent's own rules name it by (attachmentFor),
+        -- and Nothing there is CR 701.3b's illegal attach.
+        case attachmentFor source recipient gs of
+          Nothing -> pure ()
+          Just attachment -> do
+            let alreadyThere = case Game.lookupObject source gs of
+                  Nothing -> False
+                  Just obj -> Object.attachedTo obj == Just attachment
+            -- CR 701.3b, both sentences: an attach that cannot legally be
+            -- performed does not move the permanent at all (it stays where it was
+            -- rather than becoming unattached), and attaching it to what it is
+            -- ALREADY attached to "does nothing" -- which matters because of the
+            -- restamp below.
+            Monad.unless alreadyThere $ do
+              gs1 <- State.get
+              -- CR 701.3c: attaching to a DIFFERENT object or player gives it a
+              -- new timestamp. Not cosmetic -- CR 613.7 orders layer effects by
+              -- it, so two things modifying one creature apply in attach order.
+              let (ts, gs2) = Game.freshTimestamp gs1
+                  move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
+              State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
       _ -> pure ()
   -- CR 701.3a, in the other direction from Attach above: the SLOT's target is
   -- what moves, and the destination is chosen now rather than targeted. Crown of
@@ -1525,11 +1563,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.AttachTarget slot filter_ ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient: nothing on the battlefield moves
         Just subject -> do
           gs <- State.get
-          let host = Game.lookupObject subject gs >>= Object.attachedTo
+          let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
               -- The destinations the card's own TEXT admits: battlefield
               -- permanents matching the Filter, less the one the subject already
               -- holds. That exclusion is CR 701.3b's second sentence -- attaching
@@ -1579,17 +1617,22 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- happen is the move. In particular the subject stays attached to
               -- its old host rather than becoming unattached, so CR 704.5m has
               -- nothing to bury.
-              Monad.when (attachLegal subject destination gs1) $ do
-                -- CR 701.3c: attaching to a DIFFERENT object gives it a new
-                -- timestamp, which CR 613.7 orders layer effects by. Always a
-                -- different object here -- the current host was never offered.
-                let (ts, gs2) = Game.freshTimestamp gs1
-                    move o = o {Object.attachedTo = Just destination, Object.timestamp = ts}
-                State.put gs2 {GameState.objects = Map.adjust move subject (GameState.objects gs2)}
+              -- The destination was chosen as an object off the battlefield, so
+              -- it is proposed as a bare ToObject and attachmentFor re-tags it
+              -- the way the subject's own enchant spec references it.
+              case attachmentFor subject (Recipient.ToObject destination) gs1 of
+                Nothing -> pure ()
+                Just attachment -> do
+                  -- CR 701.3c: attaching to a DIFFERENT object gives it a new
+                  -- timestamp, which CR 613.7 orders layer effects by. Always a
+                  -- different object here -- the current host was never offered.
+                  let (ts, gs2) = Game.freshTimestamp gs1
+                      move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
+                  State.put gs2 {GameState.objects = Map.adjust move subject (GameState.objects gs2)}
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           -- CR 400.7: exile the target through the funnel; register the resulting
@@ -1615,14 +1658,14 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through
       -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
-      (Just recipient, True) -> mapM_ Event.counter $ recipientObject recipient
+      (Just recipient, True) -> mapM_ Event.counter $ Recipient.objectOf recipient
       _ -> pure ()
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient takes no counters
         Just target -> case Quantity.evaluate viewOf context gs source quantity of
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
@@ -1747,7 +1790,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.GainControl duration slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
+        (Just recipient, True) -> case Recipient.objectOf recipient of
           Nothing -> gs -- a player recipient cannot be controlled
           Just target
             -- CR 800.4b: "If an object would change to the control of a player
@@ -1797,6 +1840,30 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                           GameState.objects = Map.adjust sicken target (GameState.objects gs1)
                         }
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.TakeExtraTurn ref -> do
+    gs <- State.get
+    let named = playerRefPlayers chosen legality controller gs ref
+        -- CR 500.7: "If multiple players are given extra turns, the extra turns
+        -- are added one at a time, in APNAP order (see rule 101.4)." The
+        -- intersection is Draw's, for Draw's reasons: apnapOrder supplies the
+        -- ORDER and `named` the MEMBERSHIP, so a seat the rotation still names
+        -- but playerRefPlayers does not -- a departed player, who stopped being
+        -- one at CR 102.1 while keeping their seat -- gets no turn. A departed
+        -- player named through a TARGET slot can still get an entry, since that
+        -- arm reads the slot rather than the roster; CR 800.4k catches it at the
+        -- handoff, where the turn simply does not begin.
+        --
+        -- Observable, not cosmetic: the pushes below are what CR 500.7's last
+        -- sentence then reverses, so APNAP order is what decides which of two
+        -- players takes their extra turn first.
+        takers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+    -- CR 500.7: "the extra turns are added ONE AT A TIME ... the MOST RECENTLY
+    -- CREATED turn will be taken first." So each taker is pushed onto the head
+    -- in turn, and the last one pushed is the first one Engine.handoffTurn pops
+    -- -- a stack, not a queue. A second TakeExtraTurn resolving later in the
+    -- same turn lands in front of this one's entries for the same reason, which
+    -- is the half of the rule that two Time Warps exercise.
+    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (flip (:)) (GameState.extraTurns g) takers})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
@@ -1928,11 +1995,3 @@ newestBattlefieldOf _ before after =
 reorderLibrary :: PlayerId -> [ObjectId] -> GameState -> GameState
 reorderLibrary pid order gs =
   gs {GameState.library = Map.insert pid (Seq.fromList order) (GameState.library gs)}
-
--- The object a recipient names, if any (CR 612 targets a spell or permanent, not
--- a player).
-recipientObject :: Recipient -> Maybe ObjectId
-recipientObject r = case r of
-  Recipient.ToObject oid -> Just oid
-  Recipient.ToCreature oid -> Just oid
-  Recipient.ToPlayer _ -> Nothing

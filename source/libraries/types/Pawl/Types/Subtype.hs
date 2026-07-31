@@ -80,4 +80,9 @@ data Subtype
     Dragon
   | -- CR 205.3m (a creature type; Prized Unicorn's).
     Unicorn
+  | -- CR 205.3h: an enchantment type, the second after Aura (Curse of Death's
+    -- Hold's). Purely descriptive today -- no rule and no card in this pool asks
+    -- whether a permanent is a Curse -- so it exists to make the printed type
+    -- line faithful, the way Nightmare's Horse does.
+    Curse
   deriving (Eq, Ord, Show)

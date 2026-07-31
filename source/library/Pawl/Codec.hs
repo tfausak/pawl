@@ -32,6 +32,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
@@ -311,6 +312,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Thopter -> "Thopter"
   Subtype.Dragon -> "Dragon"
   Subtype.Unicorn -> "Unicorn"
+  Subtype.Curse -> "Curse"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -367,7 +369,8 @@ jsonToSubtype =
       (Text.pack "Berserker", Subtype.Berserker),
       (Text.pack "Thopter", Subtype.Thopter),
       (Text.pack "Dragon", Subtype.Dragon),
-      (Text.pack "Unicorn", Subtype.Unicorn)
+      (Text.pack "Unicorn", Subtype.Unicorn),
+      (Text.pack "Curse", Subtype.Curse)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -1076,6 +1079,19 @@ jsonToCastingPermission =
       (Text.pack "CastFromGraveyard", CastingPermission.CastFromGraveyard)
     ]
 
+castingRestrictionToJson :: CastingRestriction.CastingRestriction -> Value
+castingRestrictionToJson r = case r of
+  CastingRestriction.DuringPhase p -> Json.tagged (Text.pack "DuringPhase") (Just (phaseToJson p))
+  CastingRestriction.AttackedThisStep -> nullary (Text.pack "AttackedThisStep")
+
+jsonToCastingRestriction :: Value -> Either Text CastingRestriction.CastingRestriction
+jsonToCastingRestriction value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("DuringPhase", Just v) -> CastingRestriction.DuringPhase <$> jsonToPhase v
+    ("AttackedThisStep", _) -> Right CastingRestriction.AttackedThisStep
+    _ -> Left (Text.pack "unknown CastingRestriction: " <> t)
+
 -- Newtypes -------------------------------------------------------------------
 
 slotNameToJson :: SlotName.SlotName -> Value
@@ -1309,6 +1325,7 @@ affectedToJson a = case a of
   Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (setTo objectIdToJson ids))
   Affected.Matching f -> Json.tagged (Text.pack "Matching") (Just (filterToJson f))
   Affected.Attached -> Json.tagged (Text.pack "Attached") Nothing
+  Affected.AttachedPlayerControls f -> Json.tagged (Text.pack "AttachedPlayerControls") (Just (filterToJson f))
 
 jsonToAffected :: Value -> Either Text Affected.Affected
 jsonToAffected value = do
@@ -1317,6 +1334,7 @@ jsonToAffected value = do
     "TheseObjects" -> withValue mv (fmap Affected.TheseObjects . setFrom jsonToObjectId)
     "Matching" -> withValue mv (fmap Affected.Matching . jsonToFilter)
     "Attached" -> pure Affected.Attached
+    "AttachedPlayerControls" -> withValue mv (fmap Affected.AttachedPlayerControls . jsonToFilter)
     _ -> Left (Text.pack "unknown Affected: " <> t)
 
 recipientToJson :: Recipient.Recipient -> Value
@@ -1606,6 +1624,7 @@ effectToJson e = case e of
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
   Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson f])))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
+  Effect.TakeExtraTurn r -> Json.tagged (Text.pack "TakeExtraTurn") (Just (playerRefToJson r))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -1701,6 +1720,7 @@ jsonToEffect value = do
       Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
       _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
     "PlaySubgame" -> withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
+    "TakeExtraTurn" -> withValue mv (fmap Effect.TakeExtraTurn . jsonToPlayerRef)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------
@@ -2173,6 +2193,14 @@ cardToJson c =
                Nothing -> []
                Just spec -> [(Text.pack "enchant", targetSpecToJson spec)]
            )
+        -- Omitted when empty, unlike the required `castingPermissions` key it
+        -- mirrors: one card in the pool prints a casting restriction, and a
+        -- required key would have meant editing every other card file to say
+        -- nothing.
+        <> ( if null (CardT.castingRestrictions c)
+               then []
+               else [(Text.pack "castingRestrictions", listTo castingRestrictionToJson (CardT.castingRestrictions c))]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -2215,6 +2243,7 @@ jsonToCard value = do
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
+  restrictions <- listFromDefault jsonToCastingRestriction (getOpt (Text.pack "castingRestrictions") ps)
   colorIndicator <- setFromDefault jsonToColor (getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
   delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
@@ -2240,6 +2269,7 @@ jsonToCard value = do
         CardT.replacementEffects = replacements,
         CardT.triggeredAbilities = triggered,
         CardT.castingPermissions = permissions,
+        CardT.castingRestrictions = restrictions,
         CardT.colorIndicator = colorIndicator,
         CardT.characteristicPT = characteristicPT,
         CardT.delayedAbilities = delayed,

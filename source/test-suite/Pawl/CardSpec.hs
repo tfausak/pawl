@@ -259,6 +259,7 @@ cardTests registry =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
+                  Card.Type.castingRestrictions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.blockRequirements = [],
@@ -391,6 +392,7 @@ effectCounts effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
+  Effect.TakeExtraTurn _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -1408,7 +1410,30 @@ auraCardTests registry =
                   (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]))))
                   (Mode.targetSpecs m)
               ms -> HU.assertFailure ("expected one mode, got " <> show (length ms))
-          abs_ -> HU.assertFailure ("expected one activated ability, got " <> show (length abs_))
+          abs_ -> HU.assertFailure ("expected one activated ability, got " <> show (length abs_)),
+      -- CR 702.5d's gate card: the first Aura in the pool whose enchant ability
+      -- names a PLAYER, and the first affected set reached through one.
+      HU.testCase "Curse of Death's Hold is a {3}{B}{B} Aura Curse enchanting a player for -1/-1" $ do
+        p <- Registry.printing registry "Curse of Death's Hold"
+        let card = Printing.card p
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        HU.assertEqual "name" (Text.pack "Curse of Death's Hold") (Card.Type.name card)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, black, black]) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
+        -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Aura, Subtype.Curse]) (TypeLine.subtypes (Card.Type.typeLine card))
+        HU.assertBool "is an Aura" (Card.isAura card)
+        -- CR 702.5d: "Enchant player" -- the whole player pool, unnarrowed, which
+        -- is what lets it target and be attached to a player and nothing else.
+        HU.assertEqual "enchant player" (Just (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.Type.enchant card)
+        -- CR 303.4m through the enchanted PLAYER: "creatures enchanted player
+        -- controls get -1/-1", layer 7c on a set the Aura is not attached to.
+        HU.assertEqual
+          "one -1/-1 static ability on the enchanted player's creatures"
+          [StaticAbility.MkStaticAbility (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)) (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal (-1))))]
+          (Card.Type.staticAbilities card)
+        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+        HU.assertEqual "no spell effects" [] (Card.allEffects card)
     ]
 
 -- Skilled Animator's "for as long as this creature remains on the battlefield",

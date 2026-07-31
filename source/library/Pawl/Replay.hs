@@ -38,7 +38,7 @@ encode p answer = case p of
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
   Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
-  Prompt.ChooseManaType {} -> Response.ChoseManaType answer
+  Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
@@ -96,8 +96,8 @@ decode p response = case p of
   Prompt.ChooseManaSource {} -> case response of
     Response.ChoseManaSource oid -> Just oid
     _ -> Nothing
-  Prompt.ChooseManaType {} -> case response of
-    Response.ChoseManaType mt -> Just mt
+  Prompt.ChooseManaYield {} -> case response of
+    Response.ChoseManaYield mana -> Just mana
     _ -> Nothing
   Prompt.ChooseProliferate {} -> case response of
     Response.ChoseProliferation chosen -> Just chosen
@@ -211,9 +211,9 @@ defaultAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   -- Any candidate pays; the head is the least eventful fallback. NonEmpty.head is total.
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  -- Every offered type is producible (tapForMana only offers what the source can
+  -- Every offered yield is producible (tapForMana only offers what the source can
   -- make), so the head is a legal answer and the least eventful fallback.
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   -- CR 701.34a: "any number" includes none, and declining is always legal -- the
   -- least eventful thing a fallback can do, the same posture as declining to
   -- attack or block.

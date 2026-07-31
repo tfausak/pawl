@@ -33,6 +33,7 @@ import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
@@ -174,6 +175,13 @@ tests registry =
           HU.testCase "CastingPermission" $ do
             roundTrip "library" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromLibraryWhileSearching
             roundTrip "graveyard" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromGraveyard,
+          HU.testCase "CastingRestriction" $ do
+            let declareAttackers = CastingRestriction.DuringPhase (Phase.Combat CombatStep.DeclareAttackers)
+                upkeep = CastingRestriction.DuringPhase (Phase.Beginning BeginningStep.Upkeep)
+            roundTrip "declare attackers" Codec.castingRestrictionToJson Codec.jsonToCastingRestriction declareAttackers
+            roundTrip "upkeep" Codec.castingRestrictionToJson Codec.jsonToCastingRestriction upkeep
+            roundTrip "attacked" Codec.castingRestrictionToJson Codec.jsonToCastingRestriction CastingRestriction.AttackedThisStep
+            HU.assertBool "the phase is part of the encoding" (Codec.castingRestrictionToJson declareAttackers /= Codec.castingRestrictionToJson upkeep),
           HU.testCase "ZoneChangeSubject" $ do
             roundTrip "any" Codec.zoneChangeSubjectToJson Codec.jsonToZoneChangeSubject ZoneChangeSubject.AnyObject
             roundTrip "source" Codec.zoneChangeSubjectToJson Codec.jsonToZoneChangeSubject ZoneChangeSubject.TheSource,
@@ -234,14 +242,16 @@ tests registry =
             roundTrip "m3" Codec.modificationToJson Codec.jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island),
           HU.testCase "SetControllerToSource" $
             roundTrip "m4" Codec.modificationToJson Codec.jsonToModification Modification.SetControllerToSource,
-          HU.testCase "Affected round-trips (TheseObjects, Matching, and Matching's \"each other\" shape)" $
+          HU.testCase "Affected round-trips (TheseObjects, Matching, Matching's \"each other\" shape, and AttachedPlayerControls)" $
             mapM_
               (roundTrip "affected" Codec.affectedToJson Codec.jsonToAffected)
               [ Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]),
                 Affected.Matching (Filter.Type.HasCardType CardType.Creature),
                 -- Opalescence's shape: its own "each other" card text (not a
                 -- rule) as Not IsSource.
-                Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain), Filter.Type.Not Filter.Type.IsSource])
+                Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain), Filter.Type.Not Filter.Type.IsSource]),
+                -- CR 303.4m through a player: Curse of Death's Hold's shape.
+                Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)
               ]
         ],
       Tasty.testGroup
@@ -313,6 +323,11 @@ tests registry =
           HU.testCase "SkipNextPhase" $ do
             roundTrip "skip slot" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Phase.Beginning BeginningStep.DrawStep))
             roundTrip "skip you" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (Phase.Beginning BeginningStep.Untap)),
+          -- CR 500.7: Time Warp's slot read, plus the self-scoped arm a "take an
+          -- extra turn after this one" card would write.
+          HU.testCase "TakeExtraTurn" $ do
+            roundTrip "extra turn slot" Codec.effectToJson Codec.jsonToEffect (Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "extra turn you" Codec.effectToJson Codec.jsonToEffect (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You)),
           -- Every PlayerRef shape the opcode accepts: the self-scoped one every
           -- card in the pool uses, and the slot read CR 702.70a's "that player"
           -- needs.

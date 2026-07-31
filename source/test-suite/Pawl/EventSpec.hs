@@ -257,7 +257,7 @@ tests registry =
             attached = S.attach rider host withRider
             bounced = S.runPure S.identityAnswer attached (Event.changeZone rider Zone.Hand)
             moved = filter (\o -> Object.zone o == Zone.Hand) (Map.elems (GameState.objects bounced))
-        HU.assertEqual "attached before the move" (Just (Just host)) (fmap Object.attachedTo (Game.lookupObject rider attached))
+        HU.assertEqual "attached before the move" (Just (Just (Recipient.ToCreature host))) (fmap Object.attachedTo (Game.lookupObject rider attached))
         HU.assertEqual "one card in hand" 1 (length moved)
         HU.assertEqual "the new incarnation is unattached" [Nothing] (fmap Object.attachedTo moved)
     ]

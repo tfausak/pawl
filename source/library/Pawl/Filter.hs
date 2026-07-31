@@ -112,8 +112,9 @@ playerView pid =
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
-      -- player is not itself attached to anything (Object.attachedTo runs the
-      -- other way and names an object, #190).
+      -- player is not itself attached to anything, because Object.attachedTo
+      -- runs the other way -- it is a field of the ATTACHED permanent, and a
+      -- player is not one.
       attachedToCreature = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False
