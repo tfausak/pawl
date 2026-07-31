@@ -732,6 +732,13 @@ apply batch candidate event =
     -- loop, so no second skip can be spent on the same step. One occurrence
     -- skipped, one instance gone, the rest waiting.
     --
+    -- "One occurrence" is the occurrence the PATTERN named, which for Stonehorn
+    -- Dignitary's PhaseSelector.CombatPhase is a whole combat phase rather than a
+    -- step of one. Nothing here has to know that: Engine.runStep raises the phase
+    -- question exactly once per phase, so a whole-phase skip gets exactly one
+    -- chance to apply and spends itself taking it -- the same arithmetic two
+    -- Fatigues do on two draw steps.
+    --
     -- Eon Hub's PhaseR reaches the same arm and consumes nothing: it is a
     -- permanent's static ability, so its CandidateId is OfPermanent and `consume`
     -- is a no-op for it. Idempotent and permanent, which is what "players skip

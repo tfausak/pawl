@@ -535,6 +535,17 @@ phaseToJson p = case p of
   Phase.PostcombatMain -> nullary (Text.pack "PostcombatMain")
   Phase.Ending s -> Json.tagged (Text.pack "Ending") (Just (endingStepToJson s))
 
+jsonToPhase :: Value -> Either Text Phase.Phase
+jsonToPhase value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Beginning", Just v) -> Phase.Beginning <$> jsonToBeginningStep v
+    ("PrecombatMain", _) -> Right Phase.PrecombatMain
+    ("Combat", Just v) -> Phase.Combat <$> jsonToCombatStep v
+    ("PostcombatMain", _) -> Right Phase.PostcombatMain
+    ("Ending", Just v) -> Phase.Ending <$> jsonToEndingStep v
+    _ -> Left (Text.pack "unknown Phase: " <> t)
+
 phaseSelectorToJson :: PhaseSelector.PhaseSelector -> Value
 phaseSelectorToJson selector = case selector of
   PhaseSelector.Step p -> Json.tagged (Text.pack "Step") (Just (phaseToJson p))
@@ -551,17 +562,6 @@ jsonToPhaseSelector value = do
     ("CombatPhase", _) -> Right PhaseSelector.CombatPhase
     ("EndingPhase", _) -> Right PhaseSelector.EndingPhase
     _ -> Left (Text.pack "unknown PhaseSelector: " <> t)
-
-jsonToPhase :: Value -> Either Text Phase.Phase
-jsonToPhase value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("Beginning", Just v) -> Phase.Beginning <$> jsonToBeginningStep v
-    ("PrecombatMain", _) -> Right Phase.PrecombatMain
-    ("Combat", Just v) -> Phase.Combat <$> jsonToCombatStep v
-    ("PostcombatMain", _) -> Right Phase.PostcombatMain
-    ("Ending", Just v) -> Phase.Ending <$> jsonToEndingStep v
-    _ -> Left (Text.pack "unknown Phase: " <> t)
 
 durationToJson :: Duration.Duration -> Value
 durationToJson d = case d of
