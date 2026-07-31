@@ -523,9 +523,9 @@ data Effect card
     -- this one" is `InSlot`, reading a slot that TARGETING filled (CR 601.2c).
     --
     -- PlayerRef rather than the bare SlotName Mill and Discard take, for the
-    -- reason Draw's own comment gives: the next card whose extra turn is its
-    -- caster's ("Take an extra turn after this one") is `Relative You` and needs
-    -- no sibling opcode to say so.
+    -- reason Draw's own comment gives: a card whose extra turn is its caster's
+    -- writes `Relative You` and needs no sibling opcode to say so. Savor the
+    -- Moment's "take an extra turn after this one" is that card.
     --
     -- No count and no "which turn": every printed extra-turn card adds ONE turn
     -- directly after the current one, and CR 500.7's "if a player is given

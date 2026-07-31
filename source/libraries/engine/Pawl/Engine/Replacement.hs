@@ -239,12 +239,14 @@ loop asOf batch applied event = do
 --      order. Read from `sources`, which for a CR 608.2f batch is the board the
 --      batch began in rather than the live one (see applyReplacementsIn).
 --   2. The FLOATING store (GameState.replacements): newest first -- Resolve.hs
---      (the Replace and SkipNextPhase opcodes) and Pawl.Engine.Cast (rule 702.34a's
---      flashback exile, armed as the spell goes onto the stack) each prepend a
---      new ActiveReplacement onto the front of the list as it is created, so the
---      most recently installed floating replacement is collected before any older
---      one. Always the LIVE store, never a frozen one: CR 614.3 spends a one-shot
---      as it is applied, and `consume` writes that back here.
+--      (the Replace and SkipNextPhase opcodes), Pawl.Engine.Cast (rule 702.34a's
+--      flashback exile, armed as the spell goes onto the stack) and
+--      `installTurnSkips` below (CR 500.11's turn-scoped skip, armed as the turn
+--      it belongs to begins -- the one prepender that is not a resolution) each
+--      prepend a new ActiveReplacement onto the front of the list as it is
+--      created, so the most recently installed floating replacement is collected
+--      before any older one. Always the LIVE store, never a frozen one: CR 614.3
+--      spends a one-shot as it is applied, and `consume` writes that back here.
 --
 -- That concatenated order is what the ChooseReplacement prompt indexes into. The
 -- two segments take separate arguments -- rather than one GameState apiece, which
@@ -964,10 +966,12 @@ beginsPhase selector pid = do
 -- the card states no duration. The reason is that the skip names ONE turn and
 -- cannot apply to another, so the last moment of that turn is the last moment it
 -- could matter, and AtCleanup is the store for exactly that
--- (Pawl.Engine.Expiry.dropAtCleanup) -- an unspent row cannot lie in wait for a
--- later turn. Uses.Once is CR 614.10a's per-occurrence spend, and for the one
--- card in the pool the two never disagree: the untap step is the first step of
--- the turn the skip belongs to, so it is spent long before the sweep.
+-- (Pawl.Engine.Expiry.dropAtCleanup). Uses.Once is CR 614.10a's per-occurrence
+-- spend, and it is the one that actually fires for the one card in the pool: the
+-- untap step is the first step of the turn the skip belongs to, so the row is
+-- spent long before any sweep. Not implemented: the sweep does not run at all on
+-- a turn whose ending phase was skipped, so the expiry alone would not hold an
+-- unspent row to its turn (#491).
 installTurnSkips :: ExtraTurn -> GameState -> GameState
 installTurnSkips entry gs =
   let install g selector =

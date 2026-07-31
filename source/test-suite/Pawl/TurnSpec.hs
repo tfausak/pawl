@@ -768,9 +768,10 @@ aimPlayer pid p = case p of
 
 -- alice in her precombat main phase with priority, five untapped Islands per
 -- Time Warp (exactly {3}{U}{U} each) and that many Time Warps in hand. Both
--- libraries are stocked, because unlike every other case in this file these run
--- SEVERAL whole turns and each one's draw step takes a card -- an empty library
--- would end the game by CR 704.5b before the turn order could be read off.
+-- libraries are stocked, because these run SEVERAL whole turns and each one's
+-- draw step takes a card -- an empty library would end the game by CR 704.5b
+-- before the turn order could be read off. `savorBoard` below stocks them for the
+-- same reason; nothing else in this file runs past one turn.
 warpBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, [ObjectId])
 warpBoard island warp piker n =
   let addOne (ids, g) _ = let (oid, g1) = S.addHandCard warp S.alice g in (ids <> [oid], g1)
@@ -1008,9 +1009,10 @@ turnScopedSkipTests registry =
             let resolved = castAndResolveWith (aimPlayer S.alice) warp (castAndResolve savor gs)
                 atWarpTurn = runTurns 1 resolved
                 -- Time Warp's turn has now run, and Savor's is the one about to
-                -- begin. Re-tapped so Savor's turn has something to untap, as
-                -- attacking with it would have left it (CR 508.1f: "the active
-                -- player taps the chosen creatures").
+                -- begin. Tapped again here, by hand, so that Savor's turn has
+                -- something to untap -- the previous turn's untap step is what
+                -- undid it, and nothing in these cases taps it back (identityAnswer
+                -- declares no attackers, so CR 508.1f never fires).
                 atSavorTurn = S.tapObject piker (runTurns 1 atWarpTurn)
                 afterSavorTurn = runTurns 1 atSavorTurn
             -- Both turns are alice's, so the active player cannot tell them

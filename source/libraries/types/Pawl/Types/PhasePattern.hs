@@ -29,9 +29,11 @@ import Pawl.Types.PlayerId (PlayerId)
 -- (Pawl.Engine.Replacement.applies compares it against ProposedEvent.WouldBeginPhase's
 -- active player).
 --
--- The PlayerId is BAKED at resolution, by Resolve.applyEffect's SkipNextPhase
--- arm, exactly as Modification.SetController's is by GainControl -- card data
--- cannot name a player, so this is the only way one gets in. Meant to be
+-- The PlayerId is BAKED by the engine, never authored: card data cannot name a
+-- player, exactly as it cannot name Modification.SetController's. Two bakers, and
+-- they differ in WHEN rather than in what they write -- Resolve.applyEffect's
+-- SkipNextPhase arm at resolution, and Pawl.Engine.Replacement.installTurnSkips as
+-- an extra turn begins (see above). Meant to be
 -- runtime-only, and nothing ENFORCES that: the codec round-trips it, so card
 -- JSON could author a Just, which is meaningless (#437).
 data PhasePattern = MkPhasePattern
