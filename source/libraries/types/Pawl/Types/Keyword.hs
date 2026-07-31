@@ -95,6 +95,25 @@ data Keyword
     -- (Keyword.flashbackExile).
     Flashback Cost
   | Fear -- 702.36
+  | -- 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
+    -- that functions while the spell is on the stack. 'Entwine [cost]' means
+    -- 'You may choose all modes of this spell instead of just the number
+    -- specified. If you do, you pay an additional [cost].' Using the entwine
+    -- ability follows the rules for choosing modes and paying additional costs
+    -- in rules 601.2b and 601.2f-h."
+    --
+    -- The cost rides the constructor, as Flashback's and Cycling's do, because
+    -- rule 702.42a states it as part of the keyword rather than as separate card
+    -- text. It is NOT a Card.additionalCosts entry: that list is unconditioned,
+    -- so an entwine cost placed there would be paid by every cast, and paying it
+    -- is precisely what the player may decline (CR 601.2b's "announces their
+    -- intentions to pay any or all of those costs").
+    --
+    -- The MODE-WIDENING half is not a field either. Rule 702.42a fixes it
+    -- completely -- "all modes", never some other number -- so Pawl.Cast reads
+    -- the payload's own mode count (Modal.modeCount) rather than a number
+    -- restated here, and Pawl.Types.ModeSelection stays what the card PRINTS.
+    Entwine Cost
   | -- 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
     -- this creature deals combat damage to a player, that player gets N poison
     -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the

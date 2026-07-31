@@ -43,6 +43,11 @@ allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.mod
 -- ModeIndex order (the Set is already sorted). Out-of-range indices contribute
 -- nothing (total via Seq.lookup).
 --
+-- The ORDER is what CR 702.42b demands of an entwined spell -- "follow the text
+-- of each of the modes in the order written on the card when the spell resolves"
+-- -- and it costs nothing extra: ModeIndex order IS printed order, and
+-- Set.toAscList is already sorted. Pawl.Resolve.resolveModes walks this list.
+--
 -- Modes rather than a flat effect list because a mode is the unit CR 603.5's
 -- "may" covers (Mode.optionality) and the unit CR 700.2c scopes targets to, so a
 -- resolver that flattened first could not ask the one question per mode that
@@ -78,3 +83,10 @@ modeTargetSpecs (ModeIndex.MkModeIndex n) m =
 selectionCount :: Modal.Modal card -> Natural
 selectionCount m = case Modal.selection m of
   ModeSelection.ChooseExactly n -> n
+
+-- How many modes are PRINTED, which is not the same question as how many the
+-- selection demands. CR 702.42a's entwine is what asks it: "you may choose all
+-- modes of this spell instead of just the number specified", so this is the
+-- count Pawl.Cast substitutes for selectionCount when the entwine cost is paid.
+modeCount :: Modal.Modal card -> Natural
+modeCount = Natural.length . Modal.modes

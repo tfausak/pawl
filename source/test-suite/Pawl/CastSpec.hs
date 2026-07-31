@@ -40,6 +40,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -456,6 +457,9 @@ discardLastAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 lastN :: Natural -> [a] -> [a]
 lastN n xs = reverse (List.genericTake n (reverse xs))
@@ -1128,6 +1132,9 @@ castFirstOption p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -1183,3 +1190,6 @@ castPanglacial p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines

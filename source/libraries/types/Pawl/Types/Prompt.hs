@@ -12,6 +12,7 @@ import Pawl.Types.Concession (Concession)
 import Pawl.Types.Cost (Cost)
 import Pawl.Types.Decider (Decider)
 import Pawl.Types.EntryOption (EntryOption)
+import Pawl.Types.EntwineDecision (EntwineDecision)
 import Pawl.Types.Mana (Mana)
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.MulliganDecision (MulliganDecision)
@@ -233,11 +234,30 @@ data Prompt r where
   -- contains a Variable symbol -- a spell with no {X} is not asked (where the
   -- rules leave nothing to choose, don't prompt).
   ChooseX :: Decider -> PlayerId -> ObjectId -> Natural -> Prompt Natural
+  -- CR 702.42a: whether this player uses the entwine ability of the modal spell
+  -- they are casting -- "You may choose all modes of this spell instead of just
+  -- the number specified. If you do, you pay an additional [cost]." The ObjectId
+  -- is the spell; the Cost is the ADDITIONAL cost entwining would add on top of
+  -- whichever candidate cost is then announced (CR 601.2f).
+  --
+  -- ONE question rather than two, because rule 702.42a is one sentence: the
+  -- widened mode choice (CR 601.2b's first clause) and the intention to pay an
+  -- additional cost (CR 601.2b's third) are the same decision, so answering
+  -- Entwines settles both. It is therefore asked BEFORE ChooseModes, which for
+  -- an entwined cast then has nothing left to ask.
+  --
+  -- Asked ONLY when entwining is actually available: the spell has the keyword,
+  -- every one of its modes is legal (CR 700.2a -- "choose all modes" is not open
+  -- when one of them can't be chosen), and some candidate cost plus this one is
+  -- payable. Where the rules leave nothing to ask, don't prompt; where they do,
+  -- the engine never decides to pay on the player's behalf.
+  ChooseEntwine :: Decider -> PlayerId -> ObjectId -> Cost -> Prompt EntwineDecision
   -- CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.
   -- The answer is the chosen subset. Prompted before X and targets, and ONLY when
-  -- #legal > count; a forced selection is not asked.
+  -- #legal > count; a forced selection is not asked -- which is every entwined
+  -- cast, where CR 702.42a's "all modes" leaves no subset to pick.
   ChooseModes :: Decider -> PlayerId -> ObjectId -> Set ModeIndex -> Natural -> Prompt (Set ModeIndex)
   -- CR 707.5 / 614.1c / 614.12a: as an object enters AS A COPY (Clone), its
   -- controller chooses which permanent to copy. The ObjectId is the entering

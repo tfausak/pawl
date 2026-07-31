@@ -59,6 +59,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
@@ -238,6 +239,9 @@ identityAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -294,6 +298,9 @@ castAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -343,6 +350,9 @@ aggressiveAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Answers Prompt.ChooseDefender with `who` and everything else with
 -- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
@@ -411,6 +421,9 @@ playLandAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -558,6 +571,9 @@ randomAnswer p = case p of
   -- ChooseCost posture -- no Phyrexian card is in any deck Pawl.Cards builds, so
   -- a random draw here would explore nothing and only complicate replay.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> pure EntwineDecision.Declines
 
 -- Total index into a non-empty run of candidates -- a turn order, the tokens one
 -- Create minted: an out-of-range draw falls back to the head, which the NonEmpty

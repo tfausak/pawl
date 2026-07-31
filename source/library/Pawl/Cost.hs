@@ -137,6 +137,29 @@ total pid oid cost gs = cost {Cost.mana = fmap (totalMana pid oid gs) (Cost.mana
 totalMana :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
 totalMana pid oid gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs)
 
+-- CR 601.2f: "The total cost is the mana cost or alternative cost ... PLUS ALL
+-- ADDITIONAL COSTS and cost increases". One additional cost bolted onto a
+-- candidate, which is the shape CR 702.42a's entwine needs -- Pawl.Cast applies
+-- it to whichever candidate the caster announced, exactly as CR 118.9d says an
+-- additional cost applies to an alternative one.
+--
+-- The mana parts CONCATENATE (the extra symbols are appended, and CR 601.2f's
+-- totalling later pools the generic ones), and the components are appended in
+-- the same order, so `pay` charges the base cost's components before the
+-- additional one's.
+--
+-- CR 118.6a: "If an unpayable cost is increased by an effect or an additional
+-- cost is imposed, the cost is still unpayable." Either side being Nothing
+-- therefore leaves the whole thing unpayable, which the applicative on Maybe
+-- gives for free.
+plus :: Cost -> Cost -> Cost
+plus base extra =
+  let combine (ManaCost.MkManaCost xs) (ManaCost.MkManaCost ys) = ManaCost.MkManaCost (xs <> ys)
+   in Cost.MkCost
+        { Cost.mana = combine <$> Cost.mana base <*> Cost.mana extra,
+          Cost.components = Cost.components base <> Cost.components extra
+        }
+
 -- CR 601.2b: substitute the chosen value of X into the mana part. Identity on a
 -- Variable-free cost, and on an unpayable one.
 substituteX :: Natural -> Cost -> Cost

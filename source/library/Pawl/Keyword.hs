@@ -73,7 +73,9 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 -- These three are derived from a card's PRINTED keywords rather than a
 -- projection's post-layer ones, unlike triggeredAbilitiesOf: all three abilities
 -- function in the graveyard or on the stack (CR 113.6), where the CR 613 layer
--- system does not reach.
+-- system does not reach. entwineCost is a fourth of the same kind -- rule 702.42a
+-- says entwine "functions while the spell is on the stack", and Pawl.Cast reads
+-- it one step earlier still, off a card in a hand.
 
 -- CR 702.70b: "If a creature has multiple instances of poisonous, each triggers
 -- separately." So this returns one ability PER INSTANCE, which is exactly what
@@ -104,6 +106,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Fear -> []
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
+  Keyword.Entwine _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
@@ -145,6 +148,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Vigilance -> []
   Keyword.Fear -> []
   Keyword.Flashback _ -> []
+  Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
@@ -236,6 +240,9 @@ permissionsFor keyword = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
+  -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
+  -- cost to a cast that was already allowed, it never permits one.
+  Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
@@ -258,6 +265,24 @@ flashbackCost :: Set Keyword -> Maybe Cost
 flashbackCost keywords =
   let costOf keyword = case keyword of
         Keyword.Flashback cost -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.42a's "[cost]": the ADDITIONAL cost this card's controller may pay to
+-- choose all of its modes, or Nothing when it has no entwine. Read by Pawl.Cast,
+-- which offers it at CR 601.2b and adds it to whichever candidate cost was
+-- announced (CR 601.2f's "plus all additional costs").
+--
+-- A wildcard rather than an exhaustive case, exactly as flashbackCost above:
+-- this asks about ONE named constructor rather than classifying every keyword.
+--
+-- Nothing beyond the FIRST entwine cost is reachable, the same shape and the
+-- same gap flashbackCost records: a card printing two entwine abilities is
+-- expressible and unrepresented, and no printing does it (#294).
+entwineCost :: Set Keyword -> Maybe Cost
+entwineCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Entwine cost -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
