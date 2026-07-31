@@ -77,19 +77,19 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
 -- damage to you" -- is a slot read rather than a new opcode.
 --
--- Unlike variableX / chosenModes / triggerSource above, "no card's targetSpecs
--- may name it" is NOT lint-enforced here. The declaration lints that exist only
--- walk a card's SPELL modes (Card.allTargetSpecs is Modal.allTargetSpecs
--- (Card.spell card), CardSpec.hs) -- the same scope limit triggerSource's comment
--- above documents. "you" is stamped exclusively on TRIGGERED abilities (setYou
--- below is called only when a triggered ability is placed, Pawl.Engine), whose
--- target specs those lints never visit. So a card declaring a "you" target spec
--- on a triggered ability would pass them today, be prompted for a target, and
--- have the answer silently clobbered by setYou's insert (#428).
+-- "No card's targetSpecs may name it" is lint-enforced here as it is for the
+-- reserved names above, by a sweep (CardSpec.hs) that collects the target specs
+-- of every carrier: a card's spell modes and enchant slot, AND its activated,
+-- triggered and delayed abilities' modes. It has to reach the abilities to mean
+-- anything for this slot, because "you" is stamped exclusively on TRIGGERED
+-- abilities (setYou below is called only when a triggered ability is placed,
+-- Pawl.Engine): a card declaring a "you" target spec there would otherwise be
+-- prompted for a target and have the answer silently clobbered by setYou's
+-- insert.
 --
--- The triggered-ability READ lint that now exists does not close this: it is a
--- subset check, and "you" sits on its AVAILABLE side precisely because every
--- triggered ability has it bound.
+-- The triggered-ability READ lint is a different check and never covered this:
+-- it is a subset check, and "you" sits on its AVAILABLE side precisely because
+-- every triggered ability has it bound.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
@@ -106,8 +106,8 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
 -- Resolve.resolveEffects' legalSlot answers True for any slot with no target
 -- spec, which is how this slot stays readable at resolution. The same "no
--- card's targetSpecs may name it" caveat `you` carries applies here, and is
--- unenforced for the same reason (#428).
+-- card's targetSpecs may name it" rule `you` carries applies here, enforced by
+-- the same declaration sweep.
 --
 -- That an effect READING this slot sits under a condition that binds it IS
 -- enforced, by Pawl.Event.eventBindingSlots and CardSpec's "every slot a
@@ -165,8 +165,8 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- target spec, which is how this one stays readable at resolution, and CR
 -- 608.2b's fizzle asks only about the targeted slots so it cannot rescue a
 -- spell either. "No card's targetSpecs may name it" is checked by CardSpec.hs
--- for a card's SPELL modes only, exactly as it is for `you` -- the scope limit
--- that comment describes applies here unchanged (#428). Reading it under a
+-- over every carrier of target specs, exactly as it is for `you` -- see that
+-- comment for why the abilities have to be in scope. Reading it under a
 -- condition that never binds it is the direction that IS enforced, by
 -- Pawl.Event.eventBindingSlots (see `triggerPlayer` above).
 became :: SlotName
