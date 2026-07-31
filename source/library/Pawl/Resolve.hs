@@ -1568,6 +1568,16 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         Just subject -> do
           gs <- State.get
           let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
+              -- One candidate's view, with the one field a projection cannot fill:
+              -- whether the SUBJECT could legally be attached here (CR 701.3a).
+              -- The answer comes from attachmentFor -- the same function the move
+              -- itself goes through below, so an offer and a move cannot disagree
+              -- -- and the field is lazy, so a filter that never names the atom
+              -- pays nothing for it.
+              viewOf oid =
+                (Projection.viewOfObject oid gs)
+                  { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
+                  }
               -- The destinations the card's own TEXT admits: battlefield
               -- permanents matching the Filter, less the one the subject already
               -- holds. That exclusion is CR 701.3b's second sentence -- attaching
@@ -1583,21 +1593,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- the player's behalf, and CR 303.4j exists precisely because the
               -- choice can land somewhere the subject may not go.
               --
-              -- Filling canHostSubject is what makes a filter able to ask about
-              -- the SUBJECT rather than about the candidate, and it comes from
-              -- attachmentFor -- the same function the move itself goes through
-              -- below, so an offer and a move cannot disagree. Lazy in the View, so
-              -- a filter without the atom pays nothing for it.
-              --
               -- Ascending, so both the elision below and a transcript are
               -- deterministic. The filter context is this effect's own -- CR
               -- 109.5's "you" is the ability's controller and IsSource is its
               -- source -- because the destination filter IS the ability's card
               -- text, unlike PlayerSacrifices', which is read against the victim.
-              viewOf oid =
-                (Projection.viewOfObject oid gs)
-                  { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
-                  }
               candidates =
                 List.sort
                   ( filter
