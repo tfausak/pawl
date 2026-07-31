@@ -11,11 +11,20 @@
 -- compare two values regardless of it.
 module Pawl.Codec.Json where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Extra.Builder as Builder
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Boolean as Boolean
 import qualified Pawl.Json.Null as Null
@@ -131,3 +140,115 @@ parse :: Text -> Either Text Value
 parse input = case Parsec.parse (Value.decode <* Parsec.eof) "" input of
   Left err -> Left (Text.pack (show err))
   Right value -> Right value
+
+-- Collection and default combinators ------------------------------------------
+--
+-- Generic over the element codec: nothing here names a Pawl.Types type, which
+-- is what keeps this module below every per-type codec module (#481).
+
+nullary :: Text -> Value
+nullary t = tagged t Nothing
+
+decodeNullary :: Text -> [(Text, a)] -> Value -> Either Text a
+decodeNullary tyName table value = do
+  (t, _) <- tag value
+  case lookup t table of
+    Just x -> Right x
+    Nothing -> Left (Text.pack "unknown " <> tyName <> Text.pack ": " <> t)
+
+listTo :: (a -> Value) -> [a] -> Value
+listTo f = Value.Array . Array.MkArray . fmap f
+
+listFrom :: (Value -> Either Text a) -> Value -> Either Text [a]
+listFrom f value = asArray value >>= mapM f
+
+-- CR 613.6's card-data invariant: a static ability has at least one part. An
+-- empty array is a decode failure, not an ability that does nothing.
+nonEmptyTo :: (a -> Value) -> NonEmpty.NonEmpty a -> Value
+nonEmptyTo f = listTo f . NonEmpty.toList
+
+nonEmptyFrom :: (Value -> Either Text a) -> Value -> Either Text (NonEmpty.NonEmpty a)
+nonEmptyFrom f value = do
+  xs <- listFrom f value
+  case NonEmpty.nonEmpty xs of
+    Nothing -> Left (Text.pack "expected a non-empty array")
+    Just ne -> pure ne
+
+seqTo :: (a -> Value) -> Seq.Seq a -> Value
+seqTo f = Value.Array . Array.MkArray . fmap f . Foldable.toList
+
+seqFrom :: (Value -> Either Text a) -> Value -> Either Text (Seq.Seq a)
+seqFrom f value = Seq.fromList <$> listFrom f value
+
+setTo :: (a -> Value) -> Set a -> Value
+setTo f = listTo f . Set.toAscList
+
+setFrom :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Set a)
+setFrom f value = Set.fromList <$> listFrom f value
+
+-- A count-per-key multiset, on the wire as a plain array WITH REPEATS rather
+-- than as key/count pairs: it is what the thing being encoded is a list of, and
+-- the encoding stays legible beside setTo's. Ascending by key, so it is
+-- canonical. multisetFrom recounts, so a hand-written file may repeat a key in
+-- any order and a zero count is simply unsayable.
+multisetTo :: (a -> Value) -> Map.Map a Natural -> Value
+multisetTo f = listTo f . concatMap (\(k, n) -> List.genericReplicate n k) . Map.toAscList
+
+multisetFrom :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Map.Map a Natural)
+multisetFrom f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> listFrom f value
+
+maybeTo :: (a -> Value) -> Maybe a -> Value
+maybeTo = maybe jNull
+
+maybeFrom :: (Value -> Either Text a) -> Value -> Either Text (Maybe a)
+maybeFrom f value = case value of
+  Value.Null _ -> Right Nothing
+  _ -> Just <$> f value
+
+natTo :: Natural -> Value
+natTo = jInt . toInteger
+
+natFrom :: Value -> Either Text Natural
+natFrom value = do
+  n <- asInteger value
+  case Integer.toNatural n of
+    Just x -> Right x
+    Nothing -> Left (Text.pack "expected natural")
+
+withValue :: Maybe Value -> (Value -> Either Text a) -> Either Text a
+withValue mv f = case mv of
+  Just v -> f v
+  Nothing -> Left (Text.pack "missing tagged value")
+
+-- An omitted delayedAbilities field decodes to empty, so every card file that
+-- predates P4 stays byte-identical (the same precedent characteristicPT and
+-- colorIndicator follow).
+mapFromDefault :: (Value -> Either Text (Map.Map k v)) -> Value -> Either Text (Map.Map k v)
+mapFromDefault f value = case value of
+  Value.Null _ -> Right Map.empty
+  _ -> f value
+
+getOpt :: Text -> [(Text, Value)] -> Value
+getOpt k ps = Maybe.fromMaybe jNull (optField k ps)
+
+jsonToBoolDefault :: Bool -> Value -> Either Text Bool
+jsonToBoolDefault d value = case value of
+  Value.Null _ -> Right d
+  Value.Boolean b -> Right (Boolean.unwrap b)
+  _ -> Left (Text.pack "expected a boolean")
+
+-- An omitted set field decodes to empty. Lets an all-default field stay OUT of
+-- the committed JSON, so existing files remain byte-identical (the same
+-- precedent delayedAbilities and characteristicPT follow, P2/P4).
+setFromDefault :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Set a)
+setFromDefault f value = case value of
+  Value.Null _ -> Right Set.empty
+  _ -> setFrom f value
+
+-- An omitted list field decodes to empty, the list counterpart of
+-- setFromDefault. Lets an all-default field stay OUT of the committed JSON, so
+-- every existing card file remains byte-identical.
+listFromDefault :: (Value -> Either Text a) -> Value -> Either Text [a]
+listFromDefault f value = case value of
+  Value.Null _ -> Right []
+  _ -> listFrom f value
