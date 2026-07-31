@@ -556,7 +556,16 @@ reservedSlots =
 -- triggered abilities, placed by that same rule. A lint about what DECLARING a
 -- slot means therefore has to range over all four, not over the spell alone.
 declaredTargetSlots :: Card.Type.Card -> Set.Set SlotName.SlotName
-declaredTargetSlots card = Map.keysSet (Card.allTargetSpecs card)
+declaredTargetSlots card =
+  Set.unions
+    ( Map.keysSet (Card.allTargetSpecs card)
+        : fmap
+          (Map.keysSet . Modal.allTargetSpecs)
+          ( fmap ActivatedAbility.modal (Card.Type.activatedAbilities card)
+              <> fmap TriggeredAbility.modal (Card.Type.triggeredAbilities card)
+              <> fmap TriggeredAbility.modal (Map.elems (Card.Type.delayedAbilities card))
+          )
+    )
 
 -- The reserved names a card declares as target slots -- empty for every card
 -- authored correctly, which is the whole of the sweep's assertion.
