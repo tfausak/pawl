@@ -249,8 +249,10 @@ discardToHandSize pid = do
         let inHand oid = List.elem oid held
             toDiscard = take excess (filter inHand chosen)
         -- CR 701.9a, through the shared discard funnel: a cleanup discard is a
-        -- discard, so it records one for a rule 701.9a trigger to read. A
-        -- trigger this fires gets no extra cleanup step of its own (#51).
+        -- discard, so it records one for a rule 701.9a trigger to read. A trigger
+        -- this fires is one "waiting to be put onto the stack" during the cleanup
+        -- step, which is CR 514.3a's condition -- see `cleanupException`, and
+        -- Megrim in Pawl.GameSpec for the proof that it is reached from here.
         Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) toDiscard
 
 -- CR 103.8a: "In a two-player game, the player who plays first skips the draw
@@ -598,6 +600,11 @@ permute xs order =
         then Maybe.mapMaybe at order
         else xs
 
+-- CR 117.5's settle, discarding the report. The name all but one caller uses;
+-- `performSettle` below is the same act, and carries the whole account of it.
+settleForPriority :: Game ()
+settleForPriority = Monad.void performSettle
+
 -- CR 117.5: each time a player would receive priority, sweep expired "for as
 -- long as" effects, perform state-based actions, then put triggered abilities
 -- on the stack, repeating until none of the three does anything. Then priority
@@ -634,8 +641,29 @@ permute xs order =
 -- had to be locked in before any SBA or trigger observed it (CR 614.12a). The
 -- entry loop now runs inside the zone change itself, before the Moved event
 -- exists, so there is nothing left to drain.
-settleForPriority :: Game ()
-settleForPriority = do
+--
+-- It also REPORTS whether it performed any state-based action or placed any
+-- triggered ability on the stack. Same split as Sba.checkStateBasedActions /
+-- Sba.performStateBasedActions, and for the same reason: one caller needs the
+-- answer and the rest do not.
+--
+-- That caller is `cleanupException` (CR 514.3a), and the two things reported are
+-- exactly the two the rule asks about. The CR 611.2b conditional sweep and the
+-- monarch exile return (Monarch.returnExiledForMonarch, a DURATION ending rather
+-- than an ability triggering) also happen here and also make the loop repeat, but
+-- neither is a state-based action and neither is a triggered ability, so neither
+-- answers CR 514.3a's question and neither is reported.
+--
+-- Reported across EVERY pass, where CR 704.3's last sentence names "the step's
+-- first check". The two agree wherever the conditional sweep is inert, which is
+-- every board the CR itself describes -- the CR does not put a CR 611.2b sweep
+-- inside this check at all, so under its own reading a first check that performs
+-- nothing is a loop that does nothing. Where pawl's extra sweep makes them
+-- differ, this errs toward granting priority, so a trigger placed on a later pass
+-- still gets the CR 514.3a round it is entitled to instead of resolving a turn
+-- late.
+performSettle :: Game Bool
+performSettle = do
   swept <- Expiry.sweepConditional
   returned <- Monarch.returnExiledForMonarch
   acted <- Sba.performStateBasedActions
@@ -658,7 +686,8 @@ settleForPriority = do
   -- other writes.
   State.modify' Combat.removeChanged
   checkControlContinuity
-  Monad.when (swept || returned || acted || placed) settleForPriority
+  more <- if swept || returned || acted || placed then performSettle else pure False
+  pure (acted || placed || more)
 
 priorityLoop :: Game ()
 priorityLoop = do
@@ -944,17 +973,23 @@ advance = do
   gs <- State.get
   case Seq.viewl (GameState.remaining gs) of
     p Seq.:< rest -> State.put gs {GameState.phase = p, GameState.remaining = rest}
-    -- CR 514.3 (partial) / 117.5: the turn is over. Settle once more so every
-    -- event the cleanup step's turn-based actions emitted is scanned BEFORE
-    -- handoffTurn clears the log -- an unscanned event discarded at handoff is a
-    -- lost trigger. CR 514.3a's extra cleanup step and its priority round are not
-    -- built (#51), so a trigger placed here resolves at the next turn's first
-    -- priority rather than during this cleanup.
+    -- CR 117.5: the turn is over. Settle once more so every event the terminal
+    -- step's turn-based actions emitted is scanned BEFORE handoffTurn clears the
+    -- log -- an unscanned event discarded at handoff is a lost trigger. This is
+    -- also where CR 704.3 catches a state-based action raised by those same
+    -- turn-based actions (e.g. an Aura's CR 704.5m fall-off): the settle loops
+    -- rather than checking once.
     --
-    -- This is also where CR 704.3 catches a state-based action raised by the
-    -- terminal phase's own turn-based actions (e.g. an Aura's CR 704.5m
-    -- fall-off): settleForPriority loops rather than checking once, and that
-    -- only works here because Cleanup is the schedule-terminal phase.
+    -- The step this lands after is USUALLY the cleanup step, whose own CR 514.3a
+    -- check (`cleanupException`) has already run this settle and, if it found
+    -- anything, granted priority and scheduled another cleanup step -- so on that
+    -- path this one finds nothing left to do. It is kept anyway, because the
+    -- schedule can empty at a step that is NOT the cleanup step: CR 500.11's "as
+    -- though it didn't exist" over a skipped ending phase (skipWholePhase) drops
+    -- the cleanup step along with the rest of the phase, and the handoff then
+    -- follows the postcombat main phase directly. Stating the guarantee here
+    -- keeps it from resting on an enumeration of what each such step can leave
+    -- behind.
     Seq.EmptyL -> do
       settleForPriority
       handoffTurn
@@ -1057,10 +1092,23 @@ runStepThatBegan phase = do
   -- priority.
   State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan phase (GameState.activePlayer gs)) gs)
   runTurnBasedActions phase
+  -- Asked BEFORE the CR 704.3 check below, not after it. For every step but one
+  -- the order is free -- this line is pure there -- and for the cleanup step it
+  -- is forced: CR 704.3's last sentence keys that step's outcome to "the step's
+  -- FIRST check", so nothing may perform a state-based action ahead of CR
+  -- 514.3a's. Running the ordinary check first buries the creature that CR 514.2
+  -- just dropped to zero toughness (CR 704.5f), and CR 514.3a then finds an
+  -- already-settled board and grants nothing -- see Pawl.GameSpec's "a
+  -- state-based action alone fires the exception", which is what caught it.
+  grants <- grantsPriorityNow phase
+  -- CR 704.3, one unlooped pass (Sba.checkStateBasedActions says why one is
+  -- enough at this site). Nothing left for a cleanup step to do, since
+  -- `grantsPriorityNow` has just settled it to a fixpoint; the step's own check
+  -- for every other.
   checkSba
   finished <- State.gets (Maybe.isJust . GameState.result)
   Monad.unless finished $ do
-    Monad.when (Turn.grantsPriority phase) priorityLoop
+    Monad.when grants priorityLoop
     restarted <- State.gets GameState.restartSignal
     case restarted of
       -- CR 727.4: a restart replaced the game during this step's priority round.
@@ -1117,6 +1165,89 @@ runStepThatBegan phase = do
         stillFinished <- State.gets (Maybe.isJust . GameState.result)
         Monad.unless stillFinished advance
 
+-- Whether THIS step grants a priority round. Every step but one answers from the
+-- phase alone (Turn.grantsPriority); the cleanup step's answer is CR 514.3's
+-- "normally, no player receives priority" qualified by CR 514.3a's exception,
+-- which is a question about the board and so has to be asked here.
+grantsPriorityNow :: Phase.Phase -> Game Bool
+grantsPriorityNow phase = case phase of
+  Phase.Ending EndingStep.Cleanup -> cleanupException
+  _ -> pure (Turn.grantsPriority phase)
+
+-- CR 514.3a: "At this point, the game checks to see if any state-based actions
+-- would be performed and/or any triggered abilities are waiting to be put onto
+-- the stack (including those that trigger 'at the beginning of the next cleanup
+-- step'). If so, those state-based actions are performed, then those triggered
+-- abilities are put on the stack, then the active player gets priority. Players
+-- may cast spells and activate abilities. Once the stack is empty and all players
+-- pass in succession, another cleanup step begins."
+--
+-- Checking and performing are ONE act here. `performSettle` is precisely CR
+-- 117.5's "perform the state-based actions, then put the waiting triggered
+-- abilities on the stack, repeating until neither does anything", and it reports
+-- whether it did either. The rule reads as a question asked before its own answer
+-- is acted on, but the two orders are indistinguishable: the consequent performs
+-- exactly what the question asked about, and nothing observes the board in
+-- between. CR 704.3's last sentence states the same procedure from the other end
+-- -- "This process also occurs during the cleanup step (see rule 514), except
+-- that if no state-based actions are performed as the result of the step's first
+-- check and no triggered abilities are waiting to be put on the stack, then no
+-- player gets priority and the step ends."
+--
+-- Returns whether the exception fired, which is what the caller turns into a
+-- priority round.
+--
+-- WHY THIS TERMINATES, given that a cleanup step can now schedule another one.
+-- The chain advances only on new work: a cleanup step schedules a successor only
+-- when this check found a state-based action to perform or a trigger to place,
+-- so a cleanup step that finds nothing ends the turn, and the settle is
+-- idempotent -- running it twice over an unchanged board reports False the second
+-- time. The turn-based actions the successor re-runs cannot manufacture that work
+-- either: CR 514.1 finds the hand already at its maximum and discards nothing,
+-- and CR 514.2 finds no marked damage and no "until end of turn" effect left. So
+-- a third cleanup step needs the SECOND one's priority round to have produced
+-- something the first did not -- a card drawn back over the hand size, a
+-- permanent put onto the battlefield that then dies.
+--
+-- The pool has a producer for each half of the check, and neither can produce a
+-- third step. The trigger half is CR 514.1's discard (Megrim), which fires only
+-- on the first cleanup step, because the second finds the hand already trimmed.
+-- The state-based half is CR 514.2 ending an "until end of turn" pump out from
+-- under a creature (CR 704.5f), which the first step's own settle takes to a
+-- fixpoint -- including whatever that death raises in turn -- and which the
+-- second step has no effect left to end. So every game this engine can play ends
+-- its turns in at most two cleanup steps (Pawl.GameSpec's "the second cleanup
+-- step finds nothing waiting and ends the turn").
+--
+-- It is NOT bounded in general, and Magic does not bound it either: an ability
+-- that triggers at the beginning of each cleanup step loops forever, and CR
+-- 104.4b's draw is the rules' answer to that rather than a bound on the loop.
+-- pawl does not detect such a loop (#484), which is the same engine-liveness gap
+-- #338 opened from the turn side.
+cleanupException :: Game Bool
+cleanupException = do
+  fired <- performSettle
+  Monad.when fired $
+    -- "Once the stack is empty and all players pass in succession, another
+    -- cleanup step begins." Scheduled HERE, before the priority round rather than
+    -- after it, exactly as CR 510.4's second combat damage step is
+    -- (Turn.spliceSecondDamage, spliced from runTurnBasedActions).
+    --
+    -- The two placements are indistinguishable, which is why the existing
+    -- precedent decides it rather than an argument. The only thing between here
+    -- and `advance` that touches GameState.remaining is CR 500.8's phase splice
+    -- (Turn.splicePhases), and it lands the added phases behind this step either
+    -- way: with the entry already present it splits at index 0 and appends after
+    -- it, and with `remaining` still empty Turn.thisPhase yields an empty prefix
+    -- and appends at the front, which this then goes in front of. Both give the
+    -- second cleanup step and then the added phase, which is CR 500.8's "directly
+    -- after the specified phase" -- the second cleanup step is still part of that
+    -- ending phase. The paths that never reach `advance` discard the schedule
+    -- wholesale regardless: a restart rebuilds the GameState (CR 727.4), and a
+    -- game that has ended never advances again.
+    State.modify' (\gs -> gs {GameState.remaining = Turn.spliceExtraCleanup (GameState.remaining gs)})
+  pure fired
+
 -- Terminates because libraries are finite, each turn draws at most one card, and
 -- drawing from an empty library is a loss (CR 704.5b). That argument rests on the
 -- DRAW step being reached, and a CR 614.1b skip of it (runStep's check above)
@@ -1137,6 +1268,11 @@ runStepThatBegan phase = do
 -- handoffTurn, so a finite number of resolutions buys a finite number of turns.
 -- The card to re-examine this against would be one whose extra turn comes from
 -- an ability that triggers every turn, which the pool does not have.
+--
+-- CR 514.3a's extra CLEANUP steps are the one repetition that does not go through
+-- a draw step at all, so the library argument says nothing about them. They carry
+-- their own termination argument, at `cleanupException`, and it is bounded for
+-- the pool rather than in general (#484).
 playGame :: Game Result
 playGame =
   let loop = do
