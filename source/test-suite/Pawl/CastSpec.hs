@@ -730,14 +730,14 @@ entwineBoard island dreamsGrip piker wallOfStone islands =
       (gs, spellId) = S.handOne dreamsGrip (S.tapObject wallId gs2)
    in (gs, spellId, pikerId, wallId)
 
-tapSlot, untapSlot :: SlotName.SlotName
+tapSlot :: SlotName.SlotName
 tapSlot = SlotName.MkSlotName (Text.pack "tapped")
-untapSlot = SlotName.MkSlotName (Text.pack "untapped")
 
 -- Answers CR 702.42a's entwine question with `decision`, aims mode 0's "tapped"
--- slot at `toTap` and mode 1's "untapped" slot at `toUntap`, and defers
--- everything else to S.identityAnswer -- so the MODE choice on a declined cast
--- is identityAnswer's (the first legal mode, which is the tap one).
+-- slot at `toTap` and every other slot -- which for Dream's Grip is mode 1's
+-- "untapped", its only other one -- at `toUntap`, and defers everything else to
+-- S.identityAnswer, so the MODE choice on a declined cast is identityAnswer's
+-- (the first legal mode, which is the tap one).
 grips ::
   EntwineDecision.EntwineDecision ->
   ObjectId.ObjectId ->
@@ -809,7 +809,7 @@ entwineTests registry =
         wallOfStone <- Registry.printing registry "Wall of Stone"
         let (gs, spellId, pikerId, _) = entwineBoard island dreamsGrip piker wallOfStone 2
             (_, after) = castAndResolve (grips EntwineDecision.Entwines pikerId pikerId) gs spellId
-        HU.assertEqual "printed order ran last, so the Piker ends untapped" (Just TapState.Untapped) (tapStateOf pikerId after),
+        HU.assertEqual "the untap mode ran last, as printed, so the Piker ends untapped" (Just TapState.Untapped) (tapStateOf pikerId after),
       -- CR 601.2b/601.2f-h: the additional cost is a real cost. With one Island
       -- there is {U} and nothing more, so entwining is not on offer at all -- and
       -- the ordinary modal cast still is.
