@@ -40,8 +40,10 @@ data Effect card
   = DealDamage SlotName Quantity
   | -- CR 611: create a continuous effect on the objects the ObjectRef names, for
     -- a duration. Giant Growth and Serpent's Gift are this one opcode, differing
-    -- only in the Modification (layer 7c vs 6). Resolve stores it; it never cases
-    -- on the Modification.
+    -- only in the Modification (layer 7c vs 6). Resolve stores it -- or, when a
+    -- quantity inside it has no answer at resolution (CR 608.2h), stores nothing
+    -- rather than a value it would have to re-read later. Either way Resolve
+    -- never cases on the Modification.
     --
     -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
     -- gives at length: one opcode serving both the chosen permanent (Giant

@@ -174,6 +174,10 @@ slotsOf effect = case effect of
 -- slotsOf draws for target slots. Casing on Effect/Quantity is this module's
 -- charter. NOTE: when an opcode gains a Quantity field, add its arm here -- the
 -- compiler will not force it, since Quantity is compared by ==.
+--
+-- The comparison is by == and so is shallow: an X nested inside a Plus or a
+-- Count is not detected, unlike slotsOf, which recurses through Quantity.slots
+-- (#482).
 readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
