@@ -144,6 +144,7 @@ subtypeMana subtype = case subtype of
   -- it.
   Subtype.Faerie -> Nothing
   Subtype.Rhino -> Nothing
+  Subtype.Wraith -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an

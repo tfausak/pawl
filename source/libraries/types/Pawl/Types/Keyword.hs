@@ -3,6 +3,7 @@ module Pawl.Types.Keyword where
 import Numeric.Natural (Natural)
 import Pawl.Types.Cost (Cost)
 import Pawl.Types.Filter (Filter)
+import Pawl.Types.Subtype (Subtype)
 
 -- CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
@@ -21,8 +22,8 @@ import Pawl.Types.Filter (Filter)
 -- colourless); P10 adds Infect (702.90, a deal-time damage-diversion bit).
 --
 -- Toxic (702.164) is the first PARAMETERIZED constructor, exactly the addition
--- the `data`-not-an-enum choice was made for; Poisonous (702.70) is the second,
--- and Landwalk Subtype (702.14), Protection Quality (702.16) and Ward Cost
+-- the `data`-not-an-enum choice was made for; Poisonous (702.70) is the second
+-- and Landwalk (702.14) the third, and Protection Quality (702.16) and Ward Cost
 -- (702.21) follow the same shape.
 --
 -- A keyword is not necessarily a STATIC ability: rule 702.70 spells poisonous
@@ -42,6 +43,24 @@ data Keyword
   | Flying -- 702.9
   | Haste -- 702.10
   | Indestructible -- 702.12
+  | -- 702.14a: "Landwalk is a generic term that appears within an object's rules
+    -- text as '[type]walk,' where [type] is usually a land type, but it can also
+    -- be the card type land plus any combination of land types, card types,
+    -- and/or supertypes."
+    --
+    -- The land type rides the constructor, as Toxic's N does, so `Landwalk Swamp`
+    -- and `Landwalk Island` are distinct keywords. That is what CR 702.14d
+    -- ("landwalk abilities don't 'cancel' one another") needs them to be: the
+    -- reader looks up the DEFENDING PLAYER'S lands per land type walked, never at
+    -- the blocker -- see Pawl.Engine.Combat.landwalkAllowsGiven.
+    --
+    -- CR 702.14e ("multiple instances of the same kind of landwalk on the same
+    -- creature are redundant") is why that reader takes membership rather than
+    -- the per-keyword count Pawl.Types.ProjectedCharacteristics.keywords carries.
+    --
+    -- Only rule 702.14a's "usually a land type" case is represented. A Subtype
+    -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
+    Landwalk Subtype
   | Reach -- 702.17
   | Trample -- 702.19
   | Vigilance -- 702.20

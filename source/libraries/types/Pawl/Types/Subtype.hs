@@ -98,4 +98,6 @@ data Subtype
     Faerie
   | -- CR 205.3m (a creature type; Stonehorn Dignitary's).
     Rhino
+  | -- CR 205.3m (a creature type; Bog Wraith's).
+    Wraith
   deriving (Eq, Ord, Show)
