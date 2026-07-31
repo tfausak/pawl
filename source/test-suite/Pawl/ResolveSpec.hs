@@ -1072,7 +1072,9 @@ resolveTests registry =
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- Two Goblin tokens exist (count == 2 proves two distinct objects). The
         -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
-        HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
+        -- CR 111.4: Dragon Fodder does not name its tokens, so each is named
+        -- "Goblin Token" -- its subtype plus the word "Token".
+        HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after)
         HU.assertEqual "alice controls two creatures (the tokens)" 2 (S.creaturesInPlay S.alice after)
         HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
         -- The control leg for Hanweir Garrison's "tapped and attacking" riders

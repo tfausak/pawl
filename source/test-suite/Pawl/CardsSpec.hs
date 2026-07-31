@@ -193,7 +193,10 @@ tests registry =
         case [(q, tc) | ab <- CardT.triggeredAbilities c, Effect.Create q tc _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))] of
           [(quantity, token)] -> do
             HU.assertEqual "one token" (Quantity.Literal 1) quantity
-            HU.assertEqual "named Spirit" (Text.pack "Spirit") (CardT.name token)
+            -- CR 111.4: "If the spell or ability doesn't specify the name of
+            -- the token, its name is the same as its subtype(s) plus the word
+            -- 'Token.'" Doomed Traveler specifies no name.
+            HU.assertEqual "named Spirit Token" (Text.pack "Spirit Token") (CardT.name token)
             HU.assertEqual
               "Creature -- Spirit"
               (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Spirit))
@@ -257,7 +260,9 @@ tests registry =
         case [(q, tc) | ab <- CardT.triggeredAbilities c, Effect.Create q tc _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))] of
           [(quantity, token)] -> do
             HU.assertEqual "one token" (Quantity.Literal 1) quantity
-            HU.assertEqual "named Zombie Berserker" (Text.pack "Zombie Berserker") (CardT.name token)
+            -- CR 111.4, the multi-subtype case the rule's own Dwarven
+            -- Reinforcements example spells out: both subtypes, then "Token".
+            HU.assertEqual "named Zombie Berserker Token" (Text.pack "Zombie Berserker Token") (CardT.name token)
             HU.assertEqual
               "Creature -- Zombie Berserker"
               (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Zombie, Subtype.Berserker]))
