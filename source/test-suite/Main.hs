@@ -44,7 +44,7 @@ import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
 import qualified Pawl.PlaneswalkerSpec
-import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
+import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
@@ -89,7 +89,6 @@ testTree registry =
       CombatSpec.tests registry,
       ResolveSpec.tests registry,
       ProjectionSpec.tests registry,
-      PlayerEffectSpec.tests registry,
       ReplacementSpec.tests registry,
       TriggerSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
@@ -136,6 +135,7 @@ spec s registry = do
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
+  Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.RegistrySpec.spec s
   Pawl.ReplaySpec.spec s registry
