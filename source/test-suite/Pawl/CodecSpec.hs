@@ -299,54 +299,54 @@ tests registry =
       Tasty.testGroup
         "effect"
         [ HU.testCase "DealDamage" $
-            roundTrip "e1" Codec.effectToJson Codec.jsonToEffect (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)),
+            roundTrip "e1" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)),
           -- ModifyTarget takes the same untagged ObjectRef Destroy and Untap do,
           -- so both arms have to survive the trip: Giant Growth's slot and
           -- Trumpet Blast's filter-selected set.
           HU.testCase "ModifyTarget round-trips both ObjectRef arms" $ do
-            roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))))
-            roundTrip "e2b" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching Filter.Type.IsAttacking)),
+            roundTrip "e2" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))))
+            roundTrip "e2b" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching Filter.Type.IsAttacking)),
           HU.testCase "AddMana" $
-            roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))),
+            roundTrip "e3" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))),
           HU.testCase "AddMana of any color" $
-            roundTrip "e3b" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana ManaProduction.AnyColor),
+            roundTrip "e3b" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.AddMana ManaProduction.AnyColor),
           HU.testCase "ExileAllGraveyards" $
-            roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
+            roundTrip "e4" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) Effect.ExileAllGraveyards,
           HU.testCase "Proliferate" $
-            roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
+            roundTrip "e4b" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) Effect.Proliferate,
           -- Both shapes in the pool: Aggravated Assault's pair and Full
           -- Throttle's two combat phases with no main phase between them.
           HU.testCase "AddPhases round-trips the pair" $
-            roundTrip "e4c" Codec.effectToJson Codec.jsonToEffect (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraMain]),
+            roundTrip "e4c" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraMain]),
           HU.testCase "AddPhases round-trips a repeated phase" $
-            roundTrip "e4c1" Codec.effectToJson Codec.jsonToEffect (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat]),
+            roundTrip "e4c1" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat]),
           -- Untap takes the same untagged ObjectRef Destroy does, so both arms
           -- have to survive the trip: Act of Treason's slot and Aggravated
           -- Assault's swept set.
           HU.testCase "Untap round-trips both ObjectRef arms" $ do
-            roundTrip "e4d" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-            roundTrip "e4e" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))),
+            roundTrip "e4d" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "e4e" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Untap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))),
           -- GainControl's own two arms: Act of Treason's slot and Aura Thief's
           -- "all enchantments". Its Duration is what tells the two cards apart on
           -- the wire, so both durations ride along.
           HU.testCase "GainControl round-trips both ObjectRef arms" $ do
-            roundTrip "e4f" Codec.effectToJson Codec.jsonToEffect (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-            roundTrip "e4g" Codec.effectToJson Codec.jsonToEffect (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Enchantment))),
+            roundTrip "e4f" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "e4g" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Enchantment))),
           -- CR 701.26a's Tap is Untap's mirror and shares its wire shape, so the
           -- two must not collapse into one tag: Dream's Grip prints both modes
           -- on one card and a decoder that confused them would silently swap
           -- them.
           HU.testCase "Tap round-trips both ObjectRef arms, and is not Untap" $ do
-            roundTrip "e4f" Codec.effectToJson Codec.jsonToEffect (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-            roundTrip "e4g" Codec.effectToJson Codec.jsonToEffect (Effect.Tap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)))
+            roundTrip "e4f" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "e4g" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Tap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)))
             HU.assertBool
               "Tap and Untap of the same slot encode differently"
-              ( Codec.effectToJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-                  /= Codec.effectToJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+              ( Codec.effectToJson Codec.cardToJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+                  /= Codec.effectToJson Codec.cardToJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
               ),
           HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
-            roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing)
-            roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing),
+            roundTrip "e5a" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing)
+            roundTrip "e5b" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing),
           -- An ObjectRef is untagged and told apart by JSON type, so the two arms
           -- have to be pinned together: a string is the slot, an object is the
           -- filter-selected set. A round trip alone would not catch a decoder that
@@ -354,88 +354,88 @@ tests registry =
           HU.testCase "ObjectRef's two arms are told apart by JSON type, not by a tag" $ do
             let slotted = Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing
                 swept = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing
-            roundTrip "e5c" Codec.effectToJson Codec.jsonToEffect swept
+            roundTrip "e5c" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) swept
             HU.assertEqual
               "a slot is still a bare string, so every Destroy card on disk is unchanged"
               (J.jText (Text.pack "target"))
-              (payloadHead (Codec.effectToJson slotted))
+              (payloadHead (Codec.effectToJson Codec.cardToJson slotted))
             HU.assertEqual
               "and a set is the Filter object"
               (Codec.filterToJson (Filter.Type.HasCardType CardType.Creature))
-              (payloadHead (Codec.effectToJson swept)),
+              (payloadHead (Codec.effectToJson Codec.cardToJson swept)),
           -- Bane of Progress' "destroyed this way": the third element is the slot
           -- the sweep binds its count into, and it is ELIDED when absent -- so
           -- every Destroy already on disk keeps its two-element payload.
           HU.testCase "Destroy's bound-count slot round-trips and is elided when absent" $ do
             let counting = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed")))
                 plain = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Artifact)) Regenerability.Regenerable Nothing
-            roundTrip "e5d" Codec.effectToJson Codec.jsonToEffect counting
+            roundTrip "e5d" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) counting
             HU.assertEqual
               "a Destroy that binds nothing writes two elements"
               2
-              (payloadLength (Codec.effectToJson plain))
+              (payloadLength (Codec.effectToJson Codec.cardToJson plain))
             HU.assertEqual
               "and one that binds a count writes three"
               3
-              (payloadLength (Codec.effectToJson counting)),
+              (payloadLength (Codec.effectToJson Codec.cardToJson counting)),
           HU.testCase "ExileHandThenDraw" $
-            roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
+            roundTrip "e-powder" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) Effect.ExileHandThenDraw,
           HU.testCase "PlayerSacrifices" $
-            roundTrip "e6" Codec.effectToJson Codec.jsonToEffect (Effect.PlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.Type.HasCardType CardType.Creature) (Quantity.Literal 1)),
+            roundTrip "e6" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.PlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.Type.HasCardType CardType.Creature) (Quantity.Literal 1)),
           -- CR 701.3: the destination filter travels in the payload, which is what
           -- distinguishes this arm's wire format from Attach's bare slot.
           HU.testCase "AttachTarget" $
-            roundTrip "e-crown" Codec.effectToJson Codec.jsonToEffect (Effect.AttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.Type.HasCardType CardType.Creature)),
+            roundTrip "e-crown" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.AttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.Type.HasCardType CardType.Creature)),
           HU.testCase "Sacrifice round-trips" $
-            roundTrip "e5" Codec.effectToJson Codec.jsonToEffect (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))),
+            roundTrip "e5" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))),
           HU.testCase "PutCounters effect round-trips through the codec" $
             let effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "creature"))
-             in HU.assertEqual "round-trip" (Right effect) (Codec.jsonToEffect (Codec.effectToJson effect)),
+             in HU.assertEqual "round-trip" (Right effect) (Codec.jsonToEffect Codec.jsonToCard (Codec.effectToJson Codec.cardToJson effect)),
           HU.testCase "AffectPlayers round-trips" $
             roundTrip
               "e6"
-              Codec.effectToJson
-              Codec.jsonToEffect
+              (Codec.effectToJson Codec.cardToJson)
+              (Codec.jsonToEffect Codec.jsonToCard)
               (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells),
           -- CR 614.10a: Fatigue's slot read, plus the self-scoped arm Avizoa's
           -- "you skip your next untap step" would write -- and Stonehorn
           -- Dignitary's whole-phase selector, the arm a Phase alone cannot spell
           -- (CR 500.1).
           HU.testCase "SkipNextPhase" $ do
-            roundTrip "skip slot" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep)))
-            roundTrip "skip you" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))
-            roundTrip "skip a whole phase" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase),
+            roundTrip "skip slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep)))
+            roundTrip "skip you" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))
+            roundTrip "skip a whole phase" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase),
           -- CR 500.7: Time Warp's slot read, plus the self-scoped arm a "take an
           -- extra turn after this one" card would write.
           HU.testCase "TakeExtraTurn" $ do
-            roundTrip "extra turn slot" Codec.effectToJson Codec.jsonToEffect (Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-            roundTrip "extra turn you" Codec.effectToJson Codec.jsonToEffect (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You)),
+            roundTrip "extra turn slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "extra turn you" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You)),
           -- Every PlayerRef shape the opcode accepts: the self-scoped one every
           -- card in the pool uses, and the slot read CR 702.70a's "that player"
           -- needs.
           HU.testCase "GainPlayerCounters" $ do
-            roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
-            roundTrip "gpc slot" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) PlayerCounterKind.Poison (Quantity.Literal 3)),
+            roundTrip "gpc" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
+            roundTrip "gpc slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.GainPlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) PlayerCounterKind.Poison (Quantity.Literal 3)),
           -- Both of Draw's proven PlayerRef shapes: Divination's controller draw
           -- and Ancestral Recall's targeted one (#272).
           HU.testCase "Draw" $ do
-            roundTrip "draw" Codec.effectToJson Codec.jsonToEffect (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
-            roundTrip "draw slot" Codec.effectToJson Codec.jsonToEffect (Effect.Draw (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)),
+            roundTrip "draw" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
+            roundTrip "draw slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Draw (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)),
           -- Sign in Blood's targeted loss, and the `Relative You` arm that no
           -- card in the pool uses yet -- the codec accepts every PlayerRef either way.
           HU.testCase "LoseLife" $ do
-            roundTrip "lose slot" Codec.effectToJson Codec.jsonToEffect (Effect.LoseLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
-            roundTrip "lose you" Codec.effectToJson Codec.jsonToEffect (Effect.LoseLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)),
+            roundTrip "lose slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.LoseLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
+            roundTrip "lose you" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.LoseLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)),
           -- Soul Warden's "you gain 1 life", plus the slot arm no card uses
           -- yet -- the same coverage LoseLife above gets, on the sibling opcode.
           HU.testCase "GainLife" $ do
-            roundTrip "gain you" Codec.effectToJson Codec.jsonToEffect (Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
-            roundTrip "gain slot" Codec.effectToJson Codec.jsonToEffect (Effect.GainLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2)),
+            roundTrip "gain you" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
+            roundTrip "gain slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.GainLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2)),
           HU.testCase "CreateEmblem" $ do
             piker <- Registry.printing registry "Goblin Piker"
-            roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card piker)),
+            roundTrip "emblem" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.CreateEmblem (Printing.card piker)),
           HU.testCase "BecomeMonarch" $
-            roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController),
+            roundTrip "e" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.BecomeMonarch MonarchTarget.TheController),
           -- Every constructor, even though the encoder never emits AnyTime (it is
           -- the absent key on a card). Round-tripping the whole family is what
           -- keeps the decoder honest about the forms it accepts -- including that
@@ -449,10 +449,10 @@ tests registry =
             roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat))
             roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming (ActivationTiming.DuringPhase Phase.PostcombatMain),
           HU.testCase "ExileUntilMonarch" $
-            roundTrip "eum" Codec.effectToJson Codec.jsonToEffect (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target"))),
+            roundTrip "eum" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target"))),
           HU.testCase "PlaySubgame round-trips" $
             let e = Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser"))
-             in HU.assertEqual "PlaySubgame round-trips" (Right e) (Codec.jsonToEffect (Codec.effectToJson e))
+             in HU.assertEqual "PlaySubgame round-trips" (Right e) (Codec.jsonToEffect Codec.jsonToCard (Codec.effectToJson Codec.cardToJson e))
         ],
       Tasty.testGroup
         "duration + condition"
@@ -798,8 +798,8 @@ tests registry =
           HU.testCase "Modal round-trips" $
             roundTrip
               "modal"
-              Codec.modalToJson
-              Codec.jsonToModal
+              (Codec.modalToJson Codec.cardToJson)
+              (Codec.jsonToModal Codec.jsonToCard)
               ( Modal.MkModal
                   ( Seq.fromList
                       [ Mode.MkMode
@@ -817,25 +817,25 @@ tests registry =
             roundTrip "optional" Codec.optionalityToJson Codec.jsonToOptionality Optionality.Optional,
           HU.testCase "an Optional mode round-trips, and says so in the JSON" $ do
             let m = Mode.MkMode Seq.empty Map.empty Optionality.Optional
-            roundTrip "optional mode" Codec.modeToJson Codec.jsonToMode m
+            roundTrip "optional mode" (Codec.modeToJson Codec.cardToJson) (Codec.jsonToMode Codec.jsonToCard) m
             HU.assertEqual
               "the optionality key is present"
               (Just (Codec.optionalityToJson Optionality.Optional))
-              (optionalityKey (Codec.modeToJson m)),
+              (optionalityKey (Codec.modeToJson Codec.cardToJson m)),
           -- The byte-identity guarantee for every card file that prints no
           -- "may": a Mandatory mode emits no key, and a mode with no key decodes
           -- back to Mandatory. The counterability precedent.
           HU.testCase "a Mandatory mode omits the key, and an omitted key decodes to Mandatory" $ do
             let m = Mode.MkMode Seq.empty Map.empty Optionality.Mandatory
-            HU.assertEqual "no optionality key" Nothing (optionalityKey (Codec.modeToJson m))
-            HU.assertEqual "decodes to Mandatory" (Right m) (Codec.jsonToMode (Codec.modeToJson m)),
+            HU.assertEqual "no optionality key" Nothing (optionalityKey (Codec.modeToJson Codec.cardToJson m))
+            HU.assertEqual "decodes to Mandatory" (Right m) (Codec.jsonToMode Codec.jsonToCard (Codec.modeToJson Codec.cardToJson m)),
           HU.testCase "empty modal is a decode error" $
             HU.assertBool
               "left"
               ( either
                   (const True)
                   (const False)
-                  (Codec.jsonToModal (J.jObject [(Text.pack "modes", J.jArray []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
+                  (Codec.jsonToModal Codec.jsonToCard (J.jObject [(Text.pack "modes", J.jArray []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
               )
         ],
       Tasty.testGroup
@@ -977,16 +977,16 @@ tests registry =
                 attacking = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Tapped, TokenEntry.attacking = True}
                 plain = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Untapped, TokenEntry.attacking = False}
                 slot = SlotName.MkSlotName (Text.pack "token")
-            roundTrip "plain" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 2) card plain Nothing)
-            roundTrip "plain+slot" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 1) card plain (Just slot))
-            roundTrip "entry" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 2) card attacking Nothing)
-            roundTrip "entry+slot" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
+            roundTrip "plain" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Create (Quantity.Literal 2) card plain Nothing)
+            roundTrip "plain+slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Create (Quantity.Literal 1) card plain (Just slot))
+            roundTrip "entry" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Create (Quantity.Literal 2) card attacking Nothing)
+            roundTrip "entry+slot" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
             -- The elision itself: a default entry adds nothing to the payload,
             -- which is what keeps every token-making card file written before
             -- this one byte-identical.
             HU.assertEqual
               "a default TokenEntry is not written"
-              (Codec.effectToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
+              (Codec.effectToJson Codec.cardToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
               (J.tagged (Text.pack "Create") (Just (J.jArray [Codec.quantityToJson (Quantity.Literal 2), Codec.cardToJson card]))),
           -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
           -- pair rather than the battlefield.
@@ -1026,11 +1026,11 @@ tests registry =
           HU.testCase "AbilityName round-trips" $
             roundTrip "name" Codec.abilityNameToJson Codec.jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it")),
           HU.testCase "ArmDelayedTrigger round-trips" $
-            roundTrip "arm" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it")) Nothing),
+            roundTrip "arm" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it")) Nothing),
           -- CR 603.7b's stated duration takes the two-element form; the absent
           -- one above must keep the bare shape, so both have to survive.
           HU.testCase "ArmDelayedTrigger round-trips a stated duration" $
-            roundTrip "arm1" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "each combat")) (Just Duration.UntilEndOfTurn)),
+            roundTrip "arm1" (Codec.effectToJson Codec.cardToJson) (Codec.jsonToEffect Codec.jsonToCard) (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "each combat")) (Just Duration.UntilEndOfTurn)),
           -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
           -- only a Binding's `target` field via Binding.toObject. The codec is
           -- meant to be total over every Binding field -- subtypes, amount, modes,
@@ -1077,15 +1077,15 @@ tests registry =
                       TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
                       TriggeredAbility.intervening = Just noZombiesOnBattlefield
                     }
-             in roundTrip "ta" Codec.triggeredAbilityToJson Codec.jsonToTriggeredAbility ability
+             in roundTrip "ta" (Codec.triggeredAbilityToJson Codec.cardToJson) (Codec.jsonToTriggeredAbility Codec.jsonToCard) ability
         ],
       Tasty.testGroup
         "count + condition (M5.5 T2)"
         [ HU.testCase "Count round-trips" $
             roundTrip
               "count"
-              Codec.countToJson
-              Codec.jsonToCount
+              (Codec.countToJson Codec.quantityToJson)
+              (Codec.jsonToCount Codec.jsonToQuantity)
               ( Count.Type.MkCount
                   (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
                   (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
@@ -1094,8 +1094,8 @@ tests registry =
           HU.testCase "Count over the event history round-trips" $
             roundTrip
               "history"
-              Codec.countToJson
-              Codec.jsonToCount
+              (Codec.countToJson Codec.quantityToJson)
+              (Codec.jsonToCount Codec.jsonToQuantity)
               ( Count.Type.MkCount
                   (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
                   (Filter.Type.HasCardType CardType.Creature)
@@ -1104,8 +1104,8 @@ tests registry =
           HU.testCase "Count scoped to a slot round-trips" $
             roundTrip
               "slot"
-              Codec.countToJson
-              Codec.jsonToCount
+              (Codec.countToJson Codec.quantityToJson)
+              (Codec.jsonToCount Codec.jsonToQuantity)
               ( Count.Type.MkCount
                   (Scope.InZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
                   (Filter.Type.And [])
@@ -1130,8 +1130,8 @@ tests registry =
           HU.testCase "Greatest round-trips, including a nested Count payload" $ do
             roundTrip
               "greatest"
-              Codec.countToJson
-              Codec.jsonToCount
+              (Codec.countToJson Codec.quantityToJson)
+              (Codec.jsonToCount Codec.jsonToQuantity)
               ( Count.Type.MkCount
                   (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
                   (Filter.Type.And [Filter.Type.HasCardType CardType.Artifact, Filter.Type.ControlledBy PlayerRelation.You])
@@ -1139,8 +1139,8 @@ tests registry =
               )
             roundTrip
               "greatest nested"
-              Codec.countToJson
-              Codec.jsonToCount
+              (Codec.countToJson Codec.quantityToJson)
+              (Codec.jsonToCount Codec.jsonToQuantity)
               ( Count.Type.MkCount
                   (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
                   (Filter.Type.And [])
@@ -1165,8 +1165,26 @@ tests registry =
                 -- greater" (CR 603.4).
                 Condition.Type.MkCondition Quantity.Power Comparison.AtLeast (Quantity.Literal 3)
               ]
+        ],
+      -- Pawl.Types.Effect is parametric in `card` so that Pawl.Types stays an
+      -- acyclic module graph, and the codec mirrors that: the encoder reaches
+      -- its card payload ONLY through the codec it is handed. Proving it at two
+      -- different `card` types is what lets Pawl.Codec.Effect sit below
+      -- Pawl.Codec.Card rather than in a cycle with it (#481).
+      Tasty.testGroup
+        "parametricity"
+        [ HU.testCase "effectToJson reaches card only through the supplied codec" $
+            HU.assertEqual
+              "the emblem payload comes from the argument, not the card"
+              (Codec.effectToJson (const sentinel) (Effect.CreateEmblem ()))
+              (Codec.effectToJson (const sentinel) (Effect.CreateEmblem "a wholly different card type"))
         ]
     ]
+
+-- The stand-in a parametricity test hands over in place of a real card codec:
+-- any Value at all, so long as both instantiations are given the same one.
+sentinel :: Value.Value
+sentinel = J.jText (Text.pack "SENTINEL")
 
 -- A count with every axis non-default, so a codec that drops one is caught.
 zeroSwamps :: Count.Type.Count Quantity.Quantity
