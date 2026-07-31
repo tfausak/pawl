@@ -46,6 +46,9 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Expiry as Expiry
+import Pawl.Types.ExtraTurn (ExtraTurn)
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
@@ -930,6 +933,56 @@ beginsPhase :: PhaseSelector -> PlayerId -> Game Bool
 beginsPhase selector pid = do
   outcome <- applyReplacements (ProposedEvent.WouldBeginPhase selector pid)
   pure (Maybe.isJust (outcome >>= asPhaseBegin))
+
+-- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
+-- skips become floating replacement effects, one per selector. Called by
+-- Engine.takeNextTurn at the moment the turn actually begins, and only for a turn
+-- that does begin (CR 800.4k).
+--
+-- Here rather than in Pawl.Engine.Resolve, which installs Effect.SkipNextPhase's
+-- rows: what those two opcodes differ on is WHEN the row exists, and this module
+-- is the one that reads GameState.replacements. The row itself is the same shape
+-- Resolve builds -- PhaseR, scoped to the taker, Uses.Once -- so `beginsPhase`
+-- above answers a turn-scoped skip and a "next occurrence" skip through one
+-- mechanism, and CR 616.1's loop orders them against each other for free.
+--
+-- Installed AT THE TURN'S START rather than at the resolution that created the
+-- turn, which is the whole point: CR 614.10a's "next" would name whatever step
+-- came first in the meantime, and CR 500.7's "the most recently created turn will
+-- be taken first" lets that be a different turn entirely.
+--
+-- CR 614.10: "once a step, phase, or turn has started, it can no longer be
+-- skipped". Nothing of this turn has started yet -- Engine.beginTurnOf has only
+-- scheduled it, and Engine.runStep asks `beginsPhase` before the untap step's
+-- first observable moment.
+--
+-- Expiry.AtCleanup, not Never: the skip names THIS turn, so whatever of it is
+-- unspent ends with the turn (CR 514.2's sweep, Pawl.Engine.Expiry.dropAtCleanup)
+-- rather than lying in wait for a later one. Uses.Once is CR 614.10a's per-
+-- occurrence spend, and for the one card in the pool the two never disagree: the
+-- untap step is the first step of the turn the skip belongs to.
+installTurnSkips :: ExtraTurn -> GameState -> GameState
+installTurnSkips entry gs =
+  let install g selector =
+        let (ts, g1) = Game.freshTimestamp g
+            active =
+              ActiveReplacement.MkActiveReplacement
+                { ActiveReplacement.effect =
+                    ReplacementEffect.PhaseR
+                      PhasePattern.MkPhasePattern
+                        { PhasePattern.whichPhase = selector,
+                          -- The turn's taker, which for a step or phase OF that
+                          -- turn is also whose step it is (see PhasePattern).
+                          PhasePattern.whosePhase = Just (ExtraTurn.taker entry)
+                        },
+                  -- CR 113.7: the source of the effect that created the turn.
+                  ActiveReplacement.source = ExtraTurn.source entry,
+                  ActiveReplacement.timestamp = ts,
+                  ActiveReplacement.expiry = Expiry.AtCleanup,
+                  ActiveReplacement.uses = Uses.Once
+                }
+         in g1 {GameState.replacements = active : GameState.replacements g1}
+   in List.foldl' install gs (Set.toAscList (ExtraTurn.skipped entry))
 
 asPhaseBegin :: ProposedEvent -> Maybe (PhaseSelector, PlayerId)
 asPhaseBegin event = case event of

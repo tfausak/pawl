@@ -35,10 +35,13 @@
         "effects": [
           {
             "type": "TakeExtraTurn",
-            "value": {
-              "type": "InSlot",
-              "value": "target"
-            }
+            "value": [
+              {
+                "type": "InSlot",
+                "value": "target"
+              },
+              []
+            ]
           }
         ],
         "targetSpecs": [

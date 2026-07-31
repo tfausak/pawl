@@ -35,15 +35,6 @@
         "effects": [
           {
             "type": "TakeExtraTurn",
-            "value": {
-              "type": "Relative",
-              "value": {
-                "type": "You"
-              }
-            }
-          },
-          {
-            "type": "SkipNextPhase",
             "value": [
               {
                 "type": "Relative",
@@ -51,15 +42,17 @@
                   "type": "You"
                 }
               },
-              {
-                "type": "Step",
-                "value": {
-                  "type": "Beginning",
+              [
+                {
+                  "type": "Step",
                   "value": {
-                    "type": "Untap"
+                    "type": "Beginning",
+                    "value": {
+                      "type": "Untap"
+                    }
                   }
                 }
-              }
+              ]
             ]
           }
         ],

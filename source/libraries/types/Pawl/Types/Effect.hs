@@ -1,5 +1,6 @@
 module Pawl.Types.Effect where
 
+import Data.Set (Set)
 import Pawl.Types.AbilityName (AbilityName)
 import Pawl.Types.CounterKind (CounterKind)
 import Pawl.Types.Duration (Duration)
@@ -533,5 +534,19 @@ data Effect card
     -- turns go and in what order they are taken is Engine.handoffTurn's
     -- question, which reads GameState.extraTurns as the stack CR 500.7's last
     -- sentence describes.
-    TakeExtraTurn PlayerRef
+    --
+    -- CR 500.11 / 614.1b: the PhaseSelectors are the steps and phases the
+    -- created turn SKIPS -- Savor the Moment's "skip the untap step of that
+    -- turn" is `TakeExtraTurn (Relative You) {Step (Beginning Untap)}`. Empty
+    -- for Time Warp.
+    --
+    -- One opcode carrying a payload, rather than the card's two sentences
+    -- becoming two opcodes, because "that turn" has to name the turn this same
+    -- resolution just created. A separate skip opcode would need a reference to
+    -- it, and CR 500.7's "the most recently created turn will be taken first"
+    -- means the obvious spelling of that reference -- SkipNextPhase's CR 614.10a
+    -- "next" -- names a DIFFERENT turn as soon as another extra-turn effect
+    -- resolves afterwards. Carried on the turn, the scoping cannot be got wrong:
+    -- the skips go wherever CR 500.7's stack puts the turn.
+    TakeExtraTurn PlayerRef (Set PhaseSelector)
   deriving (Eq, Ord, Show)

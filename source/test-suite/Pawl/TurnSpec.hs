@@ -17,6 +17,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -37,6 +38,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -782,6 +784,12 @@ warpBoard island warp piker n =
         held
       )
 
+-- The seats the pending extra turns will be dealt out to, most recently created
+-- first -- GameState.extraTurns with each entry's own skips (which only Savor the
+-- Moment writes) set aside.
+takersOf :: GameState.GameState -> [PlayerId.PlayerId]
+takersOf = fmap ExtraTurn.taker . GameState.extraTurns
+
 -- The seats the next `n` turns are dealt out to, in order, by running each turn
 -- to its handoff. The one observable CR 500.7 is about.
 turnTakers :: Int -> GameState.GameState -> [PlayerId.PlayerId]
@@ -814,14 +822,14 @@ extraTurnTests registry =
             case held of
               [spell] -> do
                 let resolved = castAndResolveWith (aimPlayer S.alice) spell gs
-                HU.assertEqual "one turn was created" [S.alice] (GameState.extraTurns resolved)
+                HU.assertEqual "one turn was created" [S.alice] (takersOf resolved)
                 -- CR 500.7: "directly after the specified turn" -- alice takes
                 -- it immediately, and it is a TURN, not a continuation of this
                 -- one, so the turn number moves.
                 let (next, _) = runTurn S.identityAnswer resolved
                 HU.assertEqual "alice takes it rather than bob" S.alice (GameState.activePlayer next)
                 HU.assertEqual "and it is a turn of its own" 2 (GameState.turnNumber next)
-                HU.assertEqual "the pending stack is spent" [] (GameState.extraTurns next)
+                HU.assertEqual "the pending stack is spent" [] (takersOf next)
                 -- CR 500.7 ADDS a turn; it does not reorder the rest. Once the
                 -- extra turn is taken the seating order picks up where it was.
                 HU.assertEqual "then the ordinary order resumes" [S.bob, S.alice] (turnTakers 2 next)
@@ -836,7 +844,7 @@ extraTurnTests registry =
             case held of
               [spell] -> do
                 let resolved = castAndResolveWith (aimPlayer S.bob) spell gs
-                HU.assertEqual "bob's turn was created" [S.bob] (GameState.extraTurns resolved)
+                HU.assertEqual "bob's turn was created" [S.bob] (takersOf resolved)
                 HU.assertEqual
                   "bob's extra turn, then bob's own, and only then alice's"
                   [S.bob, S.bob, S.alice]
@@ -860,7 +868,7 @@ extraTurnTests registry =
                 let resolved =
                       castAndResolveWith (aimPlayer S.alice) second $
                         castAndResolveWith (aimPlayer S.bob) first_ gs
-                HU.assertEqual "pending, most recent at the head" [S.alice, S.bob] (GameState.extraTurns resolved)
+                HU.assertEqual "pending, most recent at the head" [S.alice, S.bob] (takersOf resolved)
                 HU.assertEqual
                   "alice's extra turn, then bob's, then bob's ordinary one"
                   [S.alice, S.bob, S.bob, S.alice]
@@ -884,8 +892,8 @@ extraTurnTests registry =
                   S.runPure
                     S.identityAnswer
                     gs
-                    (Resolve.applyEffect source S.bob Map.empty Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer))
-            HU.assertEqual "added in APNAP order, so taken in reverse" [S.alice, S.bob] (GameState.extraTurns after)
+                    (Resolve.applyEffect source S.bob Map.empty Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer Set.empty))
+            HU.assertEqual "added in APNAP order, so taken in reverse" [S.alice, S.bob] (takersOf after)
         ]
 
 -- alice in her precombat main phase with priority, eight untapped Islands

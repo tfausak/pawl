@@ -10,6 +10,7 @@ import Pawl.Types.Combat (Combat)
 import Pawl.Types.ContinuousEffect (ContinuousEffect)
 import Pawl.Types.Decider (Decider)
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
+import Pawl.Types.ExtraTurn (ExtraTurn)
 import Pawl.Types.GameEvent (GameEvent)
 import Pawl.Types.LastKnown (LastKnown)
 import Pawl.Types.Mana (Mana)
@@ -179,8 +180,11 @@ data GameState = MkGameState
     --
     -- One entry per turn, so two effects giving one player an extra turn each
     -- are two entries: CR 500.7's "the extra turns are added one at a time" is
-    -- what makes them countable rather than a set of players.
-    extraTurns :: [PlayerId],
+    -- what makes them countable rather than a set of players. Each entry also
+    -- carries the steps and phases THAT turn skips (Pawl.Types.ExtraTurn), which
+    -- is how CR 500.11's "skip the untap step of that turn" names a turn without
+    -- a reference that could dangle.
+    extraTurns :: [ExtraTurn],
     -- CR 500.7 / 103.1: while an EXTRA turn is under way, the seat the ordinary
     -- turn order resumes from -- the active player of the most recent turn that
     -- was not an extra one. Nothing on an ordinary turn, where that seat IS

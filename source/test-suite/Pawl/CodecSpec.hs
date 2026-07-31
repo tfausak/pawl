@@ -455,11 +455,24 @@ tests registry =
             roundTrip "skip slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep)))
             roundTrip "skip you" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))
             roundTrip "skip a whole phase" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase),
-          -- CR 500.7: Time Warp's slot read, plus the self-scoped arm a "take an
-          -- extra turn after this one" card would write.
+          -- CR 500.7: Time Warp's slot read, whose skip set is empty, plus Savor
+          -- the Moment's self-scoped arm carrying CR 500.11's skip of one step of
+          -- the turn it creates. The many-selector case has no producer -- no
+          -- printed card skips two windows of the turn it makes -- but the field
+          -- is a Set, so the wire format has to survive more than one.
           HU.testCase "TakeExtraTurn" $ do
-            roundTrip "extra turn slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-            roundTrip "extra turn you" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You)),
+            roundTrip "extra turn slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Set.empty)
+            roundTrip "extra turn you" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You) Set.empty)
+            roundTrip
+              "extra turn skipping its own untap step"
+              (effectToJson cardToJson)
+              (jsonToEffect jsonToCard)
+              (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You) (Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap))))
+            roundTrip
+              "extra turn skipping a step and a whole phase"
+              (effectToJson cardToJson)
+              (jsonToEffect jsonToCard)
+              (Effect.TakeExtraTurn PlayerRef.EachPlayer (Set.fromList [PhaseSelector.Step (Phase.Beginning BeginningStep.Untap), PhaseSelector.CombatPhase])),
           -- Every PlayerRef shape the opcode accepts: the self-scoped one every
           -- card in the pool uses, and the slot read CR 702.70a's "that player"
           -- needs.

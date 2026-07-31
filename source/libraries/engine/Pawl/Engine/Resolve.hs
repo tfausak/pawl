@@ -43,6 +43,7 @@ import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -167,7 +168,7 @@ slotsOf effect = case effect of
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Set.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
-  Effect.TakeExtraTurn ref -> playerRefSlots ref
+  Effect.TakeExtraTurn ref _ -> playerRefSlots ref
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -222,7 +223,7 @@ readsX = any effectReadsX
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
-      Effect.TakeExtraTurn _ -> False
+      Effect.TakeExtraTurn {} -> False
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
 -- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
@@ -273,7 +274,7 @@ manaProduced effect = case effect of
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
-  Effect.TakeExtraTurn _ -> Nothing
+  Effect.TakeExtraTurn {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -318,7 +319,7 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
-  Effect.TakeExtraTurn _ -> False
+  Effect.TakeExtraTurn {} -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -439,7 +440,7 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
   -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
-  Effect.TakeExtraTurn _ -> effect
+  Effect.TakeExtraTurn {} -> effect
 
 -- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
 -- an unchosen mode's effects never resolve), with every text-change affecting it
@@ -1959,7 +1960,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                       { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
                         GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
                       }
-  Effect.TakeExtraTurn ref -> do
+  Effect.TakeExtraTurn ref skips -> do
     gs <- State.get
     let named = playerRefPlayers chosen legality controller gs ref
         -- CR 500.7: "If multiple players are given extra turns, the extra turns
@@ -1982,7 +1983,14 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     -- -- a stack, not a queue. A second TakeExtraTurn resolving later in the
     -- same turn lands in front of this one's entries for the same reason, which
     -- is the half of the rule that two Time Warps exercise.
-    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (flip (:)) (GameState.extraTurns g) takers})
+    --
+    -- CR 500.11 / 113.7: the skips ride ALONG on each entry, naming that turn
+    -- and no other, with this effect's source as theirs. Nothing is installed
+    -- now -- Engine.takeNextTurn does that as the turn it belongs to actually
+    -- begins (see Pawl.Types.ExtraTurn for why the skip travels with the turn
+    -- rather than being a "next occurrence" replacement installed here).
+    let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
+    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).

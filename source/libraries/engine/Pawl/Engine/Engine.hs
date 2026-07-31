@@ -47,6 +47,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -879,12 +880,19 @@ turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnc
 takeNextTurn :: GameState -> GameState
 takeNextTurn gs = case GameState.extraTurns gs of
   [] -> walkToNextTurn (length (GameState.turnOrder gs)) (turnAnchorOf gs) gs
-  pid : rest ->
-    let anchor = turnAnchorOf gs
+  entry : rest ->
+    let pid = ExtraTurn.taker entry
+        anchor = turnAnchorOf gs
         swept = Expiry.dropAtTurnOf pid gs {GameState.extraTurns = rest}
         anchored = swept {GameState.turnAnchor = Just anchor}
      in if List.elem pid (Game.stillPlaying swept)
-          then beginTurnOf pid anchored
+          then -- CR 500.11: this turn's OWN skips (Savor the Moment's "skip the
+          -- untap step of that turn") come into being as it begins, and only for
+          -- a turn that begins -- a departed player's entry below is spent
+          -- without one. Nothing has started yet, so CR 614.10's "once a step,
+          -- phase, or turn has started, it can no longer be skipped" is not yet
+          -- in the way.
+            Replacement.installTurnSkips entry (beginTurnOf pid anchored)
           else takeNextTurn swept
 
 -- One seat at a time, bounded by the number of seats, so it terminates even when
@@ -1268,6 +1276,13 @@ cleanupException = do
 -- handoffTurn, so a finite number of resolutions buys a finite number of turns.
 -- The card to re-examine this against would be one whose extra turn comes from
 -- an ability that triggers every turn, which the pool does not have.
+--
+-- A turn-scoped skip (Pawl.Types.ExtraTurn's `skipped`, Savor the Moment) leaves
+-- it intact too, on both counts. It cannot suspend the draw the way Fatigue's can
+-- unless a card names the DRAW step, and none does -- Savor the Moment names the
+-- untap step, which the bound never mentioned. And it cannot outlive the turn it
+-- rode in on: installTurnSkips arms each row Uses.Once and Expiry.AtCleanup, so
+-- CR 514.2's sweep ends whatever the turn did not spend.
 --
 -- CR 514.3a's extra CLEANUP steps are the one repetition that does not go through
 -- a draw step at all, so the library argument says nothing about them. They carry
