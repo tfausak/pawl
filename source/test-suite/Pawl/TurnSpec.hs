@@ -1002,7 +1002,8 @@ turnScopedSkipTests registry =
                 atWarpTurn = runTurns 1 resolved
                 -- Time Warp's turn has now run, and Savor's is the one about to
                 -- begin. Re-tapped so Savor's turn has something to untap, as
-                -- attacking with it would have left it (CR 506.4/508.1f).
+                -- attacking with it would have left it (CR 508.1f: "the active
+                -- player taps the chosen creatures").
                 atSavorTurn = S.tapObject piker (runTurns 1 atWarpTurn)
                 afterSavorTurn = runTurns 1 atSavorTurn
             HU.assertEqual "two extra turns are pending" 2 (length (GameState.extraTurns resolved))

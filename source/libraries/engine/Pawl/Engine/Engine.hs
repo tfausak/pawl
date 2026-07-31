@@ -887,9 +887,10 @@ takeNextTurn gs = case GameState.extraTurns gs of
         anchored = swept {GameState.turnAnchor = Just anchor}
      in if List.elem pid (Game.stillPlaying swept)
           then -- CR 500.11: this turn's OWN skips (Savor the Moment's "skip the
-          -- untap step of that turn") come into being as it begins, and only for
-          -- a turn that begins -- a departed player's entry below is spent
-          -- without one. Nothing has started yet, so CR 614.10's "once a step,
+          -- untap step of that turn") come into being as it begins, and only on
+          -- this branch -- the CR 800.4k entry the `else` spends belongs to a
+          -- turn that never begins, so there is nothing for a skip of it to do.
+          -- Nothing of this turn has started yet, so CR 614.10's "once a step,
           -- phase, or turn has started, it can no longer be skipped" is not yet
           -- in the way.
             Replacement.installTurnSkips entry (beginTurnOf pid anchored)

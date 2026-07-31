@@ -509,6 +509,10 @@ bucketOf re = case re of
 -- silently choosing between two applications that produce different boards --
 -- deciding for a player who was never asked, the second invariant's violation.
 --
+-- Not implemented: the comparison reads `effect` alone, so two floating rows
+-- alike in it but differing in `expiry` or `uses` are treated as
+-- indistinguishable even though `consume` spends only the one that applied (#490).
+--
 -- Anything else prompts. The pure fold has silently picked list order since M3f;
 -- that is the second-invariant violation this phase exists to retire, and unlike
 -- an elision it carried no expiry because nothing detected it.
@@ -956,11 +960,14 @@ beginsPhase selector pid = do
 -- scheduled it, and Engine.runStep asks `beginsPhase` before the untap step's
 -- first observable moment.
 --
--- Expiry.AtCleanup, not Never: the skip names THIS turn, so whatever of it is
--- unspent ends with the turn (CR 514.2's sweep, Pawl.Engine.Expiry.dropAtCleanup)
--- rather than lying in wait for a later one. Uses.Once is CR 614.10a's per-
--- occurrence spend, and for the one card in the pool the two never disagree: the
--- untap step is the first step of the turn the skip belongs to.
+-- Expiry.AtCleanup, not Never. CR 514.2's "until end of turn" is not the reason:
+-- the card states no duration. The reason is that the skip names ONE turn and
+-- cannot apply to another, so the last moment of that turn is the last moment it
+-- could matter, and AtCleanup is the store for exactly that
+-- (Pawl.Engine.Expiry.dropAtCleanup) -- an unspent row cannot lie in wait for a
+-- later turn. Uses.Once is CR 614.10a's per-occurrence spend, and for the one
+-- card in the pool the two never disagree: the untap step is the first step of
+-- the turn the skip belongs to, so it is spent long before the sweep.
 installTurnSkips :: ExtraTurn -> GameState -> GameState
 installTurnSkips entry gs =
   let install g selector =

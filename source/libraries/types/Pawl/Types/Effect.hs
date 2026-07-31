@@ -537,8 +537,8 @@ data Effect card
     --
     -- CR 500.11 / 614.1b: the PhaseSelectors are the steps and phases the
     -- created turn SKIPS -- Savor the Moment's "skip the untap step of that
-    -- turn" is `TakeExtraTurn (Relative You) {Step (Beginning Untap)}`. Empty
-    -- for Time Warp.
+    -- turn" pairs `Relative You` with the singleton `Step (Beginning Untap)`.
+    -- Empty for Time Warp, which skips nothing.
     --
     -- One opcode carrying a payload, rather than the card's two sentences
     -- becoming two opcodes, because "that turn" has to name the turn this same
