@@ -75,6 +75,25 @@ giantGrowthOnPiker forest piker giantGrowth =
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (pikerId, resolved)
 
+-- Chooses X = 4; every other prompt takes the identity fallback, which targets
+-- the only creature on the board. The liar pattern CastSpec's answerX3 uses.
+answerX4 :: Prompt.Prompt r -> r
+answerX4 p = case p of
+  Prompt.ChooseX {} -> 4
+  _ -> S.identityAnswer p
+
+-- alice has five Forests, a Goblin Piker on the battlefield, and Untamed Might
+-- ({X}{G}, "target creature gets +X/+X until end of turn") in hand. Cast it at
+-- the Piker for X = 4 -- five Forests is exactly {4}{G} -- and resolve it.
+untamedMightOnPiker :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+untamedMightOnPiker forest piker untamedMight =
+  let base = S.landsInPlay forest 5
+      (pikerId, withPiker) = S.addCreature piker S.alice base
+      (gs, umId) = S.handOne untamedMight withPiker
+      cast = snd (Engine.runGamePure answerX4 gs (Cast.castSpell S.alice umId))
+      resolved = snd (Engine.runGamePure answerX4 cast Stack.resolveTop)
+   in (pikerId, resolved)
+
 -- Append a stored continuous effect over a dynamic set, at timestamp `ts`.
 withDynamicEffect :: Affected.Affected -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
 withDynamicEffect aff ts m gs =
@@ -282,6 +301,60 @@ tests registry =
         HU.assertEqual "one stored effect" 1 (length (GameState.continuousEffects gs))
         HU.assertEqual "power" (Just 5) (Projection.powerOf pikerId gs)
         HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId gs),
+      -- The freeze's proving card. CR 608.2h: "the answer is determined only
+      -- once, when the effect is applied", and CR 611.2d says the same of a
+      -- variable such as X. X is bound on the SPELL, which by the time these
+      -- assertions run is in its owner's graveyard: CR 608.2n puts it there "as
+      -- the final part of an instant or sorcery spell's resolution". A stored
+      -- `Quantity.X` would be re-read against the PIKER all the same --
+      -- applyModification evaluates against the AFFECTED object wherever the
+      -- source sits -- and the Piker carries no such binding, so the delta is
+      -- unevaluable and addPT drops it, leaving the printed 2/1. Frozen, the pump
+      -- is a pair of Literals and survives for the rest of the turn.
+      HU.testCase "CR 608.2h/611.2d Untamed Might's X is frozen at resolution, not re-read" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        untamedMight <- Registry.printing registry "Untamed Might"
+        let (pikerId, gs) = untamedMightOnPiker forest piker untamedMight
+        HU.assertEqual "the spell has left the stack" [] (GameState.stack gs)
+        HU.assertEqual "power 2 + 4" (Just 6) (Projection.powerOf pikerId gs)
+        HU.assertEqual "toughness 1 + 4" (Just 5) (Projection.toughnessOf pikerId gs)
+        -- What was stored, not just what it projects to: the X is gone, replaced
+        -- by the value chosen when the effect was applied.
+        HU.assertEqual
+          "the stored modification is a pair of Literals"
+          [Modification.ModifyPowerToughness (Quantity.Literal 4) (Quantity.Literal 4)]
+          (fmap ContinuousEffect.modification (GameState.continuousEffects gs))
+        -- And it stays frozen across later passes: a state-based-action pass
+        -- reprojects everything, and CR 514.2 is what finally ends it.
+        let afterSba = S.settleSba gs
+        HU.assertEqual "still 6/5 after an SBA pass" (Just 6, Just 5) (Projection.powerOf pikerId afterSba, Projection.toughnessOf pikerId afterSba)
+        let afterCleanup = snd (Engine.runGamePure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
+        HU.assertEqual "CR 514.2 back to 2/1 at cleanup" (Just 2, Just 1) (Projection.powerOf pikerId afterCleanup, Projection.toughnessOf pikerId afterCleanup),
+      -- The freeze's own contract, read off the function rather than the board.
+      -- CR 608.2h gives the effect ONE moment to determine its answer, so a
+      -- quantity with no answer at that moment has none to defer to: the whole
+      -- modification is refused, and Resolve stores nothing (ResolveSpec's "a
+      -- modification that cannot be frozen is not stored at all").
+      HU.testCase "CR 608.2h freezeQuantities locks an answerable quantity and refuses an unanswerable one" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (pikerId, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            freeze = Projection.freezeQuantities gs pikerId (Just S.alice)
+        HU.assertEqual
+          "read against the SOURCE, the Piker's power locks in at 2"
+          (Just (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 2)))
+          (freeze (Modification.ModifyPowerToughness Quantity.Power Quantity.Power))
+        -- CR 208.2: a bare star has no value of its own -- the projection
+        -- substitutes the object's characteristic-defining quantity for it at the
+        -- seed, so one reaching here was never resolved and has no answer.
+        HU.assertEqual
+          "one unanswerable half refuses the whole modification"
+          Nothing
+          (freeze (Modification.ModifyPowerToughness (Quantity.Literal 3) Quantity.Star))
+        HU.assertEqual
+          "a modification carrying no quantity always freezes"
+          (Just (Modification.GainKeyword Keyword.Flying))
+          (freeze (Modification.GainKeyword Keyword.Flying)),
       HU.testCase "CR 601.2c Giant Growth is uncastable with no creature to target" $ do
         forest <- Registry.printing registry "Forest"
         giantGrowth <- Registry.printing registry "Giant Growth"

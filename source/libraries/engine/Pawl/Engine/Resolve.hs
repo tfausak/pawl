@@ -116,7 +116,12 @@ objectRefSlots ref = case ref of
 slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
   Effect.DealDamage slot quantity -> Set.insert slot (Quantity.slots quantity)
-  Effect.ModifyTarget _ _ ref -> objectRefSlots ref
+  -- The modification's own quantities read slots too (Projection.quantitiesOf
+  -- reaches inside it, since casing on a Modification is Projection's charter);
+  -- no card in the pool reads a slot there, but a dangling one would otherwise
+  -- slip past the lint entirely.
+  Effect.ModifyTarget _ modification ref ->
+    Set.union (objectRefSlots ref) (foldMap Quantity.slots (Projection.quantitiesOf modification))
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
   Effect.Search _ _ -> Set.empty
@@ -169,12 +174,18 @@ slotsOf effect = case effect of
 -- slotsOf draws for target slots. Casing on Effect/Quantity is this module's
 -- charter. NOTE: when an opcode gains a Quantity field, add its arm here -- the
 -- compiler will not force it, since Quantity is compared by ==.
+--
+-- The comparison is by == and so is shallow: an X nested inside a Plus or a
+-- Count is not detected, unlike slotsOf, which recurses through Quantity.slots
+-- (#482).
 readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
       Effect.DealDamage _ quantity -> quantity == Quantity.Type.X
-      Effect.ModifyTarget {} -> False
+      -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
+      -- inside the Modification, reached through Projection.quantitiesOf.
+      Effect.ModifyTarget _ modification _ -> elem Quantity.Type.X (Projection.quantitiesOf modification)
       Effect.ChangeText _ -> False
       Effect.AddMana _ -> False
       Effect.Search _ _ -> False
@@ -935,17 +946,26 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- and the source's CONTROLLER (whose hand a player-scoped count
             -- counts), never against an affected object. See the P3b spec,
             -- section 2.4.
-            let (ts, gs1) = Game.freshTimestamp gs
-                frozen = Projection.freezeQuantities gs source (Just controller) modification
-                eff =
-                  ContinuousEffect.MkContinuousEffect
-                    { ContinuousEffect.source = source,
-                      ContinuousEffect.timestamp = ts,
-                      ContinuousEffect.expiry = expiry,
-                      ContinuousEffect.modification = frozen,
-                      ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
-                    }
-             in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+            --
+            -- Nothing when a quantity cannot be evaluated at THIS moment: 608.2h
+            -- gives the effect exactly one moment to determine its answer, so a
+            -- value undetermined here is undetermined for good, and storing the
+            -- raw quantity would only move the read to the wrong object at the
+            -- wrong time. Nothing is stored instead -- the same shape the Expiry
+            -- arm above takes for CR 611.2b's duration that never starts.
+            case Projection.freezeQuantities gs source (Just controller) modification of
+              Nothing -> gs
+              Just frozen ->
+                let (ts, gs1) = Game.freshTimestamp gs
+                    eff =
+                      ContinuousEffect.MkContinuousEffect
+                        { ContinuousEffect.source = source,
+                          ContinuousEffect.timestamp = ts,
+                          ContinuousEffect.expiry = expiry,
+                          ContinuousEffect.modification = frozen,
+                          ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
+                        }
+                 in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
   Effect.ChangeText slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of

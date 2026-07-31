@@ -57,7 +57,7 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- CR 613.1: the layer a modification applies in. THE ABI classification the
--- rules core would ask -- never the modification's identity. One of two case-on-
+-- rules core would ask -- never the modification's identity. One of the case-on-
 -- Modification functions this module is the sole home of.
 layer :: Modification -> Layer
 layer m = case m of
@@ -80,7 +80,9 @@ layer m = case m of
 -- continuous effect (CR 604.2 -- Opalescence's mana value is re-read per affected
 -- object every projection). A continuous effect created by a spell's RESOLUTION
 -- must not be re-read (CR 608.2h / 611.2d); it is frozen to Literals at store
--- time by Resolve, via freezeQuantities.
+-- time by Resolve, via freezeQuantities -- and is not stored at all when a
+-- quantity would not freeze, so the P/T quantities reaching here from a
+-- resolution are Literals and this evaluation is the identity on them.
 --
 -- CR 109.5: "for a static ability, this is the current controller of the object
 -- it's on" -- the effect's SOURCE's controller, not the affected object's. `src`
@@ -787,39 +789,67 @@ affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) 
 -- a static ability's effect (CR 604.2) is regenerated every projection and
 -- evaluated per affected object -- Opalescence's mana value must keep moving.
 --
+-- Nothing when ANY quantity it carries cannot be evaluated at store time. CR
+-- 608.2h/611.2d have the answer determined "only once, when the effect is
+-- applied" -- so a value that cannot be determined at that one moment cannot be
+-- determined later either, and re-reading it live against the affected object on
+-- every projection would be a WRONG answer rather than a deferred one. Resolve
+-- stores nothing in that case, the same posture CR 611.2b already gives this
+-- opcode for a duration that never starts. Untamed Might's "+X/+X" is the pool's
+-- producer, and ProjectionSpec's "CR 608.2h/611.2d Untamed Might's X is frozen"
+-- is what proves the freeze happens at all.
+--
+-- Not Literal 0, which would be inventing an answer: CR 208.2a's "if the ability
+-- needs to use a number that can't be determined ... use 0 instead of that
+-- number" is scoped to a characteristic-defining ability, and this is not one.
+--
 -- Cases on Modification, so it lives HERE (Projection is the sole home), the same
--- standing rewriteModification has. An unevaluable quantity is left alone.
-freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId.PlayerId -> Modification -> Modification
+-- standing rewriteModification has.
+freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId.PlayerId -> Modification -> Maybe Modification
 freezeQuantities gs oid you m =
-  -- The Nothing fallback leaves the quantity in the store rather than dropping
-  -- the effect. That is deliberate, but it leaves a RESIDUAL: an unevaluable
-  -- quantity (an X with no binding on the source, or a bare Star) survives into
-  -- the stored effect, where applyModification later evaluates it live against
-  -- the CURRENT game state on every projection, using the effect's SOURCE's
-  -- controller as perspective (CR 109.5) -- correct on WHO, but still wrong on
-  -- WHEN: CR 608.2h/611.2d call for a single read at store time, which is the
-  -- very mis-evaluation this freeze exists to prevent (#36).
-  --
   -- CR 608.2h / 611.2d: read the CURRENT state through the real projection --
   -- `oid` is the source, `you` its controller, matching the doc above.
   let viewOf = fullView gs
       context = Filter.MkContext you (Just oid)
-      freeze q = maybe q Quantity.Type.Literal $ Quantity.evaluate viewOf context gs oid q
+      freeze q = fmap Quantity.Type.Literal (Quantity.evaluate viewOf context gs oid q)
    in case m of
-        Modification.SetBasePowerToughness p t -> Modification.SetBasePowerToughness (freeze p) (freeze t)
-        Modification.ModifyPowerToughness p t -> Modification.ModifyPowerToughness (freeze p) (freeze t)
-        -- Every other modification carries no quantity to freeze; named
-        -- explicitly per Modification's exhaustiveness discipline.
-        Modification.GainKeyword _ -> m
-        Modification.LoseAllAbilities -> m
-        Modification.SetLandSubtype _ -> m
-        Modification.AddLandSubtype _ -> m
-        Modification.AddCardType _ -> m
-        Modification.ChangeSubtypeWord _ _ -> m
-        Modification.SetController _ -> m
-        Modification.SetControllerToSource -> m
-        Modification.SetColor _ -> m
-        Modification.SwitchPowerToughness -> m
+        Modification.SetBasePowerToughness p t -> Modification.SetBasePowerToughness <$> freeze p <*> freeze t
+        Modification.ModifyPowerToughness p t -> Modification.ModifyPowerToughness <$> freeze p <*> freeze t
+        -- Every other modification carries no quantity to freeze, so it stores as
+        -- written; named explicitly per Modification's exhaustiveness discipline.
+        Modification.GainKeyword _ -> Just m
+        Modification.LoseAllAbilities -> Just m
+        Modification.SetLandSubtype _ -> Just m
+        Modification.AddLandSubtype _ -> Just m
+        Modification.AddCardType _ -> Just m
+        Modification.ChangeSubtypeWord _ _ -> Just m
+        Modification.SetController _ -> Just m
+        Modification.SetControllerToSource -> Just m
+        Modification.SetColor _ -> Just m
+        Modification.SwitchPowerToughness -> Just m
+
+-- Every Quantity a modification carries, in the order it carries them. Another
+-- case on Modification, so it lives HERE for freezeQuantities' reason, even
+-- though its caller is elsewhere: Resolve's D4 lints have to see INSIDE a
+-- ModifyTarget's modification to find the X in Untamed Might's "+X/+X" and any
+-- slot a future card reads there.
+--
+-- NOTE: when a Modification gains a Quantity field, add it here as well as to
+-- freezeQuantities -- the compiler forces the arm to exist, not to be right.
+quantitiesOf :: Modification -> [Quantity.Type.Quantity]
+quantitiesOf m = case m of
+  Modification.SetBasePowerToughness p t -> [p, t]
+  Modification.ModifyPowerToughness p t -> [p, t]
+  Modification.GainKeyword _ -> []
+  Modification.LoseAllAbilities -> []
+  Modification.SetLandSubtype _ -> []
+  Modification.AddLandSubtype _ -> []
+  Modification.AddCardType _ -> []
+  Modification.ChangeSubtypeWord _ _ -> []
+  Modification.SetController _ -> []
+  Modification.SetControllerToSource -> []
+  Modification.SetColor _ -> []
+  Modification.SwitchPowerToughness -> []
 
 -- Every SetLandSubtype effect in the game, each with its source and affected set
 -- (from stored effects and battlefield permanents' static abilities). This is a
