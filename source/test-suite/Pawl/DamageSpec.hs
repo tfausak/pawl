@@ -2,8 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, deathtouch, trample, and
--- state-based actions. ((m2cPropertyTests cards) is deterministic fixture coverage, not
--- QuickCheck properties.)
+-- state-based actions.
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
@@ -25,7 +24,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -64,7 +62,6 @@ import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
-import qualified Test.Tasty.QuickCheck as QC
 
 creatureSbaTests :: Registry.Registry -> Tasty.TestTree
 creatureSbaTests registry =
@@ -822,38 +819,81 @@ assignmentLegalityTests =
             answer :: Map.Map Recipient.Recipient Natural.Natural
             answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 2), 2)]
          in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 2 answer)),
-      QC.testProperty "an accepted assignment always totals power and gates the defender"
-        . QC.forAll genLegalityCase
-        $ \(thresholds, power, answer) ->
-          not (Damage.legalAssignment thresholds power answer)
-            || ( sum (Map.elems answer) == power
-                   && all (\r -> Map.member r thresholds) (Map.keys answer)
-                   && ( Map.findWithDefault 0 (Recipient.ToPlayer S.bob) answer == 0
-                          || all
-                            (\(r, t) -> Map.findWithDefault 0 r answer >= t)
-                            (Map.toList (Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds))
-                      )
-               )
+      -- The threshold gates the DEFENDER's share; it is not a cap on the
+      -- blocker's. CR 702.19b lets the attacker assign past lethal and spill
+      -- what is left, so an over-assigned blocker is no obstacle.
+      HU.testCase "over-assigning a blocker and still spilling over is legal" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 2),
+                  (Recipient.ToPlayer S.bob, 0)
+                ]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 3),
+                  (Recipient.ToPlayer S.bob, 2)
+                ]
+         in HU.assertBool "accepted" (Damage.legalAssignment thresholds 5 answer),
+      -- CR 702.19b gates the defender on ALL blocking creatures having lethal,
+      -- so this pair is the quantifier: one blocker short rejects the very same
+      -- defender share that the twin below accepts once it is filled in. A gate
+      -- reading "some blocker is at lethal" passes the first and is caught here.
+      -- Two blockers is also the shape the prompt is actually reached in
+      -- (Damage.attackerAssignment forces the single-blocker case unless the
+      -- attacker tramples past its threshold).
+      HU.testCase "two blockers: one short of lethal gates the defender" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 2),
+                  (Recipient.ToCreature (ObjectId.MkObjectId 2), 2),
+                  (Recipient.ToPlayer S.bob, 0)
+                ]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 2),
+                  (Recipient.ToCreature (ObjectId.MkObjectId 2), 1),
+                  (Recipient.ToPlayer S.bob, 2)
+                ]
+         in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 5 answer)),
+      HU.testCase "two blockers: both at lethal frees the defender" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 2),
+                  (Recipient.ToCreature (ObjectId.MkObjectId 2), 2),
+                  (Recipient.ToPlayer S.bob, 0)
+                ]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 2),
+                  (Recipient.ToCreature (ObjectId.MkObjectId 2), 2),
+                  (Recipient.ToPlayer S.bob, 1)
+                ]
+         in HU.assertBool "accepted" (Damage.legalAssignment thresholds 5 answer),
+      -- Without trample the defending player is not among the thresholds at all
+      -- (Damage.attackerAssignment adds that entry only for a trampler), so a
+      -- point aimed at them is an illegal RECIPIENT rather than a gated one.
+      HU.testCase "with no trample the defending player is not a legal recipient" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 0),
+                  (Recipient.ToCreature (ObjectId.MkObjectId 2), 0)
+                ]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 1),
+                  (Recipient.ToCreature (ObjectId.MkObjectId 2), 1),
+                  (Recipient.ToPlayer S.bob, 1)
+                ]
+         in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 3 answer))
     ]
-
--- A blocker (lethal 0..4), a defender (threshold 0), power 0..6, and an arbitrary
--- assignment over those two recipients. Covers power below / equal to / above
--- lethal and every over/under split.
-genLegalityCase :: QC.Gen (Map.Map Recipient.Recipient Natural.Natural, Natural.Natural, Map.Map Recipient.Recipient Natural.Natural)
-genLegalityCase = do
-  -- Counts, not Integers: the generator's own bounds are what makes every
-  -- conversion below exact.
-  let count hi = fmap Integer.toNaturalSaturating (QC.choose (0, hi))
-  lethal <- count 4
-  power <- count 6
-  toBlocker <- count 6
-  toDefender <- count 6
-  let blocker = Recipient.ToCreature (ObjectId.MkObjectId 1)
-      thresholds :: Map.Map Recipient.Recipient Natural.Natural
-      thresholds = Map.fromList [(blocker, lethal), (Recipient.ToPlayer S.bob, 0)]
-      answer :: Map.Map Recipient.Recipient Natural.Natural
-      answer = Map.fromList [(blocker, toBlocker), (Recipient.ToPlayer S.bob, toDefender)]
-  pure (thresholds, power, answer)
 
 -- Assigns each blocker exactly its threshold, and every leftover point to the
 -- defender. A legal trample division for these boards.
@@ -910,8 +950,8 @@ trampleTests registry =
       HU.testCase "CR 702.19b under-assignment across two blockers spills nothing (power below total lethal)" $ do
         -- War Mammoth (3/3 trample) blocked by TWO Ogre Sentries (3/3 each): it
         -- cannot reach lethal on both (needs 6, has 3), so no overflow -- bob is
-        -- untouched -- and the division among the Ogres is free. Real cards, the
-        -- power-below-lethal case the property covers exhaustively.
+        -- untouched -- and the division among the Ogres is free. Real cards, for
+        -- the under-assignment case assignmentLegalityTests pins on the predicate.
         warMammoth <- Registry.printing registry "War Mammoth"
         ogreSentry <- Registry.printing registry "Ogre Sentry"
         let (gs, _, _) = S.combatBoardOf [warMammoth] [ogreSentry, ogreSentry]
