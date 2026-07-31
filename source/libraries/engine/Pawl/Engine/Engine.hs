@@ -600,6 +600,11 @@ permute xs order =
         then Maybe.mapMaybe at order
         else xs
 
+-- CR 117.5's settle, discarding the report. The name all but one caller uses;
+-- `performSettle` below is the same act, and carries the whole account of it.
+settleForPriority :: Game ()
+settleForPriority = Monad.void performSettle
+
 -- CR 117.5: each time a player would receive priority, sweep expired "for as
 -- long as" effects, perform state-based actions, then put triggered abilities
 -- on the stack, repeating until none of the three does anything. Then priority
@@ -636,17 +641,16 @@ permute xs order =
 -- had to be locked in before any SBA or trigger observed it (CR 614.12a). The
 -- entry loop now runs inside the zone change itself, before the Moved event
 -- exists, so there is nothing left to drain.
-settleForPriority :: Game ()
-settleForPriority = Monad.void performSettle
-
--- The settle itself, also reporting whether it performed any STATE-BASED ACTION
--- or placed any TRIGGERED ABILITY on the stack. Same split as
--- Sba.checkStateBasedActions / Sba.performStateBasedActions above it, and for the
--- same reason: one caller needs the answer and the rest do not.
+--
+-- It also REPORTS whether it performed any state-based action or placed any
+-- triggered ability on the stack. Same split as Sba.checkStateBasedActions /
+-- Sba.performStateBasedActions, and for the same reason: one caller needs the
+-- answer and the rest do not.
 --
 -- That caller is `cleanupException` (CR 514.3a), and the two things reported are
--- exactly the two the rule asks about. The CR 611.2b conditional sweep and the CR
--- 725.5 monarch return also happen here and also make the loop repeat, but
+-- exactly the two the rule asks about. The CR 611.2b conditional sweep and the
+-- monarch exile return (Monarch.returnExiledForMonarch, a DURATION ending rather
+-- than an ability triggering) also happen here and also make the loop repeat, but
 -- neither is a state-based action and neither is a triggered ability, so neither
 -- answers CR 514.3a's question and neither is reported.
 --
@@ -1211,15 +1215,18 @@ cleanupException = do
     -- after it, exactly as CR 510.4's second combat damage step is
     -- (Turn.spliceSecondDamage, spliced from runTurnBasedActions).
     --
-    -- The two placements agree on the schedule the step ends on, and where they
-    -- could differ this one is the correct order: the only thing between here and
-    -- `advance` that reads GameState.remaining is CR 500.8's phase splice
-    -- (Turn.splicePhases), and an extra phase added "directly after the specified
-    -- phase" belongs after the second cleanup step, which is still part of that
-    -- ending phase -- which only a schedule that already holds it can express.
-    -- The paths that never reach `advance` discard the schedule wholesale
-    -- regardless: a restart rebuilds the GameState (CR 727.4), and a game that
-    -- ends never advances again.
+    -- The two placements are indistinguishable, which is why the existing
+    -- precedent decides it rather than an argument. The only thing between here
+    -- and `advance` that touches GameState.remaining is CR 500.8's phase splice
+    -- (Turn.splicePhases), and it lands the added phases behind this step either
+    -- way: with the entry already present it splits at index 0 and appends after
+    -- it, and with `remaining` still empty Turn.thisPhase yields an empty prefix
+    -- and appends at the front, which this then goes in front of. Both give the
+    -- second cleanup step and then the added phase, which is CR 500.8's "directly
+    -- after the specified phase" -- the second cleanup step is still part of that
+    -- ending phase. The paths that never reach `advance` discard the schedule
+    -- wholesale regardless: a restart rebuilds the GameState (CR 727.4), and a
+    -- game that has ended never advances again.
     State.modify' (\gs -> gs {GameState.remaining = Turn.spliceExtraCleanup (GameState.remaining gs)})
   pure fired
 

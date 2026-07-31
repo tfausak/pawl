@@ -50,9 +50,13 @@ laterPhases = Seq.fromList (drop 1 allPhases)
 -- CR 514.3: "Normally, no player receives priority during the cleanup step, so
 -- no spells can be cast and no abilities can be activated. However, this rule is
 -- subject to the following exception:" -- and CR 514.3a is that exception. So
--- the cleanup step's False is only the NORMAL case, and the exception is not a
--- question about the phase at all but about the board: Engine.grantsPriorityNow
--- is what asks it, and this is the answer it falls back on.
+-- the cleanup step's False is the NORMAL case only, and CR 514.3a is not a
+-- question about the phase at all but about the board. Engine.grantsPriorityNow
+-- is what asks it, and it answers the cleanup step entirely by itself rather
+-- than correcting this one -- the arm stays because a predicate over Phase that
+-- silently reported True for the cleanup step would be wrong on its own terms,
+-- and because it is CR 514.3's first sentence written where the rest of the
+-- turn's priority is decided.
 grantsPriority :: Phase -> Bool
 grantsPriority phase = case phase of
   Phase.Beginning BeginningStep.Untap -> False
