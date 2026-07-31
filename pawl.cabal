@@ -216,6 +216,7 @@ library types
     Pawl.Types.Departure
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
+    Pawl.Types.DiscardCause
     Pawl.Types.Duration
     Pawl.Types.Effect
     Pawl.Types.EndingStep

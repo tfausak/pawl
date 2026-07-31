@@ -50,6 +50,7 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -1047,6 +1048,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
   TriggerCondition.SelfAttacks f -> Json.tagged (Text.pack "SelfAttacks") (Just (triggerFrequencyToJson f))
   TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
+  TriggerCondition.PlayerDiscards r -> Json.tagged (Text.pack "PlayerDiscards") (Just (playerRelationToJson r))
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
   TriggerCondition.SelfDies -> nullary (Text.pack "SelfDies")
 
@@ -1062,6 +1064,7 @@ jsonToTriggerCondition value = do
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> jsonToTriggerFrequency v
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
+    ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> jsonToPlayerRelation v
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
@@ -1476,6 +1479,19 @@ jsonToQuantityPair value = case value of
     pure (p_, t_)
   _ -> Left (Text.pack "expected a [power, toughness] quantity pair")
 
+discardCauseToJson :: DiscardCause.DiscardCause -> Value
+discardCauseToJson c = nullary . Text.pack $ case c of
+  DiscardCause.Ordinary -> "Ordinary"
+  DiscardCause.ToPayCyclingCost -> "ToPayCyclingCost"
+
+jsonToDiscardCause :: Value -> Either Text DiscardCause.DiscardCause
+jsonToDiscardCause =
+  decodeNullary
+    (Text.pack "DiscardCause")
+    [ (Text.pack "Ordinary", DiscardCause.Ordinary),
+      (Text.pack "ToPayCyclingCost", DiscardCause.ToPayCyclingCost)
+    ]
+
 gameEventToJson :: GameEvent.GameEvent -> Value
 gameEventToJson e = case e of
   GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array (MkArray [zoneChangeToJson zc, projectedCharacteristicsToJson pc])))
@@ -1483,7 +1499,8 @@ gameEventToJson e = case e of
   GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array (MkArray [phaseToJson p, playerIdToJson pid])))
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (playerIdToJson pid))
   GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (playerIdToJson pid))
-  GameEvent.Cycled oid -> Json.tagged (Text.pack "Cycled") (Just (objectIdToJson oid))
+  GameEvent.Discarded pid oid cause ->
+    Json.tagged (Text.pack "Discarded") (Just (Array (MkArray [playerIdToJson pid, objectIdToJson oid, discardCauseToJson cause])))
   GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array (MkArray [playerIdToJson pid, projectedCharacteristicsToJson pc])))
   GameEvent.AttackerDeclared oid -> Json.tagged (Text.pack "AttackerDeclared") (Just (objectIdToJson oid))
 
@@ -1496,7 +1513,8 @@ jsonToGameEvent value = do
     ("StepBegan", Just (Array (MkArray [p, pid]))) -> GameEvent.StepBegan <$> jsonToPhase p <*> jsonToPlayerId pid
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> jsonToPlayerId v
-    ("Cycled", Just v) -> GameEvent.Cycled <$> jsonToObjectId v
+    ("Discarded", Just (Array (MkArray [pid, oid, cause]))) ->
+      GameEvent.Discarded <$> jsonToPlayerId pid <*> jsonToObjectId oid <*> jsonToDiscardCause cause
     ("Revealed", Just (Array (MkArray [pid, pc]))) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
     ("AttackerDeclared", Just v) -> GameEvent.AttackerDeclared <$> jsonToObjectId v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)

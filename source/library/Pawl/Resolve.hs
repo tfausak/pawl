@@ -37,6 +37,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
@@ -1168,8 +1169,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
+                    -- CR 701.9a's move, through the shared discard funnel, so
+                    -- the discard is recorded for a rule 701.9a trigger to read
+                    -- and not merely performed.
                     bury :: [ObjectId] -> Game ()
-                    bury = Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard)
+                    bury = Monad.mapM_ (Event.discard DiscardCause.Ordinary target)
                     -- The quantity as the count it is. `n > 0` above, so the
                     -- clamp never decides anything here.
                     count = Integer.toNaturalSaturating n

@@ -34,6 +34,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -46,6 +47,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -81,8 +83,8 @@ movedOf event = case event of
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- The Moved event emitted by the same discard is the zone change; this one
-  -- describes why it happened (CR 702.29c).
-  GameEvent.Cycled _ -> Nothing
+  -- says the move WAS a discard (CR 701.9a).
+  GameEvent.Discarded {} -> Nothing
   -- CR 701.20b: "Revealing a card doesn't cause it to leave the zone it's in."
   -- The rule that makes this arm Nothing rather than an oversight -- a reveal is
   -- never a zone change, even when the card is about to make one.
@@ -97,7 +99,7 @@ damageOf event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.Cycled _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
 
@@ -109,7 +111,7 @@ castOf event = case event of
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.Cycled _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
 
@@ -122,7 +124,7 @@ revealOf event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.Cycled _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
@@ -605,6 +607,33 @@ drawCard pid = do
     [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
     top : _ -> changeZone top Zone.Hand
 
+-- The single discard funnel (CR 701.9a): "To discard a card, move it from its
+-- owner's hand to that player's graveyard." `pid` is the discarding player, whom
+-- that rule makes the card's owner either way, and `cause` is why -- see
+-- Pawl.Types.DiscardCause.
+--
+-- The move goes through changeZoneReturning, the CR 400.7 funnel, so a discarded
+-- card gets a new incarnation and Rest in Peace's redirect composes. The EVENT is
+-- what this function adds over calling that funnel directly, and it is not
+-- redundant with the Moved event the move records: a card put into a graveyard
+-- from a hand has not necessarily been discarded, and a discard CR 614 redirects
+-- elsewhere is still a discard. A discard trigger reads this record and never
+-- the zone pair.
+--
+-- Recorded only when the move COMPLETED. `Nothing` is an unknown id or a CR
+-- 616.1 loop that cancelled the move, and CR 603.2g is why that must record
+-- nothing: "an event that's prevented or replaced won't trigger anything."
+--
+-- The id recorded is the one the funnel MINTED, not the one that was in hand:
+-- CR 702.29c's abilities "trigger from whatever zone the card winds up in after
+-- it's cycled", and the graveyard object is the one bearing them.
+discard :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game ()
+discard cause pid oid = do
+  moved <- changeZoneReturning oid Zone.Graveyard
+  case moved of
+    Nothing -> pure ()
+    Just newId -> State.modify' (recordEvent (GameEvent.Discarded pid newId cause))
+
 -- The single reveal funnel (CR 701.20a): `pid` shows the card `oid` to all
 -- players, which here means appending what was shown to the public log. No-op
 -- for an id with no object, the posture changeZone takes.
@@ -661,7 +690,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
@@ -712,7 +741,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
@@ -725,7 +754,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
@@ -744,7 +773,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
@@ -754,8 +783,43 @@ matchesTrigger gs bearer you cond event = case cond of
   -- CR 702.29c: the bearer IS the card that was cycled. The event carries the
   -- incarnation the card became (CR 400.7), which is the object the scan offers
   -- as the bearer -- see cycledCard in eventTriggers below.
+  --
+  -- The CAUSE is what makes this narrower than the discard condition below, and
+  -- it is the whole of rule 702.29c's "to pay an activation cost of a cycling
+  -- ability": an ordinary discard of a card that HAS cycling -- Cathartic
+  -- Reunion pitching a Windcaller Aven -- reaches the same graveyard through the
+  -- same funnel and must fire nothing.
   TriggerCondition.SelfCycled -> case event of
-    GameEvent.Cycled oid -> oid == bearer
+    GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> oid == bearer
+    GameEvent.Discarded _ _ DiscardCause.Ordinary -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+  -- CR 701.9a: a card was discarded, by a player the relation admits. The
+  -- discarding player comes from the event; CR 109.5 fixes "you" as the
+  -- ability's controller (CR 603.3a), and Megrim's "an opponent" is every other
+  -- player -- CR 806.1 in a free-for-all, CR 102.2 in a two-player game, the
+  -- same /= either way. CR 102.3's teams are the one reading it is wrong for,
+  -- and pawl has none to express (#175).
+  --
+  -- The bearer is NOT part of the match, unlike every Self- condition here: the
+  -- enchantment watches someone else's hand and has nothing to do with the card
+  -- that left it.
+  --
+  -- CR 702.29d -- "these abilities trigger only once when a card is cycled" --
+  -- needs no clause of its own, and the DiscardCause is ignored for that reason
+  -- rather than by omission. CR 702.29a makes cycling a discard, so a cycled
+  -- card must fire this; the cycle is ONE Discarded event, so it fires it once.
+  -- TriggerSpec's "CR 702.29d cycling a card fires the discard trigger exactly
+  -- once" is the test that proves it.
+  TriggerCondition.PlayerDiscards relation -> case event of
+    GameEvent.Discarded discarder _ _ -> case relation of
+      PlayerRelation.You -> discarder == you
+      PlayerRelation.Opponent -> discarder /= you
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
@@ -792,7 +856,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
   -- CR 603.6: a zone-change trigger, matched on BOTH ends of the move -- library
   -- to graveyard. The bearer is the incarnation the card became on arrival, and
@@ -816,7 +880,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.6c narrowed by CR 700.4 ("the term dies means 'is put into a
@@ -844,7 +908,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
 
@@ -928,6 +992,13 @@ eventBindings cond event = case (cond, event) of
   -- depend on the entrant, which eventBindingSlots below could not express.
   (TriggerCondition.PermanentEnters _, GameEvent.Moved zc _) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- Megrim's "that player": the player who discarded, which CR 701.9a's "its
+  -- owner's hand ... that player's graveyard" makes one player and the event
+  -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for
+  -- the same reason -- a player the EVENT names, which CR 109.5's `you` cannot
+  -- stand in for.
+  (TriggerCondition.PlayerDiscards _, GameEvent.Discarded discarder _ _) ->
+    Binding.setTriggerPlayer discarder Map.empty
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -996,6 +1067,9 @@ eventBindingSlots cond = case cond of
   -- CR 702.29c's cycled card is the bearer itself, already bound as CR 113.7's
   -- source, and rule 508.3a's declared attacker likewise.
   TriggerCondition.SelfCycled -> Set.empty
+  -- CR 701.9a's discarding player, which is nobody the bearer already names --
+  -- Megrim's "that player" is the opponent whose hand the card left.
+  TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer
   TriggerCondition.SelfAttacks _ -> Set.empty
   -- CR 113.6k: the bearer of a library-to-graveyard trigger IS the arriving
   -- incarnation, so binding it again under `became` would be a second name for
@@ -1182,7 +1256,7 @@ eventTriggers events gs =
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.SpellCast _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
-        GameEvent.Cycled _ -> Map.empty
+        GameEvent.Discarded {} -> Map.empty
         GameEvent.Revealed _ _ -> Map.empty
         GameEvent.AttackerDeclared _ -> Map.empty
       -- CR 603.10's first sentence, per EVENT: for each event in the batch, the
@@ -1235,12 +1309,18 @@ eventTriggers events gs =
       -- the ability's source when it triggered". A card in a graveyard has no
       -- controller (CR 108.4), the same reason Activate.activatorOf reaches for
       -- the owner of a card in a hand.
+      --
+      -- Scoped to the CYCLING cause, not to every discard. That is rule 702.29c
+      -- speaking about cycling triggers specifically; an ordinary discard's card
+      -- reaches the graveyard too, and is offered by `inGraveyards` below under
+      -- CR 113.6k -- which admits only a condition that can trigger from there.
       cycledCard event = case event of
-        GameEvent.Cycled oid -> case Game.lookupObject oid gs of
+        GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> case Game.lookupObject oid gs of
           Nothing -> Map.empty
           Just obj -> case Game.cardOf oid gs of
             Nothing -> Map.empty
             Just card -> Map.singleton oid (Object.owner obj, Card.triggeredAbilities card)
+        GameEvent.Discarded _ _ DiscardCause.Ordinary -> Map.empty
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
         GameEvent.StepBegan _ _ -> Map.empty
@@ -1359,6 +1439,11 @@ functionsInGraveyard cond = case cond of
   -- own `cycledCard` is the source that actually serves it, and the overlap is
   -- documented at the Map.unions there.
   TriggerCondition.SelfCycled -> True
+  -- CR 113.6's default, and False for a reason: Megrim watches from the
+  -- battlefield, so "a trigger condition that can't trigger from the
+  -- battlefield" (CR 113.6k) never reaches it. A card in a graveyard does not
+  -- see an opponent discard.
+  TriggerCondition.PlayerDiscards _ -> False
   -- CR 113.6k, the condition this predicate exists for: a card cannot be put
   -- into a graveyard from a library while it is on the battlefield, so this
   -- condition can never trigger from the battlefield, and the one zone it can
@@ -1448,6 +1533,7 @@ stateTriggers gs =
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
                 TriggerCondition.SelfAttacks _ -> False
                 TriggerCondition.SelfCycled -> False
+                TriggerCondition.PlayerDiscards _ -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
                 TriggerCondition.SelfDies -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
