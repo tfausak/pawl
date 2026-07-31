@@ -172,15 +172,19 @@ affordableX pid oid gs cost =
 --      illegal (due to an inability to choose legal targets, for example), that
 --      mode can't be chosen." Choosing ALL modes is therefore not open when one
 --      of them cannot be chosen. Unobservable for Dream's Grip, whose two modes
---      declare the same target spec and so are fillable together or not at all,
---      and written anyway: without it an entwined cast would announce fewer
+--      draw from the same unfiltered pool and so are fillable together or not at
+--      all, and written anyway: without it an entwined cast would announce fewer
 --      modes than rule 702.42a says it chose, and castSpell's own size check
 --      would turn the whole cast into a silent no-op.
---   3. Some candidate cost PLUS this one is payable -- CR 601.2f's "plus all
+--   3. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
 --      additional costs", measured with the same payableCost predicate
 --      castability was gated on, at CR 601.2b's X=0 floor. An option the player
 --      cannot take is not offered, which is the same posture ChooseCost takes
 --      towards an unaffordable alternative.
+--
+-- None of the three is a choice being made for the player: an option the card
+-- does not have, that CR 700.2a closes, or that CR 118.3 says cannot be paid, is
+-- not an option.
 --
 -- WHICH candidate will carry the cost is not decided here: this answers only
 -- whether SOME route pays it, and castSpell narrows the candidates to the routes
@@ -474,10 +478,10 @@ castSpell pid oid = do
       -- so there is nothing left for ChooseModes to ask; a player who declines
       -- is asked the ordinary question one line below, in 601.2b's own order.
       --
-      -- The choice is never made for them. entwineOffer answers Nothing when the
-      -- option does not exist -- no entwine, an illegal mode (CR 700.2a), or no
-      -- payable route -- and that is the ONLY elision here: where the option
-      -- does exist, both answers are offered and the engine takes neither.
+      -- The choice is never made for them. entwineOffer answers Nothing only
+      -- where there is no option to offer -- no entwine, an illegal mode (CR
+      -- 700.2a), or no payable route -- and where there IS one, both answers go
+      -- to the player and the engine takes neither.
       --
       -- The answer is carried as the additional Cost itself rather than as a
       -- flag, so the two things it changes -- the mode count just below and the
@@ -516,13 +520,15 @@ castSpell pid oid = do
         -- Reject-not-repair: an answer outside the offered set makes the whole
         -- cast a no-op.
         --
-        -- CR 601.2f: "the total cost is the mana cost or alternative cost (as
-        -- determined in rule 601.2b), PLUS ALL ADDITIONAL COSTS". An announced
-        -- entwine is added to every candidate before the payability filter, so
-        -- the routes offered are the ones that can actually pay it -- CR 118.9d
-        -- is what makes it apply to an alternative cost too. What the caster
+        -- CR 601.2f: "The total cost is the mana cost or alternative cost (as
+        -- determined in rule 601.2b), plus all additional costs and cost
+        -- increases". An announced entwine is added to every candidate BEFORE
+        -- the payability filter, so the routes offered are the ones that can
+        -- actually pay it -- and CR 118.9d is what makes it apply to an
+        -- alternative cost as readily as to the printed one. What the caster
         -- then chooses between, and what is finally paid, already carries it.
-        let payable = filter (payableCost pid oid gs) (fmap (\candidate -> maybe candidate (Cost.plus candidate) entwined) (Cost.costsFor oid gs))
+        let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
+            payable = filter (payableCost pid oid gs) (fmap withEntwine (Cost.costsFor oid gs))
         Monad.unless (null payable) $ do
           chosenCost <- case payable of
             [only] -> pure only

@@ -137,11 +137,13 @@ total pid oid cost gs = cost {Cost.mana = fmap (totalMana pid oid gs) (Cost.mana
 totalMana :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
 totalMana pid oid gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs)
 
--- CR 601.2f: "The total cost is the mana cost or alternative cost ... PLUS ALL
--- ADDITIONAL COSTS and cost increases". One additional cost bolted onto a
--- candidate, which is the shape CR 702.42a's entwine needs -- Pawl.Cast applies
--- it to whichever candidate the caster announced, exactly as CR 118.9d says an
--- additional cost applies to an alternative one.
+-- CR 601.2f: "The total cost is the mana cost or alternative cost (as determined
+-- in rule 601.2b), plus all additional costs and cost increases, and minus all
+-- cost reductions." This is the ADDITIONAL-COSTS clause alone, bolted onto one
+-- candidate -- the shape CR 702.42a's entwine needs. Pawl.Cast applies it to
+-- whichever candidate the caster announced, exactly as CR 118.9d says an
+-- additional cost applies to an alternative one; the increases and reductions
+-- stay `total`'s job, run on the result.
 --
 -- The mana parts CONCATENATE (the extra symbols are appended, and CR 601.2f's
 -- totalling later pools the generic ones), and the components are appended in

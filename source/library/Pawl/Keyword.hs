@@ -73,9 +73,9 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 -- These three are derived from a card's PRINTED keywords rather than a
 -- projection's post-layer ones, unlike triggeredAbilitiesOf: all three abilities
 -- function in the graveyard or on the stack (CR 113.6), where the CR 613 layer
--- system does not reach. entwineCost is a fourth of the same kind -- rule 702.42a
--- says entwine "functions while the spell is on the stack", and Pawl.Cast reads
--- it one step earlier still, off a card in a hand.
+-- system does not reach. entwineCost is read the same way and for the same
+-- reason: rule 702.42a says entwine "functions while the spell is on the stack",
+-- and Pawl.Cast reads it one step earlier still, off a card in a hand.
 
 -- CR 702.70b: "If a creature has multiple instances of poisonous, each triggers
 -- separately." So this returns one ability PER INSTANCE, which is exactly what
@@ -241,7 +241,7 @@ permissionsFor keyword = case keyword of
   Keyword.Vigilance -> []
   Keyword.Fear -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
-  -- cost to a cast that was already allowed, it never permits one.
+  -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
   Keyword.Infect -> []
