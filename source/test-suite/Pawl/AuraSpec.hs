@@ -410,7 +410,31 @@ enchantPlayerTests registry =
             after = S.settleSba departed
         HU.assertBool "while carol is in the game the Curse is legally attached" (Set.member aura (GameState.battlefield before))
         HU.assertBool "she leaves, and it is off the battlefield after one pass" (not (Set.member aura (GameState.battlefield after)))
-        HU.assertEqual "in its OWNER's graveyard -- a put-into-graveyard, not a destruction" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+        HU.assertEqual "in its OWNER's graveyard -- a put-into-graveyard, not a destruction" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- CR 702.5d's second sentence -- such Auras "can't target permanents and
+      -- can't be attached to permanents" -- at the reattach door, and it needs no
+      -- clause of its own: Crown of the Ages moves "target Aura attached to a
+      -- creature", and CR 701.3a's IsAttachedToCreature reads the attachment for
+      -- the OBJECT it names, which a player attachment does not name at all. So
+      -- the Curse is not a legal target and there is nothing to refuse later.
+      HU.testCase "CR 702.5d: a Curse attached to a player is not an Aura attached to a creature" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        curse <- Registry.printing registry "Curse of Death's Hold"
+        crown <- Registry.printing registry "Crown of the Ages"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.alice base
+            (onCreature, g2) = S.addCreature unholyStrength S.alice g1
+            (onPlayer, g3) = S.addCreature curse S.alice g2
+            (crownId, g4) = S.addCreature crown S.alice g3
+            gs = S.attachTo onPlayer (Recipient.ToPlayer S.bob) (S.attach onCreature creature g4)
+        case crownTargetSpec crown of
+          Nothing -> HU.assertFailure "the fixture wanted Crown of the Ages' one printed target slot"
+          Just spec ->
+            HU.assertEqual
+              "only the Aura on a creature is offered"
+              (Set.singleton (Recipient.ToObject onCreature))
+              (Target.legalRecipients (Just S.alice) crownId spec gs)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
