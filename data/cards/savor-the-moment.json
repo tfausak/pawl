@@ -5,7 +5,7 @@
   "manaCost": [
     {
       "type": "Generic",
-      "value": 3
+      "value": 1
     },
     {
       "type": "OfType",
@@ -26,7 +26,7 @@
       }
     }
   ],
-  "name": "Time Warp",
+  "name": "Savor the Moment",
   "power": null,
   "replacementEffects": [],
   "spell": {
@@ -37,23 +37,26 @@
             "type": "TakeExtraTurn",
             "value": [
               {
-                "type": "InSlot",
-                "value": "target"
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
               },
-              []
+              [
+                {
+                  "type": "Step",
+                  "value": {
+                    "type": "Beginning",
+                    "value": {
+                      "type": "Untap"
+                    }
+                  }
+                }
+              ]
             ]
           }
         ],
-        "targetSpecs": [
-          {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
-          }
-        ]
+        "targetSpecs": []
       }
     ],
     "selection": {

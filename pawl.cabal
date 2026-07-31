@@ -413,6 +413,7 @@ library types
     Pawl.Types.EventShape
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
+    Pawl.Types.ExtraTurn
     Pawl.Types.Filter
     Pawl.Types.Game
     Pawl.Types.GameEvent

@@ -422,9 +422,34 @@ tests registry =
           ]
           (modeShapes (CardT.spell c))
         HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c),
-      -- CR 500.7: the pool's one creator of an extra turn. "Target player takes
-      -- an extra turn after this one" -- so the recipient is a TARGET, which is
-      -- what makes an opponent's extra turn expressible at all.
+      -- CR 500.7 / 500.11: the pool's one turn-SCOPED skip. "Take an extra turn
+      -- after this one. Skip the untap step of that turn." Two printed sentences,
+      -- ONE opcode: "that turn" is the turn this same resolution creates, so the
+      -- skip rides on the created turn rather than being a second effect holding
+      -- a reference to it (see Pawl.Types.ExtraTurn). Contrast fatigue.json just
+      -- above, whose SkipNextPhase names a player's NEXT occurrence instead.
+      HU.testCase "savor-the-moment.json loads as a {1}{U}{U} sorcery whose TakeExtraTurn carries the untap skip" $ do
+        c <- Registry.card registry "Savor the Moment"
+        HU.assertEqual "name" (Text.pack "Savor the Moment") (CardT.name c)
+        HU.assertEqual
+          "{1}{U}{U}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue), ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "take an extra turn after this one, and skip the untap step of that turn"
+          [ ( Optionality.Mandatory,
+              [Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You) (Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))]
+            )
+          ]
+          (modeShapes (CardT.spell c))
+        -- Targetless: "take an extra turn" names its own caster, unlike Time
+        -- Warp's "target player" below.
+        HU.assertEqual "no target slots" [Map.empty] (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c))))
+        HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c),
+      -- CR 500.7: the pool's one creator of an extra turn for ANOTHER player.
+      -- "Target player takes an extra turn after this one" -- so the recipient is
+      -- a TARGET, which is what makes an opponent's extra turn expressible at
+      -- all, and its skip set is empty.
       HU.testCase "time-warp.json loads as a {3}{U}{U} sorcery whose only effect is a TakeExtraTurn" $ do
         c <- Registry.card registry "Time Warp"
         HU.assertEqual "name" (Text.pack "Time Warp") (CardT.name c)
@@ -434,7 +459,7 @@ tests registry =
           (CardT.manaCost c)
         HU.assertEqual
           "target player takes an extra turn after this one"
-          [(Optionality.Mandatory, [Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")))])]
+          [(Optionality.Mandatory, [Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Set.empty])]
           (modeShapes (CardT.spell c))
         HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c),
       -- CR 307.5: the first card whose ACTIVATED ability prints a timing rider
