@@ -25,6 +25,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -36,6 +37,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -45,6 +47,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SlotName as SlotName
@@ -452,6 +455,52 @@ tests registry =
           (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
         HU.assertEqual
           "and it targets nothing"
+          [[Map.empty]]
+          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The pool's first card whose mass effect has a RIDER reading the sweep
+      -- back: "destroy all artifacts and enchantments. Put a +1/+1 counter on
+      -- this creature for each permanent destroyed this way." The two halves are
+      -- two ordinary opcodes joined by a binding slot -- the Destroy names
+      -- "destroyed" and the PutCounters reads it as Quantity.InSlot -- so nothing
+      -- about this card is a fused opcode.
+      --
+      -- The slot is a DEFINITION rather than a target spec, which is why the mode
+      -- declares none: CR 115.10a, the word "target" is nowhere on the card.
+      HU.testCase "bane-of-progress.json loads as a {4}{G}{G} Elemental whose sweep binds a count its rider reads" $ do
+        c <- Registry.card registry "Bane of Progress"
+        let destroyed = SlotName.MkSlotName (Text.pack "destroyed")
+        HU.assertEqual "name" (Text.pack "Bane of Progress") (CardT.name c)
+        HU.assertEqual
+          "{4}{G}{G}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Elemental"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Elemental))
+          (CardT.typeLine c)
+        HU.assertEqual
+          "2/2"
+          (Just (Power.MkPower (Quantity.Literal 2)), Just (Toughness.MkToughness (Quantity.Literal 2)))
+          (CardT.power c, CardT.toughness c)
+        HU.assertEqual
+          "one trigger, on this creature entering"
+          [TriggerCondition.SelfEnters]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "the sweep binds its count, and the rider reads that slot onto the source"
+          [ [ ( Optionality.Mandatory,
+                [ Effect.Destroy
+                    (ObjectRef.EachMatching (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Enchantment]))
+                    Regenerability.Regenerable
+                    (Just destroyed),
+                  Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot destroyed) Binding.triggerSource
+                ]
+              )
+            ]
+          ]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "and it targets nothing: CR 115.10a, the card never says 'target'"
           [[Map.empty]]
           (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
     ]

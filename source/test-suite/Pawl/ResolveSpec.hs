@@ -12,6 +12,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
@@ -1412,7 +1413,7 @@ fizzleTests registry =
             -- illegal (it's no longer a legal CreatureTarget), while the
             -- reserved slot -- never targeted -- stays vacuously legal.
             gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-            mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
+            mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
             run = Resolve.resolveModes abilId source [(ModeIndex.MkModeIndex 0, mode)]
             after = snd (Engine.runGamePure S.identityAnswer gone run)
         HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
@@ -2976,5 +2977,127 @@ destroyAllTests registry =
         HU.assertBool "the creature still died" (not (S.onBattlefield his (castDayOfJudgment plains dayOfJudgment g1)))
     ]
 
+-- Bane of Progress {4}{G}{G} Creature -- Elemental 2/2: "When this creature
+-- enters, destroy all artifacts and enchantments. Put a +1/+1 counter on this
+-- creature for each permanent destroyed this way."
+--
+-- Cast off six Forests from alice's hand and then run the PRIORITY LOOP to a
+-- stable board, which is what makes this a gameplay-level test rather than an
+-- applyEffect call: the loop resolves the creature spell, its own settle places
+-- CR 603.6a's enters trigger, and the next round of passes resolves that. Answers
+-- with the id Bane entered the battlefield under (CR 400.7 mints a fresh one on
+-- the way in) and the finished board.
+castBaneOfProgress :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (Maybe ObjectId.ObjectId, GameState.GameState)
+castBaneOfProgress forest bane board =
+  let (withSpell, spell) = S.handOne bane (List.foldl' (\gs _ -> snd (S.addCreature forest S.alice gs)) board [1 :: Int .. 6])
+      afterCast = S.runPure S.identityAnswer withSpell (Cast.castSpell S.alice spell)
+      finished = S.runPure S.identityAnswer afterCast Engine.priorityLoop
+   in (namedOnBattlefield "Bane of Progress" finished, finished)
+
+-- The one battlefield permanent whose card carries this name. Bane's printed
+-- incarnation is gone by the time the trigger resolves (CR 400.7), so the test
+-- cannot hold the id it was cast under.
+namedOnBattlefield :: String -> GameState.GameState -> Maybe ObjectId.ObjectId
+namedOnBattlefield name gs =
+  List.find
+    (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack name))
+    (Set.toList (GameState.battlefield gs))
+
+-- How many +1/+1 counters (CR 122.6) sit on a permanent, 0 for none.
+plusOnePlusOnesOn :: Maybe ObjectId.ObjectId -> GameState.GameState -> Natural
+plusOnePlusOnesOn moid gs =
+  Maybe.fromMaybe 0 $ do
+    oid <- moid
+    obj <- Game.lookupObject oid gs
+    Map.lookup CounterKind.PlusOnePlusOne (Object.counters obj)
+
+baneOfProgressTests :: Registry.Type.Registry -> Tasty.TestTree
+baneOfProgressTests registry =
+  Tasty.testGroup
+    "BaneOfProgress"
+    [ -- The proving case for #380: a mass effect whose RIDER reads the sweep back.
+      -- The board is arranged so that the three readings a wrong implementation
+      -- could take all give different numbers, and only one of them is right:
+      --
+      --   * "everything the filter matched" is 3 (the Myr, the Bonesplitter, Bad
+      --     Moon) -- CR 702.12b says the Myr "can't be destroyed", and CR 701.8b
+      --     says a permanent that reached a graveyard some other way "hasn't been
+      --     'destroyed'", so matching is not being destroyed;
+      --   * a FRESH count of artifacts and enchantments after the sweep is 1 (the
+      --     Myr, still standing);
+      --   * what was actually destroyed this way is 2.
+      --
+      -- The Piker is neither an artifact nor an enchantment and is the control:
+      -- "destroy all artifacts and enchantments" leaves it alone, and Bane itself
+      -- is a plain creature and never sweeps itself up.
+      HU.testCase "CR 701.8b the rider counts what was destroyed, not what the sweep matched" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        badMoon <- Registry.printing registry "Bad Moon"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (myr, g1) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
+            (equipment, g2) = S.addCreature bonesplitter S.alice g1
+            (moon, g3) = S.addCreature badMoon S.bob g2
+            (bystander, board) = S.addCreature piker S.bob g3
+            (entered, resolved) = castBaneOfProgress forest bane board
+        HU.assertBool "Bane is on the battlefield" (Maybe.isJust entered)
+        HU.assertEqual "stack empty: the spell and its trigger both resolved" 0 (length (GameState.stack resolved))
+        HU.assertBool "the artifact died" (not (S.onBattlefield equipment resolved))
+        HU.assertBool "the enchantment died" (not (S.onBattlefield moon resolved))
+        HU.assertBool "CR 702.12b the indestructible artifact creature was swept at and stands" (S.onBattlefield myr resolved)
+        HU.assertBool "the creature that is neither was never named" (S.onBattlefield bystander resolved)
+        HU.assertEqual "two permanents were destroyed this way, so two counters" 2 (plusOnePlusOnesOn entered resolved)
+        -- CR 122.1a: "A +X/+Y counter on a creature ... adds X to that object's
+        -- power and Y to that object's toughness." A printed 2/2 with two of them
+        -- is a 4/4, which is what the counters being real means.
+        HU.assertEqual "CR 122.1a a printed 2/2 with two +1/+1 counters is a 4/4" (Just 4) (entered >>= \oid -> Projection.powerOf oid resolved)
+        HU.assertEqual "and 4 toughness" (Just 4) (entered >>= \oid -> Projection.toughnessOf oid resolved),
+      -- The discriminating twin of the test above: the SAME board with the
+      -- indestructible permanent removed. The filter now matches two rather than
+      -- three, and the count is unchanged at two -- so the two counters above were
+      -- the destroyed set and not the matched one.
+      HU.testCase "CR 702.12b removing the indestructible permanent leaves the count unchanged" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        badMoon <- Registry.printing registry "Bad Moon"
+        let (_, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+            (_, board) = S.addCreature badMoon S.bob g1
+            (entered, resolved) = castBaneOfProgress forest bane board
+        HU.assertEqual "still two destroyed, so still two counters" 2 (plusOnePlusOnesOn entered resolved),
+      -- CR 701.19a: a regeneration shield "protects the permanent the next time it
+      -- would be destroyed this turn ... instead remove all damage marked on it
+      -- and its controller taps it". Bane says nothing about regeneration (CR
+      -- 701.19c), so the shield applies -- and CR 701.8c calls that replacing the
+      -- destruction event, so the permanent it saved was never destroyed and is
+      -- not counted.
+      HU.testCase "CR 701.19a a regenerated permanent is not destroyed and not counted" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        badMoon <- Registry.printing registry "Bad Moon"
+        let (equipment, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+            (moon, g2) = S.addCreature badMoon S.bob g1
+            (entered, resolved) = castBaneOfProgress forest bane (S.addRegenShield equipment g2)
+        HU.assertBool "the shielded artifact stands" (S.onBattlefield equipment resolved)
+        HU.assertEqual "and CR 701.19a taps it" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject equipment resolved))
+        HU.assertBool "its unshielded neighbour died" (not (S.onBattlefield moon resolved))
+        HU.assertEqual "one destroyed this way, so one counter" 1 (plusOnePlusOnesOn entered resolved),
+      -- CR 608.2c: the instructions run in the order written, so with nothing for
+      -- the sweep to destroy the rider reads a bound zero rather than an unbound
+      -- slot. No counters, and Bane is the 2/2 it was printed as.
+      HU.testCase "an empty sweep binds zero, so the rider puts no counters on" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (bystander, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            (entered, resolved) = castBaneOfProgress forest bane board
+        HU.assertBool "the creature stands: it is neither an artifact nor an enchantment" (S.onBattlefield bystander resolved)
+        HU.assertEqual "no counters" 0 (plusOnePlusOnesOn entered resolved)
+        HU.assertEqual "so Bane is the printed 2/2" (Just 2) (entered >>= \oid -> Projection.powerOf oid resolved)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry, baneOfProgressTests registry]

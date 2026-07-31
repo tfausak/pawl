@@ -128,6 +128,14 @@ payloadHead value = case J.tag value of
   Right (_, Just (Value.Array (Array.MkArray (h : _)))) -> h
   _ -> J.jNull
 
+-- How many elements a tagged effect's array payload holds -- what an ELIDED
+-- optional trailing element is asserted by. -1 for a payload that is not an
+-- array, so a wrong shape fails loudly rather than matching a real length.
+payloadLength :: Value.Value -> Int
+payloadLength value = case J.tag value of
+  Right (_, Just (Value.Array (Array.MkArray xs))) -> length xs
+  _ -> -1
+
 -- The `optionality` key of an encoded Mode, or Nothing when it was omitted (CR
 -- 603.5's Mandatory default).
 optionalityKey :: Value.Value -> Maybe Value.Value
@@ -221,6 +229,19 @@ tests registry =
             roundTrip "pwr" Codec.quantityToJson Codec.jsonToQuantity Quantity.Power,
           HU.testCase "Quantity.Literal round-trips" $
             roundTrip "lit" Codec.quantityToJson Codec.jsonToQuantity (Quantity.Literal 5),
+          -- Bane of Progress' "for each permanent destroyed this way": a number an
+          -- earlier effect of the same resolution bound into a slot. Unlike X, it
+          -- carries the slot name on the wire, so the payload is asserted rather
+          -- than only round-tripped -- and nested under Plus, since composition is
+          -- where a recursive decoder loses a payload.
+          HU.testCase "Quantity.InSlot carries its slot name, bare and nested" $ do
+            let slot = SlotName.MkSlotName (Text.pack "destroyed")
+            roundTrip "qslot" Codec.quantityToJson Codec.jsonToQuantity (Quantity.InSlot slot)
+            roundTrip "qslot+" Codec.quantityToJson Codec.jsonToQuantity (Quantity.Plus (Quantity.Literal 1) (Quantity.InSlot slot))
+            HU.assertEqual
+              "the slot name is on the wire"
+              (J.tagged (Text.pack "InSlot") (Just (Codec.slotNameToJson slot)))
+              (Codec.quantityToJson (Quantity.InSlot slot)),
           HU.testCase "ManaCost round-trips" $
             roundTrip
               "cost"
@@ -281,15 +302,15 @@ tests registry =
             roundTrip "e4d" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
             roundTrip "e4e" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))),
           HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
-            roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable)
-            roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated),
+            roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing)
+            roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing),
           -- An ObjectRef is untagged and told apart by JSON type, so the two arms
           -- have to be pinned together: a string is the slot, an object is the
           -- filter-selected set. A round trip alone would not catch a decoder that
           -- read every payload as one arm, so the wire form is spelled out.
           HU.testCase "ObjectRef's two arms are told apart by JSON type, not by a tag" $ do
-            let slotted = Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable
-                swept = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable
+            let slotted = Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing
+                swept = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing
             roundTrip "e5c" Codec.effectToJson Codec.jsonToEffect swept
             HU.assertEqual
               "a slot is still a bare string, so every Destroy card on disk is unchanged"
@@ -299,6 +320,21 @@ tests registry =
               "and a set is the Filter object"
               (Codec.filterToJson (Filter.Type.HasCardType CardType.Creature))
               (payloadHead (Codec.effectToJson swept)),
+          -- Bane of Progress' "destroyed this way": the third element is the slot
+          -- the sweep binds its count into, and it is ELIDED when absent -- so
+          -- every Destroy already on disk keeps its two-element payload.
+          HU.testCase "Destroy's bound-count slot round-trips and is elided when absent" $ do
+            let counting = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed")))
+                plain = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Artifact)) Regenerability.Regenerable Nothing
+            roundTrip "e5d" Codec.effectToJson Codec.jsonToEffect counting
+            HU.assertEqual
+              "a Destroy that binds nothing writes two elements"
+              2
+              (payloadLength (Codec.effectToJson plain))
+            HU.assertEqual
+              "and one that binds a count writes three"
+              3
+              (payloadLength (Codec.effectToJson counting)),
           HU.testCase "ExileHandThenDraw" $
             roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
           HU.testCase "PlayerSacrifices" $

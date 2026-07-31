@@ -1248,6 +1248,7 @@ quantityToJson q = case q of
   Quantity.ManaValue -> nullary (Text.pack "ManaValue")
   Quantity.Power -> nullary (Text.pack "Power")
   Quantity.X -> nullary (Text.pack "X")
+  Quantity.InSlot s -> Json.tagged (Text.pack "InSlot") (Just (slotNameToJson s))
   Quantity.Star -> nullary (Text.pack "Star")
   Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array (MkArray [quantityToJson a, quantityToJson b])))
   Quantity.Count c -> countToJson c
@@ -1260,6 +1261,7 @@ jsonToQuantity value = do
     ("ManaValue", _) -> Right Quantity.ManaValue
     ("Power", _) -> Right Quantity.Power
     ("X", _) -> Right Quantity.X
+    ("InSlot", Just v) -> Quantity.InSlot <$> jsonToSlotName v
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Array (MkArray [x, y]))) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
     -- jsonToCount re-derives the tag from the WHOLE value (see the comment on
@@ -1584,7 +1586,12 @@ effectToJson e = case e of
   Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [slotNameToJson slot, filterToJson f, quantityToJson q])))
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
-  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array (MkArray [objectRefToJson s, regenerabilityToJson r])))
+  -- The bound-count slot is ELIDED when absent, the posture Create's TokenEntry
+  -- and ArmDelayedTrigger's duration take, so every card that says nothing about
+  -- counting its sweep stays byte-for-byte as it was written.
+  Effect.Destroy s r ms ->
+    Json.tagged (Text.pack "Destroy") . Just . Array . MkArray $
+      [objectRefToJson s, regenerabilityToJson r] <> fmap slotNameToJson (Maybe.maybeToList ms)
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
@@ -1653,8 +1660,9 @@ jsonToEffect value = do
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> case mv of
-      Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv
-      _ -> Left (Text.pack "Destroy expects [objectRef, regenerability]")
+      Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv <*> pure Nothing
+      Just (Array (MkArray [sv, rv, nv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv <*> (Just <$> jsonToSlotName nv)
+      _ -> Left (Text.pack "Destroy expects [objectRef, regenerability], optionally with a slot")
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
     "RemoveFromCombat" -> withValue mv (fmap Effect.RemoveFromCombat . jsonToSlotName)
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
