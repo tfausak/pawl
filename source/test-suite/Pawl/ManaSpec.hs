@@ -439,7 +439,8 @@ castOffBoard answer permanents spell =
    in S.runPure answer afterCast Stack.resolveTop
 
 -- The mana Alice's pool holds after tapping `oid` with every prompt answered by
--- `answer` -- the observable that says which type a multi-type source produced.
+-- `answer` -- the observable that says WHAT a source produced: which type, where
+-- it offers several, and how much, where one activation adds more than one.
 tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> [ManaType.ManaType]
 tappedFor answer oid gs = case Mana.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units

@@ -87,8 +87,10 @@ data Prompt r where
   ChooseDefender :: Decider -> PlayerId -> NonEmpty PlayerId -> Prompt PlayerId
   -- CR 601.2g (and CR 602.2b for an ability): which mana source to activate next
   -- while paying a cost.
-  -- Asked once per source tapped, so a cost needing two mana asks twice against a
-  -- shrinking candidate list.
+  --
+  -- Asked once per source TAPPED, against a shrinking candidate list, which is
+  -- not once per mana the cost demands: a Sol Ring pays {2} in one activation and
+  -- so raises this once.
   --
   -- Elided only when there is exactly ONE candidate, where no choice exists.
   -- Same-card candidates are NOT treated as interchangeable: two Llanowar Elves
@@ -117,8 +119,9 @@ data Prompt r where
   -- Mana.tapForMana reads neither today, so nothing observable is being lost
   -- here that is not already gone (#238).
   --
-  -- The candidates are deduplicated, which is the one elision needing no
-  -- judgement: two ways to produce black mana yield the same unit either way.
+  -- The candidates are deduplicated by the WHOLE yield, which is the one elision
+  -- needing no judgement: two ways to produce black mana add the same mana either
+  -- way.
   ChooseManaYield :: Decider -> PlayerId -> ObjectId -> NonEmpty Mana -> Prompt Mana
   -- CR 701.34a: which permanents and players a proliferating player gives another
   -- counter to. The [ObjectId] is every permanent holding at least one counter and

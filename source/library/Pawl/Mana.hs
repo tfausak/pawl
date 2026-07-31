@@ -147,12 +147,19 @@ producedTypes production = case production of
       ManaType.Colored
       [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
 
--- CR 106.12: "To 'tap [a permanent] for mana' is to activate a mana ability of
--- that permanent that includes the {T} symbol in its activation cost." Every
--- such ROUTE an object offers, as the mana ONE activation of it adds: its
--- intrinsic subtype mana (CR 305.6), one route per basic land type, PLUS one
--- route per MODE (CR 700.2) of every projected activated ability that is a mana
--- ability (CR 605.1a), resolved inline at payment and never on the stack.
+-- Every ROUTE by which this object could be activated for mana, as the mana ONE
+-- activation of it adds: its intrinsic subtype mana (CR 305.6), one route per
+-- basic land type, PLUS one route per MODE (CR 700.2) of every projected
+-- activated ability that is a mana ability (CR 605.1a), resolved inline at
+-- payment and never on the stack (CR 605.3b).
+--
+-- CR 106.12 narrows the phrase "tap for mana" to a mana ability "that includes
+-- the {T} symbol in its activation cost", and NOTHING here reads a cost -- not
+-- this function and not isManaAbility. Every mana ability in the pool costs
+-- exactly {T} (manaSourcesGiven leans on the same fact for CR 302.6), so the
+-- filter would change no answer; one that did not would be enumerated here as
+-- though it tapped, which is the cost half of the same shortcut tapForMana takes
+-- (#238).
 --
 -- The nesting is the whole point. The OUTER list is the options -- which ability
 -- of this permanent, and which of its modes. The INNER list is that one
@@ -321,10 +328,10 @@ manaSourcesGiven grants pcs pid gs =
         Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaRoutesOfGiven pcs oid gs)) && notSickCreature oid
    in filter isSource (Projection.controlsGiven grants pid gs)
 
--- CR 106.12: tap an object for mana -- add the mana one activation of one of its
--- mana abilities yields, and tap it. CR 605.3b: a mana ability does not use the
--- stack, so this is immediate -- which is also why the colour choice is made
--- HERE and not by Resolve.
+-- CR 106.12's "tap [a permanent] for mana" -- add the mana one activation of one
+-- of its mana abilities yields, and tap it. CR 605.3b: a mana ability does not
+-- use the stack, so this is immediate -- which is also why the colour choice is
+-- made HERE and not by Resolve.
 --
 -- Monadic because of that choice. A Mountain offers exactly one yield and is
 -- never asked; a Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR
@@ -842,8 +849,8 @@ sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
 payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
 payableResolutions pid committed cost gs =
   let Mana.MkMana units = poolOf pid gs
-      -- The SAME board manaSources is judged against serves the per-source mana
-      -- types too, rather than a fresh projection per source on top of the sweep
+      -- The SAME board manaSources is judged against serves the per-source
+      -- yields too, rather than a fresh projection per source on top of the sweep
       -- (#200); see manaSources above for the hoist and its snapshot argument.
       grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
