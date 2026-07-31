@@ -113,9 +113,11 @@ data Effect card
     -- DestroyAll opcode was the alternative, and it would have had to carry its
     -- own copy of the CR 702.12b gate, the CR 616.1 funnel and the CR 701.19c
     -- rider -- the duplication PlayerRef already exists to avoid on the player
-    -- side (Draw's comment). Untap has since taken the same parameter for the
-    -- same reason; the other object-affecting opcodes still take a bare
-    -- SlotName, none of them having a card that names a set (#378).
+    -- side (Draw's comment). Untap, ModifyTarget and GainControl have since
+    -- taken the same parameter for the same reason -- the last two additionally
+    -- owing CR 611.2c a frozen set, since they STORE what they build; the other
+    -- object-affecting opcodes still take a bare SlotName, none of them having a
+    -- card that names a set (#378).
     Destroy ObjectRef Regenerability
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
