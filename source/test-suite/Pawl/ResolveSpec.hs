@@ -1162,8 +1162,9 @@ resolveTests registry =
       -- differ, so no single wrong reading can pass.
       --
       -- Wall of Stone is 0/8, so it survives and carries the damage as a mark
-      -- CR 120.3 leaves on it until cleanup -- a dead creature would only tell
-      -- us the damage was at least its toughness.
+      -- (CR 120.3e, removed at CR 514.2's cleanup) that the assertion can read
+      -- exactly -- a dead creature would only tell us the damage was at least
+      -- its toughness.
       HU.testCase "CR 205.4g Skred counts the snow permanents YOU control, and nothing else" $ do
         snowMountain <- Registry.printing registry "Snow-Covered Mountain"
         mountain <- Registry.printing registry "Mountain"
