@@ -41,7 +41,7 @@
                 ],
                 "keywords": [],
                 "manaCost": null,
-                "name": "Goblin",
+                "name": "Goblin Token",
                 "power": {
                   "type": "Literal",
                   "value": 1

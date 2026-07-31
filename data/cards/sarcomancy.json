@@ -56,7 +56,7 @@
                     ],
                     "keywords": [],
                     "manaCost": null,
-                    "name": "Zombie",
+                    "name": "Zombie Token",
                     "power": {
                       "type": "Literal",
                       "value": 2

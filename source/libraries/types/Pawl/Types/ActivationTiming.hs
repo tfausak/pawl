@@ -1,5 +1,7 @@
 module Pawl.Types.ActivationTiming where
 
+import Pawl.Types.Phase (Phase)
+
 -- CR 307.5: when an activated ability may be activated.
 --
 -- A sum type rather than a Bool on the ability: no boolean blindness, and the
@@ -13,12 +15,45 @@ module Pawl.Types.ActivationTiming where
 -- sorcery spell don't affect the player's capability to perform that action."
 --
 -- That last sentence is load-bearing and easy to get wrong: the check must NOT
--- consult casting prohibitions (Rule of Law, Silence). It is three facts about
--- the game state and nothing else.
+-- consult casting prohibitions (Rule of Law, Silence). For SorcerySpeed it is
+-- three facts about the game state and nothing else. DuringPhase below is held
+-- to the same discipline, and for the same reason -- Pawl.Activate.timingOk
+-- reads GameState.phase and never Pawl.Types.CastingRestriction.
+--
+-- Deliberately NOT a synonym for Pawl.Types.CastingRestriction, which carries an
+-- arm spelled the same way. Three reasons, and the first is the one that would
+-- survive a card forcing the question:
+--
+--   1. Different logical role. A CastingRestriction is one of a LIST of
+--      prohibitions layered on top of a window the rules already give the spell
+--      (CR 117.1a for an instant, CR 302.1/307.1 otherwise), and CR 601.3 makes
+--      that list a conjunction. This type is a TOTAL description: CR 602.2 gives
+--      an ability no default window beyond "any time you have priority", and
+--      AnyTime is that default stated as an arm. One type cannot be both.
+--   2. CR 307.5's last two sentences forbid the two readers agreeing --
+--      Pawl.Cast must consult casting prohibitions and Pawl.Activate must not.
+--   3. No ONE card in the pool prints both shapes -- Rally the Troops prints the
+--      casting side, Desert the ability side -- so nothing forces the merge.
+--
+-- ONE rider and never several: an ability whose printed text joins two clauses
+-- with "and only if" (Kongming's Contraptions) is unrepresentable (#456).
 data ActivationTiming
   = -- No rider: any time its controller has priority (CR 602.2).
     AnyTime
   | -- CR 702.6a's "Activate only as a sorcery", and every other ability that
     -- carries the same phrase.
     SorcerySpeed
+  | -- CR 500.1: activatable only while the game is in this step or phase.
+    -- Desert's "Activate only during the end of combat step" (CR 511.1).
+    --
+    -- Pawl.Types.Phase is one type over the CR 500.1 phases and their steps, so
+    -- naming a step and naming a STEPLESS phase (the two main phases) are the
+    -- same act here. A phase that HAS steps is not nameable -- "Activate only
+    -- during combat" (Najeela, the Blade-Blossom, Jade Statue) would have to
+    -- name five steps at once (#455).
+    --
+    -- WHOSE turn is a second axis this arm does not carry: "Activate only during
+    -- your upkeep" (Hell's Caretaker, Augur il-Vec) narrows the same window by
+    -- turn as well (#454).
+    DuringPhase Phase
   deriving (Eq, Ord, Show)

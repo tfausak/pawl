@@ -66,7 +66,7 @@
                       }
                     ],
                     "manaCost": null,
-                    "name": "Spirit",
+                    "name": "Spirit Token",
                     "power": {
                       "type": "Literal",
                       "value": 1

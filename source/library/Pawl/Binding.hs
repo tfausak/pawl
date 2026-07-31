@@ -183,6 +183,13 @@ toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
 toPlayer :: PlayerId -> Binding
 toPlayer pid = Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)}
 
+-- A binding that names one NUMBER and nothing else -- what a Destroy that counts
+-- what it destroyed binds for a later "for each ... destroyed this way" to read
+-- (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an amount
+-- rather than a recipient, so it rides the same field CR 601.2b's chosen X does.
+toAmount :: Natural -> Binding
+toAmount n = Binding.empty {Binding.amount = Just n}
+
 -- Bind an object under the reserved triggerSource slot. A dedicated
 -- single-purpose slot, so this insert never clobbers another binding (setCopy's
 -- posture).

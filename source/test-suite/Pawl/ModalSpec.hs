@@ -355,7 +355,9 @@ triggerModalTests registry =
         HU.assertEqual "Aether Channeler still on the battlefield (nothing bounced)" 1 (S.countOnBattlefieldByName (Text.pack "Aether Channeler") S.alice resolved)
         case newObjs of
           [tokId] -> do
-            HU.assertEqual "the token is named Bird" (Just (Text.pack "Bird")) (fmap Card.Type.name (Game.cardOf tokId resolved))
+            -- CR 111.4: Aether Channeler's first mode does not name the token,
+            -- so its name is its subtype plus the word "Token".
+            HU.assertEqual "the token is named Bird Token" (Just (Text.pack "Bird Token")) (fmap Card.Type.name (Game.cardOf tokId resolved))
             HU.assertBool "the Bird has flying (projected)" (Projection.hasKeyword Keyword.Flying tokId resolved)
           _ -> HU.assertFailure "expected exactly one new (Bird token) permanent",
       HU.testCase "bounce mode ({1}) returns another nonland permanent to its owner's hand (CR 601.2c)" $ do
