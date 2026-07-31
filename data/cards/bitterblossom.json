@@ -90,7 +90,7 @@
                       }
                     ],
                     "manaCost": null,
-                    "name": "Faerie Rogue",
+                    "name": "Faerie Rogue Token",
                     "power": {
                       "type": "Literal",
                       "value": 1

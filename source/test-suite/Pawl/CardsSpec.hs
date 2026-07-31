@@ -438,9 +438,10 @@ tests registry =
             HU.assertEqual "one token" (Quantity.Literal 1) quantity
             HU.assertEqual "with no entry riders" TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Untapped, TokenEntry.attacking = False} entry
             HU.assertEqual "and no slot bound to it" Nothing slot
-            -- CR 111.4's trailing "Token" is not part of any token name in this
-            -- pool (#469).
-            HU.assertEqual "named Faerie Rogue" (Text.pack "Faerie Rogue") (CardT.name token)
+            -- CR 111.4: Bitterblossom names no token, so the name is the
+            -- subtypes plus the word "Token" -- the rule's own example is
+            -- "Dwarf Berserker Token".
+            HU.assertEqual "named Faerie Rogue Token" (Text.pack "Faerie Rogue Token") (CardT.name token)
             HU.assertEqual
               "Creature - Faerie Rogue"
               (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Rogue, Subtype.Faerie]))
