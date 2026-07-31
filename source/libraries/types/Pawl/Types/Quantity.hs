@@ -1,6 +1,7 @@
 module Pawl.Types.Quantity where
 
 import Pawl.Types.Count (Count)
+import Pawl.Types.SlotName (SlotName)
 
 -- A number that may not be a literal number.
 --
@@ -44,6 +45,30 @@ data Quantity
     -- continuous effect must FREEZE this to a Literal when stored (Projection.hs
     -- note), which no M4a card exercises.
     X
+  | -- A number an EARLIER effect of the same resolution bound into a slot -- Bane
+    -- of Progress' "for each permanent destroyed this way", where the sweep's own
+    -- Destroy writes how many it actually destroyed and this reads it back. Read
+    -- from the resolving object's binding environment (Pawl.Binding.amountOf), the
+    -- same channel X uses.
+    --
+    -- Named InSlot rather than Bound because PlayerRef.InSlot and ObjectRef.InSlot
+    -- already spell "read the binding at this slot" that way; a third reference
+    -- type reading a slot uses the same word.
+    --
+    -- SEPARATE from X above rather than X being `InSlot Binding.variableX`, though
+    -- the two arms read the identical field. X is CR 601.2b's value a PLAYER chose
+    -- while casting, and being X is what the D4 "reads X iff the cost declares {X}"
+    -- lint (Resolve.readsX) is stated over, as well as the one slot read that
+    -- Resolve.slotsOf must NOT report; this is a value the ENGINE derived
+    -- mid-resolution, which neither lint may see. Collapsing them would restate
+    -- both as comparisons against one privileged slot name. Not retiring X's
+    -- reserved-slot shim in favour of this arm is #14.
+    --
+    -- Nothing when the slot holds no amount -- the producing effect has not run
+    -- yet, or bound nothing. Not 0: "how many were destroyed" is unanswered, not
+    -- answered with zero, and Resolve's arms already no-op on an unevaluable
+    -- quantity.
+    InSlot SlotName
   | -- CR 208.2 / 208.2a: the star printed in a power/toughness box, standing for
     -- a value a characteristic-defining ability defines. NOTATION, not a value:
     -- Quantity.evaluate returns Nothing for it. Projection.baseCharacteristics

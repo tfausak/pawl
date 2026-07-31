@@ -100,7 +100,30 @@ data Effect card
     -- side (Draw's comment). Untap has since taken the same parameter for the
     -- same reason; the other object-affecting opcodes still take a bare
     -- SlotName, none of them having a card that names a set (#378).
-    Destroy ObjectRef Regenerability
+    --
+    -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
+    -- destroyed into the effect SOURCE's live bindings -- the resolving spell
+    -- itself for a spell, the source permanent for an ability, the same holder
+    -- Create's minted-token slot uses -- so a later effect of the same resolution
+    -- can read it back as Quantity.InSlot. That is Bane of Progress' "destroy all
+    -- artifacts and enchantments. Put a +1/+1 counter on this creature for each
+    -- permanent destroyed this way", where the two sentences are two ordinary
+    -- opcodes joined by the slot rather than one fused opcode.
+    --
+    -- A DEFINITION, not a read: it is not a target and never appears in
+    -- targetSpecs, exactly like Create's minted-token slot and PlaySubgame's
+    -- loser slot.
+    --
+    -- ACTUALLY destroyed, which is not "matched by the ObjectRef": CR 702.12b's
+    -- indestructible permanent and CR 701.19a's regenerated one are both swept at
+    -- and neither is destroyed, and CR 701.8b says a permanent put into a
+    -- graveyard any other way "hasn't been 'destroyed'". So the number comes back
+    -- out of the destruction funnel (Event.destroyReturning) rather than from the
+    -- length of the swept list.
+    --
+    -- A COUNT, not the set: a rider that acts on each destroyed permanent rather
+    -- than on how many there were is not implemented (#463).
+    Destroy ObjectRef Regenerability (Maybe SlotName)
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
     -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor

@@ -286,6 +286,9 @@ quantityCounts quantity = case quantity of
   Quantity.Type.ManaValue -> []
   Quantity.Type.Power -> []
   Quantity.Type.X -> []
+  -- A slot read, not a fold over game state: the value was bound by an earlier
+  -- effect of the same resolution and there is no Count inside it.
+  Quantity.Type.InSlot _ -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b
   Quantity.Type.Count count -> count : countCounts count
@@ -931,7 +934,7 @@ m4bCardTests registry =
       HU.testCase "CR 701.19c Terror and Reprisal both carry the can't-be-regenerated rider" $ do
         terror <- Registry.printing registry "Terror"
         reprisal <- Registry.printing registry "Reprisal"
-        let riders c = [r | Effect.Destroy _ r <- Card.allEffects (Printing.card c)]
+        let riders c = [r | Effect.Destroy _ r _ <- Card.allEffects (Printing.card c)]
         HU.assertEqual "Terror" [Regenerability.CantBeRegenerated] (riders terror)
         HU.assertEqual "Reprisal" [Regenerability.CantBeRegenerated] (riders reprisal),
       HU.testCase "Murder is a {1}{B}{B} Instant that destroys a target creature" $ do
@@ -941,7 +944,7 @@ m4bCardTests registry =
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
         HU.assertBool "an instant" (Card.isInstant c)
         -- Murder carries no CR 701.19c rider, unlike Terror and Reprisal.
-        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable] (Card.allEffects c)
+        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing] (Card.allEffects c)
         HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
       -- Murder's opposite number on the one axis this pair exists to pin: the
       -- SAME Destroy opcode, with the SAME CR 701.19c rider, differing only in
@@ -959,7 +962,7 @@ m4bCardTests registry =
         -- text is only "all creatures", so the Filter is only HasCardType.
         HU.assertEqual
           "one Destroy over the creatures, with no can't-be-regenerated rider"
-          [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable]
+          [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing]
           (Card.allEffects c)
         HU.assertEqual "and no target spec at all" Map.empty (Card.allTargetSpecs c),
       -- The pool's counterweight to Day of Judgment: a creature that grants

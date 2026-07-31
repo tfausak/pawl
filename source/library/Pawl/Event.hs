@@ -335,7 +335,26 @@ changeZoneAttaching asOf oid requestedDest seed = do
 -- destroyIn -- the shared body -- sets out which board each of its three readers
 -- gets.
 destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
-destroy = destroyIn Nothing
+destroy regenerability oids = Monad.void (destroyIn Nothing regenerability oids)
+
+-- destroy, answering with the permanents it ACTUALLY destroyed -- CR 701.8b's
+-- "destroyed this way", which is emphatically not the batch it was handed. A
+-- member with indestructible never reaches the destruction event at all (CR
+-- 702.12b, the gate below), and a regenerated one has that event replaced (CR
+-- 701.8c, "A regeneration effect replaces a destruction event"), so neither was
+-- destroyed and neither is in this answer.
+--
+-- Each surviving destruction reports the SETTLED object rather than the one
+-- asked about, for the same reason the graveyard move follows it: a CR 616.1
+-- rewrite may redirect the destruction, and what was destroyed is what the loop
+-- handed back. No replacement in this pool redirects one, so the two lists are
+-- equal today.
+--
+-- A second door rather than a return type on `destroy`, the changeZoneReturning
+-- posture: the Destroy opcode's bound-count slot (Pawl.Types.Effect) is the only
+-- caller that has anything to do with the answer.
+destroyReturning :: Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
+destroyReturning = destroyIn Nothing
 
 -- destroy for a batch that is one PART of a larger simultaneous event, whose
 -- board is `asOf`. CR 704.3's state-based-action check is that event -- "the game
@@ -352,7 +371,7 @@ destroy = destroyIn Nothing
 -- in Pawl.Resolve and the test suite -- has no larger event to name, and for them
 -- the board the batch begins on IS the live one.
 destroyInBatch :: GameState -> Regenerability.Regenerability -> [ObjectId] -> Game ()
-destroyInBatch asOf = destroyIn (Just asOf)
+destroyInBatch asOf regenerability oids = Monad.void (destroyIn (Just asOf) regenerability oids)
 
 -- The shared body. Three separate readers of a board, and they do NOT all get the
 -- same one:
@@ -392,20 +411,28 @@ destroyInBatch asOf = destroyIn (Just asOf)
 -- rule, not the pool, is what says the two loops are one event. See
 -- Pawl.Replacement's applyReplacementsIn for what the frozen board covers and
 -- what stays live.
-destroyIn :: Maybe GameState -> Regenerability.Regenerability -> [ObjectId] -> Game ()
+--
+-- Answers with the members that were actually destroyed, in the order they were
+-- handed over; destroyReturning's haddock has what that answer is for and why it
+-- is narrower than `oids`.
+destroyIn :: Maybe GameState -> Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
 destroyIn asOf regenerability oids = do
   live <- State.get
   let gs = Maybe.fromMaybe live asOf
       doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid live) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
-  Monad.forM_ doomed $ \oid -> do
+  fmap Maybe.catMaybes . Monad.forM doomed $ \oid -> do
     settled <- Replacement.resolveDestruction (Just gs) regenerability oid
     case settled of
-      Nothing -> pure ()
+      -- CR 701.8c: a regeneration effect REPLACED the destruction, so nothing was
+      -- destroyed here and this member is not in the answer.
+      Nothing -> pure Nothing
       -- The graveyard move follows the SETTLED object, not the one asked about,
       -- so a rewrite that redirects the destruction is honoured. changeZone is a
       -- no-op for an object that is already gone, which is what makes it safe to
       -- have named the batch's members before any of them moved.
-      Just target -> changeZoneInBatch gs target Zone.Graveyard
+      Just target -> do
+        changeZoneInBatch gs target Zone.Graveyard
+        pure (Just target)
 
 -- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
 -- permanent -- not to be confused with `counter` below, CR 701.6's countering
