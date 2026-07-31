@@ -5,7 +5,7 @@ import qualified Pawl.AuraSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CardsSpec
-import qualified Pawl.CastSpec as CastSpec
+import qualified Pawl.CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
@@ -84,7 +84,6 @@ testTree registry =
       PropertySpec.tests registry,
       CodecSpec.tests registry,
       ManaSpec.tests registry,
-      CastSpec.tests registry,
       ResolveSpec.tests registry,
       ReplacementSpec.tests registry,
       TriggerSpec.tests registry,
@@ -99,6 +98,7 @@ spec s registry = do
   Pawl.AuraSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardsSpec.spec s registry
+  Pawl.CastSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
