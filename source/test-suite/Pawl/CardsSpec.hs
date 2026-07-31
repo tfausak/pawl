@@ -10,17 +10,22 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
+import qualified Pawl.Mana as Mana
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -28,6 +33,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
@@ -39,14 +45,17 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TokenEntry as TokenEntry
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -196,7 +205,10 @@ tests registry =
         case [(q, tc) | ab <- CardT.triggeredAbilities c, Effect.Create q tc _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))] of
           [(quantity, token)] -> do
             HU.assertEqual "one token" (Quantity.Literal 1) quantity
-            HU.assertEqual "named Spirit" (Text.pack "Spirit") (CardT.name token)
+            -- CR 111.4: "If the spell or ability doesn't specify the name of
+            -- the token, its name is the same as its subtype(s) plus the word
+            -- 'Token.'" Doomed Traveler specifies no name.
+            HU.assertEqual "named Spirit Token" (Text.pack "Spirit Token") (CardT.name token)
             HU.assertEqual
               "Creature -- Spirit"
               (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Spirit))
@@ -260,7 +272,9 @@ tests registry =
         case [(q, tc) | ab <- CardT.triggeredAbilities c, Effect.Create q tc _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))] of
           [(quantity, token)] -> do
             HU.assertEqual "one token" (Quantity.Literal 1) quantity
-            HU.assertEqual "named Zombie Berserker" (Text.pack "Zombie Berserker") (CardT.name token)
+            -- CR 111.4, the multi-subtype case the rule's own Dwarven
+            -- Reinforcements example spells out: both subtypes, then "Token".
+            HU.assertEqual "named Zombie Berserker Token" (Text.pack "Zombie Berserker Token") (CardT.name token)
             HU.assertEqual
               "Creature -- Zombie Berserker"
               (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Zombie, Subtype.Berserker]))
@@ -372,6 +386,50 @@ tests registry =
           [(Optionality.Mandatory, [Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")))])]
           (modeShapes (CardT.spell c))
         HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c),
+      -- CR 307.5: the first card whose ACTIVATED ability prints a timing rider
+      -- naming a phase, so the first file to carry a `timing` key that is not
+      -- SorcerySpeed. "{T}: Add {C}. / {T}: This land deals 1 damage to target
+      -- attacking creature. Activate only during the end of combat step."
+      --
+      -- Also the first NONBASIC land type in the pool (CR 205.3i), which is what
+      -- separates Pawl.Subtype.isLandType from Pawl.Mana.subtypeMana: Desert is
+      -- a land type that grants no intrinsic mana ability, so the "{T}: Add {C}"
+      -- asserted here has to be PRINTED, and it is.
+      HU.testCase "desert.json loads as a Land -- Desert whose ping is gated to the end of combat step" $ do
+        c <- Registry.card registry "Desert"
+        HU.assertEqual "name" (Text.pack "Desert") (CardT.name c)
+        HU.assertEqual "no mana cost" Nothing (CardT.manaCost c)
+        HU.assertEqual
+          "Land -- Desert"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Land) (Set.singleton Subtype.Desert))
+          (CardT.typeLine c)
+        HU.assertEqual
+          "the mana ability is unrestricted and the ping is not"
+          [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat)]
+          (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
+        -- CR 605.1a: "An activated ability is a mana ability if it meets all of
+        -- the following criteria: it doesn't require a target ..., it could add
+        -- mana to a player's mana pool when it resolves, and it's not a loyalty
+        -- ability." The ping targets, so the rider rides on the ability that is
+        -- NOT a mana ability -- which is why Pawl.Activate ever sees it at all.
+        HU.assertEqual
+          "one mana ability, one not"
+          [True, False]
+          (fmap Mana.isManaAbility (CardT.activatedAbilities c))
+        HU.assertEqual
+          "one adds {C}, the other deals 1 to its target"
+          [ [(Optionality.Mandatory, [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)])],
+            [(Optionality.Mandatory, [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)])]
+          ]
+          (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
+        -- CR 601.2c reaches an activation through CR 602.2b, and this is the
+        -- pool it announces from: creatures, narrowed to the attacking ones.
+        HU.assertEqual
+          "and can only pick an attacking creature"
+          [ [],
+            [(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures (Just Filter.IsAttacking))]
+          ]
+          [Map.toList (Mode.targetSpecs m) | ab <- CardT.activatedAbilities c, m <- Foldable.toList (Modal.modes (ActivatedAbility.modal ab))],
       -- The pool's first card whose ENTERS trigger acts on the permanent that
       -- entered. Soul Warden shares the condition and names nothing about the
       -- entrant; endless-cockroaches.json shares the slot but reads it from a
@@ -470,7 +528,53 @@ tests registry =
               )
             ]
           ]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The pool's first card whose mass effect has a RIDER reading the sweep
+      -- back: "destroy all artifacts and enchantments. Put a +1/+1 counter on
+      -- this creature for each permanent destroyed this way." The two halves are
+      -- two ordinary opcodes joined by a binding slot -- the Destroy names
+      -- "destroyed" and the PutCounters reads it as Quantity.InSlot -- so nothing
+      -- about this card is a fused opcode.
+      --
+      -- The slot is a DEFINITION rather than a target spec, which is why the mode
+      -- declares none: CR 115.10a, the word "target" is nowhere on the card.
+      HU.testCase "bane-of-progress.json loads as a {4}{G}{G} Elemental whose sweep binds a count its rider reads" $ do
+        c <- Registry.card registry "Bane of Progress"
+        let destroyed = SlotName.MkSlotName (Text.pack "destroyed")
+        HU.assertEqual "name" (Text.pack "Bane of Progress") (CardT.name c)
+        HU.assertEqual
+          "{4}{G}{G}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Elemental"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Elemental))
+          (CardT.typeLine c)
+        HU.assertEqual
+          "2/2"
+          (Just (Power.MkPower (Quantity.Literal 2)), Just (Toughness.MkToughness (Quantity.Literal 2)))
+          (CardT.power c, CardT.toughness c)
+        HU.assertEqual
+          "one trigger, on this creature entering"
+          [TriggerCondition.SelfEnters]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "the sweep binds its count, and the rider reads that slot onto the source"
+          [ [ ( Optionality.Mandatory,
+                [ Effect.Destroy
+                    (ObjectRef.EachMatching (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Enchantment]))
+                    Regenerability.Regenerable
+                    (Just destroyed),
+                  Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot destroyed) Binding.triggerSource
+                ]
+              )
+            ]
+          ]
           (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "and it targets nothing: CR 115.10a, the card never says 'target'"
+          [[Map.empty]]
+          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion

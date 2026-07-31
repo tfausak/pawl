@@ -1,5 +1,7 @@
 module Pawl.Quantity where
 
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Count as Count
 import qualified Pawl.Filter as Filter
@@ -12,6 +14,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
+import Pawl.Types.SlotName (SlotName)
 
 -- Nothing when the value cannot be determined.
 --
@@ -42,6 +45,12 @@ evaluate viewOf context gs oid quantity = case quantity of
   Quantity.X -> case Game.lookupObject oid gs of
     Nothing -> Nothing
     Just obj -> fmap toInteger (Binding.amountOf Binding.variableX (Object.bindings obj))
+  -- A value an earlier effect of this resolution bound into the slot, read off
+  -- the same object and the same binding field X is read from. Nothing when the
+  -- slot holds no amount: the producing effect has not run, or bound nothing.
+  Quantity.InSlot slot -> case Game.lookupObject oid gs of
+    Nothing -> Nothing
+    Just obj -> fmap toInteger (Binding.amountOf slot (Object.bindings obj))
   -- CR 208.2: a bare star has no value of its own. The projection substitutes
   -- the object's characteristic-defining quantity for it at the seed
   -- (Projection.baseCharacteristics), so reaching this arm means the star was
@@ -71,7 +80,31 @@ substituteStar star quantity = case quantity of
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
   Quantity.X -> quantity
+  Quantity.InSlot _ -> quantity
   Quantity.Count _ -> quantity
+
+-- The binding slots a quantity READS. Part of the read half of the D4 dataflow
+-- lint (Resolve.slotsOf calls this for every Quantity an opcode carries), whose
+-- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
+-- this way" names a slot nothing binds is a failing test, not a silent no-op.
+--
+-- X is NOT here, deliberately. It reads Binding.variableX, which casting fills
+-- and no card declares as a target slot, so returning it would make the D4
+-- equality lint ("a mode's slot reads equal its declared slots") demand a target
+-- spec for X on every card that reads one. The {X} half of the same contract is
+-- Resolve.readsX's, and stays there.
+slots :: Quantity -> Set SlotName
+slots quantity = case quantity of
+  Quantity.Literal _ -> Set.empty
+  Quantity.ManaValue -> Set.empty
+  Quantity.Power -> Set.empty
+  Quantity.X -> Set.empty
+  Quantity.InSlot slot -> Set.singleton slot
+  Quantity.Star -> Set.empty
+  Quantity.Plus a b -> Set.union (slots a) (slots b)
+  -- Terminating for the reason evaluate's Count arm is: a Greatest's payload is a
+  -- strictly smaller subterm.
+  Quantity.Count c -> Count.slots slots c
 
 -- CR 202.3: the mana value is "the total amount of mana in its mana cost,
 -- regardless of color" -- each generic symbol contributes its number, each

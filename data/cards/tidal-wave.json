@@ -83,7 +83,7 @@
                   }
                 ],
                 "manaCost": null,
-                "name": "Wall",
+                "name": "Wall Token",
                 "power": {
                   "type": "Literal",
                   "value": 5

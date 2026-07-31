@@ -984,7 +984,7 @@ tests registry =
               (_, g1) = S.addCreature doublingSeason S.alice base
               (g2, spellId) = S.handOne dragonFodder g1
               after = castAndResolve S.identityAnswer g2 spellId
-          HU.assertEqual "twice that many" 4 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after),
+          HU.assertEqual "twice that many" 4 (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after),
         HU.testCase "CR 614.5 two Doubling Seasons are two instances: eight Goblins" $ do
           mountain <- Registry.printing registry "Mountain"
           doublingSeason <- Registry.printing registry "Doubling Season"
@@ -994,7 +994,7 @@ tests registry =
               (_, g2) = S.addCreature doublingSeason S.alice g1
               (g3, spellId) = S.handOne dragonFodder g2
               after = castAndResolve S.identityAnswer g3 spellId
-          HU.assertEqual "2 -> 4 -> 8" 8 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after),
+          HU.assertEqual "2 -> 4 -> 8" 8 (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after),
         HU.testCase "CR 614.1 Doubling Season's OTHER clause doubles counters, not tokens" $ do
           forest <- Registry.printing registry "Forest"
           battlegrowth <- Registry.printing registry "Battlegrowth"

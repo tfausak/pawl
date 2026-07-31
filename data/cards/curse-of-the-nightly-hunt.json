@@ -1,0 +1,72 @@
+{
+  "activatedAbilities": [],
+  "attackRequirements": [
+    {
+      "subject": {
+        "type": "AttachedPlayerControls",
+        "value": {
+          "type": "HasCardType",
+          "value": {
+            "type": "Creature"
+          }
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "enchant": {
+    "pool": {
+      "type": "Players"
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Curse of the Nightly Hunt",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Aura"
+      },
+      {
+        "type": "Curse"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

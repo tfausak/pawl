@@ -131,6 +131,14 @@ subtypeMana subtype = case subtype of
   Subtype.Dragon -> Nothing
   Subtype.Unicorn -> Nothing
   Subtype.Curse -> Nothing
+  -- CR 205.3i: Desert IS a land type, and the first one here that is not a BASIC
+  -- land type -- "Of that list, Forest, Island, Mountain, Plains, and Swamp are
+  -- the basic land types." CR 305.6 grants its intrinsic ability to "an object
+  -- with the land card type and a basic land type", so a Desert gets nothing
+  -- from its type line and prints its own "{T}: Add {C}" instead. This is the
+  -- constructor Pawl.Subtype.isLandType answers True for and this one Nothing:
+  -- the two questions finally differ.
+  Subtype.Desert -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an
