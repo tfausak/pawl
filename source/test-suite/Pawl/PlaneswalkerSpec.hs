@@ -10,6 +10,7 @@
 -- turns are what drive it to 0 for CR 704.5i.
 module Pawl.PlaneswalkerSpec where
 
+import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
@@ -64,9 +65,16 @@ useAbility i p oid gs = case abilityAt i p of
 -- counters come from CR 306.5b's replacement rather than from a fixture.
 jaceOnBattlefield :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 jaceOnBattlefield island jace =
-  let (gs, handId) = S.handOne jace (S.landsInPlay island 3)
+  let (gs, handId) = S.handOne jace (stockLibraries island (S.landsInPlay island 3))
       after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
    in (theJace after, after)
+
+-- Four cards in each library. Jace's abilities all draw, and CR 704.5b would end
+-- the game on an empty one -- so the libraries are stocked to keep every
+-- assertion about loyalty and about who drew from resting on a deck-out.
+stockLibraries :: Printing.Printing -> GameState.GameState -> GameState.GameState
+stockLibraries island base =
+  List.foldl' (\gs pid -> snd (S.addLibraryCard island pid gs)) base (concat (replicate 4 [S.alice, S.bob]))
 
 -- The planeswalker on the battlefield, found by name because CR 400.7 mints a new
 -- object as the spell moves and the hand's id does not survive the cast.

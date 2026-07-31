@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -1773,7 +1774,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
-          Just n -> Monad.when (n > 0) (Event.putCounters target kind (Integer.toNaturalSaturating n))
+          Just n -> Monad.when (n > 0) (Replacement.putCounters target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
       -- CR 701.34a: "choose any number of permanents and/or players that have a
       -- counter, then give each one additional counter of each kind that permanent or
@@ -1827,7 +1828,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       -- counter replacements (Hardened Scales, Doubling Season) apply to a
       -- proliferated counter exactly as they do to a placed one.
       Monad.forM_ keptPermanents $ \oid ->
-        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters oid kind 1
+        Monad.forM_ (kindsOn oid) $ \kind -> Replacement.putCounters oid kind 1
       -- Player counters are added directly, with no CR 614 opportunity, matching
       -- GainPlayerCounters below and gapped for the same reason (#122).
       Monad.forM_ keptPlayers $ \pid ->

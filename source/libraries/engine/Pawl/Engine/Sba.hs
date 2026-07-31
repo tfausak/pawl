@@ -88,6 +88,31 @@ zeroToughness pc =
       Nothing -> False
       Just t -> t <= 0
 
+-- CR 704.5i: "If a planeswalker has loyalty 0, it's put into its owner's
+-- graveyard." CR 306.9 states the same rule from the card type's side.
+--
+-- A put-into-graveyard and NOT a destruction, the CR 704.5f shape rather than the
+-- CR 704.5g one: it is ungated by indestructible and offers regeneration no
+-- opportunity (CR 701.19a), which is why the classification below maps it to the
+-- bury batch.
+--
+-- Takes the GameState as well as the projection, unlike zeroToughness above,
+-- because CR 306.5c puts a permanent's loyalty in its COUNTERS -- "the loyalty of
+-- a planeswalker on the battlefield is equal to the number of loyalty counters on
+-- it" -- and no layer projects it. A planeswalker that never received counters
+-- reads 0 here and is buried, which is the rule and not an accident: a
+-- planeswalker on the battlefield always has CR 306.5b's counters unless
+-- something removed them.
+--
+-- The isPlaneswalker guard is load-bearing rather than defensive: any permanent
+-- may carry loyalty counters (a stray Proliferate would put none there, but CR
+-- 122.1e binds the loyalty READING to planeswalkers), and CR 704.5i must not
+-- bury a creature that happens to hold zero of them.
+zeroLoyalty :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
+zeroLoyalty gs pc oid =
+  Set.member CardType.Planeswalker (PC.cardTypes pc)
+    && maybe True ((== 0) . Map.findWithDefault 0 CounterKind.Loyalty . Object.counters) (Game.lookupObject oid gs)
+
 -- CR 704.5g/h: a creature destroyed by lethal marked damage or by a deathtouch
 -- source. A DESTRUCTION -- indestructible-gated (CR 700.4) and regeneration-
 -- interceptable (CR 701.19a via the Pawl.Engine.Event destroy funnel). Excludes 704.5f
@@ -495,6 +520,9 @@ performStateBasedActions = do
         Just pc
           -- CR 704.5f wins when both apply: toughness <= 0 is a put-into-graveyard.
           | zeroToughness pc -> Just False
+          -- CR 704.5i, the other put-into-graveyard, checked against the same
+          -- pre-pass board for the same CR 704.4 simultaneity reason.
+          | zeroLoyalty gs pc oid -> Just False
           | destroyedBySba gs pc oid -> Just True
           | otherwise -> Nothing
       onBattlefield = Set.toList (GameState.battlefield gs)

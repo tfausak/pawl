@@ -476,6 +476,10 @@ bucketOf re = case re of
   -- itself is unexercised by any test (#73).
   ReplacementEffect.EntryR EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   ReplacementEffect.EntryR (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
+  -- CR 616.1a-d name self-replacement, entering under a control effect,
+  -- entering as a copy and entering with the back face up; entering with
+  -- counters is none of those, so CR 616.1e is what applies.
+  ReplacementEffect.EntryR (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
   ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
   ReplacementEffect.CounterR _ _ -> ReplacementBucket.Other
@@ -668,6 +672,20 @@ apply batch candidate event =
             consume (ReplacementCandidate.identity candidate)
             State.modify' (applyEntryOption oid picked)
             pure (Just event)
+      -- CR 306.5b via CR 614.1c: "[This permanent] enters with N counters."
+      -- Through Event.putCounters, the CR 122.6 funnel, and NOT a direct write to
+      -- Object.counters: CR 614.16's second sentence makes a counter-scaling
+      -- replacement apply "even if the original event being modified wasn't
+      -- itself an effect", so Doubling Season has to see these. That nested CR
+      -- 616.1 loop is the reason the counters are placed here rather than folded
+      -- into the entry event's own payload.
+      --
+      -- Consumed like every other arm, so CR 614.5's one-opportunity rule keeps
+      -- the loop's next iteration from placing the counters a second time.
+      EntryRewrite.WithCounters kind n -> do
+        consume (ReplacementCandidate.identity candidate)
+        putCounters oid kind n
+        pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _, _) -> pure (Just event)
     (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage _) -> case rewrite of
@@ -878,6 +896,35 @@ asDestruction event = case event of
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
+
+-- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
+-- permanent -- not to be confused with Pawl.Engine.Event.counter, CR 701.6's
+-- countering of a spell). Before P5 the PutCounters opcode edited Object.counters
+-- in place with no funnel at all, so there was nothing for a replacement to
+-- intercept.
+--
+-- CR 122.6 makes this the right single seam: "Some spells and abilities refer to
+-- counters being put on an object. This refers to putting counters on that object
+-- while it's on the battlefield and also to an object that's given counters as it
+-- enters the battlefield." A zero count after the loop puts nothing on.
+--
+-- It lives HERE rather than beside the other change-and-emit funnels in
+-- Pawl.Engine.Event because CR 122.6's second clause -- the object "given counters
+-- as it enters the battlefield" -- is served by `apply`'s
+-- EntryRewrite.WithCounters arm above, and Pawl.Engine.Event already depends on
+-- this module. A copy of the body there would be a second funnel, which is the one
+-- thing a funnel must not have.
+putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game ()
+putCounters oid kind n = do
+  resolved <- resolveCounters oid kind n
+  case resolved of
+    Nothing -> pure ()
+    Just (target, settledKind, settledCount) ->
+      Monad.when (settledCount > 0)
+        . State.modify'
+        $ \gs ->
+          let bump obj = obj {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters obj)}
+           in gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
 
 -- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
 resolveCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind, Natural))

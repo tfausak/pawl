@@ -28,6 +28,7 @@ gameEventToJson e = case e of
   GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array (MkArray [playerIdToJson pid, projectedCharacteristicsToJson pc])))
   GameEvent.AttackerDeclared oid -> Json.tagged (Text.pack "AttackerDeclared") (Just (objectIdToJson oid))
   GameEvent.SpellCountered c -> Json.tagged (Text.pack "SpellCountered") (Just (counteringToJson c))
+  GameEvent.LoyaltyAbilityActivated oid -> Json.tagged (Text.pack "LoyaltyAbilityActivated") (Just (objectIdToJson oid))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
@@ -43,6 +44,7 @@ jsonToGameEvent value = do
     ("Revealed", Just (Array (MkArray [pid, pc]))) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
     ("AttackerDeclared", Just v) -> GameEvent.AttackerDeclared <$> jsonToObjectId v
     ("SpellCountered", Just v) -> GameEvent.SpellCountered <$> jsonToCountering v
+    ("LoyaltyAbilityActivated", Just v) -> GameEvent.LoyaltyAbilityActivated <$> jsonToObjectId v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
 -- MonarchTarget ----------------------------------------------------------------

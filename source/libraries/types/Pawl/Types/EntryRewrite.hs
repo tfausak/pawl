@@ -1,10 +1,13 @@
 module Pawl.Types.EntryRewrite where
 
+import Numeric.Natural (Natural)
+import Pawl.Types.CounterKind (CounterKind)
 import Pawl.Types.EntryOption (EntryOption)
 
 -- CR 614.1c: how an "as this permanent enters" replacement modifies the entry.
 -- AsCopy is Clone (CR 707.5, and a real "may" -- declining is legal); ChoiceOf
--- is Primal Plasma (CR 208.2b). Both write into the object's COPIABLE snapshot,
+-- is Primal Plasma (CR 208.2b); WithCounters is CR 306.5b's intrinsic loyalty.
+-- The first two write into the object's COPIABLE snapshot,
 -- which is what makes CR 707.2 fall out with no further machinery: the rule says
 -- copiable values are the printed values as modified by copy effects and by
 -- "as ... enters" abilities that set power and toughness.
@@ -25,4 +28,24 @@ import Pawl.Types.EntryOption (EntryOption)
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption]
+  | -- CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b is
+    -- the one producer today -- "A planeswalker has the intrinsic ability 'This
+    -- permanent enters with a number of loyalty counters on it equal to its
+    -- printed loyalty number.' This ability creates a replacement effect (see
+    -- rule 614.1c)."
+    --
+    -- The counters are placed through Pawl.Engine.Event.putCounters, the CR 122.6
+    -- funnel, and NOT written into the copiable snapshot the two arms above
+    -- write to: counters are not characteristics (CR 122.1, "counters are not
+    -- objects and have no characteristics") and CR 707.2 excludes them from the
+    -- copiable values outright. Going through the funnel is what makes CR
+    -- 614.16's second sentence hold -- a counter-scaling replacement applies
+    -- "even if the original event being modified wasn't itself an effect" --
+    -- which is why Doubling Season doubles a planeswalker's starting loyalty.
+    --
+    -- Carries the count rather than reading it back off the source, because the
+    -- intrinsic ability is minted per object from the PROJECTION
+    -- (Pawl.Engine.Projection.intrinsicReplacementsOf) and the number is settled
+    -- there, where CR 707.2's copiable loyalty is visible.
+    WithCounters CounterKind Natural
   deriving (Eq, Ord, Show)
