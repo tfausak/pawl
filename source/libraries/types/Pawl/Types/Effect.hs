@@ -38,11 +38,27 @@ import Pawl.Types.Zone (Zone)
 -- embedded card's effects, so the control-flow non-recursion above still holds.
 data Effect card
   = DealDamage SlotName Quantity
-  | -- CR 611: create a continuous effect on the slot's target for a duration.
-    -- Giant Growth and Serpent's Gift are this one opcode, differing only in the
-    -- Modification (layer 7c vs 6). Resolve stores it; it never cases on the
-    -- Modification.
-    ModifyTarget Duration Modification SlotName
+  | -- CR 611: create a continuous effect on the objects the ObjectRef names, for
+    -- a duration. Giant Growth and Serpent's Gift are this one opcode, differing
+    -- only in the Modification (layer 7c vs 6). Resolve stores it; it never cases
+    -- on the Modification.
+    --
+    -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
+    -- gives at length: one opcode serving both the chosen permanent (Giant
+    -- Growth's InSlot, filled by targeting) and the named set (Trumpet Blast's
+    -- "attacking creatures", an EachMatching swept at resolution), rather than a
+    -- sibling ModifyAll to keep in step with it. Only InSlot is a target; CR
+    -- 115.10a is the reason (ObjectRef's own comment).
+    --
+    -- CR 611.2c is the constraint the set arm has to meet, and it is what makes
+    -- this widening more than mechanical: "the set of objects it affects is
+    -- determined when that continuous effect begins. After that point, the set
+    -- won't change." So Resolve sweeps ONCE, at resolution, and freezes the
+    -- RESULT into the stored effect as Affected.TheseObjects -- never the Filter,
+    -- which would be re-evaluated each projection and would then pump a creature
+    -- that became attacking later. The one-shot opcodes that take an ObjectRef
+    -- (Destroy, Untap) are under CR 608.2c/608.2f instead, and store nothing.
+    ModifyTarget Duration Modification ObjectRef
   | -- CR 612: rewrite basic-land-type words in the target spell or permanent. The
     -- SlotName is the target slot; the two basic land types are read from the
     -- caster's binding (Binding.subtypes on Object.bindings) and baked into a

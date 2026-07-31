@@ -1012,13 +1012,14 @@ m4bCardTests registry =
             blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
             target = SlotName.MkSlotName (Text.pack "target")
             untilEot = Effect.ModifyTarget Duration.UntilEndOfTurn
+            targetRef = ObjectRef.InSlot target
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
         HU.assertBool "an instant" (Card.isInstant c)
         HU.assertEqual
           "effects, in printed order"
-          [ untilEot (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 3)) target,
-            untilEot (Modification.GainKeyword Keyword.Flying) target,
-            untilEot (Modification.GainKeyword (Keyword.Toxic 1)) target
+          [ untilEot (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 3)) targetRef,
+            untilEot (Modification.GainKeyword Keyword.Flying) targetRef,
+            untilEot (Modification.GainKeyword (Keyword.Toxic 1)) targetRef
           ]
           (Card.allEffects c)
         HU.assertEqual "one creature slot, shared by all three" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
@@ -1138,7 +1139,7 @@ m45p6CardTests registry =
               [m] -> do
                 HU.assertEqual
                   "-2/-1 until your next turn"
-                  [Effect.ModifyTarget Duration.UntilYourNextTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) slot]
+                  [Effect.ModifyTarget Duration.UntilYourNextTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) (ObjectRef.InSlot slot)]
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
                   "one OpponentCreatureTarget slot"
@@ -1527,7 +1528,7 @@ animatorCardTests registry =
               [m] -> do
                 HU.assertEqual
                   "CR 613.1d: one layer-4 addition, until end of turn"
-                  [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.AddCardType CardType.Artifact) target]
+                  [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target)]
                   (Foldable.toList (Mode.effects m))
                 -- "Target permanent", unnarrowed -- the Aura the CR 303.4d case
                 -- needs is a legal target precisely because there is no filter.
@@ -1563,9 +1564,9 @@ animatorCardTests registry =
                 -- resolution, so there is no set left to disagree about.
                 HU.assertEqual
                   "three parts, all on the target, all for the same duration"
-                  [ Effect.ModifyTarget duration (Modification.AddCardType CardType.Artifact) target,
-                    Effect.ModifyTarget duration (Modification.AddCardType CardType.Creature) target,
-                    Effect.ModifyTarget duration (Modification.SetBasePowerToughness (Quantity.Type.Literal 5) (Quantity.Type.Literal 5)) target
+                  [ Effect.ModifyTarget duration (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target),
+                    Effect.ModifyTarget duration (Modification.AddCardType CardType.Creature) (ObjectRef.InSlot target),
+                    Effect.ModifyTarget duration (Modification.SetBasePowerToughness (Quantity.Type.Literal 5) (Quantity.Type.Literal 5)) (ObjectRef.InSlot target)
                   ]
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
@@ -1788,7 +1789,7 @@ phyrexianCardTests registry =
         HU.assertBool "an instant" (Card.isInstant c)
         HU.assertEqual
           "+2/+2 until end of turn"
-          [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) target]
+          [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) (ObjectRef.InSlot target)]
           (Card.allEffects c)
         HU.assertEqual "one creature slot" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
       -- CR 202.3g: "Each Phyrexian mana symbol in a card's mana cost contributes

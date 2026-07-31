@@ -109,7 +109,7 @@ objectRefSlots ref = case ref of
 slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
   Effect.DealDamage slot _ -> Set.singleton slot
-  Effect.ModifyTarget _ _ slot -> Set.singleton slot
+  Effect.ModifyTarget _ _ ref -> objectRefSlots ref
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
   Effect.Search _ _ -> Set.empty
@@ -359,8 +359,8 @@ rewriteObjectRef pairs ref = case ref of
 
 rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
-  Effect.ModifyTarget duration modification slot ->
-    Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) slot
+  Effect.ModifyTarget duration modification ref ->
+    Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) (rewriteObjectRef pairs ref)
   Effect.DealDamage _ _ -> effect
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
@@ -877,36 +877,50 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- application. CR 120.3e / 120.3a live in applyDamage.
             Damage.applyDamage [Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)]
       _ -> pure ()
-  Effect.ModifyTarget duration modification slot ->
+  Effect.ModifyTarget duration modification ref ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case Recipient.objectOf recipient of
+      -- The affected objects are enumerated ONCE, here, by the same sweep every
+      -- ObjectRef-taking opcode uses. Giant Growth's slot and Trumpet Blast's
+      -- "attacking creatures" arrive as the same list, so there is one path
+      -- rather than two -- and a modification that cannot land at all (a player
+      -- recipient, an illegal slot per CR 608.2b, a set that matched nothing)
+      -- arrives as the empty one and stores nothing.
+      case objectRefObjects legality chosen controller source gs ref of
+        [] -> gs
+        targets -> case Expiry.arm controller source duration gs of
+          -- CR 611.2b: the duration never started, so the effect does nothing
+          -- and is never stored.
           Nothing -> gs
-          Just target -> case Expiry.arm controller source duration gs of
-            -- CR 611.2b: the duration never started, so the effect does nothing
-            -- and is never stored.
-            Nothing -> gs
-            Just expiry ->
-              -- CR 611.2c: the affected set is locked to this one object now.
-              -- CR 608.2h / 611.2d: and so is the VALUE -- "the answer is determined
-              -- only once, when the effect is applied". The quantities are frozen to
-              -- Literals against the SOURCE (which holds a chosen X) and the source's
-              -- CONTROLLER (whose hand a player-scoped count counts), never against
-              -- the target. See the P3b spec, section 2.4.
-              let (ts, gs1) = Game.freshTimestamp gs
-                  frozen = Projection.freezeQuantities gs source (Just controller) modification
-                  eff =
-                    ContinuousEffect.MkContinuousEffect
-                      { ContinuousEffect.source = source,
-                        ContinuousEffect.timestamp = ts,
-                        ContinuousEffect.expiry = expiry,
-                        ContinuousEffect.modification = frozen,
-                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                      }
-               in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-        -- A modification cannot land on a player (CreatureTarget/LandTarget name
-        -- objects) or an illegal slot (CR 608.2b): no-op.
-        _ -> gs
+          Just expiry ->
+            -- CR 611.2c: "the set of objects it affects is determined when that
+            -- continuous effect begins. After that point, the set won't change."
+            -- THIS is that moment: the swept ids are frozen into the stored
+            -- effect as Affected.TheseObjects, so a creature that becomes
+            -- attacking later is not in it and one that leaves combat is still
+            -- in it. Storing the Filter instead would re-derive the set at every
+            -- projection and get both wrong.
+            --
+            -- ONE effect over the whole set rather than one per object: CR 611.2c
+            -- describes a single continuous effect with a single set, and one
+            -- effect is one timestamp for CR 613.7 to order.
+            --
+            -- CR 608.2h / 611.2d: the VALUE is locked here too -- "the answer is
+            -- determined only once, when the effect is applied". The quantities
+            -- are frozen to Literals against the SOURCE (which holds a chosen X)
+            -- and the source's CONTROLLER (whose hand a player-scoped count
+            -- counts), never against an affected object. See the P3b spec,
+            -- section 2.4.
+            let (ts, gs1) = Game.freshTimestamp gs
+                frozen = Projection.freezeQuantities gs source (Just controller) modification
+                eff =
+                  ContinuousEffect.MkContinuousEffect
+                    { ContinuousEffect.source = source,
+                      ContinuousEffect.timestamp = ts,
+                      ContinuousEffect.expiry = expiry,
+                      ContinuousEffect.modification = frozen,
+                      ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
+                    }
+             in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
   Effect.ChangeText slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of

@@ -258,8 +258,12 @@ tests registry =
         "effect"
         [ HU.testCase "DealDamage" $
             roundTrip "e1" Codec.effectToJson Codec.jsonToEffect (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)),
-          HU.testCase "ModifyTarget" $
-            roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (SlotName.MkSlotName (Text.pack "t"))),
+          -- ModifyTarget takes the same untagged ObjectRef Destroy and Untap do,
+          -- so both arms have to survive the trip: Giant Growth's slot and
+          -- Trumpet Blast's filter-selected set.
+          HU.testCase "ModifyTarget round-trips both ObjectRef arms" $ do
+            roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))))
+            roundTrip "e2b" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching Filter.Type.IsAttacking)),
           HU.testCase "AddMana" $
             roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))),
           HU.testCase "AddMana of any color" $

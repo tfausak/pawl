@@ -21,6 +21,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -31,6 +32,8 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -402,7 +405,40 @@ tests registry =
         HU.assertEqual
           "and it targets nothing"
           [[Map.empty]]
-          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The pool's first CONTINUOUS effect over a filter-selected set (CR
+      -- 611.2c). Day of Judgment's EachMatching feeds a one-shot; this one feeds
+      -- an effect that is stored and keeps applying, so the sweep's RESULT has to
+      -- be frozen at resolution -- see Pawl.ResolveSpec's TrumpetBlast group.
+      --
+      -- The filter spells "attacking creatures" as And [HasCardType Creature,
+      -- IsAttacking] rather than IsAttacking alone: an EachMatching has no Pool
+      -- to narrow it (CR 109.2 gives it the whole battlefield), so the card type
+      -- the printed text names has to be in the filter. Kill Shot writes the same
+      -- two halves as Pool.Creatures plus a filter, because a TargetSpec has a
+      -- pool.
+      HU.testCase "trumpet-blast.json loads as a {2}{R} instant pumping every attacking creature" $ do
+        c <- Registry.card registry "Trumpet Blast"
+        HU.assertEqual "name" (Text.pack "Trumpet Blast") (CardT.name c)
+        HU.assertEqual "{2}{R}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Instant"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty)
+          (CardT.typeLine c)
+        HU.assertEqual
+          "attacking creatures get +2/+0 until end of turn"
+          [ ( Optionality.Mandatory,
+              [ Effect.ModifyTarget
+                  Duration.UntilEndOfTurn
+                  (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0))
+                  (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking]))
+              ]
+            )
+          ]
+          (modeShapes (CardT.spell c))
+        -- CR 115.10a: no "target" anywhere on the card, so no target spec and
+        -- nothing for CR 608.2b to fizzle.
+        HU.assertEqual "and it targets nothing" [Map.empty] (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c))))
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
