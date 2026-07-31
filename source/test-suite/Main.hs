@@ -29,7 +29,7 @@ import qualified Pawl.Extra.NaturalSpec
 import qualified Pawl.Extra.OrdSpec
 import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.Extra.SemigroupSpec
-import qualified Pawl.FilterSpec as FilterSpec
+import qualified Pawl.FilterSpec
 import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.Json.ArraySpec
 import qualified Pawl.Json.BooleanSpec
@@ -102,7 +102,6 @@ testTree registry =
       ModalSpec.tests registry,
       ReplacementSpec.tests registry,
       TriggerSpec.tests registry,
-      FilterSpec.tests,
       AuraSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
     ]
@@ -130,6 +129,7 @@ spec s registry = do
   Pawl.Extra.OrdSpec.spec s
   Pawl.Extra.ParsecSpec.spec s
   Pawl.Extra.SemigroupSpec.spec s
+  Pawl.FilterSpec.spec s
   Pawl.Json.ArraySpec.spec s
   Pawl.Json.BooleanSpec.spec s
   Pawl.Json.NullSpec.spec s
