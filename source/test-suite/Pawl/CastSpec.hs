@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Cast and Pawl.Stack: cast timing, the stack, discard, and
 -- summoning sickness.
@@ -27,6 +28,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -40,6 +42,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -56,6 +59,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -456,6 +460,9 @@ discardLastAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 lastN :: Natural -> [a] -> [a]
 lastN n xs = reverse (List.genericTake n (reverse xs))
@@ -696,6 +703,153 @@ modalCastTests registry =
         mountain <- Registry.printing registry "Mountain"
         let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
         HU.assertBool "no mode is fillable" (not (Cast.castable S.alice oid gs0))
+    ]
+
+-- Dream's Grip's two modes, in printed order (CR 700.2 /
+-- data/cards/dreams-grip.json):
+--   0. "Tap target permanent."   -- slot "tapped"
+--   1. "Untap target permanent." -- slot "untapped"
+-- plus "Entwine {1}" (CR 702.42).
+--
+-- The board: alice has `islands` untapped Islands, bob has a Goblin Piker
+-- (untapped) and a Wall of Stone (TAPPED), and Dream's Grip is in alice's hand.
+-- The two victims start in OPPOSITE tap states on purpose -- an entwined cast
+-- that tapped the Piker and untapped the Wall leaves a board that neither mode
+-- alone can produce, and that a cast which fused the two slots could not produce
+-- either.
+entwineBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+entwineBoard island dreamsGrip piker wallOfStone islands =
+  let (pikerId, gs1) = S.addCreature piker S.bob (S.landsInPlay island islands)
+      (wallId, gs2) = S.addCreature wallOfStone S.bob gs1
+      (gs, spellId) = S.handOne dreamsGrip (S.tapObject wallId gs2)
+   in (gs, spellId, pikerId, wallId)
+
+tapSlot :: SlotName.SlotName
+tapSlot = SlotName.MkSlotName (Text.pack "tapped")
+
+-- Answers CR 702.42a's entwine question with `decision`, aims mode 0's "tapped"
+-- slot at `toTap` and every other slot -- which for Dream's Grip is mode 1's
+-- "untapped", its only other one -- at `toUntap`, and defers everything else to
+-- S.identityAnswer, so the MODE choice on a declined cast is identityAnswer's
+-- (the first legal mode, which is the tap one).
+grips ::
+  EntwineDecision.EntwineDecision ->
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  r
+grips decision toTap toUntap p = case p of
+  Prompt.ChooseEntwine {} -> decision
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapWithKey (\slot _ -> Recipient.ToObject (if slot == tapSlot then toTap else toUntap)) sets
+  _ -> S.identityAnswer p
+
+-- Was CR 702.42a's question actually put to the player, and what did they say?
+entwineAnnouncements :: [Response.Response] -> [EntwineDecision.EntwineDecision]
+entwineAnnouncements responses = [d | Response.AnnouncedEntwine d <- responses]
+
+-- Cast and resolve in one go, keeping the transcript -- the ManaSpec shape, so
+-- an assertion about a prompt reads the answers actually given rather than
+-- reaching past the prompt.
+castAndResolve ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ([Response.Response], GameState.GameState)
+castAndResolve answer gs oid =
+  let ((_, cast), asked) = Replay.record answer gs (Cast.castSpell S.alice oid)
+   in (asked, snd (S.runPureWith answer cast Stack.resolveTop))
+
+-- CR 702.42: entwine, the first keyword that decides a modal spell's SELECTION
+-- while it is being cast rather than reading it off the card.
+entwineTests :: Registry.Type.Registry -> Tasty.TestTree
+entwineTests registry =
+  Tasty.testGroup
+    "Entwine"
+    [ -- CR 702.42a's "you MAY choose all modes": declining is a real answer, and
+      -- it leaves the printed ChooseExactly 1 alone.
+      HU.testCase "CR 702.42a declining entwine chooses one mode: the Piker is tapped, the Wall stays tapped" $ do
+        island <- Registry.printing registry "Island"
+        dreamsGrip <- Registry.printing registry "Dream's Grip"
+        piker <- Registry.printing registry "Goblin Piker"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        let (gs, spellId, pikerId, wallId) = entwineBoard island dreamsGrip piker wallOfStone 2
+            (asked, after) = castAndResolve (grips EntwineDecision.Declines pikerId wallId) gs spellId
+        HU.assertEqual "the player was asked, and declined" [EntwineDecision.Declines] (entwineAnnouncements asked)
+        HU.assertEqual "mode 0 tapped the Piker" (Just TapState.Tapped) (tapStateOf pikerId after)
+        HU.assertEqual "mode 1 never ran, so the Wall is still tapped" (Just TapState.Tapped) (tapStateOf wallId after)
+        HU.assertEqual "only {U} was paid, so one Island is still untapped" 1 (S.tappedCount S.alice after),
+      -- CR 702.42a's "instead of just the number specified": paying widens the
+      -- selection from the printed one to ALL of them.
+      HU.testCase "CR 702.42a paying entwine chooses both modes: the Piker is tapped AND the Wall is untapped" $ do
+        island <- Registry.printing registry "Island"
+        dreamsGrip <- Registry.printing registry "Dream's Grip"
+        piker <- Registry.printing registry "Goblin Piker"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        let (gs, spellId, pikerId, wallId) = entwineBoard island dreamsGrip piker wallOfStone 2
+            (asked, after) = castAndResolve (grips EntwineDecision.Entwines pikerId wallId) gs spellId
+        HU.assertEqual "the player was asked, and entwined" [EntwineDecision.Entwines] (entwineAnnouncements asked)
+        HU.assertEqual "mode 0 tapped the Piker" (Just TapState.Tapped) (tapStateOf pikerId after)
+        HU.assertEqual "mode 1 untapped the Wall" (Just TapState.Untapped) (tapStateOf wallId after)
+        HU.assertEqual "{U} plus the entwine {1}: both Islands are tapped" 2 (S.tappedCount S.alice after),
+      -- CR 702.42b: "If the entwine cost was paid, follow the text of each of the
+      -- modes in the order written on the card when the spell resolves." Aiming
+      -- BOTH slots at one untapped permanent is what makes the order observable:
+      -- tap-then-untap ends untapped, and untap-then-tap ends tapped.
+      HU.testCase "CR 702.42b both modes aimed at one untapped Piker resolve tap-then-untap, leaving it untapped" $ do
+        island <- Registry.printing registry "Island"
+        dreamsGrip <- Registry.printing registry "Dream's Grip"
+        piker <- Registry.printing registry "Goblin Piker"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        let (gs, spellId, pikerId, _) = entwineBoard island dreamsGrip piker wallOfStone 2
+            (_, after) = castAndResolve (grips EntwineDecision.Entwines pikerId pikerId) gs spellId
+        HU.assertEqual "the untap mode ran last, as printed, so the Piker ends untapped" (Just TapState.Untapped) (tapStateOf pikerId after),
+      -- CR 601.2b/601.2f-h: the additional cost is a real cost. With one Island
+      -- there is {U} and nothing more, so entwining is not on offer at all -- and
+      -- the ordinary modal cast still is.
+      HU.testCase "CR 702.42a with only {U} available the entwine option is not offered, and the ordinary cast still is" $ do
+        island <- Registry.printing registry "Island"
+        dreamsGrip <- Registry.printing registry "Dream's Grip"
+        piker <- Registry.printing registry "Goblin Piker"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        let (gs, spellId, pikerId, wallId) = entwineBoard island dreamsGrip piker wallOfStone 1
+            -- An interpreter that WOULD entwine: it never gets the chance, which
+            -- is what makes this discriminating rather than a restatement of the
+            -- answerer.
+            (asked, after) = castAndResolve (grips EntwineDecision.Entwines pikerId wallId) gs spellId
+        HU.assertBool "the spell is still castable" (Cast.castable S.alice spellId gs)
+        HU.assertEqual "no entwine question was put" [] (entwineAnnouncements asked)
+        HU.assertEqual "mode 0 tapped the Piker" (Just TapState.Tapped) (tapStateOf pikerId after)
+        HU.assertEqual "and mode 1 never ran: the Wall is still tapped" (Just TapState.Tapped) (tapStateOf wallId after),
+      -- The gate itself, asked directly, so the two arms of "is entwining
+      -- available" are pinned apart from the cast that consumes them.
+      HU.testCase "CR 702.42a Cast.entwineOffer is the {1} with two Islands and Nothing with one" $ do
+        island <- Registry.printing registry "Island"
+        dreamsGrip <- Registry.printing registry "Dream's Grip"
+        piker <- Registry.printing registry "Goblin Piker"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        let (rich, richSpell, _, _) = entwineBoard island dreamsGrip piker wallOfStone 2
+            (poor, poorSpell, _, _) = entwineBoard island dreamsGrip piker wallOfStone 1
+        HU.assertEqual
+          "two Islands: the additional cost is {1}"
+          (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.Type.components = []}))
+          (Cast.entwineOffer S.alice richSpell rich)
+        HU.assertEqual "one Island: unaffordable, so not offered" Nothing (Cast.entwineOffer S.alice poorSpell poor),
+      -- A card with no entwine is never asked, which is the other half of "where
+      -- the rules leave nothing to ask, don't prompt".
+      HU.testCase "CR 702.42a a modal spell without entwine (Chaos Charm) is never offered one" $ do
+        mountain <- Registry.printing registry "Mountain"
+        chaosCharm <- Registry.printing registry "Chaos Charm"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
+            (_, gs) = S.addCreature piker S.bob gs0
+        HU.assertEqual "no entwine cost to offer" Nothing (Cast.entwineOffer S.alice spellId gs)
     ]
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
@@ -1082,7 +1236,7 @@ tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Cast"
-    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry, fireboltTests registry, legendarySpellTests registry, printedCastingRestrictionTests registry]
+    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, entwineTests registry, auraTargetTests registry, fireboltTests registry, legendarySpellTests registry, printedCastingRestrictionTests registry]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r
@@ -1128,6 +1282,9 @@ castFirstOption p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -1183,3 +1340,6 @@ castPanglacial p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
