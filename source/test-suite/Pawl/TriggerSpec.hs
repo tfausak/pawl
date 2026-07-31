@@ -1677,11 +1677,12 @@ discardTriggerTests registry =
 -- records is indistinguishable from the one an ordinary resolution records. The
 -- first three cases below are that distinction, from three sides: the countering
 -- fires, a countering that CR 113.6g stopped does not, and a resolution into the
--- very same graveyard does not. The fourth is Baral's other half, its CR 601.2f
+-- very same graveyard does not. The fourth is the PlayerRelation axis -- whose
+-- spell did the countering -- and the fifth is Baral's other half, its CR 601.2f
 -- cost reduction.
 --
 -- bob controls the Baral throughout, so CR 109.5 fixes its "you" as bob (CR
--- 603.3a), and every spell countered below is alice's.
+-- 603.3a).
 --
 -- Baral's reflexive "if you do" is one Optional mode over both instructions
 -- (#487), so `Exercises` below draws AND discards.
@@ -1757,8 +1758,7 @@ counterTriggerTests registry =
             -- nothing, and CR 608.2n put it into bob's graveyard.
             HU.assertEqual "Rending Volley is still on the stack, alone" [victimId] (GameState.stack placed)
             HU.assertEqual "the spent Cancel is bob's only graveyard card" 1 (length (Game.zoneMembers Zone.Graveyard S.bob placed))
-            HU.assertEqual "bob drew nothing" 1 (length (Game.zoneMembers Zone.Library S.bob placed))
-            HU.assertEqual "and discarded nothing" 0 (S.handSize S.bob placed),
+            HU.assertEqual "bob drew nothing" 1 (length (Game.zoneMembers Zone.Library S.bob placed)),
           -- The negative that keeps the first case from passing vacuously. CR
           -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
           -- zone change rule 701.6a's countering makes -- so an implementation
@@ -1783,8 +1783,40 @@ counterTriggerTests registry =
             HU.assertEqual "the Bolt really did resolve into bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
             HU.assertEqual "alice took 3, so it resolved rather than fizzling" (fmap (subtract 3) (S.lifeOf S.alice gs)) (S.lifeOf S.alice resolved)
             HU.assertEqual "nothing was put on the stack" [] (GameState.stack placed)
-            HU.assertEqual "bob drew nothing" 1 (length (Game.zoneMembers Zone.Library S.bob placed))
-            HU.assertEqual "and discarded nothing" 0 (S.handSize S.bob placed),
+            HU.assertEqual "bob drew nothing" 1 (length (Game.zoneMembers Zone.Library S.bob placed)),
+          -- "A spell or ability YOU CONTROL", not "a spell or ability": the
+          -- PlayerRelation is load-bearing, and a board where only bob ever
+          -- counters cannot tell a correct implementation from one that ignores
+          -- the countering source's controller entirely. The same Cancel at the
+          -- same victim, one caster apart -- alice's Cancel counters BOB's
+          -- spell, and bob's Baral watches it happen and does nothing.
+          --
+          -- Also the other half of Baral's static: alice pays Cancel's full
+          -- {1}{U}{U}, since "spells YOU cast" is scoped to bob.
+          HU.testCase "CR 109.5 'you control': alice's Cancel countering bob's spell does not fire bob's Baral" $ do
+            island <- Registry.printing registry "Island"
+            cancel <- Registry.printing registry "Cancel"
+            baral <- Registry.printing registry "Baral, Chief of Compliance"
+            piker <- Registry.printing registry "Goblin Piker"
+            mountain <- Registry.printing registry "Mountain"
+            let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
+                withLands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withBaral [1 .. (3 :: Int)]
+                (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
+                (victimId, onStack) = S.spellOnStack piker S.bob withLibrary
+                (cancelId, gs) = S.addHandCard cancel S.alice onStack
+                answer :: Prompt.Prompt r -> r
+                answer = answerWith victimId
+                cast = S.runPure answer gs (Cast.castSpell S.alice cancelId)
+                countered = S.runPure answer cast Stack.resolveTop
+                placed = S.runPure answer countered Engine.settleForPriority
+            -- The countering really happened, so the silence below is the
+            -- relation and not a broken board.
+            HU.assertEqual "bob's spell was countered into his graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob countered))
+            -- By NAME, not S.creaturesInPlay: bob's own Baral is a creature on
+            -- his battlefield throughout, so a bare count could never read 0.
+            HU.assertEqual "and the Piker never reached the battlefield" 0 (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.bob countered)
+            HU.assertEqual "nothing was put on the stack" [] (GameState.stack placed)
+            HU.assertEqual "so bob drew nothing" 1 (length (Game.zoneMembers Zone.Library S.bob placed)),
           -- Baral's OTHER half, and the reason the board above gives bob exactly
           -- three Islands: "instant and sorcery spells you cast cost {1} less to
           -- cast" (CR 601.2f's cost reductions) turns Cancel's {1}{U}{U} into

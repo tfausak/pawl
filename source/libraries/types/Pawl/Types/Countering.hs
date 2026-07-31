@@ -28,25 +28,40 @@ data Countering = MkCountering
     spell :: ObjectId,
     -- The spell or ability that did the countering, which is what Baral, Chief
     -- of Compliance's "a spell or ability YOU CONTROL counters a spell" names.
-    -- The resolving object itself for a spell; CR 113.7's "the object whose
-    -- ability was activated" for an ability.
+    -- Whichever object Pawl.Engine.Resolve calls the effect's source: the
+    -- resolving spell itself for a spell, and CR 113.7's SOURCE PERMANENT -- not
+    -- the ability object -- for an ability.
     --
-    -- Also dead by the time the CR 117.5 trigger scan reads the log: a
-    -- countering SPELL has gone to its owner's graveyard by CR 608.2n, and a
-    -- countering ABILITY has ceased to exist by the same rule.
+    -- Nothing reads it yet. Carried because it is the other end of the act this
+    -- record describes, and because a condition scoped to the bearer ("whenever
+    -- THIS creature counters a spell") is the one thing `controller` below could
+    -- not answer.
     source :: ObjectId,
-    -- CR 109.5 / 603.3a: who controlled `source` AT THE MOMENT IT COUNTERED --
-    -- the "you" in "a spell or ability you control".
+    -- CR 405.4: who controlled `source` AT THE MOMENT IT COUNTERED -- "the
+    -- controller of a spell is the player who cast it", and for an ability the
+    -- player who activated it or who controlled its source when it triggered.
+    -- The player a "a spell or ability YOU CONTROL" condition compares against
+    -- CR 109.5's "you".
     --
     -- Captured here rather than re-derived from `source` at match time, the
     -- deal-time rider posture Pawl.Types.DamageEvent's dealtByDeathtouch takes,
-    -- and for that comment's reason: it may be unaskable later. CR 608.2n
-    -- removes a resolving ABILITY from the stack and it "ceases to exist" --
-    -- Pawl.Engine.Resolve.cease deletes the object without a zone change, so no
-    -- CR 608.2h last known information is ever filed for it and there is
-    -- nothing left to read a controller off. Rule 701.6a's own text is what
-    -- makes that case real rather than hypothetical: a spell OR ABILITY does
-    -- the countering.
+    -- and for that comment's reason: it may be unaskable later. Both halves of
+    -- rule 701.6a's "a spell or ability" have a case where it is:
+    --
+    --   * a countering SPELL, always. `source` is the spell object itself, and
+    --     CR 608.2n puts it into its owner's graveyard as the final part of its
+    --     own resolution -- before the CR 117.5 scan reads this log, and under a
+    --     new id (CR 400.7). Nothing live answers for the old one.
+    --   * a countering ABILITY, when its source has left. `source` is then CR
+    --     113.7's source permanent, which is usually still on the battlefield --
+    --     but need not be, and Pawl.Engine.Resolve's own note says why ("for an
+    --     ability, the source permanent may already be sacrificed as a cost").
+    --     CR 608.2h last known information would then answer with the controller
+    --     as of the DEPARTURE rather than as of the countering.
+    --
+    -- Even for a source that is still there, re-deriving would read control at
+    -- the scan boundary rather than at the event -- #47's elision, which this
+    -- field simply does not have.
     controller :: PlayerId
   }
   deriving (Eq, Ord, Show)

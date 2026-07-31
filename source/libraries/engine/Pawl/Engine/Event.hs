@@ -93,7 +93,7 @@ movedOf event = case event of
   GameEvent.AttackerDeclared _ -> Nothing
   -- The Moved event Event.counter records alongside this one is the zone change
   -- rule 701.6a's last sentence causes; this one says the move WAS a countering
-  -- and carries no ZoneChange of its own. The discard arm just above, exactly.
+  -- and carries no ZoneChange of its own. Exactly the Discarded arm's case.
   GameEvent.SpellCountered _ -> Nothing
 
 -- The damage an event describes, if it is any.
@@ -494,25 +494,27 @@ putCounters oid kind n = do
 -- destination (CR 614), after which no zone pair reads stack-to-graveyard at
 -- all.
 --
--- Nothing at all is recorded on the two paths that DO NOT counter, and CR 603.2g
--- is what makes that mandatory rather than tidy: "an event that's prevented or
--- replaced won't trigger anything."
+-- Nothing at all is recorded on any of the three paths that DO NOT counter, and
+-- CR 603.2g is what makes that mandatory rather than tidy: "an event that's
+-- prevented or replaced won't trigger anything."
 --
---   * The CR 113.6g gate above. Read through CR 101.2, a spell that can't be
---     countered was never countered, so there is no event to record -- which is
---     what keeps Baral silent in TriggerSpec's composition case.
+--   * An id with no object -- nothing was on the stack to remove.
+--   * The CR 113.6g gate. Read through CR 101.2, a spell that can't be countered
+--     was never countered, so there is no event to record -- which is what keeps
+--     Baral silent in TriggerSpec's composition case.
 --   * A move the CR 616.1 loop cancelled (`Nothing`), which leaves the spell on
 --     the stack, so it was never "removed from the stack" and rule 701.6a's
---     countering did not happen. The posture `discard` above takes, and with no
+--     countering did not happen. The posture `discard` below takes, and with no
 --     producer today: no card in the pool cancels a zone change outright.
 --
--- The `source` and `controller` are the countering spell or ability and its
--- controller -- CR 109.5's "you" -- which Baral, Chief of Compliance's "whenever
--- a spell or ability YOU CONTROL counters a spell" reads. Taken from the caller
--- rather than re-derived here: they are the resolving object and the CR 608.2c
--- controller Pawl.Engine.Resolve already holds, and by the time the CR 117.5
--- trigger scan reads this event neither is answerable from the board -- see
--- Pawl.Types.Countering.
+-- The `source` and `controller` are the countering spell or ability and the
+-- player who controlled it (CR 405.4) -- what Baral, Chief of Compliance's
+-- "whenever a spell or ability YOU CONTROL counters a spell" reads against CR
+-- 109.5's "you". Taken from the caller rather than re-derived here: they are the
+-- effect source and the CR 608.2c controller Pawl.Engine.Resolve already holds,
+-- and by the time the CR 117.5 trigger scan reads this event the controller can
+-- no longer be asked for exactly -- see Pawl.Types.Countering, which sets out
+-- the two cases.
 counter :: ObjectId -> PlayerId -> ObjectId -> Game ()
 counter source controller oid = do
   gs <- State.get
