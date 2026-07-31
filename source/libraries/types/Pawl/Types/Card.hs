@@ -120,8 +120,11 @@ data Card = MkCard
     -- hold for a cast to be legal, where one permission suffices.
     --
     -- Read directly from the card and never through the projection, the
-    -- castingPermissions precedent: the restriction is consulted while the object
-    -- is in a hand (CR 113.6), where the CR 613 layer system does not reach.
+    -- castingPermissions precedent. CR 113.6e is the rule that says so in as many
+    -- words: "an object's ability that restricts or modifies how that particular
+    -- object can be played or cast functions in any zone from which it could be
+    -- played or cast and also on the stack" -- a hand, where the CR 613 layer
+    -- system does not reach.
     --
     -- SELF-scoped and printed-only, which is the whole difference between this
     -- and the other producer CR 601.3's "rule or effect" names. A prohibition

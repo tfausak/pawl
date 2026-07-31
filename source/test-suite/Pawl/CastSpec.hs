@@ -1023,16 +1023,24 @@ printedCastingRestrictionTests registry =
       -- The "only during the declare attackers step" clause, isolated: bob HAS
       -- been attacked -- CR 511.3 keeps the combat record live until the end of
       -- combat step ends -- and the window has passed.
+      --
+      -- Carries its own control, in the same step and for the same player: bob's
+      -- Bolt is still offered, so what stops the Rally is the clause and not the
+      -- step being closed to bob altogether.
       HU.testCase "CR 601.3 not castable in the declare blockers step, though bob was attacked" $ do
         piker <- Registry.printing registry "Goblin Piker"
         plains <- Registry.printing registry "Plains"
         rally <- Registry.printing registry "Rally the Troops"
+        mountain <- Registry.printing registry "Mountain"
+        bolt <- Registry.printing registry "Lightning Bolt"
         let (bobsRally, _, _, board) = rallyBoard piker plains rally
-            attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+            (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
+            attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
             later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
         HU.assertBool "still attacked" (Combat.Type.attackersJoined (GameState.combat later))
         HU.assertBool "not castable" (not (Cast.castable S.bob bobsRally later))
-        HU.assertBool "and not offered" (notElem (A.Cast bobsRally) (Action.legalActions S.bob later)),
+        HU.assertBool "and not offered" (notElem (A.Cast bobsRally) (Action.legalActions S.bob later))
+        HU.assertBool "bob's unrestricted instant still is" (elem (A.Cast boltId) (Action.legalActions S.bob later)),
       -- CR 117.1a is not what is stopping it: an unrestricted instant with the
       -- same cost, in the same hand, in the same step, is castable. Without this
       -- the negatives above would also pass on an engine that refused every cast

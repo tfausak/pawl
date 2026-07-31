@@ -30,7 +30,7 @@ data CastingRestriction
     -- Pawl.Types.Phase is one type over the CR 500.1 phases and their steps, so
     -- naming a step and naming a STEPLESS phase (the two main phases) are the same
     -- act here. A phase that HAS steps is not nameable -- "Cast this spell only
-    -- during combat" (Savage Beating, Mandate of Peace) would have to name five
+    -- during combat" (Mandate of Peace, Angelic Favor) would have to name five
     -- steps at once -- which is the same gap Pawl.Types.PhasePattern already
     -- records (#337).
     --
@@ -39,8 +39,10 @@ data CastingRestriction
     -- narrow the same window by turn as well. Pawl.Types.TurnScope is the type that
     -- would say it; no card in the pool needs it yet (#445).
     DuringPhase Phase
-  | -- "and only if you've been attacked this step" -- the second clause fifteen
-    -- printings carry, Rally the Troops among them.
+  | -- "and only if you've been attacked this step" -- the second clause fourteen
+    -- cards carry on a CAST, Rally the Troops among them. (Kongming's
+    -- Contraptions prints the same words on an activated ability, which is the
+    -- ability-side type's problem and not this one's -- #446.)
     --
     -- Not a timing window at all, which is why it is its own arm rather than a
     -- field on DuringPhase: it is a question about what the combat record already

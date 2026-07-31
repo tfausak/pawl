@@ -234,10 +234,12 @@ controlsLegendaryCreature pid gs =
 -- attacked this step."
 --
 -- The exact counterweight to permissionsOf above, and read the same way: off the
--- card, never through the projection, since a restriction is consulted while the
--- object is in a hand (CR 113.6) where the CR 613 layer system does not reach.
--- ALL of them must hold, which is what CR 601.3's "no ... prohibits" means; one
--- permission, by contrast, suffices.
+-- card, never through the projection. CR 113.6e is the rule -- "an object's
+-- ability that restricts or modifies how that particular object can be played or
+-- cast functions in any zone from which it could be played or cast and also on
+-- the stack" -- which for this pool means a hand, where the CR 613 layer system
+-- does not reach. ALL of them must hold, which is what CR 601.3's "no ...
+-- prohibits" means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity: Pawl.Cast is
 -- the sole reader of Pawl.Types.CastingRestriction exactly as it is of
@@ -267,11 +269,12 @@ restrictionMet pid gs restriction = case restriction of
 -- Combat.attackers, because CR 506.4 removing the lone attacker from combat does
 -- not un-attack anybody.
 --
--- Eightfold Maze's ruling is the reading pinned here: "To cast it, a creature
--- needs to have attacked _you_." Its companion ruling carves out an attack aimed
--- at a planeswalker, which pawl has no card type for (#301), so with one defending
--- player (CR 802's attack-multiple-players option is unavailable, #175) the two
--- conjuncts are the whole question.
+-- Eightfold Maze's ruling is the reading pinned here, both sentences of it: "If
+-- all the attacking creatures attack your planeswalkers, you can't cast Eightfold
+-- Maze. To cast it, a creature needs to have attacked _you_." pawl has no
+-- planeswalker card type (#301) and one defending player (CR 802's
+-- attack-multiple-players option is unavailable, #175), so every attack in this
+-- pool is aimed at that player and the two conjuncts are the whole question.
 --
 -- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
 -- combat PHASE. The two spans coincide for every card in the pool -- the flag is
@@ -285,9 +288,15 @@ attackedThisStep pid gs =
    in Combat.defender combat == Just pid && Combat.attackersJoined combat
 
 -- Affordable and correctly timed, actually in a zone this player may cast it
--- from, fillable, and not prohibited. CR 601.2b: affordable means at least ONE
--- candidate cost is payable -- a spell may have alternative costs, and only one
--- need be.
+-- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least
+-- ONE candidate cost is payable -- a spell may have alternative costs, and only
+-- one need be.
+--
+-- THREE prohibitions, not one, and they are three because they are carried by
+-- three different things: a continuous effect on the player
+-- (PlayerEffect.prohibitsCasting -- Rule of Law, Silence), the card's own printed
+-- text (printedRestrictionsOk), and rule 205.4e itself
+-- (legendaryRestrictionOk).
 castable :: PlayerId -> ObjectId -> GameState -> Bool
 castable pid oid gs =
   timingOk pid oid gs
