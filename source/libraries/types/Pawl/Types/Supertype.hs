@@ -10,8 +10,8 @@ data Supertype
     Basic
   | -- CR 205.4d: subject to CR 704.5j's legend rule, which Pawl.Engine.Sba implements.
     -- CR 205.4e's OTHER rule -- a legendary instant or sorcery can't be cast
-    -- unless you control a legendary creature or planeswalker -- is not
-    -- checked (#307).
+    -- unless you control a legendary creature or planeswalker -- is
+    -- Pawl.Engine.Cast.legendaryRestrictionOk.
     Legendary
   | -- CR 205.4g: "any permanent with the supertype 'snow' is a snow permanent."
     -- That is the whole of the rule -- no state-based action, unlike Legendary

@@ -572,10 +572,10 @@ performStateBasedActions = do
   -- event" requires.
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
-  -- CR 704.5f (toughness <= 0), CR 704.5j (the legend rule's losers), CR 704.5k
-  -- (the world rule's) and CR 704.5m (an Aura attached to nothing). None of the
-  -- four is a destruction, so none consults indestructible or a regeneration
-  -- shield.
+  -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
+  -- rule's losers), CR 704.5k (the world rule's) and CR 704.5m (an Aura attached
+  -- to nothing). None of the five is a destruction, so none consults
+  -- indestructible or a regeneration shield.
   --
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
   -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
@@ -649,9 +649,10 @@ performStateBasedActions = do
       outcome = Departure.outcomeAfterLeaving leaving departed
       drained = vanished {GameState.damageScannedThrough = watermark}
       balanced = List.foldl' balance drained annihilations
-      -- A state-based action was performed iff a creature was buried or destroyed
-      -- (a regenerated creature still counts, which the CR 704.4 settle loop
-      -- re-checks and -- because the regen healed the damage -- terminates), a
+      -- A state-based action was performed iff a permanent was buried (a creature
+      -- at 0 toughness, CR 704.5f, or a planeswalker at 0 loyalty, CR 704.5i) or
+      -- destroyed (a regenerated creature still counts, which the CR 704.4 settle
+      -- loop re-checks and -- because the regen healed the damage -- terminates), a
       -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), a
       -- permanent detached (CR 704.5n / 704.5p), the legend rule buried a
       -- duplicate legend (CR 704.5j), or the world rule buried an older world

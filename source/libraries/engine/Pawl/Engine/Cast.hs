@@ -319,9 +319,9 @@ restrictionMet pid gs restriction = case restriction of
 -- Eightfold Maze's ruling is the reading pinned here, both sentences of it: "If
 -- all the attacking creatures attack your planeswalkers, you can't cast Eightfold
 -- Maze. To cast it, a creature needs to have attacked _you_." pawl has no
--- planeswalker card type (#301) and one defending player (CR 802's
--- attack-multiple-players option is unavailable, #175), so every attack in this
--- pool is aimed at that player and the two conjuncts are the whole question.
+-- way to attack a planeswalker (CR 306.6, #493) and one defending player (CR
+-- 802's attack-multiple-players option is unavailable, #175), so every attack in
+-- this pool is aimed at that player and the two conjuncts are the whole question.
 --
 -- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
 -- combat PHASE. The two spans coincide for every card in the pool -- the flag is
