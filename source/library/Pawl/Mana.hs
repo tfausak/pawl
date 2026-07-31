@@ -209,13 +209,15 @@ manaRoutesOfGiven pcs oid gs =
 manaYieldsOf :: ObjectId -> GameState -> [Mana]
 manaYieldsOf = manaYieldsOfGiven Map.empty
 
+-- The same yields against a pre-projected board, which is manaRoutesOfGiven's
+-- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
 manaYieldsOfGiven pcs oid gs =
   let asMana manaTypes = Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType}) manaTypes)
    in List.nub (fmap asMana (concatMap (traverse producedTypes) (manaRoutesOfGiven pcs oid gs)))
 
--- The types in one yield, in order. The one place Mana is unwrapped for reading
--- rather than for spending.
+-- The types in one yield, in printed order. Reading a Mana rather than spending
+-- or adding one, which is what every other unwrap in this module does.
 typesOf :: Mana -> [ManaType]
 typesOf (Mana.MkMana units) = fmap ManaUnit.manaType units
 
