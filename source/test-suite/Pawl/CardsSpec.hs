@@ -102,6 +102,24 @@ tests registry =
         HU.assertEqual "name" (Text.pack "Serum Powder") (CardT.name c)
         HU.assertEqual "the CR 103.5b action" [Effect.ExileHandThenDraw] (CardT.mulliganAction c)
         HU.assertEqual "one activated ability, the {T}: Add {C} mana ability" 1 (length (CardT.activatedAbilities c)),
+      -- The first card file with landwalk (CR 702.14), and the first whose
+      -- keyword payload is a SUBTYPE. What it pins is that the land type is on
+      -- the KEYWORD and not on the type line: Bog Wraith is a Wraith and prints
+      -- no Swamp anywhere, so a reader that took the land type from
+      -- TypeLine.subtypes would find nothing to walk on.
+      HU.testCase "bog-wraith.json loads as a {3}{B} 3/3 Wraith whose only keyword is swampwalk" $ do
+        c <- Registry.card registry "Bog Wraith"
+        HU.assertEqual "name" (Text.pack "Bog Wraith") (CardT.name c)
+        HU.assertEqual
+          "{3}{B}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Black)]))
+          (CardT.manaCost c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Literal 3))) (CardT.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Literal 3))) (CardT.toughness c)
+        HU.assertEqual "Creature -- Wraith" (Set.singleton Subtype.Wraith) (TypeLine.subtypes (CardT.typeLine c))
+        HU.assertEqual "one keyword: swampwalk" (Set.singleton (Keyword.Landwalk Subtype.Swamp)) (CardT.keywords c)
+        HU.assertEqual "no other text" [] (CardT.staticAbilities c)
+        HU.assertEqual "and no triggered ability either" [] (CardT.triggeredAbilities c),
       -- The first card file whose keyword carries a payload that is not a
       -- number: rule 702.34a's flashback COST, which is where the whole ability
       -- lives -- Firebolt prints no alternativeCosts and no castingPermissions of
