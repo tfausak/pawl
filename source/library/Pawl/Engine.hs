@@ -983,12 +983,14 @@ runStep = do
   -- nothing between the two but read GameState.result. So the step is scheduled,
   -- not started, and this is its last unobserved moment.
   --
-  -- The skipped step is left popped off the schedule by `advance` below rather
+  -- A skipped STEP is left popped off the schedule by `advance` below rather
   -- than dropped from GameState.remaining the way CR 508.8's combat skip is
   -- (Turn.dropSkippedCombatSteps). Both reach "as though it didn't exist"; the
   -- difference is that CR 508.8 is a RULE, known one step ahead, while a
   -- replacement effect has to be asked at the moment the event would happen,
-  -- because CR 616.1's loop reads the board as it then is.
+  -- because CR 616.1's loop reads the board as it then is. A skipped PHASE is
+  -- the case where popping one entry is not enough, and `skipWholePhase` below
+  -- says what it does instead.
   --
   -- TWO questions, in CR 500.1's own order: a phase that has steps is offered
   -- first, then the step. `Turn.phaseBeginningAt` answers Just only at a stepped
@@ -996,6 +998,10 @@ runStep = do
   -- once the phase is under way -- CR 614.10 again, read at phase grain. A main
   -- phase raises only the step question, because CR 505.2 makes it one schedule
   -- entry and asking twice about it would be asking the same thing twice.
+  --
+  -- Both questions are asked even when the phase one says yes, and in that order,
+  -- because CR 500.1 nests the step inside the phase: Stasis skipping an untap
+  -- step must still take it during a beginning phase nobody skipped.
   phaseBegins <- case Turn.phaseBeginningAt phase of
     Nothing -> pure True
     Just selector -> Replacement.beginsPhase selector active
@@ -1020,6 +1026,16 @@ runStep = do
 -- one that "never happens", and CR 500.6's "at the beginning of" triggers hang
 -- off the CR 603.2b step records `runStepThatBegan` writes, none of which this
 -- path reaches.
+--
+-- GameState.combat is left ALONE, and does not go stale by being left alone.
+-- Combat.clearCombat runs as the end of combat step ends (CR 511.3), which this
+-- path bypasses along with the rest of the phase -- but every writer of that
+-- record (Combat.declareAttackers, declareBlockers, chooseDefender,
+-- putOntoBattlefieldAttacking, Damage's first-strike mark) runs inside a combat
+-- step, so a phase whose steps never begin writes nothing and the record is
+-- still whatever the last end of combat step emptied it to. Skipping the end of
+-- combat STEP on its own is the case that would strand it, and no card in the
+-- pool names that step (#447).
 skipWholePhase :: Phase.Phase -> Game ()
 skipWholePhase phase = do
   State.modify' (\gs -> gs {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)})

@@ -105,10 +105,11 @@ lastStepOf phase = case phase of
 -- An absent final step yields an EMPTY prefix, not the whole schedule: if this
 -- phase's last step is no longer scheduled then the phase is already over as far
 -- as `remaining` shows, and "directly after this phase" (CR 500.8) is the head.
--- Unreachable from either caller -- Combat.skipEmptyCombat runs as the declare
--- attackers step ends, and Resolve's splice runs while the resolving object's
--- phase is current -- so no game can observe the choice; it is written this way
--- because dropping nothing is the safer failure than dropping everything.
+-- Unreachable from every caller -- Combat.skipEmptyCombat runs as the declare
+-- attackers step ends, Resolve's splice runs while the resolving object's phase
+-- is current, and Engine.skipWholePhase runs at the phase's FIRST step -- so no
+-- game can observe the choice; it is written this way because dropping nothing
+-- is the safer failure than dropping everything.
 thisPhase :: Phase -> Seq Phase -> (Seq Phase, Seq Phase)
 thisPhase phase remaining = case lastStepOf phase >>= \step -> Seq.elemIndexL step remaining of
   Nothing -> (Seq.empty, remaining)
