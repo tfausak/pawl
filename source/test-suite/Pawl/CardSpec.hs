@@ -937,6 +937,20 @@ lintTests registry =
               _ -> False
             offenders = filter (any offends . cardResolutionEffects . Printing.card) ps
         HU.assertEqual "control belongs on a static ability, never in a stored effect" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
+      -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
+      -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
+      -- to place and would be buried by CR 704.5i the instant it entered; a
+      -- non-planeswalker with a printed loyalty carries a number no rule reads.
+      --
+      -- Projection.intrinsicReplacementsOf's own comment leans on this in both
+      -- directions, which is why it is a lint and not a per-card assertion.
+      HU.testCase "a card is a planeswalker iff it has a printed loyalty" $ do
+        ps <- S.allPrintings registry
+        let isPlaneswalker c = Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine c))
+            offends c = isPlaneswalker c /= Maybe.isJust (Card.Type.loyalty c)
+            offenders = filter (offends . Printing.card) ps
+        HU.assertEqual "planeswalker iff loyalty" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "no mode declares a slot named enchant" $ do
         ps <- S.allPrintings registry
         let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))

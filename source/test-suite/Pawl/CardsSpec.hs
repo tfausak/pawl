@@ -26,6 +26,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Duration as Duration
@@ -34,6 +35,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -610,6 +612,54 @@ tests registry =
             -- black.
             HU.assertEqual "and black by colour indicator" (Set.singleton Color.Black) (CardT.colorIndicator token)
           other -> HU.assertFailure ("expected exactly [LoseLife, Create], got " <> show (length other) <> " effects"),
+      -- The first planeswalker printing (CR 306), and the first card file with
+      -- three activated abilities. Its type line is where CR 306.4 is settled:
+      -- the planeswalker uniqueness rule "has been removed and planeswalker cards
+      -- printed before this change have received errata in the Oracle card
+      -- reference to have the legendary supertype", so the file transcribes
+      -- Legendary and Pawl.Engine.Sba's CR 704.5j legend rule covers it with no
+      -- planeswalker-specific arm.
+      --
+      -- The abilities carry NO ActivationTiming rider, and that is the point: CR
+      -- 606.2 makes an ability a loyalty ability by what its COST contains, and CR
+      -- 606.3's sorcery-speed window follows from that in the rules core
+      -- (Pawl.Engine.Activate.loyaltyOk). A file claiming SorcerySpeed here would
+      -- be card data teaching the engine a rule it already has.
+      HU.testCase "jace-beleren.json loads as a {1}{U}{U} Legendary Planeswalker - Jace with loyalty 3 and three loyalty abilities" $ do
+        c <- Registry.card registry "Jace Beleren"
+        HU.assertEqual "name" (Text.pack "Jace Beleren") (CardT.name c)
+        HU.assertEqual
+          "{1}{U}{U}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue), ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "Legendary Planeswalker - Jace"
+          (TypeLine.MkTypeLine (Set.singleton Supertype.Legendary) (Set.singleton CardType.Planeswalker) (Set.singleton Subtype.Jace))
+          (CardT.typeLine c)
+        HU.assertEqual "no power or toughness" (Nothing, Nothing) (CardT.power c, CardT.toughness c)
+        -- CR 306.5a: "the number printed in its lower right corner".
+        HU.assertEqual "loyalty 3" (Just (Loyalty.MkLoyalty 3)) (CardT.loyalty c)
+        -- CR 606.4's loyalty symbols, in printed order, each with a {0} mana part
+        -- rather than none: CR 118.6's unpayable cost is Nothing, and a loyalty
+        -- ability's cost is real and free of mana.
+        HU.assertEqual
+          "+2, -1, -10 and no mana"
+          [ (Just (ManaCost.MkManaCost []), [CostComponent.AddLoyaltyToThis 2]),
+            (Just (ManaCost.MkManaCost []), [CostComponent.RemoveLoyaltyFromThis 1]),
+            (Just (ManaCost.MkManaCost []), [CostComponent.RemoveLoyaltyFromThis 10])
+          ]
+          (fmap ((\cost -> (Cost.mana cost, Cost.components cost)) . ActivatedAbility.cost) (CardT.activatedAbilities c))
+        HU.assertEqual
+          "no timing rider on any of them"
+          [ActivationTiming.AnyTime, ActivationTiming.AnyTime, ActivationTiming.AnyTime]
+          (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
+        HU.assertEqual
+          "each player draws, target player draws, target player mills twenty"
+          [ [(Optionality.Mandatory, [Effect.Draw PlayerRef.EachPlayer (Quantity.Literal 1)])],
+            [(Optionality.Mandatory, [Effect.Draw (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 1)])],
+            [(Optionality.Mandatory, [Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 20)])]
+          ]
+          (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c)),
       -- The first card file to spell a PlayerDiscards condition (CR 701.9a), and
       -- the first trigger condition at all whose payload is a PlayerRelation.
       -- Its "an opponent" is that relation and nothing else -- no Filter, no

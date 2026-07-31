@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Combat as Combat
@@ -251,7 +252,7 @@ legendaryRestrictionOk pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
     not (Card.isLegendary card && (Card.isInstant card || Card.isSorcery card))
-      || controlsLegendaryCreature pid gs
+      || controlsLegendaryCreatureOrPlaneswalker pid gs
 
 -- CR 205.4e's condition. Read through the PROJECTION rather than off the
 -- printed card, because "controls a legendary creature" is a question about the
@@ -260,15 +261,18 @@ legendaryRestrictionOk pid oid gs = case Game.cardOf oid gs of
 -- though its own card carries no supertype at all, which is the same reading
 -- Pawl.Engine.Sba.legendGroups takes for the legend rule.
 --
--- Rule 205.4e's second disjunct, "or a legendary planeswalker", is not
--- implemented: Pawl.Types.CardType has no Planeswalker constructor to test for
--- (#301).
-controlsLegendaryCreature :: PlayerId -> GameState -> Bool
-controlsLegendaryCreature pid gs =
+-- BOTH of rule 205.4e's disjuncts, "a legendary creature or a legendary
+-- planeswalker", read through the same projection for the same reason: a
+-- permanent animated into a planeswalker satisfies it and a planeswalker turned
+-- into something else does not.
+controlsLegendaryCreatureOrPlaneswalker :: PlayerId -> GameState -> Bool
+controlsLegendaryCreatureOrPlaneswalker pid gs =
   let qualifies oid =
         Projection.controllerOf oid gs == Just pid
           && Set.member Supertype.Legendary (Projection.supertypesOf oid gs)
-          && Projection.isCreatureOf oid gs
+          && ( Projection.isCreatureOf oid gs
+                 || Set.member CardType.Planeswalker (Projection.cardTypesOf oid gs)
+             )
    in any qualifies (GameState.battlefield gs)
 
 -- CR 601.3's PROHIBITION half -- "no rule or effect prohibits that player from
