@@ -64,44 +64,67 @@ library codec
   -- cabal-gild: discover source/libraries/codec
   exposed-modules:
     Pawl.Codec.AbilityName
+    Pawl.Codec.ActivationTiming
+    Pawl.Codec.Affected
     Pawl.Codec.Aggregation
     Pawl.Codec.All
     Pawl.Codec.BeginningStep
     Pawl.Codec.CardType
     Pawl.Codec.CastingPermission
+    Pawl.Codec.CastingRestriction
     Pawl.Codec.Color
     Pawl.Codec.CombatStep
     Pawl.Codec.Comparison
     Pawl.Codec.ControllerRelation
+    Pawl.Codec.CostComponent
     Pawl.Codec.Counterability
+    Pawl.Codec.DamageEvent
     Pawl.Codec.DamageKind
+    Pawl.Codec.DamagePattern
     Pawl.Codec.DamageRewrite
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DiscardCause
     Pawl.Codec.EndingStep
+    Pawl.Codec.EventShape
     Pawl.Codec.ExtraPhase
+    Pawl.Codec.Filter
     Pawl.Codec.Json
+    Pawl.Codec.ManaProduction
+    Pawl.Codec.ManaSymbol
+    Pawl.Codec.ManaType
     Pawl.Codec.ModeIndex
     Pawl.Codec.ModeSelection
     Pawl.Codec.MonarchTarget
     Pawl.Codec.ObjectId
+    Pawl.Codec.ObjectRef
     Pawl.Codec.Optionality
+    Pawl.Codec.Phase
+    Pawl.Codec.PhaseSelector
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerId
+    Pawl.Codec.PlayerRef
     Pawl.Codec.PlayerRelation
     Pawl.Codec.PlayerScope
     Pawl.Codec.Pool
+    Pawl.Codec.Recipient
     Pawl.Codec.Regenerability
     Pawl.Codec.Scaling
+    Pawl.Codec.Scope
     Pawl.Codec.SearchDestination
     Pawl.Codec.SlotName
     Pawl.Codec.Subtype
     Pawl.Codec.Supertype
     Pawl.Codec.TapState
+    Pawl.Codec.TargetSpec
+    Pawl.Codec.TokenEntry
+    Pawl.Codec.TokenPattern
     Pawl.Codec.TriggerFrequency
     Pawl.Codec.TurnScope
+    Pawl.Codec.TypeLine
     Pawl.Codec.Uses
     Pawl.Codec.Zone
+    Pawl.Codec.ZoneChange
+    Pawl.Codec.ZoneChangePattern
     Pawl.Codec.ZoneChangeSubject
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
