@@ -45,7 +45,7 @@ import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec as MulliganSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
-import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
+import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.Registry as Registry
@@ -95,7 +95,6 @@ testTree registry =
       CombatSpec.tests registry,
       ResolveSpec.tests registry,
       ProjectionSpec.tests registry,
-      PowerToughnessSpec.tests registry,
       PlayerEffectSpec.tests registry,
       ActivateSpec.tests registry,
       ReplacementSpec.tests registry,
@@ -139,6 +138,7 @@ spec s registry = do
   Pawl.JsonSpec.spec s
   Pawl.ModalSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
+  Pawl.PowerToughnessSpec.spec s registry
   Pawl.RegistrySpec.spec s
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
