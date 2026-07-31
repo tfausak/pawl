@@ -11,7 +11,6 @@ import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -33,7 +32,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Pawl.Event"

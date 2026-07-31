@@ -16,7 +16,6 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
@@ -35,7 +34,7 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-deckTests :: Registry.Type.Registry -> Tasty.TestTree
+deckTests :: Registry.Registry -> Tasty.TestTree
 deckTests registry =
   Tasty.testGroup
     "Deck"
@@ -118,12 +117,12 @@ deckTests registry =
         HU.assertEqual "chaos charms" 4 (S.countByName (Text.pack "Chaos Charm") S.alice gs)
     ]
 
-setupState :: Registry.Type.Registry -> IO GameState.GameState
+setupState :: Registry.Registry -> IO GameState.GameState
 setupState registry = do
   matchup <- S.redRed registry
   pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
-setupTests :: Registry.Type.Registry -> Tasty.TestTree
+setupTests :: Registry.Registry -> Tasty.TestTree
 setupTests registry =
   Tasty.testGroup
     "Setup"
@@ -163,12 +162,12 @@ setupTests registry =
         HU.assertEqual "all three playing" [S.alice, S.bob, S.carol] (Game.stillPlaying S.threePlayerGame)
     ]
 
-greenBlackSetup :: Registry.Type.Registry -> IO GameState.GameState
+greenBlackSetup :: Registry.Registry -> IO GameState.GameState
 greenBlackSetup registry = do
   matchup <- S.greenBlack registry
   pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
-greenBlackSetupTests :: Registry.Type.Registry -> Tasty.TestTree
+greenBlackSetupTests :: Registry.Registry -> Tasty.TestTree
 greenBlackSetupTests registry =
   Tasty.testGroup
     "GreenBlackSetup"
@@ -189,7 +188,7 @@ addMany :: Printing.Printing -> Int -> PlayerId -> GameState.GameState -> GameSt
 addMany mountain n pid gs =
   List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
 
-restartTests :: Registry.Type.Registry -> Tasty.TestTree
+restartTests :: Registry.Registry -> Tasty.TestTree
 restartTests registry =
   Tasty.testGroup
     "restart (CR 727)"
@@ -341,7 +340,7 @@ poolToLibrary pid gs =
           GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
         }
 
-subgameTests :: Registry.Type.Registry -> Tasty.TestTree
+subgameTests :: Registry.Registry -> Tasty.TestTree
 subgameTests registry =
   Tasty.testGroup
     "subgames (CR 729)"
@@ -470,5 +469,5 @@ subgameTests registry =
               HU.assertEqual "CR 800.1: a two-seat subgame is not a multiplayer game, so no free mulligan" 0 (Mulligan.freeMulligans sub)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Setup" [setupTests registry, greenBlackSetupTests registry, deckTests registry, restartTests registry, subgameTests registry]

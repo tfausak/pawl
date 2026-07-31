@@ -24,7 +24,6 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -67,7 +66,7 @@ import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.QuickCheck as QC
 
-creatureSbaTests :: Registry.Type.Registry -> Tasty.TestTree
+creatureSbaTests :: Registry.Registry -> Tasty.TestTree
 creatureSbaTests registry =
   Tasty.testGroup
     "CreatureSba"
@@ -157,7 +156,7 @@ creatureSbaTests registry =
           Nothing -> HU.assertFailure "victim vanished"
     ]
 
-damageTests :: Registry.Type.Registry -> Tasty.TestTree
+damageTests :: Registry.Registry -> Tasty.TestTree
 damageTests registry =
   Tasty.testGroup
     "Damage"
@@ -215,7 +214,7 @@ damageTests registry =
          in HU.assertEqual "no replacements remain" [] (GameState.replacements dropped)
     ]
 
-infectTests :: Registry.Type.Registry -> Tasty.TestTree
+infectTests :: Registry.Registry -> Tasty.TestTree
 infectTests registry =
   Tasty.testGroup
     "Infect"
@@ -256,7 +255,7 @@ infectTests registry =
             HU.assertEqual "blocker buried by 704.5f" 1 (length (Game.zoneMembers Zone.Graveyard S.bob settled))
     ]
 
-toxicTests :: Registry.Type.Registry -> Tasty.TestTree
+toxicTests :: Registry.Registry -> Tasty.TestTree
 toxicTests registry =
   Tasty.testGroup
     "Toxic"
@@ -397,7 +396,7 @@ copiesAndKeeps target keep p = case p of
 inPlay :: ObjectId.ObjectId -> GameState.GameState -> Bool
 inPlay oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
-legendRuleTests :: Registry.Type.Registry -> Tasty.TestTree
+legendRuleTests :: Registry.Registry -> Tasty.TestTree
 legendRuleTests registry =
   Tasty.testGroup
     "LegendRule"
@@ -508,13 +507,13 @@ legendRuleTests registry =
 -- The two world enchantments in the pool, fetched together: most tests below
 -- want two DIFFERENTLY NAMED world permanents, since a rule that ignores names
 -- is half of the contrast with the legend rule above.
-worldPair :: Registry.Type.Registry -> IO (Printing.Printing, Printing.Printing)
+worldPair :: Registry.Registry -> IO (Printing.Printing, Printing.Printing)
 worldPair registry = do
   crossroads <- Registry.printing registry "Concordant Crossroads"
   livingPlane <- Registry.printing registry "Living Plane"
   pure (crossroads, livingPlane)
 
-worldRuleTests :: Registry.Type.Registry -> Tasty.TestTree
+worldRuleTests :: Registry.Registry -> Tasty.TestTree
 worldRuleTests registry =
   Tasty.testGroup
     "WorldRule"
@@ -685,7 +684,7 @@ sbaTests =
          in HU.assertEqual "bob still playing" (Just Status.Playing) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
     ]
 
-damageEventTests :: Registry.Type.Registry -> Tasty.TestTree
+damageEventTests :: Registry.Registry -> Tasty.TestTree
 damageEventTests registry =
   Tasty.testGroup
     "DamageEvent"
@@ -715,7 +714,7 @@ damageEventTests registry =
           _ -> HU.assertFailure "fixture should have an attacker"
     ]
 
-deathtouchTests :: Registry.Type.Registry -> Tasty.TestTree
+deathtouchTests :: Registry.Registry -> Tasty.TestTree
 deathtouchTests registry =
   Tasty.testGroup
     "Deathtouch"
@@ -871,7 +870,7 @@ tramplingAnswer p = case p of
           [] -> toBlockers
   _ -> S.aggressiveAnswer p
 
-trampleTests :: Registry.Type.Registry -> Tasty.TestTree
+trampleTests :: Registry.Registry -> Tasty.TestTree
 trampleTests registry =
   Tasty.testGroup
     "Trample"
@@ -964,7 +963,7 @@ dumpOntoFirstCreature p = case p of
       [] -> Map.empty
   _ -> S.aggressiveAnswer p
 
-departedBlockerTests :: Registry.Type.Registry -> Tasty.TestTree
+departedBlockerTests :: Registry.Registry -> Tasty.TestTree
 departedBlockerTests registry =
   Tasty.testGroup
     "Departed blockers (#29)"
@@ -1053,7 +1052,7 @@ boltBlockerMidCombat blocks bolt blocker gs =
 -- Both end at the same observable: the attacker assigns no combat damage at all
 -- (CR 510.1c), so the defending player takes nothing. Reading emptiness as
 -- unblocked -- the bug this group pins -- lets the attacker through instead.
-blockedStaysBlockedTests :: Registry.Type.Registry -> Tasty.TestTree
+blockedStaysBlockedTests :: Registry.Registry -> Tasty.TestTree
 blockedStaysBlockedTests registry =
   Tasty.testGroup
     "Blocked stays blocked (CR 509.1h)"
@@ -1123,7 +1122,7 @@ killAttackerMidCombat victim gs =
     Event.destroy Regenerability.Regenerable [victim]
     Monad.void Damage.dealCombatDamage
 
-departedAttackerTests :: Registry.Type.Registry -> Tasty.TestTree
+departedAttackerTests :: Registry.Registry -> Tasty.TestTree
 departedAttackerTests registry =
   Tasty.testGroup
     "Departed attackers (CR 510.1d)"
@@ -1215,7 +1214,7 @@ defenderOrBlockerAnswer p = case p of
             [] -> toBlockers
   _ -> S.aggressiveAnswer p
 
-departedDefenderTests :: Registry.Type.Registry -> Tasty.TestTree
+departedDefenderTests :: Registry.Registry -> Tasty.TestTree
 departedDefenderTests registry =
   Tasty.testGroup
     "Departed defender (CR 800.4e)"
@@ -1302,7 +1301,7 @@ grantDeathtouch oid gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
-trampleDeathtouchTests :: Registry.Type.Registry -> Tasty.TestTree
+trampleDeathtouchTests :: Registry.Registry -> Tasty.TestTree
 trampleDeathtouchTests registry =
   Tasty.testGroup
     "TrampleDeathtouch"
@@ -1331,7 +1330,7 @@ trampleDeathtouchTests registry =
         HU.assertEqual "bob untouched without deathtouch" (Just 20) (S.lifeOf S.bob after)
     ]
 
-m2cPropertyTests :: Registry.Type.Registry -> Tasty.TestTree
+m2cPropertyTests :: Registry.Registry -> Tasty.TestTree
 m2cPropertyTests registry =
   Tasty.testGroup
     "M2cProperties"
@@ -1372,7 +1371,7 @@ m2cPropertyTests registry =
 -- Nothing. The third, a permanent that exists and is not a creature, no card in
 -- the pool can produce -- every DealDamage on a generically named slot belongs
 -- to a condition whose Filter admits only creatures -- so it is pinned here.
-damageRecipientTests :: Registry.Type.Registry -> Tasty.TestTree
+damageRecipientTests :: Registry.Registry -> Tasty.TestTree
 damageRecipientTests registry =
   Tasty.testGroup
     "CR 120.1a which recipients damage can be dealt to"
@@ -1403,7 +1402,7 @@ damageRecipientTests registry =
         HU.assertEqual "player" (Just (Recipient.ToPlayer S.bob)) (Damage.damageRecipient gs (Recipient.ToPlayer S.bob))
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Damage"

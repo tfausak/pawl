@@ -18,7 +18,6 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
@@ -121,7 +120,7 @@ recordAlwaysMulligan p = case p of
 -- this test tracks instead. Bob's library is uniform Mountains; only alice
 -- mulligans in the accompanying test, so bob's composition never enters the
 -- assertion.
-distinctPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
+distinctPrintings :: Registry.Registry -> IO [Printing.Printing]
 distinctPrintings registry =
   mapM
     (Registry.printing registry)
@@ -391,7 +390,7 @@ reversingShuffle p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> S.identityAnswer p
 
-trustedAnswerTests :: Registry.Type.Registry -> Tasty.TestTree
+trustedAnswerTests :: Registry.Registry -> Tasty.TestTree
 trustedAnswerTests registry =
   Tasty.testGroup
     "TrustedAnswers"
@@ -439,7 +438,7 @@ trustedAnswerTests registry =
         HU.assertEqual "the order is the reversal the interpreter asked for" (reverse before) (Game.zoneMembers Zone.Library S.alice after)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Mulligan"

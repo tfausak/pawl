@@ -48,7 +48,6 @@ import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.RegistrySpec as RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
@@ -75,7 +74,7 @@ tasty =
       Spec.it = \s -> Writer.tell . List.singleton . HU.testCase s
     }
 
-testTree :: Registry.Type.Registry -> Tasty.TestTree
+testTree :: Registry.Registry -> Tasty.TestTree
 testTree registry =
   Tasty.testGroup
     "pawl"

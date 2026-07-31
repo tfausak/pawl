@@ -12,7 +12,6 @@ import qualified Pawl.Codec.All as Codec
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -86,7 +85,7 @@ modeShapes m =
     (\mode -> (Mode.optionality mode, Foldable.toList (Mode.effects mode)))
     (Foldable.toList (Modal.modes m))
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Pawl.CardsSpec"
@@ -783,10 +782,10 @@ tests registry =
         HU.assertEqual "nothing of it is a static or a replacement" ([], []) (CardT.staticAbilities c, CardT.replacementEffects c)
     ]
 
-checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
+checkFile :: Registry.Registry -> Printing.Printing -> HU.Assertion
 checkFile registry p = do
   let slug = slugOf p
-  let path = Registry.Type.root registry <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
+  let path = Registry.root registry <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
   -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
   -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
   -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".

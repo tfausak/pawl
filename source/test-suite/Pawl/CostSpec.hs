@@ -24,11 +24,10 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Registry as Registry
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -77,7 +76,7 @@ theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
 
-doorTests :: Registry.Type.Registry -> Tasty.TestTree
+doorTests :: Registry.Registry -> Tasty.TestTree
 doorTests registry =
   Tasty.testGroup
     "Door"
@@ -235,7 +234,7 @@ greedBoard swamp greed piker life =
           }
       )
 
-greedTests :: Registry.Type.Registry -> Tasty.TestTree
+greedTests :: Registry.Registry -> Tasty.TestTree
 greedTests registry =
   let isActivate a = case a of
         Action.Type.Activate _ _ -> True
@@ -351,7 +350,7 @@ villageRitesBoard swamp piker villageRites n =
 -- Its one ruling: "You must sacrifice exactly one creature to cast this spell;
 -- you can't cast it without sacrificing a creature, and you can't sacrifice
 -- additional creatures."
-villageRitesTests :: Registry.Type.Registry -> Tasty.TestTree
+villageRitesTests :: Registry.Registry -> Tasty.TestTree
 villageRitesTests registry =
   Tasty.testGroup
     "Village Rites"
@@ -462,7 +461,7 @@ fireblastBoard mountain fireblastPrinting n tap =
 -- this spell's mana cost. Fireblast deals 4 damage to any target."
 --
 -- Scryfall returned no rulings for this card.
-fireblastTests :: Registry.Type.Registry -> Tasty.TestTree
+fireblastTests :: Registry.Registry -> Tasty.TestTree
 fireblastTests registry =
   Tasty.testGroup
     "Fireblast"
@@ -531,7 +530,7 @@ crossCheckWithPriority gs =
       GameState.priority = Just S.alice
     }
 
-crossCheckTests :: Registry.Type.Registry -> Tasty.TestTree
+crossCheckTests :: Registry.Registry -> Tasty.TestTree
 crossCheckTests registry =
   Tasty.testGroup
     "CrossChecks"
@@ -597,7 +596,7 @@ crossCheckTests registry =
 -- feeds an energy-paid pump (CR 118 / 122.6). The ability is extracted via the
 -- file-local total `theAbility` (no partial functions); the card-characteristics
 -- case guards that the extraction sees a real ability.
-longtuskCubTests :: Registry.Type.Registry -> Tasty.TestTree
+longtuskCubTests :: Registry.Registry -> Tasty.TestTree
 longtuskCubTests registry =
   Tasty.testGroup
     "LongtuskCub"
@@ -625,7 +624,7 @@ longtuskCubTests registry =
         HU.assertEqual "alice gained two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Pawl.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, safeholdSentryTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
 
 -- alice controls a Safehold Sentry and three Plains, all settled. `tapped` says
@@ -647,7 +646,7 @@ sentryBoard plains safeholdSentry tapped =
 
 -- Safehold Sentry {1}{W} Creature -- Elf Warrior 2/2: "{2}{W}, {Q}: This creature
 -- gets +0/+2 until end of turn." The card CR 107.6's untap symbol was waiting for.
-safeholdSentryTests :: Registry.Type.Registry -> Tasty.TestTree
+safeholdSentryTests :: Registry.Registry -> Tasty.TestTree
 safeholdSentryTests registry =
   Tasty.testGroup
     "Safehold Sentry"
@@ -716,7 +715,7 @@ noDiscardAnswer p = case p of
 -- Cathartic Reunion {1}{R} Sorcery: "As an additional cost to cast this spell,
 -- discard two cards. Draw three cards." The card CR 601.2f's "discarding cards"
 -- clause was waiting for.
-catharticReunionTests :: Registry.Type.Registry -> Tasty.TestTree
+catharticReunionTests :: Registry.Registry -> Tasty.TestTree
 catharticReunionTests registry =
   Tasty.testGroup
     "Cathartic Reunion"

@@ -17,7 +17,6 @@ import qualified Pawl.Departure as Departure
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -49,7 +48,7 @@ swampsYouControl =
     (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
     Aggregation.Objects
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Count"

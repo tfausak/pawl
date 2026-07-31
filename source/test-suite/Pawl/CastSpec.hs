@@ -28,7 +28,6 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -72,7 +71,7 @@ import qualified Test.Tasty.HUnit as HU
 sicknessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Sickness.Sickness
 sicknessOf oid gs = fmap Object.sickness (Game.lookupObject oid gs)
 
-sicknessTests :: Registry.Type.Registry -> Tasty.TestTree
+sicknessTests :: Registry.Registry -> Tasty.TestTree
 sicknessTests registry =
   Tasty.testGroup
     "Sickness"
@@ -101,12 +100,12 @@ sicknessTests registry =
         HU.assertEqual "still sick" (Just Sickness.Sick) (sicknessOf oid after)
     ]
 
-castGameState :: Registry.Type.Registry -> IO GameState.GameState
+castGameState :: Registry.Registry -> IO GameState.GameState
 castGameState registry = do
   matchup <- S.redRed registry
   pure (snd (Engine.runMatchPure S.castAnswer matchup))
 
-castEngineTests :: Registry.Type.Registry -> Tasty.TestTree
+castEngineTests :: Registry.Registry -> Tasty.TestTree
 castEngineTests registry =
   Tasty.testGroup
     "CastEngine"
@@ -152,7 +151,7 @@ pikerOnStack mountain piker =
   let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
    in snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
 
-stackTests :: Registry.Type.Registry -> Tasty.TestTree
+stackTests :: Registry.Registry -> Tasty.TestTree
 stackTests registry =
   Tasty.testGroup
     "Stack"
@@ -242,7 +241,7 @@ stackTests registry =
           [] -> HU.assertFailure "Evolving Wilds should have an activated ability"
     ]
 
-castTests :: Registry.Type.Registry -> Tasty.TestTree
+castTests :: Registry.Registry -> Tasty.TestTree
 castTests registry =
   Tasty.testGroup
     "Cast"
@@ -468,7 +467,7 @@ lastN :: Natural -> [a] -> [a]
 lastN n xs = reverse (List.genericTake n (reverse xs))
 
 -- Bob draws to eight, then discards at cleanup under discardLastAnswer.
-bobDiscardChoice :: Registry.Type.Registry -> IO (GameState.GameState, [ObjectId.ObjectId])
+bobDiscardChoice :: Registry.Registry -> IO (GameState.GameState, [ObjectId.ObjectId])
 bobDiscardChoice registry = do
   matchup <- S.redRed registry
   let start = Setup.emptyGame S.bothPlayers
@@ -482,7 +481,7 @@ bobDiscardChoice registry = do
       (held, final) = Engine.runGamePure discardLastAnswer start steps
   pure (final, held)
 
-discardTests :: Registry.Type.Registry -> Tasty.TestTree
+discardTests :: Registry.Registry -> Tasty.TestTree
 discardTests registry =
   Tasty.testGroup
     "Discard"
@@ -535,7 +534,7 @@ hackAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
   _ -> S.identityAnswer p
 
-magicalHackTests :: Registry.Type.Registry -> Tasty.TestTree
+magicalHackTests :: Registry.Registry -> Tasty.TestTree
 magicalHackTests registry =
   Tasty.testGroup
     "MagicalHack"
@@ -596,7 +595,7 @@ answerAboveBound p = case p of
 blazeInHand :: GameState.GameState -> Int
 blazeInHand gs = length (filter (nameOnStack (Text.pack "Blaze") gs) (Game.zoneMembers Zone.Hand S.alice gs))
 
-blazeTests :: Registry.Type.Registry -> Tasty.TestTree
+blazeTests :: Registry.Registry -> Tasty.TestTree
 blazeTests registry =
   Tasty.testGroup
     "Blaze"
@@ -687,7 +686,7 @@ blazeTests registry =
 -- Chaos Charm has three modes (destroy target Wall / damage target creature /
 -- give target creature haste); the falsifier is castability via the damage or
 -- haste mode with no Wall on the board at all.
-modalCastTests :: Registry.Type.Registry -> Tasty.TestTree
+modalCastTests :: Registry.Registry -> Tasty.TestTree
 modalCastTests registry =
   Tasty.testGroup
     "ModalCast"
@@ -768,7 +767,7 @@ castAndResolve answer gs oid =
 
 -- CR 702.42: entwine, the first keyword that decides a modal spell's SELECTION
 -- while it is being cast rather than reading it off the card.
-entwineTests :: Registry.Type.Registry -> Tasty.TestTree
+entwineTests :: Registry.Registry -> Tasty.TestTree
 entwineTests registry =
   Tasty.testGroup
     "Entwine"
@@ -859,7 +858,7 @@ entwineTests registry =
 -- teaches Target.fillableModes the extra slots a card declares outside its
 -- modes, so castability sees the enchant slot too -- without either function
 -- learning what an Aura is.
-auraTargetTests :: Registry.Type.Registry -> Tasty.TestTree
+auraTargetTests :: Registry.Registry -> Tasty.TestTree
 auraTargetTests registry =
   Tasty.testGroup
     "AuraTarget"
@@ -919,7 +918,7 @@ theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
 -- afterward, whether it resolves, is countered, or leaves the stack in some
 -- other way." "The mana value of the spell is determined only by its mana cost,
 -- no matter what the total cost to cast the spell was."
-fireboltTests :: Registry.Type.Registry -> Tasty.TestTree
+fireboltTests :: Registry.Registry -> Tasty.TestTree
 fireboltTests registry =
   Tasty.testGroup
     "Firebolt"
@@ -1041,7 +1040,7 @@ fireboltTests registry =
 -- CREATURE. Mindslaver is a legendary ARTIFACT -- the case that fails if the
 -- check reads the supertype and forgets the card type. And Thalia under bob's
 -- control is the case that fails if the check forgets "that player controls".
-legendarySpellTests :: Registry.Type.Registry -> Tasty.TestTree
+legendarySpellTests :: Registry.Registry -> Tasty.TestTree
 legendarySpellTests registry =
   Tasty.testGroup
     "LegendarySpell"
@@ -1140,7 +1139,7 @@ rallyBoard piker plains rally =
         -- unreachable; a bogus id fails the assertions rather than the suite.
         [] -> (bobsRally, alicesRally, S.noSource, tapped)
 
-printedCastingRestrictionTests :: Registry.Type.Registry -> Tasty.TestTree
+printedCastingRestrictionTests :: Registry.Registry -> Tasty.TestTree
 printedCastingRestrictionTests registry =
   Tasty.testGroup
     "PrintedCastingRestriction"
@@ -1232,7 +1231,7 @@ printedCastingRestrictionTests registry =
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Cast"

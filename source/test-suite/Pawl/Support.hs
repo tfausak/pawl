@@ -34,7 +34,6 @@ import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -135,24 +134,24 @@ fourPlayers = alice NonEmpty.:| [bob, carol, dave]
 fourPlayerGame :: GameState.GameState
 fourPlayerGame = Setup.emptyGame fourPlayers
 
-redRed :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+redRed :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed registry = do
   deck <- Cards.redDeck registry
   pure (Setup.mirror deck bothPlayers)
 
-greenBlack :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+greenBlack :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 greenBlack registry = do
   green <- Cards.greenDeck registry
   black <- Cards.blackDeck registry
   pure ((alice, green) NonEmpty.:| [(bob, black)])
 
-blueBlack :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+blueBlack :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 blueBlack registry = do
   blue <- Cards.blueDeck registry
   black <- Cards.blackDeck registry
   pure ((alice, blue) NonEmpty.:| [(bob, black)])
 
-matchups :: Registry.Type.Registry -> IO [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
+matchups :: Registry.Registry -> IO [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
 matchups registry = do
   rr <- redRed registry
   gb <- greenBlack registry
@@ -166,7 +165,7 @@ matchups registry = do
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable
 -- lands-only-decks property.
-landsOnly :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+landsOnly :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 landsOnly registry = do
   mountain <- Registry.printing registry "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
@@ -175,7 +174,7 @@ landsOnly registry = do
 -- reachable loss condition is CR 704.5b deck-out and the only reachable end is
 -- CR 104.2a's last player standing. The seat count is what makes it a falsifier:
 -- at two players the first deck-out ends the game, at three it must not.
-threePlayerLandsOnly :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threePlayerLandsOnly :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 threePlayerLandsOnly registry = do
   mountain <- Registry.printing registry "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) threePlayers)
@@ -184,7 +183,7 @@ threePlayerLandsOnly registry = do
 -- carol. Setup.mirror is already NonEmpty-shaped, so the seat count is the only
 -- difference. The three-seat setup rules (CR 103.5c's free first mulligan, CR
 -- 103.8c's first draw) are what this exists to exercise.
-threeWayMirror :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threeWayMirror :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 threeWayMirror registry = do
   deck <- Cards.redDeck registry
   pure (Setup.mirror deck threePlayers)
@@ -1510,8 +1509,8 @@ stubView table oid =
 -- exactly the file a hand-kept list forgets. Kept as a String list because that
 -- is what the sweeps feed back to Registry.card; the enumeration itself is the
 -- library's since #167.
-corpusSlugs :: Registry.Type.Registry -> IO [String]
+corpusSlugs :: Registry.Registry -> IO [String]
 corpusSlugs registry = fmap (fmap (Text.unpack . Slug.unwrap)) (Registry.slugs registry)
 
-allPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
+allPrintings :: Registry.Registry -> IO [Printing.Printing]
 allPrintings = Registry.printings

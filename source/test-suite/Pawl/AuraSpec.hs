@@ -23,7 +23,6 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -55,7 +54,7 @@ import qualified Test.Tasty.HUnit as HU
 -- and CR 704.5n's detach-rather-than-bury state-based action (#193). The
 -- Reattach group below is the same keyword action aimed the other way, at a
 -- permanent the effect TARGETS rather than at its own source.
-equipmentTests :: Registry.Type.Registry -> Tasty.TestTree
+equipmentTests :: Registry.Registry -> Tasty.TestTree
 equipmentTests registry =
   Tasty.testGroup
     "Equipment"
@@ -221,7 +220,7 @@ aimAt oid p = case p of
 -- CR 704.5p, the sibling of CR 704.5n above: 704.5n asks whether the HOST is
 -- still legal, and this asks whether the attached permanent may be attached to
 -- anything at all. Both detach and leave the permanent on the battlefield.
-unattachableTests :: Registry.Type.Registry -> Tasty.TestTree
+unattachableTests :: Registry.Registry -> Tasty.TestTree
 unattachableTests registry =
   Tasty.testGroup
     "Unattachable"
@@ -352,7 +351,7 @@ unattachableTests registry =
 -- BOTH halves of an enchant-player Aura: the Pool.Players enchant spec, which
 -- Card.enchant could already express, and a static ability whose affected set is
 -- reached THROUGH the enchanted player (Affected.AttachedPlayerControls).
-enchantPlayerTests :: Registry.Type.Registry -> Tasty.TestTree
+enchantPlayerTests :: Registry.Registry -> Tasty.TestTree
 enchantPlayerTests registry =
   Tasty.testGroup
     "EnchantPlayer"
@@ -438,7 +437,7 @@ enchantPlayerTests registry =
               (Target.legalRecipients (Just S.alice) crownId spec gs)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry, unattachableTests registry, reattachTests registry, auraGraftTests registry, enchantPlayerTests registry]
 
 -- Answers every target slot with one fixed recipient, deferring everything else
@@ -502,7 +501,7 @@ crownTargetSpec printing = case Card.Type.activatedAbilities (Printing.card prin
 -- opcode that moves an Aura already on the battlefield, which the Auras unit left
 -- unbuilt. Crown of the Ages is the proving card -- "{4}, {T}: Attach target Aura
 -- attached to a creature to another creature".
-reattachTests :: Registry.Type.Registry -> Tasty.TestTree
+reattachTests :: Registry.Registry -> Tasty.TestTree
 reattachTests registry =
   Tasty.testGroup
     "Reattach"
@@ -773,7 +772,7 @@ reattachTests registry =
 -- which is the backstop for a card that does NOT say it: the Crown offers a
 -- creature its Aura may not enchant and the move then fails, where Aura Graft may
 -- not offer one at all. The pair of cards is what keeps the two apart.
-auraGraftTests :: Registry.Type.Registry -> Tasty.TestTree
+auraGraftTests :: Registry.Registry -> Tasty.TestTree
 auraGraftTests registry =
   Tasty.testGroup
     "AuraGraft"
@@ -985,7 +984,7 @@ auraGraftTests registry =
         HU.assertEqual "so the creature it holds is hers" (Just S.alice) (Projection.controllerOf host after)
     ]
 
-auraTests :: Registry.Type.Registry -> Tasty.TestTree
+auraTests :: Registry.Registry -> Tasty.TestTree
 auraTests registry =
   Tasty.testGroup
     "Aura"

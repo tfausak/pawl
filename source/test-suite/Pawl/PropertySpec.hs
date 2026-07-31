@@ -6,7 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Deck as Deck
@@ -134,7 +134,7 @@ universalInvariants matchup gs =
         QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players gs)))
     ]
 
-propertyTests :: Registry.Type.Registry -> Tasty.TestTree
+propertyTests :: Registry.Registry -> Tasty.TestTree
 propertyTests registry =
   Tasty.localOption iterations
     . Tasty.testGroup "Properties"
@@ -187,5 +187,5 @@ propertyTests registry =
                 ]
       ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Properties" [propertyTests registry]

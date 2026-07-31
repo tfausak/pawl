@@ -12,7 +12,6 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -436,7 +435,7 @@ concedeAnswer p = case p of
 -- playLandAnswer (whose choices differ from Replay's exhausted-transcript
 -- fallback, keeping the assertions below honest: the transcript has to
 -- actually carry the decisions).
-recordedGame :: Registry.Type.Registry -> IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
+recordedGame :: Registry.Registry -> IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
 recordedGame registry = do
   matchup <- S.redRed registry
   let start = Setup.emptyGame (fmap fst matchup)
@@ -444,7 +443,7 @@ recordedGame registry = do
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
   pure (start, game, recorded, transcript)
 
-replayTests :: Registry.Type.Registry -> Tasty.TestTree
+replayTests :: Registry.Registry -> Tasty.TestTree
 replayTests registry =
   Tasty.testGroup
     "Replay"
@@ -524,5 +523,5 @@ replayTests registry =
           _ -> HU.assertFailure "Aether Channeler must have exactly one triggered ability"
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Replay" [replayTests registry, combatReplayTests]

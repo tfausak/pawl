@@ -21,11 +21,10 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.PlayerEffect as PlayerEffect
-import qualified Pawl.Registry as Registry
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator Pawl.Filter already claims the alias Filter.
 
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
@@ -80,7 +79,7 @@ ruleOfLawAfterFirst plains ruleOfLaw =
       (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
    in (a, b, resolveAll (S.runPure S.identityAnswer board (Cast.castSpell S.alice a)))
 
-ruleOfLawTests :: Registry.Type.Registry -> Tasty.TestTree
+ruleOfLawTests :: Registry.Registry -> Tasty.TestTree
 ruleOfLawTests registry =
   Tasty.testGroup
     "RuleOfLaw"
@@ -321,7 +320,7 @@ thaliaUntaxed mountain lightningBolt n =
 
 -- Thalia, Guardian of Thraben {1}{W} Legendary Creature -- Human Soldier 2/1:
 -- "First strike / Noncreature spells cost {1} more to cast."
-thaliaTests :: Registry.Type.Registry -> Tasty.TestTree
+thaliaTests :: Registry.Registry -> Tasty.TestTree
 thaliaTests registry =
   Tasty.testGroup
     "Thalia"
@@ -459,7 +458,7 @@ medallionBothBoard island sapphireMedallion thalia unsummonPrinting =
       )
 
 -- Sapphire Medallion {2} Artifact: "Blue spells you cast cost {1} less to cast."
-medallionTests :: Registry.Type.Registry -> Tasty.TestTree
+medallionTests :: Registry.Registry -> Tasty.TestTree
 medallionTests registry =
   Tasty.testGroup
     "SapphireMedallion"
@@ -567,7 +566,7 @@ medallionTests registry =
 -- AFTER the seven layers have run, so one never starts to apply before layer 6
 -- and the cut is unconditional. Same shape as the layer-7-only static ability
 -- gatherStatic drops.
-humilityTests :: Registry.Type.Registry -> Tasty.TestTree
+humilityTests :: Registry.Registry -> Tasty.TestTree
 humilityTests registry =
   Tasty.testGroup
     "Humility"
@@ -673,7 +672,7 @@ edgewalkerBoard plains edgewalker piker copies n =
 -- excess as dropped rather than spilled (#309). Edgewalker is itself a Cleric,
 -- so the spell it discounts is another copy of itself and the pool needs no
 -- second Cleric to make the point.
-edgewalkerTests :: Registry.Type.Registry -> Tasty.TestTree
+edgewalkerTests :: Registry.Registry -> Tasty.TestTree
 edgewalkerTests registry =
   Tasty.testGroup
     "Edgewalker"
@@ -758,7 +757,7 @@ reliquaryCleanup :: GameState.GameState -> GameState.GameState
 reliquaryCleanup gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
 
 -- Reliquary Tower, a Land: "You have no maximum hand size. / {T}: Add {C}."
-reliquaryTowerTests :: Registry.Type.Registry -> Tasty.TestTree
+reliquaryTowerTests :: Registry.Registry -> Tasty.TestTree
 reliquaryTowerTests registry =
   Tasty.testGroup
     "ReliquaryTower"
@@ -848,7 +847,7 @@ storedConditional piker =
 -- The STORED carrier: a player effect that outlives the object that made it.
 -- Hand-built here, exactly as ExpirySpec hand-builds a ContinuousEffect, so the
 -- carrier and its sweeps are proven before an opcode can produce one.
-storedTests :: Registry.Type.Registry -> Tasty.TestTree
+storedTests :: Registry.Registry -> Tasty.TestTree
 storedTests registry =
   let base = Setup.emptyGame S.bothPlayers
       silenced =
@@ -984,7 +983,7 @@ isSilenceActivate action = case action of
   Action.Type.Pass -> False
 
 -- Silence {W} Instant: "Your opponents can't cast spells this turn."
-silenceTests :: Registry.Type.Registry -> Tasty.TestTree
+silenceTests :: Registry.Registry -> Tasty.TestTree
 silenceTests registry =
   Tasty.testGroup
     "Silence"
@@ -1099,7 +1098,7 @@ matchesSpellBoard lightningBolt piker =
 -- over the PROJECTED view (CR 613.1d layer 4 for a card type, CR 613.1e layer 5
 -- for a colour) rather than the retired SpellCriterion. A noncreature spell is
 -- Filter.Not (Filter.HasCardType Creature); a coloured spell is Filter.HasColor.
-matchesSpellTests :: Registry.Type.Registry -> Tasty.TestTree
+matchesSpellTests :: Registry.Registry -> Tasty.TestTree
 matchesSpellTests registry =
   let noncreature = Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
    in Tasty.testGroup
@@ -1126,5 +1125,5 @@ matchesSpellTests registry =
             HU.assertBool "Lightning Bolt is not blue" (not (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Blue) bolt gs))
         ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests registry, adjustmentTests, thaliaTests registry, medallionTests registry, humilityTests registry, edgewalkerTests registry, reliquaryTowerTests registry, storedTests registry, silenceTests registry, matchesSpellTests registry]

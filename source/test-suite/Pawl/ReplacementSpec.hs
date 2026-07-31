@@ -26,11 +26,10 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Registry as Registry
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Resolve as Resolve
@@ -236,7 +235,7 @@ leylineShape src ts =
 -- Sarcomancy is placed straight onto the battlefield, so its enters-trigger
 -- never resolves and no Zombie token exists: CR 603.4's intervening "if" holds
 -- and the upkeep ability really would fire.
-stepSkipTests :: Registry.Type.Registry -> Tasty.TestTree
+stepSkipTests :: Registry.Registry -> Tasty.TestTree
 stepSkipTests registry =
   let untap = Phase.Beginning BeginningStep.Untap
       upkeep = Phase.Beginning BeginningStep.Upkeep
@@ -315,7 +314,7 @@ aimPlayer pid p = case p of
 -- skipped step cannot be confused with a step that happened and drew nothing:
 -- the CR 603.2b StepBegan record (CR 614.6, "if an event is replaced, it never
 -- happens"), and alice's library, which a real draw step empties by one.
-fatigueTests :: Registry.Type.Registry -> Tasty.TestTree
+fatigueTests :: Registry.Registry -> Tasty.TestTree
 fatigueTests registry =
   let drawStep = Phase.Beginning BeginningStep.DrawStep
       -- alice's turn, positioned at her draw step with the precombat main phase
@@ -498,7 +497,7 @@ castingSkirmishAnswer victim p = case p of
 -- Everything Fatigue proved about a skip's LIFETIME rides along unchanged: the
 -- skip is created by an effect, scoped to the player its resolution named, and
 -- consumed by one occurrence (CR 614.10a).
-stonehornTests :: Registry.Type.Registry -> Tasty.TestTree
+stonehornTests :: Registry.Registry -> Tasty.TestTree
 stonehornTests registry =
   let -- alice in her precombat main phase on turn 2, holding Stonehorn Dignitary
       -- with four untapped Plains (exactly {3}{W}); bob has one Settled Goblin
@@ -590,7 +589,7 @@ stonehornTests registry =
             HU.assertEqual "bob's skip is still armed, waiting for his own turn" 1 (armed mid)
         ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   -- CR 614.5's applied set is what makes the CR 616.1 loop TERMINATE, not merely
   -- correct: a regression there (an effect invoking itself repeatedly, e.g. two

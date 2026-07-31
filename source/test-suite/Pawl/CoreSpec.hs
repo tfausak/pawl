@@ -13,7 +13,6 @@ import qualified Pawl.Filter as Filter
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -94,7 +93,7 @@ noView _ = Nothing
 noContext :: Filter.Context
 noContext = Filter.MkContext Nothing Nothing
 
-quantityTests :: Registry.Type.Registry -> Tasty.TestTree
+quantityTests :: Registry.Registry -> Tasty.TestTree
 quantityTests registry =
   Tasty.testGroup
     "Quantity"
@@ -192,5 +191,5 @@ quantityTests registry =
           (Quantity.evaluate viewOfThree noContext three (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Core" [programTests, quantityTests registry]

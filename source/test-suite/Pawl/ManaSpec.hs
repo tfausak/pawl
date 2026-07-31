@@ -25,7 +25,6 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -100,7 +99,7 @@ avoidsSource unwanted p = case p of
     [] -> NonEmpty.head candidates
   _ -> S.identityAnswer p
 
-castabilityTests :: Registry.Type.Registry -> Tasty.TestTree
+castabilityTests :: Registry.Registry -> Tasty.TestTree
 castabilityTests registry =
   Tasty.testGroup
     "Castability"
@@ -127,7 +126,7 @@ poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Mana.poolOf pid gs of
   Mana.Type.MkMana units -> length units
 
-manaTests :: Registry.Type.Registry -> Tasty.TestTree
+manaTests :: Registry.Registry -> Tasty.TestTree
 manaTests registry =
   Tasty.testGroup
     "Mana"
@@ -454,7 +453,7 @@ tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.
 tappedFor answer oid gs = case Mana.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
 
-anyColorTests :: Registry.Type.Registry -> Tasty.TestTree
+anyColorTests :: Registry.Registry -> Tasty.TestTree
 anyColorTests registry =
   Tasty.testGroup
     "Mana of any color"
@@ -579,7 +578,7 @@ floatedPools alices forest =
 --
 -- Upwelling ({3}{G} Enchantment, "Players don't lose unspent mana as steps and
 -- phases end.") is the card that stops it, and it stops it for EVERY player.
-upwellingTests :: Registry.Type.Registry -> Tasty.TestTree
+upwellingTests :: Registry.Registry -> Tasty.TestTree
 upwellingTests registry =
   Tasty.testGroup
     "Upwelling"
@@ -662,7 +661,7 @@ upwellingTests registry =
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
 -- unit, and it is what separates "the types this source could produce" from "the
 -- mana this source produces when it is tapped" (#238).
-solRingTests :: Registry.Type.Registry -> Tasty.TestTree
+solRingTests :: Registry.Registry -> Tasty.TestTree
 solRingTests registry =
   Tasty.testGroup
     "Sol Ring"
@@ -722,7 +721,7 @@ solRingTests registry =
         HU.assertEqual "nothing to ask" 0 (State.execState (Engine.runGame countingAnswer gs (Mana.tapForMana solRingId)) 0)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Mana"
@@ -755,7 +754,7 @@ redSymbol = ManaSymbol.OfType (ManaType.Colored Color.Red)
 -- CR 107.4e: "A hybrid symbol such as {W/U} can be paid with either white or blue
 -- mana." Its example is exactly this shape: "{G/W}{G/W} can be paid by spending
 -- {G}{G}, {G}{W}, or {W}{W}."
-hybridTests :: Registry.Type.Registry -> Tasty.TestTree
+hybridTests :: Registry.Registry -> Tasty.TestTree
 hybridTests registry =
   Tasty.testGroup
     "Hybrid"
@@ -828,7 +827,7 @@ javelinCost = ManaCost.MkManaCost [twoOrRed, twoOrRed, twoOrRed]
 -- Flame Javelin ({2/R}{2/R}{2/R}) throughout, because the symbol only becomes
 -- interesting in bulk: one of them is barely distinguishable from {R}, three of
 -- them span {R}{R}{R} to {6}.
-monocoloredHybridTests :: Registry.Type.Registry -> Tasty.TestTree
+monocoloredHybridTests :: Registry.Registry -> Tasty.TestTree
 monocoloredHybridTests registry =
   let -- How many objects the stack holds after alice tries to cast the Javelin
       -- with `gs` already on the battlefield: 1 when the cost was paid, 0 when
@@ -1007,7 +1006,7 @@ aliceAt n =
 -- decides (#373); a case going through Cast.castSpell announces first, under CR
 -- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
 -- are the second path.
-phyrexianTests :: Registry.Type.Registry -> Tasty.TestTree
+phyrexianTests :: Registry.Registry -> Tasty.TestTree
 phyrexianTests registry =
   Tasty.testGroup
     "Phyrexian"
@@ -1283,7 +1282,7 @@ withPermanent land printing n = snd (S.addCreature printing S.alice (S.landsInPl
 --     own "the game returns to the moment before the casting of that spell was
 --     proposed" would also do -- but the answer was never a real option. Thalia
 --     and Mutagenic Growth, below.
-totalCostTests :: Registry.Type.Registry -> Tasty.TestTree
+totalCostTests :: Registry.Registry -> Tasty.TestTree
 totalCostTests registry =
   Tasty.testGroup
     "TotalCost"
@@ -1376,7 +1375,7 @@ totalCostTests registry =
 -- in printed order, each asked knowing the answers before it, and an earlier
 -- answer narrowing a later one's offer -- CR 601.2b's last sentence, "previously
 -- made choices ... may restrict the player's options when making these choices."
-dismemberTests :: Registry.Type.Registry -> Tasty.TestTree
+dismemberTests :: Registry.Registry -> Tasty.TestTree
 dismemberTests registry =
   Tasty.testGroup
     "Dismember"
@@ -1468,7 +1467,7 @@ pikerOn gs =
 -- names "the activation cost of an activated ability" in its own words -- so the
 -- announcement happens at CR 601.2b's position for an activation too. Until this
 -- card there was nothing in the pool for Pawl.Activate's Cost.announce call to do.
-moltensteelTests :: Registry.Type.Registry -> Tasty.TestTree
+moltensteelTests :: Registry.Registry -> Tasty.TestTree
 moltensteelTests registry =
   Tasty.testGroup
     "Moltensteel"

@@ -15,7 +15,6 @@ import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Printing as Printing
@@ -26,7 +25,7 @@ import qualified Test.Tasty.HUnit as HU
 -- A registry over a throwaway directory holding `files` (name, contents). The
 -- label keeps concurrently running cases in separate directories, since tasty
 -- runs them in parallel.
-withCorpus :: String -> [(FilePath, Text.Text)] -> (Registry.Type.Registry -> IO a) -> IO a
+withCorpus :: String -> [(FilePath, Text.Text)] -> (Registry.Registry -> IO a) -> IO a
 withCorpus label files action = do
   tmp <- Directory.getTemporaryDirectory
   let dir = tmp <> "/pawl-registry-spec-" <> label
@@ -50,7 +49,7 @@ pikerJson = do
 -- withCorpus cannot express a file containing invalid UTF-8, since Text.Text
 -- cannot hold one. This exercises Registry.load's decodeUtf8' failure branch,
 -- otherwise unreached by any case here.
-withInvalidUtf8Corpus :: String -> (Registry.Type.Registry -> IO a) -> IO a
+withInvalidUtf8Corpus :: String -> (Registry.Registry -> IO a) -> IO a
 withInvalidUtf8Corpus label action = do
   tmp <- Directory.getTemporaryDirectory
   let dir = tmp <> "/pawl-registry-spec-" <> label
@@ -112,7 +111,7 @@ tests =
         piker <- pikerJson
         withCorpus "cached" [("goblin-piker.json", piker)] $ \registry -> do
           first <- Registry.card registry "Goblin Piker"
-          Directory.removeFile (Registry.Type.root registry <> "/goblin-piker.json")
+          Directory.removeFile (Registry.root registry <> "/goblin-piker.json")
           second <- Registry.card registry "Goblin Piker"
           HU.assertEqual "served from the cache" first second,
       -- The three failure kinds the loader can raise were distinguishable only
@@ -128,7 +127,7 @@ tests =
             "missing file"
             ( \err -> do
                 HU.assertEqual "names the slug" (Text.pack "goblin-piker") (Slug.unwrap (UnknownCard.slug err))
-                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (UnknownCard.path err)
+                HU.assertEqual "names the path" (Registry.root registry <> "/goblin-piker.json") (UnknownCard.path err)
             )
             (Registry.card registry "Goblin Piker"),
       HU.testCase "a malformed file raises CorruptCard, not UnknownCard"
@@ -137,7 +136,7 @@ tests =
           expectExceptionWith
             "malformed json"
             ( \err -> do
-                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (CorruptCard.path err)
+                HU.assertEqual "names the path" (Registry.root registry <> "/goblin-piker.json") (CorruptCard.path err)
                 HU.assertBool "says why" (not (Text.null (CorruptCard.reason err)))
             )
             (Registry.card registry "Goblin Piker"),
@@ -147,7 +146,7 @@ tests =
           expectExceptionWith
             "misfiled card"
             ( \err -> do
-                HU.assertEqual "names the path" (Registry.Type.root registry <> "/bird-maiden.json") (MisfiledCard.path err)
+                HU.assertEqual "names the path" (Registry.root registry <> "/bird-maiden.json") (MisfiledCard.path err)
                 HU.assertEqual "names the card" (Text.pack "Goblin Piker") (MisfiledCard.name err)
                 HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.unwrap (MisfiledCard.expected err))
                 HU.assertEqual "names the card's slug" (Text.pack "goblin-piker") (Slug.unwrap (MisfiledCard.actual err))
@@ -159,7 +158,7 @@ tests =
           expectExceptionWith
             "invalid utf-8"
             ( \err -> do
-                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (CorruptCard.path err)
+                HU.assertEqual "names the path" (Registry.root registry <> "/goblin-piker.json") (CorruptCard.path err)
                 -- Specifically the decodeUtf8' failure, not merely any
                 -- CorruptCard: an incomplete JSON payload (this file's
                 -- contents) would fail for an unrelated reason (missing
@@ -174,11 +173,11 @@ tests =
           expectExceptionWith
             "malformed json"
             ( \err -> do
-                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (CorruptCard.path err)
+                HU.assertEqual "names the path" (Registry.root registry <> "/goblin-piker.json") (CorruptCard.path err)
                 HU.assertBool "says why" (not (Text.null (CorruptCard.reason err)))
             )
             (Registry.card registry "Goblin Piker")
-          TextIO.writeFile (Registry.Type.root registry <> "/goblin-piker.json") piker
+          TextIO.writeFile (Registry.root registry <> "/goblin-piker.json") piker
           c <- Registry.card registry "Goblin Piker"
           HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.name c),
       -- (b) A mistyped --cards-dir should fail once, at startup, rather than

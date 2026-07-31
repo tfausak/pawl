@@ -23,7 +23,6 @@ import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
-import qualified Pawl.Registry as Registry
 -- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
 -- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
 -- later be imported and must not collide.
@@ -31,7 +30,7 @@ import qualified Pawl.Registry as Registry
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Slug as Slug
@@ -99,7 +98,7 @@ import qualified Test.Tasty.HUnit as HU
 costOf :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
 costOf symbols = Just (ManaCost.MkManaCost symbols)
 
-m2aCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m2aCardTests :: Registry.Registry -> Tasty.TestTree
 m2aCardTests registry =
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       green = ManaSymbol.OfType (ManaType.Colored Color.Green)
@@ -188,7 +187,7 @@ m2aCardTests registry =
               S.m2aKeywords
         ]
 
-cardTests :: Registry.Type.Registry -> Tasty.TestTree
+cardTests :: Registry.Registry -> Tasty.TestTree
 cardTests registry =
   Tasty.testGroup
     "Card"
@@ -627,7 +626,7 @@ tokenNameOffends token =
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
 -- pool. Loosen to superset if such a card ever lands.
-lintTests :: Registry.Type.Registry -> Tasty.TestTree
+lintTests :: Registry.Registry -> Tasty.TestTree
 lintTests registry =
   Tasty.testGroup
     "Lint"
@@ -665,7 +664,7 @@ lintTests registry =
       -- it is the identity on every stem -- read the listing directly, because
       -- Registry.slugs has already normalized the evidence away.
       HU.testCase "every file name in data/cards is already a slug" $ do
-        entries <- Directory.listDirectory (Registry.Type.root registry)
+        entries <- Directory.listDirectory (Registry.root registry)
         let stems = fmap (reverse . drop (length ".json") . reverse) (filter (List.isSuffixOf ".json") entries)
         HU.assertBool "the corpus is not empty" (not (null stems))
         mapM_
@@ -941,7 +940,7 @@ lintTests registry =
         HU.assertEqual "the enchant slot is never hand-declared" [] (fmap (Card.Type.name . Printing.card) offenders)
     ]
 
-m2bCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m2bCardTests :: Registry.Registry -> Tasty.TestTree
 m2bCardTests registry =
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       gs0 = Setup.emptyGame S.bothPlayers
@@ -984,7 +983,7 @@ m2bCardTests registry =
             HU.assertEqual "raptor body" (bodyOf piker) (bodyOf ridgetopRaptor)
         ]
 
-m2cCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m2cCardTests :: Registry.Registry -> Tasty.TestTree
 m2cCardTests registry =
   Tasty.testGroup
     "M2cCards"
@@ -1004,7 +1003,7 @@ m2cCardTests registry =
         HU.assertEqual "keywords" (Set.singleton Keyword.Trample) (Card.Type.keywords c)
     ]
 
-basicLandTests :: Registry.Type.Registry -> Tasty.TestTree
+basicLandTests :: Registry.Registry -> Tasty.TestTree
 basicLandTests registry =
   Tasty.testGroup
     "BasicLand"
@@ -1034,7 +1033,7 @@ basicLandTests registry =
           (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
     ]
 
-m3cCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m3cCardTests :: Registry.Registry -> Tasty.TestTree
 m3cCardTests registry =
   Tasty.testGroup
     "M3cCards"
@@ -1045,7 +1044,7 @@ m3cCardTests registry =
         HU.assertBool "not a permanent target" (Map.null (Card.allTargetSpecs card))
     ]
 
-m3eCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m3eCardTests :: Registry.Registry -> Tasty.TestTree
 m3eCardTests registry =
   Tasty.testGroup
     "M3eCards"
@@ -1061,7 +1060,7 @@ m3eCardTests registry =
           _ -> HU.assertFailure "expected exactly one ability"
     ]
 
-m4bCardTests :: Registry.Type.Registry -> Tasty.TestTree
+m4bCardTests :: Registry.Registry -> Tasty.TestTree
 m4bCardTests registry =
   Tasty.testGroup
     "M4bCards"
@@ -1235,7 +1234,7 @@ m4bCardTests registry =
         HU.assertEqual "six" 6 (Quantity.manaValueOf (Printing.card flameJavelin))
     ]
 
-m45p6CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m45p6CardTests :: Registry.Registry -> Tasty.TestTree
 m45p6CardTests registry =
   Tasty.testGroup
     "M45p6Cards"
@@ -1296,7 +1295,7 @@ m45p6CardTests registry =
           _ -> HU.assertFailure "expected exactly one triggered ability"
     ]
 
-m45p7CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m45p7CardTests :: Registry.Registry -> Tasty.TestTree
 m45p7CardTests registry =
   Tasty.testGroup
     "M4.5 P7"
@@ -1415,7 +1414,7 @@ m45p7CardTests registry =
         HU.assertEqual "no target slots" Map.empty (Card.allTargetSpecs c)
     ]
 
-m45p11CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m45p11CardTests :: Registry.Registry -> Tasty.TestTree
 m45p11CardTests registry =
   Tasty.testGroup
     "M4.5 P11"
@@ -1433,7 +1432,7 @@ m45p11CardTests registry =
 -- fails here rather than surfacing as a behavioural oddity somewhere downstream.
 -- Master Thief's ForAsLongAs is pinned this way in m45p6CardTests; this is
 -- Barbarian Outcast's StateIs, which had only behavioural coverage (#165).
-m55CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m55CardTests :: Registry.Registry -> Tasty.TestTree
 m55CardTests registry =
   Tasty.testGroup
     "M5.5"
@@ -1485,7 +1484,7 @@ m55CardTests registry =
 
 -- The Auras phase (a) gate card: CR 303.4m's Attached affected-set, proven by a
 -- real Aura on a real creature rather than a synthetic fixture.
-auraCardTests :: Registry.Type.Registry -> Tasty.TestTree
+auraCardTests :: Registry.Registry -> Tasty.TestTree
 auraCardTests registry =
   Tasty.testGroup
     "Auras"
@@ -1640,7 +1639,7 @@ sourceOnBattlefield =
 -- -- every printed enchantment animator excludes Auras by name; and March of the
 -- Machines animates every noncreature artifact at once, which is the card CR
 -- 613.6 exists for (#233).
-animatorCardTests :: Registry.Type.Registry -> Tasty.TestTree
+animatorCardTests :: Registry.Registry -> Tasty.TestTree
 animatorCardTests registry =
   Tasty.testGroup
     "Animators"
@@ -1758,7 +1757,7 @@ animatorCardTests registry =
 -- CR 702.29: the pool's first cycling card. Barkhide Mauler is a vanilla 4/4
 -- whose only text is the keyword, so nothing else about it can stand in for the
 -- keyword when a cycling test passes.
-cyclingCardTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingCardTests :: Registry.Registry -> Tasty.TestTree
 cyclingCardTests registry =
   Tasty.testGroup
     "Cycling"
@@ -1819,7 +1818,7 @@ cyclingCardTests registry =
 -- and it is the SUPERTYPE on the type line that earns them their place: CR
 -- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Sba.worldVictims),
 -- and nothing else in the corpus carries it.
-worldCardTests :: Registry.Type.Registry -> Tasty.TestTree
+worldCardTests :: Registry.Registry -> Tasty.TestTree
 worldCardTests registry =
   Tasty.testGroup
     "WorldEnchantments"
@@ -1863,7 +1862,7 @@ worldCardTests registry =
 
 -- CR 701.20: the cards that say "reveal" in their own text, as opposed to
 -- inheriting it from a keyword the way Ash Barrens' typecycling does.
-revealCardTests :: Registry.Type.Registry -> Tasty.TestTree
+revealCardTests :: Registry.Registry -> Tasty.TestTree
 revealCardTests registry =
   Tasty.testGroup
     "Reveal"
@@ -1897,7 +1896,7 @@ revealCardTests registry =
 -- ability triggers on a permanent OTHER than itself entering, and its effect
 -- names nothing about the newcomer, so the card is a clean witness for the
 -- trigger condition alone.
-entersCardTests :: Registry.Type.Registry -> Tasty.TestTree
+entersCardTests :: Registry.Registry -> Tasty.TestTree
 entersCardTests registry =
   Tasty.testGroup
     "Enters"
@@ -1933,7 +1932,7 @@ entersCardTests registry =
           abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities))
     ]
 
-unspentManaCardTests :: Registry.Type.Registry -> Tasty.TestTree
+unspentManaCardTests :: Registry.Registry -> Tasty.TestTree
 unspentManaCardTests registry =
   Tasty.testGroup
     "Unspent mana"
@@ -1954,7 +1953,7 @@ unspentManaCardTests registry =
           (Card.Type.playerAbilities c)
     ]
 
-phyrexianCardTests :: Registry.Type.Registry -> Tasty.TestTree
+phyrexianCardTests :: Registry.Registry -> Tasty.TestTree
 phyrexianCardTests registry =
   Tasty.testGroup
     "Phyrexian"
@@ -1983,7 +1982,7 @@ phyrexianCardTests registry =
 -- "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking creature from
 -- combat." (Murders at Karlov Manor Commander; oracle text checked against
 -- Scryfall.) The gameplay proof is Pawl.CombatSpec's EffectRemoval group.
-removeFromCombatCardTests :: Registry.Type.Registry -> Tasty.TestTree
+removeFromCombatCardTests :: Registry.Registry -> Tasty.TestTree
 removeFromCombatCardTests registry =
   Tasty.testGroup
     "RemoveFromCombat"
@@ -2023,7 +2022,7 @@ removeFromCombatCardTests registry =
 -- point next to Lure's, above: the same field, the other Affected. The gameplay
 -- proof, including CR 604.2's layer-6 strip, is Pawl.CombatSpec's
 -- BlockRequirements group.
-blockRequirementCardTests :: Registry.Type.Registry -> Tasty.TestTree
+blockRequirementCardTests :: Registry.Registry -> Tasty.TestTree
 blockRequirementCardTests registry =
   Tasty.testGroup
     "BlockRequirements"
@@ -2058,7 +2057,7 @@ blockRequirementCardTests registry =
 -- Aura reaching the same set through the same Affected, carried on a field the
 -- CR 613 layer system never reads. The gameplay proof is Pawl.CombatSpec's
 -- AttackRequirements group.
-attackRequirementCardTests :: Registry.Type.Registry -> Tasty.TestTree
+attackRequirementCardTests :: Registry.Registry -> Tasty.TestTree
 attackRequirementCardTests registry =
   Tasty.testGroup
     "AttackRequirements"
@@ -2088,7 +2087,7 @@ attackRequirementCardTests registry =
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"

@@ -19,12 +19,11 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Registry as Registry
 -- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
 -- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
 -- aliased Subtype.Type below for the same reason, against Pawl.Subtype.
 
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
@@ -164,7 +163,7 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Projection"
@@ -1188,7 +1187,7 @@ tests registry =
 -- CR 122.1b: "A keyword counter on a permanent ... causes that object to gain
 -- that keyword", and CR 613.1f puts that grant in LAYER 6 -- not the layer 7c
 -- where CR 122.1a's +1/+1 counters land.
-keywordCounterTests :: Registry.Type.Registry -> Tasty.TestTree
+keywordCounterTests :: Registry.Registry -> Tasty.TestTree
 keywordCounterTests registry =
   Tasty.testGroup
     "KeywordCounter"

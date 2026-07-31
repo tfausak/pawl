@@ -21,7 +21,6 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -92,7 +91,7 @@ singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpe
 singleModeAbility effects specs =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Pawl.Activate"
@@ -360,7 +359,7 @@ aimAt who p = case p of
 -- the stack, "otherwise, it will check that information when it resolves. In both
 -- instances, if the source is no longer in the zone it's expected to be in, its
 -- last known information is used."
-lastKnownTests :: Registry.Type.Registry -> Tasty.TestTree
+lastKnownTests :: Registry.Registry -> Tasty.TestTree
 lastKnownTests registry =
   Tasty.testGroup
     "LastKnownInformation"
@@ -431,7 +430,7 @@ lastKnownTests registry =
 -- Alice holds it, two Forests pay the {2}, and her library has a card to draw --
 -- otherwise CR 704.5b would end the game around the assertion rather than the
 -- draw being observable.
-cyclingBoard :: Registry.Type.Registry -> IO (ObjectId.ObjectId, GameState.GameState)
+cyclingBoard :: Registry.Registry -> IO (ObjectId.ObjectId, GameState.GameState)
 cyclingBoard registry = do
   mauler <- Registry.printing registry "Barkhide Mauler"
   forest <- Registry.printing registry "Forest"
@@ -440,7 +439,7 @@ cyclingBoard registry = do
       (g1, oid) = S.handOne mauler g0
   pure (oid, g1 {GameState.priority = Just S.alice})
 
-cyclingTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingTests :: Registry.Registry -> Tasty.TestTree
 cyclingTests registry =
   Tasty.testGroup
     "Cycling"
@@ -775,7 +774,7 @@ pingAnswer p = case p of
     [] -> A.Pass
   _ -> S.aggressiveAnswer p
 
-printedActivationTimingTests :: Registry.Type.Registry -> Tasty.TestTree
+printedActivationTimingTests :: Registry.Registry -> Tasty.TestTree
 printedActivationTimingTests registry =
   Tasty.testGroup
     "PrintedActivationTiming"

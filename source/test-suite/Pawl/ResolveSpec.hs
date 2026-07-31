@@ -28,11 +28,10 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Monarch as Monarch
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Registry as Registry
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
@@ -113,7 +112,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-targetTests :: Registry.Type.Registry -> Tasty.TestTree
+targetTests :: Registry.Registry -> Tasty.TestTree
 targetTests registry =
   Tasty.testGroup
     "Target"
@@ -455,7 +454,7 @@ targetTests registry =
               _ -> HU.assertFailure "fixture should have one creature a side"
     ]
 
-resolveTests :: Registry.Type.Registry -> Tasty.TestTree
+resolveTests :: Registry.Registry -> Tasty.TestTree
 resolveTests registry =
   Tasty.testGroup
     "Resolve"
@@ -1350,7 +1349,7 @@ racingCounters island piker cancel =
       r2 = snd (Engine.runGamePure atVictim r1 Stack.resolveTop) -- A fizzles
    in r2
 
-counterTests :: Registry.Type.Registry -> Tasty.TestTree
+counterTests :: Registry.Registry -> Tasty.TestTree
 counterTests registry =
   Tasty.testGroup
     "Counter"
@@ -1403,7 +1402,7 @@ counterTests registry =
         HU.assertEqual "the countered spell is exiled" 1 (length (Game.zoneMembers Zone.Exile S.bob resolved))
     ]
 
-fizzleTests :: Registry.Type.Registry -> Tasty.TestTree
+fizzleTests :: Registry.Registry -> Tasty.TestTree
 fizzleTests registry =
   Tasty.testGroup
     "Fizzle"
@@ -1474,7 +1473,7 @@ fizzleTests registry =
         HU.assertEqual "the loop released priority" Nothing (GameState.priority after)
     ]
 
-indestructibleTests :: Registry.Type.Registry -> Tasty.TestTree
+indestructibleTests :: Registry.Registry -> Tasty.TestTree
 indestructibleTests registry =
   Tasty.testGroup
     "Indestructible"
@@ -1577,7 +1576,7 @@ drawersOf gs = Maybe.mapMaybe drawer (S.zoneChangesOf gs)
         then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
         else Nothing
 
-zoneChangeTests :: Registry.Type.Registry -> Tasty.TestTree
+zoneChangeTests :: Registry.Registry -> Tasty.TestTree
 zoneChangeTests registry =
   Tasty.testGroup
     "ZoneChange"
@@ -1909,7 +1908,7 @@ zoneChangeTests registry =
         HU.assertEqual "one card left in bob's hand" 1 (S.handSize S.bob after)
     ]
 
-drawCardTests :: Registry.Type.Registry -> Tasty.TestTree
+drawCardTests :: Registry.Registry -> Tasty.TestTree
 drawCardTests registry =
   Tasty.testGroup
     "DrawCard"
@@ -1925,7 +1924,7 @@ drawCardTests registry =
          in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
     ]
 
-loseLifeTests :: Registry.Type.Registry -> Tasty.TestTree
+loseLifeTests :: Registry.Registry -> Tasty.TestTree
 loseLifeTests registry =
   Tasty.testGroup
     "LoseLife"
@@ -1980,7 +1979,7 @@ loseLifeTests registry =
 -- Alice's board is Bonesplitter ({1}), Serum Powder ({3}) and Mindslaver ({6}),
 -- chosen so that greatest (6), count (3), sum (10) and least (1) are four
 -- DIFFERENT numbers: one hand-size assertion falsifies every other fold.
-greatestTests :: Registry.Type.Registry -> Tasty.TestTree
+greatestTests :: Registry.Registry -> Tasty.TestTree
 greatestTests registry =
   Tasty.testGroup
     "Greatest"
@@ -2060,7 +2059,7 @@ greatestTests registry =
         HU.assertEqual "and her library is untouched" 10 (length (Game.zoneMembers Zone.Library S.alice after))
     ]
 
-countersTests :: Registry.Type.Registry -> Tasty.TestTree
+countersTests :: Registry.Registry -> Tasty.TestTree
 countersTests registry =
   Tasty.testGroup
     "Counters"
@@ -2157,7 +2156,7 @@ countersTests registry =
         HU.assertEqual "the bounced incarnation in hand has no counters" [Map.empty] handCounters
     ]
 
-untapTests :: Registry.Type.Registry -> Tasty.TestTree
+untapTests :: Registry.Registry -> Tasty.TestTree
 untapTests registry =
   Tasty.testGroup
     "Untap"
@@ -2178,7 +2177,7 @@ untapTests registry =
         HU.assertEqual "target is untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid after))
     ]
 
-gainControlTests :: Registry.Type.Registry -> Tasty.TestTree
+gainControlTests :: Registry.Registry -> Tasty.TestTree
 gainControlTests registry =
   Tasty.testGroup
     "GainControl"
@@ -2225,7 +2224,7 @@ gainControlTests registry =
         HU.assertEqual "its settle under alice is untouched" (Just (Sickness.Settled S.alice)) (fmap Object.sickness (Game.lookupObject oid after))
     ]
 
-gainPlayerCountersTests :: Registry.Type.Registry -> Tasty.TestTree
+gainPlayerCountersTests :: Registry.Registry -> Tasty.TestTree
 gainPlayerCountersTests registry =
   Tasty.testGroup
     "GainPlayerCounters"
@@ -2255,7 +2254,7 @@ proliferate :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameStat
 proliferate answer src gs =
   S.runPure answer gs (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)
 
-proliferateTests :: Registry.Type.Registry -> Tasty.TestTree
+proliferateTests :: Registry.Registry -> Tasty.TestTree
 proliferateTests registry =
   Tasty.testGroup
     "Proliferate"
@@ -2482,7 +2481,7 @@ sacrifices wanted p = case p of
     if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
   _ -> S.identityAnswer p
 
-playerSacrificesTests :: Registry.Type.Registry -> Tasty.TestTree
+playerSacrificesTests :: Registry.Registry -> Tasty.TestTree
 playerSacrificesTests registry =
   Tasty.testGroup
     "PlayerSacrifices"
@@ -2563,7 +2562,7 @@ playerSacrificesTests registry =
         HU.assertBool "bob's creature was sacrificed" (not (S.onBattlefield his resolved))
     ]
 
-createEmblemTests :: Registry.Type.Registry -> Tasty.TestTree
+createEmblemTests :: Registry.Registry -> Tasty.TestTree
 createEmblemTests registry =
   Tasty.testGroup
     "CreateEmblem"
@@ -2577,7 +2576,7 @@ createEmblemTests registry =
         HU.assertEqual "owned by the resolver" [Just S.alice] (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems)
     ]
 
-becomeMonarchTests :: Registry.Type.Registry -> Tasty.TestTree
+becomeMonarchTests :: Registry.Registry -> Tasty.TestTree
 becomeMonarchTests registry =
   Tasty.testGroup
     "BecomeMonarch"
@@ -2599,7 +2598,7 @@ becomeMonarchTests registry =
 --
 -- So the watch is for an EVENT -- a new monarch being crowned who is an opponent
 -- -- not for the STATE "an opponent currently holds the crown".
-exileUntilMonarchTests :: Registry.Type.Registry -> Tasty.TestTree
+exileUntilMonarchTests :: Registry.Registry -> Tasty.TestTree
 exileUntilMonarchTests registry =
   Tasty.testGroup
     "ExileUntilMonarch"
@@ -2676,7 +2675,7 @@ exileUntilMonarchTests registry =
 
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
-actOfTreasonTests :: Registry.Type.Registry -> Tasty.TestTree
+actOfTreasonTests :: Registry.Registry -> Tasty.TestTree
 actOfTreasonTests registry =
   Tasty.testGroup
     "Act of Treason"
@@ -2705,7 +2704,7 @@ actOfTreasonTests registry =
 -- {1}{W}, and "When you cycle this card, you may gain 2 life". It targets
 -- nothing, so nothing here can be passing on the targeting machinery: the only
 -- new thing is whether the trigger's one effect happens.
-optionalEffectTests :: Registry.Type.Registry -> Tasty.TestTree
+optionalEffectTests :: Registry.Registry -> Tasty.TestTree
 optionalEffectTests registry =
   let -- Takes the option ONLY if the prompt names the right decider, the right
       -- player and the right mode. A prompt addressed to anybody else, or naming
@@ -2846,7 +2845,7 @@ castDayOfJudgment plains dayOfJudgment board =
       afterCast = S.runPure S.identityAnswer withSpell (Cast.castSpell S.alice spell)
    in S.runPure S.identityAnswer afterCast Stack.resolveTop
 
-destroyAllTests :: Registry.Type.Registry -> Tasty.TestTree
+destroyAllTests :: Registry.Registry -> Tasty.TestTree
 destroyAllTests registry =
   Tasty.testGroup
     "DestroyAll"
@@ -3092,7 +3091,7 @@ attackerIds = Map.keys . Combat.Type.attackers . GameState.combat
 -- The modification is layer 7c (CR 613.4c: "effects and counters that modify
 -- power and/or toughness"), the same layer Giant Growth's already lands in --
 -- what is new here is the affected set, not the modification.
-trumpetBlastTests :: Registry.Type.Registry -> Tasty.TestTree
+trumpetBlastTests :: Registry.Registry -> Tasty.TestTree
 trumpetBlastTests registry =
   Tasty.testGroup
     "TrumpetBlast"
@@ -3203,7 +3202,7 @@ trumpetBlastTests registry =
 -- The printed reminder "(You don't get to move Auras.)" is not a rule this
 -- opcode has to implement: nothing in GainControl moves an attachment, and CR
 -- 701.3 is the only thing that does.
-auraThiefTests :: Registry.Type.Registry -> Tasty.TestTree
+auraThiefTests :: Registry.Registry -> Tasty.TestTree
 auraThiefTests registry =
   let -- alice: one Mountain (the Bolt's {R}), an Aura Thief, and a Greed of her
       -- own; bob: a Bad Moon and a Hardened Scales. All four enchantments are
@@ -3353,7 +3352,7 @@ plusOnePlusOnesOn moid gs =
     obj <- Game.lookupObject oid gs
     Map.lookup CounterKind.PlusOnePlusOne (Object.counters obj)
 
-baneOfProgressTests :: Registry.Type.Registry -> Tasty.TestTree
+baneOfProgressTests :: Registry.Registry -> Tasty.TestTree
 baneOfProgressTests registry =
   Tasty.testGroup
     "BaneOfProgress"
@@ -3441,5 +3440,5 @@ baneOfProgressTests registry =
         HU.assertEqual "so Bane is the printed 2/2" (Just 2) (entered >>= \oid -> Projection.powerOf oid resolved)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry, trumpetBlastTests registry, auraThiefTests registry, baneOfProgressTests registry]

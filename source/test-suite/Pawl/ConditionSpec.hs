@@ -6,7 +6,6 @@ import qualified Pawl.Condition as Condition
 import qualified Pawl.Count as Count
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -59,7 +58,7 @@ check swamp n comparison threshold =
         (ObjectId.MkObjectId 0)
         (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Condition"

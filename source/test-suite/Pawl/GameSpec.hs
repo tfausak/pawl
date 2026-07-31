@@ -27,7 +27,6 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -85,7 +84,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-objectFactTests :: Registry.Type.Registry -> Tasty.TestTree
+objectFactTests :: Registry.Registry -> Tasty.TestTree
 objectFactTests registry =
   Tasty.testGroup
     "ObjectFacts"
@@ -138,7 +137,7 @@ afterMountainMoved :: Printing.Printing -> GameState.GameState
 afterMountainMoved mountain =
   S.runPure S.identityAnswer (S.oneMountainState mountain Phase.PrecombatMain) (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
 
-gameTests :: Registry.Type.Registry -> Tasty.TestTree
+gameTests :: Registry.Registry -> Tasty.TestTree
 gameTests registry =
   Tasty.testGroup
     "Game"
@@ -220,7 +219,7 @@ gameTests registry =
         HU.assertEqual "empty" [] (Card.Type.staticAbilities (Printing.card piker))
     ]
 
-actionTests :: Registry.Type.Registry -> Tasty.TestTree
+actionTests :: Registry.Registry -> Tasty.TestTree
 actionTests registry =
   Tasty.testGroup
     "Action"
@@ -239,12 +238,12 @@ actionTests registry =
         HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice gs)
     ]
 
-goldfishResult :: Registry.Type.Registry -> IO (Result.Result, GameState.GameState)
+goldfishResult :: Registry.Registry -> IO (Result.Result, GameState.GameState)
 goldfishResult registry = do
   matchup <- S.redRed registry
   pure (Engine.runMatchPure S.identityAnswer matchup)
 
-landState :: Registry.Type.Registry -> IO GameState.GameState
+landState :: Registry.Registry -> IO GameState.GameState
 landState registry = do
   matchup <- S.redRed registry
   pure (snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom matchup)))
@@ -256,7 +255,7 @@ turnsTaken pid gs =
   let total = GameState.turnNumber gs
    in if pid == S.alice then (total + 1) `div` 2 else total `div` 2
 
-engineTests :: Registry.Type.Registry -> Tasty.TestTree
+engineTests :: Registry.Registry -> Tasty.TestTree
 engineTests registry =
   Tasty.testGroup
     "Engine"
@@ -282,7 +281,7 @@ engineTests registry =
     ]
 
 -- Run setup, then a scripted tweak, then whatever steps the scenario needs.
-scenario :: Registry.Type.Registry -> Game.Type.Game () -> IO GameState.GameState
+scenario :: Registry.Registry -> Game.Type.Game () -> IO GameState.GameState
 scenario registry steps = do
   matchup <- S.redRed registry
   pure . snd . Engine.runGamePure S.identityAnswer (Setup.emptyGame (fmap fst matchup)) $ do
@@ -290,22 +289,22 @@ scenario registry steps = do
     steps
 
 -- Alice starts, so her turn-1 draw is skipped.
-aliceFirstDraw :: Registry.Type.Registry -> IO GameState.GameState
+aliceFirstDraw :: Registry.Registry -> IO GameState.GameState
 aliceFirstDraw registry = scenario registry S.drawStep
 
 -- Bob is not the starting player, so his draw happens normally.
-bobFirstDraw :: Registry.Type.Registry -> IO GameState.GameState
+bobFirstDraw :: Registry.Registry -> IO GameState.GameState
 bobFirstDraw registry = scenario registry $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
 
-bobAfterCleanup :: Registry.Type.Registry -> IO GameState.GameState
+bobAfterCleanup :: Registry.Registry -> IO GameState.GameState
 bobAfterCleanup registry = scenario registry $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
   Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)
 
-deckedOut :: Registry.Type.Registry -> IO GameState.GameState
+deckedOut :: Registry.Registry -> IO GameState.GameState
 deckedOut registry = scenario registry $ do
   State.modify' $ \gs ->
     gs
@@ -382,7 +381,7 @@ askedPlayers mountain piker =
         (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
         []
 
-ruleTests :: Registry.Type.Registry -> Tasty.TestTree
+ruleTests :: Registry.Registry -> Tasty.TestTree
 ruleTests registry =
   Tasty.testGroup
     "Rules"
@@ -829,7 +828,7 @@ concedeOrderAnswer who p = case p of
     pure (if asked == who then Concession.Concedes else Concession.Continues)
   _ -> pure (S.identityAnswer p)
 
-concedeTests :: Registry.Type.Registry -> Tasty.TestTree
+concedeTests :: Registry.Registry -> Tasty.TestTree
 concedeTests registry =
   Tasty.testGroup
     "concede (CR 104.3a)"
@@ -991,7 +990,7 @@ greedThenPassAnswer greedId ability p = case p of
     pure (if pid == S.alice && List.elem (A.Activate greedId ability) actions then A.Activate greedId ability else A.Pass)
   _ -> pure (S.identityAnswer p)
 
-turnOrderTests :: Registry.Type.Registry -> Tasty.TestTree
+turnOrderTests :: Registry.Registry -> Tasty.TestTree
 turnOrderTests registry =
   Tasty.testGroup
     "TurnOrder (CR 800.4)"
@@ -1359,7 +1358,7 @@ turnOrderTests registry =
 -- act on anything else. Every gate the enumeration applies -- the controller
 -- check, CR 302.6's tap-sickness gate, cost payability, CR 307.5 timing -- is
 -- only as strong as this.
-trustedActionTests :: Registry.Type.Registry -> Tasty.TestTree
+trustedActionTests :: Registry.Registry -> Tasty.TestTree
 trustedActionTests registry =
   Tasty.testGroup
     "TrustedActions"
@@ -1391,7 +1390,7 @@ trustedActionTests registry =
         HU.assertEqual "so the Sorcerer taps" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject srcId after))
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Game"
@@ -1743,7 +1742,7 @@ runCountingActions gs act =
       ((_, gs1), n) = State.runState (Engine.runGame answer gs act) 0
    in (gs1, n)
 
-restartReentryTests :: Registry.Type.Registry -> Tasty.TestTree
+restartReentryTests :: Registry.Registry -> Tasty.TestTree
 restartReentryTests registry =
   Tasty.testGroup
     "restart re-entry (CR 727.4)"

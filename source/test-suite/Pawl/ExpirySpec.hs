@@ -15,7 +15,6 @@ import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -178,7 +177,7 @@ handoffTests =
               HU.assertEqual "carol's effect ended at carol's seat, two hops past alice" [] (GameState.continuousEffects after)
     ]
 
-cleanupTests :: Registry.Type.Registry -> Tasty.TestTree
+cleanupTests :: Registry.Registry -> Tasty.TestTree
 cleanupTests registry =
   Tasty.testGroup
     "DropAtCleanup"
@@ -249,7 +248,7 @@ board piker warMammoth =
       (targetId, gs2) = S.addCreature warMammoth S.bob gs1
    in (srcId, targetId, whileEffect srcId targetId S.alice gs2)
 
-conditionalTests :: Registry.Type.Registry -> Tasty.TestTree
+conditionalTests :: Registry.Registry -> Tasty.TestTree
 conditionalTests registry =
   Tasty.testGroup
     "Conditional"
@@ -367,7 +366,7 @@ masterThiefThreeWay darksteelMyr masterThief =
 -- enters, gain control of target artifact for as long as you control this
 -- creature." CR 611.2b's own printed example; the three assertions below in
 -- tests 2-4 are its three Gatherer rulings, verbatim.
-masterThiefTests :: Registry.Type.Registry -> Tasty.TestTree
+masterThiefTests :: Registry.Registry -> Tasty.TestTree
 masterThiefTests registry =
   Tasty.testGroup
     "MasterThief"
@@ -512,7 +511,7 @@ monarchSettle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
 monarchResolveAll :: GameState.GameState -> GameState.GameState
 monarchResolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
 
-monarchTests :: Registry.Type.Registry -> Tasty.TestTree
+monarchTests :: Registry.Registry -> Tasty.TestTree
 monarchTests registry =
   Tasty.testGroup
     "Monarch"
@@ -633,7 +632,7 @@ hagBoardWith hag printing =
 -- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of
 -- your upkeep, target creature an opponent controls gets -2/-1 until your next
 -- turn." No Gatherer rulings exist, so these derive from CR 611.2a and CR 514.2.
-hagTests :: Registry.Type.Registry -> Tasty.TestTree
+hagTests :: Registry.Registry -> Tasty.TestTree
 hagTests registry =
   Tasty.testGroup
     "HagOfInnerWeakness"
@@ -738,5 +737,5 @@ hagTests registry =
         HU.assertEqual "and its toughness" (Just 2) (Projection.toughnessOf mammoth resolved)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests registry, handoffTests, conditionalTests registry, masterThiefTests registry, monarchTests registry, hagTests registry]

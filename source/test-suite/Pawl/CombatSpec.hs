@@ -22,7 +22,6 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
@@ -57,7 +56,7 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-combatDamageTests :: Registry.Type.Registry -> Tasty.TestTree
+combatDamageTests :: Registry.Registry -> Tasty.TestTree
 combatDamageTests registry =
   Tasty.testGroup
     "CombatDamage"
@@ -141,7 +140,7 @@ combatDamageTests registry =
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
 declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
 
-declareTests :: Registry.Type.Registry -> Tasty.TestTree
+declareTests :: Registry.Registry -> Tasty.TestTree
 declareTests registry =
   Tasty.testGroup
     "Declare"
@@ -219,7 +218,7 @@ declareTests registry =
         HU.assertEqual "can attack after untapping" 1 (length (declaredAttackers nextTurn))
     ]
 
-defenderTests :: Registry.Type.Registry -> Tasty.TestTree
+defenderTests :: Registry.Registry -> Tasty.TestTree
 defenderTests registry =
   Tasty.testGroup
     "Defender"
@@ -308,7 +307,7 @@ runRecordingBlockers gs =
 
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderTests, which is the Defender KEYWORD (CR 702.3b).
-defendingPlayerTests :: Registry.Type.Registry -> Tasty.TestTree
+defendingPlayerTests :: Registry.Registry -> Tasty.TestTree
 defendingPlayerTests registry =
   Tasty.testGroup
     "DefendingPlayer"
@@ -573,7 +572,7 @@ justArrived gs =
   let sicken o = if Object.owner o == S.alice then o {Object.sickness = Sickness.Sick} else o
    in gs {GameState.objects = fmap sicken (GameState.objects gs)}
 
-hasteTests :: Registry.Type.Registry -> Tasty.TestTree
+hasteTests :: Registry.Registry -> Tasty.TestTree
 hasteTests registry =
   Tasty.testGroup
     "Haste"
@@ -618,7 +617,7 @@ hasteTests registry =
           _ -> HU.assertFailure "fixture should have two creatures"
     ]
 
-controlChangeSicknessTests :: Registry.Type.Registry -> Tasty.TestTree
+controlChangeSicknessTests :: Registry.Registry -> Tasty.TestTree
 controlChangeSicknessTests registry =
   Tasty.testGroup
     "ControlChangeSickness"
@@ -683,7 +682,7 @@ withFear oid gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
-evasionTests :: Registry.Type.Registry -> Tasty.TestTree
+evasionTests :: Registry.Registry -> Tasty.TestTree
 evasionTests registry =
   Tasty.testGroup
     "Evasion"
@@ -855,7 +854,7 @@ luring lure mine theirs =
 -- carrier, and the one CR 604.2's layer-6 strip needs: it is a CREATURE, so
 -- Humility's "each creature loses all abilities" reaches its requirement with no
 -- animator in between.
-blockRequirementTests :: Registry.Type.Registry -> Tasty.TestTree
+blockRequirementTests :: Registry.Registry -> Tasty.TestTree
 blockRequirementTests registry =
   Tasty.testGroup
     "BlockRequirements"
@@ -1046,7 +1045,7 @@ cursing curse who mine theirs =
 -- Pawl.Combat.legalAttackers, so a creature that could not have attacked anyway
 -- carries no requirement and cannot make declining illegal. Half the group is
 -- that half.
-attackRequirementTests :: Registry.Type.Registry -> Tasty.TestTree
+attackRequirementTests :: Registry.Registry -> Tasty.TestTree
 attackRequirementTests registry =
   Tasty.testGroup
     "AttackRequirements"
@@ -1170,7 +1169,7 @@ attackRequirementTests registry =
           _ -> HU.assertFailure "fixture should have a creature"
     ]
 
-vigilanceTests :: Registry.Type.Registry -> Tasty.TestTree
+vigilanceTests :: Registry.Registry -> Tasty.TestTree
 vigilanceTests registry =
   Tasty.testGroup
     "Vigilance"
@@ -1209,7 +1208,7 @@ vigilanceTests registry =
           attacker : _ -> HU.assertEqual "blocked" (Set.fromList theirs) (Combat.blockersOf attacker after)
     ]
 
-combatLegalityTests :: Registry.Type.Registry -> Tasty.TestTree
+combatLegalityTests :: Registry.Registry -> Tasty.TestTree
 combatLegalityTests registry =
   Tasty.testGroup
     "CombatLegality"
@@ -1296,7 +1295,7 @@ combatLegalityTests registry =
         HU.assertEqual "clears" Map.empty (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy)))
     ]
 
-keywordTests :: Registry.Type.Registry -> Tasty.TestTree
+keywordTests :: Registry.Registry -> Tasty.TestTree
 keywordTests registry =
   let gs0 = Setup.emptyGame S.bothPlayers
       -- Each M2a printing carries exactly its one keyword and no other.
@@ -1345,7 +1344,7 @@ runToFirstStrikeDone answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 24 gs0
 
-firstStrikeTests :: Registry.Type.Registry -> Tasty.TestTree
+firstStrikeTests :: Registry.Registry -> Tasty.TestTree
 firstStrikeTests registry =
   Tasty.testGroup
     "FirstStrike"
@@ -1472,7 +1471,7 @@ runToEndOfCombat = runToStep (Phase.Combat CombatStep.EndOfCombat)
 -- round (CR 511.1), where the active player may cast an instant. Kill Shot
 -- ("Destroy target attacking creature") is what makes the window observable: it
 -- has a legal target during the end of combat step and none after it.
-endOfCombatTests :: Registry.Type.Registry -> Tasty.TestTree
+endOfCombatTests :: Registry.Registry -> Tasty.TestTree
 endOfCombatTests registry =
   Tasty.testGroup
     "EndOfCombat"
@@ -1514,7 +1513,7 @@ endOfCombatTests registry =
 frst :: (a, b, c) -> a
 frst (a, _, _) = a
 
-m2bExitTests :: Registry.Type.Registry -> Tasty.TestTree
+m2bExitTests :: Registry.Registry -> Tasty.TestTree
 m2bExitTests registry =
   Tasty.testGroup
     "M2bExit"
@@ -1583,7 +1582,7 @@ snatch victim p = case p of
 -- test is the engine's own and the removal is observed where a player would see
 -- it: at the CR 117.5 settle that follows the spell resolving. Each leg stops at
 -- the end of combat step, where CR 511.3 says the record still reads live.
-controlChangeRemovalTests :: Registry.Type.Registry -> Tasty.TestTree
+controlChangeRemovalTests :: Registry.Registry -> Tasty.TestTree
 controlChangeRemovalTests registry =
   Tasty.testGroup
     "ControlChangeRemoval"
@@ -1775,7 +1774,7 @@ stayHomeAnswer homebody p = case p of
 -- Removal is removal only. Nothing here puts a creature back into combat, which
 -- is what the rules say too -- the glossary's "removed from combat" entry has
 -- the permanent take "no further involvement in that combat phase".
-effectRemovalTests :: Registry.Type.Registry -> Tasty.TestTree
+effectRemovalTests :: Registry.Registry -> Tasty.TestTree
 effectRemovalTests registry =
   Tasty.testGroup
     "EffectRemoval"
@@ -1963,7 +1962,7 @@ unblock blocker victim p = case p of
 --
 -- Every leg runs whole steps through Engine.runStep and stops at the end of
 -- combat step, where CR 511.3 says the record still reads live.
-typeChangeRemovalTests :: Registry.Type.Registry -> Tasty.TestTree
+typeChangeRemovalTests :: Registry.Registry -> Tasty.TestTree
 typeChangeRemovalTests registry =
   Tasty.testGroup
     "TypeChangeRemoval"
@@ -2061,7 +2060,7 @@ typeChangeRemovalTests registry =
 -- Hanweir Garrison is the pool's only source of one: "Whenever this creature
 -- attacks, create two 1/1 red Human creature tokens that are tapped and
 -- attacking."
-putOntoBattlefieldAttackingTests :: Registry.Type.Registry -> Tasty.TestTree
+putOntoBattlefieldAttackingTests :: Registry.Registry -> Tasty.TestTree
 putOntoBattlefieldAttackingTests registry =
   Tasty.testGroup
     "PutOntoBattlefieldAttacking"
@@ -2118,7 +2117,7 @@ putOntoBattlefieldAttackingTests registry =
         HU.assertEqual "bob takes 2 + 1 + 1" (Just 16) (S.lifeOf S.bob after)
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Combat"

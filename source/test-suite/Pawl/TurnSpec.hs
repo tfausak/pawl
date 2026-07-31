@@ -22,7 +22,6 @@ import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -162,7 +161,7 @@ turnDataTests =
               (Turn.dropRestOfPhase (Phase.Combat CombatStep.BeginningOfCombat) remaining)
     ]
 
-skipTests :: Registry.Type.Registry -> Tasty.TestTree
+skipTests :: Registry.Registry -> Tasty.TestTree
 skipTests registry =
   Tasty.testGroup
     "Skip"
@@ -482,7 +481,7 @@ castAndResolveWith answer spell gs =
 -- main phase. Activate only as a sorcery.) and Relentless Assault ({2}{R}{R}:
 -- Untap all creatures that attacked this turn. After this main phase, there is
 -- an additional combat phase followed by an additional main phase.)
-extraPhaseTests :: Registry.Type.Registry -> Tasty.TestTree
+extraPhaseTests :: Registry.Registry -> Tasty.TestTree
 extraPhaseTests registry =
   Tasty.testGroup
     "ExtraPhase"
@@ -781,7 +780,7 @@ turnTakers n gs =
 -- CR 500.7's extra turns, end to end, through the one card in the pool that
 -- creates any: Time Warp ({3}{U}{U} Sorcery, "Target player takes an extra turn
 -- after this one.").
-extraTurnTests :: Registry.Type.Registry -> Tasty.TestTree
+extraTurnTests :: Registry.Registry -> Tasty.TestTree
 extraTurnTests registry =
   let boardOf n = do
         island <- Registry.printing registry "Island"
@@ -879,5 +878,5 @@ dedupe xs = case xs of
   [] -> []
   h : t -> h : dedupe (filter (/= h) t)
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry, extraTurnTests registry]

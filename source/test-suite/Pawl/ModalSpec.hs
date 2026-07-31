@@ -17,11 +17,10 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Registry as Registry
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 
-import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -82,7 +81,7 @@ neverAskModes p = case p of
   Prompt.ChooseModes {} -> error "ChooseModes prompt issued for a non-modal spell"
   _ -> S.identityAnswer p
 
-gateTests :: Registry.Type.Registry -> Tasty.TestTree
+gateTests :: Registry.Registry -> Tasty.TestTree
 gateTests registry =
   Tasty.testGroup
     "Gate"
@@ -128,7 +127,7 @@ gateTests registry =
 -- all-slots-fillable engine, which would have called Chaos Charm uncastable
 -- the moment ANY mode (here, the Wall mode with no Wall in play) had an
 -- unfillable slot.
-falsifierTests :: Registry.Type.Registry -> Tasty.TestTree
+falsifierTests :: Registry.Registry -> Tasty.TestTree
 falsifierTests registry =
   Tasty.testGroup
     "Falsifier"
@@ -147,7 +146,7 @@ falsifierTests registry =
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
 -- on the stack object -- an unchosen mode's slot name never appears at all.
-onlyChosenModeTests :: Registry.Type.Registry -> Tasty.TestTree
+onlyChosenModeTests :: Registry.Registry -> Tasty.TestTree
 onlyChosenModeTests registry =
   Tasty.testGroup
     "OnlyChosenModeTargets"
@@ -171,7 +170,7 @@ onlyChosenModeTests registry =
                     HU.assertBool "does not have the 'wall' slot" (not (Set.member (SlotName.MkSlotName (Text.pack "wall")) keys))
     ]
 
-fizzleTests :: Registry.Type.Registry -> Tasty.TestTree
+fizzleTests :: Registry.Registry -> Tasty.TestTree
 fizzleTests registry =
   Tasty.testGroup
     "Fizzle"
@@ -193,7 +192,7 @@ fizzleTests registry =
         HU.assertEqual "stack empty" 0 (length (GameState.stack after))
     ]
 
-forcedTests :: Registry.Type.Registry -> Tasty.TestTree
+forcedTests :: Registry.Registry -> Tasty.TestTree
 forcedTests registry =
   Tasty.testGroup
     "ForcedNoPrompt"
@@ -215,7 +214,7 @@ forcedTests registry =
 -- Pool.Permanents narrowed by Not (HasCardType Land), with CR 601.2c's "another"
 -- as the Not IsSource conjunct (#163). This proves the spec and the exclusion in
 -- isolation; the wiring to a consumer is a later M4h task.
-nonlandPermanentTargetTests :: Registry.Type.Registry -> Tasty.TestTree
+nonlandPermanentTargetTests :: Registry.Registry -> Tasty.TestTree
 nonlandPermanentTargetTests registry =
   Tasty.testGroup
     "M4h NonlandPermanentTarget"
@@ -274,7 +273,7 @@ modalReaderTests =
 -- with just the activator and one victim on the battlefield (CreatureTarget
 -- does not self-exclude), so `legal = {0,1}` and `count = 1`: a real prompt,
 -- not the forced/single-mode path.
-activationModalTests :: Registry.Type.Registry -> Tasty.TestTree
+activationModalTests :: Registry.Registry -> Tasty.TestTree
 activationModalTests registry =
   Tasty.testGroup
     "M4h activation modal (CR 602.2b)"
@@ -340,7 +339,7 @@ triggerModalOf acPrinting = case Card.Type.triggeredAbilities (Printing.card acP
   [ab] -> Just (TriggeredAbility.modal ab)
   _ -> Nothing
 
-triggerModalTests :: Registry.Type.Registry -> Tasty.TestTree
+triggerModalTests :: Registry.Registry -> Tasty.TestTree
 triggerModalTests registry =
   Tasty.testGroup
     "M4h trigger modal (CR 700.2b/603.3d)"
@@ -450,7 +449,7 @@ triggerModalTests registry =
         HU.assertEqual "nothing was exiled" 0 (length (Game.zoneMembers Zone.Exile S.alice placed))
     ]
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Modal"

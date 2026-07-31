@@ -22,7 +22,6 @@ import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Registry as Registry.Type
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -145,7 +144,7 @@ optionalityKey value = case J.asObject value of
   Right ps -> J.optField (Text.pack "optionality") ps
   Left _ -> Nothing
 
-tests :: Registry.Type.Registry -> Tasty.TestTree
+tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Pawl.CodecSpec"
