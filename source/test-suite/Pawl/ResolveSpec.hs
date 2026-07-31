@@ -144,7 +144,7 @@ targetTests registry =
                   Map.empty
                   (Map.singleton slot True)
                   (Map.singleton slot (Recipient.ToObject myr))
-                  (Effect.GainControl Duration.Indefinite slot)
+                  (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
             control =
               S.runPure S.identityAnswer board $
                 Resolve.applyEffect
@@ -153,7 +153,7 @@ targetTests registry =
                   Map.empty
                   (Map.singleton slot True)
                   (Map.singleton slot (Recipient.ToObject myr))
-                  (Effect.GainControl Duration.Indefinite slot)
+                  (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
         HU.assertEqual "no control effect is stored for a departed controller" [] (GameState.continuousEffects after)
         HU.assertEqual "and the Myr's controller is unchanged" (Just S.carol) (Projection.controllerOf myr after)
         HU.assertEqual "the same call for a player still in the game DOES store one -- the guard is what did it" 1 (length (GameState.continuousEffects control))
@@ -2149,7 +2149,7 @@ gainControlTests registry =
                 Map.empty
                 (Map.singleton slot True)
                 (Map.singleton slot (Recipient.ToCreature oid))
-                (Effect.GainControl Duration.UntilEndOfTurn slot)
+                (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
             after = snd (Engine.runGamePure S.identityAnswer base run)
         HU.assertEqual "alice now controls it" (Just S.alice) (Projection.controllerOf oid after)
         HU.assertEqual "it is summoning sick for the new controller" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject oid after))
@@ -2173,7 +2173,7 @@ gainControlTests registry =
                 Map.empty
                 (Map.singleton slot True)
                 (Map.singleton slot (Recipient.ToCreature oid))
-                (Effect.GainControl Duration.UntilEndOfTurn slot)
+                (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
             after = snd (Engine.runGamePure S.identityAnswer settled run)
         HU.assertEqual "alice controlled it before" (Just S.alice) (Projection.controllerOf oid settled)
         HU.assertEqual "and still does" (Just S.alice) (Projection.controllerOf oid after)
@@ -3141,5 +3141,138 @@ trumpetBlastTests registry =
           _ -> HU.assertFailure "fixture should have exactly one attacker"
     ]
 
+-- Aura Thief ({3}{U} 2/2 Creature -- Illusion, "Flying / When this creature
+-- dies, you gain control of all enchantments") is the CONTROL-side twin of
+-- Trumpet Blast, and the other half of what CR 611.2c names: that rule fixes the
+-- affected set of a resolution effect that "modifies the characteristics OR
+-- CHANGES THE CONTROLLER of any objects". The layer differs (CR 613.1b's layer 2
+-- rather than 613.4c's 7c) and the opcode differs, but the freeze is the same
+-- one, and these tests are the proof that GainControl performs it too.
+--
+-- The trigger is a dies trigger, so the whole card runs the way Doomed
+-- Traveler's does in Pawl.TriggerSpec: a Lightning Bolt kills the 2/2, CR
+-- 704.5g's state-based action puts it in the graveyard, the CR 603.10a look-back
+-- trigger reaches the stack in that same settle, and resolving it is what
+-- steals the enchantments. Nothing here hand-builds a continuous effect.
+--
+-- The printed reminder "(You don't get to move Auras.)" is not a rule this
+-- opcode has to implement: nothing in GainControl moves an attachment, and CR
+-- 701.3 is the only thing that does.
+auraThiefTests :: Registry.Type.Registry -> Tasty.TestTree
+auraThiefTests registry =
+  let -- alice: one Mountain (the Bolt's {R}), an Aura Thief, and a Greed of her
+      -- own; bob: a Bad Moon and a Hardened Scales. All four enchantments are
+      -- inert on this board -- no black creature, no +1/+1 counter, no activation
+      -- -- so the only thing any test here reads off them is who controls them.
+      -- S.identityAnswer targets the least Recipient and Recipient.ToCreature
+      -- sorts before Recipient.ToPlayer, so the Thief, the only creature on the
+      -- board, is the Bolt's target without a bespoke interpreter.
+      thiefBoard = do
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        auraThief <- Registry.printing registry "Aura Thief"
+        greed <- Registry.printing registry "Greed"
+        badMoon <- Registry.printing registry "Bad Moon"
+        hardenedScales <- Registry.printing registry "Hardened Scales"
+        let (thief, g1) = S.addCreature auraThief S.alice (S.landsInPlay mountain 1)
+            (hers, g2) = S.addCreature greed S.alice g1
+            (moon, g3) = S.addCreature badMoon S.bob g2
+            (scales, g4) = S.addCreature hardenedScales S.bob g3
+            (withBolt, spell) = S.handOne lightningBolt g4
+        pure (withBolt, spell, thief, [hers], [moon, scales])
+      -- Cast the Bolt, resolve it, settle (CR 704.5g destroys the damaged 2/2 and
+      -- the same settle places its CR 603.10a look-back trigger), then resolve
+      -- the trigger.
+      boltIt (gs, spell) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spell)
+            damaged = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+   in Tasty.testGroup
+        "AuraThief"
+        [ -- CR 109.2 again: "all enchantments" names no zone and no card, so it
+          -- means every enchantment PERMANENT on the battlefield -- both
+          -- players', and pointedly the Thief's controller's own, which is the
+          -- one that would be missing if the sweep had quietly read "you don't
+          -- control".
+          HU.testCase "Aura Thief whole card: its dies trigger gives its controller control of every enchantment" $ do
+            (board, spell, thief, hers, theirs) <- thiefBoard
+            let (settled, after) = boltIt (board, spell)
+            HU.assertBool "the Thief died" (not (S.onBattlefield thief settled))
+            HU.assertEqual "its trigger reached the stack in that settle" 1 (length (GameState.stack settled))
+            HU.assertEqual "the trigger resolved" 0 (length (GameState.stack after))
+            HU.assertEqual "alice took bob's enchantments" (fmap (const (Just S.alice)) theirs) (fmap (`Projection.controllerOf` after) theirs)
+            HU.assertEqual "and still has her own" (fmap (const (Just S.alice)) hers) (fmap (`Projection.controllerOf` after) hers),
+          -- The structural half of CR 611.2c, on the control side: what is stored
+          -- is the swept id set, not the Filter that found it.
+          HU.testCase "CR 611.2c the stored control effect holds the swept ids, not the filter that swept them" $ do
+            (board, spell, _, hers, theirs) <- thiefBoard
+            let (_, after) = boltIt (board, spell)
+            HU.assertEqual
+              "one stored effect, over all three enchantments"
+              [Affected.TheseObjects (Set.fromList (hers <> theirs))]
+              (affectedSets after),
+          -- "After that point, the set won't change." An enchantment that arrives
+          -- after the trigger has resolved is not in the set, so its controller
+          -- keeps it -- the control-side twin of the Hanweir Garrison tokens.
+          HU.testCase "CR 611.2c an enchantment that enters after the trigger resolves is not stolen" $ do
+            (board, spell, _, _, theirs) <- thiefBoard
+            greed <- Registry.printing registry "Greed"
+            let (_, after) = boltIt (board, spell)
+                (latecomer, later) = S.addCreature greed S.bob after
+            HU.assertEqual "the ones that were there are alice's" (fmap (const (Just S.alice)) theirs) (fmap (`Projection.controllerOf` later) theirs)
+            HU.assertEqual "the one that arrived afterwards is still bob's" (Just S.bob) (Projection.controllerOf latecomer later),
+          -- CR 611.2a: "If no duration is stated, it lasts until the end of the
+          -- game." Aura Thief states none, so the grant is Duration.Indefinite and
+          -- survives the cleanup step that would end an Act of Treason.
+          HU.testCase "CR 611.2a the grant states no duration, so it does not end at cleanup" $ do
+            (board, spell, _, _, theirs) <- thiefBoard
+            let (_, after) = boltIt (board, spell)
+                swept = Expiry.dropAtCleanup after
+            HU.assertEqual "alice still controls them after cleanup" (fmap (const (Just S.alice)) theirs) (fmap (`Projection.controllerOf` swept) theirs),
+          -- CR 302.6: "A creature's activated ability with the tap symbol ... in
+          -- its activation cost can't be activated unless the creature has been
+          -- under its controller's control continuously since their most recent
+          -- turn began." Gaining control interrupts that continuity, and gaining
+          -- control of something you already control does not -- so the sweep has
+          -- to ask per object rather than re-Sicking everything it names.
+          HU.testCase "CR 302.6 the newly gained enchantments are re-Sicked and the one alice already controlled is not" $ do
+            (board, spell, _, hers, theirs) <- thiefBoard
+            let (_, after) = boltIt (board, spell)
+                sicknessOf oid = fmap Object.sickness (Game.lookupObject oid after)
+            HU.assertEqual "bob's, taken from him, start their clock over" (fmap (const (Just Sickness.Sick)) theirs) (fmap sicknessOf theirs)
+            HU.assertEqual "alice's own was never interrupted" (fmap (const (Just (Sickness.Settled S.alice))) hers) (fmap sicknessOf hers),
+          -- The card is named Aura Thief, so an Aura is the case worth proving,
+          -- and Control Magic is the pool's one control-granting Aura. CR 109.5:
+          -- "For a static ability, [you] is the current controller of the object
+          -- it's on" -- so taking the Aura takes what the Aura grants, WITHOUT
+          -- moving the Aura. That is the whole content of the printed reminder
+          -- "(You don't get to move Auras.)": Object.attachedTo is untouched here.
+          --
+          -- The Thief is added before the Piker so it holds the lower ObjectId
+          -- and is therefore the Bolt's target under S.identityAnswer, which picks
+          -- the least Recipient.
+          HU.testCase "CR 109.5 taking bob's Control Magic hands alice back the creature it steals, without moving the Aura" $ do
+            mountain <- Registry.printing registry "Mountain"
+            lightningBolt <- Registry.printing registry "Lightning Bolt"
+            auraThief <- Registry.printing registry "Aura Thief"
+            piker <- Registry.printing registry "Goblin Piker"
+            controlMagic <- Registry.printing registry "Control Magic"
+            let (thief, g1) = S.addCreature auraThief S.alice (S.landsInPlay mountain 1)
+                (creature, g2) = S.addCreature piker S.alice g1
+                (aura, g3) = S.addCreature controlMagic S.bob g2
+                stolen = S.attach aura creature g3
+                (withBolt, spell) = S.handOne lightningBolt stolen
+                (_, after) = boltIt (withBolt, spell)
+            HU.assertBool "setup: the Thief is the Bolt's target, holding the lower id" (thief < creature)
+            HU.assertEqual "setup: bob's Control Magic has taken alice's creature" (Just S.bob) (Projection.controllerOf creature stolen)
+            HU.assertEqual "alice now controls the Aura" (Just S.alice) (Projection.controllerOf aura after)
+            HU.assertEqual "and so has her creature back" (Just S.alice) (Projection.controllerOf creature after)
+            HU.assertEqual
+              "the Aura never moved: it still enchants the same creature"
+              (Just (Just (Recipient.ToCreature creature)))
+              (fmap Object.attachedTo (Game.lookupObject aura after))
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry, trumpetBlastTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry, trumpetBlastTests registry, auraThiefTests registry]

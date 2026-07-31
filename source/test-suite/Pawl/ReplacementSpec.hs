@@ -64,6 +64,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -952,7 +953,7 @@ tests registry =
               g3 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g2))) g2
               stolen =
                 S.runPure S.identityAnswer g3 $
-                  Resolve.applyEffect S.noSource S.bob Map.empty (Map.singleton slot True) (Map.singleton slot (Recipient.ToObject oid)) (Effect.GainControl Duration.Indefinite slot)
+                  Resolve.applyEffect S.noSource S.bob Map.empty (Map.singleton slot True) (Map.singleton slot (Recipient.ToObject oid)) (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
               after = S.runPure S.identityAnswer stolen (Event.changeZone oid Zone.Graveyard)
           HU.assertEqual "bob really did take control of it" (Just S.bob) (Projection.controllerOf oid stolen)
           HU.assertEqual "it reaches its OWNER's graveyard, unexiled" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))

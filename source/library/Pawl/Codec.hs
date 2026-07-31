@@ -1609,7 +1609,7 @@ effectToJson e = case e of
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [playerRefToJson r, playerCounterKindToJson k, quantityToJson q])))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
   Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (MkArray (fmap extraPhaseToJson ps))))
-  Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, slotNameToJson s])))
+  Effect.GainControl d r -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, objectRefToJson r])))
   -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
   -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
   -- states a duration writes the two-element form.
@@ -1707,8 +1707,8 @@ jsonToEffect value = do
       Just (Array (MkArray ps)) -> Effect.AddPhases <$> traverse jsonToExtraPhase ps
       _ -> Left (Text.pack "AddPhases expects [ExtraPhase]")
     "GainControl" -> case mv of
-      Just (Array (MkArray [d, s])) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s
-      _ -> Left (Text.pack "GainControl expects [duration, slot]")
+      Just (Array (MkArray [d, r])) -> Effect.GainControl <$> jsonToDuration d <*> jsonToObjectRef r
+      _ -> Left (Text.pack "GainControl expects [duration, objectRef]")
     "AffectPlayers" -> case mv of
       Just (Array (MkArray [d, s, pe])) -> Effect.AffectPlayers <$> jsonToDuration d <*> jsonToPlayerScope s <*> jsonToPlayerEffect pe
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")

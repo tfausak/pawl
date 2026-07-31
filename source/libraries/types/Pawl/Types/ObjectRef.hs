@@ -41,9 +41,9 @@ data ObjectRef
     --
     -- A CONTINUOUS effect over a set must additionally freeze the swept set into
     -- the effect itself, because CR 611.2c fixes the affected set "when that
-    -- continuous effect begins": Effect.ModifyTarget does that, storing
-    -- Affected.TheseObjects (Trumpet Blast's "attacking creatures"). Effect.GainControl
-    -- still takes a bare SlotName and so cannot say "gain control of all
-    -- enchantments" (#377).
+    -- continuous effect begins". Effect.ModifyTarget (Trumpet Blast's "attacking
+    -- creatures") and Effect.GainControl (Aura Thief's "all enchantments") both
+    -- do that, storing Affected.TheseObjects; the one-shots that take this type
+    -- store nothing and are governed by CR 608.2c/608.2f instead.
     EachMatching Filter
   deriving (Eq, Ord, Show)

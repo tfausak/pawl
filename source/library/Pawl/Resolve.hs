@@ -139,7 +139,7 @@ slotsOf effect = case effect of
   Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
-  Effect.GainControl _ slot -> Set.singleton slot
+  Effect.GainControl _ ref -> objectRefSlots ref
   Effect.ArmDelayedTrigger _ _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
@@ -395,7 +395,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
-  Effect.GainControl _ _ -> effect
+  Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger _ _ -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
@@ -1801,59 +1801,68 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.AddPhases extras ->
     State.modify' $ \gs ->
       gs {GameState.remaining = Turn.splicePhases (GameState.phase gs) extras (GameState.remaining gs)}
-  Effect.GainControl duration slot ->
+  Effect.GainControl duration ref ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case Recipient.objectOf recipient of
-          Nothing -> gs -- a player recipient cannot be controlled
-          Just target
-            -- CR 800.4b: "If an object would change to the control of a player
-            -- who has left the game, it doesn't." `controller` is baked at
-            -- trigger time (CR 113.8), so a resolution can name a player who has
-            -- since left. Nothing would clean up after the change: CR 800.4a's
-            -- fourth clause ("Then, if there are any objects still controlled by
-            -- that player, those objects are exiled") is not a state-based action
-            -- and "happens as soon as the player leaves the game", so it has
-            -- already run and does not run again. Without this guard the
-            -- permanent would simply sit on the battlefield controlled by a
-            -- player who is not in the game.
-            | List.notElem controller (Game.stillPlaying gs) -> gs
-            | otherwise -> case Expiry.arm controller source duration gs of
-                -- CR 611.2b: the duration never started -- no control effect is
-                -- stored, and nothing is re-Sicked, because control never changed.
-                Nothing -> gs
-                Just expiry ->
-                  -- CR 613.1b / 611.2c: the new controller is `controller` (this
-                  -- effect's source's controller), baked in now -- derived, never
-                  -- chosen. CR 302.6: the new controller has not controlled the
-                  -- permanent continuously, so it is re-Sicked.
-                  --
-                  -- Unless control does not actually move. CR 302.6 asks whether
-                  -- control was CONTINUOUS, and gaining control of a permanent you
-                  -- already control interrupts nothing, so the clock must not
-                  -- reset (#206). Act of Treason may legally target your own
-                  -- creature -- untapping it is the reason to.
-                  --
-                  -- Compared against the PROJECTED controller, read before the new
-                  -- effect is stored, not against Object.owner: you may already
-                  -- control a permanent you do not own (Control Magic), and
-                  -- re-gaining that one interrupts nothing either.
-                  let (ts, gs1) = Game.freshTimestamp gs
-                      eff =
-                        ContinuousEffect.MkContinuousEffect
-                          { ContinuousEffect.source = source,
-                            ContinuousEffect.timestamp = ts,
-                            ContinuousEffect.expiry = expiry,
-                            ContinuousEffect.modification = Modification.SetController controller,
-                            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                          }
-                      alreadyTheirs = Projection.controllerOf target gs == Just controller
-                      sicken o = if alreadyTheirs then o else o {Object.sickness = Sickness.Sick}
-                   in gs1
-                        { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
-                          GameState.objects = Map.adjust sicken target (GameState.objects gs1)
+      -- Enumerated ONCE, by the sweep every ObjectRef-taking opcode shares: Act
+      -- of Treason's slot and Aura Thief's "all enchantments" arrive as the same
+      -- list, and a player recipient, an illegal slot (CR 608.2b) and a set that
+      -- matched nothing all arrive as the empty one and change nothing.
+      case objectRefObjects legality chosen controller source gs ref of
+        [] -> gs
+        targets
+          -- CR 800.4b: "If an object would change to the control of a player
+          -- who has left the game, it doesn't." `controller` is baked at
+          -- trigger time (CR 113.8), so a resolution can name a player who has
+          -- since left. Nothing would clean up after the change: CR 800.4a's
+          -- fourth clause ("Then, if there are any objects still controlled by
+          -- that player, those objects are exiled") is not a state-based action
+          -- and "happens as soon as the player leaves the game", so it has
+          -- already run and does not run again. Without this guard the
+          -- permanent would simply sit on the battlefield controlled by a
+          -- player who is not in the game.
+          | List.notElem controller (Game.stillPlaying gs) -> gs
+          | otherwise -> case Expiry.arm controller source duration gs of
+              -- CR 611.2b: the duration never started -- no control effect is
+              -- stored, and nothing is re-Sicked, because control never changed.
+              Nothing -> gs
+              Just expiry ->
+                -- CR 613.1b / 611.2c: the new controller is `controller` (this
+                -- effect's source's controller), baked in now -- derived, never
+                -- chosen. CR 302.6: the new controller has not controlled the
+                -- permanent continuously, so it is re-Sicked.
+                --
+                -- Unless control does not actually move. CR 302.6 asks whether
+                -- control was CONTINUOUS, and gaining control of a permanent you
+                -- already control interrupts nothing, so the clock must not
+                -- reset (#206). Act of Treason may legally target your own
+                -- creature -- untapping it is the reason to; Aura Thief's "all
+                -- enchantments" sweeps its own controller's as well. So the
+                -- question is asked PER OBJECT, not once for the whole set.
+                --
+                -- Compared against the PROJECTED controller, read before the new
+                -- effect is stored, not against Object.owner: you may already
+                -- control a permanent you do not own (Control Magic), and
+                -- re-gaining that one interrupts nothing either.
+                --
+                -- CR 611.2c: one stored effect over the frozen id set, exactly as
+                -- ModifyTarget stores one -- "the set of objects it affects is
+                -- determined when that continuous effect begins", so an
+                -- enchantment that enters after this is not in it.
+                let (ts, gs1) = Game.freshTimestamp gs
+                    eff =
+                      ContinuousEffect.MkContinuousEffect
+                        { ContinuousEffect.source = source,
+                          ContinuousEffect.timestamp = ts,
+                          ContinuousEffect.expiry = expiry,
+                          ContinuousEffect.modification = Modification.SetController controller,
+                          ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
                         }
-        _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+                    sicken o = o {Object.sickness = Sickness.Sick}
+                    moved = filter (\oid -> Projection.controllerOf oid gs /= Just controller) targets
+                 in gs1
+                      { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
+                        GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
+                      }
   Effect.TakeExtraTurn ref -> do
     gs <- State.get
     let named = playerRefPlayers chosen legality controller gs ref

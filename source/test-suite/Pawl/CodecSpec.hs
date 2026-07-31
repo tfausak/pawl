@@ -284,6 +284,12 @@ tests registry =
           HU.testCase "Untap round-trips both ObjectRef arms" $ do
             roundTrip "e4d" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
             roundTrip "e4e" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))),
+          -- GainControl's own two arms: Act of Treason's slot and Aura Thief's
+          -- "all enchantments". Its Duration is what tells the two cards apart on
+          -- the wire, so both durations ride along.
+          HU.testCase "GainControl round-trips both ObjectRef arms" $ do
+            roundTrip "e4f" Codec.effectToJson Codec.jsonToEffect (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "e4g" Codec.effectToJson Codec.jsonToEffect (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Enchantment))),
           HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
             roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable)
             roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated),

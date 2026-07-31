@@ -1110,7 +1110,7 @@ m45p6CardTests registry =
               [m] -> do
                 HU.assertEqual
                   "one GainControl effect with a conditional duration"
-                  [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) slot]
+                  [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) (ObjectRef.InSlot slot)]
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
                   "one ArtifactTarget slot"

@@ -365,16 +365,23 @@ data Effect card
     -- 505.1a/506.1 detail of WHAT is inserted and the CR 511.3 question of WHERE
     -- live.
     AddPhases [ExtraPhase]
-  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the slot's target
-    -- for a duration. The new controller is THIS effect's source's controller
-    -- (the `controller` passed to applyEffect), baked into a stored
-    -- SetController continuous effect -- derived, never chosen. Also re-Sicks the
-    -- target (CR 302.6: the new controller has not controlled it continuously).
-    -- Act of Treason's control clause. NOT a reuse of ModifyTarget, whose
-    -- Modification is static card data and cannot carry a resolution-time
-    -- PlayerId. Permanent control (CR 613), distinct from Mindslaver's
-    -- player-control (CR 723, ControlPlayerNextTurn).
-    GainControl Duration SlotName
+  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
+    -- ObjectRef names, for a duration. The new controller is THIS effect's
+    -- source's controller (the `controller` passed to applyEffect), baked into a
+    -- stored SetController continuous effect -- derived, never chosen. Also
+    -- re-Sicks each object whose controller actually changed (CR 302.6: the new
+    -- controller has not controlled it continuously). NOT a reuse of
+    -- ModifyTarget, whose Modification is static card data and cannot carry a
+    -- resolution-time PlayerId. Permanent control (CR 613), distinct from
+    -- Mindslaver's player-control (CR 723, ControlPlayerNextTurn).
+    --
+    -- ObjectRef for the reason Destroy's comment gives: Act of Treason's control
+    -- clause is the InSlot arm, and Aura Thief's "you gain control of all
+    -- enchantments" is the EachMatching one. Like ModifyTarget, and unlike the
+    -- one-shots, the swept set has to be FROZEN into the stored effect (CR
+    -- 611.2c names controller changes in as many words), so an enchantment that
+    -- enters afterwards is not stolen.
+    GainControl Duration ObjectRef
   | -- CR 603.7: create a delayed triggered ability -- the one this card declares
     -- under this name (Card.delayedAbilities). First-order: the payload is card
     -- data joined by a name, so this opcode carries no nested ability and adds no

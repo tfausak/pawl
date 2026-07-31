@@ -438,7 +438,39 @@ tests registry =
           (modeShapes (CardT.spell c))
         -- CR 115.10a: no "target" anywhere on the card, so no target spec and
         -- nothing for CR 608.2b to fizzle.
-        HU.assertEqual "and it targets nothing" [Map.empty] (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c))))
+        HU.assertEqual "and it targets nothing" [Map.empty] (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c)))),
+      -- The control-side twin of trumpet-blast.json, and the other half of what
+      -- CR 611.2c names: a resolution effect that CHANGES THE CONTROLLER of a
+      -- filter-selected set. Its duration is Indefinite because the card states
+      -- none -- CR 611.2a: "If no duration is stated, it lasts until the end of
+      -- the game" -- which is the one place this card differs from Act of
+      -- Treason's UntilEndOfTurn.
+      --
+      -- The filter is a bare HasCardType Enchantment: the card says "all
+      -- enchantments", with no "you don't control" and no "other", and the Thief
+      -- itself is in a graveyard by the time the trigger resolves.
+      HU.testCase "aura-thief.json loads as a {3}{U} 2/2 flying Illusion whose dies trigger takes every enchantment" $ do
+        c <- Registry.card registry "Aura Thief"
+        HU.assertEqual "name" (Text.pack "Aura Thief") (CardT.name c)
+        HU.assertEqual "{3}{U}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Blue)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Illusion"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Illusion))
+          (CardT.typeLine c)
+        HU.assertEqual "2/2" (Just (Power.MkPower (Quantity.Literal 2)), Just (Toughness.MkToughness (Quantity.Literal 2))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual "flying, and nothing else" (Set.singleton Keyword.Flying) (CardT.keywords c)
+        HU.assertEqual
+          "one trigger, on dying"
+          [TriggerCondition.SelfDies]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "gaining control of every enchantment, for good"
+          [ [ ( Optionality.Mandatory,
+                [Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment))]
+              )
+            ]
+          ]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
