@@ -1531,9 +1531,9 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- restamp below.
             Monad.unless alreadyThere $ do
               gs1 <- State.get
-              -- CR 701.3c: attaching to a DIFFERENT object gives it a new
-              -- timestamp. Not cosmetic -- CR 613.7 orders layer effects by it, so
-              -- two things modifying one creature apply in attach order.
+              -- CR 701.3c: attaching to a DIFFERENT object or player gives it a
+              -- new timestamp. Not cosmetic -- CR 613.7 orders layer effects by
+              -- it, so two things modifying one creature apply in attach order.
               let (ts, gs2) = Game.freshTimestamp gs1
                   move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
               State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
