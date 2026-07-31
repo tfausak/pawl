@@ -1,4 +1,12 @@
--- | The @Card ⇆ Json@ codec (#481).
+-- | The @Card ⇆ Json@ codec (§2 of the M3.5 spec), and the entry point to the
+-- rest of @Pawl.Codec@: the transitive closure of @Card@'s fields is one
+-- module per type, each exposing free @xToJson@\/@jsonToX@ functions rather
+-- than a type class, and this module is where they are instantiated at
+-- @Card@ (#481).
+--
+-- Every @Pawl.Types.*@ module stays JSON-free. Casing on an effect's identity
+-- anywhere under @Pawl.Codec@ is open-half machinery, not the rules core --
+-- mirroring 'Pawl.Engine.Resolve', the sole @case@-on-@Effect@ home.
 module Pawl.Codec.Card where
 
 import qualified Data.Map.Strict as Map

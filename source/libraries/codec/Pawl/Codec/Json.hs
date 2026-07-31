@@ -1,8 +1,12 @@
 -- | Construction, normalization, and extraction helpers over the @json@
 -- sublibrary's 'Value', plus the small tagged-object convention the codec (§2 of
--- the M3.5 spec) builds on. Encoding and decoding themselves live in
--- 'Pawl.Json.Value'; this module only adapts them to the codec's @Either Text@
--- error channel.
+-- the M3.5 spec) builds on, and the element-generic collection and default
+-- combinators every per-type codec module is written in terms of. Encoding and
+-- decoding themselves live in 'Pawl.Json.Value'; this module adapts them to the
+-- codec's @Either Text@ error channel.
+--
+-- Nothing here names a @Pawl.Types@ type, which is what keeps it below all 95
+-- per-type modules rather than in a cycle with them (#481).
 --
 -- 'jObject' and 'asObject' trade in assoc lists, which is the shape the codec
 -- wants: it writes fields in a readable order rather than an alphabetical one,
@@ -143,8 +147,7 @@ parse input = case Parsec.parse (Value.decode <* Parsec.eof) "" input of
 
 -- Collection and default combinators ------------------------------------------
 --
--- Generic over the element codec: nothing here names a Pawl.Types type, which
--- is what keeps this module below every per-type codec module (#481).
+-- Generic over the element codec, which is taken as an argument.
 
 nullary :: Text -> Value
 nullary t = tagged t Nothing
