@@ -1433,7 +1433,38 @@ auraCardTests registry =
           [StaticAbility.MkStaticAbility (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)) (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal (-1))))]
           (Card.Type.staticAbilities card)
         -- CR 303.4: an Aura spell has no spell effects; it enters attached.
-        HU.assertEqual "no spell effects" [] (Card.allEffects card)
+        HU.assertEqual "no spell effects" [] (Card.allEffects card),
+      -- The second Effect.AttachTarget producer in the pool, and the shape is the
+      -- design argument: ONE target slot for the Aura (CR 601.2c -- Gatherer is
+      -- explicit for Crown of the Ages that "this only targets the Aura"), two
+      -- effects in the order written (CR 608.2c), and a destination Filter that
+      -- asks about the SUBJECT rather than about the candidate.
+      HU.testCase "Aura Graft is a {1}{U} instant that gains an Aura and then moves it" $ do
+        p <- Registry.printing registry "Aura Graft"
+        let card = Printing.card p
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+            target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual "name" (Text.pack "Aura Graft") (Card.Type.name card)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, blue]) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Instant) (TypeLine.types (Card.Type.typeLine card))
+        HU.assertEqual "no enchant ability: it is not an Aura itself" Nothing (Card.Type.enchant card)
+        case Foldable.toList (Modal.modes (Card.Type.spell card)) of
+          [m] -> do
+            -- Gatherer, 2007-07-15: "Aura Graft's effect has no duration", so the
+            -- control change is Duration.Indefinite rather than end of turn.
+            HU.assertEqual
+              "gain control indefinitely, then attach"
+              [ Effect.GainControl Duration.Indefinite target,
+                Effect.AttachTarget target Filter.Type.CanHostSubject
+              ]
+              (Foldable.toList (Mode.effects m))
+            -- "target Aura THAT'S ATTACHED TO A PERMANENT" -- the one slot, and the
+            -- only place IsAttachedToPermanent appears in the pool.
+            HU.assertEqual
+              "CR 115.1: one target slot, an Aura on a permanent"
+              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToPermanent]))))
+              (Mode.targetSpecs m)
+          ms -> HU.assertFailure ("expected one mode, got " <> show (length ms))
     ]
 
 -- Skilled Animator's "for as long as this creature remains on the battlefield",

@@ -14,10 +14,11 @@ import Pawl.Types.Supertype (Supertype)
 -- controller, and for a player candidate its identity) -- exactly as the rules
 -- already case on a CardType -- and on a handful of things CR 109.3 says are NOT
 -- characteristics but that the closed half owns just as squarely: combat status
--- (IsAttacking, IsBlocking), attachment (IsAttachedToCreature), what a permanent
--- is represented by (IsToken), and what happened earlier this turn
--- (AttackedThisTurn, the only one that is not a present state at all). Each arm
--- carries its own defence. Casing on a characteristic classification is
+-- (IsAttacking, IsBlocking), attachment (IsAttachedToCreature,
+-- IsAttachedToPermanent, and CanHostSubject for the attachment an effect is about
+-- to make), what a permanent is represented by (IsToken), and what happened
+-- earlier this turn (AttackedThisTurn, the only one that is not a present state
+-- at all). Each arm carries its own defence. Casing on a characteristic classification is
 -- legitimate; the invariant forbids only casing on an EFFECT's identity, which
 -- this type never does.
 --
@@ -137,6 +138,50 @@ data Filter
     -- that would compose with the rest of this type: the narrowest atom the one
     -- card in the pool needs. The generalization is #356.
     IsAttachedToCreature
+  | -- CR 303.4 / 701.3a: the candidate is attached to a PERMANENT -- Aura Graft's
+    -- "target Aura that's attached to a permanent". Strictly wider than
+    -- IsAttachedToCreature above and strictly narrower than "attached to
+    -- anything": CR 303.4 attaches an Aura to "an object or player", and only one
+    -- of those two is a permanent, so an enchant-player Aura (Curse of Death's
+    -- Hold) is out. An Aura on a noncreature permanent is in, which is the whole
+    -- difference from the atom above.
+    --
+    -- Nullary for IsAttachedToCreature's reason and one more of its own. #356's
+    -- general `AttachedTo Filter` needs a RECURSIVE View -- a candidate's view
+    -- would have to carry its host's -- which #356 records as a bigger structural
+    -- change than any card justifies, and which would also make this type's
+    -- derived Eq and Show diverge on a cyclic attachment. This atom needs neither:
+    -- being attached to a permanent is a question about the ATTACHMENT, not about
+    -- the host's characteristics, so it reads no second projection at all.
+    IsAttachedToPermanent
+  | -- CR 701.3a's last sentence: "An Aura, Equipment, or Fortification can't be
+    -- attached to an object or player it couldn't enchant, equip, or fortify,
+    -- respectively." The candidate is one the SUBJECT of the surrounding attach --
+    -- the permanent being moved -- could legally be attached to. Aura Graft's
+    -- "another permanent IT CAN ENCHANT".
+    --
+    -- Context-relative in exactly the way IsSource and ControlledBy are: the
+    -- Filter value carries no object id, and the answer comes from what the caller
+    -- supplies. The subject arrives through Pawl.Filter.View rather than through
+    -- Context, because the answer is per-candidate and needs the game state --
+    -- which is the same footing `attachedToCreature` is on, and Context has
+    -- neither. Vacuously False wherever no attach frames the match, the posture
+    -- every other context-relative arm here takes.
+    --
+    -- Asks about the SUBJECT and not about the candidate, which is what no
+    -- combination of the atoms above can express -- a destination filter narrowed
+    -- by HasCardType would still admit a creature the Aura's enchant ability
+    -- rejects. NOT a restatement of CR 303.4j: that rule is the backstop for a
+    -- card that does NOT say "it can enchant" (Crown of the Ages), where the
+    -- destination is offered and the move then fails. A card that says it narrows
+    -- the offer instead, and the two are only the same when the player would have
+    -- picked a legal destination anyway.
+    --
+    -- Answerable only where an attach frames the match, and silently False in any
+    -- other Filter position (#471). Reads the subject's enchant ability and not
+    -- CR 303.4's "other effects can limit what a permanent can be enchanted by"
+    -- (#472).
+    CanHostSubject
   | -- CR 111.6: "A token isn't a card." Ashaya, Soul of the Wild's "nontoken
     -- creatures you control" is the card text this exists for, and it is spelled
     -- `Not IsToken` -- one relation, one spelling, the way CR 601.2c's "another"

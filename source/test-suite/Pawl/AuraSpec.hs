@@ -650,13 +650,15 @@ reattachTests registry =
       -- did not happen is the move.
       --
       -- The case where the destination is not a CREATURE at all, which no card in
-      -- the pool reaches: Crown of the Ages is the only Effect.AttachTarget producer
-      -- and its destination filter is HasCardType Creature. The opcode is driven
-      -- directly with a wider, hand-made filter instead -- the same way the
-      -- Effect.Attach cases in the Equipment group above drive that opcode -- and
-      -- that synthetic filter is the labeled crutch (#431). The rule's other case,
-      -- a destination the Aura's own enchant restriction rejects, is the whole-cards
-      -- test right below.
+      -- the pool reaches. Crown of the Ages' destination filter is HasCardType
+      -- Creature, so every destination it can offer is at least a creature; Aura
+      -- Graft's is Filter.CanHostSubject, so every destination IT can offer is one
+      -- the Aura may legally enchant, and this rule's refusal never fires for it.
+      -- The opcode is driven directly with a wider, hand-made filter instead -- the
+      -- same way the Effect.Attach cases in the Equipment group above drive that
+      -- opcode -- and that synthetic filter is the labeled crutch (#431). The
+      -- rule's other case, a destination the Aura's own enchant restriction
+      -- rejects, is the whole-cards test right below.
       HU.testCase "CR 303.4j attaching an Aura to something it cannot enchant leaves it where it was" $ do
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"

@@ -136,7 +136,9 @@ data Effect card
     -- TargetSpec.
     --
     -- The Filter is the destination's card text ("another CREATURE" is
-    -- `HasCardType Creature`); the candidates it narrows are the permanents on
+    -- `HasCardType Creature`; Aura Graft's "another permanent IT CAN ENCHANT" is
+    -- `Filter.CanHostSubject`, the one atom that asks about the SUBJECT rather
+    -- than about the candidate); the candidates it narrows are the permanents on
     -- the battlefield. The "another" is NOT in the Filter: CR 701.3b's second
     -- sentence makes attaching a permanent to what it already holds do nothing
     -- whatever the card says, so the opcode always excludes the current host and
@@ -145,7 +147,9 @@ data Effect card
     -- CR 303.4j / 701.3b's FIRST sentence is the failure mode, and it is not a
     -- fizzle: a destination the subject cannot legally be attached to leaves it
     -- exactly where it was -- unmoved and unrestamped -- while the rest of the
-    -- ability resolves normally.
+    -- ability resolves normally. Only a card whose text does NOT already exclude
+    -- such a destination can reach it -- Crown of the Ages can, Aura Graft cannot
+    -- -- which is why the rule and the atom are not the same thing.
     AttachTarget SlotName Filter
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries

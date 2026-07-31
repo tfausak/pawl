@@ -1575,21 +1575,33 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- and it is also how Crown of the Ages' "ANOTHER creature" is
               -- spelled, so a card omitting the word would behave identically.
               --
-              -- Deliberately NOT narrowed to destinations the move would be
-              -- LEGAL for. "Another creature" is the whole of what the card says;
-              -- pre-filtering past it would answer CR 303.4j's question on the
-              -- player's behalf, and CR 303.4j exists precisely because the
+              -- Narrowed to destinations the move would be LEGAL for only when the
+              -- card SAYS so, which is Filter.CanHostSubject's whole job: Aura
+              -- Graft's "another permanent IT CAN ENCHANT" narrows, and Crown of
+              -- the Ages' bare "another creature" does not. Narrowing a filter
+              -- that does not carry the atom would answer CR 303.4j's question on
+              -- the player's behalf, and CR 303.4j exists precisely because the
               -- choice can land somewhere the subject may not go.
+              --
+              -- Filling canHostSubject is what makes a filter able to ask about
+              -- the SUBJECT rather than about the candidate, and it comes from
+              -- attachmentFor -- the same function the move itself goes through
+              -- below, so an offer and a move cannot disagree. Lazy in the View, so
+              -- a filter without the atom pays nothing for it.
               --
               -- Ascending, so both the elision below and a transcript are
               -- deterministic. The filter context is this effect's own -- CR
               -- 109.5's "you" is the ability's controller and IsSource is its
               -- source -- because the destination filter IS the ability's card
               -- text, unlike PlayerSacrifices', which is read against the victim.
+              viewOf oid =
+                (Projection.viewOfObject oid gs)
+                  { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
+                  }
               candidates =
                 List.sort
                   ( filter
-                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (Projection.viewOfObject oid gs) filter_)
+                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (viewOf oid) filter_)
                       (Set.toList (GameState.battlefield gs))
                   )
           case candidates of

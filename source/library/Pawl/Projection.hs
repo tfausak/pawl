@@ -463,6 +463,12 @@ viewOfCard card =
           -- CR 303.4b: only a permanent on the battlefield is attached to
           -- anything, and a printed card off it is not one.
           Filter.attachedToCreature = False,
+          -- CR 303.4 again: nor is it attached to a permanent, for the same reason.
+          Filter.attachedToPermanent = False,
+          -- CR 701.3a: nothing can be attached to a card off the battlefield
+          -- either -- attaching puts a permanent "onto that object", and CR 110.1
+          -- makes only a battlefield object one.
+          Filter.canHostSubject = False,
           -- CR 111.6: "A token isn't a card." This builder describes a card in a
           -- zone the battlefield is not (a library search, viewUpTo's fallback),
           -- and CR 704.5d already made a token in any such zone cease to exist --
@@ -523,6 +529,17 @@ viewOfCharacteristics oid pc controller gs =
       Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
         Nothing -> False
         Just host -> isCreatureOf host gs,
+      -- CR 303.4: the same stored attachment, asked a question that stops at the
+      -- attachment itself -- does it name an OBJECT (CR 110.1: a permanent) rather
+      -- than a player? Recipient.objectOf is that question, and unlike the field
+      -- above there is no second projection behind it, so this one need not be
+      -- lazy for the recursion reason (it still is, being a record field).
+      Filter.attachedToPermanent = Maybe.isJust (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf),
+      -- CR 701.3a: filled only by Pawl.Resolve's AttachTarget arm, which is the
+      -- one place that knows what is being moved. Every view this function builds
+      -- is asked about some candidate in isolation, and "could the subject be
+      -- attached here" is not a question about the candidate alone.
+      Filter.canHostSubject = False,
       -- CR 111.6: not a characteristic either, and unlike the two fields above it
       -- is not even mutable -- Object.source is fixed for the life of the object
       -- (CR 400.7 mints a new one on every zone change), so this is a constant
@@ -1272,6 +1289,23 @@ filterReads f = case f of
   -- which is the conservative direction. Nothing in the pool puts this atom in an
   -- affected set, so no ordering observable today turns on the choice (#357).
   Filter.Type.IsAttachedToCreature -> Set.singleton Types
+  -- Reads nothing, unlike its sibling above, and the difference is exactly why
+  -- the two are separate atoms: this one stops at Object.attachedTo and asks
+  -- whether the attachment names an object or a player (CR 303.4). No Modification
+  -- writes that field -- CR 701.3's attach is a keyword ACTION performed by a
+  -- resolution, between projections rather than inside one -- so no CR 613 layer
+  -- can move a set this atom selects.
+  Filter.Type.IsAttachedToPermanent -> Set.empty
+  -- Over-declared, deliberately. The characteristics behind this atom are the
+  -- CANDIDATE's (an Equipment needs a creature, CR 301.5) and the SUBJECT's (its
+  -- enchant ability, CR 702.5a, whose own Filter can read anything), and Aspect
+  -- names aspects of one object's projection, so there is no honest way to say
+  -- "and another object's". Declaring everything orders any characteristic-writing
+  -- effect before an affected set that asks this, which is the conservative
+  -- direction -- and no card in the pool puts this atom in an affected set at all,
+  -- because it is a destination filter, so nothing observable turns on the choice.
+  -- The same limitation IsAttachedToCreature's arm above records (#357).
+  Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, PowerA, Controller]
   -- Reads nothing, and for a stronger reason than the three empty arms above:
   -- CR 111.3 makes a token's effect-defined values "functionally equivalent" to
   -- printed ones rather than a separate kind of characteristic, and no
