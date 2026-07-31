@@ -1092,10 +1092,22 @@ runStepThatBegan phase = do
   -- priority.
   State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan phase (GameState.activePlayer gs)) gs)
   runTurnBasedActions phase
+  -- Asked BEFORE the CR 704.3 check below, not after it. For every step but one
+  -- the order is free -- this line is pure there -- and for the cleanup step it
+  -- is forced: CR 704.3's last sentence keys that step's outcome to "the step's
+  -- FIRST check", so nothing may perform a state-based action ahead of CR
+  -- 514.3a's. Running the ordinary check first buries the creature that CR 514.2
+  -- just dropped to zero toughness (CR 704.5f), and CR 514.3a then finds an
+  -- already-settled board and grants nothing -- see Pawl.GameSpec's "a
+  -- state-based action alone fires the exception", which is what caught it.
+  grants <- grantsPriorityNow phase
+  -- CR 704.3, one unlooped pass (Sba.checkStateBasedActions says why one is
+  -- enough at this site). Nothing left for a cleanup step to do, since
+  -- `grantsPriorityNow` has just settled it to a fixpoint; the step's own check
+  -- for every other.
   checkSba
   finished <- State.gets (Maybe.isJust . GameState.result)
   Monad.unless finished $ do
-    grants <- grantsPriorityNow phase
     Monad.when grants priorityLoop
     restarted <- State.gets GameState.restartSignal
     case restarted of

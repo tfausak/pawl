@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
@@ -1855,5 +1856,48 @@ cleanupStepTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         megrim <- Registry.printing registry "Megrim"
         let (_, asked) = runCountingActions (cleanupBoard piker 8 [megrim]) Engine.runStep
-        HU.assertEqual "two passes to resolve the trigger, two to end the step" 4 asked
+        HU.assertEqual "two passes to resolve the trigger, two to end the step" 4 asked,
+      -- CR 514.3a's condition is "state-based actions ... AND/OR ... triggered
+      -- abilities", and the cases above are all the second half. This is the
+      -- first half on its own: alice's Goblin Piker (2/1) is enchanted by nothing
+      -- and pumped to 5/4 by Giant Growth, and bob's Curse of Death's Hold on
+      -- alice makes her creatures -1/-1, so it stands at 4/3. CR 514.2 ends the
+      -- +3/+3, the Curse alone leaves it 1/0, and CR 704.5f buries it -- a
+      -- state-based action performed BY the cleanup step, with no trigger
+      -- anywhere on the board to accompany it.
+      --
+      -- CR 704.3's last sentence is what this pins: the outcome turns on "the
+      -- step's FIRST check", so the check whose result decides the priority round
+      -- must be the first thing to perform a state-based action here. An ordinary
+      -- unlooped CR 704.3 check running ahead of it buries the Piker, and CR
+      -- 514.3a then finds an already-settled board and grants nothing.
+      HU.testCase "CR 514.3a a state-based action alone fires the exception" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        giantGrowth <- Registry.printing registry "Giant Growth"
+        curse <- Registry.printing registry "Curse of Death's Hold"
+        let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+            (gs0, ggId) = S.handOne giantGrowth withPiker
+            cast = S.runPure S.identityAnswer gs0 (Cast.castSpell S.alice ggId)
+            pumped = S.runPure S.identityAnswer cast Stack.resolveTop
+            (curseId, withCurse) = S.addCreature curse S.bob pumped
+            atCleanup =
+              (S.attachTo curseId (Recipient.ToPlayer S.alice) withCurse)
+                { GameState.activePlayer = S.alice,
+                  GameState.turnNumber = 1,
+                  GameState.phase = Phase.Ending EndingStep.Cleanup,
+                  GameState.remaining = Seq.empty
+                }
+            (after, asked) = runCountingActions atCleanup Engine.runStep
+        HU.assertEqual "the pump kept the Piker alive up to the cleanup step" (Just 4) (Projection.powerOf pikerId atCleanup)
+        HU.assertBool "it left the battlefield" (List.notElem pikerId (Game.zoneMembers Zone.Battlefield S.alice after))
+        -- By NAME, not by id: CR 400.7 makes the card in the graveyard a new
+        -- object, so pikerId names nothing there. The Giant Growth is in the same
+        -- graveyard, hence `any`.
+        HU.assertBool
+          "CR 704.5f buried it once CR 514.2 ended the pump"
+          (any (\i -> namedIs (Text.pack "Goblin Piker") (Game.lookupObject i after)) (Game.zoneMembers Zone.Graveyard S.alice after))
+        HU.assertEqual "nothing triggered, so the SBA alone bought the priority round" 2 asked
+        HU.assertEqual "and another cleanup step began" (Phase.Ending EndingStep.Cleanup) (GameState.phase after)
+        HU.assertEqual "with the turn not yet handed off" S.alice (GameState.activePlayer after)
     ]
