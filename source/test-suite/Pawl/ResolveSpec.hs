@@ -1187,7 +1187,37 @@ resolveTests registry =
             cast = snd (Engine.runGamePure (atCreature wall) gs4 (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure (atCreature wall) cast Stack.resolveTop)
         HU.assertEqual "no damage before it resolves" (Just 0) (S.damageOf wall cast)
-        HU.assertEqual "two snow permanents you control, so two damage" (Just 2) (S.damageOf wall after)
+        HU.assertEqual "two snow permanents you control, so two damage" (Just 2) (S.damageOf wall after),
+      -- CR 608.2h: the answer "is determined only once, when the effect is
+      -- applied", so a quantity Projection.freezeQuantities cannot evaluate at
+      -- that one moment has no later moment to be evaluated in. Storing the raw
+      -- quantity would hand it to applyModification, which reads it against the
+      -- AFFECTED object on every projection -- a wrong answer, not a deferred
+      -- one. Nothing is stored instead, which is the posture CR 611.2b already
+      -- gives this opcode when the duration never starts.
+      --
+      -- A bare Star is the unevaluable quantity here (CR 208.2: it has no value
+      -- of its own); the literal leg is the control that keeps the empty result
+      -- from passing vacuously.
+      HU.testCase "CR 608.2h a modification that cannot be frozen is not stored at all" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (pikerId, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            slot = SlotName.MkSlotName (Text.pack "target")
+            store m =
+              S.runPure S.identityAnswer gs $
+                Resolve.applyEffect
+                  S.noSource
+                  S.alice
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToCreature pikerId))
+                  (Effect.ModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot))
+            refused = store (Modification.ModifyPowerToughness (Quantity.Literal 3) Quantity.Star)
+            stored = store (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))
+        HU.assertEqual "no effect is stored for an unevaluable quantity" [] (GameState.continuousEffects refused)
+        HU.assertEqual "and the Piker is its printed 2/1" (Just 2, Just 1) (Projection.powerOf pikerId refused, Projection.toughnessOf pikerId refused)
+        HU.assertEqual "the same call with two Literals DOES store one -- the refusal is what did it" 1 (length (GameState.continuousEffects stored))
+        HU.assertEqual "and pumps the Piker to 5/4" (Just 5, Just 4) (Projection.powerOf pikerId stored, Projection.toughnessOf pikerId stored)
     ]
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a

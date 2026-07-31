@@ -799,6 +799,10 @@ affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) 
 -- producer, and ProjectionSpec's "CR 608.2h/611.2d Untamed Might's X is frozen"
 -- is what proves the freeze happens at all.
 --
+-- Not Literal 0, which would be inventing an answer: CR 208.2a's "if the ability
+-- needs to use a number that can't be determined ... use 0 instead of that
+-- number" is scoped to a characteristic-defining ability, and this is not one.
+--
 -- Cases on Modification, so it lives HERE (Projection is the sole home), the same
 -- standing rewriteModification has.
 freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId.PlayerId -> Modification -> Maybe Modification
