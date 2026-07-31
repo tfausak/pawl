@@ -1156,7 +1156,38 @@ resolveTests registry =
         HU.assertEqual
           "Alice's five"
           (Just 5)
-          (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
+          (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand),
+      -- CR 205.4g, end to end: "any permanent with the supertype 'snow' is a
+      -- snow permanent." Skred deals damage equal to the number of snow
+      -- permanents YOU control, cast through the real path (Cast.castSpell +
+      -- resolveTop) so the count is read at resolution off a real projection.
+      --
+      -- THE FALSIFIER, in both directions at once, which is why the board is
+      -- lopsided. Alice has two Snow-Covered Mountains and two plain Mountains;
+      -- Bob has one Snow-Covered Mountain and the Wall of Stone that takes the
+      -- damage. The right answer is 2. A count blind to the supertype would see
+      -- four permanents Alice controls and deal 4; a count blind to CR 109.5's
+      -- controller would see three snow permanents and deal 3. All three numbers
+      -- differ, so no single wrong reading can pass.
+      --
+      -- Wall of Stone is 0/8, so it survives and carries the damage as a mark
+      -- (CR 120.3e, removed at CR 514.2's cleanup) that the assertion can read
+      -- exactly -- a dead creature would only tell us the damage was at least
+      -- its toughness.
+      HU.testCase "CR 205.4g Skred counts the snow permanents YOU control, and nothing else" $ do
+        snowMountain <- Registry.printing registry "Snow-Covered Mountain"
+        mountain <- Registry.printing registry "Mountain"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        skred <- Registry.printing registry "Skred"
+        let gs0 = S.landsInPlay snowMountain 2
+            gs1 = snd (S.addCreature mountain S.alice (snd (S.addCreature mountain S.alice gs0)))
+            gs2 = snd (S.addCreature snowMountain S.bob gs1)
+            (wall, gs3) = S.addCreature wallOfStone S.bob gs2
+            (spellId, gs4) = S.addHandCard skred S.alice gs3
+            cast = snd (Engine.runGamePure (atCreature wall) gs4 (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure (atCreature wall) cast Stack.resolveTop)
+        HU.assertEqual "no damage before it resolves" (Just 0) (S.damageOf wall cast)
+        HU.assertEqual "two snow permanents you control, so two damage" (Just 2) (S.damageOf wall after)
     ]
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
@@ -1499,6 +1530,13 @@ castBlackRemovalAt swamp printing foe =
 atBobAnswer :: Prompt.Prompt r -> r
 atBobAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
+
+-- atBobAnswer's creature counterpart: aim every target slot at one named
+-- creature, rather than at whatever Set.lookupMin happens to offer first.
+atCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+atCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
   _ -> S.identityAnswer p
 
 -- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
