@@ -523,6 +523,16 @@ tests registry =
               Codec.typeLineToJson
               Codec.jsonToTypeLine
               (TypeLine.MkTypeLine (Set.singleton Supertype.Basic) (Set.singleton CardType.Land) (Set.singleton Subtype.Mountain)),
+          -- CR 308.1/308.2: the kindred shape -- two card types, and a CREATURE
+          -- subtype on a card that is not a creature. Bitterblossom's type line,
+          -- and the only one in the pool where the subtype's family and the
+          -- card types disagree.
+          HU.testCase "TypeLine (kindred)" $
+            roundTrip
+              "tl-kindred"
+              Codec.typeLineToJson
+              Codec.jsonToTypeLine
+              (TypeLine.MkTypeLine Set.empty (Set.fromList [CardType.Kindred, CardType.Enchantment]) (Set.singleton Subtype.Faerie)),
           Tasty.testGroup
             "cost (P8)"
             [ HU.testCase "every CostComponent round-trips" $

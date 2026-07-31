@@ -131,6 +131,10 @@ subtypeMana subtype = case subtype of
   Subtype.Dragon -> Nothing
   Subtype.Unicorn -> Nothing
   Subtype.Curse -> Nothing
+  -- CR 205.3m: Faerie is a creature type (and, per CR 308.2, a kindred subtype),
+  -- not a basic land type, so CR 305.6's intrinsic mana ability never applies to
+  -- it.
+  Subtype.Faerie -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an

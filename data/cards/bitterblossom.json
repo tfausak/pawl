@@ -1,0 +1,163 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Bitterblossom",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "StepBegins",
+        "value": [
+          {
+            "type": "Beginning",
+            "value": {
+              "type": "Upkeep"
+            }
+          },
+          {
+            "type": "ControllersTurn"
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "LoseLife",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "type": "Create",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  },
+                  {
+                    "activatedAbilities": [],
+                    "castingPermissions": [],
+                    "colorIndicator": [
+                      {
+                        "type": "Black"
+                      }
+                    ],
+                    "keywords": [
+                      {
+                        "type": "Flying"
+                      }
+                    ],
+                    "manaCost": null,
+                    "name": "Faerie Rogue",
+                    "power": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "replacementEffects": [],
+                    "spell": {
+                      "modes": [
+                        {
+                          "effects": [],
+                          "targetSpecs": []
+                        }
+                      ],
+                      "selection": {
+                        "type": "ChooseExactly",
+                        "value": 1
+                      }
+                    },
+                    "staticAbilities": [],
+                    "toughness": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "triggeredAbilities": [],
+                    "typeLine": {
+                      "subtypes": [
+                        {
+                          "type": "Rogue"
+                        },
+                        {
+                          "type": "Faerie"
+                        }
+                      ],
+                      "supertypes": [],
+                      "types": [
+                        {
+                          "type": "Creature"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Faerie"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      },
+      {
+        "type": "Kindred"
+      }
+    ]
+  }
+}

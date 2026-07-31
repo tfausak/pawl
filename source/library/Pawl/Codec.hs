@@ -214,6 +214,7 @@ cardTypeToJson c = nullary . Text.pack $ case c of
   CardType.Enchantment -> "Enchantment"
   CardType.Artifact -> "Artifact"
   CardType.Sorcery -> "Sorcery"
+  CardType.Kindred -> "Kindred"
 
 jsonToCardType :: Value -> Either Text CardType.CardType
 jsonToCardType =
@@ -224,7 +225,8 @@ jsonToCardType =
       (Text.pack "Instant", CardType.Instant),
       (Text.pack "Enchantment", CardType.Enchantment),
       (Text.pack "Artifact", CardType.Artifact),
-      (Text.pack "Sorcery", CardType.Sorcery)
+      (Text.pack "Sorcery", CardType.Sorcery),
+      (Text.pack "Kindred", CardType.Kindred)
     ]
 
 -- No longer uniformly nullary: CR 122.1b's keyword counter carries the keyword it
@@ -313,6 +315,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Dragon -> "Dragon"
   Subtype.Unicorn -> "Unicorn"
   Subtype.Curse -> "Curse"
+  Subtype.Faerie -> "Faerie"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -370,7 +373,8 @@ jsonToSubtype =
       (Text.pack "Thopter", Subtype.Thopter),
       (Text.pack "Dragon", Subtype.Dragon),
       (Text.pack "Unicorn", Subtype.Unicorn),
-      (Text.pack "Curse", Subtype.Curse)
+      (Text.pack "Curse", Subtype.Curse),
+      (Text.pack "Faerie", Subtype.Faerie)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an

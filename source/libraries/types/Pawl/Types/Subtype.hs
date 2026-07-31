@@ -85,4 +85,9 @@ data Subtype
     -- whether a permanent is a Curse -- so it exists to make the printed type
     -- line faithful, the way Nightmare's Horse does.
     Curse
+  | -- CR 205.3m (a creature type; Bitterblossom's, and its token's). The first
+    -- subtype in this type to sit on something that is not a creature: CR 308.2
+    -- makes the kindred subtypes the same set as the creature subtypes, so
+    -- Bitterblossom is a Kindred Enchantment -- Faerie.
+    Faerie
   deriving (Eq, Ord, Show)

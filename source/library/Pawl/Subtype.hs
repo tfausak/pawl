@@ -83,3 +83,7 @@ isLandType subtype = case subtype of
   Subtype.Unicorn -> False
   -- CR 205.3h: an enchantment type.
   Subtype.Curse -> False
+  -- CR 205.3m: a creature type -- and, per CR 308.2, a kindred subtype too,
+  -- since those are the same set. Still not a land type either way, which is the
+  -- only question this function asks.
+  Subtype.Faerie -> False

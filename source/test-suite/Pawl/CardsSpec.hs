@@ -402,7 +402,56 @@ tests registry =
         HU.assertEqual
           "and it targets nothing"
           [[Map.empty]]
-          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The pool's first KINDRED card (CR 308). CR 308.1 -- "each kindred card
+      -- has another card type" -- is why the type line carries Enchantment
+      -- alongside Kindred, and CR 110.4 keeps Kindred off the list of six
+      -- permanent types, so it is the Enchantment that makes this a permanent.
+      -- CR 308.2 -- "the set of kindred subtypes is the same as the set of
+      -- creature subtypes" -- is why a NONCREATURE card carries the creature
+      -- type Faerie; Pawl.TriggerSpec's Kindred group is where that is proved
+      -- observable. CR 308.3 needs nothing here: cards printed with the
+      -- "tribal" type were errata'd, so the Oracle text this file transcribes
+      -- is already kindred.
+      HU.testCase "bitterblossom.json loads as a {1}{B} Kindred Enchantment - Faerie whose upkeep trigger costs 1 life and makes a Faerie Rogue" $ do
+        c <- Registry.card registry "Bitterblossom"
+        HU.assertEqual "name" (Text.pack "Bitterblossom") (CardT.name c)
+        HU.assertEqual "{1}{B}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Kindred Enchantment - Faerie"
+          (TypeLine.MkTypeLine Set.empty (Set.fromList [CardType.Kindred, CardType.Enchantment]) (Set.singleton Subtype.Faerie))
+          (CardT.typeLine c)
+        HU.assertEqual "no power or toughness" (Nothing, Nothing) (CardT.power c, CardT.toughness c)
+        HU.assertEqual "no keywords" Set.empty (CardT.keywords c)
+        -- CR 603.3a / 109.5: "your upkeep" is the ability CONTROLLER's, which is
+        -- what TurnScope.ControllersTurn spells.
+        HU.assertEqual
+          "one trigger, at the beginning of its controller's upkeep"
+          [TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        case concatMap (concatMap snd . modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c) of
+          [Effect.LoseLife who amount, Effect.Create quantity token entry slot] -> do
+            -- Printed order, and it is the order the effects are authored in:
+            -- "you lose 1 life AND create".
+            HU.assertEqual "its controller loses the life" (PlayerRef.Relative PlayerRelation.You) who
+            HU.assertEqual "1 life" (Quantity.Literal 1) amount
+            HU.assertEqual "one token" (Quantity.Literal 1) quantity
+            HU.assertEqual "with no entry riders" TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Untapped, TokenEntry.attacking = False} entry
+            HU.assertEqual "and no slot bound to it" Nothing slot
+            -- CR 111.4's trailing "Token" is not part of any token name in this
+            -- pool (#469).
+            HU.assertEqual "named Faerie Rogue" (Text.pack "Faerie Rogue") (CardT.name token)
+            HU.assertEqual
+              "Creature - Faerie Rogue"
+              (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Rogue, Subtype.Faerie]))
+              (CardT.typeLine token)
+            HU.assertEqual "1/1" (Just (Power.MkPower (Quantity.Literal 1)), Just (Toughness.MkToughness (Quantity.Literal 1))) (CardT.power token, CardT.toughness token)
+            HU.assertEqual "with flying" (Set.singleton Keyword.Flying) (CardT.keywords token)
+            -- CR 202.2b/202.2e, exactly as doomed-traveler.json's Spirit: a
+            -- token has no mana cost, so only the colour indicator makes it
+            -- black.
+            HU.assertEqual "and black by colour indicator" (Set.singleton Color.Black) (CardT.colorIndicator token)
+          other -> HU.assertFailure ("expected exactly [LoseLife, Create], got " <> show (length other) <> " effects")
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion

@@ -27,7 +27,10 @@
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
 -- and Khabál Ghoul -- `bystanderTests`. The same CR 400.7e slot read from the ENTRY
 -- direction, where the entrant is a different card from the bearer, with Aether
--- Flash -- `aetherFlashTests`.
+-- Flash -- `aetherFlashTests`. CR 308's kindred card type, whose one observable
+-- consequence (CR 308.2: a noncreature card carrying creature types) is read
+-- through the ordinary Pool + Filter target machinery, with Bitterblossom --
+-- `kindredTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -60,6 +63,7 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -97,6 +101,7 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -105,8 +110,10 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -2409,5 +2416,75 @@ aetherFlashTests registry =
             HU.assertEqual "the card is in the graveyard once, not twice" [pikerName] (namesIn Zone.Graveyard S.alice after)
         ]
 
+-- Bitterblossom {1}{B} Kindred Enchantment -- Faerie: "At the beginning of your
+-- upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token
+-- with flying." The pool's first KINDRED card (CR 308), and so the first object
+-- of any kind that carries a creature type without being a creature.
+kindredTests :: Registry.Type.Registry -> Tasty.TestTree
+kindredTests registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- Bitterblossom on alice's battlefield, alice's upkeep begun. The middle
+      -- state is the one where the trigger is on the stack (CR 603.3b); the last
+      -- is after it has resolved, so a Faerie Rogue token stands beside it.
+      board bitterblossom =
+        let (oid, gs) = S.addCreature bitterblossom S.alice (Setup.emptyGame S.bothPlayers)
+            onStack = settle (beginUpkeep gs)
+         in (oid, onStack, resolveAll onStack)
+      slot = SlotName.MkSlotName (Text.pack "target")
+      -- "Target Faerie ...", drawn from a pool: the same Pool + Filter machinery
+      -- every printed target spec goes through (Pawl.ResolveSpec's "target
+      -- Wall" is the same shape over a creature type that behaves ordinarily).
+      faeriesIn pool gs =
+        Map.findWithDefault
+          Set.empty
+          slot
+          (Target.legalSets (Just S.alice) S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
+   in Tasty.testGroup
+        "Kindred"
+        [ -- The proving test for CR 308. CR 308.2 makes the kindred subtypes
+          -- "the same as the set of creature subtypes", so the ENCHANTMENT
+          -- answers a creature-type filter -- and CR 110.4's six permanent types
+          -- do not include kindred, so it still answers no to being a creature.
+          -- The token it makes is the control: a real Faerie creature, in both
+          -- pools, which is what keeps the enchantment's absence from the
+          -- creature pool from being a fixture that simply produced nothing.
+          HU.testCase "CR 308.2 a Kindred Enchantment is a legal \"target Faerie permanent\", and CR 110.4 keeps it out of \"target Faerie creature\"" $ do
+            bitterblossom <- Registry.printing registry "Bitterblossom"
+            let (blossomId, _, after) = board bitterblossom
+                permanents = faeriesIn Pool.Permanents after
+                creatures = faeriesIn Pool.Creatures after
+            HU.assertBool "the enchantment carries the creature type Faerie" (Set.member Subtype.Faerie (Projection.subtypesOf blossomId after))
+            HU.assertBool "and is not a creature" (not (Projection.isCreatureOf blossomId after))
+            HU.assertBool "so \"target Faerie permanent\" offers it" (Set.member (Recipient.ToObject blossomId) permanents)
+            HU.assertEqual "alongside the token it made, and nothing else" 2 (Set.size permanents)
+            HU.assertBool "\"target Faerie creature\" does not" (not (Set.member (Recipient.ToCreature blossomId) creatures))
+            HU.assertEqual "the token is the only one of those" 1 (Set.size creatures),
+          -- CR 308.1: "casting and resolving a kindred card follows the rules for
+          -- ... the other card type", and here the other type is Enchantment, so
+          -- nothing about the trigger is kindred-specific. What this pins is that
+          -- the whole printed ability runs -- CR 603.3a's "your upkeep" (the
+          -- ability controller's, CR 109.5), the life payment, and CR 111.1's
+          -- token -- through the ordinary priority loop.
+          HU.testCase "CR 603.3a Bitterblossom's upkeep trigger costs its controller 1 life and mints a 1/1 flying black Faerie Rogue" $ do
+            bitterblossom <- Registry.printing registry "Bitterblossom"
+            let (blossomId, onStack, after) = board bitterblossom
+            HU.assertBool "the upkeep trigger really reached the stack" (not (null (GameState.stack onStack)))
+            HU.assertEqual "no life was lost before it resolved" (Just 20) (S.lifeOf S.alice onStack)
+            HU.assertEqual "alice paid the 1 life" (Just 19) (S.lifeOf S.alice after)
+            case filter (/= blossomId) (Set.toList (GameState.battlefield after)) of
+              [token] -> do
+                HU.assertEqual "1/1" (Just 1, Just 1) (Projection.powerOf token after, Projection.toughnessOf token after)
+                -- CR 202.2b/202.2e: a token has no mana cost, so the colour
+                -- indicator is the only thing making it black.
+                HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf token after)
+                HU.assertEqual "Faerie Rogue" (Set.fromList [Subtype.Faerie, Subtype.Rogue]) (Projection.subtypesOf token after)
+                HU.assertBool "with flying" (Map.member Keyword.Type.Flying (Projection.keywordsOf token after))
+                HU.assertBool "and it, unlike its maker, IS a creature" (Projection.isCreatureOf token after)
+              other -> HU.assertFailure ("expected exactly one token beside Bitterblossom, got " <> show (length other) <> " other permanents")
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry, kindredTests registry]
