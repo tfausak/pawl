@@ -33,6 +33,8 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Turn as Turn
+import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -422,6 +424,167 @@ fatigueTests registry =
             HU.assertEqual "alice's draw step began" 1 (begun after)
             HU.assertEqual "and drew" 4 (libraryOf S.alice after)
             HU.assertEqual "bob's skip is still armed, waiting for his own turn" 1 (armed after)
+        ]
+
+-- The turn's schedule after the precombat main phase, so a board positioned in
+-- that phase still runs its own combat.
+afterPrecombatMain :: Seq.Seq Phase.Phase
+afterPrecombatMain = Seq.drop 1 (Seq.dropWhileL (/= Phase.PrecombatMain) (Seq.fromList Turn.allPhases))
+
+-- Run whole steps until `done` holds of the board, the game ends, or the bound
+-- runs out. The bound is three turns' worth of steps, so a skip that dropped
+-- more of the schedule than it should still terminates and fails an assertion
+-- rather than hanging.
+runUntil :: (GameState.GameState -> Bool) -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runUntil done answer gs0 =
+  let go n g =
+        if n <= (0 :: Int) || done g || Maybe.isJust (GameState.result g)
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 40 gs0
+
+-- Run whole steps until the board reaches its postcombat main phase. Top-level
+-- rather than a `where` binding because the answer is rank-2 and GHC will not
+-- infer it -- the same reason castEach above is.
+atPostcombatMain :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+atPostcombatMain = runUntil ((== Phase.PostcombatMain) . GameState.phase)
+
+-- Run whole steps until the turn hands off, leaving the board at the first step
+-- of the next turn.
+nextTurn :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+nextTurn answer gs = runUntil ((/= GameState.turnNumber gs) . GameState.turnNumber) answer gs
+
+-- Attacks with everything, blocks with nothing, and aims every target slot at
+-- `victim`. Blocks are declined so an attack's damage lands on the defending
+-- PLAYER -- the observable a skipped combat phase removes. Never casts, which
+-- is what makes it the control.
+skirmishAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+skirmishAnswer victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer victim)) sets
+  Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.identityAnswer p
+
+-- skirmishAnswer, plus casting whatever is castable. alice's hand holds exactly
+-- Stonehorn Dignitary and both libraries hold only lands, so this casts that one
+-- card and nothing else.
+castingSkirmishAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+castingSkirmishAnswer victim p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    let isCast a = case a of
+          Action.Cast _ -> True
+          _ -> False
+     in case filter isCast actions of
+          h : _ -> h
+          [] -> Action.Pass
+  _ -> skirmishAnswer victim p
+
+-- Stonehorn Dignitary {3}{W} Creature -- Rhino Soldier 1/4: "When this creature
+-- enters, target opponent skips their next combat phase." (oracle checked on
+-- Scryfall)
+--
+-- The pool's first skip of a phase that HAS steps. CR 500.1: "The beginning,
+-- combat, and ending phases are further broken down into steps, which proceed in
+-- order" -- so what this card names is not one entry of the turn's schedule, the
+-- way Eon Hub's upkeep step and Fatigue's draw step are, but the whole of CR
+-- 506.1's five.
+--
+-- CR 500.11: "to skip a step, phase, or turn is to proceed past it as though it
+-- didn't exist" -- past the PHASE, so no step of it begins and the turn carries
+-- on at the postcombat main phase, which CR 511.3 names as combat's successor.
+--
+-- Everything Fatigue proved about a skip's LIFETIME rides along unchanged: the
+-- skip is created by an effect, scoped to the player its resolution named, and
+-- consumed by one occurrence (CR 614.10a).
+stonehornTests :: Registry.Type.Registry -> Tasty.TestTree
+stonehornTests registry =
+  let -- alice in her precombat main phase on turn 2, holding Stonehorn Dignitary
+      -- with four untapped Plains (exactly {3}{W}); bob has one Settled Goblin
+      -- Piker, whose attack is what the skip must prevent. Both libraries hold
+      -- five lands, so the draw steps this fixture runs through never reach CR
+      -- 704.5b, and neither player can cast anything off the top.
+      --
+      -- Turn 2, so CR 103.8a's first-turn draw skip is out of the way.
+      board plains stonehorn piker =
+        let (_, gs1) = S.addCreature piker S.bob (S.landsInPlay plains 4)
+            stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard plains pid h)) g [1 .. (5 :: Int)]
+            (gs2, held) = S.handOne stonehorn (stock (stock gs1 S.alice) S.bob)
+         in ( gs2
+                { GameState.remaining = afterPrecombatMain,
+                  GameState.turnNumber = 2
+                },
+              held
+            )
+      -- CR 603.2b: the steps of `pid`'s turn that actually BEGAN. A skipped step
+      -- never appears, which is CR 614.6's "if an event is replaced, it never
+      -- happens" -- and is why this is read at the postcombat main phase rather
+      -- than after the turn, since Engine.handoffTurn clears the log.
+      stepsBegunBy pid gs = [ph | GameEvent.StepBegan ph who <- foldr (:) [] (GameState.events gs), who == pid]
+      combatStepsOf pid gs = [ph | ph@(Phase.Combat _) <- stepsBegunBy pid gs]
+      armed gs = length (GameState.replacements gs)
+   in Tasty.testGroup
+        "Stonehorn Dignitary"
+        [ -- The control: the same board with the creature never cast. bob's combat
+          -- phase runs all five of CR 506.1's steps and his Piker takes two off
+          -- alice, which is what every case below is measured against.
+          HU.testCase "CR 506.1 without a skip bob's combat phase runs and his Piker connects" $ do
+            plains <- Registry.printing registry "Plains"
+            stonehorn <- Registry.printing registry "Stonehorn Dignitary"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (gs, _) = board plains stonehorn piker
+                bobsTurn = nextTurn (skirmishAnswer S.bob) gs
+                mid = atPostcombatMain (skirmishAnswer S.bob) bobsTurn
+            HU.assertEqual "all five combat steps began" 5 (length (combatStepsOf S.bob mid))
+            HU.assertEqual "and the Piker's two damage landed" (Just 18) (S.lifeOf S.alice mid),
+          -- THE PROVING CASE. CR 500.11 / 614.1b: the whole combat phase is
+          -- replaced with nothing, so NO step of it begins -- not merely the
+          -- beginning of combat step the boundary question is asked at. A
+          -- pattern that named one step would leave the other four running, and
+          -- bob's Piker would still be declared.
+          HU.testCase "CR 500.11 the named opponent's whole combat phase is skipped, every step of it" $ do
+            plains <- Registry.printing registry "Plains"
+            stonehorn <- Registry.printing registry "Stonehorn Dignitary"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (gs, _) = board plains stonehorn piker
+                bobsTurn = nextTurn (castingSkirmishAnswer S.bob) gs
+                mid = atPostcombatMain (castingSkirmishAnswer S.bob) bobsTurn
+            HU.assertEqual "no combat step began at all" [] (combatStepsOf S.bob mid)
+            HU.assertEqual "so the Piker never attacked" [] (S.attackerDeclarationsOf mid)
+            HU.assertEqual "and alice took nothing" (Just 20) (S.lifeOf S.alice mid)
+            -- CR 511.3 names the postcombat main phase as what follows combat;
+            -- CR 500.11's "proceed past it" is past the PHASE and no further.
+            HU.assertEqual "the turn proceeded to the postcombat main phase" Phase.PostcombatMain (GameState.phase mid)
+            HU.assertEqual "and the skip was used up (CR 614.3)" 0 (armed mid),
+          -- CR 614.10a: "anything scheduled for the 'next' occurrence of something
+          -- waits for the first occurrence that isn't skipped" -- ONE occurrence,
+          -- so bob's following combat phase is his own again.
+          HU.testCase "CR 614.10a one Stonehorn skips one combat phase, and the next one happens" $ do
+            plains <- Registry.printing registry "Plains"
+            stonehorn <- Registry.printing registry "Stonehorn Dignitary"
+            piker <- Registry.printing registry "Goblin Piker"
+            let answer = castingSkirmishAnswer S.bob
+                (gs, _) = board plains stonehorn piker
+                bobsTurn = nextTurn answer gs
+                alicesTurn = nextTurn answer bobsTurn
+                bobsSecondTurn = nextTurn answer alicesTurn
+                mid = atPostcombatMain answer bobsSecondTurn
+            HU.assertEqual "bob is active again" S.bob (GameState.activePlayer bobsSecondTurn)
+            HU.assertEqual "all five combat steps began this time" 5 (length (combatStepsOf S.bob mid))
+            HU.assertEqual "and the Piker connected" (Just 18) (S.lifeOf S.alice mid),
+          -- The "whose" dimension, read the discriminating way round. The skip is
+          -- installed during ALICE's precombat main phase, one phase before her
+          -- own combat phase -- so a whole-phase skip that ignored
+          -- PhasePattern.whosePhase would eat alice's combat immediately, and
+          -- spend itself doing it.
+          HU.testCase "CR 614.1b a Stonehorn aimed at bob leaves alice's own combat phase alone" $ do
+            plains <- Registry.printing registry "Plains"
+            stonehorn <- Registry.printing registry "Stonehorn Dignitary"
+            piker <- Registry.printing registry "Goblin Piker"
+            let answer = castingSkirmishAnswer S.bob
+                (gs, _) = board plains stonehorn piker
+                mid = atPostcombatMain answer gs
+            HU.assertBool "alice's combat phase began" (not (null (combatStepsOf S.alice mid)))
+            HU.assertEqual "bob's skip is still armed, waiting for his own turn" 1 (armed mid)
         ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
@@ -1039,5 +1202,6 @@ tests registry =
               (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)
           HU.assertEqual "consumed by the shield" Nothing settled,
         stepSkipTests registry,
-        fatigueTests registry
+        fatigueTests registry,
+        stonehornTests registry
       ]
