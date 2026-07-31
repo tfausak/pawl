@@ -89,3 +89,6 @@ isLandType subtype = case subtype of
   -- only question this function asks.
   Subtype.Faerie -> False
   Subtype.Rhino -> False
+  -- CR 205.3j: a planeswalker type. CR 205.3c correlates each subtype to
+  -- exactly one card type, so a planeswalker type is never a land type.
+  Subtype.Jace -> False

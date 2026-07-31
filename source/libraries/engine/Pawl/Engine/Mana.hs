@@ -144,6 +144,10 @@ subtypeMana subtype = case subtype of
   -- it.
   Subtype.Faerie -> Nothing
   Subtype.Rhino -> Nothing
+  -- CR 205.3j: a planeswalker type, so CR 305.6's intrinsic mana ability --
+  -- which reaches "an object with the land card type and a basic land type" --
+  -- never applies to it.
+  Subtype.Jace -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an

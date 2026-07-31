@@ -594,6 +594,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.colors = Set.empty,
         PC.power = Nothing,
         PC.toughness = Nothing,
+        PC.loyalty = Nothing,
         PC.characteristicPT = Nothing,
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
@@ -629,6 +630,9 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
             PC.toughness = case Card.Type.toughness card of
               Nothing -> Nothing
               Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
+            -- CR 306.5a: a literal number, so it is copied through rather than
+            -- evaluated the way the two Quantity-valued fields above are.
+            PC.loyalty = Card.Type.loyalty card,
             PC.characteristicPT = seedCharacteristicPT card,
             PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
             PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
@@ -1238,6 +1242,11 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               CounterKind.Keyword kw -> List.genericReplicate n (at Layer.Ability (Modification.GainKeyword kw))
               CounterKind.PlusOnePlusOne -> []
               CounterKind.MinusOneMinusOne -> []
+              -- CR 122.1e: a loyalty counter grants nothing. It "indicates how
+              -- much loyalty" a planeswalker has, and no CR 613 layer reads
+              -- loyalty at all -- CR 704.5i's state-based action and CR 606.6's
+              -- activation gate count Object.counters directly instead.
+              CounterKind.Loyalty -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency

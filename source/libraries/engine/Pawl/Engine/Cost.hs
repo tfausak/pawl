@@ -29,6 +29,7 @@ import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
@@ -239,6 +240,50 @@ requiresSicknessCheck :: Cost -> Bool
 requiresSicknessCheck cost =
   any (\c -> elem c (Cost.components cost)) [CostComponent.TapThis, CostComponent.UntapThis]
 
+-- CR 606.2: "An activated ability with a loyalty symbol in its cost is a loyalty
+-- ability." The CLASSIFICATION Pawl.Engine.Activate reads for CR 606.3's window
+-- and once-per-turn limit, so that this module stays the only one matching a
+-- CostComponent constructor -- the requiresSicknessCheck shape.
+--
+-- Derived from the cost rather than stored on the ability, because CR 606.2 is a
+-- rule about what a cost CONTAINS and not a rider a card prints. That is also
+-- why Jace Beleren's abilities carry no ActivationTiming.SorcerySpeed: the
+-- sorcery-speed half of CR 606.3 is the rules core's to know, and a card file
+-- claiming a rider it does not print would be the open half teaching the closed
+-- half a rule it already has.
+isLoyaltyCost :: Cost -> Bool
+isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
+
+isLoyaltyComponent :: CostComponent.CostComponent -> Bool
+isLoyaltyComponent component = case component of
+  CostComponent.AddLoyaltyToThis _ -> True
+  CostComponent.RemoveLoyaltyFromThis _ -> True
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.PayLife _ -> False
+  CostComponent.Sacrifice _ _ -> False
+  CostComponent.DiscardCards _ -> False
+  CostComponent.DiscardThis -> False
+  CostComponent.PayEnergy _ -> False
+
+-- CR 306.5c: "The loyalty of a planeswalker on the battlefield is equal to the
+-- number of loyalty counters on it." Zero for an object with none, which CR
+-- 704.5i then reads as loyalty 0 -- so this is deliberately only ever asked of
+-- something already known to be a planeswalker.
+loyaltyCountersOn :: ObjectId -> GameState -> Natural
+loyaltyCountersOn oid gs =
+  maybe 0 (Map.findWithDefault 0 CounterKind.Loyalty . Object.counters) (Game.lookupObject oid gs)
+
+addLoyalty :: Natural -> Object.Object -> Object.Object
+addLoyalty n obj = obj {Object.counters = Map.insertWith (+) CounterKind.Loyalty n (Object.counters obj)}
+
+removeLoyalty :: Natural -> Object.Object -> Object.Object
+removeLoyalty n obj =
+  let have = Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj)
+      left = if have >= n then have - n else 0
+   in obj {Object.counters = Map.insert CounterKind.Loyalty left (Object.counters obj)}
+
 -- Which permanents a Filter admits, matched through the PROJECTION and never
 -- against printed characteristics: a card type is CR 613.1d layer 4 and a
 -- subtype is layer 4 too, so Blood Moon changes the answer. A sacrifice cost
@@ -346,6 +391,26 @@ canPayComponent pid oid component gs = case component of
   CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
     Nothing -> False
     Just player -> Map.findWithDefault 0 PlayerCounterKind.Energy (Player.counters player) >= n
+  -- CR 606.4: a cost that PUTS loyalty counters on the permanent. Always
+  -- payable -- CR 606.6 gates only the removing half -- but the permanent still
+  -- has to be one this player controls on the battlefield, the SacrificeThis
+  -- floor, since CR 606.4 puts the counters on "that permanent" and a permanent
+  -- that has left cannot take them.
+  CostComponent.AddLoyaltyToThis _ ->
+    Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid
+  -- CR 606.6: "A loyalty ability with a negative loyalty cost, taking into
+  -- account any additional costs, can't be activated unless the permanent has at
+  -- least that many loyalty counters on it." Jace Beleren's -10 at 3 loyalty is
+  -- the proving case: it is not merely unpaid, it is never OFFERED, because
+  -- Pawl.Engine.Activate.activatableGiven has canPay as a conjunct and
+  -- Pawl.Engine.Engine.priorityLoop rejects an action it did not offer.
+  --
+  -- "At least that many" is >=, so a -1 at exactly 1 loyalty IS activatable, and
+  -- CR 704.5i then buries the planeswalker on the next state-based-action check.
+  CostComponent.RemoveLoyaltyFromThis n ->
+    Set.member oid (GameState.battlefield gs)
+      && Projection.controllerOf oid gs == Just pid
+      && loyaltyCountersOn oid gs >= n
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
 -- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
@@ -510,6 +575,23 @@ payComponent pid oid component = case component of
               left = if have >= n then have - n else 0
            in player {Player.counters = Map.insert PlayerCounterKind.Energy left (Player.counters player)}
     State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})
+    pure Payment.Paid
+  -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
+  -- through Event.putCounters, which is the CR 614 funnel: CR 614.16 admits a
+  -- counter-scaling replacement (Doubling Season, Hardened Scales) only "if the
+  -- effect of a resolving spell or ability ... puts a counter on a permanent",
+  -- and paying a cost is neither. The counters CR 306.5b's enters-with
+  -- replacement places DO go through that funnel -- see
+  -- Pawl.Engine.Replacement's EntryR arm -- which is what makes Doubling Season
+  -- double a planeswalker's starting loyalty and leave its +1 alone.
+  CostComponent.AddLoyaltyToThis n -> do
+    State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
+    pure Payment.Paid
+  -- CR 606.4's other half. Natural subtraction is PARTIAL, so the floor is
+  -- guarded exactly as PayEnergy's is above: canPayComponent's CR 606.6 check
+  -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
+  CostComponent.RemoveLoyaltyFromThis n -> do
+    State.modify' (\gs -> gs {GameState.objects = Map.adjust (removeLoyalty n) oid (GameState.objects gs)})
     pure Payment.Paid
 
 -- The arithmetic half, pure and board-free.
