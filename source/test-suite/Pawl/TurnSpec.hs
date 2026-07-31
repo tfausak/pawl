@@ -42,6 +42,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
@@ -105,7 +106,60 @@ turnDataTests =
         let gs = Setup.emptyGame S.bothPlayers
          in do
               HU.assertEqual "phase" Turn.firstPhase (GameState.phase gs)
-              HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs)
+              HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs),
+      -- CR 500.1: only the FIRST step of a phase that has steps opens that
+      -- phase, and both main phases open none -- CR 505.2 makes each of them a
+      -- single schedule entry, which PhaseSelector.Step already names.
+      --
+      -- This is what keeps CR 614.10's "once a step, phase, or turn has started,
+      -- it can no longer be skipped" true at phase grain: Engine.runStep asks the
+      -- whole-phase question only where this answers Just.
+      HU.testCase "CR 500.1 phaseBeginningAt opens a phase only at its first step" $
+        HU.assertEqual
+          "one Just per stepped phase"
+          [ Just PhaseSelector.BeginningPhase,
+            Nothing,
+            Nothing,
+            Nothing,
+            Just PhaseSelector.CombatPhase,
+            Nothing,
+            Nothing,
+            Nothing,
+            Nothing,
+            Nothing,
+            Just PhaseSelector.EndingPhase,
+            Nothing
+          ]
+          (fmap Turn.phaseBeginningAt Turn.allPhases),
+      -- CR 500.11: "to skip a step, phase, or turn is to proceed past it as
+      -- though it didn't exist" -- past the PHASE, so its four remaining steps go
+      -- and the postcombat main phase (CR 511.3) is what is left.
+      --
+      -- Positional, like dropSkippedCombatSteps: a SECOND combat phase later in
+      -- the turn (CR 500.8) survives untouched, which is what a filter over the
+      -- whole schedule would get wrong.
+      HU.testCase "CR 500.11 dropRestOfPhase drops this combat phase and leaves a later one" $
+        let remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareAttackers,
+                  Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain,
+                  Phase.Combat CombatStep.BeginningOfCombat,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.Ending EndingStep.EndStep
+                ]
+         in HU.assertEqual
+              "only the current phase's steps go"
+              ( Seq.fromList
+                  [ Phase.PostcombatMain,
+                    Phase.Combat CombatStep.BeginningOfCombat,
+                    Phase.Combat CombatStep.EndOfCombat,
+                    Phase.Ending EndingStep.EndStep
+                  ]
+              )
+              (Turn.dropRestOfPhase (Phase.Combat CombatStep.BeginningOfCombat) remaining)
     ]
 
 skipTests :: Registry.Type.Registry -> Tasty.TestTree

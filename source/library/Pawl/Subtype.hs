@@ -88,3 +88,4 @@ isLandType subtype = case subtype of
   -- since those are the same set. Still not a land type either way, which is the
   -- only question this function asks.
   Subtype.Faerie -> False
+  Subtype.Rhino -> False

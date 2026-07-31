@@ -32,9 +32,12 @@
                 "value": "target"
               },
               {
-                "type": "Beginning",
+                "type": "Step",
                 "value": {
-                  "type": "DrawStep"
+                  "type": "Beginning",
+                  "value": {
+                    "type": "DrawStep"
+                  }
                 }
               }
             ]

@@ -15,9 +15,12 @@
       "type": "PhaseR",
       "value": {
         "whichPhase": {
-          "type": "Beginning",
+          "type": "Step",
           "value": {
-            "type": "Upkeep"
+            "type": "Beginning",
+            "value": {
+              "type": "Upkeep"
+            }
           }
         },
         "whosePhase": null

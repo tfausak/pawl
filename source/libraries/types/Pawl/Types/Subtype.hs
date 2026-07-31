@@ -96,4 +96,6 @@ data Subtype
     -- makes the kindred subtypes the same set as the creature subtypes, so
     -- Bitterblossom is a Kindred Enchantment -- Faerie.
     Faerie
+  | -- CR 205.3m (a creature type; Stonehorn Dignitary's).
+    Rhino
   deriving (Eq, Ord, Show)

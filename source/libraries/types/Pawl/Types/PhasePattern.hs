@@ -1,22 +1,18 @@
 module Pawl.Types.PhasePattern where
 
-import Pawl.Types.Phase (Phase)
+import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerId (PlayerId)
 
 -- CR 614.1b / 500.11: which step-or-phase beginnings a SKIP intercepts. Eon Hub
--- is (Beginning Upkeep) for everybody; Fatigue is (Beginning DrawStep) for the
--- one player its resolution named.
+-- is (Step (Beginning Upkeep)) for everybody; Fatigue is
+-- (Step (Beginning DrawStep)) for the one player its resolution named; Stonehorn
+-- Dignitary is CombatPhase for that player -- the whole of CR 506.1's five steps
+-- and none of them individually.
 --
--- Pawl.Types.Phase is one type over both the CR 500.1 phases and their steps, and
--- GameState.remaining is a Seq of exactly these, so naming a step and naming a
--- STEPLESS phase (CR 500.1's two main phases) are the same act. A phase that HAS
--- steps is not: CR 500.1's beginning, combat and ending phases exist in this type
--- only as their steps, so "skip your next combat phase" (Stonehorn Dignitary)
--- would have to name five of them at once. The shape that fixes it -- a
--- phase-level pattern, or a Phase value standing for the whole phase -- is a
--- choice a card should make, not this file (#337).
+-- WHICH windows a PhaseSelector can name, and why a bare Phase cannot name them
+-- all, is Pawl.Types.PhaseSelector's own question.
 --
--- Also not expressible: a skip scoped to one identified turn (#334).
+-- Not expressible: a skip scoped to one identified turn (#334).
 --
 -- `whosePhase` is CR 614.1's "does this instance apply" question asked about a
 -- PLAYER, and Nothing is not a missing answer -- it is EVERY player. Eon Hub's
@@ -34,7 +30,7 @@ import Pawl.Types.PlayerId (PlayerId)
 -- runtime-only, and nothing ENFORCES that: the codec round-trips it, so card
 -- JSON could author a Just, which is meaningless (#437).
 data PhasePattern = MkPhasePattern
-  { whichPhase :: Phase,
+  { whichPhase :: PhaseSelector,
     whosePhase :: Maybe PlayerId
   }
   deriving (Eq, Ord, Show)

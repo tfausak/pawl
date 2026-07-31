@@ -78,6 +78,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -319,6 +320,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Curse -> "Curse"
   Subtype.Desert -> "Desert"
   Subtype.Faerie -> "Faerie"
+  Subtype.Rhino -> "Rhino"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -378,7 +380,8 @@ jsonToSubtype =
       (Text.pack "Unicorn", Subtype.Unicorn),
       (Text.pack "Curse", Subtype.Curse),
       (Text.pack "Desert", Subtype.Desert),
-      (Text.pack "Faerie", Subtype.Faerie)
+      (Text.pack "Faerie", Subtype.Faerie),
+      (Text.pack "Rhino", Subtype.Rhino)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -554,6 +557,23 @@ jsonToPhase value = do
     ("PostcombatMain", _) -> Right Phase.PostcombatMain
     ("Ending", Just v) -> Phase.Ending <$> jsonToEndingStep v
     _ -> Left (Text.pack "unknown Phase: " <> t)
+
+phaseSelectorToJson :: PhaseSelector.PhaseSelector -> Value
+phaseSelectorToJson selector = case selector of
+  PhaseSelector.Step p -> Json.tagged (Text.pack "Step") (Just (phaseToJson p))
+  PhaseSelector.BeginningPhase -> nullary (Text.pack "BeginningPhase")
+  PhaseSelector.CombatPhase -> nullary (Text.pack "CombatPhase")
+  PhaseSelector.EndingPhase -> nullary (Text.pack "EndingPhase")
+
+jsonToPhaseSelector :: Value -> Either Text PhaseSelector.PhaseSelector
+jsonToPhaseSelector value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Step", Just v) -> PhaseSelector.Step <$> jsonToPhase v
+    ("BeginningPhase", _) -> Right PhaseSelector.BeginningPhase
+    ("CombatPhase", _) -> Right PhaseSelector.CombatPhase
+    ("EndingPhase", _) -> Right PhaseSelector.EndingPhase
+    _ -> Left (Text.pack "unknown PhaseSelector: " <> t)
 
 durationToJson :: Duration.Duration -> Value
 durationToJson d = case d of
@@ -946,14 +966,14 @@ jsonToTokenPattern value = do
 phasePatternToJson :: PhasePattern.PhasePattern -> Value
 phasePatternToJson p =
   Json.jObject
-    [ (Text.pack "whichPhase", phaseToJson (PhasePattern.whichPhase p)),
+    [ (Text.pack "whichPhase", phaseSelectorToJson (PhasePattern.whichPhase p)),
       (Text.pack "whosePhase", maybeTo playerIdToJson (PhasePattern.whosePhase p))
     ]
 
 jsonToPhasePattern :: Value -> Either Text PhasePattern.PhasePattern
 jsonToPhasePattern value = do
   ps <- Json.asObject value
-  p <- Json.field (Text.pack "whichPhase") ps >>= jsonToPhase
+  p <- Json.field (Text.pack "whichPhase") ps >>= jsonToPhaseSelector
   w <- Json.field (Text.pack "whosePhase") ps >>= maybeFrom jsonToPlayerId
   pure PhasePattern.MkPhasePattern {PhasePattern.whichPhase = p, PhasePattern.whosePhase = w}
 
@@ -1644,7 +1664,7 @@ effectToJson e = case e of
         <> (if te == defaultTokenEntry then [] else [tokenEntryToJson te])
         <> fmap slotNameToJson (Maybe.maybeToList ms)
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [durationToJson d, usesToJson u, replacementEffectToJson re])))
-  Effect.SkipNextPhase r ph -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [playerRefToJson r, phaseToJson ph])))
+  Effect.SkipNextPhase r sel -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [playerRefToJson r, phaseSelectorToJson sel])))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [counterKindToJson k, quantityToJson q, slotNameToJson s])))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [playerRefToJson r, playerCounterKindToJson k, quantityToJson q])))
   Effect.Tap r -> Json.tagged (Text.pack "Tap") (Just (objectRefToJson r))
@@ -1736,8 +1756,8 @@ jsonToEffect value = do
         pure (Effect.Replace duration uses effect)
       _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
     "SkipNextPhase" -> case mv of
-      Just (Array (MkArray [r, ph])) -> Effect.SkipNextPhase <$> jsonToPlayerRef r <*> jsonToPhase ph
-      _ -> Left (Text.pack "SkipNextPhase expects [playerRef, phase]")
+      Just (Array (MkArray [r, sel])) -> Effect.SkipNextPhase <$> jsonToPlayerRef r <*> jsonToPhaseSelector sel
+      _ -> Left (Text.pack "SkipNextPhase expects [playerRef, phaseSelector]")
     "PutCounters" -> case mv of
       Just (Array (MkArray [k, q, s])) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
