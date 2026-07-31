@@ -774,6 +774,8 @@ lintTests registry =
       -- the condition-specific reserved slots live -- CR 400.7e's `became` and
       -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
       -- side and for why this cannot be an equality check.
+      --
+      -- No ACTIVATED-ability counterpart of this read check exists (#479).
       HU.testCase "every slot a triggered ability reads is bound for its condition" $ do
         ps <- S.allPrintings registry
         let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
