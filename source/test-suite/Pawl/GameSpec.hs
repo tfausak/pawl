@@ -1394,7 +1394,7 @@ tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Game"
-    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry, turnOrderTests registry, trustedActionTests registry]
+    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, cleanupStepTests registry, concedeTests registry, turnOrderTests registry, trustedActionTests registry]
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
@@ -1778,4 +1778,82 @@ restartReentryTests registry =
         mountain <- Registry.printing registry "Mountain"
         let (result, _) = Engine.runGamePure S.identityAnswer (restartOnStack mountain) Engine.playGame
         HU.assertBool "the new game reached a result" (case result of Result.Won _ -> True; Result.Drawn -> True)
+    ]
+
+-- alice is the active player in her cleanup step with `n` cards in hand and
+-- nothing else scheduled; `others` are put onto the battlefield under bob's
+-- control. Nothing is in either library, so no draw can happen and the only
+-- event of the step is CR 514.1's discard.
+cleanupBoard :: Printing.Printing -> Int -> [Printing.Printing] -> GameState.GameState
+cleanupBoard filler n others =
+  let base = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) (Setup.emptyGame S.bothPlayers) others
+      full = List.foldl' (\g _ -> snd (S.addHandCard filler S.alice g)) base [1 .. n]
+   in full
+        { GameState.activePlayer = S.alice,
+          GameState.turnNumber = 1,
+          GameState.phase = Phase.Ending EndingStep.Cleanup,
+          GameState.remaining = Seq.empty
+        }
+
+-- CR 514.3a's extra cleanup step and its priority round.
+--
+-- Megrim, {2}{B} Enchantment: "Whenever an opponent discards a card, this
+-- enchantment deals 2 damage to that player." bob controls it, so CR 109.5 fixes
+-- its "you" as bob and "an opponent" as alice. alice is the active player with
+-- eight cards in hand, so CR 514.1's turn-based discard is an opponent's discard
+-- and a triggered ability is waiting DURING the cleanup step -- CR 514.3a's
+-- condition exactly.
+--
+-- The discriminator is alice's life, read after ONE Engine.runStep. Under CR
+-- 514.3 alone the trigger was placed by the settle in Engine.advance and then
+-- sat on the stack across the handoff, to resolve at bob's first priority: alice
+-- still on 20, bob active, turn 2. Under CR 514.3a it resolves inside alice's own
+-- cleanup step: alice on 18, alice still active, and a second cleanup step
+-- current.
+cleanupStepTests :: Registry.Registry -> Tasty.TestTree
+cleanupStepTests registry =
+  Tasty.testGroup
+    "extra cleanup step (CR 514.3a)"
+    [ HU.testCase "CR 514.3a a trigger waiting during cleanup resolves in that cleanup" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        megrim <- Registry.printing registry "Megrim"
+        let after = S.runPure S.identityAnswer (cleanupBoard piker 8 [megrim]) Engine.runStep
+        HU.assertEqual "CR 514.1 trimmed alice to her maximum hand size" 7 (length (Game.zoneMembers Zone.Hand S.alice after))
+        HU.assertEqual "Megrim's trigger RESOLVED, in this cleanup step" (Just 18) (S.lifeOf S.alice after)
+        HU.assertEqual "and left the stack empty" [] (GameState.stack after)
+        HU.assertEqual "the turn did not hand off" S.alice (GameState.activePlayer after)
+        HU.assertEqual "so it is still turn 1" 1 (GameState.turnNumber after)
+        HU.assertEqual "and another cleanup step began" (Phase.Ending EndingStep.Cleanup) (GameState.phase after),
+      -- The termination argument at Engine.cleanupException, pinned: the chain is
+      -- two cleanup steps because CR 514.1 finds the hand already at its maximum
+      -- the second time round and so has no discard to fire the Megrim with.
+      HU.testCase "CR 514.3a the second cleanup step finds nothing waiting and ends the turn" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        megrim <- Registry.printing registry "Megrim"
+        let after = S.runPure S.identityAnswer (cleanupBoard piker 8 [megrim]) Engine.runStep
+            (again, asked) = runCountingActions after Engine.runStep
+        HU.assertEqual "nobody was asked to act in the second cleanup step" 0 asked
+        HU.assertEqual "the turn handed off" S.bob (GameState.activePlayer again)
+        HU.assertEqual "to turn 2" 2 (GameState.turnNumber again)
+        HU.assertEqual "starting at the untap step" Turn.firstPhase (GameState.phase again)
+        HU.assertEqual "with a fresh schedule, not a third cleanup" Turn.laterPhases (GameState.remaining again)
+        HU.assertEqual "and alice took Megrim's 2 damage once, not twice" (Just 18) (S.lifeOf S.alice again),
+      -- CR 514.3: "Normally, no player receives priority during the cleanup step,
+      -- so no spells can be cast and no abilities can be activated." The same
+      -- board one card apart: without the Megrim nothing is waiting, and the
+      -- exception must not fire.
+      HU.testCase "CR 514.3 a cleanup step with nothing waiting grants no priority" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (after, asked) = runCountingActions (cleanupBoard piker 8 []) Engine.runStep
+        HU.assertEqual "nobody was asked to act" 0 asked
+        HU.assertEqual "the turn handed off at once" S.bob (GameState.activePlayer after)
+        HU.assertEqual "to turn 2" 2 (GameState.turnNumber after),
+      -- The count, not just the fact: one round of passes resolves the trigger,
+      -- and a second empties the stack and ends the step (CR 514.3a's "once the
+      -- stack is empty and all players pass in succession").
+      HU.testCase "CR 514.3a the exception grants a real priority round" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        megrim <- Registry.printing registry "Megrim"
+        let (_, asked) = runCountingActions (cleanupBoard piker 8 [megrim]) Engine.runStep
+        HU.assertEqual "two passes to resolve the trigger, two to end the step" 4 asked
     ]

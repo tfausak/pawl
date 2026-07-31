@@ -63,10 +63,24 @@ turnTests =
         HU.assertEqual "twelve" 12 (length Turn.allPhases),
       HU.testCase "firstPhase and laterPhases reconstruct the turn template" $
         HU.assertEqual "reconstruct" (Seq.fromList (drop 1 Turn.allPhases)) Turn.laterPhases,
-      HU.testCase "untap and cleanup grant no priority"
+      -- CR 502.4 outright, CR 514.3's "normally" for the cleanup step -- whose
+      -- CR 514.3a exception is Engine.grantsPriorityNow's question, not this
+      -- one's (Pawl.GameSpec's "extra cleanup step").
+      HU.testCase "untap grants no priority, and cleanup none by the phase alone"
         . HU.assertBool "no priority"
         $ not (Turn.grantsPriority (Phase.Beginning BeginningStep.Untap))
           && not (Turn.grantsPriority (Phase.Ending EndingStep.Cleanup)),
+      -- CR 514.3a: "another cleanup step begins" -- at the head, so it runs next,
+      -- exactly as CR 510.4's second combat damage step does.
+      HU.testCase "CR 514.3a spliceExtraCleanup puts another cleanup step next" $ do
+        HU.assertEqual
+          "the ordinary case: the cleanup step is the last of the turn"
+          (Seq.singleton (Phase.Ending EndingStep.Cleanup))
+          (Turn.spliceExtraCleanup Seq.empty)
+        HU.assertEqual
+          "and it goes IN FRONT of a CR 500.8 phase added after the ending phase"
+          (Phase.Ending EndingStep.Cleanup Seq.<| Turn.combatAndMainPhase)
+          (Turn.spliceExtraCleanup Turn.combatAndMainPhase),
       QC.testProperty "a turn never revisits a phase" $
         QC.property (length Turn.allPhases == length (dedupe Turn.allPhases))
     ]

@@ -41,6 +41,18 @@ firstPhase = Phase.Beginning BeginningStep.Untap
 laterPhases :: Seq Phase
 laterPhases = Seq.fromList (drop 1 allPhases)
 
+-- Which steps grant a priority round from the PHASE alone.
+--
+-- CR 502.4: "No player receives priority during the untap step, so no spells can
+-- be cast or resolve and no abilities can be activated or resolve." Nothing
+-- qualifies that, so the untap step's False is the whole answer.
+--
+-- CR 514.3: "Normally, no player receives priority during the cleanup step, so
+-- no spells can be cast and no abilities can be activated. However, this rule is
+-- subject to the following exception:" -- and CR 514.3a is that exception. So
+-- the cleanup step's False is only the NORMAL case, and the exception is not a
+-- question about the phase at all but about the board: Engine.grantsPriorityNow
+-- is what asks it, and this is the answer it falls back on.
 grantsPriority :: Phase -> Bool
 grantsPriority phase = case phase of
   Phase.Beginning BeginningStep.Untap -> False
@@ -175,6 +187,23 @@ dropSkippedCombatSteps phase remaining =
 -- CR 500.9's "most recently created step occurs first" is exactly cons-at-head.
 spliceSecondDamage :: Seq Phase -> Seq Phase
 spliceSecondDamage remaining = Phase.Combat CombatStep.CombatDamage Seq.<| remaining
+
+-- CR 514.3a: "Once the stack is empty and all players pass in succession,
+-- another cleanup step begins." Spliced directly after the current one -- at the
+-- head of the remaining schedule, so it runs next.
+--
+-- The twin of spliceSecondDamage above, and deliberately built the same way: a
+-- step that repeats itself is one more entry at the front of the turn, not a
+-- special case inside Engine.advance. The head is the whole of "another cleanup
+-- step begins" because the cleanup step is the last of the turn (CR 512.1), so
+-- for an ordinary turn `remaining` is empty here and this makes it a singleton.
+--
+-- Non-empty is still handled rather than assumed: CR 500.8 lets an effect add a
+-- phase after the ending phase, and the added phase's steps sit in `remaining`
+-- behind the cleanup step that added them. The second cleanup step belongs to
+-- the ending phase, so it goes in front of them.
+spliceExtraCleanup :: Seq Phase -> Seq Phase
+spliceExtraCleanup remaining = Phase.Ending EndingStep.Cleanup Seq.<| remaining
 
 -- The steps one added phase expands to. CR 506.1 fixes the combat phase's five
 -- and their order; CR 505.2 ("The main phase has no steps") is why a main phase
