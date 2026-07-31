@@ -40,7 +40,7 @@ import qualified Pawl.Json.PairSpec
 import qualified Pawl.Json.StringSpec
 import qualified Pawl.Json.ValueSpec
 import qualified Pawl.JsonSpec
-import qualified Pawl.ManaSpec as ManaSpec
+import qualified Pawl.ManaSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
 import qualified Pawl.PlaneswalkerSpec
@@ -83,7 +83,6 @@ testTree registry =
       DamageSpec.tests registry,
       PropertySpec.tests registry,
       CodecSpec.tests registry,
-      ManaSpec.tests registry,
       ResolveSpec.tests registry,
       ReplacementSpec.tests registry,
       TriggerSpec.tests registry,
@@ -131,6 +130,7 @@ spec s registry = do
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
   Pawl.JsonSpec.spec s
+  Pawl.ManaSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
