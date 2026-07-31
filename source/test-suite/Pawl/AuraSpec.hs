@@ -696,10 +696,10 @@ reattachTests registry =
       -- 303.4j is about and which no pair of cards could produce before.
       --
       -- CR 109.5 fixes whose "you" that is: the AURA's controller, not the moving
-      -- effect's. Pawl.Resolve.attachLegal asks Target.legalRecipients with
+      -- effect's. Pawl.Resolve.attachmentFor asks Target.legalRecipients with
       -- Projection.controllerOf on the Aura for exactly that reason. Alice controls
       -- both cards here, so this board cannot tell the two readings apart -- nothing
-      -- in the pool takes control of a noncreature artifact -- but attachLegal is
+      -- in the pool takes control of a noncreature artifact -- but attachmentFor is
       -- never handed the moving effect's source at all, so there is no second
       -- controller for it to read by mistake.
       --

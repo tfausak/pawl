@@ -129,8 +129,8 @@ destroyedBySba gs pc oid =
 --
 -- CR 704.5n's "or to a player" clause is expressible but has no producer: no
 -- effect in this pool attaches an Equipment to a player (CR 301.5 lets an
--- Equipment be attached only to a creature, and Pawl.Resolve.attachLegal refuses
--- anything else). Written anyway, as the `Nothing` a player host yields from
+-- Equipment be attached only to a creature, and Pawl.Resolve.attachmentFor
+-- refuses anything else). Written anyway, as the `Nothing` a player host yields from
 -- Recipient.objectOf -- there is no host object to be a creature, so the rule
 -- detaches it.
 --
@@ -193,7 +193,7 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- CR 303.4d's clause is a RESTRICTION as well as a state-based action ("can't
 -- enchant anything"), and only the state-based half lives here. The restriction
--- half is Pawl.Resolve.attachLegal's first Aura conjunct, which refuses to attach
+-- half is Pawl.Resolve.attachmentFor's first Aura conjunct, which refuses to attach
 -- an Aura that is also a creature to anything.
 cannotBeAttached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
