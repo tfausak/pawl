@@ -5,6 +5,9 @@
 -- CR 500.8's added phases -- Aggravated Assault and Relentless Assault for the
 -- combat-and-main pair, Aurelia, the Warleader for one added from INSIDE a
 -- combat phase, and Full Throttle for two combat phases and none of main.
+--
+-- Also CR 500.7's extra TURNS, which Engine.handoffTurn deals out -- Time Warp,
+-- the pool's one creator of any.
 module Pawl.TurnSpec where
 
 import qualified Data.Foldable as Foldable
@@ -20,6 +23,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Registry as Registry.Type
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -30,15 +34,21 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectId as ObjectId
 import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TapState as TapState
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -96,7 +106,60 @@ turnDataTests =
         let gs = Setup.emptyGame S.bothPlayers
          in do
               HU.assertEqual "phase" Turn.firstPhase (GameState.phase gs)
-              HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs)
+              HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs),
+      -- CR 500.1: only the FIRST step of a phase that has steps opens that
+      -- phase, and both main phases open none -- CR 505.2 makes each of them a
+      -- single schedule entry, which PhaseSelector.Step already names.
+      --
+      -- This is what keeps CR 614.10's "once a step, phase, or turn has started,
+      -- it can no longer be skipped" true at phase grain: Engine.runStep asks the
+      -- whole-phase question only where this answers Just.
+      HU.testCase "CR 500.1 phaseBeginningAt opens a phase only at its first step" $
+        HU.assertEqual
+          "one Just per stepped phase"
+          [ Just PhaseSelector.BeginningPhase,
+            Nothing,
+            Nothing,
+            Nothing,
+            Just PhaseSelector.CombatPhase,
+            Nothing,
+            Nothing,
+            Nothing,
+            Nothing,
+            Nothing,
+            Just PhaseSelector.EndingPhase,
+            Nothing
+          ]
+          (fmap Turn.phaseBeginningAt Turn.allPhases),
+      -- CR 500.11: "to skip a step, phase, or turn is to proceed past it as
+      -- though it didn't exist" -- past the PHASE, so its four remaining steps go
+      -- and the postcombat main phase (CR 511.3) is what is left.
+      --
+      -- Positional, like dropSkippedCombatSteps: a SECOND combat phase later in
+      -- the turn (CR 500.8) survives untouched, which is what a filter over the
+      -- whole schedule would get wrong.
+      HU.testCase "CR 500.11 dropRestOfPhase drops this combat phase and leaves a later one" $
+        let remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareAttackers,
+                  Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain,
+                  Phase.Combat CombatStep.BeginningOfCombat,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.Ending EndingStep.EndStep
+                ]
+         in HU.assertEqual
+              "only the current phase's steps go"
+              ( Seq.fromList
+                  [ Phase.PostcombatMain,
+                    Phase.Combat CombatStep.BeginningOfCombat,
+                    Phase.Combat CombatStep.EndOfCombat,
+                    Phase.Ending EndingStep.EndStep
+                  ]
+              )
+              (Turn.dropRestOfPhase (Phase.Combat CombatStep.BeginningOfCombat) remaining)
     ]
 
 skipTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -406,9 +469,12 @@ throttleBoard mountain throttle piker =
 -- Cast a spell from alice's hand through the real path -- Cast.castSpell pays
 -- its cost off the board -- and let it resolve.
 castAndResolve :: ObjectId -> GameState.GameState -> GameState.GameState
-castAndResolve spell gs =
-  let cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spell))
-   in snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+castAndResolve = castAndResolveWith S.identityAnswer
+
+castAndResolveWith :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> GameState.GameState -> GameState.GameState
+castAndResolveWith answer spell gs =
+  let cast = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice spell))
+   in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
 -- CR 500.8's added phases, end to end, through the cards in the pool that add
 -- any: Aggravated Assault ({3}{R}{R}: Untap all creatures you control. After
@@ -677,10 +743,141 @@ extraPhaseTests registry =
           (fmap Object.tapped (Game.lookupObject attacker (castAndResolve spell fought)))
     ]
 
+-- Aim every target slot at one player. Time Warp's spec is Pool.Players, so a
+-- recipient tagged for any other pool is not in its legal set at all.
+aimPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer pid)) sets
+  _ -> S.identityAnswer p
+
+-- alice in her precombat main phase with priority, five untapped Islands per
+-- Time Warp (exactly {3}{U}{U} each) and that many Time Warps in hand. Both
+-- libraries are stocked, because unlike every other case in this file these run
+-- SEVERAL whole turns and each one's draw step takes a card -- an empty library
+-- would end the game by CR 704.5b before the turn order could be read off.
+warpBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, [ObjectId])
+warpBoard island warp piker n =
+  let addOne (ids, g) _ = let (oid, g1) = S.addHandCard warp S.alice g in (ids <> [oid], g1)
+      (held, withHand) = List.foldl' addOne ([], S.landsInPlay island (5 * n)) [1 .. n]
+      stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
+   in ( (stock (stock withHand S.alice) S.bob)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held
+      )
+
+-- The seats the next `n` turns are dealt out to, in order, by running each turn
+-- to its handoff. The one observable CR 500.7 is about.
+turnTakers :: Int -> GameState.GameState -> [PlayerId.PlayerId]
+turnTakers n gs =
+  if n <= 0
+    then []
+    else
+      let next = fst (runTurn S.identityAnswer gs)
+       in GameState.activePlayer next : turnTakers (n - 1) next
+
+-- CR 500.7's extra turns, end to end, through the one card in the pool that
+-- creates any: Time Warp ({3}{U}{U} Sorcery, "Target player takes an extra turn
+-- after this one.").
+extraTurnTests :: Registry.Type.Registry -> Tasty.TestTree
+extraTurnTests registry =
+  let boardOf n = do
+        island <- Registry.printing registry "Island"
+        warp <- Registry.printing registry "Time Warp"
+        piker <- Registry.printing registry "Goblin Piker"
+        pure (warpBoard island warp piker n)
+   in Tasty.testGroup
+        "ExtraTurn"
+        [ -- The control: without the spell the turn hands off down the seating
+          -- order, which is what every case below is measured against.
+          HU.testCase "CR 103.1 without an extra turn the seating order alternates" $ do
+            (gs, _) <- boardOf 1
+            HU.assertEqual "bob, alice, bob follow alice's turn" [S.bob, S.alice, S.bob] (turnTakers 3 gs),
+          HU.testCase "CR 500.7 whole card: Time Warp aimed at yourself takes the next turn" $ do
+            (gs, held) <- boardOf 1
+            case held of
+              [spell] -> do
+                let resolved = castAndResolveWith (aimPlayer S.alice) spell gs
+                HU.assertEqual "one turn was created" [S.alice] (GameState.extraTurns resolved)
+                -- CR 500.7: "directly after the specified turn" -- alice takes
+                -- it immediately, and it is a TURN, not a continuation of this
+                -- one, so the turn number moves.
+                let (next, _) = runTurn S.identityAnswer resolved
+                HU.assertEqual "alice takes it rather than bob" S.alice (GameState.activePlayer next)
+                HU.assertEqual "and it is a turn of its own" 2 (GameState.turnNumber next)
+                HU.assertEqual "the pending stack is spent" [] (GameState.extraTurns next)
+                -- CR 500.7 ADDS a turn; it does not reorder the rest. Once the
+                -- extra turn is taken the seating order picks up where it was.
+                HU.assertEqual "then the ordinary order resumes" [S.bob, S.alice] (turnTakers 2 next)
+              _ -> HU.assertFailure "warpBoard should deal exactly one Time Warp",
+          -- THE ANCHOR CASE. CR 500.7 adds a turn "directly after the specified
+          -- turn" and takes none away, so bob's OWN turn still follows alice's.
+          -- Fails against a handoff anchored on GameState.activePlayer, which
+          -- would walk from bob after the extra turn and hand back to alice --
+          -- silently eating the ordinary turn the rules never touched.
+          HU.testCase "CR 500.7 an opponent's extra turn does not consume their ordinary one" $ do
+            (gs, held) <- boardOf 1
+            case held of
+              [spell] -> do
+                let resolved = castAndResolveWith (aimPlayer S.bob) spell gs
+                HU.assertEqual "bob's turn was created" [S.bob] (GameState.extraTurns resolved)
+                HU.assertEqual
+                  "bob's extra turn, then bob's own, and only then alice's"
+                  [S.bob, S.bob, S.alice]
+                  (turnTakers 3 resolved)
+              _ -> HU.assertFailure "warpBoard should deal exactly one Time Warp",
+          -- THE PROVING CASE for the last sentence of CR 500.7: "the most
+          -- recently created turn will be taken first." Two Time Warps resolve
+          -- in alice's turn, the first naming BOB and the second naming ALICE,
+          -- so alice's turn is the more recent one and goes first.
+          --
+          -- Discriminating in both directions, which is why the two are aimed
+          -- this way round rather than the other: a QUEUE would deal bob's turn
+          -- out first and give [bob, alice, bob, alice] -- which is also exactly
+          -- what an engine with NO extra turns at all produces, since the
+          -- seating order alternates. Only the stack reading answers alice
+          -- first.
+          HU.testCase "CR 500.7 two extra turns are a stack: most recently created first" $ do
+            (gs, held) <- boardOf 2
+            case held of
+              [first_, second] -> do
+                let resolved =
+                      castAndResolveWith (aimPlayer S.alice) second $
+                        castAndResolveWith (aimPlayer S.bob) first_ gs
+                HU.assertEqual "pending, most recent at the head" [S.alice, S.bob] (GameState.extraTurns resolved)
+                HU.assertEqual
+                  "alice's extra turn, then bob's, then bob's ordinary one"
+                  [S.alice, S.bob, S.bob, S.alice]
+                  (turnTakers 4 resolved)
+              _ -> HU.assertFailure "warpBoard should deal exactly two Time Warps",
+          -- CR 500.7's APNAP clause, which no card in the pool reaches: Time
+          -- Warp names one player, so the order between takers is vacuous for
+          -- it. Applied directly, as the emblem and Aura cases in the sibling
+          -- specs do, because the rule is real and the opcode's PlayerRef can
+          -- name a set.
+          --
+          -- bob is the active player, so CR 101.4 orders the takers [bob,
+          -- alice]; they are added one at a time in that order, which leaves
+          -- ALICE's turn most recently created and therefore first. Fails
+          -- against a push in seating order, which would answer [bob, alice].
+          HU.testCase "CR 500.7 several extra turns from one effect are added in APNAP order" $ do
+            island <- Registry.printing registry "Island"
+            let gs = (S.landsInPlay island 1) {GameState.activePlayer = S.bob}
+                source = ObjectId.MkObjectId 0
+                after =
+                  S.runPure
+                    S.identityAnswer
+                    gs
+                    (Resolve.applyEffect source S.bob Map.empty Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer))
+            HU.assertEqual "added in APNAP order, so taken in reverse" [S.alice, S.bob] (GameState.extraTurns after)
+        ]
+
 dedupe :: (Eq a) => [a] -> [a]
 dedupe xs = case xs of
   [] -> []
   h : t -> h : dedupe (filter (/= h) t)
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry]
+tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry, extraTurnTests registry]

@@ -12,6 +12,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
@@ -41,12 +42,15 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
@@ -142,7 +146,7 @@ targetTests registry =
                   Map.empty
                   (Map.singleton slot True)
                   (Map.singleton slot (Recipient.ToObject myr))
-                  (Effect.GainControl Duration.Indefinite slot)
+                  (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
             control =
               S.runPure S.identityAnswer board $
                 Resolve.applyEffect
@@ -151,7 +155,7 @@ targetTests registry =
                   Map.empty
                   (Map.singleton slot True)
                   (Map.singleton slot (Recipient.ToObject myr))
-                  (Effect.GainControl Duration.Indefinite slot)
+                  (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
         HU.assertEqual "no control effect is stored for a departed controller" [] (GameState.continuousEffects after)
         HU.assertEqual "and the Myr's controller is unchanged" (Just S.carol) (Projection.controllerOf myr after)
         HU.assertEqual "the same call for a player still in the game DOES store one -- the guard is what did it" 1 (length (GameState.continuousEffects control))
@@ -558,9 +562,11 @@ resolveTests registry =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
+                  Card.Type.castingRestrictions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.blockRequirements = [],
+                  Card.Type.attackRequirements = [],
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
@@ -975,9 +981,11 @@ resolveTests registry =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
+                  Card.Type.castingRestrictions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.blockRequirements = [],
+                  Card.Type.attackRequirements = [],
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
@@ -1034,9 +1042,11 @@ resolveTests registry =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
+                  Card.Type.castingRestrictions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.blockRequirements = [],
+                  Card.Type.attackRequirements = [],
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
@@ -1070,7 +1080,9 @@ resolveTests registry =
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- Two Goblin tokens exist (count == 2 proves two distinct objects). The
         -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
-        HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
+        -- CR 111.4: Dragon Fodder does not name its tokens, so each is named
+        -- "Goblin Token" -- its subtype plus the word "Token".
+        HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after)
         HU.assertEqual "alice controls two creatures (the tokens)" 2 (S.creaturesInPlay S.alice after)
         HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
         -- The control leg for Hanweir Garrison's "tapped and attacking" riders
@@ -1145,7 +1157,38 @@ resolveTests registry =
         HU.assertEqual
           "Alice's five"
           (Just 5)
-          (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
+          (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand),
+      -- CR 205.4g, end to end: "any permanent with the supertype 'snow' is a
+      -- snow permanent." Skred deals damage equal to the number of snow
+      -- permanents YOU control, cast through the real path (Cast.castSpell +
+      -- resolveTop) so the count is read at resolution off a real projection.
+      --
+      -- THE FALSIFIER, in both directions at once, which is why the board is
+      -- lopsided. Alice has two Snow-Covered Mountains and two plain Mountains;
+      -- Bob has one Snow-Covered Mountain and the Wall of Stone that takes the
+      -- damage. The right answer is 2. A count blind to the supertype would see
+      -- four permanents Alice controls and deal 4; a count blind to CR 109.5's
+      -- controller would see three snow permanents and deal 3. All three numbers
+      -- differ, so no single wrong reading can pass.
+      --
+      -- Wall of Stone is 0/8, so it survives and carries the damage as a mark
+      -- (CR 120.3e, removed at CR 514.2's cleanup) that the assertion can read
+      -- exactly -- a dead creature would only tell us the damage was at least
+      -- its toughness.
+      HU.testCase "CR 205.4g Skred counts the snow permanents YOU control, and nothing else" $ do
+        snowMountain <- Registry.printing registry "Snow-Covered Mountain"
+        mountain <- Registry.printing registry "Mountain"
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        skred <- Registry.printing registry "Skred"
+        let gs0 = S.landsInPlay snowMountain 2
+            gs1 = snd (S.addCreature mountain S.alice (snd (S.addCreature mountain S.alice gs0)))
+            gs2 = snd (S.addCreature snowMountain S.bob gs1)
+            (wall, gs3) = S.addCreature wallOfStone S.bob gs2
+            (spellId, gs4) = S.addHandCard skred S.alice gs3
+            cast = snd (Engine.runGamePure (atCreature wall) gs4 (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure (atCreature wall) cast Stack.resolveTop)
+        HU.assertEqual "no damage before it resolves" (Just 0) (S.damageOf wall cast)
+        HU.assertEqual "two snow permanents you control, so two damage" (Just 2) (S.damageOf wall after)
     ]
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
@@ -1407,7 +1450,7 @@ fizzleTests registry =
             -- illegal (it's no longer a legal CreatureTarget), while the
             -- reserved slot -- never targeted -- stays vacuously legal.
             gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-            mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
+            mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
             run = Resolve.resolveModes abilId source [(ModeIndex.MkModeIndex 0, mode)]
             after = snd (Engine.runGamePure S.identityAnswer gone run)
         HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
@@ -1488,6 +1531,13 @@ castBlackRemovalAt swamp printing foe =
 atBobAnswer :: Prompt.Prompt r -> r
 atBobAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
+
+-- atBobAnswer's creature counterpart: aim every target slot at one named
+-- creature, rather than at whatever Set.lookupMin happens to offer first.
+atCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+atCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
   _ -> S.identityAnswer p
 
 -- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
@@ -2144,7 +2194,7 @@ gainControlTests registry =
                 Map.empty
                 (Map.singleton slot True)
                 (Map.singleton slot (Recipient.ToCreature oid))
-                (Effect.GainControl Duration.UntilEndOfTurn slot)
+                (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
             after = snd (Engine.runGamePure S.identityAnswer base run)
         HU.assertEqual "alice now controls it" (Just S.alice) (Projection.controllerOf oid after)
         HU.assertEqual "it is summoning sick for the new controller" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject oid after))
@@ -2168,7 +2218,7 @@ gainControlTests registry =
                 Map.empty
                 (Map.singleton slot True)
                 (Map.singleton slot (Recipient.ToCreature oid))
-                (Effect.GainControl Duration.UntilEndOfTurn slot)
+                (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
             after = snd (Engine.runGamePure S.identityAnswer settled run)
         HU.assertEqual "alice controlled it before" (Just S.alice) (Projection.controllerOf oid settled)
         HU.assertEqual "and still does" (Just S.alice) (Projection.controllerOf oid after)
@@ -2971,5 +3021,425 @@ destroyAllTests registry =
         HU.assertBool "the creature still died" (not (S.onBattlefield his (castDayOfJudgment plains dayOfJudgment g1)))
     ]
 
+-- alice is mid-combat with one creature per printing in `mine`, bob defends with
+-- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the
+-- three Mountains that pay for it. The board sits at the declare attackers step
+-- like every combatBoardOf board, so the ENGINE declares the attack and the
+-- combat record every test below reads is its own, never hand-written.
+-- S.addCreature is what puts the Mountains out: the "any printing, on the
+-- battlefield, untapped and Settled" helper its haddock says it is.
+trumpetBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+trumpetBoard mountain trumpetBlast mine theirs =
+  let (gs0, ours, yours) = S.combatBoardOf mine theirs
+      withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) gs0 [1 :: Int .. 3]
+      (withCard, _) = S.handOne trumpetBlast withLands
+   in ( -- handOne parks its state in a precombat main phase; this board is
+        -- mid-combat.
+        withCard
+          { GameState.phase = GameState.phase gs0,
+            GameState.priority = GameState.priority gs0
+          },
+        ours,
+        yours
+      )
+
+-- Attack with everything, cast whenever a cast is offered, and never block.
+-- Blocks are DECLINED so the attacker survives into the postcombat main phase,
+-- which is where the "the set does not shrink either" leg reads it.
+attackAndCast :: Prompt.Prompt r -> r
+attackAndCast p = case p of
+  Prompt.ChooseAction {} -> S.castAnswer p
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- Run whole steps until `step` is the current phase, WITHOUT running it. Bounded
+-- so a bug cannot loop forever.
+runToStep :: Phase.Phase -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToStep step answer gs0 =
+  let go n g =
+        if n <= (0 :: Int) || GameState.phase g == step
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 8 gs0
+
+-- Every stored continuous effect's affected set. CR 611.2c is a claim about
+-- exactly this field, so the tests below read it directly as well as through the
+-- projection: a filter stored here and re-evaluated would pass a naive
+-- power-is-4 assertion.
+affectedSets :: GameState.GameState -> [Affected.Affected]
+affectedSets = fmap ContinuousEffect.affected . GameState.continuousEffects
+
+-- The attacking creatures, by id, in the engine's own combat record.
+attackerIds :: GameState.GameState -> [ObjectId.ObjectId]
+attackerIds = Map.keys . Combat.Type.attackers . GameState.combat
+
+-- Trumpet Blast ({2}{R} instant, "Attacking creatures get +2/+0 until end of
+-- turn") is the pool's first card whose CONTINUOUS effect names a filter-selected
+-- set rather than a target. Day of Judgment's EachMatching feeds a ONE-SHOT, so
+-- CR 608.2c/608.2f are the whole of its story; this one is stored and keeps
+-- applying, which puts it under CR 611.2c as well:
+--
+--   "If a continuous effect generated by the resolution of a spell or ability
+--   modifies the characteristics or changes the controller of any objects, the
+--   set of objects it affects is determined when that continuous effect begins.
+--   After that point, the set won't change."
+--
+-- So the sweep happens ONCE, at resolution, and its RESULT is frozen into the
+-- stored effect as Affected.TheseObjects. The three legs below are the ones a
+-- stored-and-re-evaluated Filter would fail: it would pump a creature that
+-- became attacking later, and drop the pump from one that left combat.
+--
+-- The modification is layer 7c (CR 613.4c: "effects and counters that modify
+-- power and/or toughness"), the same layer Giant Growth's already lands in --
+-- what is new here is the affected set, not the modification.
+trumpetBlastTests :: Registry.Type.Registry -> Tasty.TestTree
+trumpetBlastTests registry =
+  Tasty.testGroup
+    "TrumpetBlast"
+    [ -- CR 109.2: "attacking creatures" names no zone and no card, so it means
+      -- attacking creature PERMANENTS on the battlefield -- both players', if both
+      -- had attackers, and pointedly not a creature that is merely sitting there.
+      HU.testCase "Trumpet Blast gives every attacking creature +2/+0 and leaves a non-attacker alone" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        trumpetBlast <- Registry.printing registry "Trumpet Blast"
+        let (board, ours, yours) = trumpetBoard mountain trumpetBlast [piker, piker] [piker]
+            after = runToStep (Phase.Combat CombatStep.DeclareBlockers) attackAndCast board
+        HU.assertEqual "the spell resolved" 0 (length (GameState.stack after))
+        HU.assertEqual "both of alice's creatures are attacking" (List.sort ours) (List.sort (attackerIds after))
+        HU.assertEqual "each attacker is a 4/1" (fmap (const (Just 4)) ours) (fmap (`Projection.powerOf` after) ours)
+        HU.assertEqual "and only power moved" (fmap (const (Just 1)) ours) (fmap (`Projection.toughnessOf` after) ours)
+        HU.assertEqual "bob's creature never attacked, so it is still a 2/1" (fmap (const (Just 2)) yours) (fmap (`Projection.powerOf` after) yours),
+      -- The structural half of CR 611.2c, read off the stored effect rather than
+      -- through the projection: what is stored is an ID SET, not the Filter that
+      -- found it. Every behavioural leg below follows from this one field, and an
+      -- implementation that stored Affected.Matching would fail here first.
+      HU.testCase "CR 611.2c the stored effect holds the swept ids, not the filter that swept them" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        trumpetBlast <- Registry.printing registry "Trumpet Blast"
+        let (board, ours, _) = trumpetBoard mountain trumpetBlast [piker, piker] [piker]
+            after = runToStep (Phase.Combat CombatStep.DeclareBlockers) attackAndCast board
+        HU.assertEqual "one stored effect, over exactly the two attackers" [Affected.TheseObjects (Set.fromList ours)] (affectedSets after),
+      -- CR 611.2c's own sentence, in the direction it is usually quoted: the set
+      -- is fixed when the effect BEGINS, so a creature that becomes attacking
+      -- afterwards is not in it.
+      --
+      -- Hanweir Garrison is the pool's producer for "becomes attacking later":
+      -- its CR 508.3a attack trigger creates two 1/1 Humans "that are tapped and
+      -- attacking". The trigger is put on the stack as attackers are declared,
+      -- alice casts Trumpet Blast on top of it, and the spell therefore resolves
+      -- FIRST -- so the tokens are minted, already attacking, after the continuous
+      -- effect began. They are attacking, which is exactly what makes this
+      -- discriminating: a stored Filter re-evaluated each projection would find
+      -- them and pump them to 3/1.
+      HU.testCase "CR 611.2c a creature that becomes attacking after the spell resolves is not in the set" $ do
+        mountain <- Registry.printing registry "Mountain"
+        garrison <- Registry.printing registry "Hanweir Garrison"
+        trumpetBlast <- Registry.printing registry "Trumpet Blast"
+        let (board, ours, _) = trumpetBoard mountain trumpetBlast [garrison] []
+            after = runToStep (Phase.Combat CombatStep.DeclareBlockers) attackAndCast board
+            tokens = filter (`List.notElem` ours) (attackerIds after)
+        HU.assertEqual "the stack is empty: both the spell and the trigger resolved" 0 (length (GameState.stack after))
+        HU.assertEqual "the trigger made two tokens" 2 (length tokens)
+        HU.assertEqual "the Garrison was attacking when the spell resolved, so it is a 4/3" (fmap (const (Just 4)) ours) (fmap (`Projection.powerOf` after) ours)
+        HU.assertEqual "the tokens ARE attacking" 2 (length (filter (`List.elem` attackerIds after) tokens))
+        HU.assertEqual "and are 1/1 all the same: they were not in the set when it was determined" (fmap (const (Just 1)) tokens) (fmap (`Projection.powerOf` after) tokens)
+        HU.assertEqual "the stored set still names only the Garrison" [Affected.TheseObjects (Set.fromList ours)] (affectedSets after),
+      -- "After that point, the set won't change" runs in BOTH directions, which is
+      -- the half a re-evaluated filter gets wrong even more loudly. CR 511.3
+      -- removes every creature from combat as the end of combat step ends, so by
+      -- the postcombat main phase nothing is attacking at all -- and the pump is
+      -- still there, because it lasts until end of turn (CR 611.2a) and its set
+      -- was fixed at resolution.
+      HU.testCase "CR 611.2c an attacker that leaves combat keeps the +2/+0" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        trumpetBlast <- Registry.printing registry "Trumpet Blast"
+        let (board, ours, _) = trumpetBoard mountain trumpetBlast [piker] []
+            postcombat = runToStep Phase.PostcombatMain attackAndCast board
+        HU.assertEqual "the leg really reached the postcombat main phase" Phase.PostcombatMain (GameState.phase postcombat)
+        HU.assertEqual "CR 511.3: nothing is attacking any more" [] (attackerIds postcombat)
+        HU.assertEqual "the creature is still a 4/1" (fmap (const (Just 4)) ours) (fmap (`Projection.powerOf` postcombat) ours)
+        -- The pumped power is what got through: an unblocked 4/1 takes bob from
+        -- 20 to 16, where an unpumped 2/1 would leave him on 18.
+        HU.assertEqual "and it dealt 4 combat damage on the way" (Just 16) (S.lifeOf S.bob postcombat),
+      -- CR 400.7: "An object that moves from one zone to another becomes a new
+      -- object with no memory of, or relation to, its previous existence." A
+      -- frozen set is a set of ObjectIds, so the creature that comes back is
+      -- simply not in it -- which is the reason CR 611.2c can be implemented as an
+      -- id set at all.
+      HU.testCase "CR 400.7 a creature that leaves the battlefield and returns is a new object outside the frozen set" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        trumpetBlast <- Registry.printing registry "Trumpet Blast"
+        let (board, ours, _) = trumpetBoard mountain trumpetBlast [piker] []
+            after = runToStep (Phase.Combat CombatStep.DeclareBlockers) attackAndCast board
+        case ours of
+          [attacker] -> do
+            let bounced = S.runPure S.identityAnswer after (Event.changeZone attacker Zone.Hand)
+                (returned, back) = S.addCreature piker S.alice bounced
+            HU.assertEqual "it was a 4/1 before it left" (Just 4) (Projection.powerOf attacker after)
+            HU.assertBool "what came back is a different object" (returned /= attacker)
+            HU.assertEqual "and it is a plain 2/1" (Just 2) (Projection.powerOf returned back)
+            HU.assertEqual "the stored set still names the incarnation that left" [Affected.TheseObjects (Set.singleton attacker)] (affectedSets back)
+          _ -> HU.assertFailure "fixture should have exactly one attacker"
+    ]
+
+-- Aura Thief ({3}{U} 2/2 Creature -- Illusion, "Flying / When this creature
+-- dies, you gain control of all enchantments") is the CONTROL-side twin of
+-- Trumpet Blast, and the other half of what CR 611.2c names: that rule fixes the
+-- affected set of a resolution effect that "modifies the characteristics OR
+-- CHANGES THE CONTROLLER of any objects". The layer differs (CR 613.1b's layer 2
+-- rather than 613.4c's 7c) and the opcode differs, but the freeze is the same
+-- one, and these tests are the proof that GainControl performs it too.
+--
+-- The trigger is a dies trigger, so the whole card runs the way Doomed
+-- Traveler's does in Pawl.TriggerSpec: a Lightning Bolt kills the 2/2, CR
+-- 704.5g's state-based action puts it in the graveyard, the CR 603.10a look-back
+-- trigger reaches the stack in that same settle, and resolving it is what
+-- steals the enchantments. Nothing here hand-builds a continuous effect.
+--
+-- The printed reminder "(You don't get to move Auras.)" is not a rule this
+-- opcode has to implement: nothing in GainControl moves an attachment, and CR
+-- 701.3 is the only thing that does.
+auraThiefTests :: Registry.Type.Registry -> Tasty.TestTree
+auraThiefTests registry =
+  let -- alice: one Mountain (the Bolt's {R}), an Aura Thief, and a Greed of her
+      -- own; bob: a Bad Moon and a Hardened Scales. All four enchantments are
+      -- inert on this board -- no black creature, no +1/+1 counter, no activation
+      -- -- so the only thing any test here reads off them is who controls them.
+      -- S.identityAnswer targets the least Recipient and Recipient.ToCreature
+      -- sorts before Recipient.ToPlayer, so the Thief, the only creature on the
+      -- board, is the Bolt's target without a bespoke interpreter.
+      thiefBoard = do
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        auraThief <- Registry.printing registry "Aura Thief"
+        greed <- Registry.printing registry "Greed"
+        badMoon <- Registry.printing registry "Bad Moon"
+        hardenedScales <- Registry.printing registry "Hardened Scales"
+        let (thief, g1) = S.addCreature auraThief S.alice (S.landsInPlay mountain 1)
+            (hers, g2) = S.addCreature greed S.alice g1
+            (moon, g3) = S.addCreature badMoon S.bob g2
+            (scales, g4) = S.addCreature hardenedScales S.bob g3
+            (withBolt, spell) = S.handOne lightningBolt g4
+        pure (withBolt, spell, thief, [hers], [moon, scales])
+      -- Cast the Bolt, resolve it, settle (CR 704.5g destroys the damaged 2/2 and
+      -- the same settle places its CR 603.10a look-back trigger), then resolve
+      -- the trigger.
+      boltIt (gs, spell) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spell)
+            damaged = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+   in Tasty.testGroup
+        "AuraThief"
+        [ -- CR 109.2 again: "all enchantments" names no zone and no card, so it
+          -- means every enchantment PERMANENT on the battlefield -- both
+          -- players', and pointedly the Thief's controller's own, which is the
+          -- one that would be missing if the sweep had quietly read "you don't
+          -- control".
+          HU.testCase "Aura Thief whole card: its dies trigger gives its controller control of every enchantment" $ do
+            (board, spell, thief, hers, theirs) <- thiefBoard
+            let (settled, after) = boltIt (board, spell)
+            HU.assertBool "the Thief died" (not (S.onBattlefield thief settled))
+            HU.assertEqual "its trigger reached the stack in that settle" 1 (length (GameState.stack settled))
+            HU.assertEqual "the trigger resolved" 0 (length (GameState.stack after))
+            HU.assertEqual "alice took bob's enchantments" (fmap (const (Just S.alice)) theirs) (fmap (`Projection.controllerOf` after) theirs)
+            HU.assertEqual "and still has her own" (fmap (const (Just S.alice)) hers) (fmap (`Projection.controllerOf` after) hers),
+          -- The structural half of CR 611.2c, on the control side: what is stored
+          -- is the swept id set, not the Filter that found it.
+          HU.testCase "CR 611.2c the stored control effect holds the swept ids, not the filter that swept them" $ do
+            (board, spell, _, hers, theirs) <- thiefBoard
+            let (_, after) = boltIt (board, spell)
+            HU.assertEqual
+              "one stored effect, over all three enchantments"
+              [Affected.TheseObjects (Set.fromList (hers <> theirs))]
+              (affectedSets after),
+          -- "After that point, the set won't change." An enchantment that arrives
+          -- after the trigger has resolved is not in the set, so its controller
+          -- keeps it -- the control-side twin of the Hanweir Garrison tokens.
+          HU.testCase "CR 611.2c an enchantment that enters after the trigger resolves is not stolen" $ do
+            (board, spell, _, _, theirs) <- thiefBoard
+            greed <- Registry.printing registry "Greed"
+            let (_, after) = boltIt (board, spell)
+                (latecomer, later) = S.addCreature greed S.bob after
+            HU.assertEqual "the ones that were there are alice's" (fmap (const (Just S.alice)) theirs) (fmap (`Projection.controllerOf` later) theirs)
+            HU.assertEqual "the one that arrived afterwards is still bob's" (Just S.bob) (Projection.controllerOf latecomer later),
+          -- CR 611.2a: "If no duration is stated, it lasts until the end of the
+          -- game." Aura Thief states none, so the grant is Duration.Indefinite and
+          -- survives the cleanup step that would end an Act of Treason.
+          HU.testCase "CR 611.2a the grant states no duration, so it does not end at cleanup" $ do
+            (board, spell, _, _, theirs) <- thiefBoard
+            let (_, after) = boltIt (board, spell)
+                swept = Expiry.dropAtCleanup after
+            HU.assertEqual "alice still controls them after cleanup" (fmap (const (Just S.alice)) theirs) (fmap (`Projection.controllerOf` swept) theirs),
+          -- CR 302.6: "A creature's activated ability with the tap symbol ... in
+          -- its activation cost can't be activated unless the creature has been
+          -- under its controller's control continuously since their most recent
+          -- turn began." Gaining control interrupts that continuity, and gaining
+          -- control of something you already control does not -- so the sweep has
+          -- to ask per object rather than re-Sicking everything it names.
+          HU.testCase "CR 302.6 the newly gained enchantments are re-Sicked and the one alice already controlled is not" $ do
+            (board, spell, _, hers, theirs) <- thiefBoard
+            let (_, after) = boltIt (board, spell)
+                sicknessOf oid = fmap Object.sickness (Game.lookupObject oid after)
+            HU.assertEqual "bob's, taken from him, start their clock over" (fmap (const (Just Sickness.Sick)) theirs) (fmap sicknessOf theirs)
+            HU.assertEqual "alice's own was never interrupted" (fmap (const (Just (Sickness.Settled S.alice))) hers) (fmap sicknessOf hers),
+          -- The card is named Aura Thief, so an Aura is the case worth proving,
+          -- and Control Magic is the pool's one control-granting Aura. CR 109.5:
+          -- "For a static ability, [you] is the current controller of the object
+          -- it's on" -- so taking the Aura takes what the Aura grants, WITHOUT
+          -- moving the Aura. That is the whole content of the printed reminder
+          -- "(You don't get to move Auras.)": Object.attachedTo is untouched here.
+          --
+          -- The Thief is added before the Piker so it holds the lower ObjectId
+          -- and is therefore the Bolt's target under S.identityAnswer, which picks
+          -- the least Recipient.
+          HU.testCase "CR 109.5 taking bob's Control Magic hands alice back the creature it steals, without moving the Aura" $ do
+            mountain <- Registry.printing registry "Mountain"
+            lightningBolt <- Registry.printing registry "Lightning Bolt"
+            auraThief <- Registry.printing registry "Aura Thief"
+            piker <- Registry.printing registry "Goblin Piker"
+            controlMagic <- Registry.printing registry "Control Magic"
+            let (thief, g1) = S.addCreature auraThief S.alice (S.landsInPlay mountain 1)
+                (creature, g2) = S.addCreature piker S.alice g1
+                (aura, g3) = S.addCreature controlMagic S.bob g2
+                stolen = S.attach aura creature g3
+                (withBolt, spell) = S.handOne lightningBolt stolen
+                (_, after) = boltIt (withBolt, spell)
+            HU.assertBool "setup: the Thief is the Bolt's target, holding the lower id" (thief < creature)
+            HU.assertEqual "setup: bob's Control Magic has taken alice's creature" (Just S.bob) (Projection.controllerOf creature stolen)
+            HU.assertEqual "alice now controls the Aura" (Just S.alice) (Projection.controllerOf aura after)
+            HU.assertEqual "and so has her creature back" (Just S.alice) (Projection.controllerOf creature after)
+            HU.assertEqual
+              "the Aura never moved: it still enchants the same creature"
+              (Just (Just (Recipient.ToCreature creature)))
+              (fmap Object.attachedTo (Game.lookupObject aura after))
+        ]
+
+-- Bane of Progress {4}{G}{G} Creature -- Elemental 2/2: "When this creature
+-- enters, destroy all artifacts and enchantments. Put a +1/+1 counter on this
+-- creature for each permanent destroyed this way."
+--
+-- Cast off six Forests from alice's hand and then run the PRIORITY LOOP to a
+-- stable board, which is what makes this a gameplay-level test rather than an
+-- applyEffect call: the loop resolves the creature spell, its own settle places
+-- CR 603.6a's enters trigger, and the next round of passes resolves that. Answers
+-- with the id Bane entered the battlefield under (CR 400.7 mints a fresh one on
+-- the way in) and the finished board.
+castBaneOfProgress :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (Maybe ObjectId.ObjectId, GameState.GameState)
+castBaneOfProgress forest bane board =
+  let (withSpell, spell) = S.handOne bane (List.foldl' (\gs _ -> snd (S.addCreature forest S.alice gs)) board [1 :: Int .. 6])
+      afterCast = S.runPure S.identityAnswer withSpell (Cast.castSpell S.alice spell)
+      finished = S.runPure S.identityAnswer afterCast Engine.priorityLoop
+   in (namedOnBattlefield "Bane of Progress" finished, finished)
+
+-- The one battlefield permanent whose card carries this name. Bane's printed
+-- incarnation is gone by the time the trigger resolves (CR 400.7), so the test
+-- cannot hold the id it was cast under.
+namedOnBattlefield :: String -> GameState.GameState -> Maybe ObjectId.ObjectId
+namedOnBattlefield name gs =
+  List.find
+    (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack name))
+    (Set.toList (GameState.battlefield gs))
+
+-- How many +1/+1 counters (CR 122.6) sit on a permanent, 0 for none.
+plusOnePlusOnesOn :: Maybe ObjectId.ObjectId -> GameState.GameState -> Natural
+plusOnePlusOnesOn moid gs =
+  Maybe.fromMaybe 0 $ do
+    oid <- moid
+    obj <- Game.lookupObject oid gs
+    Map.lookup CounterKind.PlusOnePlusOne (Object.counters obj)
+
+baneOfProgressTests :: Registry.Type.Registry -> Tasty.TestTree
+baneOfProgressTests registry =
+  Tasty.testGroup
+    "BaneOfProgress"
+    [ -- The proving case for #380: a mass effect whose RIDER reads the sweep back.
+      -- The board is arranged so that the three readings a wrong implementation
+      -- could take all give different numbers, and only one of them is right:
+      --
+      --   * "everything the filter matched" is 3 (the Myr, the Bonesplitter, Bad
+      --     Moon) -- CR 702.12b says the Myr "can't be destroyed", and CR 701.8b
+      --     says a permanent that reached a graveyard some other way "hasn't been
+      --     'destroyed'", so matching is not being destroyed;
+      --   * a FRESH count of artifacts and enchantments after the sweep is 1 (the
+      --     Myr, still standing);
+      --   * what was actually destroyed this way is 2.
+      --
+      -- The Piker is neither an artifact nor an enchantment and is the control:
+      -- "destroy all artifacts and enchantments" leaves it alone, and Bane itself
+      -- is a plain creature and never sweeps itself up.
+      HU.testCase "CR 701.8b the rider counts what was destroyed, not what the sweep matched" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        badMoon <- Registry.printing registry "Bad Moon"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (myr, g1) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
+            (equipment, g2) = S.addCreature bonesplitter S.alice g1
+            (moon, g3) = S.addCreature badMoon S.bob g2
+            (bystander, board) = S.addCreature piker S.bob g3
+            (entered, resolved) = castBaneOfProgress forest bane board
+        HU.assertBool "Bane is on the battlefield" (Maybe.isJust entered)
+        HU.assertEqual "stack empty: the spell and its trigger both resolved" 0 (length (GameState.stack resolved))
+        HU.assertBool "the artifact died" (not (S.onBattlefield equipment resolved))
+        HU.assertBool "the enchantment died" (not (S.onBattlefield moon resolved))
+        HU.assertBool "CR 702.12b the indestructible artifact creature was swept at and stands" (S.onBattlefield myr resolved)
+        HU.assertBool "the creature that is neither was never named" (S.onBattlefield bystander resolved)
+        HU.assertEqual "two permanents were destroyed this way, so two counters" 2 (plusOnePlusOnesOn entered resolved)
+        -- CR 122.1a: "A +X/+Y counter on a creature ... adds X to that object's
+        -- power and Y to that object's toughness." A printed 2/2 with two of them
+        -- is a 4/4, which is what the counters being real means.
+        HU.assertEqual "CR 122.1a a printed 2/2 with two +1/+1 counters is a 4/4" (Just 4) (entered >>= \oid -> Projection.powerOf oid resolved)
+        HU.assertEqual "and 4 toughness" (Just 4) (entered >>= \oid -> Projection.toughnessOf oid resolved),
+      -- The discriminating twin of the test above: the SAME board with the
+      -- indestructible permanent removed. The filter now matches two rather than
+      -- three, and the count is unchanged at two -- so the two counters above were
+      -- the destroyed set and not the matched one.
+      HU.testCase "CR 702.12b removing the indestructible permanent leaves the count unchanged" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        badMoon <- Registry.printing registry "Bad Moon"
+        let (_, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+            (_, board) = S.addCreature badMoon S.bob g1
+            (entered, resolved) = castBaneOfProgress forest bane board
+        HU.assertEqual "still two destroyed, so still two counters" 2 (plusOnePlusOnesOn entered resolved),
+      -- CR 701.19a: a regeneration shield "protects the permanent the next time it
+      -- would be destroyed this turn ... instead remove all damage marked on it
+      -- and its controller taps it". Bane says nothing about regeneration (CR
+      -- 701.19c), so the shield applies -- and CR 701.8c calls that replacing the
+      -- destruction event, so the permanent it saved was never destroyed and is
+      -- not counted.
+      HU.testCase "CR 701.19a a regenerated permanent is not destroyed and not counted" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        badMoon <- Registry.printing registry "Bad Moon"
+        let (equipment, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+            (moon, g2) = S.addCreature badMoon S.bob g1
+            (entered, resolved) = castBaneOfProgress forest bane (S.addRegenShield equipment g2)
+        HU.assertBool "the shielded artifact stands" (S.onBattlefield equipment resolved)
+        HU.assertEqual "and CR 701.19a taps it" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject equipment resolved))
+        HU.assertBool "its unshielded neighbour died" (not (S.onBattlefield moon resolved))
+        HU.assertEqual "one destroyed this way, so one counter" 1 (plusOnePlusOnesOn entered resolved),
+      -- CR 608.2c: the instructions run in the order written, so with nothing for
+      -- the sweep to destroy the rider reads a bound zero rather than an unbound
+      -- slot. No counters, and Bane is the 2/2 it was printed as.
+      HU.testCase "an empty sweep binds zero, so the rider puts no counters on" $ do
+        forest <- Registry.printing registry "Forest"
+        bane <- Registry.printing registry "Bane of Progress"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (bystander, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            (entered, resolved) = castBaneOfProgress forest bane board
+        HU.assertBool "the creature stands: it is neither an artifact nor an enchantment" (S.onBattlefield bystander resolved)
+        HU.assertEqual "no counters" 0 (plusOnePlusOnesOn entered resolved)
+        HU.assertEqual "so Bane is the printed 2/2" (Just 2) (entered >>= \oid -> Projection.powerOf oid resolved)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry, trumpetBlastTests registry, auraThiefTests registry, baneOfProgressTests registry]

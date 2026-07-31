@@ -12,6 +12,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
+import qualified Pawl.Codec.All as Codec
+import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Event as Event
 -- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
@@ -37,6 +39,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
@@ -261,9 +264,11 @@ cardTests registry =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
+                  Card.Type.castingRestrictions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.blockRequirements = [],
+                  Card.Type.attackRequirements = [],
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
@@ -287,6 +292,9 @@ quantityCounts quantity = case quantity of
   Quantity.Type.ManaValue -> []
   Quantity.Type.Power -> []
   Quantity.Type.X -> []
+  -- A slot read, not a fold over game state: the value was bound by an earlier
+  -- effect of the same resolution and there is no Count inside it.
+  Quantity.Type.InSlot _ -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b
   Quantity.Type.Count count -> count : countCounts count
@@ -347,6 +355,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfCycled -> []
+  -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
+  TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfDies -> []
 
@@ -382,6 +392,7 @@ effectCounts effect = case effect of
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
+  Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
@@ -393,6 +404,7 @@ effectCounts effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
+  Effect.TakeExtraTurn _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -527,6 +539,90 @@ oneEffectTrigger condition effect =
       TriggeredAbility.intervening = Nothing
     }
 
+-- Pawl.Binding's reserved slot names in full: the binding keys the engine
+-- STAMPS rather than asks a player for. The whole module's list rather than a
+-- hand-picked subset, so a new reserved slot joins the declaration sweep below
+-- by being added here and nowhere else.
+reservedSlots :: Set.Set SlotName.SlotName
+reservedSlots =
+  Set.fromList
+    [ Binding.variableX,
+      Binding.chosenModes,
+      Binding.copySource,
+      Binding.triggerSource,
+      Binding.you,
+      Binding.triggerPlayer,
+      Binding.became
+    ]
+
+-- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
+-- enchant slot (Card.allTargetSpecs), and its activated, triggered and delayed
+-- abilities' modes.
+--
+-- All four carriers, because all four ask the same question at different
+-- moments. CR 601.2c is the question ("the player announces their choice of an
+-- appropriate object or player for each target the spell requires"); CR 602.2b
+-- makes activating an ability follow "rules 601.2b-i"; CR 603.3d makes putting
+-- a triggered ability on the stack "identical to the process for casting a
+-- spell listed in rules 601.2c-d"; and CR 603.7's delayed abilities are
+-- triggered abilities, placed by that same rule. A lint about what DECLARING a
+-- slot means therefore has to range over all four, not over the spell alone.
+declaredTargetSlots :: Card.Type.Card -> Set.Set SlotName.SlotName
+declaredTargetSlots card =
+  Set.unions
+    ( Map.keysSet (Card.allTargetSpecs card)
+        : fmap
+          (Map.keysSet . Modal.allTargetSpecs)
+          ( fmap ActivatedAbility.modal (Card.Type.activatedAbilities card)
+              <> fmap TriggeredAbility.modal (Card.Type.triggeredAbilities card)
+              <> fmap TriggeredAbility.modal (Map.elems (Card.Type.delayedAbilities card))
+          )
+    )
+
+-- The reserved names a card declares as target slots -- empty for every card
+-- authored correctly, which is the whole of the sweep's assertion.
+--
+-- Declaring one is the SECOND INVARIANT's failure mode rather than a dataflow
+-- nicety: the slot is prompted (CR 601.2c) and the answer then thrown away. On
+-- a triggered or delayed ability, Pawl.Engine stamps CR 113.7's `self` and CR
+-- 109.5's `you` OVER the chosen targets, so the player is asked and overruled.
+-- CR 400.7e's `became` and CR 603.2's `thatPlayer` run the other way -- the
+-- chosen target wins the union and the event's own stamp is lost, so the
+-- payload silently reads the answer to a question about something else. Either
+-- way the engine asked a question it did not use.
+reservedDeclarations :: Card.Type.Card -> Set.Set SlotName.SlotName
+reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
+
+-- CR 111.4: "A spell or ability that creates a token sets both its name and its
+-- subtype(s). If the spell or ability doesn't specify the name of the token, its
+-- name is the same as its subtype(s) plus the word 'Token.'" True of every token
+-- this pool creates, because no card in it specifies a token name.
+--
+-- Compared against every PERMUTATION of the subtypes rather than one rendering,
+-- and that is forced rather than chosen: TypeLine.subtypes is a Set, so a
+-- multi-subtype token's printed word order ("Zombie Berserker Token", not
+-- "Berserker Zombie Token") is not recoverable from the card. The lint therefore
+-- pins which subtypes appear and never their order (#477). Permuting also keeps
+-- it correct for CR 205.3b's two-WORD creature types, which splitting the name
+-- on spaces would not. The factorial is bounded by a token's subtype count, at
+-- most two here.
+--
+-- Narrow this the first time a card DOES specify a token's name, at which point
+-- the rule supplies nothing and the name is whatever the card says: CR 111.9's
+-- legendary tokens ("create Boo, a legendary 1/1 red Hamster creature token"),
+-- CR 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles), and the
+-- copy tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter,
+-- "not Human Token or Doomed Dissenter Token") are each correctly named
+-- something this lint would reject.
+tokenNameOffends :: Card.Type.Card -> Bool
+tokenNameOffends token =
+  case traverse (fmap fst . Json.tag . Codec.subtypeToJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
+    Left _ -> True
+    Right subtypes ->
+      notElem
+        (Card.Type.name token)
+        (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
+
 -- The D4 dataflow lint: every slot an effect reads is declared, and every
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
@@ -603,49 +699,98 @@ lintTests registry =
                 (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
                 ps
         HU.assertEqual "X read iff {X} declared" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved X slot is never a declared target slot" $ do
+      HU.testCase "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
         ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.variableX . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the X slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved modes slot is never a declared target slot" $ do
+        let tokensOf card = [token | Effect.Create _ token _ _ <- cardResolutionEffects card]
+            tokens = concatMap (tokensOf . Printing.card) ps
+        -- Guards the sweep against passing vacuously if Create ever moves out
+        -- from under cardResolutionEffects.
+        HU.assertBool "the pool creates tokens" (not (null tokens))
+        HU.assertEqual "no token is misnamed" [] (fmap Card.Type.name (filter tokenNameOffends tokens)),
+      HU.testCase "the lint itself catches a token named without the suffix" $ do
+        doomedTraveler <- Registry.printing registry "Doomed Traveler"
+        case [token | Effect.Create _ token _ _ <- cardResolutionEffects (Printing.card doomedTraveler)] of
+          [token] -> do
+            HU.assertBool "the real token passes" (not (tokenNameOffends token))
+            -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
+            -- the suffix dropped.
+            HU.assertBool "misnamed token detected" (tokenNameOffends token {Card.Type.name = Text.pack "Spirit"})
+          other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
+      -- ONE sweep over the whole reserved set, replacing the five per-name
+      -- cases this grew out of. Those five each filtered on
+      -- Card.allTargetSpecs, so they saw a card's spell modes and enchant slot
+      -- and nothing else; they also covered only five of the seven reserved
+      -- names, leaving `copySource` and `thatPlayer` with no declaration case
+      -- at all. See reservedDeclarations for why declaring one is a discarded
+      -- prompt rather than a naming quibble.
+      HU.testCase "no reserved binding slot is ever a declared target slot" $ do
         ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.chosenModes . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the modes slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved trigger-source slot is never a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.triggerSource . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the self slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the reserved you slot is never a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.you . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the you slot" [] (fmap (Card.Type.name . Printing.card) offenders),
-      -- CR 400.7e's arriving incarnation is stamped by Event.eventBindings, not
-      -- chosen, so a card declaring it as a target spec would be prompted for a
-      -- target and then have the answer clobbered. Same SCOPE limit as the three
-      -- above -- Card.allTargetSpecs walks a card's SPELL modes only, so a
-      -- triggered ability declaring the slot still slips through, which is the
-      -- gap Pawl.Binding's `you` comment documents for the whole family (#428).
-      -- The READ direction over a triggered ability's modes is a separate lint,
-      -- below.
-      HU.testCase "the reserved became slot is never a declared target slot" $ do
-        ps <- S.allPrintings registry
-        let offenders =
-              filter
-                (Map.member Binding.became . Card.allTargetSpecs . Printing.card)
-                ps
-        HU.assertEqual "no card names the became slot" [] (fmap (Card.Type.name . Printing.card) offenders),
+        let offends = not . Set.null . reservedDeclarations
+            offenders = filter (offends . Printing.card) ps
+        HU.assertEqual "no card declares a reserved slot" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- The sweep above passes VACUOUSLY: no committed card declares a reserved
+      -- slot anywhere, so on its own it proves nothing about the lint. Proven
+      -- here instead against hand-built offenders, in the posture the
+      -- triggered-read self-test below uses -- never a card file, because a
+      -- misauthored card must not be loadable -- one per ability carrier the
+      -- sweep gained, each grafted onto a real card that has that kind of
+      -- ability.
+      --
+      -- Each carrier is asserted TWICE: the sweep sees the offender, and
+      -- Card.allTargetSpecs -- the spell-modes-and-enchant view the five old
+      -- cases filtered on -- does not. The second half is the regression guard:
+      -- it is the hole itself, and it fails if the sweep is ever narrowed back.
+      HU.testCase "the lint itself catches an ability that declares a reserved slot" $ do
+        roaches <- Registry.printing registry "Endless Cockroaches"
+        sorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        tidalWave <- Registry.printing registry "Tidal Wave"
+        let -- A one-mode, effectless modal declaring exactly one target slot.
+            declaring slot =
+              Modal.MkModal
+                (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory))
+                (ModeSelection.ChooseExactly 1)
+            withTriggered slot card =
+              card
+                { Card.Type.triggeredAbilities =
+                    [ TriggeredAbility.MkTriggeredAbility
+                        { TriggeredAbility.condition = TriggerCondition.SelfDies,
+                          TriggeredAbility.modal = declaring slot,
+                          TriggeredAbility.intervening = Nothing
+                        }
+                    ]
+                }
+            withActivated slot card =
+              card {Card.Type.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = declaring slot}) (Card.Type.activatedAbilities card)}
+            withDelayed slot card =
+              card {Card.Type.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Card.Type.delayedAbilities card)}
+            catches slot graft printing =
+              let card = graft slot (Printing.card printing)
+               in (reservedDeclarations card, Map.member slot (Card.allTargetSpecs card))
+        HU.assertEqual
+          "CR 109.5 you declared on a triggered ability is caught, and the spell-modes view misses it"
+          (Set.singleton Binding.you, False)
+          (catches Binding.you withTriggered roaches)
+        HU.assertEqual
+          "CR 113.7 self declared on an activated ability is caught, and the spell-modes view misses it"
+          (Set.singleton Binding.triggerSource, False)
+          (catches Binding.triggerSource withActivated sorcerer)
+        HU.assertEqual
+          "CR 400.7e became declared on a delayed ability is caught, and the spell-modes view misses it"
+          (Set.singleton Binding.became, False)
+          (catches Binding.became withDelayed tidalWave)
+        -- Not vacuous the other way either: the sweep reaches an ability's
+        -- ORDINARY slots, which Card.allTargetSpecs cannot see -- Prodigal
+        -- Sorcerer's spell is a creature's empty mode, so its "target" is
+        -- declared by its activated ability alone.
+        let target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual
+          "an activated ability's ordinary slot is in the sweep but not the spell-modes view"
+          (True, False)
+          (Set.member target (declaredTargetSlots (Printing.card sorcerer)), Map.member target (Card.allTargetSpecs (Printing.card sorcerer)))
+        HU.assertEqual
+          "and the three real cards declare no reserved slot"
+          [Set.empty, Set.empty, Set.empty]
+          (fmap (reservedDeclarations . Printing.card) [roaches, sorcerer, tidalWave]),
       HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $ do
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         let card = Printing.card lightningBolt
@@ -688,6 +833,8 @@ lintTests registry =
       -- the condition-specific reserved slots live -- CR 400.7e's `became` and
       -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
       -- side and for why this cannot be an equality check.
+      --
+      -- No ACTIVATED-ability counterpart of this read check exists (#479).
       HU.testCase "every slot a triggered ability reads is bound for its condition" $ do
         ps <- S.allPrintings registry
         let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
@@ -931,7 +1078,7 @@ m4bCardTests registry =
       HU.testCase "CR 701.19c Terror and Reprisal both carry the can't-be-regenerated rider" $ do
         terror <- Registry.printing registry "Terror"
         reprisal <- Registry.printing registry "Reprisal"
-        let riders c = [r | Effect.Destroy _ r <- Card.allEffects (Printing.card c)]
+        let riders c = [r | Effect.Destroy _ r _ <- Card.allEffects (Printing.card c)]
         HU.assertEqual "Terror" [Regenerability.CantBeRegenerated] (riders terror)
         HU.assertEqual "Reprisal" [Regenerability.CantBeRegenerated] (riders reprisal),
       HU.testCase "Murder is a {1}{B}{B} Instant that destroys a target creature" $ do
@@ -941,7 +1088,7 @@ m4bCardTests registry =
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
         HU.assertBool "an instant" (Card.isInstant c)
         -- Murder carries no CR 701.19c rider, unlike Terror and Reprisal.
-        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable] (Card.allEffects c)
+        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing] (Card.allEffects c)
         HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
       -- Murder's opposite number on the one axis this pair exists to pin: the
       -- SAME Destroy opcode, with the SAME CR 701.19c rider, differing only in
@@ -959,7 +1106,7 @@ m4bCardTests registry =
         -- text is only "all creatures", so the Filter is only HasCardType.
         HU.assertEqual
           "one Destroy over the creatures, with no can't-be-regenerated rider"
-          [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable]
+          [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing]
           (Card.allEffects c)
         HU.assertEqual "and no target spec at all" Map.empty (Card.allTargetSpecs c),
       -- The pool's counterweight to Day of Judgment: a creature that grants
@@ -1012,13 +1159,14 @@ m4bCardTests registry =
             blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
             target = SlotName.MkSlotName (Text.pack "target")
             untilEot = Effect.ModifyTarget Duration.UntilEndOfTurn
+            targetRef = ObjectRef.InSlot target
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
         HU.assertBool "an instant" (Card.isInstant c)
         HU.assertEqual
           "effects, in printed order"
-          [ untilEot (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 3)) target,
-            untilEot (Modification.GainKeyword Keyword.Flying) target,
-            untilEot (Modification.GainKeyword (Keyword.Toxic 1)) target
+          [ untilEot (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 3)) targetRef,
+            untilEot (Modification.GainKeyword Keyword.Flying) targetRef,
+            untilEot (Modification.GainKeyword (Keyword.Toxic 1)) targetRef
           ]
           (Card.allEffects c)
         HU.assertEqual "one creature slot, shared by all three" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
@@ -1109,7 +1257,7 @@ m45p6CardTests registry =
               [m] -> do
                 HU.assertEqual
                   "one GainControl effect with a conditional duration"
-                  [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) slot]
+                  [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) (ObjectRef.InSlot slot)]
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
                   "one ArtifactTarget slot"
@@ -1138,7 +1286,7 @@ m45p6CardTests registry =
               [m] -> do
                 HU.assertEqual
                   "-2/-1 until your next turn"
-                  [Effect.ModifyTarget Duration.UntilYourNextTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) slot]
+                  [Effect.ModifyTarget Duration.UntilYourNextTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) (ObjectRef.InSlot slot)]
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
                   "one OpponentCreatureTarget slot"
@@ -1410,7 +1558,61 @@ auraCardTests registry =
                   (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]))))
                   (Mode.targetSpecs m)
               ms -> HU.assertFailure ("expected one mode, got " <> show (length ms))
-          abs_ -> HU.assertFailure ("expected one activated ability, got " <> show (length abs_))
+          abs_ -> HU.assertFailure ("expected one activated ability, got " <> show (length abs_)),
+      -- CR 702.5d's gate card: the first Aura in the pool whose enchant ability
+      -- names a PLAYER, and the first affected set reached through one.
+      HU.testCase "Curse of Death's Hold is a {3}{B}{B} Aura Curse enchanting a player for -1/-1" $ do
+        p <- Registry.printing registry "Curse of Death's Hold"
+        let card = Printing.card p
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        HU.assertEqual "name" (Text.pack "Curse of Death's Hold") (Card.Type.name card)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, black, black]) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
+        -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Aura, Subtype.Curse]) (TypeLine.subtypes (Card.Type.typeLine card))
+        HU.assertBool "is an Aura" (Card.isAura card)
+        -- CR 702.5d: "Enchant player" -- the whole player pool, unnarrowed, which
+        -- is what lets it target and be attached to a player and nothing else.
+        HU.assertEqual "enchant player" (Just (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.Type.enchant card)
+        -- CR 303.4m through the enchanted PLAYER: "creatures enchanted player
+        -- controls get -1/-1", layer 7c on a set the Aura is not attached to.
+        HU.assertEqual
+          "one -1/-1 static ability on the enchanted player's creatures"
+          [StaticAbility.MkStaticAbility (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)) (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal (-1))))]
+          (Card.Type.staticAbilities card)
+        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+        HU.assertEqual "no spell effects" [] (Card.allEffects card),
+      -- The second Effect.AttachTarget producer in the pool, and the shape is the
+      -- design argument: ONE target slot for the Aura (CR 601.2c -- Gatherer is
+      -- explicit for Crown of the Ages that "this only targets the Aura"), two
+      -- effects in the order written (CR 608.2c), and a destination Filter that
+      -- asks about the SUBJECT rather than about the candidate.
+      HU.testCase "Aura Graft is a {1}{U} instant that gains an Aura and then moves it" $ do
+        p <- Registry.printing registry "Aura Graft"
+        let card = Printing.card p
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+            target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual "name" (Text.pack "Aura Graft") (Card.Type.name card)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, blue]) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Instant) (TypeLine.types (Card.Type.typeLine card))
+        HU.assertEqual "no enchant ability: it is not an Aura itself" Nothing (Card.Type.enchant card)
+        case Foldable.toList (Modal.modes (Card.Type.spell card)) of
+          [m] -> do
+            -- Gatherer, 2007-07-15: "Aura Graft's effect has no duration", so the
+            -- control change is Duration.Indefinite rather than end of turn.
+            HU.assertEqual
+              "gain control indefinitely, then attach"
+              [ Effect.GainControl Duration.Indefinite (ObjectRef.InSlot target),
+                Effect.AttachTarget target Filter.Type.CanHostSubject
+              ]
+              (Foldable.toList (Mode.effects m))
+            -- "target Aura THAT'S ATTACHED TO A PERMANENT" -- the one slot, and the
+            -- only place IsAttachedToPermanent appears in the pool.
+            HU.assertEqual
+              "CR 115.1: one target slot, an Aura on a permanent"
+              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToPermanent]))))
+              (Mode.targetSpecs m)
+          ms -> HU.assertFailure ("expected one mode, got " <> show (length ms))
     ]
 
 -- Skilled Animator's "for as long as this creature remains on the battlefield",
@@ -1504,7 +1706,7 @@ animatorCardTests registry =
               [m] -> do
                 HU.assertEqual
                   "CR 613.1d: one layer-4 addition, until end of turn"
-                  [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.AddCardType CardType.Artifact) target]
+                  [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target)]
                   (Foldable.toList (Mode.effects m))
                 -- "Target permanent", unnarrowed -- the Aura the CR 303.4d case
                 -- needs is a legal target precisely because there is no filter.
@@ -1540,9 +1742,9 @@ animatorCardTests registry =
                 -- resolution, so there is no set left to disagree about.
                 HU.assertEqual
                   "three parts, all on the target, all for the same duration"
-                  [ Effect.ModifyTarget duration (Modification.AddCardType CardType.Artifact) target,
-                    Effect.ModifyTarget duration (Modification.AddCardType CardType.Creature) target,
-                    Effect.ModifyTarget duration (Modification.SetBasePowerToughness (Quantity.Type.Literal 5) (Quantity.Type.Literal 5)) target
+                  [ Effect.ModifyTarget duration (Modification.AddCardType CardType.Artifact) (ObjectRef.InSlot target),
+                    Effect.ModifyTarget duration (Modification.AddCardType CardType.Creature) (ObjectRef.InSlot target),
+                    Effect.ModifyTarget duration (Modification.SetBasePowerToughness (Quantity.Type.Literal 5) (Quantity.Type.Literal 5)) (ObjectRef.InSlot target)
                   ]
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
@@ -1765,7 +1967,7 @@ phyrexianCardTests registry =
         HU.assertBool "an instant" (Card.isInstant c)
         HU.assertEqual
           "+2/+2 until end of turn"
-          [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) target]
+          [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) (ObjectRef.InSlot target)]
           (Card.allEffects c)
         HU.assertEqual "one creature slot" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
       -- CR 202.3g: "Each Phyrexian mana symbol in a card's mana cost contributes
@@ -1848,8 +2050,46 @@ blockRequirementCardTests registry =
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
     ]
 
+-- CR 508.1d's attacking requirement, the twin of the blocking one above. Curse of
+-- the Nightly Hunt is a {2}{R} Enchantment -- Aura Curse reading "Enchant player.
+-- Creatures enchanted player controls attack each combat if able." (Commander
+-- Anthology 2018; name, cost, type line and oracle text checked against Scryfall.)
+-- Its shape is the point next to Curse of Death's Hold's: the same enchant-player
+-- Aura reaching the same set through the same Affected, carried on a field the
+-- CR 613 layer system never reads. The gameplay proof is Pawl.CombatSpec's
+-- AttackRequirements group.
+attackRequirementCardTests :: Registry.Type.Registry -> Tasty.TestTree
+attackRequirementCardTests registry =
+  Tasty.testGroup
+    "AttackRequirements"
+    [ HU.testCase "Curse of the Nightly Hunt is a {2}{R} Aura Curse whose only ability is a CR 508.1d attacking requirement" $ do
+        p <- Registry.printing registry "Curse of the Nightly Hunt"
+        let card = Printing.card p
+            red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        HU.assertEqual "name" (Text.pack "Curse of the Nightly Hunt") (Card.Type.name card)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red])) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
+        -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Aura, Subtype.Curse]) (TypeLine.subtypes (Card.Type.typeLine card))
+        HU.assertBool "is an Aura" (Card.isAura card)
+        -- CR 702.5d: "Enchant player", the whole player pool.
+        HU.assertEqual "enchant player" (Just (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.Type.enchant card)
+        -- "CREATURES ENCHANTED PLAYER CONTROLS attack each combat if able": the
+        -- requirement names its SUBJECT, where Lure's names the attacker to be
+        -- blocked. Same Affected as Curse of Death's Hold, different field --
+        -- which is what says this changes no characteristic.
+        HU.assertEqual
+          "one requirement, over the enchanted player's creatures"
+          [AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature))]
+          (Card.Type.attackRequirements card)
+        HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
+        HU.assertEqual "and requires no block" [] (Card.Type.blockRequirements card)
+        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+        HU.assertEqual "no spell effects" [] (Card.allEffects card)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry, blockRequirementCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry, blockRequirementCardTests registry, attackRequirementCardTests registry]

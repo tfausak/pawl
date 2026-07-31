@@ -1,4 +1,4 @@
--- Covers Pawl.Registry and Pawl.Types.Registry. Every test builds its own corpus
+-- Covers Pawl.Registry and Pawl.Registry. Every test builds its own corpus
 -- in a temporary directory: the committed data/cards is read-only here, and the
 -- failure modes (a missing file, a malformed file, a file whose name disagrees
 -- with its file name) have no representative in it by construction.

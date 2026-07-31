@@ -77,19 +77,19 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
 -- damage to you" -- is a slot read rather than a new opcode.
 --
--- Unlike variableX / chosenModes / triggerSource above, "no card's targetSpecs
--- may name it" is NOT lint-enforced here. The declaration lints that exist only
--- walk a card's SPELL modes (Card.allTargetSpecs is Modal.allTargetSpecs
--- (Card.spell card), CardSpec.hs) -- the same scope limit triggerSource's comment
--- above documents. "you" is stamped exclusively on TRIGGERED abilities (setYou
--- below is called only when a triggered ability is placed, Pawl.Engine), whose
--- target specs those lints never visit. So a card declaring a "you" target spec
--- on a triggered ability would pass them today, be prompted for a target, and
--- have the answer silently clobbered by setYou's insert (#428).
+-- "No card's targetSpecs may name it" is lint-enforced here as it is for the
+-- reserved names above, by a sweep (CardSpec.hs) that collects the target specs
+-- of every carrier: a card's spell modes and enchant slot, AND its activated,
+-- triggered and delayed abilities' modes. It has to reach the abilities to mean
+-- anything for this slot, because "you" is stamped exclusively on TRIGGERED
+-- abilities (setYou below is called only when a triggered ability is placed,
+-- Pawl.Engine): a card declaring a "you" target spec there would otherwise be
+-- prompted for a target and have the answer silently clobbered by setYou's
+-- insert.
 --
--- The triggered-ability READ lint that now exists does not close this: it is a
--- subset check, and "you" sits on its AVAILABLE side precisely because every
--- triggered ability has it bound.
+-- The triggered-ability READ lint is a different check and never covered this:
+-- it is a subset check, and "you" sits on its AVAILABLE side precisely because
+-- every triggered ability has it bound.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
@@ -106,13 +106,14 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
 -- Resolve.resolveEffects' legalSlot answers True for any slot with no target
 -- spec, which is how this slot stays readable at resolution. The same "no
--- card's targetSpecs may name it" caveat `you` carries applies here, and is
--- unenforced for the same reason (#428).
+-- card's targetSpecs may name it" rule `you` carries applies here, enforced by
+-- the same declaration sweep.
 --
 -- That an effect READING this slot sits under a condition that binds it IS
 -- enforced, by Pawl.Event.eventBindingSlots and CardSpec's "every slot a
--- triggered ability reads is bound for its condition": only CR 702.70a's
--- combat-damage condition stamps it, so reading it under any other is a failing
+-- triggered ability reads is bound for its condition": only CR 510.1b's
+-- combat-damage-to-a-player condition stamps it -- which poisonous is one
+-- printing of, not the owner of -- so reading it under any other is a failing
 -- test rather than a silent no-op.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
@@ -124,9 +125,24 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- to the card that left the battlefield checks for it only in the first zone
 -- that it went to."
 --
--- A SECOND name for what one printed word calls "it", and the two are not
--- interchangeable. CR 400.7 mints a fresh id on every zone change, so a
--- leaves-the-battlefield trigger has two objects to talk about at once:
+-- ONE slot for both directions of a zone change, because CR 400.7e is one rule
+-- about whatever moved, not a rule about the ability's bearer:
+--
+--   * a DEPARTURE, where the mover is the bearer -- Endless Cockroaches' "when
+--     this creature dies, return it to its owner's hand". The paragraphs below
+--     are about this case, which is the hard one.
+--   * an ENTRY, where the mover is generally NOT the bearer -- Aether Flash's
+--     "whenever a creature enters, this enchantment deals 2 damage to it".
+--     Here `triggerSource` is the enchantment and this slot is the entrant, so
+--     the two name unrelated objects and nothing has to be told apart. The
+--     entrant may still be gone by the time the ability resolves (CR 608.2h),
+--     which is what makes an effect reading this slot have to tolerate an id
+--     that no longer resolves either way.
+--
+-- For the departure direction it is a SECOND name for what one printed word
+-- calls "it", and the two are not interchangeable. CR 400.7 mints a fresh id on
+-- every zone change, so a leaves-the-battlefield trigger has two objects to
+-- talk about at once:
 --
 --   * `triggerSource` above is CR 113.7a's SOURCE -- the permanent as it was on
 --     the battlefield, which CR 603.10a's look-back is about and which
@@ -149,8 +165,8 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- target spec, which is how this one stays readable at resolution, and CR
 -- 608.2b's fizzle asks only about the targeted slots so it cannot rescue a
 -- spell either. "No card's targetSpecs may name it" is checked by CardSpec.hs
--- for a card's SPELL modes only, exactly as it is for `you` -- the scope limit
--- that comment describes applies here unchanged (#428). Reading it under a
+-- over every carrier of target specs, exactly as it is for `you` -- see that
+-- comment for why the abilities have to be in scope. Reading it under a
 -- condition that never binds it is the direction that IS enforced, by
 -- Pawl.Event.eventBindingSlots (see `triggerPlayer` above).
 became :: SlotName
@@ -166,6 +182,13 @@ toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
 -- recipient is a player (ToPlayer), not an object.
 toPlayer :: PlayerId -> Binding
 toPlayer pid = Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)}
+
+-- A binding that names one NUMBER and nothing else -- what a Destroy that counts
+-- what it destroyed binds for a later "for each ... destroyed this way" to read
+-- (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an amount
+-- rather than a recipient, so it rides the same field CR 601.2b's chosen X does.
+toAmount :: Natural -> Binding
+toAmount n = Binding.empty {Binding.amount = Just n}
 
 -- Bind an object under the reserved triggerSource slot. A dedicated
 -- single-purpose slot, so this insert never clobbers another binding (setCopy's

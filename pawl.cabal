@@ -94,6 +94,7 @@ library engine
   exposed-modules:
     Pawl.Action
     Pawl.Activate
+    Pawl.AttackRequirement
     Pawl.Binding
     Pawl.BlockRequirement
     Pawl.Card
@@ -270,6 +271,7 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
     Pawl.Types.Aggregation
+    Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
@@ -278,6 +280,7 @@ library types
     Pawl.Types.Card
     Pawl.Types.CardType
     Pawl.Types.CastingPermission
+    Pawl.Types.CastingRestriction
     Pawl.Types.Color
     Pawl.Types.Combat
     Pawl.Types.CombatStep
@@ -303,11 +306,13 @@ library types
     Pawl.Types.Departure
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
+    Pawl.Types.DiscardCause
     Pawl.Types.Duration
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
     Pawl.Types.EntryRewrite
+    Pawl.Types.EntwineDecision
     Pawl.Types.EventShape
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
@@ -343,6 +348,7 @@ library types
     Pawl.Types.PendingTrigger
     Pawl.Types.Phase
     Pawl.Types.PhasePattern
+    Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Player
     Pawl.Types.PlayerCounterKind

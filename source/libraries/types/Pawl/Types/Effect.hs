@@ -9,7 +9,7 @@ import Pawl.Types.ManaProduction (ManaProduction)
 import Pawl.Types.Modification (Modification)
 import Pawl.Types.MonarchTarget (MonarchTarget)
 import Pawl.Types.ObjectRef (ObjectRef)
-import Pawl.Types.Phase (Phase)
+import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import Pawl.Types.PlayerRef (PlayerRef)
@@ -38,11 +38,27 @@ import Pawl.Types.Zone (Zone)
 -- embedded card's effects, so the control-flow non-recursion above still holds.
 data Effect card
   = DealDamage SlotName Quantity
-  | -- CR 611: create a continuous effect on the slot's target for a duration.
-    -- Giant Growth and Serpent's Gift are this one opcode, differing only in the
-    -- Modification (layer 7c vs 6). Resolve stores it; it never cases on the
-    -- Modification.
-    ModifyTarget Duration Modification SlotName
+  | -- CR 611: create a continuous effect on the objects the ObjectRef names, for
+    -- a duration. Giant Growth and Serpent's Gift are this one opcode, differing
+    -- only in the Modification (layer 7c vs 6). Resolve stores it; it never cases
+    -- on the Modification.
+    --
+    -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
+    -- gives at length: one opcode serving both the chosen permanent (Giant
+    -- Growth's InSlot, filled by targeting) and the named set (Trumpet Blast's
+    -- "attacking creatures", an EachMatching swept at resolution), rather than a
+    -- sibling ModifyAll to keep in step with it. Only InSlot is a target; CR
+    -- 115.10a is the reason (ObjectRef's own comment).
+    --
+    -- CR 611.2c is the constraint the set arm has to meet, and it is what makes
+    -- this widening more than mechanical: "the set of objects it affects is
+    -- determined when that continuous effect begins. After that point, the set
+    -- won't change." So Resolve sweeps ONCE, at resolution, and freezes the
+    -- RESULT into the stored effect as Affected.TheseObjects -- never the Filter,
+    -- which would be re-evaluated each projection and would then pump a creature
+    -- that became attacking later. The one-shot opcodes that take an ObjectRef
+    -- (Destroy, Untap) are under CR 608.2c/608.2f instead, and store nothing.
+    ModifyTarget Duration Modification ObjectRef
   | -- CR 612: rewrite basic-land-type words in the target spell or permanent. The
     -- SlotName is the target slot; the two basic land types are read from the
     -- caster's binding (Binding.subtypes on Object.bindings) and baked into a
@@ -50,8 +66,11 @@ data Effect card
     -- applies it.
     ChangeText SlotName
   | -- CR 605: add one unit of mana, of the type the ManaProduction names -- one
-    -- fixed type, or one colour its controller chooses (CR 105.4). Executed by
-    -- Mana.tapForMana at payment (CR 605.3b: a mana ability never uses the stack);
+    -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
+    -- mode adding more says so by holding the opcode more than once: Sol Ring's
+    -- "{T}: Add {C}{C}" is two of these, and Mana.manaRoutesOfGiven reads a
+    -- mode's whole list as one activation's yield. Executed by Mana.tapForMana at
+    -- payment (CR 605.3b: a mana ability never uses the stack);
     -- Resolve.applyEffect never runs it. Read by Resolve.manaProduced (the
     -- "produces mana?" ABI bit).
     AddMana ManaProduction
@@ -94,10 +113,35 @@ data Effect card
     -- DestroyAll opcode was the alternative, and it would have had to carry its
     -- own copy of the CR 702.12b gate, the CR 616.1 funnel and the CR 701.19c
     -- rider -- the duplication PlayerRef already exists to avoid on the player
-    -- side (Draw's comment). Untap has since taken the same parameter for the
-    -- same reason; the other object-affecting opcodes still take a bare
-    -- SlotName, none of them having a card that names a set (#378).
-    Destroy ObjectRef Regenerability
+    -- side (Draw's comment). Untap, ModifyTarget and GainControl have since
+    -- taken the same parameter for the same reason -- the last two additionally
+    -- owing CR 611.2c a frozen set, since they STORE what they build; the other
+    -- object-affecting opcodes still take a bare SlotName, none of them having a
+    -- card that names a set (#378).
+    --
+    -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
+    -- destroyed into the effect SOURCE's live bindings -- the resolving spell
+    -- itself for a spell, the source permanent for an ability, the same holder
+    -- Create's minted-token slot uses -- so a later effect of the same resolution
+    -- can read it back as Quantity.InSlot. That is Bane of Progress' "destroy all
+    -- artifacts and enchantments. Put a +1/+1 counter on this creature for each
+    -- permanent destroyed this way", where the two sentences are two ordinary
+    -- opcodes joined by the slot rather than one fused opcode.
+    --
+    -- A DEFINITION, not a read: it is not a target and never appears in
+    -- targetSpecs, exactly like Create's minted-token slot and PlaySubgame's
+    -- loser slot.
+    --
+    -- ACTUALLY destroyed, which is not "matched by the ObjectRef": CR 702.12b's
+    -- indestructible permanent and CR 701.19a's regenerated one are both swept at
+    -- and neither is destroyed, and CR 701.8b says a permanent put into a
+    -- graveyard any other way "hasn't been 'destroyed'". So the number comes back
+    -- out of the destruction funnel (Event.destroyReturning) rather than from the
+    -- length of the swept list.
+    --
+    -- A COUNT, not the set: a rider that acts on each destroyed permanent rather
+    -- than on how many there were is not implemented (#463).
+    Destroy ObjectRef Regenerability (Maybe SlotName)
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
     -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor
@@ -133,7 +177,9 @@ data Effect card
     -- TargetSpec.
     --
     -- The Filter is the destination's card text ("another CREATURE" is
-    -- `HasCardType Creature`); the candidates it narrows are the permanents on
+    -- `HasCardType Creature`; Aura Graft's "another permanent IT CAN ENCHANT" is
+    -- `Filter.CanHostSubject`, the one atom that asks about the SUBJECT rather
+    -- than about the candidate); the candidates it narrows are the permanents on
     -- the battlefield. The "another" is NOT in the Filter: CR 701.3b's second
     -- sentence makes attaching a permanent to what it already holds do nothing
     -- whatever the card says, so the opcode always excludes the current host and
@@ -142,7 +188,9 @@ data Effect card
     -- CR 303.4j / 701.3b's FIRST sentence is the failure mode, and it is not a
     -- fizzle: a destination the subject cannot legally be attached to leaves it
     -- exactly where it was -- unmoved and unrestamped -- while the rest of the
-    -- ability resolves normally.
+    -- ability resolves normally. Only a card whose text does NOT already exclude
+    -- such a destination can reach it -- Crown of the Ages can, Aura Graft cannot
+    -- -- which is why the rule and the atom are not the same thing.
     AttachTarget SlotName Filter
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
@@ -245,7 +293,9 @@ data Effect card
     Replace Duration Uses ReplacementEffect
   | -- CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue is
-    -- `SkipNextPhase (InSlot "target") (Beginning DrawStep)`.
+    -- `SkipNextPhase (InSlot "target") (Step (Beginning DrawStep))`; Stonehorn
+    -- Dignitary is `SkipNextPhase (InSlot "target") CombatPhase`, naming a phase
+    -- rather than one of its steps (CR 500.1).
     --
     -- NOT a Replace carrying a PhaseR, and not for want of trying: CR 614.1b
     -- makes this a replacement effect and Replace already installs floating ones,
@@ -266,7 +316,7 @@ data Effect card
     -- Targetless in itself, like GainPlayerCounters: the slot a PlayerRef reads
     -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
     -- "target player", but nothing here demands it.
-    SkipNextPhase PlayerRef Phase
+    SkipNextPhase PlayerRef PhaseSelector
   | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
     -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
     -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way
@@ -296,6 +346,17 @@ data Effect card
     -- TARGETING (CR 601.2c), which is how a future "target player gets two
     -- poison counters" is written, but nothing here demands it (#120).
     GainPlayerCounters PlayerRef PlayerCounterKind Quantity
+  | -- CR 701.26a: "To tap a permanent, turn it sideways from an upright
+    -- position. Only untapped permanents can be tapped." The exact mirror of
+    -- Untap below, down to the ObjectRef -- Dream's Grip's "tap target
+    -- permanent" is `InSlot`, and an "all creatures your opponents control" tap
+    -- would be `EachMatching`.
+    --
+    -- A permanent that is ALREADY tapped is left alone rather than being an
+    -- error, which is rule 701.26a's own second sentence: there is no such
+    -- event, so nothing happens to it. That falls out of the resolution being an
+    -- assignment to TapState.Tapped and needs no arm of its own.
+    Tap ObjectRef
   | -- CR 701.26b: untap the permanents the ObjectRef names. Act of Treason's
     -- "untap that creature" is `InSlot`; Aggravated Assault's "untap all
     -- creatures you control" and Relentless Assault's "untap all creatures that
@@ -309,7 +370,7 @@ data Effect card
     -- specifically removes it from combat." THIS is that effect -- the rule's one
     -- clause that a card ASKS for rather than a condition the engine has to
     -- notice, which is why it is an opcode and not a sampler like
-    -- Combat.removeControlChanged. Labyrinth of Skophos' "{4}, {T}: Remove target
+    -- Combat.removeChanged. Labyrinth of Skophos' "{4}, {T}: Remove target
     -- attacking or blocking creature from combat" is the card text it exists
     -- for; the slot's target is what leaves.
     --
@@ -346,16 +407,23 @@ data Effect card
     -- 505.1a/506.1 detail of WHAT is inserted and the CR 511.3 question of WHERE
     -- live.
     AddPhases [ExtraPhase]
-  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the slot's target
-    -- for a duration. The new controller is THIS effect's source's controller
-    -- (the `controller` passed to applyEffect), baked into a stored
-    -- SetController continuous effect -- derived, never chosen. Also re-Sicks the
-    -- target (CR 302.6: the new controller has not controlled it continuously).
-    -- Act of Treason's control clause. NOT a reuse of ModifyTarget, whose
-    -- Modification is static card data and cannot carry a resolution-time
-    -- PlayerId. Permanent control (CR 613), distinct from Mindslaver's
-    -- player-control (CR 723, ControlPlayerNextTurn).
-    GainControl Duration SlotName
+  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
+    -- ObjectRef names, for a duration. The new controller is THIS effect's
+    -- source's controller (the `controller` passed to applyEffect), baked into a
+    -- stored SetController continuous effect -- derived, never chosen. Also
+    -- re-Sicks each object whose controller actually changed (CR 302.6: the new
+    -- controller has not controlled it continuously). NOT a reuse of
+    -- ModifyTarget, whose Modification is static card data and cannot carry a
+    -- resolution-time PlayerId. Permanent control (CR 613), distinct from
+    -- Mindslaver's player-control (CR 723, ControlPlayerNextTurn).
+    --
+    -- ObjectRef for the reason Destroy's comment gives: Act of Treason's control
+    -- clause is the InSlot arm, and Aura Thief's "you gain control of all
+    -- enchantments" is the EachMatching one. Like ModifyTarget, and unlike the
+    -- one-shots, the swept set has to be FROZEN into the stored effect (CR
+    -- 611.2c names controller changes in as many words), so an enchantment that
+    -- enters afterwards is not stolen.
+    GainControl Duration ObjectRef
   | -- CR 603.7: create a delayed triggered ability -- the one this card declares
     -- under this name (Card.delayedAbilities). First-order: the payload is card
     -- data joined by a name, so this opcode carries no nested ability and adds no
@@ -445,4 +513,23 @@ data Effect card
     -- all of them, and one with none sacrifices nothing -- "as much as possible",
     -- and forced, so neither case is prompted.
     PlayerSacrifices SlotName Filter Quantity
+  | -- CR 500.7: "Some effects can give a player extra turns. They do this by
+    -- adding the turns directly after the specified turn." The players the
+    -- PlayerRef names each get one extra turn, added directly after the turn
+    -- this resolves in. Time Warp's "target player takes an extra turn after
+    -- this one" is `InSlot`, reading a slot that TARGETING filled (CR 601.2c).
+    --
+    -- PlayerRef rather than the bare SlotName Mill and Discard take, for the
+    -- reason Draw's own comment gives: the next card whose extra turn is its
+    -- caster's ("Take an extra turn after this one") is `Relative You` and needs
+    -- no sibling opcode to say so.
+    --
+    -- No count and no "which turn": every printed extra-turn card adds ONE turn
+    -- directly after the current one, and CR 500.7's "if a player is given
+    -- multiple extra turns, the extra turns are added one at a time" is about
+    -- several such effects rather than one effect adding several. WHERE the
+    -- turns go and in what order they are taken is Engine.handoffTurn's
+    -- question, which reads GameState.extraTurns as the stack CR 500.7's last
+    -- sentence describes.
+    TakeExtraTurn PlayerRef
   deriving (Eq, Ord, Show)

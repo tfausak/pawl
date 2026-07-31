@@ -1,0 +1,143 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Haste"
+    },
+    {
+      "type": "Trample"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Lightning Skelemental",
+  "power": {
+    "type": "Literal",
+    "value": 6
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 1
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfDealsCombatDamageToPlayer"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Discard",
+                "value": [
+                  "thatPlayer",
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    },
+    {
+      "condition": {
+        "type": "StepBegins",
+        "value": [
+          {
+            "type": "Ending",
+            "value": {
+              "type": "EndStep"
+            }
+          },
+          {
+            "type": "EachTurn"
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Sacrifice",
+                "value": "self"
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Skeleton"
+      },
+      {
+        "type": "Elemental"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

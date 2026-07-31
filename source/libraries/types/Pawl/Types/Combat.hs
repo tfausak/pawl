@@ -42,7 +42,7 @@ data Combat = MkCombat
     -- 510.4 says verbatim.
     struckFirst :: Maybe (Set ObjectId),
     -- CR 506.4: who controlled each combatant AS IT JOINED combat -- the
-    -- comparand Pawl.Combat.removeControlChanged needs to answer "if its
+    -- comparand Pawl.Combat.removeChanged needs to answer "if its
     -- controller changes". Keyed by the creature, so one map covers attackers
     -- and blockers alike; written by declareAttackers and declareBlockers, the
     -- only two things that put a creature into this record.

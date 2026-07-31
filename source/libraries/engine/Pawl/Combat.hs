@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.AttackRequirement as AttackRequirement
 import qualified Pawl.BlockRequirement as BlockRequirement
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
@@ -167,6 +168,101 @@ legalAttackers pid gs =
   let grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
    in filter (\oid -> canAttackGiven grants pcs pid oid gs) (Projection.controlsGiven grants pid gs)
+
+-- CR 508.1d's two halves, computed together because neither is usable alone: the
+-- requirement instances in force, and a declaration obeying the "maximum possible
+-- number of requirements that could be obeyed without disobeying any
+-- restrictions". blockCeiling's twin, and the pair is deliberately the same shape
+-- so the two rules read the same way at their call sites.
+--
+-- The maximum is answered in CLOSED FORM -- the best declaration IS the instance
+-- set -- where blockCeiling enumerates every candidate declaration and folds. That
+-- is not an optimization of the blocking search; it is a different search, and it
+-- is exact only because of what pawl cannot yet print:
+--
+--   * every attacking RESTRICTION pawl models is per creature (CR 508.1a's own
+--     clauses, plus CR 702.3b's defender), and canAttack has already applied all
+--     of them to `candidates`, which AttackRequirement.instances then prunes its
+--     instances by;
+--   * so declaring every required creature at once disobeys nothing -- attacking
+--     with one creature cannot make another's attack illegal -- which makes that
+--     declaration legal AND maximal by construction.
+--
+-- Both bullets fail the moment a set-shaped restriction lands (Silent Arbiter's
+-- "no more than one creature can attack each combat"), and the replacement is
+-- blockCeiling's enumeration with blockCeiling's exponential cost (#459). The
+-- closed form therefore rests on a missing capability rather than on a claim about
+-- Magic.
+--
+-- So nothing here is exponential, and #342's warning about the blocking search has
+-- no counterpart: the work is one battlefield walk plus, per requirement, one
+-- Projection.affects per candidate. That last read is QUADRATIC in the battlefield
+-- rather than linear -- Projection.affects's AttachedPlayerControls arm takes a
+-- projection and a control-grant walk per candidate, which is #435's shape and is
+-- documented at that arm. Measured on a board of N Goblin Pikers under one Curse:
+-- 5 MB allocated at N=100, 15 MB at N=200, 53 MB and 0.02s at N=400.
+--
+-- CR 508.1d's cost clause -- "if a creature can't attack unless a player pays a
+-- cost, that player is not required to pay that cost, even if attacking with that
+-- creature would increase the number of requirements being obeyed" -- is not
+-- implemented: nothing in the pool makes attacking cost anything (#460).
+--
+-- (empty, empty) when no requirement is in force, which is every board without a
+-- Curse on it: the maximum is zero, every declaration obeys zero, and CR 508.1d
+-- has nothing to say.
+attackCeiling :: [ObjectId] -> GameState -> (Set ObjectId, Set ObjectId)
+attackCeiling candidates gs =
+  let required = AttackRequirement.instances candidates gs
+   in (required, required)
+
+-- How many of `required` this declaration obeys -- CR 508.1d's "the number of
+-- requirements that are being obeyed". A requirement instance is obeyed exactly
+-- when the declaration attacks with its creature. requirementsMet's twin, on a set
+-- of creatures rather than a map of pairs.
+attackRequirementsMet :: Set ObjectId -> Set ObjectId -> Int
+attackRequirementsMet required declaration = Set.size (Set.intersection required declaration)
+
+-- CR 508.1d asked of a declaration that has already passed CR 508.1a and CR
+-- 508.1c: does it obey at least as many requirements as the maximum? Split out of
+-- legalAttackDeclaration so that declareAttackers can ask it against a ceiling it
+-- computed once, rather than paying for a second one -- and so that the two of
+-- them cannot drift, since the caller's check is built from this same expression.
+obeysAttackRequirements :: (Set ObjectId, Set ObjectId) -> [ObjectId] -> Bool
+obeysAttackRequirements (required, best) chosen =
+  attackRequirementsMet required (Set.fromList chosen) >= attackRequirementsMet required best
+
+-- CR 508.1: is this declaration one the active player may make? Both checks the
+-- rules ask for, in the order they ask them: CR 508.1a's chosen-from set together
+-- with CR 508.1c's restrictions, then CR 508.1d's requirements.
+--
+-- CR 508.1c's restrictions are not a separate conjunct because they are not a
+-- separate set: canAttack is the whole of what pawl can say a creature "can't
+-- attack" for, so being a candidate IS obeying every restriction it knows (#459).
+--
+-- CR 508.1d is not a check but a MAXIMIZATION -- "if the number of requirements
+-- that are being obeyed is fewer than the maximum possible number of requirements
+-- that could be obeyed without disobeying any restrictions, the declaration of
+-- attackers is illegal" -- so it cannot be asked of the declaration alone. It is
+-- what makes declaring no attackers at all illegal while a Curse of the Nightly
+-- Hunt is on the enchanted player's battlefield.
+legalAttackDeclaration :: PlayerId -> [ObjectId] -> GameState -> Bool
+legalAttackDeclaration pid chosen gs = legalAttackDeclarationGiven (legalAttackers pid gs) chosen gs
+
+legalAttackDeclarationGiven :: [ObjectId] -> [ObjectId] -> GameState -> Bool
+legalAttackDeclarationGiven candidates chosen gs =
+  all (\oid -> List.elem oid candidates) chosen
+    && obeysAttackRequirements (attackCeiling candidates gs) chosen
+
+-- A declaration that is always legal: one attaining CR 508.1d's maximum, which
+-- with no requirement in force is the empty one (declining to attack). Not an
+-- answer the engine ever prefers to the active player's own -- declareAttackers
+-- reaches for it only when an interpreter hands back a declaration the rules
+-- forbid.
+--
+-- Taken as a filter over `candidates` rather than as Set.toList, so the forced
+-- declaration comes back in the order the player was offered its creatures.
+forcedAttackDeclaration :: (Set ObjectId, Set ObjectId) -> [ObjectId] -> [ObjectId]
+forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 
 -- CR 509.1a: a blocking creature must be untapped and controlled by the
 -- defending player.
@@ -410,61 +506,83 @@ isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
 combatants :: Combat -> Set ObjectId
 combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.elems (Combat.blockers c)))
 
--- CR 506.4: "A permanent is removed from combat if ... its controller changes."
--- The one clause of that rule whose trigger is DERIVED state, which is why it is
--- a sampler and not a hook: a control change has no event to hang a removal on --
--- a control-granting static ability (Control Magic's SetControllerToSource) is
--- re-read live by the projection, and even a stored SetController is installed by
--- a resolution that never announces "control changed" (#198). The same shape, and
--- the same argument, as Engine.checkControlContinuity's CR 302.6 scan; Engine's
--- settleForPriority runs both, at every point the board can change.
+-- CR 506.4: "A permanent is removed from combat if ... its controller changes ...
+-- or if it's an attacking or blocking creature that ... stops being a creature."
 --
--- The TIMING that costs: the rules remove the permanent the instant control
--- changes, and this notices at the next settle. Nothing can see the difference.
--- CR 117.5 makes "whenever a player would get priority" the coarsest moment
--- anything observes the board, and the two readers of the combat record -- the
--- CR 510 damage steps and Filter.IsAttacking at targeting -- both sit behind a
--- priority grant, which settles first. The window that would open it is a single
--- resolution that changes control and then reads combat status in a LATER effect
--- of the same resolution; no card in the pool has one, and the settle loop is
--- where such a card's fix would go.
+-- The two clauses of that rule whose trigger is DERIVED state, which is why this
+-- is a sampler and not a hook. Neither has an event to hang a removal on: a
+-- control-granting static ability (Control Magic's SetControllerToSource) is
+-- re-read live by the projection, and even a stored SetController is installed by
+-- a resolution that never announces "control changed" (#198); creature-ness is
+-- the same, a CR 613 layer-4 answer that changes the moment the effect producing
+-- it appears or ends. The same shape, and the same argument, as
+-- Engine.checkControlContinuity's CR 302.6 scan; Engine's settleForPriority runs
+-- both, at every point the board can change.
+--
+-- The TIMING that costs: the rules remove the permanent the instant the
+-- characteristic changes, and this notices at the next settle. Nothing can see
+-- the difference. CR 117.5 makes "whenever a player would get priority" the
+-- coarsest moment anything observes the board, and the two readers of the combat
+-- record -- the CR 510 damage steps and Filter.IsAttacking at targeting -- both
+-- sit behind a priority grant, which settles first. The window that would open it
+-- is a single resolution that changes control or card types and then reads combat
+-- status in a LATER effect of the same resolution; no card in the pool has one,
+-- and the settle loop is where such a card's fix would go.
 --
 -- It only ever REMOVES. That asymmetry is what makes the sampling sound, exactly
--- as it is there: a discrepancy proves control changed, so removing is always
--- right, while putting a creature BACK when control returns would invent a
--- CR 506.4 the rules do not have -- removal from combat is permanent for that
--- combat phase (the glossary: "has no further involvement in that combat phase").
+-- as it is there: a discrepancy proves the characteristic changed, so removing is
+-- always right, while putting a creature BACK when control returns or a new
+-- animation starts would invent a CR 506.4 the rules do not have -- removal
+-- from combat is permanent for that combat phase (the glossary: "has no further
+-- involvement in that combat phase").
 --
--- Battlefield-scoped, so this stays the control-change clause and nothing else.
--- CR 110.1 makes a permanent something on the battlefield, and an object that has
--- LEFT it was already removed by that separate clause of CR 506.4 -- whose
--- implementation is elsewhere (Pawl.Departure, and Pawl.Damage's liveness filters
--- for the CR 509.1h key this must not disturb). Without the gate, an object gone
--- from GameState.objects would answer Nothing here and be swept up under the
--- wrong clause.
+-- Battlefield-scoped, so this stays these two clauses and nothing else. CR 110.1
+-- makes a permanent something on the battlefield, and an object that has LEFT it
+-- was already removed by that separate clause of CR 506.4 -- whose implementation
+-- is elsewhere (Pawl.Departure, and Pawl.Damage's liveness filters for the
+-- CR 509.1h key this must not disturb). Without the gate, an object gone from
+-- GameState.objects would fail both tests here -- no controller to match, and no
+-- card types to find a creature in -- and be swept up under the wrong clause.
 --
--- Removal goes through Game.removeFromCombat, so a stolen ATTACKER takes its
--- blocked-ness with it (Map.delete) while a stolen BLOCKER leaves the attacker
+-- Removal goes through Game.removeFromCombat, so a removed ATTACKER takes its
+-- blocked-ness with it (Map.delete) while a removed BLOCKER leaves the attacker
 -- blocked with nothing blocking it (Set.delete inside a surviving key) --
 -- CR 509.1h's last sentence, argued in full at that function.
 --
--- A combatant with no entry in Combat.joinedUnder is left alone, because there is
--- nothing to compare it against and this only ever removes. Unreachable through
--- the engine: declareAttackers and declareBlockers write the snapshot in the same
--- update that puts the creature into the record.
+-- The types clause reads the creature card type ALONE, and that is exact today
+-- rather than a simplification of CR 506.4d/e: those two subrules are about a
+-- permanent that is also an attacked planeswalker or battle, and neither card
+-- type is modeled (#301, #302), so nothing in pawl's combat record is anything
+-- but a creature. CR 506.4's "becomes a battle" clause is unreachable for the
+-- same reason, and "phases out" for phasing's (#154).
 --
--- Nobody in combat short-circuits, which is most of the game: the grant list
--- costs a whole-battlefield scan (Projection.controlGrants), and this runs on
--- every settle pass alongside checkControlContinuity's own.
-removeControlChanged :: GameState -> GameState
-removeControlChanged gs =
+-- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
+-- clause, because there is nothing to compare it against and this only ever
+-- removes. Unreachable through the engine: declareAttackers and declareBlockers
+-- write the snapshot in the same update that puts the creature into the record.
+-- The types clause needs no such comparand -- CR 506.3 lets only a creature be
+-- declared, so every combatant was one, and "is it one now" is the whole test.
+--
+-- Nobody in combat short-circuits, which is most of the game: the grant list and
+-- the gathered candidate list each cost a whole-battlefield scan
+-- (Projection.controlGrants, Projection.gather), both hoisted out of the
+-- per-combatant loop, and this runs on every settle pass alongside
+-- checkControlContinuity's own. The gather is NOT shared with the one
+-- Sba.performStateBasedActions makes earlier in the same settle pass: a
+-- state-based action can change the board between the two, and a sample has to
+-- gather against the state it is judging (Projection.projectGiven's own caveat).
+removeChanged :: GameState -> GameState
+removeChanged gs =
   let c = GameState.combat gs
       inCombat = combatants c
       grants = Projection.controlGrants gs
-      changed oid = case Map.lookup oid (Combat.joinedUnder c) of
+      cands = Projection.gather gs
+      controlChanged oid = case Map.lookup oid (Combat.joinedUnder c) of
         Nothing -> False
         Just who -> Projection.controllerOfGiven grants Set.empty oid gs /= Just who
+      stoppedBeingCreature oid = not (Projection.isCreatureFrom cands oid gs)
       onBattlefield oid = Set.member oid (GameState.battlefield gs)
+      changed oid = controlChanged oid || stoppedBeingCreature oid
       leaving = filter (\oid -> onBattlefield oid && changed oid) (Set.toList inCombat)
    in if Set.null inCombat
         then gs
@@ -533,12 +651,20 @@ chooseDefender = do
         State.modify' $ \g ->
           g {GameState.combat = (GameState.combat g) {Combat.defender = Just chosen}}
 
--- CR 508.1: the active player chooses which creatures attack, then they become
--- tapped and attacking (CR 508.1f).
+-- CR 508.1: the active player chooses which creatures attack (CR 508.1a), the
+-- declaration is judged against CR 508.1c's restrictions and CR 508.1d's
+-- requirements, and then they become tapped and attacking (CR 508.1f).
 --
 -- No legal attackers means no prompt: declining is then the only legal answer,
 -- and asking would be inventing a decision. Same reasoning as CR 510.1c's single
--- blocker.
+-- blocker, and a requirement cannot make it wrong -- CR 508.1d's instances are
+-- minted from the candidate list, so with no candidate there is nothing to
+-- require.
+--
+-- The steps run here are CR 508.1a, 508.1c, 508.1d, 508.1f and 508.1k, in the
+-- rule's own order, plus the event CR 508.1m's triggers watch. CR 508.1b's
+-- announcement (#59) and CR 508.1g-508.1j's costs to attack (#460) are not
+-- implemented.
 declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
@@ -562,7 +688,42 @@ declareAttackers pid = do
         -- Filtered, not trusted: an interpreter cannot attack with a creature
         -- that is not legally an attacker.
         let isCandidate oid = List.elem oid candidates
-            attacking = filter isCandidate chosen
+            offered = filter isCandidate chosen
+            -- CR 508.1d's maximization, taken ONCE for both questions below --
+            -- one battlefield walk, against the same candidate list the prompt
+            -- was built from.
+            bound = attackCeiling candidates gs
+            -- Declining to attack is NOT always legal: with a CR 508.1d
+            -- requirement on the board (Curse of the Nightly Hunt), "no attacks"
+            -- can itself be the illegal answer, so the filtered answer is not a
+            -- state this can always accept. It degrades to forcedAttackDeclaration
+            -- instead -- always legal, and EQUAL to the filtered answer whenever
+            -- no requirement is in force, so no board that had a behaviour before
+            -- has a different one now.
+            --
+            -- The whole answer is replaced rather than repaired, which is
+            -- declareBlockers' posture and rests on its argument: a declaration is
+            -- illegal AS A WHOLE (CR 508.1's own "the declaration is illegal"), and
+            -- unioning the missing creatures into the player's answer would be
+            -- sound only while every restriction stays per-creature (#459). Nor is
+            -- it re-prompted -- a pure `Prompt r -> r` returns the identical wrong
+            -- answer -- and this is NOT CR 733's rewind, which is about human
+            -- error at a table rather than an engine check.
+            --
+            -- It is not the engine choosing for the player: an enforcing
+            -- interpreter never arrives here, and the player's answer was taken and
+            -- rejected before this ran. Where a requirement leaves exactly one
+            -- legal declaration, this hands back the one the rules already forced.
+            -- Where it leaves several -- any SUPERSET of the required creatures
+            -- also attains the maximum, since attacking with more is always legal
+            -- -- this takes the smallest, which is the least the rules can be said
+            -- to have forced. That is a real choice among distinguishable
+            -- declarations, and it is why nothing but a broken interpreter may
+            -- reach it; the same is true of forcedBlockDeclaration.
+            attacking =
+              if obeysAttackRequirements bound offered
+                then offered
+                else forcedAttackDeclaration bound candidates
             -- CR 508.1f: declaring an attacker taps it -- unless it has vigilance
             -- (CR 702.20b), which does not change WHETHER it attacks, only what
             -- attacking does to it.

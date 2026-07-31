@@ -15,6 +15,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Concession as Concession
 import Pawl.Types.Desync (Desync)
 import qualified Pawl.Types.Desync as Desync
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -38,7 +39,7 @@ encode p answer = case p of
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
   Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
-  Prompt.ChooseManaType {} -> Response.ChoseManaType answer
+  Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
@@ -49,6 +50,7 @@ encode p answer = case p of
   Prompt.SearchLibrary {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
+  Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
@@ -96,8 +98,8 @@ decode p response = case p of
   Prompt.ChooseManaSource {} -> case response of
     Response.ChoseManaSource oid -> Just oid
     _ -> Nothing
-  Prompt.ChooseManaType {} -> case response of
-    Response.ChoseManaType mt -> Just mt
+  Prompt.ChooseManaYield {} -> case response of
+    Response.ChoseManaYield mana -> Just mana
     _ -> Nothing
   Prompt.ChooseProliferate {} -> case response of
     Response.ChoseProliferation chosen -> Just chosen
@@ -174,6 +176,9 @@ decode p response = case p of
   Prompt.AnnouncePhyrexianPayment {} -> case response of
     Response.AnnouncedPhyrexianPayment way -> Just way
     _ -> Nothing
+  Prompt.ChooseEntwine {} -> case response of
+    Response.AnnouncedEntwine decision -> Just decision
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -211,9 +216,9 @@ defaultAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   -- Any candidate pays; the head is the least eventful fallback. NonEmpty.head is total.
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  -- Every offered type is producible (tapForMana only offers what the source can
+  -- Every offered yield is producible (tapForMana only offers what the source can
   -- make), so the head is a legal answer and the least eventful fallback.
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   -- CR 701.34a: "any number" includes none, and declining is always legal -- the
   -- least eventful thing a fallback can do, the same posture as declining to
   -- attack or block.
@@ -311,6 +316,11 @@ defaultAnswer p = case p of
   -- two are), so the head is a legal answer and the least eventful fallback when
   -- a transcript runs short. NonEmpty.head is total.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: entwine is a "may", so declining is always legal and is the
+  -- least-eventful fallback when a transcript runs short (mirrors ChooseOptional
+  -- -> Declines). It also costs no mana, which keeps a short transcript from
+  -- diverging into an unpayable cast.
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

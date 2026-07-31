@@ -45,6 +45,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -325,7 +326,7 @@ recordingAnswer p = case p of
   Prompt.Concede _ -> pure Concession.Continues
   Prompt.ChooseDefender _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseManaSource _ _ candidates -> pure (NonEmpty.head candidates)
-  Prompt.ChooseManaType _ _ _ candidates -> pure (NonEmpty.head candidates)
+  Prompt.ChooseManaYield _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseProliferate {} -> pure (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
@@ -368,6 +369,9 @@ recordingAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> pure EntwineDecision.Declines
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -1450,7 +1454,7 @@ slaveAnswer p = case p of
   -- that. Placed with the other incidental arms rather than above ChooseAction,
   -- so the one arm that reads the Decider stays first and legible.
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -1481,6 +1485,9 @@ slaveAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- CR 723.5 combat: alice, controlling bob, declares bob's attackers. Attackers
 -- are declared only when the prompt's Decider is alice for player bob; a naive

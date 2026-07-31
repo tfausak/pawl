@@ -32,6 +32,8 @@ blackCreature =
       Filter.blocking = False,
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
+      Filter.attachedToPermanent = False,
+      Filter.canHostSubject = False,
       Filter.token = False
     }
 
@@ -51,6 +53,8 @@ devoidBigCreature =
       Filter.blocking = False,
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
+      Filter.attachedToPermanent = False,
+      Filter.canHostSubject = False,
       Filter.token = False
     }
 
@@ -259,12 +263,62 @@ tests =
             . HU.assertBool "subtype does not imply attachment"
             . not
             $ Filter.matches self (blackCreature {Filter.subtypes = Set.singleton Subtype.Aura}) Filter.Type.IsAttachedToCreature,
-          -- CR 303.4: a player is enchanted BY an Aura, never attached to
-          -- anything (#190).
+          -- CR 303.4b: a player is enchanted BY an Aura, never attached to
+          -- anything -- Object.attachedTo is a field of the attached permanent,
+          -- and a player is not one.
           HU.testCase "a player candidate is vacuously false"
             . HU.assertBool "player"
             . not
             $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttachedToCreature
+        ],
+      Tasty.testGroup
+        "IsAttachedToPermanent"
+        [ HU.testCase "matches a view whose attachment says so"
+            . HU.assertBool "attached to a permanent"
+            $ Filter.matches self (blackCreature {Filter.attachedToPermanent = True}) Filter.Type.IsAttachedToPermanent,
+          HU.testCase "does not match a permanent attached to nothing"
+            . HU.assertBool "unattached"
+            . not
+            $ Filter.matches self blackCreature Filter.Type.IsAttachedToPermanent,
+          -- The pair that makes this a separate atom rather than a synonym: CR
+          -- 303.4 attaches an Aura to "an object or player", so being attached to a
+          -- permanent is strictly wider than being attached to a creature and the
+          -- implication runs one way only. Pawl.Projection fills both fields off the
+          -- same Object.attachedTo, so the views a real board produces never carry
+          -- the impossible combination -- but the matcher folds whatever it is
+          -- given, and each atom must read its own field.
+          HU.testCase "is a wider question than IsAttachedToCreature" $ do
+            let onLand = blackCreature {Filter.attachedToPermanent = True}
+            HU.assertBool "on a land: attached to a permanent" (Filter.matches self onLand Filter.Type.IsAttachedToPermanent)
+            HU.assertBool "but not to a creature" (not (Filter.matches self onLand Filter.Type.IsAttachedToCreature)),
+          -- CR 303.4b: a player is enchanted BY an Aura and is not itself attached
+          -- to anything, which is the case this atom exists to exclude -- Curse of
+          -- Death's Hold is attached to a player, so it is not a legal target for
+          -- Aura Graft.
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttachedToPermanent
+        ],
+      Tasty.testGroup
+        "CanHostSubject"
+        [ HU.testCase "matches a view the caller marked as a legal destination"
+            . HU.assertBool "can host"
+            $ Filter.matches self (blackCreature {Filter.canHostSubject = True}) Filter.Type.CanHostSubject,
+          -- CR 701.3a asks about the SUBJECT, so no fact about the candidate can
+          -- settle it: a creature is exactly what an Aura usually enchants and
+          -- still answers False until the caller that knows what is moving says
+          -- otherwise.
+          HU.testCase "is independent of every characteristic axis"
+            . HU.assertBool "being a creature does not make it a legal host"
+            . not
+            $ Filter.matches self blackCreature Filter.Type.CanHostSubject,
+          -- Vacuously False wherever no attach frames the match, which is every
+          -- view but the ones Pawl.Resolve's AttachTarget arm builds.
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.CanHostSubject
         ],
       Tasty.testGroup
         "IsToken"

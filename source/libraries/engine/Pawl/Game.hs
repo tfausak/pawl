@@ -55,8 +55,10 @@ zoneMembers zone pid gs =
 
 -- CR 506.4: remove a permanent from combat -- it "stops being an attacking,
 -- blocking, blocked, and/or unblocked creature". The one performer, shared by the
--- clauses that have producers: CR 701.19a regeneration (Pawl.Replacement) and a
--- controller change (Pawl.Combat.removeControlChanged).
+-- clauses that have producers: CR 701.19a regeneration (Pawl.Replacement), an
+-- effect that specifically removes it (Pawl.Resolve), and the two derived
+-- clauses -- a controller change, and an attacking or blocking creature that
+-- stops being a creature (both Pawl.Combat.removeChanged).
 -- Edits the GameState.combat maps directly. It lives here, in the lowest layer,
 -- because Pawl.Replacement needs it and must never import Pawl.Event.
 --

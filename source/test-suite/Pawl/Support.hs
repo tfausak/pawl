@@ -60,6 +60,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
@@ -199,7 +200,7 @@ identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -238,6 +239,9 @@ identityAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -248,7 +252,7 @@ castAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -294,6 +298,9 @@ castAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -308,7 +315,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
@@ -343,6 +350,9 @@ aggressiveAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Answers Prompt.ChooseDefender with `who` and everything else with
 -- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
@@ -368,7 +378,7 @@ playLandAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
@@ -411,6 +421,9 @@ playLandAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -433,12 +446,12 @@ randomAnswer p = case p of
         (i, g') = Random.uniformR (0, length sources - 1) g
     State.put g'
     pure (pickFrom candidates i)
-  -- And the same for WHICH type a multi-type source makes, so a random game
+  -- And the same for WHICH yield a source with several makes, so a random game
   -- exercises every colour an any-colour source can produce.
-  Prompt.ChooseManaType _ _ _ candidates -> do
+  Prompt.ChooseManaYield _ _ _ candidates -> do
     g <- State.get
-    let types = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length types - 1) g
+    let yields = NonEmpty.toList candidates
+        (i, g') = Random.uniformR (0, length yields - 1) g
     State.put g'
     pure (pickFrom candidates i)
   -- CR 701.34a: a random subset of each offered list, so a random game explores
@@ -558,6 +571,9 @@ randomAnswer p = case p of
   -- ChooseCost posture -- no Phyrexian card is in any deck Pawl.Cards builds, so
   -- a random draw here would explore nothing and only complicate replay.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
+  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
+  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
+  Prompt.ChooseEntwine {} -> pure EntwineDecision.Declines
 
 -- Total index into a non-empty run of candidates -- a turn order, the tokens one
 -- Create minted: an out-of-range draw falls back to the head, which the NonEmpty
@@ -681,6 +697,7 @@ continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
   Affected.Matching _ -> False
   Affected.Attached -> False
+  Affected.AttachedPlayerControls _ -> False
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 -- Object id 998 is a stand-in source: nothing in these tests reads the
@@ -1260,8 +1277,21 @@ addCounter kind n oid gs =
 -- (the shape addCreature and withEffect already have), not a synthetic card --
 -- every printing a caller passes is real. Type-agnostic on purpose: CR 400.7's
 -- reset is a property of the field, so the CR 400.7 test does not need an Aura.
+--
+-- Tagged ToCreature, which is the tag the real attach paths would store: every
+-- Aura in this pool has a Pool.Creatures enchant spec, and Target's candidates
+-- for that pool are ToCreature -- so an SBA that re-checks the attachment against
+-- the spec (Pawl.Sba.stillLegalEnchant) sees what casting would have left. The
+-- callers that attach to a non-creature are testing rules that read only WHICH
+-- object is named (CR 704.5n, CR 704.5p, CR 400.7), never the tag.
 attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-attach rider host gs =
+attach rider host = attachTo rider (Recipient.ToCreature host)
+
+-- attach, to whatever a Recipient names -- CR 303.4's "attached to an object or
+-- player". The door an enchant-player Aura (CR 702.5d) needs, since no ObjectId
+-- names its host.
+attachTo :: ObjectId.ObjectId -> Recipient.Recipient -> GameState.GameState -> GameState.GameState
+attachTo rider host gs =
   let set obj = obj {Object.attachedTo = Just host}
    in gs {GameState.objects = Map.adjust set rider (GameState.objects gs)}
 
@@ -1382,7 +1412,9 @@ oneMountainState mountain ph =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
-          GameState.exiledUntilMonarch = Map.empty
+          GameState.exiledUntilMonarch = Map.empty,
+          GameState.extraTurns = [],
+          GameState.turnAnchor = Nothing
         }
 
 drawStep :: Game.Type.Game ()
@@ -1467,6 +1499,8 @@ stubView table oid =
                 Filter.blocking = False,
                 Filter.attackedThisTurn = False,
                 Filter.attachedToCreature = False,
+                Filter.attachedToPermanent = False,
+                Filter.canHostSubject = False,
                 Filter.token = False
               }
         [] -> Nothing

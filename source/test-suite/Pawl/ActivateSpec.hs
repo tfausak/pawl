@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Filter as Filter
@@ -29,6 +30,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -94,7 +96,8 @@ tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Pawl.Activate"
-    [ HU.testCase "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
+    [ printedActivationTimingTests registry,
+      HU.testCase "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
         prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
         let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
             g1 = g0 {GameState.priority = Just S.alice}
@@ -723,3 +726,138 @@ isActivate :: A.Action -> Bool
 isActivate a = case a of
   A.Activate _ _ -> True
   _ -> False
+
+-- The activations offered for ONE source, so a board carrying two activatable
+-- permanents can say which of them was offered. `any isActivate` cannot.
+activationsOf :: ObjectId.ObjectId -> [A.Action] -> [A.Action]
+activationsOf oid = filter (isActivationOf oid)
+
+isActivationOf :: ObjectId.ObjectId -> A.Action -> Bool
+isActivationOf oid a = case a of
+  A.Activate o _ -> o == oid
+  _ -> False
+
+-- CR 307.5's phase-scoped rider, printed on a card about itself: Desert (Arabian
+-- Nights) prints "{T}: This land deals 1 damage to target attacking creature.
+-- Activate only during the end of combat step."
+--
+-- The mirror of Pawl.CastSpec's printedCastingRestrictionTests, and deliberately
+-- not the same type -- see Pawl.Types.ActivationTiming for why the two gates
+-- cannot share one, CR 307.5's last two sentences being the load-bearing part.
+--
+-- The fixture is alice attacking with one Goblin Piker (2/1) into a bob who
+-- controls one Desert and nothing else. Every test declares the attack itself,
+-- so the step each one then names is the only variable.
+desertBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+desertBoard piker desert =
+  let (gs0, ours, _) = S.combatBoardOf [piker] []
+      (desertId, gs1) = S.addCreature desert S.bob gs0
+   in case ours of
+        attackerId : _ ->
+          (desertId, attackerId, gs1)
+        -- combatBoardOf returns one id per printing given, so this is
+        -- unreachable; a bogus id fails the assertions rather than the suite.
+        [] -> (desertId, S.noSource, gs1)
+
+-- Declares alice's attack and hands priority to bob, the defending player (CR
+-- 506.2). The board every timing assertion below starts from, and the ones that
+-- name a later step do it by overwriting GameState.phase on this.
+desertAttacked :: GameState.GameState -> GameState.GameState
+desertAttacked gs =
+  (S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)) {GameState.priority = Just S.bob}
+
+-- Activates the first offered activation, else passes -- the interpreter that
+-- takes the Desert's ping the moment the engine offers it.
+pingAnswer :: Prompt.Prompt r -> r
+pingAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivate options of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+printedActivationTimingTests :: Registry.Type.Registry -> Tasty.TestTree
+printedActivationTimingTests registry =
+  Tasty.testGroup
+    "PrintedActivationTiming"
+    [ -- The rider, isolated. bob is in the declare attackers step with an
+      -- untapped Desert, a legal target (CR 508.1f has just tapped alice's
+      -- attacker, and it is attacking) and no cost to pay beyond {T}. The only
+      -- thing withholding the ability is the printed window.
+      --
+      -- Carries its own control in the same test, on the same board and for the
+      -- same player: bob's Prodigal Sorcerer ("{T}: This creature deals 1 damage
+      -- to any target", CR 602.2 and no rider) IS offered, so what stops the
+      -- Desert is the rider and not the step being closed to bob altogether.
+      HU.testCase "CR 307.5 the Desert's ping is NOT offered in the declare attackers step" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        desert <- Registry.printing registry "Desert"
+        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        let (gs0, _, theirs) = S.combatBoardOf [piker] [prodigalSorcerer]
+            (desertId, gs1) = S.addCreature desert S.bob gs0
+            attacked = desertAttacked gs1
+            offered = Action.legalActions S.bob attacked
+        HU.assertEqual "no activation of the Desert" [] (activationsOf desertId offered)
+        case theirs of
+          sorcererId : _ ->
+            HU.assertBool "but bob's unrestricted ability is offered in the same step" (not (null (activationsOf sorcererId offered)))
+          [] -> HU.assertFailure "fixture should have given bob a Prodigal Sorcerer",
+      -- CR 511.1: "The end of combat step has no turn-based actions. Once it
+      -- begins, the active player gets priority." The printed window, reached.
+      --
+      -- CR 511.3 is what makes the window useful at all: "As soon as the end of
+      -- combat step ENDS, all creatures ... are removed from combat", so a
+      -- creature declared as an attacker is still attacking throughout this step
+      -- and the ability still has something to target.
+      HU.testCase "CR 307.5 the Desert's ping IS offered in the end of combat step" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        desert <- Registry.printing registry "Desert"
+        let (desertId, _, board) = desertBoard piker desert
+            atEndOfCombat = (desertAttacked board) {GameState.phase = Phase.Combat CombatStep.EndOfCombat}
+        HU.assertEqual "exactly one activation, the ping" 1 (length (activationsOf desertId (Action.legalActions S.bob atEndOfCombat))),
+      -- The same board one step later, differing in nothing but the phase. The
+      -- combat record still holds the attack -- asserted, so this cannot pass
+      -- because the target pool emptied -- and the ability is gone all the same.
+      HU.testCase "CR 307.5 the Desert's ping is NOT offered in the postcombat main phase" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        desert <- Registry.printing registry "Desert"
+        let (desertId, _, board) = desertBoard piker desert
+            attacked = desertAttacked board
+            later = attacked {GameState.phase = Phase.PostcombatMain}
+        HU.assertBool "the attack is still on the record" (Combat.Type.attackersJoined (GameState.combat later))
+        HU.assertEqual "still offered in the step it names" 1 (length (activationsOf desertId (Action.legalActions S.bob (attacked {GameState.phase = Phase.Combat CombatStep.EndOfCombat}))))
+        HU.assertEqual "and not one phase later" [] (activationsOf desertId (Action.legalActions S.bob later)),
+      -- The gameplay-level proof (design.md section 4), driven through
+      -- Engine.runStep and the priority loop rather than by calling
+      -- Activate.activateAbility: bob takes every activation the engine offers
+      -- him, and the whole combat phase runs.
+      --
+      -- bob's life is the falsifier, and it is why this test is worth more than
+      -- the enumeration tests above. An engine that ignored the rider would offer
+      -- the ping at bob's FIRST priority -- in the declare attackers step -- the
+      -- Piker would die before CR 510.2 dealt its combat damage, and bob would
+      -- still be at 20. Losing the 2 life and THEN killing the attacker is the
+      -- shape only the printed window produces.
+      --
+      -- CR 704.5g: "If a creature has toughness greater than 0, it has damage
+      -- marked on it, and the total damage marked on it is greater than or equal
+      -- to its toughness, that creature has been dealt lethal damage and is
+      -- destroyed." One damage on a 2/1.
+      HU.testCase "CR 307.5 whole card: Desert pings the attacker dead in the end of combat step" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        desert <- Registry.printing registry "Desert"
+        let (desertId, attackerId, board) = desertBoard piker desert
+            after = S.runCombat pingAnswer board
+        HU.assertEqual "the Piker connected first" (Just 18) (S.lifeOf S.bob after)
+        HU.assertBool "and then died to the ping" (not (Set.member attackerId (GameState.battlefield after)))
+        HU.assertEqual "the Desert paid its {T}" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject desertId after)),
+      -- The control for the whole-card test: the same board and the same combat,
+      -- with an interpreter that never activates. The Piker survives, so what
+      -- killed it above was the ability and not combat.
+      HU.testCase "CR 307.5 whole card: the attacker survives a combat bob does not ping in" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        desert <- Registry.printing registry "Desert"
+        let (_, attackerId, board) = desertBoard piker desert
+            after = S.runCombat S.aggressiveAnswer board
+        HU.assertEqual "the Piker still connected" (Just 18) (S.lifeOf S.bob after)
+        HU.assertBool "and is still on the battlefield" (Set.member attackerId (GameState.battlefield after))
+    ]

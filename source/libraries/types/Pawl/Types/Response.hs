@@ -6,7 +6,8 @@ import Numeric.Natural (Natural)
 import Pawl.Types.Action (Action)
 import Pawl.Types.Concession (Concession)
 import Pawl.Types.Cost (Cost)
-import Pawl.Types.ManaType (ManaType)
+import Pawl.Types.EntwineDecision (EntwineDecision)
+import Pawl.Types.Mana (Mana)
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.MulliganDecision (MulliganDecision)
 import Pawl.Types.ObjectId (ObjectId)
@@ -35,12 +36,13 @@ data Response
     ChoseDefender PlayerId
   | -- CR 601.2g: the mana source the player chose to tap.
     ChoseManaSource ObjectId
-  | -- CR 605.3b / 105.4: the mana type the source's controller chose it to
-    -- produce, serialized so a DecisionLog replays an any-colour source (or a
-    -- dual land) deterministically. Its own constructor rather than a reuse of
+  | -- CR 605.3b / 105.4: the mana the source's controller chose it to produce --
+    -- the whole yield of one activation, so a Sol Ring's is two units --
+    -- serialized so a DecisionLog replays an any-colour source (or a dual land)
+    -- deterministically. Its own constructor rather than a reuse of
     -- ChoseManaSource: decode must return Nothing for a response that does not
     -- match the prompt being asked, and two prompts sharing a constructor cannot.
-    ChoseManaType ManaType
+    ChoseManaYield Mana
   | -- CR 701.34a: the permanents and players a proliferating player chose,
     -- serialized so a DecisionLog replays a proliferate deterministically. A pair
     -- rather than two constructors, because one prompt asks one question.
@@ -136,4 +138,11 @@ data Response
     -- not match the prompt being asked, and two two-valued prompts sharing a
     -- constructor cannot do that.
     AnnouncedPhyrexianPayment PhyrexianPayment
+  | -- CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
+    -- ability, serialized so a DecisionLog replays an entwined cast exactly as
+    -- it was made. Its own constructor rather than a reuse of ChoseOptional,
+    -- Conceded or DeclaredMulligan, for the reason ChoseDefender records: decode
+    -- must return Nothing for a response that does not match the prompt being
+    -- asked, and two two-valued prompts sharing a constructor cannot do that.
+    AnnouncedEntwine EntwineDecision
   deriving (Eq, Show)

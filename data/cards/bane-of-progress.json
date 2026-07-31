@@ -1,0 +1,124 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 4
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Bane of Progress",
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Destroy",
+                "value": [
+                  {
+                    "type": "Or",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      },
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Enchantment"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Regenerable"
+                  },
+                  "destroyed"
+                ]
+              },
+              {
+                "type": "PutCounters",
+                "value": [
+                  {
+                    "type": "PlusOnePlusOne"
+                  },
+                  {
+                    "type": "InSlot",
+                    "value": "destroyed"
+                  },
+                  "self"
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Elemental"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

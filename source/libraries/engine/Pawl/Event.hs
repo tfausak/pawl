@@ -34,6 +34,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -46,6 +47,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -81,8 +83,8 @@ movedOf event = case event of
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- The Moved event emitted by the same discard is the zone change; this one
-  -- describes why it happened (CR 702.29c).
-  GameEvent.Cycled _ -> Nothing
+  -- says the move WAS a discard (CR 701.9a).
+  GameEvent.Discarded {} -> Nothing
   -- CR 701.20b: "Revealing a card doesn't cause it to leave the zone it's in."
   -- The rule that makes this arm Nothing rather than an oversight -- a reveal is
   -- never a zone change, even when the card is about to make one.
@@ -97,7 +99,7 @@ damageOf event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.Cycled _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
 
@@ -109,7 +111,7 @@ castOf event = case event of
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.Cycled _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
 
@@ -122,7 +124,7 @@ revealOf event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.Cycled _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
@@ -197,7 +199,7 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 --
 -- `asOf` is the CR 608.2f / 704.3 batch board changeZoneInBatch above supplies,
 -- and Nothing for every other caller.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> Game (Maybe ObjectId)
 changeZoneAttaching asOf oid requestedDest seed = do
   gs <- State.get
   case Game.lookupObject oid gs of
@@ -330,12 +332,32 @@ changeZoneAttaching asOf oid requestedDest seed = do
 -- 704.5d cease-to-exist still compose). Ungated for CR 701.19c "can't be
 -- regenerated" (#42).
 --
--- This is the door for a batch that is a whole event to itself. destroyInBatch
--- below is the door for one nested inside a larger simultaneous event, and
--- destroyIn -- the shared body -- sets out which board each of its three readers
--- gets.
+-- This is the door for a batch that is a whole event to itself and whose caller
+-- does not care what died. destroyReturning below is that same door for a caller
+-- that does, destroyInBatch is the door for a batch nested inside a larger
+-- simultaneous event, and destroyIn -- the shared body -- sets out which board
+-- each of its three readers gets.
 destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
-destroy = destroyIn Nothing
+destroy regenerability oids = Monad.void (destroyIn Nothing regenerability oids)
+
+-- destroy, answering with the permanents it ACTUALLY destroyed -- CR 701.8b's
+-- "destroyed this way", which is emphatically not the batch it was handed. A
+-- member with indestructible never reaches the destruction event at all (CR
+-- 702.12b, the gate below), and a regenerated one has that event replaced (CR
+-- 701.8c, "A regeneration effect replaces a destruction event"), so neither was
+-- destroyed and neither is in this answer.
+--
+-- Each surviving destruction reports the SETTLED object rather than the one
+-- asked about, for the same reason the graveyard move follows it: a CR 616.1
+-- rewrite may redirect the destruction, and what was destroyed is what the loop
+-- handed back. No replacement in this pool redirects one, so the two lists are
+-- equal today.
+--
+-- A second door rather than a return type on `destroy`, the changeZoneReturning
+-- posture: the Destroy opcode's bound-count slot (Pawl.Types.Effect) is the only
+-- caller that has anything to do with the answer.
+destroyReturning :: Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
+destroyReturning = destroyIn Nothing
 
 -- destroy for a batch that is one PART of a larger simultaneous event, whose
 -- board is `asOf`. CR 704.3's state-based-action check is that event -- "the game
@@ -352,7 +374,7 @@ destroy = destroyIn Nothing
 -- in Pawl.Resolve and the test suite -- has no larger event to name, and for them
 -- the board the batch begins on IS the live one.
 destroyInBatch :: GameState -> Regenerability.Regenerability -> [ObjectId] -> Game ()
-destroyInBatch asOf = destroyIn (Just asOf)
+destroyInBatch asOf regenerability oids = Monad.void (destroyIn (Just asOf) regenerability oids)
 
 -- The shared body. Three separate readers of a board, and they do NOT all get the
 -- same one:
@@ -392,20 +414,28 @@ destroyInBatch asOf = destroyIn (Just asOf)
 -- rule, not the pool, is what says the two loops are one event. See
 -- Pawl.Replacement's applyReplacementsIn for what the frozen board covers and
 -- what stays live.
-destroyIn :: Maybe GameState -> Regenerability.Regenerability -> [ObjectId] -> Game ()
+--
+-- Answers with the members that were actually destroyed, in the order they were
+-- handed over; destroyReturning's haddock has what that answer is for and why it
+-- is narrower than `oids`.
+destroyIn :: Maybe GameState -> Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
 destroyIn asOf regenerability oids = do
   live <- State.get
   let gs = Maybe.fromMaybe live asOf
       doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid live) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
-  Monad.forM_ doomed $ \oid -> do
+  fmap Maybe.catMaybes . Monad.forM doomed $ \oid -> do
     settled <- Replacement.resolveDestruction (Just gs) regenerability oid
     case settled of
-      Nothing -> pure ()
+      -- CR 701.8c: a regeneration effect REPLACED the destruction, so nothing was
+      -- destroyed here and this member is not in the answer.
+      Nothing -> pure Nothing
       -- The graveyard move follows the SETTLED object, not the one asked about,
       -- so a rewrite that redirects the destruction is honoured. changeZone is a
       -- no-op for an object that is already gone, which is what makes it safe to
       -- have named the batch's members before any of them moved.
-      Just target -> changeZoneInBatch gs target Zone.Graveyard
+      Just target -> do
+        changeZoneInBatch gs target Zone.Graveyard
+        pure (Just target)
 
 -- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
 -- permanent -- not to be confused with `counter` below, CR 701.6's countering
@@ -605,6 +635,34 @@ drawCard pid = do
     [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
     top : _ -> changeZone top Zone.Hand
 
+-- The single discard funnel (CR 701.9a): "To discard a card, move it from its
+-- owner's hand to that player's graveyard." `pid` is the discarding player, whom
+-- that rule makes the card's owner either way, and `cause` is why -- see
+-- Pawl.Types.DiscardCause.
+--
+-- The move goes through changeZoneReturning, the CR 400.7 funnel, so a discarded
+-- card gets a new incarnation and Rest in Peace's redirect composes. The EVENT is
+-- what this function adds over calling that funnel directly, and it is not
+-- redundant with the Moved event the move records: CR 701.9c speaks of a card
+-- that "is discarded, but an effect causes it to be put into a hidden zone
+-- instead of into its owner's graveyard", so a discard the CR 614 loop redirected
+-- is still a discard while its Moved event no longer reads hand-to-graveyard. A
+-- discard trigger reads this record and never the zone pair.
+--
+-- Recorded only when the move COMPLETED. `Nothing` is an unknown id or a CR
+-- 616.1 loop that cancelled the move, and CR 603.2g is why that must record
+-- nothing: "an event that's prevented or replaced won't trigger anything."
+--
+-- The id recorded is the one the funnel MINTED, not the one that was in hand:
+-- CR 702.29c's abilities "trigger from whatever zone the card winds up in after
+-- it's cycled", and the graveyard object is the one bearing them.
+discard :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game ()
+discard cause pid oid = do
+  moved <- changeZoneReturning oid Zone.Graveyard
+  case moved of
+    Nothing -> pure ()
+    Just newId -> State.modify' (recordEvent (GameEvent.Discarded pid newId cause))
+
 -- The single reveal funnel (CR 701.20a): `pid` shows the card `oid` to all
 -- players, which here means appending what was shown to the public log. No-op
 -- for an id with no object, the posture changeZone takes.
@@ -661,7 +719,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
@@ -690,7 +748,8 @@ matchesTrigger gs bearer you cond event = case cond of
           -- before the CR 117.5 boundary -- is still read as it was ON THE
           -- BATTLEFIELD (CR 608.2h) instead of vanishing from the match. It
           -- reads LIVE whenever the id still resolves, which is the ordinary
-          -- case; the fallback mirrors eventTriggers' own `goneEntrant`.
+          -- case; the fallback is the same CR 608.2h reading eventTriggers'
+          -- `leftBattlefield` and `bystanders` take.
           --
           -- The projection is recomputed for each (bearer carrying THIS
           -- condition, entry event) pair rather than shared across the scan:
@@ -711,7 +770,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
@@ -724,7 +783,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
@@ -743,7 +802,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
@@ -753,8 +812,43 @@ matchesTrigger gs bearer you cond event = case cond of
   -- CR 702.29c: the bearer IS the card that was cycled. The event carries the
   -- incarnation the card became (CR 400.7), which is the object the scan offers
   -- as the bearer -- see cycledCard in eventTriggers below.
+  --
+  -- The CAUSE is what makes this narrower than the discard condition below, and
+  -- it is the whole of rule 702.29c's "to pay an activation cost of a cycling
+  -- ability": an ordinary discard of a card that HAS cycling -- Cathartic
+  -- Reunion pitching a Windcaller Aven -- reaches the same graveyard through the
+  -- same funnel and must fire nothing.
   TriggerCondition.SelfCycled -> case event of
-    GameEvent.Cycled oid -> oid == bearer
+    GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> oid == bearer
+    GameEvent.Discarded _ _ DiscardCause.Ordinary -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+  -- CR 701.9a: a card was discarded, by a player the relation admits. The
+  -- discarding player comes from the event; CR 109.5 fixes "you" as the
+  -- ability's controller (CR 603.3a), and Megrim's "an opponent" is every other
+  -- player -- CR 806.1 in a free-for-all, CR 102.2 in a two-player game, the
+  -- same /= either way. CR 102.3's teams are the one reading it is wrong for,
+  -- and pawl has none to express (#175).
+  --
+  -- The bearer is NOT part of the match, unlike every Self- condition here: the
+  -- enchantment watches someone else's hand and has nothing to do with the card
+  -- that left it.
+  --
+  -- CR 702.29d -- "these abilities trigger only once when a card is cycled" --
+  -- needs no clause of its own, and the DiscardCause is ignored for that reason
+  -- rather than by omission. CR 702.29a makes cycling a discard, so a cycled
+  -- card must fire this; the cycle is ONE Discarded event, so it fires it once.
+  -- TriggerSpec's "CR 702.29d cycling a card fires the discard trigger exactly
+  -- once" is the test that proves it.
+  TriggerCondition.PlayerDiscards relation -> case event of
+    GameEvent.Discarded discarder _ _ -> case relation of
+      PlayerRelation.You -> discarder == you
+      PlayerRelation.Opponent -> discarder /= you
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
@@ -791,7 +885,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
   -- CR 603.6: a zone-change trigger, matched on BOTH ends of the move -- library
   -- to graveyard. The bearer is the incarnation the card became on arrival, and
@@ -815,7 +909,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
   -- CR 603.6c narrowed by CR 700.4 ("the term dies means 'is put into a
@@ -843,7 +937,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Cycled _ -> False
+    GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
 
@@ -861,9 +955,6 @@ matchesTrigger gs bearer you cond event = case cond of
 -- The parallel for a SOURCELESS inherent ability is Pawl.Monarch.inherentMatch,
 -- which binds its own event's creature; there is no shared matcher because that
 -- one has no bearer to scope the match to.
---
--- PermanentEnters contributes no binding: the permanent that entered is not
--- named by any slot, so an enters trigger cannot refer back to it (#330).
 eventBindings :: TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
 eventBindings cond event = case (cond, event) of
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
@@ -901,6 +992,42 @@ eventBindings cond event = case (cond, event) of
   -- -- and Pawl.Activate.isHiddenZone is the classifier it would reach for.
   (TriggerCondition.SelfDies, GameEvent.Moved zc _) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- CR 400.7e again, read in the ENTRY direction: Aether Flash's "whenever a
+  -- creature enters, this enchantment deals 2 damage to IT". The object that
+  -- moved is the entrant, and "the new object that it became in the zone it
+  -- moved to" is the permanent now on the battlefield -- ZoneChange.object, the
+  -- same field the SelfDies arm above reads, for the same reason.
+  --
+  -- The SAME slot as that arm, not a second one, because CR 400.7e is one rule
+  -- and this is one of its two readings. What differs between the arms is which
+  -- object CR 113.7a's SOURCE happens to be, and that is a fact about the
+  -- CONDITION rather than about the slot: SelfDies matches on the departing
+  -- incarnation (CR 603.10a's look-back), so `triggerSource` and `became` are
+  -- two incarnations of one card, while here the bearer is some other permanent
+  -- entirely and `became` is the only name the entrant has. Two slots would
+  -- have to be kept apart by every reader for a distinction no rule draws --
+  -- and Pawl.Resolve, which is where the slot is read, cannot draw it: it never
+  -- learns which condition placed the ability.
+  --
+  -- CR 400.7e's public-zone proviso holds by construction here too, and even
+  -- more simply than for SelfDies: matchesTrigger's PermanentEnters arm has
+  -- already required `to == Battlefield`, and CR 400.2 lists the battlefield
+  -- among the public zones.
+  --
+  -- Bound whatever the Filter admits, creature or not. Whether the entrant can
+  -- RECEIVE what the payload does to it is the payload's question -- CR 120.1a
+  -- for damage, answered in Pawl.Damage.damageRecipient -- not this arm's; a
+  -- binding that existed only for creatures would make the slot's presence
+  -- depend on the entrant, which eventBindingSlots below could not express.
+  (TriggerCondition.PermanentEnters _, GameEvent.Moved zc _) ->
+    Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- Megrim's "that player": the player who discarded, which CR 701.9a's "its
+  -- owner's hand ... that player's graveyard" makes one player and the event
+  -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for
+  -- the same reason -- a player the EVENT names, which CR 109.5's `you` cannot
+  -- stand in for.
+  (TriggerCondition.PlayerDiscards _, GameEvent.Discarded discarder _ _) ->
+    Binding.setTriggerPlayer discarder Map.empty
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -930,22 +1057,27 @@ eventBindings cond event = case (cond, event) of
 -- which runs every condition against an event that genuinely fires it and
 -- compares Map.keysSet of the result against the answer here.
 --
--- Both slots are unconditional GIVEN A MATCH, and that is what makes a
--- per-CONDITION set sound at all: matchesTrigger's SelfDies arm has already
--- required the graveyard destination (so CR 400.7e's public-zone proviso holds
--- by construction, CR 400.2), and its SelfDealsCombatDamageToPlayer arm has
--- already required a player recipient (isPlayerRecipient). #384's wider
+-- Every slot named here is unconditional GIVEN A MATCH, and that is what makes
+-- a per-CONDITION set sound at all: matchesTrigger's SelfDies and
+-- PermanentEnters arms have already required the graveyard and battlefield
+-- destinations respectively (so CR 400.7e's public-zone proviso holds by
+-- construction for both, CR 400.2), and its SelfDealsCombatDamageToPlayer arm
+-- has already required a player recipient (isPlayerRecipient). #384's wider
 -- leaves-the-battlefield condition is where that stops being true: its
 -- destination may be a hand or a library, so `became` would be bound only for a
 -- PUBLIC destination and the answer would become per-condition-AND-destination,
 -- which this signature cannot express.
 eventBindingSlots :: TriggerCondition -> Set.Set SlotName.SlotName
 eventBindingSlots cond = case cond of
-  -- CR 603.6a's entrant is named by no slot, so an enters trigger cannot refer
-  -- back to it -- eventBindings' own PermanentEnters note, from this side
-  -- (#330).
+  -- CR 603.6a's two written forms differ here, and only because of which object
+  -- the bearer is. SelfEnters matches on `ZoneChange.object == bearer`, so the
+  -- bearer IS the entrant and CR 113.7a's source slot already names it; binding
+  -- it again under `became` would be a second name for one object, exactly the
+  -- SelfPutIntoGraveyardFromLibrary case below. "Whenever a [type] enters" has
+  -- no such luck: the entrant is some other permanent, so CR 400.7e's slot is
+  -- the only name it has (Aether Flash).
   TriggerCondition.SelfEnters -> Set.empty
-  TriggerCondition.PermanentEnters _ -> Set.empty
+  TriggerCondition.PermanentEnters _ -> Set.singleton Binding.became
   -- CR 603.2b's step beginning names no object and no player but the active one,
   -- and the active player is not what CR 109.5's `you` means.
   TriggerCondition.StepBegins _ _ -> Set.empty
@@ -964,6 +1096,9 @@ eventBindingSlots cond = case cond of
   -- CR 702.29c's cycled card is the bearer itself, already bound as CR 113.7's
   -- source, and rule 508.3a's declared attacker likewise.
   TriggerCondition.SelfCycled -> Set.empty
+  -- CR 701.9a's discarding player, which is nobody the bearer already names --
+  -- Megrim's "that player" is the opponent whose hand the card left.
+  TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer
   TriggerCondition.SelfAttacks _ -> Set.empty
   -- CR 113.6k: the bearer of a library-to-graveyard trigger IS the arriving
   -- incarnation, so binding it again under `became` would be a second name for
@@ -1006,43 +1141,52 @@ isPlayerRecipient r = case r of
 -- exception list that follows it (603.10a-g are leaves-the-battlefield,
 -- sacrifice, phase-out and similar, none of them enters): "objects that exist
 -- immediately after an event are checked to see if the event matched any trigger
--- conditions". That is a per-EVENT question, and the battlefield set this scan
--- walks answers a per-BOUNDARY one: the scan runs once, at CR 117.5, after CR
--- 704.5's state-based actions have already run. A permanent that enters and dies
--- inside one settle -- a creature entering with toughness 0 or less, buried by CR
--- 704.5f -- exists immediately after its own entry event and is gone by the time
--- the scan looks.
+-- conditions". That is a per-EVENT question, and the live battlefield set this
+-- scan walks answers a per-BOUNDARY one: the scan runs once, at CR 117.5, after
+-- CR 704.5's state-based actions have already run. Every permanent that left the
+-- battlefield anywhere inside the batch is missing from that set, including for
+-- the events it was plainly still there for.
 --
--- So each entry event contributes ONE extra candidate of its own: the object it
--- names, read from CR 608.2h last known information (GameState.lastKnown), scoped
--- to that event alone. Three things make that exact rather than approximate:
+-- So each event contributes the permanents that left the battlefield LATER in
+-- the same batch, read from CR 608.2h last known information
+-- (GameState.lastKnown) -- `bystanders` below, the running union of
+-- `leftBattlefield` over the events after this one. Four things make that exact
+-- rather than approximate:
 --
+--   * IT IS THE SAME READING, ONE EVENT LATER. A permanent still on the
+--     battlefield to be removed by a later event existed immediately after this
+--     one, which is precisely what the rule asks about. It reaches the event's
+--     own newcomer for free: a creature that enters as a 0/0 and is buried by CR
+--     704.5f leaves at a later index than its own entry, so its CR 603.6a entry
+--     trigger ("including the newcomers") is recovered by the general rule
+--     rather than by a case of its own.
 --   * NO DOUBLE FIRE, structurally. GameState.lastKnown is written by the zone
 --     change that DELETES an id, and CR 400.7 mints a fresh id per move, so no
---     id is ever in both `lastKnown` and `objects`. A newcomer still on the
---     battlefield at the boundary therefore has no lastKnown entry and
---     contributes no extra candidate at all; the Map.union below prefers the
---     live reading regardless.
+--     id is ever in both `lastKnown` and `objects`. A permanent still on the
+--     battlefield at the boundary therefore has no lastKnown entry and appears
+--     here not at all; the Map.unions below prefers the live reading regardless.
 --   * THE RIGHT SNAPSHOT. `lastKnown` holds the permanent as it was in the zone
---     it LEFT -- the battlefield -- so a creature that entered and died is read
---     with its continuous effects applied, which is what CR 603.10's same
---     sentence demands ("continuous effects that exist at that time are used to
---     determine what the trigger conditions are").
+--     it LEFT -- the battlefield -- so it is read with its continuous effects
+--     applied, which is what CR 603.10's same sentence demands ("continuous
+--     effects that exist at that time are used to determine what the trigger
+--     conditions are").
 --   * A CANONICAL PLACE IN THE ORDER. Candidates are a Map keyed by ObjectId and
---     traversed ascending, so the extra candidate sorts into the same
---     permanents-inner order every other candidate obeys -- it is not appended.
+--     traversed ascending, so the extra candidates sort into the same
+--     permanents-inner order every other candidate obeys -- they are not
+--     appended.
 --
 -- CR 603.10a is the OTHER half of that rule, and the exception rather than the
 -- normal case: "some zone-change triggers look back in time. These are
--- leaves-the-battlefield abilities ..." So a DEPARTURE event contributes an
--- extra candidate too -- the permanent it took off the battlefield, again read
--- from `lastKnown` -- and for that one the last-known reading is not a repair
--- for a boundary the scan arrives at late, it is what the rule asks for. See
--- `leftBattlefield` below.
+-- leaves-the-battlefield abilities ..." So a DEPARTURE event ALSO contributes
+-- the permanent it took off the battlefield -- read from the same `lastKnown` --
+-- and for that one the last-known reading is not a repair for a boundary the
+-- scan arrives at late, it is what the rule asks for. See `leftBattlefield`
+-- below, which is both the CR 603.10a source in its own right and the step
+-- `bystanders` accumulates.
 --
--- Only the event's own object is recovered, either way. A permanent that was on
--- the battlefield when some OTHER event in the same batch happened and is gone by
--- the boundary still loses that event's trigger (#289).
+-- The reverse direction is not reconstructed: a permanent that ENTERED later in
+-- the batch and left before the boundary is offered as a candidate for the
+-- batch's earlier events too, which CR 603.10 would not have it be (#441).
 --
 -- Events outer, permanents inner (ascending by id): a deterministic canonical
 -- order, which is what the CR 603.3b ordering prompt indexes into.
@@ -1081,35 +1225,6 @@ eventTriggers events gs =
               )
               (Set.toAscList (GameState.battlefield gs))
           )
-      -- CR 603.10: the newcomer this event put onto the battlefield, IF it no
-      -- longer exists. Empty for a newcomer that is still there -- `onBattlefield`
-      -- above already carries it, from live state rather than from a snapshot --
-      -- and empty for an object that ceased without a zone change ever running
-      -- over it (Resolve.cease, Departure.objectsLeaveWith), which files no last
-      -- known information.
-      --
-      -- CR 603.3a's controller comes from that same last known information: the
-      -- player who controlled it as it left the battlefield. Within one settle
-      -- that IS "the player who controlled its source at the time it triggered",
-      -- because the permanent entered and died with nothing in between that could
-      -- move control.
-      goneEntrant event = case event of
-        GameEvent.Moved zc _
-          | ZoneChange.to zc == Zone.Battlefield ->
-              case Map.lookup (ZoneChange.object zc) (GameState.lastKnown gs) of
-                Nothing -> Map.empty
-                Just lk ->
-                  Map.singleton
-                    (ZoneChange.object zc)
-                    (LastKnown.controller lk, abilitiesOf (LastKnown.characteristics lk))
-        GameEvent.Moved _ _ -> Map.empty
-        GameEvent.DamageDealt _ -> Map.empty
-        GameEvent.StepBegan _ _ -> Map.empty
-        GameEvent.SpellCast _ -> Map.empty
-        GameEvent.BecameMonarch _ -> Map.empty
-        GameEvent.Cycled _ -> Map.empty
-        GameEvent.Revealed _ _ -> Map.empty
-        GameEvent.AttackerDeclared _ -> Map.empty
       -- CR 603.10a: the permanent this event took OFF the battlefield, read from
       -- CR 608.2h last known information. Its look-back list opens with
       -- "leaves-the-battlefield abilities", and CR 603.10's own sentence says
@@ -1121,18 +1236,18 @@ eventTriggers events gs =
       -- controller is the player who controlled the permanent as it left, not
       -- the owner of the card that landed in the graveyard.
       --
-      -- This is the mirror of `goneEntrant` above, and it is possible only
-      -- because GameEvent.Moved now names BOTH ids: a departure event's
-      -- ZoneChange.object is the new incarnation in the DESTINATION zone (CR
-      -- 400.7), which `lastKnown` knows nothing about, while
+      -- It is possible only because GameEvent.Moved names BOTH ids: a departure
+      -- event's ZoneChange.object is the new incarnation in the DESTINATION zone
+      -- (CR 400.7), which `lastKnown` knows nothing about, while
       -- ZoneChange.departed is exactly the key it files under.
       --
       -- Keyed by that departing id, which by construction no longer exists, so
       -- this source cannot collide with any other: not with `onBattlefield`
-      -- (live ids), not with `goneEntrant` (which wants to == Battlefield, and
-      -- this wants the opposite), not with `cycledCard` (a cycled card leaves a
-      -- HAND), and not with `inGraveyards` (live graveyard ids). One entry per
-      -- id means one pass of `forOne`, without leaning on Map.unions' bias.
+      -- (live ids), not with `bystanders` (which unions this same function over
+      -- the LATER events only, and an id departs exactly once -- changeZone
+      -- deletes it), not with `cycledCard` (a cycled card leaves a HAND), and
+      -- not with `inGraveyards` (live graveyard ids). One entry per id means one
+      -- pass of `forOne`, without leaning on Map.unions' bias.
       --
       -- EVERY battlefield departure contributes, not only the deaths. Which
       -- destinations a condition accepts is the CONDITION's business --
@@ -1152,15 +1267,10 @@ eventTriggers events gs =
       -- incarnation instead, and that is a SECOND slot rather than a different
       -- value in this one: eventBindings binds it under Binding.became.
       --
-      -- Only the departure event's own permanent is recovered. A BYSTANDER that
-      -- was on the battlefield when some other event in the same batch happened
-      -- and is gone by the boundary still loses that event's trigger (#289) --
-      -- though the obstacle that issue names, a departure event not carrying the
-      -- departing id, is gone.
-      --
       -- Empty for a permanent that ceased without a zone change ever running
       -- over it (Resolve.cease, Departure.objectsLeaveWith), which files no last
-      -- known information -- the same hole `goneEntrant` has.
+      -- known information. That hole is `bystanders`' too, since it is built out
+      -- of this: such a permanent is recoverable for no event at all.
       leftBattlefield event = case event of
         GameEvent.Moved zc _
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
@@ -1175,13 +1285,44 @@ eventTriggers events gs =
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.SpellCast _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
-        GameEvent.Cycled _ -> Map.empty
+        GameEvent.Discarded {} -> Map.empty
         GameEvent.Revealed _ _ -> Map.empty
         GameEvent.AttackerDeclared _ -> Map.empty
+      -- CR 603.10's first sentence, per EVENT: for each event in the batch, the
+      -- permanents that were still on the battlefield when it happened and have
+      -- left by the CR 117.5 boundary. One entry per event, aligned with
+      -- `events`, so the element at index i is the union of `leftBattlefield`
+      -- over the events AFTER i -- a permanent removed by a later event was
+      -- there for this one.
+      --
+      -- STRICTLY LATER, so an event's own departure is not in its own entry.
+      -- That is not an optimisation: the departing permanent does NOT exist
+      -- immediately after the event that removed it, and it is a candidate for
+      -- that one event only through CR 603.10a's look-back, which
+      -- `leftBattlefield` supplies separately and under a different rule.
+      --
+      -- A right scan rather than a lookup table: `List.scanr` shares each
+      -- suffix's union with the one before it, so the whole batch costs one pass
+      -- and one `leftBattlefield` call per event. Building the union per event
+      -- instead would be quadratic in batch size, and a combat damage step's
+      -- batch is a whole board's worth of deaths.
+      --
+      -- `drop 1` is the alignment: scanr yields n+1 entries, the last being the
+      -- empty union after the final event, and entry i is the union over the
+      -- events from i ONWARD. Dropping the head shifts it to "from i+1 onward",
+      -- which is what pairs with events !! i.
+      --
+      -- CR 603.3a's controller, and the abilities themselves, are the ones the
+      -- permanent had as it LEFT -- one moment after the event that triggered
+      -- them, not at it. That is #47's elision, on a nearer boundary than the
+      -- live path's: `onBattlefield` reads both at the CR 117.5 scan, and this
+      -- reads them at the departure, which is somewhere between the event and
+      -- the scan. Nothing in this pool moves control or grants an ability in
+      -- that window, which is why the two coincide today.
+      bystanders = drop 1 (List.scanr (\event acc -> Map.union (leftBattlefield event) acc) Map.empty events)
       -- CR 702.29c: the card that was just cycled, wherever it landed. The
-      -- fourth candidate source, and the first that is neither on the
-      -- battlefield nor a permanent that just left it -- which is exactly what
-      -- that rule asks for:
+      -- candidate source that is neither on the battlefield nor a permanent that
+      -- left it -- which is exactly what that rule asks for:
       -- "these abilities trigger from whatever zone the card winds up in after
       -- it's cycled", the graveyard for every printing today.
       --
@@ -1197,12 +1338,18 @@ eventTriggers events gs =
       -- the ability's source when it triggered". A card in a graveyard has no
       -- controller (CR 108.4), the same reason Activate.activatorOf reaches for
       -- the owner of a card in a hand.
+      --
+      -- Scoped to the CYCLING cause, not to every discard. That is rule 702.29c
+      -- speaking about cycling triggers specifically; an ordinary discard's card
+      -- reaches the graveyard too, and is offered by `inGraveyards` below under
+      -- CR 113.6k -- which admits only a condition that can trigger from there.
       cycledCard event = case event of
-        GameEvent.Cycled oid -> case Game.lookupObject oid gs of
+        GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> case Game.lookupObject oid gs of
           Nothing -> Map.empty
           Just obj -> case Game.cardOf oid gs of
             Nothing -> Map.empty
             Just card -> Map.singleton oid (Object.owner obj, Card.triggeredAbilities card)
+        GameEvent.Discarded _ _ DiscardCause.Ordinary -> Map.empty
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
         GameEvent.StepBegan _ _ -> Map.empty
@@ -1214,7 +1361,7 @@ eventTriggers events gs =
         -- TriggerCondition first, and none exists (#322).
         GameEvent.Revealed _ _ -> Map.empty
         GameEvent.AttackerDeclared _ -> Map.empty
-      -- CR 113.6k: the fifth candidate source -- every card in every graveyard
+      -- CR 113.6k: the last candidate source -- every card in every graveyard
       -- that carries at least one ability CR 113.6k puts there. The one source
       -- that widens the SCANNED ZONE rather than recovering an object a single
       -- event names, which is why it is computed ONCE, outside the event loop,
@@ -1264,11 +1411,11 @@ eventTriggers events gs =
       -- is what rules out a double fire: one entry per id means one pass of
       -- `forOne` per id, whatever the id's abilities came from.
       --
-      -- The first four sets are disjoint by construction -- goneEntrant and
-      -- leftBattlefield both file only an id that no longer exists, and they
-      -- disagree about the event's destination (Battlefield versus anything
-      -- else), while cycledCard files only one the funnel just minted in a
-      -- graveyard -- and the left-bias is belt and braces over that.
+      -- The first four sets are disjoint by construction -- `leftBattlefield` and
+      -- `gone` both file only an id that no longer exists, and they are this
+      -- event's departure versus the LATER events' (an id departs exactly once),
+      -- while cycledCard files only one the funnel just minted in a graveyard --
+      -- and the left-bias is belt and braces over that.
       -- `inGraveyards` genuinely OVERLAPS `cycledCard`, and does so on purpose:
       -- CR 702.29c's "these abilities trigger from whatever zone the card winds up
       -- in after it's cycled" is CR 113.6k for a SelfCycled condition, so a card
@@ -1276,8 +1423,9 @@ eventTriggers events gs =
       -- same either way -- cycledCard's entry, which wins, offers the same card's
       -- printed abilities unfiltered, a superset of what inGraveyards offers for
       -- that id -- but the bias is what makes it one entry rather than two.
-      candidates event = Map.toAscList (Map.unions [onBattlefield, goneEntrant event, leftBattlefield event, cycledCard event, inGraveyards])
-   in concatMap (\event -> concatMap (forOne event) (candidates event)) events
+      candidates event gone = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, gone, cycledCard event, inGraveyards])
+      scanOne (event, gone) = concatMap (forOne event) (candidates event gone)
+   in concatMap scanOne (zip events bystanders)
 
 -- CR 113.6k: "A trigger condition that can't trigger from the battlefield
 -- functions in all zones it can trigger from. Other trigger conditions of the
@@ -1320,6 +1468,11 @@ functionsInGraveyard cond = case cond of
   -- own `cycledCard` is the source that actually serves it, and the overlap is
   -- documented at the Map.unions there.
   TriggerCondition.SelfCycled -> True
+  -- CR 113.6's default, and False for a reason: Megrim watches from the
+  -- battlefield, so "a trigger condition that can't trigger from the
+  -- battlefield" (CR 113.6k) never reaches it. A card in a graveyard does not
+  -- see an opponent discard.
+  TriggerCondition.PlayerDiscards _ -> False
   -- CR 113.6k, the condition this predicate exists for: a card cannot be put
   -- into a graveyard from a library while it is on the battlefield, so this
   -- condition can never trigger from the battlefield, and the one zone it can
@@ -1409,6 +1562,7 @@ stateTriggers gs =
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
                 TriggerCondition.SelfAttacks _ -> False
                 TriggerCondition.SelfCycled -> False
+                TriggerCondition.PlayerDiscards _ -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
                 TriggerCondition.SelfDies -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty

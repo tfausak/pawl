@@ -159,6 +159,15 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
 -- Priority is not re-checked here: the only caller is Action.legalActions, which
 -- the priority loop asks only of the player who has priority.
 --
+-- CASTING PROHIBITIONS ARE NOT CONSULTED, by any arm. CR 307.5's last two
+-- sentences say so for the sorcery-speed rider -- "Effects that would preclude
+-- that player from casting a sorcery spell don't affect the player's capability
+-- to perform that action" -- and no rule extends Pawl.Cast's CR 601.3 list to an
+-- activation either, since CR 601.3 is about beginning to CAST a spell. That is
+-- why this function reads GameState.phase directly rather than reaching for
+-- Pawl.Types.CastingRestriction, whose DuringPhase arm is spelled the same way
+-- and answers a different question (see Pawl.Types.ActivationTiming).
+--
 -- This gate makes the ability un-OFFERED. Engine.priorityLoop is what makes that
 -- binding: it rejects an action the interpreter was not offered, so a
 -- sorcery-speed activation named at instant speed does not happen either (#219).
@@ -166,6 +175,12 @@ timingOk :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState
 timingOk pid ability gs = case ActivatedAbility.timing ability of
   ActivationTiming.AnyTime -> True
   ActivationTiming.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
+  -- CR 500.1's phases and steps, compared for equality: GameState.phase is the
+  -- one the game is in, and Pawl.Types.Phase spans both kinds. The same one-line
+  -- comparison Pawl.Cast makes for CastingRestriction.DuringPhase, deliberately
+  -- duplicated rather than shared -- the two gates differ in what else they may
+  -- read, which is the whole of the paragraph above.
+  ActivationTiming.DuringPhase phase -> GameState.phase gs == phase
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability (mana abilities are handled at

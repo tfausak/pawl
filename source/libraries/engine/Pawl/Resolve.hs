@@ -10,6 +10,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Combat as Combat
@@ -37,6 +38,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
@@ -106,40 +108,49 @@ objectRefSlots ref = case ref of
 -- semantics (design.md section 1). Everything else asks classifications. The
 -- executor itself arrives with resolution; slotsOf is the read half of the
 -- dataflow lint.
+--
+-- Every arm carrying a Quantity unions Quantity.slots over it, because a
+-- Quantity.InSlot is a slot READ like any other -- the value half of the same
+-- dataflow the SlotName fields carry. X is not one of those reads (Quantity.slots
+-- says why); Resolve.readsX below is X's own half of the contract.
 slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
-  Effect.DealDamage slot _ -> Set.singleton slot
-  Effect.ModifyTarget _ _ slot -> Set.singleton slot
+  Effect.DealDamage slot quantity -> Set.insert slot (Quantity.slots quantity)
+  Effect.ModifyTarget _ _ ref -> objectRefSlots ref
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
   Effect.Search _ _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
-  Effect.PlayerSacrifices slot _ _ -> Set.singleton slot
+  Effect.PlayerSacrifices slot _ quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
-  Effect.Destroy ref _ -> objectRefSlots ref
+  -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
+  -- so it belongs to definedSlots below and must not appear here -- Create's and
+  -- PlaySubgame's slots take the same posture.
+  Effect.Destroy ref _ _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.RemoveFromCombat slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
-  Effect.Draw ref _ -> playerRefSlots ref
-  Effect.Mill slot _ -> Set.singleton slot
-  Effect.Discard slot _ -> Set.singleton slot
-  Effect.LoseLife ref _ -> playerRefSlots ref
-  Effect.GainLife ref _ -> playerRefSlots ref
+  Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.Mill slot quantity -> Set.insert slot (Quantity.slots quantity)
+  Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
+  Effect.LoseLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.GainLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
-  -- lint must not see it here.
-  Effect.Create {} -> Set.empty
+  -- lint must not see it here. Its Quantity is a read like every other.
+  Effect.Create quantity _ _ _ -> Quantity.slots quantity
   Effect.Replace {} -> Set.empty
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
   Effect.Counter slot -> Set.singleton slot
-  Effect.PutCounters _ _ slot -> Set.singleton slot
-  Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
+  Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
+  Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
-  Effect.GainControl _ slot -> Set.singleton slot
+  Effect.GainControl _ ref -> objectRefSlots ref
   Effect.ArmDelayedTrigger _ _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
@@ -150,6 +161,8 @@ slotsOf effect = case effect of
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Set.empty
+  -- The PlayerRef may name a target slot -- Time Warp's "target player".
+  Effect.TakeExtraTurn ref -> playerRefSlots ref
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -186,6 +199,7 @@ readsX = any effectReadsX
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
+      Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
@@ -197,11 +211,13 @@ readsX = any effectReadsX
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
+      Effect.TakeExtraTurn _ -> False
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
 -- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
--- to keep mana abilities off the stack, and by Mana.manaTypesOf to enumerate what
--- a source could produce. Casing on Effect is Resolve's charter.
+-- to keep mana abilities off the stack, and by Mana.manaRoutesOfGiven to
+-- enumerate what one activation of a source would add. Casing on Effect is
+-- Resolve's charter.
 --
 -- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
 -- asks whether the ability "could add mana", which an unresolved colour choice
@@ -234,6 +250,7 @@ manaProduced effect = case effect of
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
+  Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.GainControl _ _ -> Nothing
@@ -245,6 +262,7 @@ manaProduced effect = case effect of
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
+  Effect.TakeExtraTurn _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -277,6 +295,7 @@ searchesLibrary effect = case effect of
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
+  Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
@@ -288,6 +307,7 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
+  Effect.TakeExtraTurn _ -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -309,12 +329,14 @@ armedAbilities effects =
    in Set.fromList (Maybe.mapMaybe named effects)
 
 -- The slots an effect list DEFINES rather than reads: a Create that names the
--- token it mints (CR 603.7c's "it"). The write half of the same lint.
+-- token it mints (CR 603.7c's "it"), a PlaySubgame that names its loser, a
+-- Destroy that names how many it destroyed. The write half of the same lint.
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
 definedSlots effects =
   let bound effect = case effect of
         Effect.Create _ _ _ mSlot -> mSlot
         Effect.PlaySubgame slot -> Just slot
+        Effect.Destroy _ _ mSlot -> mSlot
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe bound effects)
 
@@ -353,8 +375,8 @@ rewriteObjectRef pairs ref = case ref of
 
 rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
-  Effect.ModifyTarget duration modification slot ->
-    Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) slot
+  Effect.ModifyTarget duration modification ref ->
+    Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) (rewriteObjectRef pairs ref)
   Effect.DealDamage _ _ -> effect
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
@@ -365,7 +387,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy ref regenerability -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability
+  Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
   Effect.Sacrifice _ -> effect
   Effect.RemoveFromCombat _ -> effect
   Effect.MoveToZone {} -> effect
@@ -386,10 +408,11 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters {} -> effect
   -- No rewritable land-type word.
   Effect.GainPlayerCounters {} -> effect
+  Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
-  Effect.GainControl _ _ -> effect
+  Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger _ _ -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
@@ -404,6 +427,8 @@ rewriteEffect pairs effect = case effect of
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
+  -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
+  Effect.TakeExtraTurn _ -> effect
 
 -- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
 -- an unchosen mode's effects never resolve), with every text-change affecting it
@@ -689,11 +714,11 @@ cease abilId gs =
 -- that spec is the AURA's controller, not the moving effect's -- proven by
 -- Pawl.AuraSpec's "CR 303.4j whole cards", where Crown of the Ages cannot move
 -- Setessan Training ("Enchant creature you control") onto an opponent's
--- creature. An Aura with no enchant ability answers False and cannot arise: the
+-- creature. An Aura with no enchant ability answers Nothing and cannot arise: the
 -- Pawl.CardSpec lint family holds the Aura-iff-enchant biconditional in both
 -- directions.
 --
--- The Aura branch's first conjunct is CR 303.4d's "An Aura that's also a creature
+-- The Aura branch's first test is CR 303.4d's "An Aura that's also a creature
 -- can't enchant anything" -- the RESTRICTION half of that rule, whose
 -- state-based half is Pawl.Sba.cannotBeAttached. Unreachable in this pool (such
 -- an Aura is detached by CR 704.5p and buried by CR 704.5m before any player
@@ -702,28 +727,53 @@ cease abilId gs =
 -- reconfigure exception (CR 702.151b) that nothing here can express, and the
 -- Equipment path is not this change's to alter (#193).
 --
--- The `src /= target` conjunct is CR 301.5c ("An Equipment can't equip itself")
--- and CR 303.4d ("An Aura can't enchant itself") at once.
+-- The first guard -- the destination naming `src` itself -- is CR 301.5c ("An
+-- Equipment can't equip itself") and CR 303.4d ("An Aura can't enchant itself")
+-- at once.
 --
--- False for a source that is neither, which is CR 701.3b's third sentence: "If
+-- Nothing for a source that is neither, which is CR 701.3b's third sentence: "If
 -- an effect tries to attach an object that isn't an Aura, Equipment, or
 -- Fortification to another object or player, the effect does nothing and the
 -- first object doesn't move." There is no Subtype.Fortification to case on.
-attachLegal :: ObjectId -> ObjectId -> GameState -> Bool
-attachLegal src target gs
-  | src == target = False
-  | Set.member Subtype.Equipment subtypes = Projection.isCreatureOf target gs
+--
+-- Answers with the RECIPIENT to store rather than with a Bool, because CR 303.4
+-- attachment is to "an object or player" and Object.attachedTo records which --
+-- and the tag it records has to be the one the moving permanent's OWN rules
+-- reference that destination by, not the one the moving EFFECT happened to
+-- target it with. A Pool.Players enchant spec produces ToPlayer candidates and a
+-- Pool.Permanents one produces ToObject candidates; taking the answer from the
+-- spec's own candidate list is what keeps Pawl.Sba's CR 303.4c re-check able to
+-- compare the stored value against that same list later. `destination` is
+-- therefore matched by WHICH object or player it names, not by how the caller
+-- tagged it.
+attachmentFor :: ObjectId -> Recipient -> GameState -> Maybe Recipient
+attachmentFor src destination gs
+  | Recipient.objectOf destination == Just src = Nothing
+  -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
+  -- which is also why a player destination falls to Nothing here rather than
+  -- getting a branch of its own.
+  | Set.member Subtype.Equipment subtypes = case Recipient.objectOf destination of
+      Just oid | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
+      _ -> Nothing
   | Set.member Subtype.Aura subtypes =
-      not (Projection.isCreatureOf src gs)
-        && case Game.cardOf src gs >>= Card.Type.enchant of
-          Nothing -> False
+      if Projection.isCreatureOf src gs
+        then Nothing
+        else case Game.cardOf src gs >>= Card.Type.enchant of
+          Nothing -> Nothing
           Just spec ->
-            any
-              (\r -> recipientObject r == Just target)
-              (Target.legalRecipients (Projection.controllerOf src gs) src spec gs)
-  | otherwise = False
+            List.find
+              (names destination)
+              (Set.toList (Target.legalRecipients (Projection.controllerOf src gs) src spec gs))
+  | otherwise = Nothing
   where
     subtypes = Projection.subtypesOf src gs
+    -- Same object, or same player, however either was tagged. Two object tags
+    -- (ToCreature / ToObject) name one object; ToPlayer is the only player tag,
+    -- so those compare whole.
+    names a b = case (Recipient.objectOf a, Recipient.objectOf b) of
+      (Just x, Just y) -> x == y
+      (Nothing, Nothing) -> a == b
+      _ -> False
 
 -- The players a PlayerRef names DURING a resolution, read from the slots this
 -- resolution filled rather than from the source's bindings (which is what
@@ -795,6 +845,14 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 -- between -- so a caller hands the whole list to its funnel as one batch rather
 -- than calling it once per element. Event.destroy's haddock has that half.
 --
+-- The two callers that store a CONTINUOUS effect -- ModifyTarget and GainControl
+-- -- take a further obligation from CR 611.2c: "the set of objects it affects is
+-- determined when that continuous effect begins. After that point, the set won't
+-- change." This answer is that determination, and those arms freeze it into the
+-- stored effect as Affected.TheseObjects rather than keeping the Filter around.
+-- Nothing here enforces that; it is stated so a third storing caller does not
+-- reach for Affected.Matching, which is a STATIC ability's dynamic set.
+--
 -- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
 -- determination of the order of those actions"), then ascending ObjectId within
 -- a controller. That second key is the engine's, not the resolving controller's
@@ -804,7 +862,7 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 objectRefObjects :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
 objectRefObjects legality chosen controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-    (Just recipient, True) -> Maybe.maybeToList (recipientObject recipient)
+    (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
     _ -> []
   ObjectRef.EachMatching filter_ ->
     let context = Filter.MkContext (Just controller) (Just source)
@@ -825,7 +883,15 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    -- CR 120.1a: a slot may name something damage cannot be dealt to at all. A
+    -- slot bound by Pawl.Event.eventBindings names a permanent GENERICALLY --
+    -- Aether Flash's entrant under Pawl.Binding.became, tagged from a trigger
+    -- condition that said nothing about card types -- so what it names is
+    -- classified by Damage.damageRecipient before any event is built, and an
+    -- entrant that is no longer a creature (gone by resolution, CR 608.2h) makes
+    -- this a no-op rather than a damage event nothing can apply. This is the
+    -- only site that can hand applyDamage a generically named recipient.
+    case (Map.lookup slot chosen >>= Damage.damageRecipient gs, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Quantity.evaluate viewOf context gs source quantity of
         -- An unevaluable quantity is a no-op, the powerOf posture.
         Nothing -> pure ()
@@ -836,41 +902,55 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- application. CR 120.3e / 120.3a live in applyDamage.
             Damage.applyDamage [Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)]
       _ -> pure ()
-  Effect.ModifyTarget duration modification slot ->
+  Effect.ModifyTarget duration modification ref ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
+      -- The affected objects are enumerated ONCE, here, by the same sweep every
+      -- ObjectRef-taking opcode uses. Giant Growth's slot and Trumpet Blast's
+      -- "attacking creatures" arrive as the same list, so there is one path
+      -- rather than two -- and a modification that cannot land at all (a player
+      -- recipient, an illegal slot per CR 608.2b, a set that matched nothing)
+      -- arrives as the empty one and stores nothing.
+      case objectRefObjects legality chosen controller source gs ref of
+        [] -> gs
+        targets -> case Expiry.arm controller source duration gs of
+          -- CR 611.2b: the duration never started, so the effect does nothing
+          -- and is never stored.
           Nothing -> gs
-          Just target -> case Expiry.arm controller source duration gs of
-            -- CR 611.2b: the duration never started, so the effect does nothing
-            -- and is never stored.
-            Nothing -> gs
-            Just expiry ->
-              -- CR 611.2c: the affected set is locked to this one object now.
-              -- CR 608.2h / 611.2d: and so is the VALUE -- "the answer is determined
-              -- only once, when the effect is applied". The quantities are frozen to
-              -- Literals against the SOURCE (which holds a chosen X) and the source's
-              -- CONTROLLER (whose hand a player-scoped count counts), never against
-              -- the target. See the P3b spec, section 2.4.
-              let (ts, gs1) = Game.freshTimestamp gs
-                  frozen = Projection.freezeQuantities gs source (Just controller) modification
-                  eff =
-                    ContinuousEffect.MkContinuousEffect
-                      { ContinuousEffect.source = source,
-                        ContinuousEffect.timestamp = ts,
-                        ContinuousEffect.expiry = expiry,
-                        ContinuousEffect.modification = frozen,
-                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                      }
-               in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-        -- A modification cannot land on a player (CreatureTarget/LandTarget name
-        -- objects) or an illegal slot (CR 608.2b): no-op.
-        _ -> gs
+          Just expiry ->
+            -- CR 611.2c: "the set of objects it affects is determined when that
+            -- continuous effect begins. After that point, the set won't change."
+            -- THIS is that moment: the swept ids are frozen into the stored
+            -- effect as Affected.TheseObjects, so a creature that becomes
+            -- attacking later is not in it and one that leaves combat is still
+            -- in it. Storing the Filter instead would re-derive the set at every
+            -- projection and get both wrong.
+            --
+            -- ONE effect over the whole set rather than one per object: CR 611.2c
+            -- describes a single continuous effect with a single set, and one
+            -- effect is one timestamp for CR 613.7 to order.
+            --
+            -- CR 608.2h / 611.2d: the VALUE is locked here too -- "the answer is
+            -- determined only once, when the effect is applied". The quantities
+            -- are frozen to Literals against the SOURCE (which holds a chosen X)
+            -- and the source's CONTROLLER (whose hand a player-scoped count
+            -- counts), never against an affected object. See the P3b spec,
+            -- section 2.4.
+            let (ts, gs1) = Game.freshTimestamp gs
+                frozen = Projection.freezeQuantities gs source (Just controller) modification
+                eff =
+                  ContinuousEffect.MkContinuousEffect
+                    { ContinuousEffect.source = source,
+                      ContinuousEffect.timestamp = ts,
+                      ContinuousEffect.expiry = expiry,
+                      ContinuousEffect.modification = frozen,
+                      ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
+                    }
+             in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
   Effect.ChangeText slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of
         (Just recipient, True, Just (from, to)) ->
-          case recipientObject recipient of
+          case Recipient.objectOf recipient of
             Nothing -> gs
             -- CR 611.2a: the opcode states no duration, so the effect "lasts
             -- until the end of the game" -- Duration.Indefinite, armed through
@@ -1010,7 +1090,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy ref regenerability -> do
+  Effect.Destroy ref regenerability mSlot -> do
     gs <- State.get
     -- CR 701.8: destroy them through the single funnel -- indestructible (CR
     -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide. The
@@ -1023,10 +1103,26 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     -- 702.12b gate is judged (Event.destroy) alike. An illegal slot (CR 608.2b),
     -- a non-object recipient, or a set that matched nothing all arrive here as
     -- the empty list and destroy nothing -- one path, not three.
-    Event.destroy regenerability (objectRefObjects legality chosen controller source gs ref)
+    destroyed <- Event.destroyReturning regenerability (objectRefObjects legality chosen controller source gs ref)
+    -- CR 701.8b: "destroyed this way" is what the funnel DESTROYED, never what
+    -- the sweep named -- an indestructible permanent (CR 702.12b) and one a
+    -- regeneration shield saved (CR 701.8c) were both named and neither was
+    -- destroyed, and the rule's last sentence is explicit that a permanent that
+    -- reached a graveyard any other way "hasn't been 'destroyed'". Bound onto
+    -- this effect's SOURCE so a later effect of the same resolution reads it as
+    -- Quantity.InSlot, which is Bane of Progress' rider; the read goes through
+    -- live GameState rather than the `chosen` snapshot, so it works on the
+    -- ability path as well as the spell one.
+    --
+    -- Bound even when nothing was destroyed. Zero is an answer -- "for each
+    -- permanent destroyed this way" of nothing is no counters -- where leaving
+    -- the slot unbound would make the rider's quantity UNEVALUABLE, which is a
+    -- different thing that Resolve's arms happen to treat the same way today.
+    Monad.forM_ mSlot $ \slot ->
+      State.modify' (bindAmountSlot source slot (Natural.length destroyed))
   Effect.Sacrifice slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient cannot be sacrificed
         -- CR 701.21: through the single funnel, which is NOT Event.destroy --
         -- CR 701.21a: sacrificing is not destroying. The sacrificing player is
@@ -1039,7 +1135,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.RemoveFromCombat slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
+        (Just recipient, True) -> case Recipient.objectOf recipient of
           Nothing -> gs -- a player recipient is not in combat
           -- CR 506.4: through Game.removeFromCombat, the one performer of every
           -- clause of that rule -- so this clause takes CR 509.1h's asymmetry
@@ -1056,7 +1152,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         _ -> gs
   Effect.MoveToZone slot zone ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
         Just target -> Event.changeZone target zone
@@ -1127,8 +1223,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
+                    -- CR 701.9a's move, through the shared discard funnel, so
+                    -- the discard is recorded for a rule 701.9a trigger to read
+                    -- and not merely performed.
                     bury :: [ObjectId] -> Game ()
-                    bury = Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard)
+                    bury = Monad.mapM_ (Event.discard DiscardCause.Ordinary target)
                     -- The quantity as the count it is. `n > 0` above, so the
                     -- clamp never decides anything here.
                     count = Integer.toNaturalSaturating n
@@ -1381,7 +1480,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   ActiveReplacement.uses = uses
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
-  Effect.SkipNextPhase ref phase -> do
+  Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the
     -- sorcery (CR 614.3: floating replacements "last until they're used up").
@@ -1400,6 +1499,10 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     -- yet -- "the other will remain until another occurrence can be skipped".
     --
     -- CR 113.7: the SOURCE is this effect's source, as Replace's is.
+    --
+    -- The PhaseSelector goes in untouched: whether it names one step or a whole
+    -- phase (CR 500.1) is card data, and only Pawl.Replacement's comparison and
+    -- Pawl.Engine's boundary question read it.
     gs <- State.get
     let named = playerRefPlayers chosen legality controller gs ref
         install pid g =
@@ -1409,7 +1512,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   { ActiveReplacement.effect =
                       ReplacementEffect.PhaseR
                         PhasePattern.MkPhasePattern
-                          { PhasePattern.whichPhase = phase,
+                          { PhasePattern.whichPhase = selector,
                             -- The player the resolution named, baked now. Card
                             -- data cannot name one (see
                             -- Pawl.Types.PhasePattern).
@@ -1473,7 +1576,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           -- creature), read from the reserved trigger-source slot.
           MonarchTarget.ControllerOfSource ->
             Map.lookup Binding.triggerSource chosen
-              >>= recipientObject
+              >>= Recipient.objectOf
               >>= (\o -> Projection.controllerOf o gs)
     case newMonarch of
       Nothing -> pure ()
@@ -1489,25 +1592,30 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- moves the slot's TARGET instead.
   Effect.Attach slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
-        Nothing -> pure () -- a player recipient: CR 702.5d's enchant-player is unrepresentable (#190)
-        Just target -> do
-          gs <- State.get
-          let alreadyThere = case Game.lookupObject source gs of
-                Nothing -> False
-                Just obj -> Object.attachedTo obj == Just target
-          -- CR 701.3b, both sentences: an attach that cannot legally be performed
-          -- does not move the permanent at all (it stays where it was rather than
-          -- becoming unattached), and attaching it to what it is ALREADY attached
-          -- to "does nothing" -- which matters because of the restamp below.
-          Monad.when (attachLegal source target gs && not alreadyThere) $ do
-            gs1 <- State.get
-            -- CR 701.3c: attaching to a DIFFERENT object gives it a new timestamp.
-            -- Not cosmetic -- CR 613.7 orders layer effects by it, so two things
-            -- modifying one creature apply in attach order.
-            let (ts, gs2) = Game.freshTimestamp gs1
-                move o = o {Object.attachedTo = Just target, Object.timestamp = ts}
-            State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
+      (Just recipient, True) -> do
+        gs <- State.get
+        -- The slot's recipient is a PROPOSED destination; what gets stored is the
+        -- recipient the moving permanent's own rules name it by (attachmentFor),
+        -- and Nothing there is CR 701.3b's illegal attach.
+        case attachmentFor source recipient gs of
+          Nothing -> pure ()
+          Just attachment -> do
+            let alreadyThere = case Game.lookupObject source gs of
+                  Nothing -> False
+                  Just obj -> Object.attachedTo obj == Just attachment
+            -- CR 701.3b, both sentences: an attach that cannot legally be
+            -- performed does not move the permanent at all (it stays where it was
+            -- rather than becoming unattached), and attaching it to what it is
+            -- ALREADY attached to "does nothing" -- which matters because of the
+            -- restamp below.
+            Monad.unless alreadyThere $ do
+              gs1 <- State.get
+              -- CR 701.3c: attaching to a DIFFERENT object or player gives it a
+              -- new timestamp. Not cosmetic -- CR 613.7 orders layer effects by
+              -- it, so two things modifying one creature apply in attach order.
+              let (ts, gs2) = Game.freshTimestamp gs1
+                  move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
+              State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
       _ -> pure ()
   -- CR 701.3a, in the other direction from Attach above: the SLOT's target is
   -- what moves, and the destination is chosen now rather than targeted. Crown of
@@ -1517,11 +1625,21 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.AttachTarget slot filter_ ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient: nothing on the battlefield moves
         Just subject -> do
           gs <- State.get
-          let host = Game.lookupObject subject gs >>= Object.attachedTo
+          let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
+              -- One candidate's view, with the one field a projection cannot fill:
+              -- whether the SUBJECT could legally be attached here (CR 701.3a).
+              -- The answer comes from attachmentFor -- the same function the move
+              -- itself goes through below, so an offer and a move cannot disagree
+              -- -- and the field is lazy, so a filter that never names the atom
+              -- pays nothing for it.
+              viewOf oid =
+                (Projection.viewOfObject oid gs)
+                  { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
+                  }
               -- The destinations the card's own TEXT admits: battlefield
               -- permanents matching the Filter, less the one the subject already
               -- holds. That exclusion is CR 701.3b's second sentence -- attaching
@@ -1529,10 +1647,12 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- and it is also how Crown of the Ages' "ANOTHER creature" is
               -- spelled, so a card omitting the word would behave identically.
               --
-              -- Deliberately NOT narrowed to destinations the move would be
-              -- LEGAL for. "Another creature" is the whole of what the card says;
-              -- pre-filtering past it would answer CR 303.4j's question on the
-              -- player's behalf, and CR 303.4j exists precisely because the
+              -- Narrowed to destinations the move would be LEGAL for only when the
+              -- card SAYS so, which is Filter.CanHostSubject's whole job: Aura
+              -- Graft's "another permanent IT CAN ENCHANT" narrows, and Crown of
+              -- the Ages' bare "another creature" does not. Narrowing a filter
+              -- that does not carry the atom would answer CR 303.4j's question on
+              -- the player's behalf, and CR 303.4j exists precisely because the
               -- choice can land somewhere the subject may not go.
               --
               -- Ascending, so both the elision below and a transcript are
@@ -1543,7 +1663,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               candidates =
                 List.sort
                   ( filter
-                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (Projection.viewOfObject oid gs) filter_)
+                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (viewOf oid) filter_)
                       (Set.toList (GameState.battlefield gs))
                   )
           case candidates of
@@ -1571,17 +1691,22 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- happen is the move. In particular the subject stays attached to
               -- its old host rather than becoming unattached, so CR 704.5m has
               -- nothing to bury.
-              Monad.when (attachLegal subject destination gs1) $ do
-                -- CR 701.3c: attaching to a DIFFERENT object gives it a new
-                -- timestamp, which CR 613.7 orders layer effects by. Always a
-                -- different object here -- the current host was never offered.
-                let (ts, gs2) = Game.freshTimestamp gs1
-                    move o = o {Object.attachedTo = Just destination, Object.timestamp = ts}
-                State.put gs2 {GameState.objects = Map.adjust move subject (GameState.objects gs2)}
+              -- The destination was chosen as an object off the battlefield, so
+              -- it is proposed as a bare ToObject and attachmentFor re-tags it
+              -- the way the subject's own enchant spec references it.
+              case attachmentFor subject (Recipient.ToObject destination) gs1 of
+                Nothing -> pure ()
+                Just attachment -> do
+                  -- CR 701.3c: attaching to a DIFFERENT object gives it a new
+                  -- timestamp, which CR 613.7 orders layer effects by. Always a
+                  -- different object here -- the current host was never offered.
+                  let (ts, gs2) = Game.freshTimestamp gs1
+                      move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
+                  State.put gs2 {GameState.objects = Map.adjust move subject (GameState.objects gs2)}
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           -- CR 400.7: exile the target through the funnel; register the resulting
@@ -1607,14 +1732,14 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through
       -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
-      (Just recipient, True) -> mapM_ Event.counter $ recipientObject recipient
+      (Just recipient, True) -> mapM_ Event.counter $ Recipient.objectOf recipient
       _ -> pure ()
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient takes no counters
         Just target -> case Quantity.evaluate viewOf context gs source quantity of
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
@@ -1713,6 +1838,22 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                       }
                 )
       _ -> pure ()
+  Effect.Tap ref ->
+    State.modify' $ \gs ->
+      -- CR 701.26a: turn each named permanent sideways. The exact mirror of the
+      -- Untap arm below, enumerating its victims ONCE through the same
+      -- objectRefObjects for the same CR 608.2f simultaneity, so an illegal slot
+      -- (CR 608.2b), a player recipient and a set that matched nothing all
+      -- arrive as the empty list and tap nothing.
+      --
+      -- Rule 701.26a's "only untapped permanents can be tapped" needs no guard:
+      -- assigning Tapped to something already tapped leaves it exactly as it
+      -- was, which is what "nothing happens" means for a state this coarse.
+      let tap o = o {Object.tapped = TapState.Tapped}
+       in gs
+            { GameState.objects =
+                foldr (Map.adjust tap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
+            }
   Effect.Untap ref ->
     State.modify' $ \gs ->
       -- CR 701.26b: rotate each named permanent back to the upright position.
@@ -1736,59 +1877,92 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   Effect.AddPhases extras ->
     State.modify' $ \gs ->
       gs {GameState.remaining = Turn.splicePhases (GameState.phase gs) extras (GameState.remaining gs)}
-  Effect.GainControl duration slot ->
+  Effect.GainControl duration ref ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
-          Nothing -> gs -- a player recipient cannot be controlled
-          Just target
-            -- CR 800.4b: "If an object would change to the control of a player
-            -- who has left the game, it doesn't." `controller` is baked at
-            -- trigger time (CR 113.8), so a resolution can name a player who has
-            -- since left. Nothing would clean up after the change: CR 800.4a's
-            -- fourth clause ("Then, if there are any objects still controlled by
-            -- that player, those objects are exiled") is not a state-based action
-            -- and "happens as soon as the player leaves the game", so it has
-            -- already run and does not run again. Without this guard the
-            -- permanent would simply sit on the battlefield controlled by a
-            -- player who is not in the game.
-            | List.notElem controller (Game.stillPlaying gs) -> gs
-            | otherwise -> case Expiry.arm controller source duration gs of
-                -- CR 611.2b: the duration never started -- no control effect is
-                -- stored, and nothing is re-Sicked, because control never changed.
-                Nothing -> gs
-                Just expiry ->
-                  -- CR 613.1b / 611.2c: the new controller is `controller` (this
-                  -- effect's source's controller), baked in now -- derived, never
-                  -- chosen. CR 302.6: the new controller has not controlled the
-                  -- permanent continuously, so it is re-Sicked.
-                  --
-                  -- Unless control does not actually move. CR 302.6 asks whether
-                  -- control was CONTINUOUS, and gaining control of a permanent you
-                  -- already control interrupts nothing, so the clock must not
-                  -- reset (#206). Act of Treason may legally target your own
-                  -- creature -- untapping it is the reason to.
-                  --
-                  -- Compared against the PROJECTED controller, read before the new
-                  -- effect is stored, not against Object.owner: you may already
-                  -- control a permanent you do not own (Control Magic), and
-                  -- re-gaining that one interrupts nothing either.
-                  let (ts, gs1) = Game.freshTimestamp gs
-                      eff =
-                        ContinuousEffect.MkContinuousEffect
-                          { ContinuousEffect.source = source,
-                            ContinuousEffect.timestamp = ts,
-                            ContinuousEffect.expiry = expiry,
-                            ContinuousEffect.modification = Modification.SetController controller,
-                            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                          }
-                      alreadyTheirs = Projection.controllerOf target gs == Just controller
-                      sicken o = if alreadyTheirs then o else o {Object.sickness = Sickness.Sick}
-                   in gs1
-                        { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
-                          GameState.objects = Map.adjust sicken target (GameState.objects gs1)
+      -- Enumerated ONCE, by the sweep every ObjectRef-taking opcode shares: Act
+      -- of Treason's slot and Aura Thief's "all enchantments" arrive as the same
+      -- list, and a player recipient, an illegal slot (CR 608.2b) and a set that
+      -- matched nothing all arrive as the empty one and change nothing.
+      case objectRefObjects legality chosen controller source gs ref of
+        [] -> gs
+        targets
+          -- CR 800.4b: "If an object would change to the control of a player
+          -- who has left the game, it doesn't." `controller` is baked at
+          -- trigger time (CR 113.8), so a resolution can name a player who has
+          -- since left. Nothing would clean up after the change: CR 800.4a's
+          -- fourth clause ("Then, if there are any objects still controlled by
+          -- that player, those objects are exiled") is not a state-based action
+          -- and "happens as soon as the player leaves the game", so it has
+          -- already run and does not run again. Without this guard the
+          -- permanent would simply sit on the battlefield controlled by a
+          -- player who is not in the game.
+          | List.notElem controller (Game.stillPlaying gs) -> gs
+          | otherwise -> case Expiry.arm controller source duration gs of
+              -- CR 611.2b: the duration never started -- no control effect is
+              -- stored, and nothing is re-Sicked, because control never changed.
+              Nothing -> gs
+              Just expiry ->
+                -- CR 613.1b / 611.2c: the new controller is `controller` (this
+                -- effect's source's controller), baked in now -- derived, never
+                -- chosen. CR 302.6: the new controller has not controlled the
+                -- permanent continuously, so it is re-Sicked.
+                --
+                -- Unless control does not actually move. CR 302.6 asks whether
+                -- control was CONTINUOUS, and gaining control of a permanent you
+                -- already control interrupts nothing, so the clock must not
+                -- reset (#206). Act of Treason may legally target your own
+                -- creature -- untapping it is the reason to; Aura Thief's "all
+                -- enchantments" sweeps its own controller's as well. So the
+                -- question is asked PER OBJECT, not once for the whole set.
+                --
+                -- Compared against the PROJECTED controller, read before the new
+                -- effect is stored, not against Object.owner: you may already
+                -- control a permanent you do not own (Control Magic), and
+                -- re-gaining that one interrupts nothing either.
+                --
+                -- CR 611.2c: one stored effect over the frozen id set, exactly as
+                -- ModifyTarget stores one -- "the set of objects it affects is
+                -- determined when that continuous effect begins", so an
+                -- enchantment that enters after this is not in it.
+                let (ts, gs1) = Game.freshTimestamp gs
+                    eff =
+                      ContinuousEffect.MkContinuousEffect
+                        { ContinuousEffect.source = source,
+                          ContinuousEffect.timestamp = ts,
+                          ContinuousEffect.expiry = expiry,
+                          ContinuousEffect.modification = Modification.SetController controller,
+                          ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
                         }
-        _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+                    sicken o = o {Object.sickness = Sickness.Sick}
+                    moved = filter (\oid -> Projection.controllerOf oid gs /= Just controller) targets
+                 in gs1
+                      { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
+                        GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
+                      }
+  Effect.TakeExtraTurn ref -> do
+    gs <- State.get
+    let named = playerRefPlayers chosen legality controller gs ref
+        -- CR 500.7: "If multiple players are given extra turns, the extra turns
+        -- are added one at a time, in APNAP order (see rule 101.4)." The
+        -- intersection is Draw's, for Draw's reasons: apnapOrder supplies the
+        -- ORDER and `named` the MEMBERSHIP, so a seat the rotation still names
+        -- but playerRefPlayers does not -- a departed player, who stopped being
+        -- one at CR 102.1 while keeping their seat -- gets no turn. A departed
+        -- player named through a TARGET slot can still get an entry, since that
+        -- arm reads the slot rather than the roster; CR 800.4k catches it at the
+        -- handoff, where the turn simply does not begin.
+        --
+        -- Observable, not cosmetic: the pushes below are what CR 500.7's last
+        -- sentence then reverses, so APNAP order is what decides which of two
+        -- players takes their extra turn first.
+        takers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+    -- CR 500.7: "the extra turns are added ONE AT A TIME ... the MOST RECENTLY
+    -- CREATED turn will be taken first." So each taker is pushed onto the head
+    -- in turn, and the last one pushed is the first one Engine.handoffTurn pops
+    -- -- a stack, not a queue. A second TakeExtraTurn resolving later in the
+    -- same turn lands in front of this one's entries for the same reason, which
+    -- is the half of the rule that two Time Warps exercise.
+    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (flip (:)) (GameState.extraTurns g) takers})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
@@ -1870,6 +2044,21 @@ bindLoserSlot holder slot loser gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer loser) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
+-- CR 701.8b: bind how many permanents a destruction actually destroyed into
+-- `slot` on `holder`, so a later effect of the same resolution can read it as
+-- Quantity.InSlot. The third of the same shape, after bindSlot (an object) and
+-- bindLoserSlot (a player); this one binds a NUMBER, which rides the binding
+-- field CR 601.2b's chosen X rides.
+--
+-- Left behind on the holder after the resolution ends, exactly as the other two
+-- are. Harmless and unreadable: only an effect naming this slot can see it, the
+-- D4 lint makes every such read live under an effect list that also BINDS it,
+-- and a second sweep on the same holder overwrites the value before reading it.
+bindAmountSlot :: ObjectId -> SlotName -> Natural -> GameState -> GameState
+bindAmountSlot holder slot n gs =
+  let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
 -- CR 701.23: do to a found card what the search said -- a move for every
 -- destination and, for one of them, a CR 701.20a reveal first. The move goes
 -- through the CR 400.7 funnel either way, so a replacement watching the
@@ -1920,11 +2109,3 @@ newestBattlefieldOf _ before after =
 reorderLibrary :: PlayerId -> [ObjectId] -> GameState -> GameState
 reorderLibrary pid order gs =
   gs {GameState.library = Map.insert pid (Seq.fromList order) (GameState.library gs)}
-
--- The object a recipient names, if any (CR 612 targets a spell or permanent, not
--- a player).
-recipientObject :: Recipient -> Maybe ObjectId
-recipientObject r = case r of
-  Recipient.ToObject oid -> Just oid
-  Recipient.ToCreature oid -> Just oid
-  Recipient.ToPlayer _ -> Nothing

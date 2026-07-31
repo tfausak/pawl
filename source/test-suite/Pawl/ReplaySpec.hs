@@ -25,11 +25,14 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
@@ -47,6 +50,11 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+
+-- The one-unit yield of a single-colour mana ability, which is what a
+-- ChooseManaYield candidate looks like for every source but Sol Ring.
+oneMana :: Color.Color -> Mana.Mana
+oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color}]
 
 combatReplayTests :: Tasty.TestTree
 combatReplayTests =
@@ -85,6 +93,49 @@ combatReplayTests =
                 p = Prompt.ChooseModes decider S.alice oid legal 1
                 answer = Set.singleton (ModeIndex.MkModeIndex 1)
              in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          -- CR 702.42a: whether the entwine cost was paid decides how many modes
+          -- the spell has, so a transcript that lost it would replay a different
+          -- spell. Both answers are checked: a decode that ignored the response
+          -- and returned a fixed value would pass one leg by accident.
+          HU.testCase "ChooseEntwine records and replays an EntwineDecision" $
+            let entwineCost =
+                  Cost.Type.MkCost
+                    { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                      Cost.Type.components = []
+                    }
+                p = Prompt.ChooseEntwine decider S.alice oid entwineCost
+             in do
+                  HU.assertEqual
+                    "entwining round trips"
+                    (Just EntwineDecision.Entwines)
+                    (Replay.decode p (Replay.encode p EntwineDecision.Entwines))
+                  HU.assertEqual
+                    "declining round trips"
+                    (Just EntwineDecision.Declines)
+                    (Replay.decode p (Replay.encode p EntwineDecision.Declines))
+                  -- Discriminating: fails if ChooseEntwine reuses another
+                  -- two-valued response rather than getting its own constructor.
+                  HU.assertEqual
+                    "an optional decision is not an entwine announcement"
+                    Nothing
+                    (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)),
+          HU.testCase "a short transcript declines entwine" $
+            -- CR 702.42a: declining is always legal and costs nothing, so it is
+            -- the least-eventful fallback when a transcript runs short.
+            HU.assertEqual
+              "declines"
+              EntwineDecision.Declines
+              ( Replay.defaultAnswer
+                  ( Prompt.ChooseEntwine
+                      decider
+                      S.alice
+                      oid
+                      Cost.Type.MkCost
+                        { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                          Cost.Type.components = []
+                        }
+                  )
+              ),
           HU.testCase "ChooseCopyTarget records and replays a Maybe ObjectId" $
             let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
                 answer = Just (ObjectId.MkObjectId 7)
@@ -225,21 +276,21 @@ combatReplayTests =
               "the head"
               (ObjectId.MkObjectId 7)
               (Replay.defaultAnswer (Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
-          -- CR 605.3b / 105.4: the colour an any-colour source was tapped for is a
+          -- CR 605.3b / 105.4: the mana an any-colour source was tapped for is a
           -- decision, so it has to survive a transcript like any other.
-          HU.testCase "ChooseManaType round-trips through the transcript" $
-            let black = ManaType.Colored Color.Black
-                red = ManaType.Colored Color.Red
-                p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (black NonEmpty.:| [red])
+          HU.testCase "ChooseManaYield round-trips through the transcript" $
+            let black = oneMana Color.Black
+                red = oneMana Color.Red
+                p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (black NonEmpty.:| [red])
              in do
                   HU.assertEqual "black round trips" (Just black) (Replay.decode p (Replay.encode p black))
                   -- Discriminating for the same reason the pair above is: a decode
                   -- that returned the head would pass one leg by accident.
                   HU.assertEqual "red round trips" (Just red) (Replay.decode p (Replay.encode p red)),
-          HU.testCase "a mana-source choice does not decode as a mana-type choice" $
-            -- Discriminating: this fails if ChooseManaType reuses ChoseManaSource
+          HU.testCase "a mana-source choice does not decode as a mana-yield choice" $
+            -- Discriminating: this fails if ChooseManaYield reuses ChoseManaSource
             -- rather than getting its own constructor.
-            let p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red])
+            let p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red])
              in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
           -- CR 701.34a: who was proliferated onto is a decision, so it has to
           -- survive a transcript like any other.
@@ -347,11 +398,11 @@ combatReplayTests =
                       (PhyrexianPayment.PaysLife NonEmpty.:| [PhyrexianPayment.PaysMana])
                   )
               ),
-          HU.testCase "a short transcript produces the first offered mana type" $
+          HU.testCase "a short transcript produces the first offered mana yield" $
             HU.assertEqual
               "the head"
-              (ManaType.Colored Color.Black)
-              (Replay.defaultAnswer (Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red]))),
+              (oneMana Color.Black)
+              (Replay.defaultAnswer (Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red]))),
           HU.testCase "a short transcript defends with the first candidate" $
             -- Discriminating against a defaultAnswer that returned the active
             -- player, or a candidate not on the offered list: the first candidate

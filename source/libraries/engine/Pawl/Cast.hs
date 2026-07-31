@@ -23,7 +23,10 @@ import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -54,6 +57,10 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 -- CR 117.1a / 304.1: an instant is castable whenever its controller has
 -- priority; anything else needs sorcery speed (CR 302.1 / 307.1). Priority is
 -- implicit: the engine only offers actions to the priority holder.
+--
+-- The window the RULES give a spell, and not the whole of when it may be cast: a
+-- card may narrow this further with a printed restriction (CR 601.3), which
+-- `castable` conjoins separately through printedRestrictionsOk.
 timingOk :: PlayerId -> ObjectId -> GameState -> Bool
 timingOk pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
@@ -151,6 +158,48 @@ affordableX pid oid gs cost =
   let climb x = if payableCostAt (x + 1) pid oid gs cost then climb (x + 1) else x
    in if Cost.hasVariable cost then climb 0 else 0
 
+-- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
+-- this modal spell's modes -- "You may choose all modes of this spell instead of
+-- just the number specified. If you do, you pay an additional [cost]" -- or
+-- Nothing when entwining is not on offer at all.
+--
+-- Three conditions, and each is a different rule:
+--
+--   1. The card HAS entwine. Rule 702.42a is a static ability of the spell
+--      itself, so it is read off the card's printed keywords (Keyword.entwineCost)
+--      one step before CR 601.2a moves it to the stack.
+--   2. Every printed mode is LEGAL. CR 700.2a: "If one of the modes would be
+--      illegal (due to an inability to choose legal targets, for example), that
+--      mode can't be chosen." Choosing ALL modes is therefore not open when one
+--      of them cannot be chosen. Unobservable for Dream's Grip, whose two modes
+--      draw from the same unfiltered pool and so are fillable together or not at
+--      all, and written anyway: without it an entwined cast would announce fewer
+--      modes than rule 702.42a says it chose, and castSpell's own size check
+--      would turn the whole cast into a silent no-op.
+--   3. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
+--      additional costs", measured with the same payableCost predicate
+--      castability was gated on, at CR 601.2b's X=0 floor. An option the player
+--      cannot take is not offered, which is the same posture ChooseCost takes
+--      towards an unaffordable alternative.
+--
+-- None of the three is a choice being made for the player: an option the card
+-- does not have, that CR 700.2a closes, or that CR 118.3 says cannot be paid, is
+-- not an option.
+--
+-- WHICH candidate will carry the cost is not decided here: this answers only
+-- whether SOME route pays it, and castSpell narrows the candidates to the routes
+-- that really do once the answer is in.
+entwineOffer :: PlayerId -> ObjectId -> GameState -> Maybe Cost
+entwineOffer pid oid gs = case Game.cardOf oid gs of
+  Nothing -> Nothing
+  Just card -> do
+    cost <- Keyword.entwineCost (Card.Type.keywords card)
+    let modal = Card.Type.spell card
+        legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) modal gs
+    Monad.guard (Natural.length legal == Modal.modeCount modal)
+    Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) (Cost.costsFor oid gs))
+    pure cost
+
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
 -- filters, so the two can never disagree about where to look.
@@ -222,10 +271,75 @@ controlsLegendaryCreature pid gs =
           && Projection.isCreatureOf oid gs
    in any qualifies (GameState.battlefield gs)
 
+-- CR 601.3's PROHIBITION half -- "no rule or effect prohibits that player from
+-- casting it" -- as printed on the card about ITSELF. Rally the Troops' "Cast
+-- this spell only during the declare attackers step and only if you've been
+-- attacked this step."
+--
+-- The exact counterweight to permissionsOf above, and read the same way: off the
+-- card, never through the projection. CR 113.6e is the rule -- "an object's
+-- ability that restricts or modifies how that particular object can be played or
+-- cast functions in any zone from which it could be played or cast and also on
+-- the stack" -- which for this pool means a hand, where the CR 613 layer system
+-- does not reach. ALL of them must hold, which is what CR 601.3's "no ...
+-- prohibits" means; one permission, by contrast, suffices.
+--
+-- Casing on the arms is a classification, not an effect's identity: Pawl.Cast is
+-- the sole reader of Pawl.Types.CastingRestriction exactly as it is of
+-- CastingPermission.
+printedRestrictionsOk :: PlayerId -> ObjectId -> GameState -> Bool
+printedRestrictionsOk pid oid gs = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card -> all (restrictionMet pid gs) (Card.Type.castingRestrictions card)
+
+-- Does the game state satisfy this one printed clause?
+restrictionMet :: PlayerId -> GameState -> CastingRestriction.CastingRestriction -> Bool
+restrictionMet pid gs restriction = case restriction of
+  -- CR 500.1: a step or a stepless phase, compared against the one the game is
+  -- in. Reading GameState.phase is the same closed-half act as CR 307.1's
+  -- main-phase test in Turn.sorcerySpeedWindow.
+  CastingRestriction.DuringPhase phase -> GameState.phase gs == phase
+  CastingRestriction.AttackedThisStep -> attackedThisStep pid gs
+
+-- "only if you've been attacked this step", asked of the CASTING player.
+--
+-- CR 506.2: "During the combat phase of a two-player game, the nonactive player
+-- is the defending player; that player, planeswalkers they control, and battles
+-- they protect may be attacked." Combat.defender is that player, so being
+-- attacked at all requires being them. CR 508.8's Combat.attackersJoined is the
+-- other half -- whether "creatures [have been] declared as attackers or put onto
+-- the battlefield attacking" -- and it is the HISTORICAL flag rather than
+-- Combat.attackers, because CR 506.4 removing the lone attacker from combat does
+-- not un-attack anybody.
+--
+-- Eightfold Maze's ruling is the reading pinned here, both sentences of it: "If
+-- all the attacking creatures attack your planeswalkers, you can't cast Eightfold
+-- Maze. To cast it, a creature needs to have attacked _you_." pawl has no
+-- planeswalker card type (#301) and one defending player (CR 802's
+-- attack-multiple-players option is unavailable, #175), so every attack in this
+-- pool is aimed at that player and the two conjuncts are the whole question.
+--
+-- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
+-- combat PHASE. The two spans coincide for every card in the pool -- the flag is
+-- written only by Pawl.Combat.declareAttackers (CR 508.1, the declare attackers
+-- step's turn-based action) and by putOntoBattlefieldAttacking, whose only
+-- producer is a CR 508.3a attack trigger resolving in that same step -- but that
+-- is a fact about the pool rather than a rule (#447).
+attackedThisStep :: PlayerId -> GameState -> Bool
+attackedThisStep pid gs =
+  let combat = GameState.combat gs
+   in Combat.defender combat == Just pid && Combat.attackersJoined combat
+
 -- Affordable and correctly timed, actually in a zone this player may cast it
--- from, fillable, and not prohibited. CR 601.2b: affordable means at least ONE
--- candidate cost is payable -- a spell may have alternative costs, and only one
--- need be.
+-- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least
+-- ONE candidate cost is payable -- a spell may have alternative costs, and only
+-- one need be.
+--
+-- THREE prohibitions, not one, and they are three because they are carried by
+-- three different things: a continuous effect on the player
+-- (PlayerEffect.prohibitsCasting -- Rule of Law, Silence), the card's own printed
+-- text (printedRestrictionsOk), and rule 205.4e itself
+-- (legendaryRestrictionOk).
 castable :: PlayerId -> ObjectId -> GameState -> Bool
 castable pid oid gs =
   timingOk pid oid gs
@@ -234,6 +348,7 @@ castable pid oid gs =
     -- (Rule of Law, Silence). Gated HERE, upstream of Action.legalActions,
     -- because the engine never offers an illegal action and then rejects it.
     && not (PlayerEffect.prohibitsCasting pid gs)
+    && printedRestrictionsOk pid oid gs
     && legendaryRestrictionOk pid oid gs
     && any (payableCost pid oid gs) (Cost.costsFor oid gs)
     && targetable pid oid gs
@@ -283,11 +398,25 @@ permissionsOf card =
 -- permission does not reach it either. Unobservable in this pool (no card both
 -- searches this way and is a legendary instant or sorcery) and written anyway,
 -- because the alternative is a cast the rules forbid.
+--
+-- printedRestrictionsOk rides along too, and it is the closest call of the three:
+-- a "Cast this spell only during the declare attackers step" IS about timing, so
+-- the ruling's "except for timing" could be read to lift it. pawl takes the
+-- narrower reading -- the ruling excepts the RULES' own timing window (CR 302.1 /
+-- 307.1), not a prohibition the card prints on itself, which is what CR 601.3's
+-- second half covers. Unobservable in this pool for the same reason as CR 205.4e:
+-- Panglacial Wurm is the only card with the permission and it prints no
+-- restriction.
 castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
       affordable oid = any (payableCost pid oid gs) (Cost.costsFor oid gs)
-      allowed oid = permitted oid && affordable oid && legendaryRestrictionOk pid oid gs && targetable pid oid gs
+      allowed oid =
+        permitted oid
+          && affordable oid
+          && printedRestrictionsOk pid oid gs
+          && legendaryRestrictionOk pid oid gs
+          && targetable pid oid gs
    in if PlayerEffect.prohibitsCasting pid gs
         then []
         else filter allowed (Game.zoneMembers Zone.Library pid gs)
@@ -339,13 +468,44 @@ castSpell pid oid = do
     Nothing -> pure ()
     Just card -> do
       let decider = Decide.deciderFor pid gs
-          legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) (Card.Type.spell card) gs
-          count = Modal.selectionCount (Card.Type.spell card)
+          modal = Card.Type.spell card
+          legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) modal gs
+      -- CR 702.42a: entwine, asked FIRST -- before the mode choice CR 601.2b
+      -- lists first -- because rule 702.42a states the widened selection and the
+      -- extra payment as ONE decision ("You may choose all modes of this spell
+      -- instead of just the number specified. If you do, you pay an additional
+      -- [cost]"). A player who entwines has thereby announced their mode choice,
+      -- so there is nothing left for ChooseModes to ask; a player who declines
+      -- is asked the ordinary question one line below, in 601.2b's own order.
+      --
+      -- The choice is never made for them. entwineOffer answers Nothing only
+      -- where there is no option to offer -- no entwine, an illegal mode (CR
+      -- 700.2a), or no payable route -- and where there IS one, both answers go
+      -- to the player and the engine takes neither.
+      --
+      -- The answer is carried as the additional Cost itself rather than as a
+      -- flag, so the two things it changes -- the mode count just below and the
+      -- candidate costs further down -- read the same value.
+      entwined <- case entwineOffer pid oid gs of
+        Nothing -> pure Nothing
+        Just extra -> do
+          decision <- Trans.lift (Program.prompt (Prompt.ChooseEntwine decider pid oid extra))
+          pure $ case decision of
+            EntwineDecision.Entwines -> Just extra
+            EntwineDecision.Declines -> Nothing
+      -- CR 700.2 normally, CR 702.42a's "all modes" when the entwine cost is
+      -- being paid. The printed ModeSelection is untouched either way: entwine
+      -- overrides the count for this ONE cast, it does not reprint the card.
+      let count = case entwined of
+            Just _ -> Modal.modeCount modal
+            Nothing -> Modal.selectionCount modal
       -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
       -- unprompted) exactly when there is nothing to choose -- as many legal
       -- modes as the selection demands or fewer (a non-modal card's one mode,
       -- or a modal card whose only-just-fillable modes leave no real
-      -- choice), #50.
+      -- choice), #50. An entwined cast is always in that case: entwineOffer has
+      -- already established that every mode is legal, so `legal` has exactly
+      -- `count` members and CR 702.42a's "all modes" is the only answer.
       chosenModes <-
         if Natural.length legal <= count
           then pure legal
@@ -359,7 +519,16 @@ castSpell pid oid = do
         -- is really choosing); one payable candidate is forced and unprompted.
         -- Reject-not-repair: an answer outside the offered set makes the whole
         -- cast a no-op.
-        let payable = filter (payableCost pid oid gs) (Cost.costsFor oid gs)
+        --
+        -- CR 601.2f: "The total cost is the mana cost or alternative cost (as
+        -- determined in rule 601.2b), plus all additional costs and cost
+        -- increases". An announced entwine is added to every candidate BEFORE
+        -- the payability filter, so the routes offered are the ones that can
+        -- actually pay it -- and CR 118.9d is what makes it apply to an
+        -- alternative cost as readily as to the printed one. What the caster
+        -- then chooses between, and what is finally paid, already carries it.
+        let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
+            payable = filter (payableCost pid oid gs) (fmap withEntwine (Cost.costsFor oid gs))
         Monad.unless (null payable) $ do
           chosenCost <- case payable of
             [only] -> pure only

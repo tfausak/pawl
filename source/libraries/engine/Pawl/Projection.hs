@@ -46,6 +46,7 @@ import qualified Pawl.Types.Power as Power
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
@@ -275,9 +276,10 @@ affects source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
   -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
   -- source names nothing, so the set is empty and the effect applies to no one.
-  Affected.Attached -> case Game.lookupObject source gs of
-    Nothing -> False
-    Just src -> Object.attachedTo src == Just oid
+  -- A source attached to a PLAYER names no object, so the set is empty here too
+  -- -- CR 702.5d's enchant-player Auras reach the battlefield through
+  -- AttachedPlayerControls below instead.
+  Affected.Attached -> (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
   Affected.Matching f ->
     let -- CR 109.5: "you" on a continuous effect is the effect's SOURCE's
         -- controller; ControlledBy compares the affected object's controller to
@@ -299,6 +301,42 @@ affects source oid a partial gs = case a of
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
+  -- CR 303.4b / 303.4m: the SOURCE's attachment again, but read for the PLAYER it
+  -- names -- "creatures enchanted player controls". A source that is unattached,
+  -- or attached to an object, names no player and so affects nobody.
+  --
+  -- The controller comparison is CR 613.1b's layer 2, already applied by the time
+  -- this set is asked: a creature the enchanted player has since lost control of
+  -- is out of the set, and one they have gained control of is in it. Same
+  -- `controllerOf oid gs` the Matching arm above hands to the candidate's view.
+  --
+  -- Unlike that arm's `perspective`, this call is FORCED on every candidate, so
+  -- the #197 hazard is worth stating rather than inheriting: controllerOf ->
+  -- controlGrants -> liveGiven -> affectsBase re-enters this function, which would
+  -- loop if a SetLandSubtype effect (the only kind liveGiven feeds) ever carried
+  -- an AttachedPlayerControls set. None does -- the pool's one static example is
+  -- Blood Moon, and Pawl.Resolve stores every ContinuousEffect with
+  -- Affected.TheseObjects -- and controllerOfGiven's own namesFrom answers False
+  -- for this arm rather than recursing.
+  --
+  -- The Filter's perspective is the Matching arm's, not the enchanted player's:
+  -- CR 109.5 fixes "you" as the effect's source's controller, and being the set
+  -- the enchanted player controls does not move that. Curse of Death's Hold's
+  -- filter is a bare card type, so nothing forces it today either.
+  --
+  -- The candidate's controller is bound ONCE and used twice (the comparison and
+  -- the view), because controllerOf is the un-hoisted variant -- it rebuilds
+  -- controlGrants, a whole-board walk, on every call. That still costs one such
+  -- walk per candidate per layer this set is asked in, which the Matching arm
+  -- above avoids only by leaving the same call an unforced thunk. Hoisting it out
+  -- of `affects` would mean threading the grant list through every caller.
+  Affected.AttachedPlayerControls f -> case Game.lookupObject source gs >>= Object.attachedTo of
+    Just (Recipient.ToPlayer pid) ->
+      let controller = controllerOf oid gs
+       in Set.member oid (GameState.battlefield gs)
+            && controller == Just pid
+            && Filter.matches (Filter.MkContext (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller gs) f
+    _ -> False
 
 -- CR 205.4a: supertypes are read from the printed type line -- no Modification
 -- arm changes a supertype (#311). Empty when the object has no underlying card.
@@ -425,6 +463,12 @@ viewOfCard card =
           -- CR 303.4b: only a permanent on the battlefield is attached to
           -- anything, and a printed card off it is not one.
           Filter.attachedToCreature = False,
+          -- CR 303.4 again: nor is it attached to a permanent, for the same reason.
+          Filter.attachedToPermanent = False,
+          -- CR 701.3a: only Pawl.Resolve's AttachTarget arm fills this field, and
+          -- its candidates are battlefield permanents, so a card in a library or a
+          -- hand is never asked whether an attach could land on it.
+          Filter.canHostSubject = False,
           -- CR 111.6: "A token isn't a card." This builder describes a card in a
           -- zone the battlefield is not (a library search, viewUpTo's fallback),
           -- and CR 704.5d already made a token in any such zone cease to exist --
@@ -479,9 +523,29 @@ viewOfCharacteristics oid pc controller gs =
       -- That is why this field must stay lazy: `affects` calls this function
       -- from inside a projection, and forcing a second projection there would
       -- recurse. See Pawl.Filter.View's own note on the field.
-      Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo of
+      -- A player host answers False without a projection at all: CR 701.3a's
+      -- question is whether the attachment is to a CREATURE, and a player is not
+      -- one -- Recipient.objectOf's Nothing is that answer.
+      Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
         Nothing -> False
         Just host -> isCreatureOf host gs,
+      -- CR 303.4: the same stored attachment, asked a question that stops short of
+      -- the host's characteristics -- does the attachment name an object that is
+      -- on the battlefield, which CR 110.1 is the definition of a permanent, or a
+      -- player? Recipient.objectOf splits the two, and the battlefield membership
+      -- is what rules out a stale attachment to a host that has already left:
+      -- CR 704.5m buries such an Aura, but only on the next pass, and until then
+      -- it is attached to nothing that exists. Unlike the field above there is no
+      -- projection OF ANOTHER OBJECT behind this, so it carries no recursion
+      -- hazard and needs no laziness argument.
+      Filter.attachedToPermanent = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
+        Nothing -> False
+        Just host -> Set.member host (GameState.battlefield gs),
+      -- CR 701.3a: filled only by Pawl.Resolve's AttachTarget arm, which is the
+      -- one place that knows what is being moved. Every view this function builds
+      -- is asked about some candidate in isolation, and "could the subject be
+      -- attached here" is not a question about the candidate alone.
+      Filter.canHostSubject = False,
       -- CR 111.6: not a characteristic either, and unlike the two fields above it
       -- is not even mutable -- Object.source is fixed for the life of the object
       -- (CR 400.7 mints a new one on every zone change), so this is a constant
@@ -1176,19 +1240,23 @@ data Aspect
 -- Controller and Types here. pawl does not derive it: attacking-ness is a stored
 -- combat record (CR 109.3 is emphatic that it is not a characteristic), CR 506.4
 -- is performed by EDITING that record, and the edit happens between projections
--- (Combat.removeControlChanged, from Engine.settleForPriority) rather than inside
--- one. So the record is a fixed INPUT to any single projection: applying one
+-- (Combat.removeChanged, from Engine.settleForPriority) rather than inside one.
+-- So the record is a fixed INPUT to any single projection: applying one
 -- modification before another cannot change what this arm answers, which is
--- exactly the question CR 613.8a asks. CR 506.4's "an effect specifically
--- removes it from combat" clause does not disturb that: Effect.RemoveFromCombat
--- edits the same record from Resolve.applyEffect, which is a RESOLUTION and so
--- between projections just as squarely as a settle is. The remaining clauses
--- (#246) arrive by one of those two doors as well.
+-- exactly the question CR 613.8a asks. That holds for the TYPES clause too, and
+-- it is the one that looks most like a dependency: a modification really can be
+-- what makes a permanent stop being a creature, but the removal it causes lands
+-- at the next settle, not inside the projection that noticed it. CR 506.4's "an
+-- effect specifically removes it from combat" clause does not disturb it either:
+-- Effect.RemoveFromCombat edits the same record from Resolve.applyEffect, which
+-- is a RESOLUTION and so between projections just as squarely as a settle is. The
+-- clauses that remain unbuilt -- phasing (#154), and the ones about an attacked
+-- planeswalker or battle (#301, #302) -- arrive by one of those two doors as well.
 --
 -- What that costs is TIMING, not dependency: the rules remove the permanent the
--- instant control changes, and pawl removes it at the next settle. That window is
--- argued where the sampling happens. The effect clause has no such window at
--- all, because a resolving effect edits the record on the spot.
+-- instant control or creature-ness changes, and pawl removes it at the next
+-- settle. That window is argued where the sampling happens. The effect clause has
+-- no such window at all, because a resolving effect edits the record on the spot.
 filterReads :: Filter.Type.Filter -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
@@ -1227,6 +1295,23 @@ filterReads f = case f of
   -- which is the conservative direction. Nothing in the pool puts this atom in an
   -- affected set, so no ordering observable today turns on the choice (#357).
   Filter.Type.IsAttachedToCreature -> Set.singleton Types
+  -- Reads nothing, unlike its sibling above, and the difference is exactly why
+  -- the two are separate atoms: this one stops at Object.attachedTo and asks
+  -- whether the attachment names an object or a player (CR 303.4). No Modification
+  -- writes that field -- CR 701.3's attach is a keyword ACTION performed by a
+  -- resolution, between projections rather than inside one -- so no CR 613 layer
+  -- can move a set this atom selects.
+  Filter.Type.IsAttachedToPermanent -> Set.empty
+  -- Over-declared, deliberately. The characteristics behind this atom are the
+  -- CANDIDATE's (an Equipment needs a creature, CR 301.5) and the SUBJECT's (its
+  -- enchant ability, CR 702.5a, whose own Filter can read anything), and Aspect
+  -- names aspects of one object's projection, so there is no honest way to say
+  -- "and another object's". Declaring everything orders any characteristic-writing
+  -- effect before an affected set that asks this, which is the conservative
+  -- direction -- and no card in the pool puts this atom in an affected set at all,
+  -- because it is a destination filter, so nothing observable turns on the choice.
+  -- The same limitation IsAttachedToCreature's arm above records (#357).
+  Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, PowerA, Controller]
   -- Reads nothing, and for a stronger reason than the three empty arms above:
   -- CR 111.3 makes a token's effect-defined values "functionally equivalent" to
   -- printed ones rather than a separate kind of characteristic, and no
@@ -1266,15 +1351,20 @@ modificationWrites m = case m of
   Modification.SetControllerToSource -> Set.singleton Controller
 
 -- Could another effect move this one's affected set at all? The structural half
--- of projectWith's movableReads: only a Matching set is a predicate over
--- characteristics that something else can change. A TheseObjects set names ids
--- (CR 611.2c) and an Attached one reads its source's attachment off the game
--- state (CR 303.4m).
+-- of projectWith's movableReads: a set is movable when something a modification
+-- writes selects it -- a Matching set's predicate over characteristics, or an
+-- AttachedPlayerControls set's controller (CR 613.1b). A TheseObjects set names
+-- ids (CR 611.2c) and an Attached one reads its source's attachment off the game
+-- state (CR 303.4m), and no modification writes either.
 staticallyMovable :: Gathered -> Bool
 staticallyMovable c = case gAffected c of
   Affected.Matching _ -> True
   Affected.TheseObjects _ -> False
   Affected.Attached -> False
+  -- Movable, unlike Attached: the attachment half is immovable for Attached's
+  -- reason, but WHO CONTROLS a candidate is a layer-2 effect's business
+  -- (CR 613.1b), so a control change moves this set.
+  Affected.AttachedPlayerControls _ -> True
 
 -- CR 613.8's unit is an EFFECT, not a modification: "an effect is said to
 -- 'depend on' another", and CR 613.6 calls one ability's modifications "the parts
@@ -1445,6 +1535,10 @@ projectWith admits cands = forObject
                     Affected.Matching f ->
                       let aspects = filterReads f
                        in if Set.null aspects then Nothing else Just aspects
+                    -- Always movable, whatever the filter reads: the set is
+                    -- narrowed by WHO CONTROLS each candidate, and Controller is
+                    -- an aspect layer 2 writes (CR 613.1b).
+                    Affected.AttachedPlayerControls f -> Just (Set.insert Controller (filterReads f))
                 -- CR 613.8b: an effect that depends on another waits for it, and among
                 -- the effects waiting on nothing, CR 613.7 timestamp order picks the
                 -- next. Re-deriving `ready` each time round IS CR 613.8c ("the order of
@@ -1749,6 +1843,15 @@ isCreatureOf = isCreatureGiven Map.empty
 isCreatureGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
 isCreatureGiven pcs oid gs = Set.member CardType.Creature (cardTypesGiven pcs oid gs)
 
+-- The same question against a PRECOMPUTED candidate list rather than a
+-- pre-projected board -- projectFrom's posture instead of projectGiven's. For a
+-- caller that asks about a HANDFUL of objects out of a whole battlefield
+-- (Combat.removeChanged's combatants), that is the cheaper of the two: one
+-- gather and one fold per object asked about, where projectAll would fold every
+-- permanent on the board. Same answer either way, by projectAll's own argument.
+isCreatureFrom :: [Gathered] -> ObjectId -> GameState -> Bool
+isCreatureFrom cands oid gs = Set.member CardType.Creature (PC.cardTypes (projectFrom cands oid gs))
+
 -- Membership, which DISCARDS the count -- and is exactly right for every
 -- keyword whose multiple instances the rules call redundant (CR 702.3c
 -- defender, CR 702.9c flying). A keyword that stacks is asked about with its
@@ -1900,12 +2003,13 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
               Affected.TheseObjects s -> Set.member oid s
               -- CR 303.4m: the source's own attachment. No projection needed,
               -- which is what keeps this fold lean.
-              Affected.Attached -> case Game.lookupObject source gs of
-                Nothing -> False
-                Just src -> Object.attachedTo src == Just oid
+              Affected.Attached -> (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
               -- Needs a projection to evaluate, and this fold must not project
               -- (see controlGrants). No card produces one (#195).
               Affected.Matching _ -> False
+              -- Worse than Matching: this one would re-enter controllerOf, which
+              -- is the fold now running. No card produces one either (#195).
+              Affected.AttachedPlayerControls _ -> False
             storedSetter eff = case ContinuousEffect.modification eff of
               Modification.SetController pid
                 | namesFrom (ContinuousEffect.source eff) (ContinuousEffect.affected eff) ->

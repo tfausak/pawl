@@ -1359,11 +1359,56 @@ m2cPropertyTests registry =
         HU.assertBool "see TrampleDeathtouch and Deathtouch groups" True
     ]
 
+-- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
+-- creature, or a planeswalker." Damage.damageRecipient is where a Recipient that
+-- names a permanent GENERICALLY -- Pawl.Binding.became's entrant, which
+-- Pawl.Event.eventBindings tags Recipient.ToObject because the trigger condition
+-- says nothing about the entrant's card types -- gets classified before an
+-- effect can build a damage event out of it.
+--
+-- Aether Flash exercises the two answers this function gives in a real game
+-- (TriggerSpec's aetherFlashTests): a creature entrant becomes ToCreature, and
+-- an entrant already dead by the time the ability resolves (CR 608.2h) becomes
+-- Nothing. The third, a permanent that exists and is not a creature, no card in
+-- the pool can produce -- every DealDamage on a generically named slot belongs
+-- to a condition whose Filter admits only creatures -- so it is pinned here.
+damageRecipientTests :: Registry.Type.Registry -> Tasty.TestTree
+damageRecipientTests registry =
+  Tasty.testGroup
+    "CR 120.1a which recipients damage can be dealt to"
+    [ HU.testCase "a generically named creature becomes CR 120.3e's creature recipient" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual
+          "retagged, not rejected"
+          (Just (Recipient.ToCreature oid))
+          (Damage.damageRecipient gs (Recipient.ToObject oid)),
+      HU.testCase "a generically named NONcreature permanent can be dealt no damage" $ do
+        plains <- Registry.printing registry "Plains"
+        let (oid, gs) = S.addCreature plains S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertBool "the land is really there" (Set.member oid (GameState.battlefield gs))
+        HU.assertEqual "and takes nothing" Nothing (Damage.damageRecipient gs (Recipient.ToObject oid)),
+      HU.testCase "an object that no longer exists takes nothing either (CR 608.2h)" $
+        HU.assertEqual
+          "no recipient"
+          Nothing
+          (Damage.damageRecipient (Setup.emptyGame S.bothPlayers) (Recipient.ToObject (ObjectId.MkObjectId 99))),
+      -- The pass-through half. A combat recipient (CR 510.1b-d) and a chosen
+      -- target out of a typed Pool were classified when they were built, so this
+      -- function is not a second, later reading of the same question.
+      HU.testCase "a creature or player recipient is unchanged" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "creature" (Just (Recipient.ToCreature oid)) (Damage.damageRecipient gs (Recipient.ToCreature oid))
+        HU.assertEqual "player" (Just (Recipient.ToPlayer S.bob)) (Damage.damageRecipient gs (Recipient.ToPlayer S.bob))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Damage"
     [ damageTests registry,
+      damageRecipientTests registry,
       legendRuleTests registry,
       worldRuleTests registry,
       damageEventTests registry,

@@ -12,7 +12,8 @@ import Pawl.Types.Concession (Concession)
 import Pawl.Types.Cost (Cost)
 import Pawl.Types.Decider (Decider)
 import Pawl.Types.EntryOption (EntryOption)
-import Pawl.Types.ManaType (ManaType)
+import Pawl.Types.EntwineDecision (EntwineDecision)
+import Pawl.Types.Mana (Mana)
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.MulliganDecision (MulliganDecision)
 import Pawl.Types.MulliganOffer (MulliganOffer)
@@ -87,35 +88,42 @@ data Prompt r where
   ChooseDefender :: Decider -> PlayerId -> NonEmpty PlayerId -> Prompt PlayerId
   -- CR 601.2g (and CR 602.2b for an ability): which mana source to activate next
   -- while paying a cost.
-  -- Asked once per source tapped, so a cost needing two mana asks twice against a
-  -- shrinking candidate list.
+  --
+  -- Asked once per source TAPPED, against a shrinking candidate list, which is
+  -- not once per mana the cost demands: a Sol Ring pays {2} in one activation and
+  -- so raises this once.
   --
   -- Elided only when there is exactly ONE candidate, where no choice exists.
   -- Same-card candidates are NOT treated as interchangeable: two Llanowar Elves
   -- can differ by an Equipment, an Aura, counters or borrowed control, and none of
   -- that is visible in the printed card (#12, #217).
   ChooseManaSource :: Decider -> PlayerId -> NonEmpty ObjectId -> Prompt ObjectId
-  -- CR 605.3b: which mana type the source (the ObjectId) produces, asked as the
-  -- mana ability resolves -- immediately, since a mana ability never uses the
-  -- stack. Two separate things reach this one prompt, because they are
+  -- CR 605.3b: which mana the source (the ObjectId) produces, asked as the mana
+  -- ability resolves -- immediately, since a mana ability never uses the stack.
+  -- The answer is a YIELD, the whole mana one activation adds, so Sol Ring's
+  -- "{T}: Add {C}{C}" is one candidate of two units rather than two candidates of
+  -- one. Three separate things reach this one prompt, because they are
   -- observationally the same question:
   --
-  --   * one ability offering a choice -- Birds of Paradise's "add one mana of
-  --     any color", whose five options are CR 105.4's five colours; and
+  --   * one AddMana effect offering a choice -- Birds of Paradise's "add one mana
+  --     of any color", whose five options are CR 105.4's five colours;
   --   * a permanent with SEVERAL single-type mana abilities -- an Urborg'd
   --     Mountain (CR 305.6/305.7) is both a Mountain and a Swamp, so its
-  --     controller picks which of its two intrinsic abilities to activate.
+  --     controller picks which of its two intrinsic abilities to activate; and
+  --   * a mana ability with several MODES (CR 700.2), where the mode picks the
+  --     yield. No card in the pool has one.
   --
-  -- Collapsing them is sound because a source produces exactly one mana and taps
-  -- doing it, so "which ability" and "which type" have the same answer set and
-  -- the same consequences. It would stop being sound if two abilities of one
+  -- Collapsing them is sound because a source taps once and adds one yield, so
+  -- "which ability", "which mode" and "which colours" have the same answer set
+  -- and the same consequences. It would stop being sound if two abilities of one
   -- permanent differed in cost or in a rider (City of Brass' damage) -- but
   -- Mana.tapForMana reads neither today, so nothing observable is being lost
   -- here that is not already gone (#238).
   --
-  -- The candidates are deduplicated, which is the one elision needing no
-  -- judgement: two ways to produce black mana yield the same unit either way.
-  ChooseManaType :: Decider -> PlayerId -> ObjectId -> NonEmpty ManaType -> Prompt ManaType
+  -- The candidates are deduplicated by the WHOLE yield, which is the one elision
+  -- needing no judgement: two ways to produce black mana add the same mana either
+  -- way.
+  ChooseManaYield :: Decider -> PlayerId -> ObjectId -> NonEmpty Mana -> Prompt Mana
   -- CR 701.34a: which permanents and players a proliferating player gives another
   -- counter to. The [ObjectId] is every permanent holding at least one counter and
   -- the [PlayerId] every player holding at least one; the answer is the subset of
@@ -226,11 +234,30 @@ data Prompt r where
   -- contains a Variable symbol -- a spell with no {X} is not asked (where the
   -- rules leave nothing to choose, don't prompt).
   ChooseX :: Decider -> PlayerId -> ObjectId -> Natural -> Prompt Natural
+  -- CR 702.42a: whether this player uses the entwine ability of the modal spell
+  -- they are casting -- "You may choose all modes of this spell instead of just
+  -- the number specified. If you do, you pay an additional [cost]." The ObjectId
+  -- is the spell; the Cost is the ADDITIONAL cost entwining would add on top of
+  -- whichever candidate cost is then announced (CR 601.2f).
+  --
+  -- ONE question rather than two, because rule 702.42a is one sentence: the
+  -- widened mode choice (CR 601.2b's first clause) and the intention to pay an
+  -- additional cost (CR 601.2b's third) are the same decision, so answering
+  -- Entwines settles both. It is therefore asked BEFORE ChooseModes, which for
+  -- an entwined cast then has nothing left to ask.
+  --
+  -- Asked ONLY when entwining is actually available: the spell has the keyword,
+  -- every one of its modes is legal (CR 700.2a -- "choose all modes" is not open
+  -- when one of them can't be chosen), and some candidate cost plus this one is
+  -- payable. Where the rules leave nothing to ask, don't prompt; where they do,
+  -- the engine never decides to pay on the player's behalf.
+  ChooseEntwine :: Decider -> PlayerId -> ObjectId -> Cost -> Prompt EntwineDecision
   -- CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.
   -- The answer is the chosen subset. Prompted before X and targets, and ONLY when
-  -- #legal > count; a forced selection is not asked.
+  -- #legal > count; a forced selection is not asked -- which is every entwined
+  -- cast, where CR 702.42a's "all modes" leaves no subset to pick.
   ChooseModes :: Decider -> PlayerId -> ObjectId -> Set ModeIndex -> Natural -> Prompt (Set ModeIndex)
   -- CR 707.5 / 614.1c / 614.12a: as an object enters AS A COPY (Clone), its
   -- controller chooses which permanent to copy. The ObjectId is the entering
@@ -369,10 +396,12 @@ data Prompt r where
   -- CHOOSE, not target. Crown of the Ages' ruling is explicit -- "This only
   -- targets the Aura and not either creature" -- so a destination is offered no
   -- matter whose it is and no matter whether it can be targeted, and nothing here
-  -- is re-checked under CR 608.2b. The engine deliberately does NOT pre-filter to
-  -- destinations the move would be LEGAL for: "another creature" is the whole of
-  -- what the card says, and narrowing it further would answer CR 303.4j's
-  -- question on the player's behalf.
+  -- is re-checked under CR 608.2b. The offer is the card's TEXT and nothing more:
+  -- Crown of the Ages says "another creature" and gets every creature, including
+  -- ones CR 303.4j will then refuse to move the Aura onto, because narrowing past
+  -- what the card says would answer that rule's question on the player's behalf.
+  -- Aura Graft says "another permanent IT CAN ENCHANT" and gets only the legal
+  -- ones, because that is what ITS text says (Filter.CanHostSubject).
   --
   -- Elided at exactly one candidate, the ChooseManaSource posture: the effect is
   -- mandatory ("Attach ... to another creature", no "may"), so a single

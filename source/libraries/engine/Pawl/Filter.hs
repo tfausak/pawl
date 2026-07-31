@@ -80,6 +80,33 @@ data View = MkView
     -- Projection.affects records for `perspective` (#197), and it is a fact about
     -- the pool's card data rather than a guarantee this record enforces.
     attachedToCreature :: Bool,
+    -- CR 303.4: is this candidate attached to a PERMANENT right now? Read from
+    -- Object.attachedTo alone -- whether the attachment names an object rather
+    -- than a player (CR 303.4 attaches an Aura to "an object or player"), and
+    -- Recipient.objectOf is that question. False for every candidate with no
+    -- attachment to read, the vacuous posture `attacking` takes.
+    --
+    -- Unlike `attachedToCreature` this reads no second projection, so it needs no
+    -- laziness argument: an object's attachment is a stored field, and whether it
+    -- names an object or a player is settled without asking the host anything.
+    attachedToPermanent :: Bool,
+    -- CR 701.3a: could the SUBJECT of the attach now being performed -- the
+    -- permanent an Effect.AttachTarget is moving -- legally be attached to this
+    -- candidate? "An Aura, Equipment, or Fortification can't be attached to an
+    -- object or player it couldn't enchant, equip, or fortify, respectively."
+    --
+    -- The one field whose answer depends on something OTHER than the candidate,
+    -- which is why it lives here rather than in Context: Context carries no game
+    -- state, and this needs both the subject's enchant ability (CR 702.5a) and the
+    -- candidate's projected characteristics. Pawl.Resolve's AttachTarget arm is
+    -- the only site that fills it, from Resolve.attachmentFor -- the same function
+    -- that performs the move, so the offer and the move cannot disagree.
+    --
+    -- False everywhere else, and that is not a lost distinction: outside an attach
+    -- there is no subject for the question to be about. The vacuous posture
+    -- `playerIdentity` and `attacking` take -- and a Filter that named the atom
+    -- from any other position would read that vacuous False (#471).
+    canHostSubject :: Bool,
     -- CR 111.1 / 111.6: is this candidate a token rather than a card? Read from
     -- Object.source (Pawl.Game.isToken), never from a projection -- CR 111.3 makes
     -- a token's effect-defined characteristics equivalent to printed ones, so no
@@ -112,9 +139,18 @@ playerView pid =
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
-      -- player is not itself attached to anything (Object.attachedTo runs the
-      -- other way and names an object, #190).
+      -- player is not itself attached to anything, because Object.attachedTo
+      -- runs the other way -- it is a field of the ATTACHED permanent, and a
+      -- player is not one.
       attachedToCreature = False,
+      -- CR 303.4 again, for the same reason: Object.attachedTo is a field of the
+      -- ATTACHED permanent, and a player is not one.
+      attachedToPermanent = False,
+      -- CR 701.3a's question can be asked about a player -- CR 702.5d lets an
+      -- enchant-player Aura be attached to one -- but not here: the only site that
+      -- fills this field is Pawl.Resolve's AttachTarget arm, whose candidates are
+      -- battlefield permanents, so no player candidate ever carries an answer.
+      canHostSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False
     }
@@ -189,6 +225,14 @@ matches context view predicate = case predicate of
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
   Filter.IsAttachedToCreature -> attachedToCreature view
+  -- CR 303.4: a live read of Object.attachedTo, and of nothing else -- whether the
+  -- attachment names an object rather than a player. An Aura buried by CR 704.5m
+  -- stops matching because it stops being attached, never because a stamp was
+  -- cleared.
+  Filter.IsAttachedToPermanent -> attachedToPermanent view
+  -- CR 701.3a: a live read of the legality of the attach this match is framing,
+  -- computed by the caller that knows what is moving. Vacuously False outside one.
+  Filter.CanHostSubject -> canHostSubject view
   -- CR 111.6: "A token isn't a card." A live read of what the object is
   -- represented by (Object.source), never a stamp on the candidate -- and unlike
   -- the two arms above it cannot change while the game runs, because CR 111.3
@@ -228,4 +272,6 @@ rewrite pairs predicate = case predicate of
   Filter.IsBlocking -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
+  Filter.IsAttachedToPermanent -> predicate
+  Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate

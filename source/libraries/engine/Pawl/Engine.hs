@@ -45,6 +45,7 @@ import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -54,6 +55,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Program as Program
 import Pawl.Types.Prompt (Prompt)
@@ -246,7 +248,10 @@ discardToHandSize pid = do
         chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (Int.toNaturalSaturating excess)))
         let inHand oid = List.elem oid held
             toDiscard = take excess (filter inHand chosen)
-        Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
+        -- CR 701.9a, through the shared discard funnel: a cleanup discard is a
+        -- discard, so it records one for a rule 701.9a trigger to read. A
+        -- trigger this fires gets no extra cleanup step of its own (#51).
+        Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) toDiscard
 
 -- CR 103.8a: "In a two-player game, the player who plays first skips the draw
 -- step (see rule 504, "Draw Step") of their first turn." CR 103.8c: "In all
@@ -602,13 +607,13 @@ permute xs order =
 -- that changes nothing (the common case) costs one board projection and one
 -- length comparison per carrier, NOT a deep GameState equality check.
 --
--- On top of that, every pass pays two control samples, because a derived control
--- change has nothing else to notice it. The CR 302.6 continuity scan
--- (checkControlContinuity) is unconditional and linear in the battlefield -- a
--- real addition to this path's cost, not a free rider. The CR 506.4
--- removal-from-combat scan (Combat.removeControlChanged) costs the same again
--- while creatures are in combat and nothing at all when none are, which is most
--- of the game.
+-- On top of that, every pass pays two samples of derived state, because a derived
+-- change to control or to card types has nothing else to notice it. The CR 302.6
+-- continuity scan (checkControlContinuity) is unconditional and linear in the
+-- battlefield -- a real addition to this path's cost, not a free rider. The
+-- CR 506.4 removal-from-combat scan (Combat.removeChanged) costs a control-grant
+-- scan and a gather while creatures are in combat, and nothing at all when none
+-- are, which is most of the game.
 --
 -- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
 -- a player would get priority" the coarsest moment anything could observe it,
@@ -636,15 +641,22 @@ settleForPriority = do
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: both read
-  -- CONTROL, and must see the control this settle leaves behind rather than the
-  -- control some earlier step saw. Outside the recursion guard on purpose --
-  -- neither makes further work, so neither is a reason to loop, and both must run
-  -- even on a pass where nothing fired.
+  -- state this settle can still change, and are placed to see what it leaves
+  -- behind rather than what some earlier step saw. Both read CONTROL, and the
+  -- CR 506.4 scan also reads CARD TYPES -- where the sweep is what ends a "for as
+  -- long as" animation, and so what makes an attacker stop being a creature.
+  --
+  -- Outside the recursion guard on purpose -- neither makes further work, so
+  -- neither is a reason to loop, and both must run even on a pass where nothing
+  -- fired. That last part is also what keeps the placement a matter of doing the
+  -- work in ONE pass rather than of correctness: the settle stops only on a pass
+  -- where nothing fired, and these two ran on that pass, against the finished
+  -- board, before priority is granted.
   --
   -- Order between the two does not matter and is not load-bearing: CR 506.4 asks
   -- about combat and CR 302.6 about summoning sickness, and neither reads what the
   -- other writes.
-  State.modify' Combat.removeControlChanged
+  State.modify' Combat.removeChanged
   checkControlContinuity
   Monad.when (swept || returned || acted || placed) settleForPriority
 
@@ -780,21 +792,71 @@ priorityLoop = do
   settleForPriority
   loop
 
--- CR 800.4k / CR 800.4m: hand the turn to the next SEAT in the seating order
--- (GameState.turnOrder, which is never shortened -- see Pawl.Types.GameState)
--- whose player is still in the game.
+-- CR 500.7 / 800.4k / 800.4m: this turn is over, so begin the next one -- a
+-- pending EXTRA turn if there is one, and otherwise the turn of the next SEAT in
+-- the seating order (GameState.turnOrder, which is never shortened -- see
+-- Pawl.Types.GameState) whose player is still in the game. Which of the two it
+-- is, is takeNextTurn's question.
 --
 -- CR 800.4k: "If a player who has left the game would begin a turn, that turn
--- doesn't begin." So a departed seat is walked past, not made active.
+-- doesn't begin." So a departed seat is walked past, not made active, and a
+-- departed player's extra turn is spent without beginning.
 --
 -- CR 800.4m: "any continuous effects with durations that last until that
 -- player's next turn ... will last until that turn WOULD have begun." So
--- Expiry.dropAtTurnOf fires at EVERY seat the walk passes, including the ones
--- whose turn never begins. For the seat that does begin a turn, the same call is
--- CR 611.2a.
+-- Expiry.dropAtTurnOf fires at EVERY seat the walk passes and at every extra
+-- turn popped, including the ones whose turn never begins. For the seat that
+-- does begin a turn, the same call is CR 611.2a.
 handoffTurn :: Game ()
-handoffTurn = State.modify' $ \gs ->
-  walkToNextTurn (length (GameState.turnOrder gs)) (GameState.activePlayer gs) gs
+handoffTurn = State.modify' takeNextTurn
+
+-- CR 500.7 / 103.1: the seat the ordinary turn order resumes from. Read through
+-- one function so the two callers below cannot drift: the anchor is the active
+-- player unless an extra turn is under way, in which case it is the seat that
+-- extra turn was inserted after (see GameState.turnAnchor).
+turnAnchorOf :: GameState -> PlayerId
+turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnchor gs)
+
+-- CR 500.7 first: "Some effects can give a player extra turns. They do this by
+-- adding the turns directly after the specified turn." Every extra-turn effect
+-- in the pool specifies the turn it resolves in, so an entry in
+-- GameState.extraTurns is a turn scheduled directly after THIS one -- which
+-- makes popping it here, before the seating order is consulted at all, the whole
+-- of "directly after".
+--
+-- CR 500.7 last: "the most recently created turn will be taken first" -- so the
+-- store is a stack and this takes its HEAD. Resolve's TakeExtraTurn arm is the
+-- other half; between them, two turns created in one turn come out in the
+-- reverse of the order they were created in.
+--
+-- The anchor does NOT move (see GameState.turnAnchor): CR 500.7 adds a turn and
+-- removes none, so the turn that would have followed the specified turn still
+-- follows it. That is only observable when the taker is not the active player --
+-- Time Warp aimed at an opponent -- and it is what stops an extra turn from
+-- silently eating that player's ordinary one.
+--
+-- CR 805.8 (shared team turns) and CR 807.4i/j (Grand Melee's turn markers, which
+-- can make a player's extra turn wait) each rewrite this rule for their own
+-- option or variant. Neither is implemented, because pawl has no format or
+-- variant to read one from (#175).
+--
+-- CR 800.4k applies to an extra turn exactly as it does to an ordinary one: a
+-- departed player's extra turn does not begin. The entry is still SPENT, and
+-- Expiry.dropAtTurnOf still fires for CR 800.4m's "would have begun" -- the same
+-- two things walkToNextTurn does for a seat it walks past.
+--
+-- Total: each recursive call consumes one entry, and the empty case falls
+-- through to walkToNextTurn, which is bounded by the seat count.
+takeNextTurn :: GameState -> GameState
+takeNextTurn gs = case GameState.extraTurns gs of
+  [] -> walkToNextTurn (length (GameState.turnOrder gs)) (turnAnchorOf gs) gs
+  pid : rest ->
+    let anchor = turnAnchorOf gs
+        swept = Expiry.dropAtTurnOf pid gs {GameState.extraTurns = rest}
+        anchored = swept {GameState.turnAnchor = Just anchor}
+     in if List.elem pid (Game.stillPlaying swept)
+          then beginTurnOf pid anchored
+          else takeNextTurn swept
 
 -- One seat at a time, bounded by the number of seats, so it terminates even when
 -- every seat has departed. The fallback returns the state without beginning a
@@ -812,7 +874,10 @@ walkToNextTurn seatsLeft seat gs =
       let next = nextInOrder (GameState.turnOrder gs) seat
           swept = Expiry.dropAtTurnOf next gs
        in if List.elem next (Game.stillPlaying swept)
-            then beginTurnOf next swept
+            then -- CR 500.7 / 103.1: this turn IS the ordinary rotation, so the
+            -- seat it is dealt to is the one the next walk starts from and
+            -- there is nothing left to remember (see GameState.turnAnchor).
+              beginTurnOf next swept {GameState.turnAnchor = Nothing}
             else walkToNextTurn (seatsLeft - 1) next swept
 
 -- The turn actually begins for `pid`. Split out of handoffTurn so the CR 800.4k
@@ -922,16 +987,63 @@ runStep = do
   -- nothing between the two but read GameState.result. So the step is scheduled,
   -- not started, and this is its last unobserved moment.
   --
-  -- The skipped step is left popped off the schedule by `advance` below rather
+  -- A skipped STEP is left popped off the schedule by `advance` below rather
   -- than dropped from GameState.remaining the way CR 508.8's combat skip is
   -- (Turn.dropSkippedCombatSteps). Both reach "as though it didn't exist"; the
   -- difference is that CR 508.8 is a RULE, known one step ahead, while a
   -- replacement effect has to be asked at the moment the event would happen,
-  -- because CR 616.1's loop reads the board as it then is.
-  begins <- Replacement.beginsPhase phase active
-  if not begins
-    then advance
-    else runStepThatBegan phase
+  -- because CR 616.1's loop reads the board as it then is. A skipped PHASE is
+  -- the case where popping one entry is not enough, and `skipWholePhase` below
+  -- says what it does instead.
+  --
+  -- TWO questions, in CR 500.1's own order: a phase that has steps is offered
+  -- first, then the step. `Turn.phaseBeginningAt` answers Just only at a stepped
+  -- phase's FIRST step, so the phase question is asked once per phase and never
+  -- once the phase is under way -- CR 614.10 again, read at phase grain. A main
+  -- phase raises only the step question, because CR 505.2 makes it one schedule
+  -- entry and asking twice about it would be asking the same thing twice.
+  --
+  -- Both questions are asked even when the phase one says yes, and in that order,
+  -- because CR 500.1 nests the step inside the phase: Stasis skipping an untap
+  -- step must still take it during a beginning phase nobody skipped.
+  phaseBegins <- case Turn.phaseBeginningAt phase of
+    Nothing -> pure True
+    Just selector -> Replacement.beginsPhase selector active
+  if not phaseBegins
+    then skipWholePhase phase
+    else do
+      begins <- Replacement.beginsPhase (PhaseSelector.Step phase) active
+      if not begins
+        then advance
+        else runStepThatBegan phase
+
+-- CR 500.11: proceed past a SKIPPED PHASE "as though it didn't exist" -- so the
+-- rest of its steps leave the schedule and `advance` picks up whatever CR
+-- 500.1's fixed order puts after the phase -- the postcombat main phase, for the
+-- combat one Stonehorn Dignitary takes.
+--
+-- Positional, via Turn.dropRestOfPhase, not a filter: CR 500.8 lets a second
+-- combat phase be added later in the same turn, and skipping this one says
+-- nothing about that one -- the same reason CR 508.8's step skip is positional.
+--
+-- Nothing about the skipped phase is announced. CR 614.6 makes a replaced event
+-- one that "never happens", and CR 500.6's "at the beginning of" triggers hang
+-- off the CR 603.2b step records `runStepThatBegan` writes, none of which this
+-- path reaches.
+--
+-- GameState.combat is left ALONE, and does not go stale by being left alone.
+-- Combat.clearCombat runs as the end of combat step ends (CR 511.3), which this
+-- path bypasses along with the rest of the phase -- but every writer of that
+-- record (Combat.declareAttackers, declareBlockers, chooseDefender,
+-- putOntoBattlefieldAttacking, Damage's first-strike mark) runs inside a combat
+-- step, so a phase whose steps never begin writes nothing and the record is
+-- still whatever the last end of combat step emptied it to. Skipping the end of
+-- combat STEP on its own is the case that would strand it, and no card in the
+-- pool names that step (#447).
+skipWholePhase :: Phase.Phase -> Game ()
+skipWholePhase phase = do
+  State.modify' (\gs -> gs {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)})
+  advance
 
 -- The body of a step that was not skipped, split out only so `runStep`'s CR
 -- 614.1b check reads as a guard rather than as a nesting level.
@@ -1017,6 +1129,14 @@ runStepThatBegan phase = do
 -- draw by one turn rather than stopping it, and a finite number of copies still
 -- runs the library out. A card whose skip is unbounded -- a permanent's static,
 -- as Eon Hub's upkeep skip is -- would be the one that hangs it.
+--
+-- CR 500.7's extra turns leave the argument intact. An extra turn is a turn like
+-- any other and reaches its own draw step, so the bound is still one card off a
+-- finite library per turn; and the schedule cannot refill itself, because
+-- GameState.extraTurns is pushed only by a resolving effect and popped only by
+-- handoffTurn, so a finite number of resolutions buys a finite number of turns.
+-- The card to re-examine this against would be one whose extra turn comes from
+-- an ability that triggers every turn, which the pool does not have.
 playGame :: Game Result
 playGame =
   let loop = do

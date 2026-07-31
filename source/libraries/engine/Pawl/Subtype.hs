@@ -18,11 +18,11 @@ import qualified Pawl.Types.Subtype as Subtype
 -- constructor is therefore a False a new subtype must decide deliberately --
 -- hence total, with no wildcard.
 --
--- Five of CR 205.3i's seventeen exist in this type today, and they happen to be
--- exactly the five BASIC land types (CR 305.6). That coincidence is not what
--- this function means: Pawl.Mana.subtypeMana is the CR 305.6 question ("which
--- mana does this basic land type make?"), and the two must come apart the moment
--- a Locus or a Gate lands.
+-- Six of CR 205.3i's seventeen exist in this type today. Five of them are the
+-- BASIC land types (CR 305.6) and Desert is not, which is what keeps this
+-- function distinct from Pawl.Mana.subtypeMana: that one asks the CR 305.6
+-- question ("which mana does this basic land type make?") and answers Nothing
+-- for Desert, while this one answers True.
 isLandType :: Subtype.Subtype -> Bool
 isLandType subtype = case subtype of
   Subtype.Mountain -> True
@@ -30,6 +30,7 @@ isLandType subtype = case subtype of
   Subtype.Forest -> True
   Subtype.Island -> True
   Subtype.Plains -> True
+  Subtype.Desert -> True
   -- CR 205.3m: creature types.
   Subtype.Goblin -> False
   Subtype.Warrior -> False
@@ -81,3 +82,10 @@ isLandType subtype = case subtype of
   Subtype.Thopter -> False
   Subtype.Dragon -> False
   Subtype.Unicorn -> False
+  -- CR 205.3h: an enchantment type.
+  Subtype.Curse -> False
+  -- CR 205.3m: a creature type -- and, per CR 308.2, a kindred subtype too,
+  -- since those are the same set. Still not a land type either way, which is the
+  -- only question this function asks.
+  Subtype.Faerie -> False
+  Subtype.Rhino -> False

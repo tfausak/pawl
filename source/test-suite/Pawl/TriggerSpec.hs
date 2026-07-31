@@ -22,7 +22,17 @@
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
 -- against the keys eventBindings actually stamps. CR 603.4's intervening "if"
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
--- -- `lookBackInterveningTests`.
+-- -- `lookBackInterveningTests`. CR 603.10's first sentence for a BYSTANDER -- a
+-- permanent that was on the battlefield when some OTHER event in the same batch
+-- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
+-- and Khabál Ghoul -- `bystanderTests`. The same CR 400.7e slot read from the ENTRY
+-- direction, where the entrant is a different card from the bearer, with Aether
+-- Flash -- `aetherFlashTests`. CR 308's kindred card type, whose one observable
+-- consequence (CR 308.2: a noncreature card carrying creature types) is read
+-- through the ordinary Pool + Filter target machinery, with Bitterblossom --
+-- `kindredTests`.
+-- Flash -- `aetherFlashTests`. CR 701.9a's discard trigger, and CR 702.29d's
+-- "only once when a card is cycled", with Megrim -- `discardTriggerTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -30,6 +40,7 @@ module Pawl.TriggerSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -59,6 +70,7 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -73,6 +85,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
@@ -93,6 +106,8 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -100,8 +115,10 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -1546,6 +1563,102 @@ cyclingTriggerTests registry =
           abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities))
     ]
 
+-- CR 701.9a: "To discard a card, move it from its owner's hand to that player's
+-- graveyard." Nothing in the pool triggered on that until Megrim, {2}{B}
+-- Enchantment: "Whenever an opponent discards a card, this enchantment deals 2
+-- damage to that player." One trigger condition, one effect, and the effect
+-- targets nothing -- so the only new thing any case below can be passing on is
+-- the condition.
+--
+-- The interaction is the reason the condition is hard rather than the condition
+-- itself. CR 702.29a: "'Cycling [cost]' means '[Cost], Discard this card: Draw a
+-- card'", so cycling IS discarding and a discard trigger has to see it. CR
+-- 702.29d then bounds how often: "Some cards have abilities that trigger
+-- whenever a player 'cycles or discards' a card. These abilities trigger only
+-- once when a card is cycled." An engine that recorded the cycle and the discard
+-- as two log entries, both of them describing the one discard, would answer 4
+-- damage to the second case below instead of 2.
+--
+-- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
+-- every "an opponent" below is alice.
+discardTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+discardTriggerTests registry =
+  Tasty.testGroup
+    "DiscardTrigger"
+    [ -- CR 601.2f's "costs may include ... discarding cards", and CR 701.9a is
+      -- per CARD: Cathartic Reunion's additional cost discards two, so the one
+      -- Megrim triggers twice and alice takes 4.
+      HU.testCase "CR 701.9a whole cards: Cathartic Reunion's two discards fire bob's Megrim twice" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        reunion <- Registry.printing registry "Cathartic Reunion"
+        megrim <- Registry.printing registry "Megrim"
+        let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 2))
+            (reunionId, g1) = S.addHandCard reunion S.alice base
+            -- Exactly two other cards, so CR 701.9b has nothing to ask and the
+            -- discard is forced -- the prompt is not what this case is about.
+            g2 = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) g1 [1 .. (2 :: Int)]
+            g3 = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g2 [1 .. (4 :: Int)]
+            gs =
+              g3
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice reunionId)
+            placed = S.runPure S.identityAnswer cast Engine.settleForPriority
+            after = S.runPure S.identityAnswer cast Engine.priorityLoop
+        HU.assertEqual "both cards were discarded as the cost was paid" 2 (length (Game.zoneMembers Zone.Graveyard S.alice cast))
+        HU.assertEqual "two triggers, above the sorcery that caused them" 3 (length (GameState.stack placed))
+        HU.assertEqual "alice took 2 per discarded card" (fmap (subtract 4) (S.lifeOf S.alice gs)) (S.lifeOf S.alice after)
+        HU.assertEqual "bob discarded nothing and took nothing" (S.lifeOf S.bob gs) (S.lifeOf S.bob after),
+      -- THE case. CR 702.29d: "These abilities trigger only once when a card is
+      -- cycled." Barkhide Mauler's whole text is "Cycling {2}", so nothing on it
+      -- can contribute a second trigger and the count is the discard's alone.
+      HU.testCase "CR 702.29d cycling a card fires the discard trigger exactly once" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        megrim <- Registry.printing registry "Megrim"
+        let base = snd (S.addCreature megrim S.bob (S.landsInPlay forest 2))
+            (_, withLibrary) = S.addLibraryCard piker S.alice base
+            (gs, maulerId) = S.handOne mauler withLibrary
+        case Activate.abilitiesFor maulerId gs of
+          [ability] -> do
+            let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
+                placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
+                after = S.runPure S.identityAnswer cycled Engine.priorityLoop
+            HU.assertEqual "the Mauler was discarded to pay the cost" 1 (length (Game.zoneMembers Zone.Graveyard S.alice cycled))
+            HU.assertEqual "cycling's own draw plus ONE Megrim trigger" 2 (length (GameState.stack placed))
+            HU.assertEqual "so alice took 2, not 4" (fmap (subtract 2) (S.lifeOf S.alice gs)) (S.lifeOf S.alice after)
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- "An OPPONENT discards", not "a player": the axis is load-bearing, and a
+      -- board where only the opponent ever discards cannot tell a correct
+      -- implementation from one that ignores the player entirely. The same
+      -- board, the same component, one discarder apart.
+      HU.testCase "CR 102.2 'an opponent': bob discarding to his own Megrim fires nothing" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        megrim <- Registry.printing registry "Megrim"
+        let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 1))
+            (_, withAlicesCard) = S.addHandCard piker S.alice base
+            (_, gs0) = S.addHandCard piker S.bob withAlicesCard
+            gs = gs0 {GameState.priority = Just S.alice}
+            discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent pid S.noSource (CostComponent.DiscardCards 1))
+            byAlice = discardBy S.alice
+            byBob = discardBy S.bob
+            settle g = S.runPure S.identityAnswer g Engine.priorityLoop
+        HU.assertEqual "alice's card reached her graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice byAlice))
+        HU.assertEqual "and bob's reached his" 1 (length (Game.zoneMembers Zone.Graveyard S.bob byBob))
+        HU.assertEqual "the opponent's discard costs her 2" (fmap (subtract 2) (S.lifeOf S.alice gs)) (S.lifeOf S.alice (settle byAlice))
+        HU.assertEqual "the controller's own discard costs him nothing" (S.lifeOf S.bob gs) (S.lifeOf S.bob (settle byBob))
+        HU.assertEqual "and costs alice nothing either" (S.lifeOf S.alice gs) (S.lifeOf S.alice (settle byBob))
+        HU.assertEqual
+          "bob's discard put nothing on the stack at all"
+          []
+          (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority))
+    ]
+
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
 -- enters, you gain 1 life", the card that proves it. Its effect names nothing
@@ -1609,7 +1722,7 @@ permanentEntersTests registry =
           -- -- here moved straight on to the graveyard -- is read from last known
           -- information, which for a permanent that left the battlefield is the
           -- battlefield reading. The event happened; the trigger is not lost with
-          -- the object. Same fallback eventTriggers' own `goneEntrant` takes for
+          -- the object. Same fallback eventTriggers' own `bystanders` takes for
           -- the bearer side.
           HU.testCase "CR 608.2h a creature that enters and leaves again still fires the trigger" $ do
             soulWarden <- Registry.printing registry "Soul Warden"
@@ -1799,7 +1912,9 @@ diesTriggerTests registry =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
       spiritsOf pid gs =
         filter
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Spirit"))
+          -- CR 111.4: Doomed Traveler does not specify the token's name, so the
+          -- name is its subtype plus the word "Token".
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Spirit Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
       travelerName = Text.pack "Doomed Traveler"
    in Tasty.testGroup
@@ -1893,7 +2008,8 @@ representativeEvent cond =
         TriggerCondition.StateIs _ -> GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
         TriggerCondition.SelfDealsCombatDamageToPlayer -> combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> combatDamage
-        TriggerCondition.SelfCycled -> GameEvent.Cycled departed
+        TriggerCondition.SelfCycled -> GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost
+        TriggerCondition.PlayerDiscards _ -> GameEvent.Discarded S.alice departed DiscardCause.Ordinary
         TriggerCondition.SelfAttacks _ -> GameEvent.AttackerDeclared departed
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> moved Zone.Library Zone.Graveyard
         TriggerCondition.SelfDies -> moved Zone.Battlefield Zone.Graveyard
@@ -1910,6 +2026,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.SelfCycled,
+    TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfDies
@@ -2079,7 +2196,9 @@ lookBackInterveningTests registry =
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
       tokensOf pid gs =
         filter
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Zombie Berserker"))
+          -- CR 111.4: the name is BOTH subtypes plus "Token", which is exactly
+          -- the rule's own Dwarven Reinforcements example.
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Zombie Berserker Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
    in Tasty.testGroup
         "CR 603.4 an intervening if over last known information"
@@ -2151,5 +2270,328 @@ strippedTriggerTests registry =
             HU.assertBool "colorless gone" (ManaType.Colorless `notElem` Mana.manaTypesOf fountainId after)
         ]
 
+-- CR 702.19b: assign each blocker exactly its lethal threshold and let the
+-- excess trample through to the defending player. S.aggressiveAnswer cannot be
+-- used here -- its AssignCombatDamage arm dumps the whole amount onto the first
+-- CREATURE recipient it finds, so nothing would ever reach a player and the
+-- trigger under test would never have an event to match.
+tramplingAnswer :: Prompt.Prompt r -> r
+tramplingAnswer p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    let blockerEntries = Map.toList (Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds)
+        spent = sum (fmap snd blockerEntries)
+        leftover = if n >= spent then n - spent else 0
+        toBlockers = Map.fromList blockerEntries
+     in case filter (not . S.isCreatureRecipient) (Map.keys thresholds) of
+          d : _ -> Map.insert d leftover toBlockers
+          [] -> toBlockers
+  _ -> S.aggressiveAnswer p
+
+-- CR 603.10's FIRST sentence for a BYSTANDER: "objects that exist immediately
+-- after an event are checked to see if the event matched any trigger
+-- conditions". The scan runs once, at the CR 117.5 boundary, after CR 704.3's
+-- state-based actions -- so a permanent that was on the battlefield when some
+-- OTHER event in the same batch happened, and is gone by the time the scan
+-- looks, has to be recovered from CR 608.2h last known information exactly as
+-- CR 603.10a's look-back already recovers a departure event's own permanent.
+--
+-- Lightning Skelemental is the card: {B}{R}{R} Creature -- Elemental Skeleton
+-- 6/1, "Trample, haste / Whenever this creature deals combat damage to a
+-- player, that player discards two cards. / At the beginning of the end step,
+-- sacrifice this creature." Its 1 toughness and CR 702.19b's trample are what
+-- put the trigger's event and the bearer's death in ONE batch: the excess
+-- reaches bob while the blocker's damage kills the Skelemental at the very next
+-- CR 704.5g check, before any player gets priority.
+bystanderTests :: Registry.Type.Registry -> Tasty.TestTree
+bystanderTests registry =
+  Tasty.testGroup
+    "Bystander"
+    [ -- The proving test. bob holds THREE cards, so "discarded once" (one left)
+      -- is distinguishable from "discarded twice" (none) and from "not at all"
+      -- (three).
+      HU.testCase "CR 603.10 whole cards: Lightning Skelemental dies to its blocker and STILL makes bob discard two" $ do
+        skelemental <- Registry.printing registry "Lightning Skelemental"
+        piker <- Registry.printing registry "Goblin Piker"
+        case S.combatBoardOf [skelemental] [piker] of
+          (base, [attacker], [blocker]) -> do
+            let gs = List.foldl' (\g _ -> snd (S.addHandCard piker S.bob g)) base [(), (), ()]
+                after = S.runCombat tramplingAnswer gs
+            HU.assertEqual "bob starts with three cards" 3 (S.handSize S.bob gs)
+            HU.assertEqual "CR 702.19b: five trampled through to bob" (Just 15) (S.lifeOf S.bob after)
+            HU.assertBool "CR 704.5g: the Piker's two killed the 6/1" (not (S.onBattlefield attacker after))
+            HU.assertBool "and the Piker died to its one" (not (S.onBattlefield blocker after))
+            HU.assertEqual "the Skelemental is in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+            HU.assertEqual "and bob discarded two, exactly once" 1 (S.handSize S.bob after)
+          _ -> HU.assertFailure "fixture should give alice one attacker and bob one blocker",
+      -- The control leg, which passes with or without the bystander recovery:
+      -- unblocked, the Skelemental is still on the battlefield at the boundary,
+      -- so `onBattlefield` carries it and the same trigger fires from the
+      -- ordinary candidate source. It is what makes the card data and the
+      -- reserved "that player" slot innocent when the leg above fails.
+      HU.testCase "CR 510.1b control: an UNBLOCKED Skelemental survives and makes bob discard two the ordinary way" $ do
+        skelemental <- Registry.printing registry "Lightning Skelemental"
+        piker <- Registry.printing registry "Goblin Piker"
+        case S.combatBoardOf [skelemental] [] of
+          (base, [attacker], []) -> do
+            let gs = List.foldl' (\g _ -> snd (S.addHandCard piker S.bob g)) base [(), (), ()]
+                after = S.runCombat tramplingAnswer gs
+            HU.assertBool "the Skelemental is still on the battlefield" (S.onBattlefield attacker after)
+            HU.assertEqual "bob took all six" (Just 14) (S.lifeOf S.bob after)
+            HU.assertEqual "and discarded two" 1 (S.handSize S.bob after)
+          _ -> HU.assertFailure "fixture should give alice one attacker and bob no blockers",
+      -- The OTHER shape the rule reaches, at the gather rather than through a
+      -- whole turn: a CR 603.2b step trigger whose bearer is gone by the
+      -- boundary. Khabál Ghoul ("At the beginning of each end step, put a +1/+1
+      -- counter on Khabál Ghoul for each creature that died this turn") is the
+      -- bearer; the end step's beginning and the Ghoul's own death are two
+      -- events in one unscanned batch, and the step event comes FIRST, so
+      -- nothing about the Ghoul's own departure event can be what recovers it.
+      HU.testCase "CR 603.10 a StepBegins bearer that dies later in the same batch still triggers" $ do
+        khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+        let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+            began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
+            dead = S.runPure S.identityAnswer began (Event.destroy Regenerability.Regenerable [ghoul])
+            triggers = fst (Event.gatherTriggers (Event.unscannedEvents dead) dead)
+        HU.assertEqual "the Ghoul really did leave the battlefield" Nothing (Game.lookupObject ghoul dead)
+        HU.assertEqual "its step trigger still fired" [TriggerSource.OfObject ghoul] (fmap PendingTrigger.source triggers)
+        HU.assertEqual "under alice, who controlled it as it left (CR 603.3a)" [S.alice] (fmap PendingTrigger.controller triggers),
+      -- The discriminating twin: a bearer that left the battlefield BEFORE the
+      -- step began did not exist immediately after that event, and gets nothing.
+      -- Same board, same two events, opposite order.
+      HU.testCase "CR 603.10 a bearer that had already left before the event does NOT trigger" $ do
+        khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+        let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+            dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [ghoul])
+            began = S.runPure S.identityAnswer dead (State.modify' (Event.recordEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)))
+            triggers = fst (Event.gatherTriggers (Event.unscannedEvents began) began)
+        HU.assertEqual "the Ghoul is gone" Nothing (Game.lookupObject ghoul began)
+        HU.assertEqual "and nothing triggered" [] (fmap PendingTrigger.source triggers)
+    ]
+
+-- CR 400.7e's slot read from the OTHER direction of a zone change: an entry.
+-- "Abilities that trigger when an object moves from one zone to another ... can
+-- find the new object that it became in the zone it moved to when the ability
+-- triggered, if that zone is a public zone" -- and CR 400.2 lists the
+-- battlefield among the public zones, so an enters trigger's payload may name
+-- the entrant with no proviso to check.
+--
+-- Aether Flash, {2}{R}{R} Enchantment, "Whenever a creature enters, this
+-- enchantment deals 2 damage to it." Soul Warden proved the CONDITION
+-- (permanentEntersTests above); its "you gain 1 life" names nothing about the
+-- creature that entered. This is the first card whose EFFECT refers back to the
+-- entrant.
+--
+-- The contrast with becameSlotTests is the point of reusing one slot name.
+-- There the bearer and the entrant are two incarnations of ONE card, and
+-- `became` is the second of them; here the bearer is the enchantment and the
+-- entrant is a different card entirely. CR 400.7e distinguishes neither
+-- situation: it names "the new object that IT became", where "it" is whatever
+-- moved, and the moved object being the bearer is a fact about the condition
+-- rather than about the slot.
+--
+-- Goblin Piker ({1}{R} Creature -- Goblin Warrior 2/1) and Ogre Sentry ({1}{R}
+-- Creature -- Ogre Warrior 3/3, defender) are the pair: identical costs and
+-- colors, so two Mountains cast either, and the ONLY difference the test can be
+-- reading is the toughness the 2 damage is measured against.
+aetherFlashTests :: Registry.Type.Registry -> Tasty.TestTree
+aetherFlashTests registry =
+  let -- alice: Aether Flash already on the battlefield and two Mountains, with
+      -- one creature card in hand. Casting it is the only thing on offer, so
+      -- S.identityAnswer needs no bespoke interpreter.
+      flashBoard creature = do
+        mountain <- Registry.printing registry "Mountain"
+        aetherFlash <- Registry.printing registry "Aether Flash"
+        entrant <- Registry.printing registry creature
+        let (flashId, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
+        pure (flashId, S.handOne entrant withFlash)
+      castIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+         in S.runPure S.identityAnswer cast Engine.priorityLoop
+      namesIn zone pid gs =
+        fmap Card.Type.name (Maybe.mapMaybe (\oid -> Game.cardOf oid gs) (Game.zoneMembers zone pid gs))
+      damageEventsIn gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events gs))
+      -- CR 120.3e's marked damage on the one battlefield permanent with this
+      -- name. Nothing if it is not there, or if there is more than one of it.
+      markedOn name gs =
+        case filter (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just name) (Set.toList (GameState.battlefield gs)) of
+          [oid] -> fmap Object.damage (Game.lookupObject oid gs)
+          _ -> Nothing
+      pikerName = Text.pack "Goblin Piker"
+      sentryName = Text.pack "Ogre Sentry"
+   in Tasty.testGroup
+        "CR 400.7e the entrant an enters trigger names"
+        [ -- The gameplay-level proof, cast to resolution. The discriminating
+          -- assertion is the GRAVEYARD: an ability whose `became` slot went
+          -- unbound would resolve, find nothing under it and silently deal no
+          -- damage, leaving a live 2/1 on the battlefield.
+          HU.testCase "CR 603.6a whole card: a Goblin Piker enters and Aether Flash's 2 damage kills it (CR 704.5g)" $ do
+            (flashId, board) <- flashBoard "Goblin Piker"
+            let after = castIt board
+            HU.assertEqual "the Piker is not on the battlefield" 0 (S.countOnBattlefieldByName pikerName S.alice after)
+            HU.assertEqual "it is in the graveyard, once" [pikerName] (namesIn Zone.Graveyard S.alice after)
+            -- Falsifiers. The damage went to the creature, not to a player
+            -- (CR 120.1a admits only battles, creatures and planeswalkers), and
+            -- Aether Flash did not damage itself into the graveyard either.
+            HU.assertEqual "alice's life is untouched" (Just 20) (S.lifeOf S.alice after)
+            HU.assertEqual "bob's too" (Just 20) (S.lifeOf S.bob after)
+            HU.assertBool "and the enchantment is still on the battlefield" (Set.member flashId (GameState.battlefield after))
+            HU.assertEqual "exactly one damage event, of 2" [2] (fmap DamageEvent.amount (damageEventsIn after)),
+          -- The control, differing only in the entrant's toughness: 2 damage
+          -- marked on a 3/3 is not lethal (CR 704.5g compares the total marked
+          -- against toughness), so the creature stays and CARRIES the mark. The
+          -- marked damage is what proves the effect landed at all -- without it
+          -- "still on the battlefield" would also be what a no-op looks like.
+          HU.testCase "CR 704.5g the control: an Ogre Sentry survives the same 2 damage, marked" $ do
+            (_, board) <- flashBoard "Ogre Sentry"
+            let after = castIt board
+            HU.assertEqual "the Sentry is on the battlefield" 1 (S.countOnBattlefieldByName sentryName S.alice after)
+            HU.assertEqual "the graveyard is empty" [] (namesIn Zone.Graveyard S.alice after)
+            HU.assertEqual "with 2 damage marked on it" (Just 2) (markedOn sentryName after),
+          -- eventBindings in isolation, so the binding is pinned to CR 400.7e
+          -- rather than to Aether Flash's payload. The entrant is
+          -- ZoneChange.object -- for an ENTRY the arriving incarnation is what
+          -- the event is about, so `departed` would be the pre-move id of a card
+          -- that is not on the battlefield at all.
+          HU.testCase "CR 400.7e eventBindings binds the ENTRANT under became" $
+            let castCard = ObjectId.MkObjectId 1
+                entered = ObjectId.MkObjectId 2
+                entry = GameEvent.Moved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics
+             in HU.assertEqual
+                  "became names the permanent that entered"
+                  (Map.singleton Binding.became (Binding.toObject entered))
+                  (Event.eventBindings (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry),
+          -- CR 603.6a's "EACH TIME an event puts one or more permanents onto
+          -- the battlefield" met with a per-entrant payload: Dragon Fodder
+          -- ({1}{R} Sorcery, "create two 1/1 red Goblin creature tokens") makes
+          -- two entrants in one event, so one Aether Flash places two triggers
+          -- and each has to name ITS OWN. Both tokens dying is what says so --
+          -- two triggers sharing one binding would kill one token twice and
+          -- leave the other standing.
+          --
+          -- A token is also the one entrant whose Moved event is
+          -- battlefield-to-battlefield (Event.recordTokenEntry's pseudo-move,
+          -- where `departed` and `object` are the same fresh id), so this is the
+          -- shape where reading either field would look identical. It is here as
+          -- the reminder that the fields agree for a token and only for a token.
+          -- CR 704.5d then removes the dead tokens from the graveyard, so the
+          -- damage's proof is the DamageDealt log, not a graveyard census.
+          HU.testCase "CR 603.6a two tokens enter together and each trigger names its own" $ do
+            mountain <- Registry.printing registry "Mountain"
+            aetherFlash <- Registry.printing registry "Aether Flash"
+            dragonFodder <- Registry.printing registry "Dragon Fodder"
+            let (_, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
+                (gs, spellId) = S.handOne dragonFodder withFlash
+                after = castIt (gs, spellId)
+            HU.assertEqual "no Goblin token survived" 0 (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after)
+            HU.assertEqual "two damage events of 2, one per token" [2, 2] (fmap DamageEvent.amount (damageEventsIn after))
+            HU.assertEqual
+              "and they were dealt to two different objects"
+              2
+              (Set.size (Set.fromList (fmap DamageEvent.target (damageEventsIn after)))),
+          -- CR 608.2h, the case Aether Flash makes reachable with no second
+          -- card: "if the effect requires information from a specific object
+          -- ... the effect uses the current information of that object if it's
+          -- in the public zone it was expected to be in". Two Aether Flashes,
+          -- one 2/1 entrant, two triggers -- and the first one's damage kills it
+          -- at the next state-based-action check, so the second resolves with
+          -- its entrant already gone from the battlefield it was expected to be
+          -- on. CR 400.7 minted a fresh id for the graveyard card, so the effect
+          -- does not follow it there.
+          HU.testCase "CR 608.2h a second Aether Flash resolves with the entrant already dead, and deals nothing" $ do
+            mountain <- Registry.printing registry "Mountain"
+            aetherFlash <- Registry.printing registry "Aether Flash"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (_, oneFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
+                (_, twoFlashes) = S.addCreature aetherFlash S.alice oneFlash
+                (gs, spellId) = S.handOne piker twoFlashes
+                cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+                -- The creature spell resolves and enters; the settle's CR 117.5
+                -- scan places both triggers.
+                entered = S.runPure S.identityAnswer cast Stack.resolveTop
+                placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+                -- One trigger resolves for 2, and the settle after it is where
+                -- CR 704.5g destroys the 2/1.
+                hit = S.runPure S.identityAnswer placed Stack.resolveTop
+                buried = S.runPure S.identityAnswer hit Engine.settleForPriority
+                -- The second trigger, resolving against an id CR 400.7 deleted.
+                after = S.runPure S.identityAnswer buried Stack.resolveTop
+            HU.assertEqual "both triggers were placed" 2 (length (GameState.stack placed))
+            HU.assertEqual "the Piker is dead before the second resolves" 0 (S.countOnBattlefieldByName pikerName S.alice buried)
+            HU.assertEqual "one damage event so far" [2] (fmap DamageEvent.amount (damageEventsIn buried))
+            HU.assertEqual "the second trigger did resolve" [] (GameState.stack after)
+            HU.assertEqual "and dealt nothing: still one damage event" [2] (fmap DamageEvent.amount (damageEventsIn after))
+            HU.assertEqual "the card is in the graveyard once, not twice" [pikerName] (namesIn Zone.Graveyard S.alice after)
+        ]
+
+-- Bitterblossom {1}{B} Kindred Enchantment -- Faerie: "At the beginning of your
+-- upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token
+-- with flying." The pool's first KINDRED card (CR 308), and so the first object
+-- of any kind that carries a creature type without being a creature.
+kindredTests :: Registry.Type.Registry -> Tasty.TestTree
+kindredTests registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- Bitterblossom on alice's battlefield, alice's upkeep begun. The middle
+      -- state is the one where the trigger is on the stack (CR 603.3b); the last
+      -- is after it has resolved, so a Faerie Rogue token stands beside it.
+      board bitterblossom =
+        let (oid, gs) = S.addCreature bitterblossom S.alice (Setup.emptyGame S.bothPlayers)
+            onStack = settle (beginUpkeep gs)
+         in (oid, onStack, resolveAll onStack)
+      slot = SlotName.MkSlotName (Text.pack "target")
+      -- "Target Faerie ...", drawn from a pool: the same Pool + Filter machinery
+      -- every printed target spec goes through (Pawl.ResolveSpec's "target
+      -- Wall" is the same shape over a creature type that behaves ordinarily).
+      faeriesIn pool gs =
+        Map.findWithDefault
+          Set.empty
+          slot
+          (Target.legalSets (Just S.alice) S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
+   in Tasty.testGroup
+        "Kindred"
+        [ -- The proving test for CR 308. CR 308.2 makes the kindred subtypes
+          -- "the same as the set of creature subtypes", so the ENCHANTMENT
+          -- answers a creature-type filter -- and CR 110.4's six permanent types
+          -- do not include kindred, so it still answers no to being a creature.
+          -- The token it makes is the control: a real Faerie creature, in both
+          -- pools, which is what keeps the enchantment's absence from the
+          -- creature pool from being a fixture that simply produced nothing.
+          HU.testCase "CR 308.2 a Kindred Enchantment is a legal \"target Faerie permanent\", and CR 110.4 keeps it out of \"target Faerie creature\"" $ do
+            bitterblossom <- Registry.printing registry "Bitterblossom"
+            let (blossomId, _, after) = board bitterblossom
+                permanents = faeriesIn Pool.Permanents after
+                creatures = faeriesIn Pool.Creatures after
+            HU.assertBool "the enchantment carries the creature type Faerie" (Set.member Subtype.Faerie (Projection.subtypesOf blossomId after))
+            HU.assertBool "and is not a creature" (not (Projection.isCreatureOf blossomId after))
+            HU.assertBool "so \"target Faerie permanent\" offers it" (Set.member (Recipient.ToObject blossomId) permanents)
+            HU.assertEqual "alongside the token it made, and nothing else" 2 (Set.size permanents)
+            HU.assertBool "\"target Faerie creature\" does not" (not (Set.member (Recipient.ToCreature blossomId) creatures))
+            HU.assertEqual "the token is the only one of those" 1 (Set.size creatures),
+          -- CR 308.1: "casting and resolving a kindred card follows the rules for
+          -- ... the other card type", and here the other type is Enchantment, so
+          -- nothing about the trigger is kindred-specific. What this pins is that
+          -- the whole printed ability runs -- CR 603.3a's "your upkeep" (the
+          -- ability controller's, CR 109.5), the life payment, and CR 111.1's
+          -- token -- through the ordinary priority loop.
+          HU.testCase "CR 603.3a Bitterblossom's upkeep trigger costs its controller 1 life and mints a 1/1 flying black Faerie Rogue" $ do
+            bitterblossom <- Registry.printing registry "Bitterblossom"
+            let (blossomId, onStack, after) = board bitterblossom
+            HU.assertBool "the upkeep trigger really reached the stack" (not (null (GameState.stack onStack)))
+            HU.assertEqual "no life was lost before it resolved" (Just 20) (S.lifeOf S.alice onStack)
+            HU.assertEqual "alice paid the 1 life" (Just 19) (S.lifeOf S.alice after)
+            case filter (/= blossomId) (Set.toList (GameState.battlefield after)) of
+              [token] -> do
+                HU.assertEqual "1/1" (Just 1, Just 1) (Projection.powerOf token after, Projection.toughnessOf token after)
+                -- CR 202.2b/202.2e: a token has no mana cost, so the colour
+                -- indicator is the only thing making it black.
+                HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf token after)
+                HU.assertEqual "Faerie Rogue" (Set.fromList [Subtype.Faerie, Subtype.Rogue]) (Projection.subtypesOf token after)
+                HU.assertBool "with flying" (Map.member Keyword.Type.Flying (Projection.keywordsOf token after))
+                HU.assertBool "and it, unlike its maker, IS a creature" (Projection.isCreatureOf token after)
+              other -> HU.assertFailure ("expected exactly one token beside Bitterblossom, got " <> show (length other) <> " other permanents")
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry, kindredTests registry, discardTriggerTests registry]

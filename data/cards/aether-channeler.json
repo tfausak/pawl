@@ -65,7 +65,7 @@
                       }
                     ],
                     "manaCost": null,
-                    "name": "Bird",
+                    "name": "Bird Token",
                     "power": {
                       "type": "Literal",
                       "value": 1
