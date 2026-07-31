@@ -29,9 +29,9 @@ import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
-import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -454,9 +454,10 @@ payComponent pid oid component = case component of
   -- Repair would mean COMPLETING a short answer from cards the interpreter never
   -- named, which is exactly what this does not do.
   --
-  -- CR 701.9a's move is made through Event.changeZone, the CR 400.7 funnel, so a
-  -- discarded card gets a new incarnation and Rest in Peace's redirect composes --
-  -- the same call the Discard effect makes.
+  -- CR 701.9a's move is made through Event.discard, the shared discard funnel, so
+  -- the card gets a CR 400.7 incarnation, Rest in Peace's redirect composes, and
+  -- the discard is recorded for a rule 701.9a trigger to read -- the same call the
+  -- Discard effect makes.
   CostComponent.DiscardCards n -> do
     gs <- State.get
     let held = discardCandidates pid oid gs
@@ -468,12 +469,12 @@ payComponent pid oid component = case component of
     let distinct = List.nub chosen
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do
-        Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) distinct
+        Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) distinct
         pure Payment.Paid
       else pure Payment.Unpaid
-  -- CR 701.9a's move, through Event.changeZone -- the same CR 400.7 funnel
-  -- DiscardCards uses above, so a cycled card gets a new incarnation and Rest in
-  -- Peace's redirect composes. No prompt: the cost names this card.
+  -- CR 701.9a's move, through Event.discard -- the same funnel DiscardCards uses
+  -- above, so a cycled card gets a CR 400.7 incarnation and Rest in Peace's
+  -- redirect composes. No prompt: the cost names this card.
   --
   -- The card is in the GRAVEYARD (or wherever the funnel redirected it) by the
   -- time the ability resolves, which is not a problem to route around: it is what
@@ -484,8 +485,8 @@ payComponent pid oid component = case component of
   --
   -- CR 702.29c: this is also where a cycling TRIGGER fires from -- "'When you
   -- cycle this card' means 'When you discard this card to pay an activation cost
-  -- of a cycling ability'" -- so the event is recorded here, off the cost, and
-  -- carries the id the funnel just minted rather than the one that was in hand.
+  -- of a cycling ability'" -- so the cause travels with the discard recorded
+  -- here, off the cost rather than off the ability resolving.
   --
   -- The one thing this site cannot see is rule 702.29c's "of a CYCLING ability":
   -- a cost component knows it was paid, not which ability it belonged to.
@@ -495,10 +496,7 @@ payComponent pid oid component = case component of
   -- break that, firing every cycling trigger on the board; the event has to carry
   -- which ability paid it before that card can exist (#319).
   CostComponent.DiscardThis -> do
-    moved <- Event.changeZoneReturning oid Zone.Graveyard
-    case moved of
-      Nothing -> pure ()
-      Just newId -> State.modify' (Event.recordEvent (GameEvent.Cycled newId))
+    Event.discard DiscardCause.ToPayCyclingCost pid oid
     pure Payment.Paid
   -- CR 107.14: paying energy removes that many energy counters from the
   -- player. Natural subtraction is PARTIAL (it throws on underflow), so `left`

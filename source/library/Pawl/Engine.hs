@@ -45,6 +45,7 @@ import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -247,7 +248,10 @@ discardToHandSize pid = do
         chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (Int.toNaturalSaturating excess)))
         let inHand oid = List.elem oid held
             toDiscard = take excess (filter inHand chosen)
-        Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
+        -- CR 701.9a, through the shared discard funnel: a cleanup discard is a
+        -- discard, so it records one for a rule 701.9a trigger to read. A
+        -- trigger this fires gets no extra cleanup step of its own (#51).
+        Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) toDiscard
 
 -- CR 103.8a: "In a two-player game, the player who plays first skips the draw
 -- step (see rule 504, "Draw Step") of their first turn." CR 103.8c: "In all
