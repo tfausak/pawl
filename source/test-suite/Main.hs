@@ -53,7 +53,7 @@ import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
-import qualified Pawl.SetupSpec as SetupSpec
+import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.TriggerSpec as TriggerSpec
@@ -83,7 +83,6 @@ testTree registry =
       CardsSpec.tests registry,
       TurnSpec.tests registry,
       GameSpec.tests registry,
-      SetupSpec.tests registry,
       MulliganSpec.tests registry,
       DamageSpec.tests registry,
       ExpirySpec.tests registry,
@@ -141,4 +140,5 @@ spec s registry = do
   Pawl.ModalSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.RegistrySpec.spec s
+  Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
