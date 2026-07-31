@@ -14,9 +14,10 @@ import Pawl.Types.PlayerId (PlayerId)
 -- caller that swapped them would still typecheck.
 --
 -- Only the SPELL half of rule 701.6a is here. That rule covers countering an
--- ABILITY too, and nothing in this pool counters one -- no effect targets an
--- ability on the stack -- so a countered ability records nothing today (#43 is
--- the issue this type closes; the ability half is #486).
+-- ABILITY too, and nothing in this pool counters one: CR 113.9's first sentence
+-- says an ability on the stack "can't be countered by anything that counters
+-- only spells", and Pawl.Types.Pool has no constructor admitting one as a target
+-- either -- so a countered ability records nothing today (#486).
 data Countering = MkCountering
   { -- CR 701.6a: the spell that was countered, as it was on the stack. The id is
     -- already dead by the time any reader sees this: countering removes it from
@@ -25,11 +26,14 @@ data Countering = MkCountering
     -- -- the event otherwise says only that somebody countered something, and
     -- two counters in one batch would be indistinguishable entries.
     spell :: ObjectId,
-    -- CR 113.7a: the spell or ability that did the countering -- "a spell or
-    -- ability YOU CONTROL counters a spell" (Baral, Chief of Compliance) names
-    -- this object. Also dead by the time the CR 117.5 trigger scan reads the
-    -- log: a countering SPELL has gone to its owner's graveyard by CR 608.2n,
-    -- and a countering ABILITY has ceased to exist by the same rule.
+    -- The spell or ability that did the countering, which is what Baral, Chief
+    -- of Compliance's "a spell or ability YOU CONTROL counters a spell" names.
+    -- The resolving object itself for a spell; CR 113.7's "the object whose
+    -- ability was activated" for an ability.
+    --
+    -- Also dead by the time the CR 117.5 trigger scan reads the log: a
+    -- countering SPELL has gone to its owner's graveyard by CR 608.2n, and a
+    -- countering ABILITY has ceased to exist by the same rule.
     source :: ObjectId,
     -- CR 109.5 / 603.3a: who controlled `source` AT THE MOMENT IT COUNTERED --
     -- the "you" in "a spell or ability you control".

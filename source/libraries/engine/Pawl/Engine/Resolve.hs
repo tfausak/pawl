@@ -1755,8 +1755,9 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       --
       -- The funnel is handed THIS object and its controller, which is what
       -- Baral, Chief of Compliance's "whenever a spell or ability you control
-      -- counters a spell" reads off the event it records -- CR 113.7a's source
-      -- and CR 109.5's "you". Passed rather than left to be re-derived, because
+      -- counters a spell" reads off the event it records -- the countering
+      -- object, and CR 109.5's "you". Passed rather than left to be re-derived,
+      -- because
       -- by the time the CR 117.5 trigger scan runs, a countering spell has gone
       -- to its owner's graveyard and a countering ability has ceased to exist
       -- (CR 608.2n); see Pawl.Types.Countering.

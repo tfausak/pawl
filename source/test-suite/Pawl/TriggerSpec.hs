@@ -1675,12 +1675,13 @@ discardTriggerTests registry =
 -- part of an instant or sorcery spell's resolution, the spell is put into its
 -- owner's graveyard" -- so the stack-to-graveyard zone change a countering
 -- records is indistinguishable from the one an ordinary resolution records. The
--- three cases below are that distinction, from three sides: the countering
+-- first three cases below are that distinction, from three sides: the countering
 -- fires, a countering that CR 113.6g stopped does not, and a resolution into the
--- very same graveyard does not.
+-- very same graveyard does not. The fourth is Baral's other half, its CR 601.2f
+-- cost reduction.
 --
--- bob controls the Baral and casts the Cancel throughout, so CR 109.5 fixes its
--- "you" as bob (CR 603.3a) and every countered spell is alice's.
+-- bob controls the Baral throughout, so CR 109.5 fixes its "you" as bob (CR
+-- 603.3a), and every spell countered below is alice's.
 --
 -- Baral's reflexive "if you do" is one Optional mode over both instructions
 -- (#487), so `Exercises` below draws AND discards.
@@ -1734,11 +1735,11 @@ counterTriggerTests registry =
           -- to see. The falsifier for an implementation that recorded the event
           -- before the gate, or that read the zone change instead.
           --
-          -- Rending Volley rather than Blurred Mongoose (which issue #43
-          -- proposed): the Mongoose also prints shroud, and CR 702.18 is
-          -- unimplemented (#488), so it could not be modelled faithfully. Both
-          -- cards reach this gate the same way -- through Card.counterability,
-          -- read off the spell on the stack.
+          -- Rending Volley rather than Blurred Mongoose, whose "this spell
+          -- can't be countered" sits on a creature card: the Mongoose also
+          -- prints shroud, and CR 702.18 is not implemented (#488), so it could
+          -- not be modelled faithfully. Both cards reach this gate the same way
+          -- -- through Card.counterability, read off the spell on the stack.
           HU.testCase "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
             island <- Registry.printing registry "Island"
             cancel <- Registry.printing registry "Cancel"
@@ -1803,8 +1804,7 @@ counterTriggerTests registry =
                     [ oid
                     | oid <- Game.zoneMembers Zone.Battlefield S.bob g,
                       Just obj <- [Game.lookupObject oid g],
-                      Object.tapped obj == TapState.Untapped,
-                      Object.zone obj == Zone.Battlefield
+                      Object.tapped obj == TapState.Untapped
                     ]
             -- Three Islands and the Baral start untapped; paying {U}{U} taps two.
             HU.assertEqual "four untapped permanents before" 4 (untapped gs)

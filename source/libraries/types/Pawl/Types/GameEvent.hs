@@ -142,10 +142,10 @@ data GameEvent
     -- apart -- and a discard or a mill lands a card in a graveyard too. What
     -- happened is not derivable from where the card went, so it is recorded.
     --
-    -- Emitted ONLY where a counter actually happened. CR 113.6g's "can't be
+    -- Emitted ONLY where a countering actually happened. CR 113.6g's "can't be
     -- countered" functions on the stack and CR 101.2 makes the "can't" win, so a
-    -- spell that says it was never countered: Event.counter returns before this
-    -- is recorded, and CR 603.2g is the rule that makes that mandatory -- "an
-    -- event that's prevented or replaced won't trigger anything."
+    -- spell printing that clause is never countered at all -- Event.counter
+    -- returns before this is recorded, and CR 603.2g is the rule that makes that
+    -- mandatory: "an event that's prevented or replaced won't trigger anything."
     SpellCountered Countering
   deriving (Eq, Ord, Show)

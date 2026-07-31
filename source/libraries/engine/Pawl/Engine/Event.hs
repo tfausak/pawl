@@ -91,9 +91,9 @@ movedOf event = case event of
   -- never a zone change, even when the card is about to make one.
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
-  -- The Moved event Event.counter emits alongside this one is the zone change
-  -- rule 701.6a's last sentence causes; this one says the move WAS a countering.
-  -- Answering the zone change here too would report one countering as two moves.
+  -- The Moved event Event.counter records alongside this one is the zone change
+  -- rule 701.6a's last sentence causes; this one says the move WAS a countering
+  -- and carries no ZoneChange of its own. The discard arm just above, exactly.
   GameEvent.SpellCountered _ -> Nothing
 
 -- The damage an event describes, if it is any.
@@ -470,8 +470,9 @@ putCounters oid kind n = do
 -- The single spell-countering funnel (CR 701.6 -- not to be confused with
 -- `putCounters` above, CR 122.6's placement of counter markers). A countered
 -- spell is removed from the stack and put into its owner's graveyard (CR
--- 701.6a) via changeZone -- so Rest in Peace's redirect (graveyard->exile) and
--- CR 400.7's new incarnation still compose, exactly as they do for destroy.
+-- 701.6a) through the changeZone funnel -- so Rest in Peace's redirect
+-- (graveyard->exile) and CR 400.7's new incarnation still compose, exactly as
+-- they do for destroy.
 -- Gated on CR 113.6g's "can't be countered", which functions on the stack and so
 -- is read off the spell's own card (Card.counterability) rather than through the
 -- projection -- there is no battlefield projection of a spell. CR 101.2 is what
@@ -493,24 +494,25 @@ putCounters oid kind n = do
 -- destination (CR 614), after which no zone pair reads stack-to-graveyard at
 -- all.
 --
--- Recorded only when the move COMPLETED, the posture `discard` above takes and
--- for its reason. `Nothing` is a CR 616.1 loop that cancelled the move, which
--- leaves the spell on the stack -- so it was not "removed from the stack" and
--- rule 701.6a's countering did not happen. CR 603.2g again: "an event that's
--- prevented or replaced won't trigger anything." No producer today, since no
--- card in the pool cancels a zone change outright.
+-- Nothing at all is recorded on the two paths that DO NOT counter, and CR 603.2g
+-- is what makes that mandatory rather than tidy: "an event that's prevented or
+-- replaced won't trigger anything."
+--
+--   * The CR 113.6g gate above. Read through CR 101.2, a spell that can't be
+--     countered was never countered, so there is no event to record -- which is
+--     what keeps Baral silent in TriggerSpec's composition case.
+--   * A move the CR 616.1 loop cancelled (`Nothing`), which leaves the spell on
+--     the stack, so it was never "removed from the stack" and rule 701.6a's
+--     countering did not happen. The posture `discard` above takes, and with no
+--     producer today: no card in the pool cancels a zone change outright.
 --
 -- The `source` and `controller` are the countering spell or ability and its
--- controller -- CR 113.7a and CR 109.5 -- which Baral, Chief of Compliance's
--- "whenever a spell or ability YOU CONTROL counters a spell" reads. Taken from
--- the caller rather than re-derived here: they are the resolving object and the
--- CR 608.2 controller Pawl.Engine.Resolve already holds, and by the time the CR
--- 117.5 trigger scan reads this event neither is answerable from the board --
--- see Pawl.Types.Countering.
---
--- The CR 113.6g path above records NOTHING, which is CR 603.2g ("an event that's
--- prevented or replaced won't trigger anything") read through CR 101.2: a spell
--- that can't be countered was never countered, so there is no event.
+-- controller -- CR 109.5's "you" -- which Baral, Chief of Compliance's "whenever
+-- a spell or ability YOU CONTROL counters a spell" reads. Taken from the caller
+-- rather than re-derived here: they are the resolving object and the CR 608.2c
+-- controller Pawl.Engine.Resolve already holds, and by the time the CR 117.5
+-- trigger scan reads this event neither is answerable from the board -- see
+-- Pawl.Types.Countering.
 counter :: ObjectId -> PlayerId -> ObjectId -> Game ()
 counter source controller oid = do
   gs <- State.get
