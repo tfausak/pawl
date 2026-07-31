@@ -56,7 +56,7 @@ import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
-import qualified Pawl.TriggerSpec as TriggerSpec
+import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -83,7 +83,6 @@ testTree registry =
       PropertySpec.tests registry,
       ResolveSpec.tests registry,
       ReplacementSpec.tests registry,
-      TriggerSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
     ]
 
@@ -141,4 +140,5 @@ spec s registry = do
   Pawl.ReplaySpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.TriggerSpec.spec s registry
   Pawl.TurnSpec.spec s registry
