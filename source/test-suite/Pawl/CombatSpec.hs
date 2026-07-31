@@ -863,6 +863,23 @@ evasionTests registry =
             let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
             HU.assertEqual "the block sticks" (Set.singleton b) (Combat.blockersOf a after)
           _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.14c the land type read is the PROJECTED one, so an Urborg'd Island is a Swamp" $ do
+        -- THE FALSIFIER for reading the defending player's lands off their
+        -- PRINTED type lines. Urborg, Tomb of Yawgmoth is "Each land is a Swamp
+        -- in addition to its other land types" -- a CR 613 layer-4
+        -- AddLandSubtype over every land -- so bob's Island is a Swamp and the
+        -- Wraith walks on it. Urborg is ALICE'S, so the only land bob controls
+        -- printed no Swamp at all.
+        bogWraith <- Registry.printing registry "Bog Wraith"
+        piker <- Registry.printing registry "Goblin Piker"
+        island <- Registry.printing registry "Island"
+        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+        let (gs0, mine, theirs) = attacking [bogWraith] [piker]
+            gs = snd (S.addCreature urborg S.alice (withLands [island] gs0))
+        case (mine, theirs) of
+          (a : _, b : _) ->
+            HU.assertBool "illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs))
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
       HU.testCase "CR 702.14d swampwalk on the BLOCKER cancels nothing" $ do
         -- CR 702.14d's own example, in swamps: the defending player controls the
         -- named land AND a creature with the same landwalk, and still may not

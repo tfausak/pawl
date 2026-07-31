@@ -324,29 +324,30 @@ fearAllowsGiven pcs blocker attacker gs =
     || Set.member CardType.Artifact (Projection.cardTypesGiven pcs blocker gs)
     || Set.member Color.Black (Projection.colorsGiven pcs blocker gs)
 
--- CR 702.14c: "A creature with landwalk can't be blocked as long as the defending
--- player controls at least one land with the specified land type (as in
--- 'islandwalk')."
+-- CR 702.14c: "A creature with landwalk can't be blocked as long as the
+-- defending player controls at least one land with the specified land type (as
+-- in 'islandwalk')."
 --
--- The BLOCKER is not an argument, and that is CR 702.14d stated in the type. "Landwalk
--- abilities don't 'cancel' one another": its example is a player who controls a snow
--- Forest AND a creature with snow forestwalk, and who still may not block a
--- snow-forestwalker. Landwalk is a property of the defending player's LANDS, never a
--- comparison between the two creatures -- unlike protection -- so a signature that could
--- read the blocker is a signature that could answer 702.14d wrong.
+-- The BLOCKER is not an argument, and that is CR 702.14d stated in the type.
+-- "Landwalk abilities don't 'cancel' one another": its example is a player who
+-- controls a snow Forest AND a creature with snow forestwalk, and who still may
+-- not block a snow-forestwalker. Landwalk is a property of the defending
+-- player's LANDS, never a comparison between the two creatures -- unlike
+-- protection -- so a signature that could read the blocker is a signature that
+-- could answer 702.14d wrong.
 --
--- The same asymmetry the other two evasion gates have (see evasionAllows): landwalk
--- restricts being BLOCKED, so the question is asked of the ATTACKER first.
+-- The same asymmetry the other two evasion gates have (see evasionAllows):
+-- landwalk restricts being BLOCKED, so the question is asked of the ATTACKER.
 --
--- Membership over the projection's keyword map, never its counts: CR 702.14e says
--- "multiple instances of the same kind of landwalk on the same creature are redundant".
--- Reading the map rather than asking hasKeywordGiven, because CR 702.14a's "[type]"
--- rides the constructor -- there is no single Keyword value to ask about, which is
--- Projection.totalToxic's situation and takes its shape.
+-- Membership over the projection's keyword map, never its counts: CR 702.14e
+-- says "multiple instances of the same kind of landwalk on the same creature are
+-- redundant". The MAP rather than hasKeywordGiven, because CR 702.14a's "[type]"
+-- rides the constructor -- there is no single Keyword value to ask about, which
+-- is Projection.totalToxic's situation and takes its shape.
 --
--- Only CR 702.14a's "usually a land type" case is implemented: a Subtype cannot say
--- "nonbasic land", "artifact land" or "snow Swamp", so 702.14c's other three clauses
--- are unrepresentable (#499).
+-- Only CR 702.14a's "usually a land type" case is implemented: a Subtype cannot
+-- say "nonbasic land", "artifact land" or "snow Swamp", so the other three
+-- clauses of CR 702.14c are unrepresentable (#499).
 landwalkAllows :: ObjectId -> GameState -> Bool
 landwalkAllows attacker gs = landwalkAllowsGiven (Projection.controlGrants gs) Map.empty attacker gs
 
@@ -359,7 +360,7 @@ landwalkAllowsGiven grants pcs attacker gs =
         Keyword.Landwalk subtype -> Just subtype
         _ -> Nothing
       walked = Maybe.mapMaybe landTypeOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
-      -- CR 506.2/CR 508.1: which player this creature is attacking. Read off the
+      -- CR 506.2/CR 508.1b: which player this creature is attacking. Read off the
       -- attack itself rather than off the blocker's controller, because CR 702.14c
       -- names the DEFENDING PLAYER -- the one CR 509.1a's blocker is defending --
       -- and those two coincide only while there is exactly one of them (CR 802,
@@ -367,8 +368,12 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- can restrict anything.
       defendingPlayer = fmap (\(AttackTarget.OfPlayer pid) -> pid) (Map.lookup attacker (Combat.attackers (GameState.combat gs)))
       -- CR 702.14c's "at least one land with the specified land type" -- both
-      -- halves of that phrase, since CR 205.3d lets an effect give a land type to
-      -- something that is not a land.
+      -- halves of that phrase, because the rule states both. CR 205.3d ("an
+      -- object can't gain a subtype that doesn't correspond to one of that
+      -- object's types") is what makes the card-type half all but redundant, and
+      -- "all but" is why it is still asked: nothing in the projection enforces
+      -- 205.3d, so a Modification.AddLandSubtype aimed at a non-land would
+      -- otherwise be walked on.
       --
       -- Lazy, and load-bearing: this walks the whole battlefield, and `any` below
       -- never forces it for an attacker without landwalk, which is every attacker
@@ -388,7 +393,8 @@ landwalkAllowsGiven grants pcs attacker gs =
 -- different evasion abilities are cumulative: an attacker with flying AND shadow
 -- admits only blockers that answer both.
 --
--- Every restriction in the pool today happens to be pairwise. Menace (CR 702.111b,
+-- Every restriction in the pool today is at most pairwise, and CR 702.14c's
+-- landwalk is less than that: it does not read the blocker at all. Menace (CR 702.111b,
 -- "can't be blocked except by two or more creatures") is not -- it constrains the
 -- SET blocking one attacker -- and when it lands it belongs in
 -- declarationAllowed, which is asked of the whole declaration, never here.
@@ -418,9 +424,10 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- The unit of legality is the whole declaration, not the pair, and that is not a
 -- stylistic choice. Menace (CR 702.111b, one punchlist entry away) says a creature
 -- can't be blocked except by TWO OR MORE creatures -- a constraint on the SET
--- blocking an attacker, which no per-pair predicate can express. Only flying and
--- reach are pairwise; designing to them would be designing to the case that
--- misleads. See the M2a spec, section 3. So this stays a whole-declaration
+-- blocking an attacker, which no per-pair predicate can express. Every evasion
+-- ability the pool has -- flying, reach, fear, landwalk -- is pairwise or
+-- narrower; designing to them would be designing to the case that misleads. See
+-- the M2a spec, section 3. So this stays a whole-declaration
 -- function even though its body is currently a fold of pairAllowed: this is the
 -- seam a set-shaped restriction plugs into, and it is the seam blockCeiling's
 -- enumeration is filtered through.
