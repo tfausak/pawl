@@ -156,6 +156,15 @@ manaTests registry =
         HU.assertEqual "plains" (Just (ManaType.Colored Color.White)) (Mana.subtypeMana Subtype.Plains),
       HU.testCase "CR 205.3h: Aura is an enchantment type, so it has no CR 305.6 intrinsic mana" $
         HU.assertEqual "no mana" Nothing (Mana.subtypeMana Subtype.Aura),
+      -- CR 305.6 grants its intrinsic ability to "an object with the land card
+      -- type and A BASIC LAND TYPE", and CR 205.3i lists which of the land types
+      -- those are: "Of that list, Forest, Island, Mountain, Plains, and Swamp are
+      -- the basic land types." So a Desert is a land type with no mana of its own
+      -- -- the one constructor where this answer and Pawl.Subtype.isLandType's
+      -- (asserted in Pawl.ProjectionSpec) come apart, and the reason they are two
+      -- functions.
+      HU.testCase "CR 305.6 Desert is a land type but not a BASIC one, so it grants no mana" $
+        HU.assertEqual "no mana" Nothing (Mana.subtypeMana Subtype.Desert),
       HU.testCase "an empty pool starts empty" $ do
         mountain <- Registry.printing registry "Mountain"
         HU.assertEqual "empty" 0 (poolSize S.alice (S.landsInPlay mountain 2)),

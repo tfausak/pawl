@@ -42,7 +42,7 @@ data CastingRestriction
   | -- "and only if you've been attacked this step" -- the second clause fourteen
     -- cards carry on a CAST, Rally the Troops among them. (Kongming's
     -- Contraptions prints the same words on an activated ability, which is the
-    -- ability-side type's problem and not this one's -- #446.)
+    -- ability-side type's problem and not this one's -- #456.)
     --
     -- Not a timing window at all, which is why it is its own arm rather than a
     -- field on DuringPhase: it is a question about what the combat record already
