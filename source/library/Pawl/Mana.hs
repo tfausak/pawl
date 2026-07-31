@@ -173,14 +173,12 @@ producedTypes production = case production of
 -- (#449). A mode adding no mana contributes an empty route, which is a legal but
 -- pointless activation and costs the reader nothing below: it is one more option
 -- offering no mana, and the supply model ignores it.
-manaRoutesOf :: ObjectId -> GameState -> [[ManaProduction]]
-manaRoutesOf = manaRoutesOfGiven Map.empty
-
--- The same routes against a pre-projected board, for a caller asking them of
--- every source a player controls -- manaSources below and payableResolutions
--- both do, and each of the two projection reads here was a fresh gather per
--- source (#200). See Projection.projectGiven for what the board is and why
--- Map.empty above is the same answer.
+--
+-- Takes a PRE-PROJECTED board, because every caller asks this of every source a
+-- player controls -- manaSources below and payableResolutions both do, and each
+-- of the two projection reads here was a fresh gather per source (#200). See
+-- Projection.projectGiven for what the board is and why passing Map.empty (which
+-- manaYieldsOf does) is the same answer.
 manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [[ManaProduction]]
 manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =
@@ -232,8 +230,8 @@ manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
 -- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
--- predicate read at two sites: manaRoutesOf includes a mana ability as a source
--- (Task 6); Action.legalActions excludes it from the stack (Task 5).
+-- predicate read at two sites: manaRoutesOfGiven includes a mana ability as a
+-- source (Task 6); Action.legalActions excludes it from the stack (Task 5).
 --
 -- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
 -- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even
@@ -292,10 +290,10 @@ emptyManaPools gs =
 -- Sba.performStateBasedActions takes for the CR 704.3 sweep and
 -- Projection.controls takes for the grant list. Unhoisted, each candidate cost as
 -- many as four fresh Projection.gathers -- two for its mana routes alone
--- (manaRoutesOf reads subtypes and abilities separately), one for the card-type
--- test and one for the haste read behind it -- plus a fresh grant walk, which
--- made a function the priority loop reaches at every boundary quadratic in the
--- battlefield (#200).
+-- (manaRoutesOfGiven reads subtypes and abilities separately), one for the
+-- card-type test and one for the haste read behind it -- plus a fresh grant
+-- walk, which made a function the priority loop reaches at every boundary
+-- quadratic in the battlefield (#200).
 --
 -- Projection.projectGiven carries the snapshot argument. It holds here because
 -- this is a pure function of one GameState: nothing can move between the
@@ -767,6 +765,26 @@ canPay pid = canPayCommitting pid 0
 canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
 canPayCommitting pid committed cost gs = not (null (payableResolutions pid committed cost gs))
 
+-- One untapped source's contribution to the supply side, as a supply per mana it
+-- would add: the Nth supply is every type the Nth mana of any of its yields
+-- could be. `transpose` is exactly that read, and its ragged case -- yields of
+-- different LENGTHS -- takes the longest, so a source is counted for the most
+-- mana any one activation of it adds.
+--
+-- EXACT wherever the pool reaches it, and the two cases are worth separating. A
+-- source with ONE yield (Sol Ring, Birds of Paradise, a Forest) has nothing to
+-- mix, and a source whose yields are all ONE mana (an Urborg'd Mountain) has one
+-- supply carrying their union, which is what the whole model was before Sol Ring.
+-- What it OVER-counts is a source offering several multi-mana yields: transposing
+-- lets the first mana come from one yield and the second from another, and
+-- letting the longest yield set the count credits a source with mana the yield
+-- the player actually picks may not add. Over-permissive, deliberately -- an
+-- unpayable payment fails and rolls back (CR 601.2h, payCost), while
+-- under-counting would withhold an action the player was entitled to. No card in
+-- the pool has two yields of which either adds more than one mana (#450).
+sourceSupplies :: [Mana] -> [Set.Set ManaType]
+sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
+
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
 -- is what lifeNeeded reads. NOT the resolution `spend` will take: `spend` walks
@@ -819,26 +837,6 @@ canPayCommitting pid committed cost gs = not (null (payableResolutions pid commi
 -- rides on the same enumeration: its life way is a resolution with one fewer
 -- demand, so neither clause has to learn about a symbol that consumes no supply
 -- at all.
--- One untapped source's contribution to the supply side, as a supply per mana it
--- would add: the Nth supply is every type the Nth mana of any of its yields
--- could be. `transpose` is exactly that read, and its ragged case -- yields of
--- different LENGTHS -- takes the longest, so a source is counted for the most
--- mana any one activation of it adds.
---
--- EXACT wherever the pool reaches it, and the two cases are worth separating. A
--- source with ONE yield (Sol Ring, Birds of Paradise, a Forest) has nothing to
--- mix, and a source whose yields are all ONE mana (an Urborg'd Mountain) has one
--- supply carrying their union, which is what the whole model was before Sol Ring.
--- What it OVER-counts is a source offering several multi-mana yields: transposing
--- lets the first mana come from one yield and the second from another, and
--- letting the longest yield set the count credits a source with mana the yield
--- the player actually picks may not add. Over-permissive, deliberately -- an
--- unpayable payment fails and rolls back (CR 601.2h, payCost), while
--- under-counting would withhold an action the player was entitled to. No card in
--- the pool has two yields of which either adds more than one mana (#450).
-sourceSupplies :: [Mana] -> [Set.Set ManaType]
-sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
-
 payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
 payableResolutions pid committed cost gs =
   let Mana.MkMana units = poolOf pid gs
