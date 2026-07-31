@@ -602,13 +602,13 @@ permute xs order =
 -- that changes nothing (the common case) costs one board projection and one
 -- length comparison per carrier, NOT a deep GameState equality check.
 --
--- On top of that, every pass pays two control samples, because a derived control
--- change has nothing else to notice it. The CR 302.6 continuity scan
--- (checkControlContinuity) is unconditional and linear in the battlefield -- a
--- real addition to this path's cost, not a free rider. The CR 506.4
--- removal-from-combat scan (Combat.removeControlChanged) costs the same again
--- while creatures are in combat and nothing at all when none are, which is most
--- of the game.
+-- On top of that, every pass pays two samples of derived state, because a derived
+-- change to control or to card types has nothing else to notice it. The CR 302.6
+-- continuity scan (checkControlContinuity) is unconditional and linear in the
+-- battlefield -- a real addition to this path's cost, not a free rider. The
+-- CR 506.4 removal-from-combat scan (Combat.removeChanged) costs a control-grant
+-- scan and a gather while creatures are in combat, and nothing at all when none
+-- are, which is most of the game.
 --
 -- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
 -- a player would get priority" the coarsest moment anything could observe it,
@@ -636,15 +636,22 @@ settleForPriority = do
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: both read
-  -- CONTROL, and must see the control this settle leaves behind rather than the
-  -- control some earlier step saw. Outside the recursion guard on purpose --
-  -- neither makes further work, so neither is a reason to loop, and both must run
-  -- even on a pass where nothing fired.
+  -- state this settle can still change, and are placed to see what it leaves
+  -- behind rather than what some earlier step saw. Both read CONTROL, and the
+  -- CR 506.4 scan also reads CARD TYPES -- where the sweep is what ends a "for as
+  -- long as" animation, and so what makes an attacker stop being a creature.
+  --
+  -- Outside the recursion guard on purpose -- neither makes further work, so
+  -- neither is a reason to loop, and both must run even on a pass where nothing
+  -- fired. That last part is also what keeps the placement a matter of doing the
+  -- work in ONE pass rather than of correctness: the settle stops only on a pass
+  -- where nothing fired, and these two ran on that pass, against the finished
+  -- board, before priority is granted.
   --
   -- Order between the two does not matter and is not load-bearing: CR 506.4 asks
   -- about combat and CR 302.6 about summoning sickness, and neither reads what the
   -- other writes.
-  State.modify' Combat.removeControlChanged
+  State.modify' Combat.removeChanged
   checkControlContinuity
   Monad.when (swept || returned || acted || placed) settleForPriority
 
