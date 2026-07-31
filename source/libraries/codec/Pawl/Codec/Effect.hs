@@ -93,7 +93,7 @@ effectToJson codec e = case e of
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
   Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson f])))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
-  Effect.TakeExtraTurn r -> Json.tagged (Text.pack "TakeExtraTurn") (Just (playerRefToJson r))
+  Effect.TakeExtraTurn r skips -> Json.tagged (Text.pack "TakeExtraTurn") (Just (Array (MkArray [playerRefToJson r, Json.setTo phaseSelectorToJson skips])))
 
 jsonToEffect :: (Value -> Either Text card) -> Value -> Either Text (Effect.Effect card)
 jsonToEffect decode value = do
@@ -191,5 +191,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
       _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
     "PlaySubgame" -> Json.withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
-    "TakeExtraTurn" -> Json.withValue mv (fmap Effect.TakeExtraTurn . jsonToPlayerRef)
+    "TakeExtraTurn" -> case mv of
+      Just (Array (MkArray [r, skips])) -> Effect.TakeExtraTurn <$> jsonToPlayerRef r <*> Json.setFrom jsonToPhaseSelector skips
+      _ -> Left (Text.pack "TakeExtraTurn expects [playerRef, phaseSelectors]")
     _ -> Left (Text.pack "unknown Effect: " <> t)

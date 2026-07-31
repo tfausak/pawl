@@ -12,7 +12,12 @@ import Pawl.Types.PlayerId (PlayerId)
 -- WHICH windows a PhaseSelector can name, and why a bare Phase cannot name them
 -- all, is Pawl.Types.PhaseSelector's own question.
 --
--- Not expressible: a skip scoped to one identified turn (#334).
+-- A skip scoped to ONE identified turn is not said here either, and does not need
+-- to be: Savor the Moment's "skip the untap step of that turn" rides on the
+-- pending turn itself (Pawl.Types.ExtraTurn) and becomes an ordinary pattern of
+-- this shape -- selector plus taker -- only once that turn begins, by which point
+-- "that turn" and "this turn" are the same turn
+-- (Pawl.Engine.Replacement.installTurnSkips).
 --
 -- `whosePhase` is CR 614.1's "does this instance apply" question asked about a
 -- PLAYER, and Nothing is not a missing answer -- it is EVERY player. Eon Hub's
@@ -24,9 +29,11 @@ import Pawl.Types.PlayerId (PlayerId)
 -- (Pawl.Engine.Replacement.applies compares it against ProposedEvent.WouldBeginPhase's
 -- active player).
 --
--- The PlayerId is BAKED at resolution, by Resolve.applyEffect's SkipNextPhase
--- arm, exactly as Modification.SetController's is by GainControl -- card data
--- cannot name a player, so this is the only way one gets in. Meant to be
+-- The PlayerId is BAKED by the engine, never authored: card data cannot name a
+-- player, exactly as it cannot name Modification.SetController's. Two bakers, and
+-- they differ in WHEN rather than in what they write -- Resolve.applyEffect's
+-- SkipNextPhase arm at resolution, and Pawl.Engine.Replacement.installTurnSkips as
+-- an extra turn begins (see above). Meant to be
 -- runtime-only, and nothing ENFORCES that: the codec round-trips it, so card
 -- JSON could author a Just, which is meaningless (#437).
 data PhasePattern = MkPhasePattern

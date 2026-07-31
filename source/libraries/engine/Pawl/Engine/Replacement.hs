@@ -46,6 +46,9 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Expiry as Expiry
+import Pawl.Types.ExtraTurn (ExtraTurn)
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
@@ -236,12 +239,14 @@ loop asOf batch applied event = do
 --      order. Read from `sources`, which for a CR 608.2f batch is the board the
 --      batch began in rather than the live one (see applyReplacementsIn).
 --   2. The FLOATING store (GameState.replacements): newest first -- Resolve.hs
---      (the Replace and SkipNextPhase opcodes) and Pawl.Engine.Cast (rule 702.34a's
---      flashback exile, armed as the spell goes onto the stack) each prepend a
---      new ActiveReplacement onto the front of the list as it is created, so the
---      most recently installed floating replacement is collected before any older
---      one. Always the LIVE store, never a frozen one: CR 614.3 spends a one-shot
---      as it is applied, and `consume` writes that back here.
+--      (the Replace and SkipNextPhase opcodes), Pawl.Engine.Cast (rule 702.34a's
+--      flashback exile, armed as the spell goes onto the stack) and
+--      `installTurnSkips` below (CR 500.11's turn-scoped skip, armed as the turn
+--      it belongs to begins -- the one prepender that is not a resolution) each
+--      prepend a new ActiveReplacement onto the front of the list as it is
+--      created, so the most recently installed floating replacement is collected
+--      before any older one. Always the LIVE store, never a frozen one: CR 614.3
+--      spends a one-shot as it is applied, and `consume` writes that back here.
 --
 -- That concatenated order is what the ChooseReplacement prompt indexes into. The
 -- two segments take separate arguments -- rather than one GameState apiece, which
@@ -505,6 +510,10 @@ bucketOf re = case re of
 -- must preserve that independence; the day one does not, this elision starts
 -- silently choosing between two applications that produce different boards --
 -- deciding for a player who was never asked, the second invariant's violation.
+--
+-- Not implemented: the comparison reads `effect` alone, so two floating rows
+-- alike in it but differing in `expiry` or `uses` are treated as
+-- indistinguishable even though `consume` spends only the one that applied (#490).
 --
 -- Anything else prompts. The pure fold has silently picked list order since M3f;
 -- that is the second-invariant violation this phase exists to retire, and unlike
@@ -930,6 +939,61 @@ beginsPhase :: PhaseSelector -> PlayerId -> Game Bool
 beginsPhase selector pid = do
   outcome <- applyReplacements (ProposedEvent.WouldBeginPhase selector pid)
   pure (Maybe.isJust (outcome >>= asPhaseBegin))
+
+-- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
+-- skips become floating replacement effects, one per selector. Called by
+-- Engine.takeNextTurn at the moment the turn actually begins, and only for a turn
+-- that does begin (CR 800.4k).
+--
+-- Here rather than in Pawl.Engine.Resolve, which installs Effect.SkipNextPhase's
+-- rows: what those two opcodes differ on is WHEN the row exists, and this module
+-- is the one that reads GameState.replacements. The row itself is the same shape
+-- Resolve builds -- PhaseR, scoped to the taker, Uses.Once -- so `beginsPhase`
+-- above answers a turn-scoped skip and a "next occurrence" skip through one
+-- mechanism, and CR 616.1's loop orders them against each other for free.
+--
+-- Installed AT THE TURN'S START rather than at the resolution that created the
+-- turn, which is the whole point: CR 614.10a's "next" would name whatever step
+-- came first in the meantime, and CR 500.7's "the most recently created turn will
+-- be taken first" lets that be a different turn entirely.
+--
+-- CR 614.10: "once a step, phase, or turn has started, it can no longer be
+-- skipped". Nothing of this turn has started yet -- Engine.beginTurnOf has only
+-- scheduled it, and Engine.runStep asks `beginsPhase` before the untap step's
+-- first observable moment.
+--
+-- Expiry.AtCleanup, not Never. CR 514.2's "until end of turn" is not the reason:
+-- the card states no duration. The reason is that the skip names ONE turn and
+-- cannot apply to another, so the last moment of that turn is the last moment it
+-- could matter, and AtCleanup is the store for exactly that
+-- (Pawl.Engine.Expiry.dropAtCleanup). Uses.Once is CR 614.10a's per-occurrence
+-- spend, and it is the one that actually fires for the one card in the pool: the
+-- untap step is the first step of the turn the skip belongs to, so the row is
+-- spent long before any sweep. Not implemented: the sweep does not run at all on
+-- a turn whose ending phase was skipped, so the expiry alone would not hold an
+-- unspent row to its turn (#491).
+installTurnSkips :: ExtraTurn -> GameState -> GameState
+installTurnSkips entry gs =
+  let install g selector =
+        let (ts, g1) = Game.freshTimestamp g
+            active =
+              ActiveReplacement.MkActiveReplacement
+                { ActiveReplacement.effect =
+                    ReplacementEffect.PhaseR
+                      PhasePattern.MkPhasePattern
+                        { PhasePattern.whichPhase = selector,
+                          -- The turn's taker, which for a step or phase OF that
+                          -- turn is also whose step it is (see PhasePattern).
+                          PhasePattern.whosePhase = Just (ExtraTurn.taker entry)
+                        },
+                  -- CR 113.7: the source of the effect that created the turn.
+                  ActiveReplacement.source = ExtraTurn.source entry,
+                  ActiveReplacement.timestamp = ts,
+                  ActiveReplacement.expiry = Expiry.AtCleanup,
+                  ActiveReplacement.uses = Uses.Once
+                }
+         in g1 {GameState.replacements = active : GameState.replacements g1}
+   in List.foldl' install gs (Set.toAscList (ExtraTurn.skipped entry))
 
 asPhaseBegin :: ProposedEvent -> Maybe (PhaseSelector, PlayerId)
 asPhaseBegin event = case event of
