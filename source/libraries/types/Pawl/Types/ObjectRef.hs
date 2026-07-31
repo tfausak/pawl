@@ -39,9 +39,11 @@ data ObjectRef
     -- is affected must be judged before any of them is, which belongs to the
     -- opcode's funnel rather than to this type (Pawl.Event.destroy).
     --
-    -- A one-shot only. A CONTINUOUS effect over a set (Aura Thief's "gain
-    -- control of all enchantments") must additionally freeze the swept set into
+    -- A CONTINUOUS effect over a set must additionally freeze the swept set into
     -- the effect itself, because CR 611.2c fixes the affected set "when that
-    -- continuous effect begins"; no opcode does that yet (#377).
+    -- continuous effect begins". Effect.ModifyTarget (Trumpet Blast's "attacking
+    -- creatures") and Effect.GainControl (Aura Thief's "all enchantments") both
+    -- do that, storing Affected.TheseObjects; the one-shots that take this type
+    -- store nothing and are governed by CR 608.2c/608.2f instead.
     EachMatching Filter
   deriving (Eq, Ord, Show)

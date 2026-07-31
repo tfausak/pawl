@@ -38,11 +38,27 @@ import Pawl.Types.Zone (Zone)
 -- embedded card's effects, so the control-flow non-recursion above still holds.
 data Effect card
   = DealDamage SlotName Quantity
-  | -- CR 611: create a continuous effect on the slot's target for a duration.
-    -- Giant Growth and Serpent's Gift are this one opcode, differing only in the
-    -- Modification (layer 7c vs 6). Resolve stores it; it never cases on the
-    -- Modification.
-    ModifyTarget Duration Modification SlotName
+  | -- CR 611: create a continuous effect on the objects the ObjectRef names, for
+    -- a duration. Giant Growth and Serpent's Gift are this one opcode, differing
+    -- only in the Modification (layer 7c vs 6). Resolve stores it; it never cases
+    -- on the Modification.
+    --
+    -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
+    -- gives at length: one opcode serving both the chosen permanent (Giant
+    -- Growth's InSlot, filled by targeting) and the named set (Trumpet Blast's
+    -- "attacking creatures", an EachMatching swept at resolution), rather than a
+    -- sibling ModifyAll to keep in step with it. Only InSlot is a target; CR
+    -- 115.10a is the reason (ObjectRef's own comment).
+    --
+    -- CR 611.2c is the constraint the set arm has to meet, and it is what makes
+    -- this widening more than mechanical: "the set of objects it affects is
+    -- determined when that continuous effect begins. After that point, the set
+    -- won't change." So Resolve sweeps ONCE, at resolution, and freezes the
+    -- RESULT into the stored effect as Affected.TheseObjects -- never the Filter,
+    -- which would be re-evaluated each projection and would then pump a creature
+    -- that became attacking later. The one-shot opcodes that take an ObjectRef
+    -- (Destroy, Untap) are under CR 608.2c/608.2f instead, and store nothing.
+    ModifyTarget Duration Modification ObjectRef
   | -- CR 612: rewrite basic-land-type words in the target spell or permanent. The
     -- SlotName is the target slot; the two basic land types are read from the
     -- caster's binding (Binding.subtypes on Object.bindings) and baked into a
@@ -97,9 +113,11 @@ data Effect card
     -- DestroyAll opcode was the alternative, and it would have had to carry its
     -- own copy of the CR 702.12b gate, the CR 616.1 funnel and the CR 701.19c
     -- rider -- the duplication PlayerRef already exists to avoid on the player
-    -- side (Draw's comment). Untap has since taken the same parameter for the
-    -- same reason; the other object-affecting opcodes still take a bare
-    -- SlotName, none of them having a card that names a set (#378).
+    -- side (Draw's comment). Untap, ModifyTarget and GainControl have since
+    -- taken the same parameter for the same reason -- the last two additionally
+    -- owing CR 611.2c a frozen set, since they STORE what they build; the other
+    -- object-affecting opcodes still take a bare SlotName, none of them having a
+    -- card that names a set (#378).
     --
     -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
     -- destroyed into the effect SOURCE's live bindings -- the resolving spell
@@ -389,16 +407,23 @@ data Effect card
     -- 505.1a/506.1 detail of WHAT is inserted and the CR 511.3 question of WHERE
     -- live.
     AddPhases [ExtraPhase]
-  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the slot's target
-    -- for a duration. The new controller is THIS effect's source's controller
-    -- (the `controller` passed to applyEffect), baked into a stored
-    -- SetController continuous effect -- derived, never chosen. Also re-Sicks the
-    -- target (CR 302.6: the new controller has not controlled it continuously).
-    -- Act of Treason's control clause. NOT a reuse of ModifyTarget, whose
-    -- Modification is static card data and cannot carry a resolution-time
-    -- PlayerId. Permanent control (CR 613), distinct from Mindslaver's
-    -- player-control (CR 723, ControlPlayerNextTurn).
-    GainControl Duration SlotName
+  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
+    -- ObjectRef names, for a duration. The new controller is THIS effect's
+    -- source's controller (the `controller` passed to applyEffect), baked into a
+    -- stored SetController continuous effect -- derived, never chosen. Also
+    -- re-Sicks each object whose controller actually changed (CR 302.6: the new
+    -- controller has not controlled it continuously). NOT a reuse of
+    -- ModifyTarget, whose Modification is static card data and cannot carry a
+    -- resolution-time PlayerId. Permanent control (CR 613), distinct from
+    -- Mindslaver's player-control (CR 723, ControlPlayerNextTurn).
+    --
+    -- ObjectRef for the reason Destroy's comment gives: Act of Treason's control
+    -- clause is the InSlot arm, and Aura Thief's "you gain control of all
+    -- enchantments" is the EachMatching one. Like ModifyTarget, and unlike the
+    -- one-shots, the swept set has to be FROZEN into the stored effect (CR
+    -- 611.2c names controller changes in as many words), so an enchantment that
+    -- enters afterwards is not stolen.
+    GainControl Duration ObjectRef
   | -- CR 603.7: create a delayed triggered ability -- the one this card declares
     -- under this name (Card.delayedAbilities). First-order: the payload is card
     -- data joined by a name, so this opcode carries no nested ability and adds no
