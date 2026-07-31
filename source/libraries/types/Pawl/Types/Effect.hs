@@ -328,6 +328,17 @@ data Effect card
     -- TARGETING (CR 601.2c), which is how a future "target player gets two
     -- poison counters" is written, but nothing here demands it (#120).
     GainPlayerCounters PlayerRef PlayerCounterKind Quantity
+  | -- CR 701.26a: "To tap a permanent, turn it sideways from an upright
+    -- position. Only untapped permanents can be tapped." The exact mirror of
+    -- Untap below, down to the ObjectRef -- Dream's Grip's "tap target
+    -- permanent" is `InSlot`, and an "all creatures your opponents control" tap
+    -- would be `EachMatching`.
+    --
+    -- A permanent that is ALREADY tapped is left alone rather than being an
+    -- error, which is rule 701.26a's own second sentence: there is no such
+    -- event, so nothing happens to it. That falls out of the resolution being an
+    -- assignment to TapState.Tapped and needs no arm of its own.
+    Tap ObjectRef
   | -- CR 701.26b: untap the permanents the ObjectRef names. Act of Treason's
     -- "untap that creature" is `InSlot`; Aggravated Assault's "untap all
     -- creatures you control" and Relentless Assault's "untap all creatures that

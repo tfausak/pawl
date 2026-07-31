@@ -181,6 +181,26 @@ tests registry =
             roundTrip "flashback {1}" Codec.keywordToJson Codec.jsonToKeyword (flashback 1)
             roundTrip "flashback {4}" Codec.keywordToJson Codec.jsonToKeyword (flashback 4)
             HU.assertBool "the cost is part of the encoding" (Codec.keywordToJson (flashback 1) /= Codec.keywordToJson (flashback 4)),
+          -- CR 702.42a's payload is a whole Cost too, and it must not share
+          -- Flashback's tag: Dream's Grip may not decode as a card castable from
+          -- a graveyard.
+          HU.testCase "Keyword.Entwine carries its cost, and is not Flashback" $ do
+            let entwine n =
+                  Keyword.Entwine
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic n]),
+                        Cost.Type.components = []
+                      }
+                flashbackOf n =
+                  Keyword.Flashback
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic n]),
+                        Cost.Type.components = []
+                      }
+            roundTrip "entwine {1}" Codec.keywordToJson Codec.jsonToKeyword (entwine 1)
+            roundTrip "entwine {3}" Codec.keywordToJson Codec.jsonToKeyword (entwine 3)
+            HU.assertBool "the cost is part of the encoding" (Codec.keywordToJson (entwine 1) /= Codec.keywordToJson (entwine 3))
+            HU.assertBool "entwine {1} is not flashback {1}" (Codec.keywordToJson (entwine 1) /= Codec.keywordToJson (flashbackOf 1)),
           HU.testCase "CastingPermission" $ do
             roundTrip "library" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromLibraryWhileSearching
             roundTrip "graveyard" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromGraveyard,
@@ -302,6 +322,18 @@ tests registry =
           HU.testCase "Untap round-trips both ObjectRef arms" $ do
             roundTrip "e4d" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
             roundTrip "e4e" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))),
+          -- CR 701.26a's Tap is Untap's mirror and shares its wire shape, so the
+          -- two must not collapse into one tag: Dream's Grip prints both modes
+          -- on one card and a decoder that confused them would silently swap
+          -- them.
+          HU.testCase "Tap round-trips both ObjectRef arms, and is not Untap" $ do
+            roundTrip "e4f" Codec.effectToJson Codec.jsonToEffect (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "e4g" Codec.effectToJson Codec.jsonToEffect (Effect.Tap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)))
+            HU.assertBool
+              "Tap and Untap of the same slot encode differently"
+              ( Codec.effectToJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+                  /= Codec.effectToJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+              ),
           HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
             roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing)
             roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing),
@@ -578,6 +610,16 @@ tests registry =
               Codec.typeLineToJson
               Codec.jsonToTypeLine
               (TypeLine.MkTypeLine (Set.singleton Supertype.Basic) (Set.singleton CardType.Land) (Set.singleton Subtype.Mountain)),
+          -- CR 308.1/308.2: the kindred shape -- two card types, and a CREATURE
+          -- subtype on a card that is not a creature. Bitterblossom's type line,
+          -- and the only one in the pool where the subtype's family and the
+          -- card types disagree.
+          HU.testCase "TypeLine (kindred)" $
+            roundTrip
+              "tl-kindred"
+              Codec.typeLineToJson
+              Codec.jsonToTypeLine
+              (TypeLine.MkTypeLine Set.empty (Set.fromList [CardType.Kindred, CardType.Enchantment]) (Set.singleton Subtype.Faerie)),
           Tasty.testGroup
             "cost (P8)"
             [ HU.testCase "every CostComponent round-trips" $

@@ -6,6 +6,7 @@ import Numeric.Natural (Natural)
 import Pawl.Types.Action (Action)
 import Pawl.Types.Concession (Concession)
 import Pawl.Types.Cost (Cost)
+import Pawl.Types.EntwineDecision (EntwineDecision)
 import Pawl.Types.Mana (Mana)
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.MulliganDecision (MulliganDecision)
@@ -137,4 +138,11 @@ data Response
     -- not match the prompt being asked, and two two-valued prompts sharing a
     -- constructor cannot do that.
     AnnouncedPhyrexianPayment PhyrexianPayment
+  | -- CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
+    -- ability, serialized so a DecisionLog replays an entwined cast exactly as
+    -- it was made. Its own constructor rather than a reuse of ChoseOptional,
+    -- Conceded or DeclaredMulligan, for the reason ChoseDefender records: decode
+    -- must return Nothing for a response that does not match the prompt being
+    -- asked, and two two-valued prompts sharing a constructor cannot do that.
+    AnnouncedEntwine EntwineDecision
   deriving (Eq, Show)

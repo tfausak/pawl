@@ -146,6 +146,7 @@ slotsOf effect = case effect of
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ slot -> Set.singleton slot
@@ -197,6 +198,7 @@ readsX = any effectReadsX
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
+      Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
@@ -247,6 +249,7 @@ manaProduced effect = case effect of
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
+  Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.GainControl _ _ -> Nothing
@@ -291,6 +294,7 @@ searchesLibrary effect = case effect of
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
+  Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
@@ -403,6 +407,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters {} -> effect
   -- No rewritable land-type word.
   Effect.GainPlayerCounters {} -> effect
+  Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
@@ -1807,6 +1812,22 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                       }
                 )
       _ -> pure ()
+  Effect.Tap ref ->
+    State.modify' $ \gs ->
+      -- CR 701.26a: turn each named permanent sideways. The exact mirror of the
+      -- Untap arm below, enumerating its victims ONCE through the same
+      -- objectRefObjects for the same CR 608.2f simultaneity, so an illegal slot
+      -- (CR 608.2b), a player recipient and a set that matched nothing all
+      -- arrive as the empty list and tap nothing.
+      --
+      -- Rule 701.26a's "only untapped permanents can be tapped" needs no guard:
+      -- assigning Tapped to something already tapped leaves it exactly as it
+      -- was, which is what "nothing happens" means for a state this coarse.
+      let tap o = o {Object.tapped = TapState.Tapped}
+       in gs
+            { GameState.objects =
+                foldr (Map.adjust tap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
+            }
   Effect.Untap ref ->
     State.modify' $ \gs ->
       -- CR 701.26b: rotate each named permanent back to the upright position.

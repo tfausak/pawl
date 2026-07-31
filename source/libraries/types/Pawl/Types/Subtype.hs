@@ -91,6 +91,11 @@ data Subtype
     -- Pawl.Mana.subtypeMana apart: a land type that grants no intrinsic mana
     -- ability. Appended at the END for the Ord-canonical reason Equipment states.
     Desert
+  | -- CR 205.3m (a creature type; Bitterblossom's, and its token's). The first
+    -- subtype in this type to sit on something that is not a creature: CR 308.2
+    -- makes the kindred subtypes the same set as the creature subtypes, so
+    -- Bitterblossom is a Kindred Enchantment -- Faerie.
+    Faerie
   | -- CR 205.3m (a creature type; Stonehorn Dignitary's).
     Rhino
   deriving (Eq, Ord, Show)
