@@ -5,14 +5,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.HUnit as HU
 
 sampleSnapshot :: PC.ProjectedCharacteristics
 sampleSnapshot =
@@ -32,31 +31,37 @@ sampleSnapshot =
       PC.triggeredAbilities = []
     }
 
-tests :: Tasty.TestTree
-tests =
-  Tasty.testGroup
-    "Pawl.Engine.Binding"
-    [ HU.testCase "fromChoices merges a shared slot's target and subtypes" $
-        let slot = SlotName.MkSlotName (Text.pack "target")
-            r = Recipient.ToPlayer S.alice
-            pair = (Subtype.Mountain, Subtype.Island)
-            m = Binding.fromChoices (Map.singleton slot r) (Map.singleton slot pair) Nothing Set.empty
-         in do
-              HU.assertEqual "target projected" (Map.singleton slot r) (Binding.targetsOf m)
-              HU.assertEqual "subtypes projected" (Map.singleton slot pair) (Binding.subtypesOf m),
-      HU.testCase "fromChoices stores X under the reserved slot" $
-        let m = Binding.fromChoices Map.empty Map.empty (Just 3) Set.empty
-         in HU.assertEqual "amount readable" (Just 3) (Binding.amountOf Binding.variableX m),
-      HU.testCase "amountOf is Nothing for an absent slot" $
-        HU.assertEqual "no amount" Nothing (Binding.amountOf Binding.variableX Map.empty),
-      HU.testCase "modesOf round-trips a stamped set of chosen modes" $
-        let chosen = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]
-            m = Binding.fromChoices Map.empty Map.empty Nothing chosen
-         in HU.assertEqual "modes readable" chosen (Binding.modesOf m),
-      HU.testCase "modesOf is empty for an absent slot" $
-        HU.assertEqual "no modes" Set.empty (Binding.modesOf Map.empty),
-      HU.testCase "setCopy then copyOf round-trips the snapshot" $
-        HU.assertEqual "copy snapshot" (Just sampleSnapshot) (Binding.copyOf (Binding.setCopy sampleSnapshot Map.empty)),
-      HU.testCase "no copy binding means copyOf is Nothing" $
-        HU.assertEqual "absent" Nothing (Binding.copyOf Map.empty)
-    ]
+spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Engine.Binding" $ do
+  Spec.describe s "fromChoices merges a shared slot's target and subtypes" $ do
+    let slot = SlotName.MkSlotName (Text.pack "target")
+        r = Recipient.ToPlayer S.alice
+        pair = (Subtype.Mountain, Subtype.Island)
+        m = Binding.fromChoices (Map.singleton slot r) (Map.singleton slot pair) Nothing Set.empty
+
+    Spec.it s "target projected" $ do
+      Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot r
+
+    Spec.it s "subtypes projected" $ do
+      Spec.assertEq s (Binding.subtypesOf m) $ Map.singleton slot pair
+
+  Spec.it s "fromChoices stores X under the reserved slot" $ do
+    let m = Binding.fromChoices Map.empty Map.empty (Just 3) Set.empty
+    Spec.assertEq s (Binding.amountOf Binding.variableX m) $ Just 3
+
+  Spec.it s "amountOf is Nothing for an absent slot" $ do
+    Spec.assertEq s (Binding.amountOf Binding.variableX Map.empty) Nothing
+
+  Spec.it s "modesOf round-trips a stamped set of chosen modes" $ do
+    let chosen = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]
+        m = Binding.fromChoices Map.empty Map.empty Nothing chosen
+    Spec.assertEq s (Binding.modesOf m) chosen
+
+  Spec.it s "modesOf is empty for an absent slot" $ do
+    Spec.assertEq s (Binding.modesOf Map.empty) Set.empty
+
+  Spec.it s "setCopy then copyOf round-trips the snapshot" $ do
+    Spec.assertEq s (Binding.copyOf (Binding.setCopy sampleSnapshot Map.empty)) $ Just sampleSnapshot
+
+  Spec.it s "no copy binding means copyOf is Nothing" $ do
+    Spec.assertEq s (Binding.copyOf Map.empty) Nothing

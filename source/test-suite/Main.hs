@@ -2,7 +2,7 @@ import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
 import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.AuraSpec as AuraSpec
-import qualified Pawl.BindingSpec as BindingSpec
+import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CardsSpec as CardsSpec
 import qualified Pawl.CastSpec as CastSpec
@@ -10,7 +10,7 @@ import qualified Pawl.CodecSpec as CodecSpec
 import qualified Pawl.ColorSpec as ColorSpec
 import qualified Pawl.CombatSpec as CombatSpec
 import qualified Pawl.ConditionSpec
-import qualified Pawl.CopySpec as CopySpec
+import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.CostSpec as CostSpec
 import qualified Pawl.CountSpec as CountSpec
@@ -39,7 +39,7 @@ import qualified Pawl.Json.ObjectSpec
 import qualified Pawl.Json.PairSpec
 import qualified Pawl.Json.StringSpec
 import qualified Pawl.Json.ValueSpec
-import qualified Pawl.JsonSpec as JsonSpec
+import qualified Pawl.JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ModalSpec as ModalSpec
 import qualified Pawl.MulliganSpec as MulliganSpec
@@ -80,7 +80,6 @@ testTree registry =
   Tasty.testGroup
     "pawl"
     [ CoreSpec.tests registry,
-      BindingSpec.tests,
       CardSpec.tests registry,
       CardsSpec.tests registry,
       TurnSpec.tests registry,
@@ -93,7 +92,6 @@ testTree registry =
       ExpirySpec.tests registry,
       ReplaySpec.tests registry,
       PropertySpec.tests registry,
-      JsonSpec.tests,
       CodecSpec.tests registry,
       ManaSpec.tests registry,
       CastSpec.tests registry,
@@ -107,7 +105,6 @@ testTree registry =
       ActivateSpec.tests registry,
       PlaneswalkerSpec.tests registry,
       ModalSpec.tests registry,
-      CopySpec.tests registry,
       ReplacementSpec.tests registry,
       ColorSpec.tests registry,
       TriggerSpec.tests registry,
@@ -121,7 +118,9 @@ testTree registry =
 -- IO action. The rest stay polymorphic in the assertion monad.
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
 spec s registry = do
+  Pawl.BindingSpec.spec s
   Pawl.ConditionSpec.spec s registry
+  Pawl.CopySpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
   Pawl.Extra.BuilderSpec.spec s
@@ -141,4 +140,5 @@ spec s registry = do
   Pawl.Json.PairSpec.spec s
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
+  Pawl.JsonSpec.spec s
   Pawl.SlugSpec.spec s
