@@ -354,12 +354,18 @@ tests registry =
             roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card piker)),
           HU.testCase "BecomeMonarch" $
             roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController),
-          -- Both constructors, even though the encoder only ever emits
-          -- SorcerySpeed (AnyTime is the absent key on a card). Round-tripping
-          -- the pair is what keeps the decoder honest about the form it accepts.
-          HU.testCase "ActivationTiming round-trips both ways" $ do
+          -- Every constructor, even though the encoder never emits AnyTime (it is
+          -- the absent key on a card). Round-tripping the whole family is what
+          -- keeps the decoder honest about the forms it accepts -- including that
+          -- the two nullary arms still render as a bare tag now that DuringPhase
+          -- has made the encoder a tagged one.
+          HU.testCase "ActivationTiming round-trips every way" $ do
             roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming ActivationTiming.AnyTime
-            roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming ActivationTiming.SorcerySpeed,
+            roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming ActivationTiming.SorcerySpeed
+            -- Desert's own rider (CR 511.1), and a stepless phase alongside it:
+            -- Pawl.Types.Phase spans both, so the arm has to carry both.
+            roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat))
+            roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming (ActivationTiming.DuringPhase Phase.PostcombatMain),
           HU.testCase "ExileUntilMonarch" $
             roundTrip "eum" Codec.effectToJson Codec.jsonToEffect (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target"))),
           HU.testCase "PlaySubgame round-trips" $

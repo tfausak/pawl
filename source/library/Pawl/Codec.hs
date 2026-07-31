@@ -313,6 +313,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Dragon -> "Dragon"
   Subtype.Unicorn -> "Unicorn"
   Subtype.Curse -> "Curse"
+  Subtype.Desert -> "Desert"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -370,7 +371,8 @@ jsonToSubtype =
       (Text.pack "Thopter", Subtype.Thopter),
       (Text.pack "Dragon", Subtype.Dragon),
       (Text.pack "Unicorn", Subtype.Unicorn),
-      (Text.pack "Curse", Subtype.Curse)
+      (Text.pack "Curse", Subtype.Curse),
+      (Text.pack "Desert", Subtype.Desert)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -1822,21 +1824,26 @@ activatedAbilityToJson aa =
       -- takes, and it leaves every card without one byte-identical.
       <> ( case ActivatedAbility.timing aa of
              ActivationTiming.AnyTime -> []
-             ActivationTiming.SorcerySpeed -> [(Text.pack "timing", activationTimingToJson (ActivatedAbility.timing aa))]
+             _ -> [(Text.pack "timing", activationTimingToJson (ActivatedAbility.timing aa))]
          )
 
+-- Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a phase,
+-- the shape costComponentToJson takes. AnyTime and SorcerySpeed still render as
+-- the bare tag they always did, so every committed card file is unchanged.
 activationTimingToJson :: ActivationTiming.ActivationTiming -> Value
-activationTimingToJson t = nullary . Text.pack $ case t of
-  ActivationTiming.AnyTime -> "AnyTime"
-  ActivationTiming.SorcerySpeed -> "SorcerySpeed"
+activationTimingToJson t = case t of
+  ActivationTiming.AnyTime -> nullary (Text.pack "AnyTime")
+  ActivationTiming.SorcerySpeed -> nullary (Text.pack "SorcerySpeed")
+  ActivationTiming.DuringPhase p -> Json.tagged (Text.pack "DuringPhase") (Just (phaseToJson p))
 
 jsonToActivationTiming :: Value -> Either Text ActivationTiming.ActivationTiming
-jsonToActivationTiming =
-  decodeNullary
-    (Text.pack "ActivationTiming")
-    [ (Text.pack "AnyTime", ActivationTiming.AnyTime),
-      (Text.pack "SorcerySpeed", ActivationTiming.SorcerySpeed)
-    ]
+jsonToActivationTiming value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("AnyTime", _) -> Right ActivationTiming.AnyTime
+    ("SorcerySpeed", _) -> Right ActivationTiming.SorcerySpeed
+    ("DuringPhase", Just v) -> ActivationTiming.DuringPhase <$> jsonToPhase v
+    _ -> Left (Text.pack "unknown ActivationTiming: " <> t)
 
 jsonToActivatedAbility :: Value -> Either Text (ActivatedAbility.ActivatedAbility CardT.Card)
 jsonToActivatedAbility value = do

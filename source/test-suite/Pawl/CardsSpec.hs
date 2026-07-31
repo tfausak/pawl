@@ -3,19 +3,24 @@ module Pawl.CardsSpec where
 
 import qualified Data.ByteString as ByteString
 import qualified Data.Foldable as Foldable
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
+import qualified Pawl.Mana as Mana
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -23,8 +28,10 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
@@ -34,6 +41,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
@@ -42,6 +50,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TokenEntry as TokenEntry
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -366,7 +375,51 @@ tests registry =
           "target player takes an extra turn after this one"
           [(Optionality.Mandatory, [Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")))])]
           (modeShapes (CardT.spell c))
-        HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c)
+        HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c),
+      -- CR 307.5: the first card whose ACTIVATED ability prints a timing rider
+      -- naming a phase, so the first file to carry a `timing` key that is not
+      -- SorcerySpeed. "{T}: Add {C}. / {T}: This land deals 1 damage to target
+      -- attacking creature. Activate only during the end of combat step."
+      --
+      -- Also the first NONBASIC land type in the pool (CR 205.3i), which is what
+      -- separates Pawl.Subtype.isLandType from Pawl.Mana.subtypeMana: Desert is
+      -- a land type that grants no intrinsic mana ability, so the "{T}: Add {C}"
+      -- asserted here has to be PRINTED, and it is.
+      HU.testCase "desert.json loads as a Land -- Desert whose ping is gated to the end of combat step" $ do
+        c <- Registry.card registry "Desert"
+        HU.assertEqual "name" (Text.pack "Desert") (CardT.name c)
+        HU.assertEqual "no mana cost" Nothing (CardT.manaCost c)
+        HU.assertEqual
+          "Land -- Desert"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Land) (Set.singleton Subtype.Desert))
+          (CardT.typeLine c)
+        HU.assertEqual
+          "the mana ability is unrestricted and the ping is not"
+          [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat)]
+          (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
+        -- CR 605.1a: "An activated ability is a mana ability if it meets all of
+        -- the following criteria: it doesn't require a target ..., it could add
+        -- mana to a player's mana pool when it resolves, and it's not a loyalty
+        -- ability." The ping targets, so the rider rides on the ability that is
+        -- NOT a mana ability -- which is why Pawl.Activate ever sees it at all.
+        HU.assertEqual
+          "one mana ability, one not"
+          [True, False]
+          (fmap Mana.isManaAbility (CardT.activatedAbilities c))
+        HU.assertEqual
+          "one adds {C}, the other deals 1 to its target"
+          [ [(Optionality.Mandatory, [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)])],
+            [(Optionality.Mandatory, [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)])]
+          ]
+          (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
+        -- CR 601.2c reaches an activation through CR 602.2b, and this is the
+        -- pool it announces from: creatures, narrowed to the attacking ones.
+        HU.assertEqual
+          "and can only pick an attacking creature"
+          [ [],
+            [(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures (Just Filter.IsAttacking))]
+          ]
+          [Map.toList (Mode.targetSpecs m) | ab <- CardT.activatedAbilities c, m <- Foldable.toList (Modal.modes (ActivatedAbility.modal ab))]
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
