@@ -16,6 +16,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
@@ -25,6 +26,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -50,8 +52,10 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Registry as Registry.Type
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TokenEntry as TokenEntry
@@ -462,6 +466,53 @@ tests registry =
           "and it targets nothing"
           [[Map.empty]]
           (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The pool's first printing carrying CR 205.4g's supertype: "any permanent
+      -- with the supertype 'snow' is a snow permanent." The whole of the rule is
+      -- the type line -- no state-based action, no casting restriction -- so this
+      -- file differs from mountain.json in exactly one entry.
+      --
+      -- The printed "({T}: Add {R}.)" is REMINDER text, not an ability: CR 305.6
+      -- grants "{T}: Add {R}" intrinsically to any object with the Land card type
+      -- and the Mountain subtype, "even if the text box doesn't actually contain
+      -- that text." Printing it here would give the card two mana abilities.
+      HU.testCase "snow-covered-mountain.json loads as a Basic Snow Land - Mountain with no printed ability" $ do
+        c <- Registry.card registry "Snow-Covered Mountain"
+        HU.assertEqual "name" (Text.pack "Snow-Covered Mountain") (CardT.name c)
+        HU.assertEqual
+          "CR 205.4a: basic and snow, over the Mountain subtype"
+          ( TypeLine.MkTypeLine
+              (Set.fromList [Supertype.Basic, Supertype.Snow])
+              (Set.singleton CardType.Land)
+              (Set.singleton Subtype.Mountain)
+          )
+          (CardT.typeLine c)
+        HU.assertEqual "CR 305.6: the mana ability is intrinsic, so the file prints none" [] (CardT.activatedAbilities c)
+        HU.assertEqual "a land has no mana cost" Nothing (CardT.manaCost c),
+      -- The card that READS the supertype, which is what makes CR 205.4g worth
+      -- modelling: a snow permanent nothing counts is unobservable. "Snow
+      -- permanents you control" is a count over the battlefield (CR 110.1: "a
+      -- permanent is a card or token on the battlefield"), narrowed by the
+      -- supertype and by CR 109.5's controller -- the same shape nightmare.json
+      -- uses for Swamps, with HasSupertype where that has HasSubtype.
+      HU.testCase "skred.json loads as a {R} Instant dealing damage equal to the snow permanents you control" $ do
+        c <- Registry.card registry "Skred"
+        let target = SlotName.MkSlotName (Text.pack "target")
+            snowPermanentsYouControl =
+              Count.MkCount
+                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Filter.And [Filter.HasSupertype Supertype.Snow, Filter.ControlledBy PlayerRelation.You])
+                Aggregation.Objects
+        HU.assertEqual "name" (Text.pack "Skred") (CardT.name c)
+        HU.assertEqual "{R}" (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)])) (CardT.manaCost c)
+        HU.assertEqual "Instant" (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty) (CardT.typeLine c)
+        HU.assertEqual
+          "one unnarrowed target creature"
+          [Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)]
+          (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c))))
+        HU.assertEqual
+          "CR 205.4g: damage equal to the snow permanents you control"
+          [(Optionality.Mandatory, [Effect.DealDamage target (Quantity.Count snowPermanentsYouControl)])]
+          (modeShapes (CardT.spell c)),
       -- The pool's first KINDRED card (CR 308). CR 308.1 -- "each kindred card
       -- has another card type" -- is why the type line carries Enchantment
       -- alongside Kindred, and CR 110.4 keeps Kindred off the list of six

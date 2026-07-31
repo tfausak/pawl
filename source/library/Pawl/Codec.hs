@@ -404,6 +404,7 @@ supertypeToJson :: Supertype.Supertype -> Value
 supertypeToJson s = nullary . Text.pack $ case s of
   Supertype.Basic -> "Basic"
   Supertype.Legendary -> "Legendary"
+  Supertype.Snow -> "Snow"
   Supertype.World -> "World"
 
 jsonToSupertype :: Value -> Either Text Supertype.Supertype
@@ -412,6 +413,7 @@ jsonToSupertype =
     (Text.pack "Supertype")
     [ (Text.pack "Basic", Supertype.Basic),
       (Text.pack "Legendary", Supertype.Legendary),
+      (Text.pack "Snow", Supertype.Snow),
       (Text.pack "World", Supertype.World)
     ]
 
