@@ -3,6 +3,7 @@ module Pawl.Types.TriggerCondition where
 import Pawl.Types.Condition (Condition)
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.Phase (Phase)
+import Pawl.Types.PlayerRelation (PlayerRelation)
 import Pawl.Types.TriggerFrequency (TriggerFrequency)
 import Pawl.Types.TurnScope (TurnScope)
 
@@ -60,6 +61,21 @@ data TriggerCondition
     -- continues "these abilities trigger from whatever zone the card winds up in
     -- after it's cycled" -- the graveyard, for every printing today.
     SelfCycled
+  | -- CR 701.9a: "whenever [a player] discards a card" -- Megrim's "whenever an
+    -- OPPONENT discards a card". Matched against GameEvent.Discarded, whose
+    -- PlayerId is the discarding player; the PlayerRelation reads that player
+    -- against CR 109.5's "you", the ability's controller (CR 603.3a).
+    --
+    -- NOT self-scoped, unlike SelfCycled just above: the bearer is a bystander
+    -- watching someone else's hand, so nothing about the bearer is part of the
+    -- match. Bartered Cow's "when you discard this card" is the self-scoped
+    -- sibling, and is a different condition that does not exist yet (#319).
+    --
+    -- The DiscardCause is deliberately not part of this condition. CR 702.29a
+    -- makes cycling a discard, so a cycled card must fire this; CR 702.29d
+    -- bounds it to once, which the single Discarded event supplies by
+    -- construction (see Pawl.Types.GameEvent).
+    PlayerDiscards PlayerRelation
   | -- CR 508.3a: "An ability that reads 'Whenever [a creature] attacks, . . .'
     -- triggers if that creature is declared as an attacker." Hanweir Garrison's.
     -- Self-scoped like SelfEnters and SelfCycled: the scan visits every

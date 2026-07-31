@@ -51,6 +51,7 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -928,8 +929,15 @@ tests registry =
             roundTrip "typecyc" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Cycling cost (Just (Filter.Type.HasCardType CardType.Land))),
           HU.testCase "SearchDestination round-trips" $
             mapM_ (roundTrip "dest" Codec.searchDestinationToJson Codec.jsonToSearchDestination) [SearchDestination.BattlefieldTapped, SearchDestination.RevealThenHand],
-          HU.testCase "GameEvent.Cycled round-trips" $
-            roundTrip "cyc" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Cycled (ObjectId.MkObjectId 7)),
+          -- CR 701.9a's event, carrying the incarnation the discarded card
+          -- became. Both causes, because the cause is what tells a cycle from an
+          -- ordinary discard (CR 702.29c) and a trip that flattened it would
+          -- leave the two indistinguishable.
+          HU.testCase "GameEvent.Discarded round-trips with either cause" $ do
+            roundTrip "disc" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Discarded S.alice (ObjectId.MkObjectId 7) DiscardCause.Ordinary)
+            roundTrip "cyc" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Discarded S.bob (ObjectId.MkObjectId 7) DiscardCause.ToPayCyclingCost),
+          HU.testCase "DiscardCause round-trips" $
+            mapM_ (roundTrip "cause" Codec.discardCauseToJson Codec.jsonToDiscardCause) [DiscardCause.Ordinary, DiscardCause.ToPayCyclingCost],
           -- CR 701.20a: the reveal's whole payload IS the snapshot, so it is the
           -- one GameEvent whose round-trip failing would silently erase what the
           -- players were shown rather than merely mislabel it. Typhoid Rats for
@@ -940,6 +948,11 @@ tests registry =
             roundTrip "revealed" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $
             roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
+          -- Both relations, since the PlayerRelation is the whole content of
+          -- Megrim's "an OPPONENT discards a card".
+          HU.testCase "TriggerCondition.PlayerDiscards round-trips both relations" $ do
+            roundTrip "pdo" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.PlayerDiscards PlayerRelation.Opponent)
+            roundTrip "pdy" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.PlayerDiscards PlayerRelation.You),
           HU.testCase "TriggerCondition.SelfAttacks round-trips both frequencies" $ do
             roundTrip "sa" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime)
             roundTrip "sa1" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn),

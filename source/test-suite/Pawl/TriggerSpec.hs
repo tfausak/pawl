@@ -31,6 +31,8 @@
 -- consequence (CR 308.2: a noncreature card carrying creature types) is read
 -- through the ordinary Pool + Filter target machinery, with Bitterblossom --
 -- `kindredTests`.
+-- Flash -- `aetherFlashTests`. CR 701.9a's discard trigger, and CR 702.29d's
+-- "only once when a card is cycled", with Megrim -- `discardTriggerTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -81,6 +83,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
@@ -101,6 +104,7 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
@@ -1558,6 +1562,102 @@ cyclingTriggerTests registry =
           abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities))
     ]
 
+-- CR 701.9a: "To discard a card, move it from its owner's hand to that player's
+-- graveyard." Nothing in the pool triggered on that until Megrim, {2}{B}
+-- Enchantment: "Whenever an opponent discards a card, this enchantment deals 2
+-- damage to that player." One trigger condition, one effect, and the effect
+-- targets nothing -- so the only new thing any case below can be passing on is
+-- the condition.
+--
+-- The interaction is the reason the condition is hard rather than the condition
+-- itself. CR 702.29a: "'Cycling [cost]' means '[Cost], Discard this card: Draw a
+-- card'", so cycling IS discarding and a discard trigger has to see it. CR
+-- 702.29d then bounds how often: "Some cards have abilities that trigger
+-- whenever a player 'cycles or discards' a card. These abilities trigger only
+-- once when a card is cycled." An engine that recorded the cycle and the discard
+-- as two log entries, both of them describing the one discard, would answer 4
+-- damage to the second case below instead of 2.
+--
+-- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
+-- every "an opponent" below is alice.
+discardTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+discardTriggerTests registry =
+  Tasty.testGroup
+    "DiscardTrigger"
+    [ -- CR 601.2f's "costs may include ... discarding cards", and CR 701.9a is
+      -- per CARD: Cathartic Reunion's additional cost discards two, so the one
+      -- Megrim triggers twice and alice takes 4.
+      HU.testCase "CR 701.9a whole cards: Cathartic Reunion's two discards fire bob's Megrim twice" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        reunion <- Registry.printing registry "Cathartic Reunion"
+        megrim <- Registry.printing registry "Megrim"
+        let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 2))
+            (reunionId, g1) = S.addHandCard reunion S.alice base
+            -- Exactly two other cards, so CR 701.9b has nothing to ask and the
+            -- discard is forced -- the prompt is not what this case is about.
+            g2 = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) g1 [1 .. (2 :: Int)]
+            g3 = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g2 [1 .. (4 :: Int)]
+            gs =
+              g3
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice reunionId)
+            placed = S.runPure S.identityAnswer cast Engine.settleForPriority
+            after = S.runPure S.identityAnswer cast Engine.priorityLoop
+        HU.assertEqual "both cards were discarded as the cost was paid" 2 (length (Game.zoneMembers Zone.Graveyard S.alice cast))
+        HU.assertEqual "two triggers, above the sorcery that caused them" 3 (length (GameState.stack placed))
+        HU.assertEqual "alice took 2 per discarded card" (fmap (subtract 4) (S.lifeOf S.alice gs)) (S.lifeOf S.alice after)
+        HU.assertEqual "bob discarded nothing and took nothing" (S.lifeOf S.bob gs) (S.lifeOf S.bob after),
+      -- THE case. CR 702.29d: "These abilities trigger only once when a card is
+      -- cycled." Barkhide Mauler's whole text is "Cycling {2}", so nothing on it
+      -- can contribute a second trigger and the count is the discard's alone.
+      HU.testCase "CR 702.29d cycling a card fires the discard trigger exactly once" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        megrim <- Registry.printing registry "Megrim"
+        let base = snd (S.addCreature megrim S.bob (S.landsInPlay forest 2))
+            (_, withLibrary) = S.addLibraryCard piker S.alice base
+            (gs, maulerId) = S.handOne mauler withLibrary
+        case Activate.abilitiesFor maulerId gs of
+          [ability] -> do
+            let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
+                placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
+                after = S.runPure S.identityAnswer cycled Engine.priorityLoop
+            HU.assertEqual "the Mauler was discarded to pay the cost" 1 (length (Game.zoneMembers Zone.Graveyard S.alice cycled))
+            HU.assertEqual "cycling's own draw plus ONE Megrim trigger" 2 (length (GameState.stack placed))
+            HU.assertEqual "so alice took 2, not 4" (fmap (subtract 2) (S.lifeOf S.alice gs)) (S.lifeOf S.alice after)
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- "An OPPONENT discards", not "a player": the axis is load-bearing, and a
+      -- board where only the opponent ever discards cannot tell a correct
+      -- implementation from one that ignores the player entirely. The same
+      -- board, the same component, one discarder apart.
+      HU.testCase "CR 102.2 'an opponent': bob discarding to his own Megrim fires nothing" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        megrim <- Registry.printing registry "Megrim"
+        let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 1))
+            (_, withAlicesCard) = S.addHandCard piker S.alice base
+            (_, gs0) = S.addHandCard piker S.bob withAlicesCard
+            gs = gs0 {GameState.priority = Just S.alice}
+            discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent pid S.noSource (CostComponent.DiscardCards 1))
+            byAlice = discardBy S.alice
+            byBob = discardBy S.bob
+            settle g = S.runPure S.identityAnswer g Engine.priorityLoop
+        HU.assertEqual "alice's card reached her graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice byAlice))
+        HU.assertEqual "and bob's reached his" 1 (length (Game.zoneMembers Zone.Graveyard S.bob byBob))
+        HU.assertEqual "the opponent's discard costs her 2" (fmap (subtract 2) (S.lifeOf S.alice gs)) (S.lifeOf S.alice (settle byAlice))
+        HU.assertEqual "the controller's own discard costs him nothing" (S.lifeOf S.bob gs) (S.lifeOf S.bob (settle byBob))
+        HU.assertEqual "and costs alice nothing either" (S.lifeOf S.alice gs) (S.lifeOf S.alice (settle byBob))
+        HU.assertEqual
+          "bob's discard put nothing on the stack at all"
+          []
+          (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority))
+    ]
+
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
 -- enters, you gain 1 life", the card that proves it. Its effect names nothing
@@ -1907,7 +2007,8 @@ representativeEvent cond =
         TriggerCondition.StateIs _ -> GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
         TriggerCondition.SelfDealsCombatDamageToPlayer -> combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> combatDamage
-        TriggerCondition.SelfCycled -> GameEvent.Cycled departed
+        TriggerCondition.SelfCycled -> GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost
+        TriggerCondition.PlayerDiscards _ -> GameEvent.Discarded S.alice departed DiscardCause.Ordinary
         TriggerCondition.SelfAttacks _ -> GameEvent.AttackerDeclared departed
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> moved Zone.Library Zone.Graveyard
         TriggerCondition.SelfDies -> moved Zone.Battlefield Zone.Graveyard
@@ -1924,6 +2025,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.SelfCycled,
+    TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfDies
@@ -2491,4 +2593,4 @@ kindredTests registry =
         ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry, kindredTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry, aetherFlashTests registry, kindredTests registry, discardTriggerTests registry]
