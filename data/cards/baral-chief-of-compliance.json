@@ -1,0 +1,149 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Baral, Chief of Compliance",
+  "playerAbilities": [
+    {
+      "effect": {
+        "type": "ReduceSpellCost",
+        "value": [
+          {
+            "type": "Or",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Instant"
+                }
+              },
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Sorcery"
+                }
+              }
+            ]
+          },
+          [
+            {
+              "type": "Generic",
+              "value": 1
+            }
+          ]
+        ]
+      },
+      "scope": {
+        "type": "You"
+      }
+    }
+  ],
+  "power": {
+    "type": "Literal",
+    "value": 1
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SpellOrAbilityCounters",
+        "value": {
+          "type": "You"
+        }
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "type": "Discard",
+                "value": [
+                  "you",
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "optionality": {
+              "type": "Optional"
+            },
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Human"
+      },
+      {
+        "type": "Wizard"
+      }
+    ],
+    "supertypes": [
+      {
+        "type": "Legendary"
+      }
+    ],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

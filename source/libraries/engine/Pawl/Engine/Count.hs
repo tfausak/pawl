@@ -215,3 +215,10 @@ snapshotView shape event = case event of
   -- The same reason as the reveal: an attacker being declared (CR 508.2b) is not
   -- a zone change, and every EventShape is a shape of one.
   GameEvent.AttackerDeclared _ -> Nothing
+  -- A countering (CR 701.6a) DOES move the spell -- to its owner's graveyard --
+  -- but this event is not that move: the Moved event Event.counter records
+  -- alongside this one is the zone change, and matching both would count one
+  -- countering twice. It records no characteristics snapshot either, so there
+  -- would be nothing to build a view from. The arm becomes a real view the day
+  -- an EventShape names countering (#162).
+  GameEvent.SpellCountered _ -> Nothing

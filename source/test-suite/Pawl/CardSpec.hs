@@ -358,6 +358,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfDies -> []
+  -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
+  -- exactly as the discard condition above.
+  TriggerCondition.SpellOrAbilityCounters _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem

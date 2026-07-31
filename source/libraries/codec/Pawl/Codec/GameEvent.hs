@@ -3,6 +3,7 @@ module Pawl.Codec.GameEvent where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Pawl.Codec.Countering (counteringToJson, jsonToCountering)
 import Pawl.Codec.DamageEvent (damageEventToJson, jsonToDamageEvent)
 import Pawl.Codec.DiscardCause (discardCauseToJson, jsonToDiscardCause)
 import qualified Pawl.Codec.Json as Json
@@ -26,6 +27,7 @@ gameEventToJson e = case e of
     Json.tagged (Text.pack "Discarded") (Just (Array (MkArray [playerIdToJson pid, objectIdToJson oid, discardCauseToJson cause])))
   GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array (MkArray [playerIdToJson pid, projectedCharacteristicsToJson pc])))
   GameEvent.AttackerDeclared oid -> Json.tagged (Text.pack "AttackerDeclared") (Just (objectIdToJson oid))
+  GameEvent.SpellCountered c -> Json.tagged (Text.pack "SpellCountered") (Just (counteringToJson c))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
@@ -40,6 +42,7 @@ jsonToGameEvent value = do
       GameEvent.Discarded <$> jsonToPlayerId pid <*> jsonToObjectId oid <*> jsonToDiscardCause cause
     ("Revealed", Just (Array (MkArray [pid, pc]))) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
     ("AttackerDeclared", Just v) -> GameEvent.AttackerDeclared <$> jsonToObjectId v
+    ("SpellCountered", Just v) -> GameEvent.SpellCountered <$> jsonToCountering v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
 -- MonarchTarget ----------------------------------------------------------------

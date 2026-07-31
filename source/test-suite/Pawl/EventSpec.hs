@@ -1,6 +1,8 @@
 module Pawl.EventSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Cast as Cast
@@ -14,6 +16,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Departure as Departure.Type
@@ -31,6 +34,16 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+
+-- CR 701.6a: the counterings recorded so far this turn, in order. The sibling of
+-- Support.zoneChangesOf, kept local because Event.counter is the only funnel that
+-- appends one and this module is the only reader.
+counteringsOf :: GameState.GameState -> [Countering.Countering]
+counteringsOf gs =
+  let counteringOf event = case event of
+        GameEvent.SpellCountered c -> Just c
+        _ -> Nothing
+   in Maybe.mapMaybe counteringOf (Foldable.toList (GameState.events gs))
 
 tests :: Registry.Registry -> Tasty.TestTree
 tests registry =
@@ -71,10 +84,19 @@ tests registry =
       HU.testCase "CR 701.6a Event.counter puts a countered spell into its owner's graveyard" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (spellId, onStack) = S.spellOnStack piker S.bob (Setup.emptyGame S.bothPlayers)
-            after = S.runPure S.identityAnswer onStack (Event.counter spellId)
+            after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
         HU.assertEqual "off the stack" [] (GameState.stack after)
         HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-        HU.assertEqual "not on the battlefield" 0 (S.creaturesInPlay S.bob after),
+        HU.assertEqual "not on the battlefield" 0 (S.creaturesInPlay S.bob after)
+        -- The distinct event, recorded ALONGSIDE the Moved event the same move
+        -- files -- never instead of it. The Moved event is what CR 400.7 did;
+        -- this one is what the move WAS, and CR 608.2n's resolved spell reaches
+        -- the same graveyard by the same zone pair.
+        HU.assertEqual
+          "and a countering event names the spell, the source and its controller"
+          [Countering.MkCountering spellId S.noSource S.alice]
+          (counteringsOf after)
+        HU.assertEqual "beside the zone change, not instead of it" 1 (length (S.zoneChangesOf after)),
       -- CR 113.6g at the funnel itself, without a countering spell in the way:
       -- Event.counter is what CR 701.6a's "remove it from the stack" runs
       -- through, and the gate is there rather than in the Counter opcode so that
@@ -82,15 +104,20 @@ tests registry =
       HU.testCase "CR 113.6g Event.counter is a no-op on a spell that can't be countered" $ do
         rendingVolley <- Registry.printing registry "Rending Volley"
         let (spellId, onStack) = S.spellOnStack rendingVolley S.bob (Setup.emptyGame S.bothPlayers)
-            after = S.runPure S.identityAnswer onStack (Event.counter spellId)
+            after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
         HU.assertEqual "still on the stack, under its original id" [spellId] (GameState.stack after)
-        HU.assertEqual "nothing reached the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+        HU.assertEqual "nothing reached the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        -- CR 603.2g: "an event that's prevented or replaced won't trigger
+        -- anything." A spell that can't be countered was never countered, so the
+        -- gate must record nothing at all -- which is what keeps Baral, Chief of
+        -- Compliance silent in Pawl.TriggerSpec's composition case.
+        HU.assertEqual "and no countering event was recorded" [] (counteringsOf after),
       HU.testCase "CR 614 a countered spell is exiled under Rest in Peace" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         piker <- Registry.printing registry "Goblin Piker"
         let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             (spellId, onStack) = S.spellOnStack piker S.bob g0
-            after = S.runPure S.identityAnswer onStack (Event.counter spellId)
+            after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
         HU.assertEqual "not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
         HU.assertEqual "exiled instead" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
       HU.testCase "CR 603/614 whole card: cast Rest in Peace, ETB exiles graveyards, then deaths are exiled" $ do

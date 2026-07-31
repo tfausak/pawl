@@ -954,7 +954,7 @@ fireboltTests registry =
         case GameState.stack cast of
           [] -> HU.assertFailure "expected the flashback spell on the stack"
           onStack : _ -> do
-            let countered = S.runPure S.identityAnswer cast (Event.counter onStack)
+            let countered = S.runPure S.identityAnswer cast (Event.counter S.noSource S.bob onStack)
             HU.assertEqual "not in the graveyard" [] (Game.zoneMembers Zone.Graveyard S.alice countered)
             HU.assertEqual "exiled" 1 (length (Game.zoneMembers Zone.Exile S.alice countered)),
       -- The self-scoping in rule 702.34a's "exile THIS card". A flashback spell
