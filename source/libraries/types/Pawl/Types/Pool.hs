@@ -8,7 +8,9 @@ module Pawl.Types.Pool where
 data Pool
   = Creatures -- CR 115.1a: creatures on the battlefield (ToCreature).
   | Players -- CR 115: players still in the game (ToPlayer).
-  | AnyTarget -- CR 115.4: creatures + players (planeswalkers/battles absent).
+  | -- CR 115.4 names creatures, players, planeswalkers AND battles; this admits
+    -- only the first two (#494, #302).
+    AnyTarget
   | Permanents -- CR 110.1: permanents on the battlefield (ToObject).
   | Spells -- CR 112.1: spells on the stack (ToObject).
   | SpellsAndPermanents -- CR 115: spells on the stack + battlefield permanents (ToObject).

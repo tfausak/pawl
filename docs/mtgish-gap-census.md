@@ -222,8 +222,9 @@ charge counter is a named counter, no new mechanism). The structural gaps:
 - **Ability-granting counters** — `FlyingCounter`, `DeathtouchCounter`, etc. must
   feed the *layer 6* ability system, not just P/T. pawl's counter→layer-7c
   projection (M4f) does not generalize to granting keywords. GAP (small).
-- **Loyalty / defense / lore counters** — bound to planeswalkers / battles / sagas
-  (card types pawl doesn't model yet). VOCAB-gated on those card types.
+- **Defense / lore counters** — bound to battles / sagas (card types pawl doesn't
+  model yet). VOCAB-gated on those card types. Loyalty counters are built
+  (`CounterKind.Loyalty`, CR 122.1e), with the planeswalker card type.
 
 → **GAP-C:** player-counter substrate + counter→layer-6 path.
 

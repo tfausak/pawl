@@ -25,6 +25,7 @@ import Pawl.Codec.Counterability (counterabilityToJson, jsonToCounterabilityDefa
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
+import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
 import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
@@ -56,6 +57,15 @@ cardToJson c =
         (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (CardT.triggeredAbilities c)),
         (Text.pack "castingPermissions", Json.listTo castingPermissionToJson (CardT.castingPermissions c))
       ]
+        -- CR 306.5: omitted for every card that is not a planeswalker, the
+        -- counterability posture below rather than the power/toughness one. Those
+        -- two are required keys spelled `null` on every noncreature because they
+        -- predate the pool; a required loyalty key would have meant editing every
+        -- other card file to say nothing.
+        <> ( case CardT.loyalty c of
+               Nothing -> []
+               Just l -> [(Text.pack "loyalty", loyaltyToJson l)]
+           )
         <> ( if Set.null (CardT.colorIndicator c)
                then []
                else [(Text.pack "colorIndicator", Json.setTo colorToJson (CardT.colorIndicator c))]
@@ -126,6 +136,7 @@ jsonToCard value = do
   typeLine <- Json.field (Text.pack "typeLine") ps >>= jsonToTypeLine
   power <- Json.maybeFrom jsonToPower (Json.getOpt (Text.pack "power") ps)
   toughness <- Json.maybeFrom jsonToToughness (Json.getOpt (Text.pack "toughness") ps)
+  loyalty <- Json.maybeFrom jsonToLoyalty (Json.getOpt (Text.pack "loyalty") ps)
   keywords <- Json.field (Text.pack "keywords") ps >>= Json.setFrom jsonToKeyword
   statics <- Json.field (Text.pack "staticAbilities") ps >>= Json.listFrom jsonToStaticAbility
   spell <- Json.field (Text.pack "spell") ps >>= jsonToModal jsonToCard
@@ -153,6 +164,7 @@ jsonToCard value = do
         CardT.typeLine = typeLine,
         CardT.power = power,
         CardT.toughness = toughness,
+        CardT.loyalty = loyalty,
         CardT.keywords = keywords,
         CardT.staticAbilities = statics,
         CardT.spell = spell,

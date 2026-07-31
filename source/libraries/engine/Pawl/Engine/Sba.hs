@@ -88,6 +88,35 @@ zeroToughness pc =
       Nothing -> False
       Just t -> t <= 0
 
+-- CR 704.5i: "If a planeswalker has loyalty 0, it's put into its owner's
+-- graveyard." CR 306.9 states the same rule from the card type's side.
+--
+-- A put-into-graveyard and NOT a destruction, the CR 704.5f shape rather than the
+-- CR 704.5g one: it is ungated by indestructible and offers regeneration no
+-- opportunity (CR 701.19a), which is why the classification below maps it to the
+-- bury batch.
+--
+-- Takes the GameState as well as the projection, unlike zeroToughness above,
+-- because CR 306.5c puts a permanent's loyalty in its COUNTERS -- "the loyalty of
+-- a planeswalker on the battlefield is equal to the number of loyalty counters on
+-- it" -- and no layer projects it. A planeswalker that never received counters
+-- reads 0 here and is buried, which is the rule and not an accident: a
+-- planeswalker on the battlefield always has CR 306.5b's counters unless
+-- something removed them.
+--
+-- The card-type guard is load-bearing rather than defensive, and in the opposite
+-- direction to zeroToughness's: Object.counters is keyed by kind for EVERY
+-- permanent, so absent this guard every creature on the battlefield would read as
+-- having loyalty 0 and be buried. CR 122.1e is what confines the reading -- "the
+-- number of loyalty counters on a PLANESWALKER on the battlefield indicates how
+-- much loyalty it has".
+zeroLoyalty :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
+zeroLoyalty gs pc oid =
+  Set.member CardType.Planeswalker (PC.cardTypes pc)
+    && case Game.lookupObject oid gs of
+      Nothing -> False
+      Just obj -> Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj) == 0
+
 -- CR 704.5g/h: a creature destroyed by lethal marked damage or by a deathtouch
 -- source. A DESTRUCTION -- indestructible-gated (CR 700.4) and regeneration-
 -- interceptable (CR 701.19a via the Pawl.Engine.Event destroy funnel). Excludes 704.5f
@@ -495,6 +524,9 @@ performStateBasedActions = do
         Just pc
           -- CR 704.5f wins when both apply: toughness <= 0 is a put-into-graveyard.
           | zeroToughness pc -> Just False
+          -- CR 704.5i, the other put-into-graveyard, checked against the same
+          -- pre-pass board for the same CR 704.4 simultaneity reason.
+          | zeroLoyalty gs pc oid -> Just False
           | destroyedBySba gs pc oid -> Just True
           | otherwise -> Nothing
       onBattlefield = Set.toList (GameState.battlefield gs)
@@ -544,10 +576,10 @@ performStateBasedActions = do
   -- event" requires.
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
-  -- CR 704.5f (toughness <= 0), CR 704.5j (the legend rule's losers), CR 704.5k
-  -- (the world rule's) and CR 704.5m (an Aura attached to nothing). None of the
-  -- four is a destruction, so none consults indestructible or a regeneration
-  -- shield.
+  -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
+  -- rule's losers), CR 704.5k (the world rule's) and CR 704.5m (an Aura attached
+  -- to nothing). None of the five is a destruction, so none consults
+  -- indestructible or a regeneration shield.
   --
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
   -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
@@ -621,9 +653,10 @@ performStateBasedActions = do
       outcome = Departure.outcomeAfterLeaving leaving departed
       drained = vanished {GameState.damageScannedThrough = watermark}
       balanced = List.foldl' balance drained annihilations
-      -- A state-based action was performed iff a creature was buried or destroyed
-      -- (a regenerated creature still counts, which the CR 704.4 settle loop
-      -- re-checks and -- because the regen healed the damage -- terminates), a
+      -- A state-based action was performed iff a permanent was buried (a creature
+      -- at 0 toughness, CR 704.5f, or a planeswalker at 0 loyalty, CR 704.5i) or
+      -- destroyed (a regenerated creature still counts, which the CR 704.4 settle
+      -- loop re-checks and -- because the regen healed the damage -- terminates), a
       -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), a
       -- permanent detached (CR 704.5n / 704.5p), the legend rule buried a
       -- duplicate legend (CR 704.5j), or the world rule buried an older world

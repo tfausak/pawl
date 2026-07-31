@@ -23,6 +23,7 @@ sampleSnapshot =
       PC.colors = Set.empty,
       PC.power = Just 2,
       PC.toughness = Just 1,
+      PC.loyalty = Nothing,
       PC.characteristicPT = Nothing,
       PC.cardTypes = Set.empty,
       PC.subtypes = Set.empty,

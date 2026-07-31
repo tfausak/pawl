@@ -22,6 +22,8 @@ costComponentToJson c = case c of
   CostComponent.DiscardCards n -> Json.tagged (Text.pack "DiscardCards") (Just (Json.natTo n))
   CostComponent.DiscardThis -> Json.nullary (Text.pack "DiscardThis")
   CostComponent.PayEnergy n -> Json.tagged (Text.pack "PayEnergy") (Just (Json.natTo n))
+  CostComponent.AddLoyaltyToThis n -> Json.tagged (Text.pack "AddLoyaltyToThis") (Just (Json.natTo n))
+  CostComponent.RemoveLoyaltyFromThis n -> Json.tagged (Text.pack "RemoveLoyaltyFromThis") (Just (Json.natTo n))
 
 jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
 jsonToCostComponent value = do
@@ -38,4 +40,6 @@ jsonToCostComponent value = do
     ("DiscardCards", Just v) -> fmap CostComponent.DiscardCards (Json.natFrom v)
     ("DiscardThis", _) -> Right CostComponent.DiscardThis
     ("PayEnergy", Just v) -> fmap CostComponent.PayEnergy (Json.natFrom v)
+    ("AddLoyaltyToThis", Just v) -> fmap CostComponent.AddLoyaltyToThis (Json.natFrom v)
+    ("RemoveLoyaltyFromThis", Just v) -> fmap CostComponent.RemoveLoyaltyFromThis (Json.natFrom v)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)

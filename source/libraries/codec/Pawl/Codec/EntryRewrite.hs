@@ -3,15 +3,18 @@ module Pawl.Codec.EntryRewrite where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.EntryOption (entryOptionToJson, jsonToEntryOption)
 import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import Pawl.Json.Array (Array (MkArray))
+import Pawl.Json.Value (Value (Array))
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 
 entryRewriteToJson :: EntryRewrite.EntryRewrite -> Value
 entryRewriteToJson r = case r of
   EntryRewrite.AsCopy -> Json.nullary (Text.pack "AsCopy")
   EntryRewrite.ChoiceOf options -> Json.tagged (Text.pack "ChoiceOf") (Just (Json.listTo entryOptionToJson options))
+  EntryRewrite.WithCounters kind n -> Json.tagged (Text.pack "WithCounters") (Just (Array (MkArray [counterKindToJson kind, Json.natTo n])))
 
 jsonToEntryRewrite :: Value -> Either Text EntryRewrite.EntryRewrite
 jsonToEntryRewrite value = do
@@ -19,4 +22,8 @@ jsonToEntryRewrite value = do
   case (Text.unpack t, mv) of
     ("AsCopy", _) -> Right EntryRewrite.AsCopy
     ("ChoiceOf", Just v) -> fmap EntryRewrite.ChoiceOf (Json.listFrom jsonToEntryOption v)
+    ("WithCounters", Just (Array (MkArray [k, n]))) -> do
+      kind <- jsonToCounterKind k
+      count <- Json.natFrom n
+      pure (EntryRewrite.WithCounters kind count)
     _ -> Left (Text.pack "unknown EntryRewrite: " <> t)

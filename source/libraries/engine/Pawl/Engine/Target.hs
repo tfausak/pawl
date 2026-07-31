@@ -30,7 +30,8 @@ import qualified Pawl.Types.Zone as Zone
 
 -- CR 115: a target slot's legal recipients are its Pool's base candidate set
 -- (CR 115.4's "any target" is creatures on the battlefield plus players still in
--- the game; planeswalkers/battles do not exist yet) narrowed by its Filter (a
+-- the game; the planeswalkers and battles that rule also names are not admitted,
+-- #494 and #302) narrowed by its Filter (a
 -- bare "target creature" carries Nothing and narrows nothing). No restriction
 -- (protection, hexproof, shroud) exists in the pool -- this function is where
 -- they will all land.

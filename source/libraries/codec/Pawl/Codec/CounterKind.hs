@@ -16,6 +16,7 @@ counterKindToJson k = case k of
   CounterKind.PlusOnePlusOne -> Json.nullary (Text.pack "PlusOnePlusOne")
   CounterKind.MinusOneMinusOne -> Json.nullary (Text.pack "MinusOneMinusOne")
   CounterKind.Keyword kw -> Json.tagged (Text.pack "Keyword") (Just (keywordToJson kw))
+  CounterKind.Loyalty -> Json.nullary (Text.pack "Loyalty")
 
 jsonToCounterKind :: Value -> Either Text CounterKind.CounterKind
 jsonToCounterKind value = do
@@ -24,4 +25,5 @@ jsonToCounterKind value = do
     ("PlusOnePlusOne", _) -> Right CounterKind.PlusOnePlusOne
     ("MinusOneMinusOne", _) -> Right CounterKind.MinusOneMinusOne
     ("Keyword", Just v) -> CounterKind.Keyword <$> jsonToKeyword v
+    ("Loyalty", _) -> Right CounterKind.Loyalty
     _ -> Left (Text.pack "unknown CounterKind: " <> t)

@@ -24,10 +24,12 @@ import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
 import Pawl.Codec.DiscardCause (discardCauseToJson, jsonToDiscardCause)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
+import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
+import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
 import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
 import Pawl.Codec.ManaSymbol (jsonToManaSymbol, manaSymbolToJson)
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
@@ -114,6 +116,7 @@ import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -270,7 +273,9 @@ tests registry =
             roundTrip "poison" playerCounterKindToJson jsonToPlayerCounterKind PlayerCounterKind.Poison,
           HU.testCase "CounterKind" $ do
             HU.assertEqual "plus" (Right CounterKind.PlusOnePlusOne) (jsonToCounterKind (counterKindToJson CounterKind.PlusOnePlusOne))
-            HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne)),
+            HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne))
+            -- CR 122.1e, the first kind that modifies no characteristic.
+            HU.assertEqual "loyalty" (Right CounterKind.Loyalty) (jsonToCounterKind (counterKindToJson CounterKind.Loyalty)),
           HU.testCase "Zone" $
             roundTrip "zone" zoneToJson jsonToZone Zone.Graveyard,
           HU.testCase "Zone.Command" $
@@ -694,6 +699,23 @@ tests registry =
               typeLineToJson
               jsonToTypeLine
               (TypeLine.MkTypeLine Set.empty (Set.fromList [CardType.Kindred, CardType.Enchantment]) (Set.singleton Subtype.Faerie)),
+          -- CR 306.3 / 205.3j: Jace Beleren's, and the first type line whose
+          -- subtype is a planeswalker type.
+          HU.testCase "TypeLine (planeswalker)" $
+            roundTrip
+              "tl-planeswalker"
+              typeLineToJson
+              jsonToTypeLine
+              (TypeLine.MkTypeLine (Set.singleton Supertype.Legendary) (Set.singleton CardType.Planeswalker) (Set.singleton Subtype.Jace)),
+          -- CR 306.5a: the printed loyalty number.
+          HU.testCase "Loyalty" $
+            roundTrip "loyalty" loyaltyToJson jsonToLoyalty (Loyalty.MkLoyalty 3),
+          -- CR 614.1c / 306.5b: the intrinsic enters-with-counters rewrite.
+          HU.testCase "EntryRewrite (with counters)" $
+            roundTrip "entry-counters" entryRewriteToJson jsonToEntryRewrite (EntryRewrite.WithCounters CounterKind.Loyalty 3),
+          -- CR 606.3's record.
+          HU.testCase "GameEvent (loyalty ability activated)" $
+            roundTrip "loyalty-activated" gameEventToJson jsonToGameEvent (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7)),
           Tasty.testGroup
             "cost (P8)"
             [ HU.testCase "every CostComponent round-trips" $
@@ -706,6 +728,10 @@ tests registry =
                   ],
               HU.testCase "PayEnergy" $
                 roundTrip "pe" costComponentToJson jsonToCostComponent (CostComponent.PayEnergy 2),
+              -- CR 606.4's two halves, Jace Beleren's +2 and -1.
+              HU.testCase "loyalty costs" $ do
+                roundTrip "add" costComponentToJson jsonToCostComponent (CostComponent.AddLoyaltyToThis 2)
+                roundTrip "remove" costComponentToJson jsonToCostComponent (CostComponent.RemoveLoyaltyFromThis 1),
               HU.testCase "a Cost with a mana part and components round-trips" $
                 roundTrip
                   "cost"

@@ -1,0 +1,191 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "AddLoyaltyToThis",
+            "value": 2
+          }
+        ],
+        "mana": []
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "EachPlayer"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    },
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "RemoveLoyaltyFromThis",
+            "value": 1
+          }
+        ],
+        "mana": []
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "InSlot",
+                    "value": "target"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    },
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "RemoveLoyaltyFromThis",
+            "value": 10
+          }
+        ],
+        "mana": []
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Mill",
+                "value": [
+                  "target",
+                  {
+                    "type": "Literal",
+                    "value": 20
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "loyalty": 3,
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Jace Beleren",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Jace"
+      }
+    ],
+    "supertypes": [
+      {
+        "type": "Legendary"
+      }
+    ],
+    "types": [
+      {
+        "type": "Planeswalker"
+      }
+    ]
+  }
+}

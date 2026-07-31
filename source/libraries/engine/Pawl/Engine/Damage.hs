@@ -268,9 +268,10 @@ gatherCombatDamage assigns = do
 -- would be a second, later reading of the same question, which is what CR
 -- 608.2b's target re-validation is for and this is not.
 --
--- Only battles and planeswalkers are missing from the classification, and only
--- because no card type for either exists yet; CR 120.3c and CR 120.3h are what
--- each would need.
+-- Battles and planeswalkers are missing from the classification. A battle has no
+-- card type yet (#302); a planeswalker does (Jace Beleren), and CR 120.3c --
+-- damage to it removes that many loyalty counters -- is unimplemented (#494),
+-- which is why a ToObject naming one is dropped here rather than reclassified.
 damageRecipient :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
 damageRecipient gs recipient = case recipient of
   Recipient.ToPlayer _ -> Just recipient
@@ -310,7 +311,7 @@ applyDamage events = do
         Recipient.ToCreature oid ->
           if DamageEvent.dealtByInfect ev
             then -- CR 120.3d / 702.90c: -1/-1 counters, no marked damage. Added
-            -- directly (not via Event.putCounters): this is a consequence of
+            -- directly (not via Replacement.putCounters): this is a consequence of
             -- a damage event that already ran the CR 616 replacement loop, so
             -- a "would put -1/-1 from infect" CR 614 sub-replacement is out of
             -- scope (#122).

@@ -9,6 +9,7 @@ import Pawl.Types.Card (Card)
 import Pawl.Types.CardType (CardType)
 import Pawl.Types.Color (Color)
 import Pawl.Types.Keyword (Keyword)
+import Pawl.Types.Loyalty (Loyalty)
 import Pawl.Types.Quantity (Quantity)
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import Pawl.Types.Subtype (Subtype)
@@ -62,6 +63,17 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     colors :: Set Color,
     power :: Maybe Integer,
     toughness :: Maybe Integer,
+    -- CR 306.5 / 109.3: the object's PRINTED loyalty, which CR 707.2 lists among
+    -- the copiable values -- so a Clone entering as a copy of a planeswalker
+    -- (CR 614.1c) has the copy's loyalty here and not its own.
+    --
+    -- Seeded from the card and touched by NO layer, unlike power/toughness above:
+    -- the CR 613 layer system has no sublayer that sets or modifies loyalty. What
+    -- a permanent's loyalty on the battlefield actually is comes from CR 306.5c
+    -- instead -- the number of CounterKind.Loyalty counters on it -- so this field
+    -- answers only CR 306.5a's question, and the one reader is CR 306.5b's
+    -- intrinsic enters-with replacement.
+    loyalty :: Maybe Loyalty,
     -- CR 613.4a layer 7a: the object's characteristic-defining P/T, as the pair of
     -- UNEVALUATED quantities (power, toughness) with the printed star already
     -- substituted. Seeded from the card, so it rides copiableCharacteristics and a
