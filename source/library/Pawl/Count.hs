@@ -205,7 +205,7 @@ snapshotView shape event = case event of
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
   -- the same discard emits is what carries one -- so there is nothing here for an
   -- EventShape to match against.
-  GameEvent.Cycled _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
   -- A reveal DOES carry a characteristics snapshot, unlike the two above, and is
   -- still Nothing here: the only EventShape is a shape of ZONE CHANGE, and CR
   -- 701.20b says a reveal is not one ("revealing a card doesn't cause it to

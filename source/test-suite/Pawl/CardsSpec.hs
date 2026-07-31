@@ -608,6 +608,35 @@ tests registry =
             -- black.
             HU.assertEqual "and black by colour indicator" (Set.singleton Color.Black) (CardT.colorIndicator token)
           other -> HU.assertFailure ("expected exactly [LoseLife, Create], got " <> show (length other) <> " effects"),
+      -- The first card file to spell a PlayerDiscards condition (CR 701.9a), and
+      -- the first trigger condition at all whose payload is a PlayerRelation.
+      -- Its "an opponent" is that relation and nothing else -- no Filter, no
+      -- second exclusion mechanism -- and the effect reads CR 702.70a's existing
+      -- "that player" slot rather than adding a spelling of its own.
+      HU.testCase "megrim.json loads as a {2}{B} enchantment triggering on an opponent's discard" $ do
+        c <- Registry.card registry "Megrim"
+        HU.assertEqual "name" (Text.pack "Megrim") (CardT.name c)
+        HU.assertEqual
+          "{2}{B}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Black)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "Enchantment"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Enchantment) Set.empty)
+          (CardT.typeLine c)
+        HU.assertEqual "no power or toughness" (Nothing, Nothing) (CardT.power c, CardT.toughness c)
+        HU.assertEqual
+          "one trigger, on an opponent discarding"
+          [TriggerCondition.PlayerDiscards PlayerRelation.Opponent]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "dealing 2 damage to the that-player slot"
+          [[(Optionality.Mandatory, [Effect.DealDamage Binding.triggerPlayer (Quantity.Literal 2)])]]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "and it targets nothing"
+          [[Map.empty]]
+          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
       -- The pool's first card whose mass effect has a RIDER reading the sweep
       -- back: "destroy all artifacts and enchantments. Put a +1/+1 counter on
       -- this creature for each permanent destroyed this way." The two halves are
