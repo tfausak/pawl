@@ -30,7 +30,7 @@ import qualified Pawl.Extra.OrdSpec
 import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.Extra.SemigroupSpec
 import qualified Pawl.FilterSpec
-import qualified Pawl.GameSpec as GameSpec
+import qualified Pawl.GameSpec
 import qualified Pawl.Json.ArraySpec
 import qualified Pawl.Json.BooleanSpec
 import qualified Pawl.Json.NullSpec
@@ -80,7 +80,6 @@ testTree registry =
   Tasty.testGroup
     "pawl"
     [ CardSpec.tests registry,
-      GameSpec.tests registry,
       DamageSpec.tests registry,
       PropertySpec.tests registry,
       CodecSpec.tests registry,
@@ -122,6 +121,7 @@ spec s registry = do
   Pawl.Extra.ParsecSpec.spec s
   Pawl.Extra.SemigroupSpec.spec s
   Pawl.FilterSpec.spec s
+  Pawl.GameSpec.spec s registry
   Pawl.Json.ArraySpec.spec s
   Pawl.Json.BooleanSpec.spec s
   Pawl.Json.NullSpec.spec s
