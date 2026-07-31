@@ -68,56 +68,79 @@ library codec
     Pawl.Codec.Affected
     Pawl.Codec.Aggregation
     Pawl.Codec.All
+    Pawl.Codec.AttackRequirement
     Pawl.Codec.BeginningStep
+    Pawl.Codec.BlockRequirement
     Pawl.Codec.CardType
     Pawl.Codec.CastingPermission
     Pawl.Codec.CastingRestriction
     Pawl.Codec.Color
     Pawl.Codec.CombatStep
     Pawl.Codec.Comparison
+    Pawl.Codec.Condition
     Pawl.Codec.ControllerRelation
+    Pawl.Codec.Cost
     Pawl.Codec.CostComponent
+    Pawl.Codec.Count
     Pawl.Codec.Counterability
+    Pawl.Codec.CounterKind
+    Pawl.Codec.CounterPattern
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageKind
     Pawl.Codec.DamagePattern
     Pawl.Codec.DamageRewrite
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DiscardCause
+    Pawl.Codec.Duration
     Pawl.Codec.EndingStep
+    Pawl.Codec.EntryOption
+    Pawl.Codec.EntryRewrite
     Pawl.Codec.EventShape
+    Pawl.Codec.Expiry
     Pawl.Codec.ExtraPhase
     Pawl.Codec.Filter
     Pawl.Codec.Json
+    Pawl.Codec.Keyword
+    Pawl.Codec.ManaCost
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaSymbol
     Pawl.Codec.ManaType
     Pawl.Codec.ModeIndex
     Pawl.Codec.ModeSelection
+    Pawl.Codec.Modification
     Pawl.Codec.MonarchTarget
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectRef
     Pawl.Codec.Optionality
     Pawl.Codec.Phase
+    Pawl.Codec.PhasePattern
     Pawl.Codec.PhaseSelector
     Pawl.Codec.PlayerCounterKind
+    Pawl.Codec.PlayerEffect
     Pawl.Codec.PlayerId
     Pawl.Codec.PlayerRef
     Pawl.Codec.PlayerRelation
     Pawl.Codec.PlayerScope
+    Pawl.Codec.PlayerStaticAbility
     Pawl.Codec.Pool
+    Pawl.Codec.Power
+    Pawl.Codec.Quantity
     Pawl.Codec.Recipient
     Pawl.Codec.Regenerability
+    Pawl.Codec.ReplacementEffect
     Pawl.Codec.Scaling
     Pawl.Codec.Scope
     Pawl.Codec.SearchDestination
     Pawl.Codec.SlotName
+    Pawl.Codec.StaticAbility
     Pawl.Codec.Subtype
     Pawl.Codec.Supertype
     Pawl.Codec.TapState
     Pawl.Codec.TargetSpec
     Pawl.Codec.TokenEntry
     Pawl.Codec.TokenPattern
+    Pawl.Codec.Toughness
+    Pawl.Codec.TriggerCondition
     Pawl.Codec.TriggerFrequency
     Pawl.Codec.TurnScope
     Pawl.Codec.TypeLine
