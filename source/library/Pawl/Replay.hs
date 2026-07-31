@@ -15,6 +15,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Concession as Concession
 import Pawl.Types.Desync (Desync)
 import qualified Pawl.Types.Desync as Desync
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -49,6 +50,7 @@ encode p answer = case p of
   Prompt.SearchLibrary {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
+  Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
@@ -173,6 +175,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.AnnouncePhyrexianPayment {} -> case response of
     Response.AnnouncedPhyrexianPayment way -> Just way
+    _ -> Nothing
+  Prompt.ChooseEntwine {} -> case response of
+    Response.AnnouncedEntwine decision -> Just decision
     _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
@@ -311,6 +316,11 @@ defaultAnswer p = case p of
   -- two are), so the head is a legal answer and the least eventful fallback when
   -- a transcript runs short. NonEmpty.head is total.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.42a: entwine is a "may", so declining is always legal and is the
+  -- least-eventful fallback when a transcript runs short (mirrors ChooseOptional
+  -- -> Declines). It also costs no mana, which keeps a short transcript from
+  -- diverging into an unpayable cast.
+  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

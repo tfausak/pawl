@@ -216,6 +216,7 @@ cardTypeToJson c = nullary . Text.pack $ case c of
   CardType.Enchantment -> "Enchantment"
   CardType.Artifact -> "Artifact"
   CardType.Sorcery -> "Sorcery"
+  CardType.Kindred -> "Kindred"
 
 jsonToCardType :: Value -> Either Text CardType.CardType
 jsonToCardType =
@@ -226,7 +227,8 @@ jsonToCardType =
       (Text.pack "Instant", CardType.Instant),
       (Text.pack "Enchantment", CardType.Enchantment),
       (Text.pack "Artifact", CardType.Artifact),
-      (Text.pack "Sorcery", CardType.Sorcery)
+      (Text.pack "Sorcery", CardType.Sorcery),
+      (Text.pack "Kindred", CardType.Kindred)
     ]
 
 -- No longer uniformly nullary: CR 122.1b's keyword counter carries the keyword it
@@ -316,6 +318,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Unicorn -> "Unicorn"
   Subtype.Curse -> "Curse"
   Subtype.Desert -> "Desert"
+  Subtype.Faerie -> "Faerie"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -374,7 +377,8 @@ jsonToSubtype =
       (Text.pack "Dragon", Subtype.Dragon),
       (Text.pack "Unicorn", Subtype.Unicorn),
       (Text.pack "Curse", Subtype.Curse),
-      (Text.pack "Desert", Subtype.Desert)
+      (Text.pack "Desert", Subtype.Desert),
+      (Text.pack "Faerie", Subtype.Faerie)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -432,6 +436,7 @@ keywordToJson k = case k of
   Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array (MkArray [costToJson cost, maybe Json.jNull filterToJson searchFor])))
   Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (costToJson cost))
   Keyword.Fear -> nullary (Text.pack "Fear")
+  Keyword.Entwine cost -> Json.tagged (Text.pack "Entwine") (Just (costToJson cost))
   Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (natTo n))
   Keyword.Infect -> nullary (Text.pack "Infect")
   Keyword.Devoid -> nullary (Text.pack "Devoid")
@@ -454,6 +459,7 @@ jsonToKeyword value = do
     ("Cycling", Just (Array (MkArray [c, f]))) -> Keyword.Cycling <$> jsonToCost c <*> optionalFilter f
     ("Flashback", Just v) -> Keyword.Flashback <$> jsonToCost v
     ("Fear", _) -> Right Keyword.Fear
+    ("Entwine", Just v) -> Keyword.Entwine <$> jsonToCost v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> natFrom v
     ("Infect", _) -> Right Keyword.Infect
     ("Devoid", _) -> Right Keyword.Devoid
@@ -1641,6 +1647,7 @@ effectToJson e = case e of
   Effect.SkipNextPhase r ph -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [playerRefToJson r, phaseToJson ph])))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [counterKindToJson k, quantityToJson q, slotNameToJson s])))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [playerRefToJson r, playerCounterKindToJson k, quantityToJson q])))
+  Effect.Tap r -> Json.tagged (Text.pack "Tap") (Just (objectRefToJson r))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
   Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (MkArray (fmap extraPhaseToJson ps))))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, slotNameToJson s])))
@@ -1737,6 +1744,7 @@ jsonToEffect value = do
     "GainPlayerCounters" -> case mv of
       Just (Array (MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> jsonToPlayerRef r <*> jsonToPlayerCounterKind k <*> jsonToQuantity q
       _ -> Left (Text.pack "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]")
+    "Tap" -> withValue mv (fmap Effect.Tap . jsonToObjectRef)
     "Untap" -> withValue mv (fmap Effect.Untap . jsonToObjectRef)
     "AddPhases" -> case mv of
       Just (Array (MkArray ps)) -> Effect.AddPhases <$> traverse jsonToExtraPhase ps

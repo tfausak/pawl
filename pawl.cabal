@@ -223,6 +223,7 @@ library types
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
     Pawl.Types.EntryRewrite
+    Pawl.Types.EntwineDecision
     Pawl.Types.EventShape
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
