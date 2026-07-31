@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
@@ -47,382 +48,386 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.HUnit as HU
 
 -- The one-unit yield of a single-colour mana ability, which is what a
 -- ChooseManaYield candidate looks like for every source but Sol Ring.
 oneMana :: Color.Color -> Mana.Mana
 oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color}]
 
-combatReplayTests :: Tasty.TestTree
-combatReplayTests =
+combatReplaySpec :: (Monad n) => Spec.Spec IO n -> n ()
+combatReplaySpec s =
   let decider = Decide.deciderFor S.alice (Setup.emptyGame S.bothPlayers)
       oid = ObjectId.MkObjectId 7
       attackPrompt = Prompt.DeclareAttackers decider S.alice [oid]
       blockPrompt = Prompt.DeclareBlockers decider S.bob [oid] [oid]
       damagePrompt = Prompt.AssignCombatDamage decider S.alice oid (Map.singleton (Recipient.ToCreature oid) 0) 2
-   in Tasty.testGroup
-        "CombatReplay"
-        [ HU.testCase "attackers round-trip through the transcript" $
-            HU.assertEqual "round trip" (Just [oid]) (Replay.decode attackPrompt (Replay.encode attackPrompt [oid])),
-          HU.testCase "blockers round-trip through the transcript" $
-            let answer = Map.singleton oid oid
-             in HU.assertEqual "round trip" (Just answer) (Replay.decode blockPrompt (Replay.encode blockPrompt answer)),
-          HU.testCase "a damage assignment round-trips through the transcript" $
-            let answer :: Map.Map Recipient.Recipient Natural.Natural
-                answer = Map.singleton (Recipient.ToCreature oid) 2
-             in HU.assertEqual "round trip" (Just answer) (Replay.decode damagePrompt (Replay.encode damagePrompt answer)),
-          HU.testCase "a mismatched response decodes to Nothing" $
-            HU.assertEqual "mismatch" Nothing (Replay.decode attackPrompt (Response.Shuffled [oid])),
-          -- The recorded answer is 4 while the prompt's bound is 2: the transcript
-          -- carries what the player SAID, and CR 601.2b lets them say more than
-          -- the board can pay. A codec that folded the bound into the response
-          -- would replay a different game (#417).
-          HU.testCase "ChooseX records and replays a Natural" $
-            let p = Prompt.ChooseX decider S.alice oid 2
-             in HU.assertEqual "round trip" (Just (4 :: Natural.Natural)) (Replay.decode p (Replay.encode p 4)),
-          -- CR 601.2b / 700.2a: a modal choice (Response.ChoseModes, a Set
-          -- ModeIndex) round-trips through the DecisionLog exactly like every
-          -- other response -- no JSON codec is involved: Response has never had
-          -- one (only Prompt/Response answers get serialized, via Replay's
-          -- encode/decode, not Pawl.Codec's JSON arms).
-          HU.testCase "ChooseModes records and replays a Set ModeIndex" $
-            let legal = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 1]
-                p = Prompt.ChooseModes decider S.alice oid legal 1
-                answer = Set.singleton (ModeIndex.MkModeIndex 1)
-             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          -- CR 702.42a: whether the entwine cost was paid decides how many modes
-          -- the spell has, so a transcript that lost it would replay a different
-          -- spell. Both answers are checked: a decode that ignored the response
-          -- and returned a fixed value would pass one leg by accident.
-          HU.testCase "ChooseEntwine records and replays an EntwineDecision" $
-            let entwineCost =
-                  Cost.Type.MkCost
-                    { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
-                      Cost.Type.components = []
-                    }
-                p = Prompt.ChooseEntwine decider S.alice oid entwineCost
-             in do
-                  HU.assertEqual
-                    "entwining round trips"
-                    (Just EntwineDecision.Entwines)
-                    (Replay.decode p (Replay.encode p EntwineDecision.Entwines))
-                  HU.assertEqual
-                    "declining round trips"
-                    (Just EntwineDecision.Declines)
-                    (Replay.decode p (Replay.encode p EntwineDecision.Declines))
-                  -- Discriminating: fails if ChooseEntwine reuses another
-                  -- two-valued response rather than getting its own constructor.
-                  HU.assertEqual
-                    "an optional decision is not an entwine announcement"
-                    Nothing
-                    (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)),
-          HU.testCase "a short transcript declines entwine" $
-            -- CR 702.42a: declining is always legal and costs nothing, so it is
-            -- the least-eventful fallback when a transcript runs short.
-            HU.assertEqual
-              "declines"
-              EntwineDecision.Declines
-              ( Replay.defaultAnswer
-                  ( Prompt.ChooseEntwine
-                      decider
-                      S.alice
-                      oid
-                      Cost.Type.MkCost
-                        { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
-                          Cost.Type.components = []
-                        }
-                  )
-              ),
-          HU.testCase "ChooseCopyTarget records and replays a Maybe ObjectId" $
-            let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
-                answer = Just (ObjectId.MkObjectId 7)
-             in HU.assertEqual "round-trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          -- CR 208.2b: Primal Plasma is in no deck, so no gameplay-level test
-          -- reaches Response.ChoseEntryOption through the record/replay path --
-          -- this exercises the transcript codec directly, matching the shape
-          -- of every other payload-carrying prompt above.
-          HU.testCase "ChooseEntryOption records and replays a Natural" $
-            let options = [EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}]
-                p = Prompt.ChooseEntryOption decider S.alice oid options
-             in HU.assertEqual "round trip" (Just (1 :: Natural.Natural)) (Replay.decode p (Replay.encode p 1)),
-          HU.testCase "DeclareMulligan records and replays a MulliganDecision" $
-            let offer = MulliganOffer.MkMulliganOffer {MulliganOffer.taken = 0, MulliganOffer.bottomCount = 1}
-                p = Prompt.DeclareMulligan decider S.alice offer
-             in HU.assertEqual "round trip" (Just MulliganDecision.Mulligan) (Replay.decode p (Replay.encode p MulliganDecision.Mulligan)),
-          HU.testCase "Bottom records and replays an ordered [ObjectId]" $
-            let p = Prompt.Bottom decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8] 1
-                answer = [ObjectId.MkObjectId 8]
-             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          HU.testCase "MulliganAction records and replays a Maybe ObjectId" $
-            let p = Prompt.MulliganAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
-                answer = Just (ObjectId.MkObjectId 8)
-             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          HU.testCase "OpeningHandAction records and replays a Maybe ObjectId" $
-            let p = Prompt.OpeningHandAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
-                answer = Just (ObjectId.MkObjectId 7)
-             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          -- CR 603.5: both answers to a printed "may", so the transcript is
-          -- proved to distinguish them -- a codec that collapsed them would
-          -- replay a declined Renewed Faith as a taken one.
-          HU.testCase "ChooseOptional records and replays both answers" $
-            let p = Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)
-             in do
-                  HU.assertEqual "exercised" (Just OptionalDecision.Exercises) (Replay.decode p (Replay.encode p OptionalDecision.Exercises))
-                  HU.assertEqual "declined" (Just OptionalDecision.Declines) (Replay.decode p (Replay.encode p OptionalDecision.Declines)),
-          -- CR 603.5: a transcript that runs short must not silently take an
-          -- option its author never chose.
-          HU.testCase "defaultAnswer declines a may" $
-            HU.assertEqual
-              "declines"
-              OptionalDecision.Declines
-              (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0))),
-          HU.testCase "a mismatched response does not decode as a may" $
-            HU.assertEqual
-              "mismatch"
-              Nothing
-              (Replay.decode (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)) (Response.Conceded Concession.Continues)),
-          HU.testCase "defaultAnswer attacks with nothing" $
-            HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
-          HU.testCase "defaultAnswer blocks with nothing" $
-            HU.assertEqual "no blocks" Map.empty (Replay.defaultAnswer blockPrompt),
-          HU.testCase "defaultAnswer assigns a LEGAL division" $
-            -- Total must equal the attacker's power, or the fallback would be
-            -- rejected by validation and deal no damage at all.
-            HU.assertEqual "all to one blocker" (Map.singleton (Recipient.ToCreature oid) 2) (Replay.defaultAnswer damagePrompt),
-          -- The payload mixes both kinds of entry (CR 113.7's borne trigger and
-          -- CR 725.2's sourceless one), which is what the batch really looks like
-          -- when the monarch controls a trigger of her own at the same moment.
-          HU.testCase "OrderTriggers records and replays a permutation" $
-            let p = Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless]
-                answer = [1, 0] :: [Natural.Natural]
-             in HU.assertEqual "round-trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          HU.testCase "defaultAnswer keeps the canonical order" $
-            HU.assertEqual
-              "identity permutation"
-              [0, 1 :: Natural.Natural]
-              (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless])),
-          HU.testCase "ChooseSacrifices records and replays a Set ObjectId" $
-            let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
-                answer = Set.singleton (ObjectId.MkObjectId 8)
-             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          HU.testCase "defaultAnswer sacrifices the first `count` offered, in order" $
-            HU.assertEqual
-              "the ascending prefix"
-              (Set.singleton oid)
-              (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1)),
-          HU.testCase "ChooseCost records and replays a Cost" $
-            let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
-                alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]
-                p = Prompt.ChooseCost decider S.alice oid [printed, alternative]
-             in HU.assertEqual "round trip" (Just alternative) (Replay.decode p (Replay.encode p alternative)),
-          HU.testCase "defaultAnswer takes the first offered cost (the printed one)" $
-            let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
-                alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]
-             in HU.assertEqual
-                  "the printed one"
-                  printed
-                  (Replay.defaultAnswer (Prompt.ChooseCost decider S.alice oid [printed, alternative])),
-          -- #136 / CR 729.2: "Randomly determine which player goes first." The
-          -- determination is randomness, not a choice, so the prompt carries NO
-          -- Decider -- Shuffle is the only other such constructor. Recording it
-          -- is what keeps a subgame replayable: the randomness lives in the
-          -- interpreter, and the transcript carries what it rolled.
-          HU.testCase "RandomFirstPlayer round-trips through the transcript" $
-            let p = Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob])
-             in HU.assertEqual "round trip" (Just S.bob) (Replay.decode p (Replay.encode p S.bob)),
-          HU.testCase "a short transcript starts the head of the turn order" $
-            HU.assertEqual
-              "the head"
-              S.alice
-              (Replay.defaultAnswer (Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob]))),
-          -- CR 507.1 / 703.4h: the defending-player choice round-trips like every
-          -- other prompt. NonEmpty because the action only runs when there is at
-          -- least one candidate.
-          HU.testCase "ChooseDefender round-trips through the transcript" $
-            let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
-             in do
-                  HU.assertEqual "carol round trips" (Just S.carol) (Replay.decode p (Replay.encode p S.carol))
-                  -- Discriminating: both legs must round-trip. A decode that
-                  -- ignored the response and returned the head would pass the
-                  -- carol leg only by accident of which one was written first.
-                  HU.assertEqual "bob round trips" (Just S.bob) (Replay.decode p (Replay.encode p S.bob)),
-          HU.testCase "a first-player roll does not decode as a defender choice" $
-            -- Discriminating: this is the assertion that fails if ChooseDefender
-            -- reuses Response.DeterminedFirstPlayer instead of getting its own
-            -- constructor. Both carry a PlayerId, so the types would not object.
-            let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
-             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.DeterminedFirstPlayer S.bob)),
-          -- CR 601.2g: the mana-source choice round-trips like every other prompt.
-          HU.testCase "ChooseManaSource round-trips through the transcript" $
-            let a = ObjectId.MkObjectId 7
-                b = ObjectId.MkObjectId 9
-                p = Prompt.ChooseManaSource decider S.alice (a NonEmpty.:| [b])
-             in do
-                  HU.assertEqual "the second source round trips" (Just b) (Replay.decode p (Replay.encode p b))
-                  -- Discriminating for the same reason ChooseDefender's pair is: a
-                  -- decode that ignored the response and returned the head would
-                  -- pass one leg by accident.
-                  HU.assertEqual "the first source round trips" (Just a) (Replay.decode p (Replay.encode p a)),
-          HU.testCase "a discard choice does not decode as a mana-source choice" $
-            -- Discriminating: this fails if ChooseManaSource reuses another
-            -- ObjectId-shaped response instead of getting its own constructor.
-            let p = Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
-             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseDiscard [ObjectId.MkObjectId 7])),
-          HU.testCase "a short transcript taps the first offered source" $
-            HU.assertEqual
-              "the head"
-              (ObjectId.MkObjectId 7)
-              (Replay.defaultAnswer (Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
-          -- CR 605.3b / 105.4: the mana an any-colour source was tapped for is a
-          -- decision, so it has to survive a transcript like any other.
-          HU.testCase "ChooseManaYield round-trips through the transcript" $
-            let black = oneMana Color.Black
-                red = oneMana Color.Red
-                p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (black NonEmpty.:| [red])
-             in do
-                  HU.assertEqual "black round trips" (Just black) (Replay.decode p (Replay.encode p black))
-                  -- Discriminating for the same reason the pair above is: a decode
-                  -- that returned the head would pass one leg by accident.
-                  HU.assertEqual "red round trips" (Just red) (Replay.decode p (Replay.encode p red)),
-          HU.testCase "a mana-source choice does not decode as a mana-yield choice" $
-            -- Discriminating: this fails if ChooseManaYield reuses ChoseManaSource
-            -- rather than getting its own constructor.
-            let p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red])
-             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
-          -- CR 701.34a: who was proliferated onto is a decision, so it has to
-          -- survive a transcript like any other.
-          HU.testCase "ChooseProliferate round-trips through the transcript" $
-            let a = ObjectId.MkObjectId 7
-                p = Prompt.ChooseProliferate decider S.alice [a] [S.bob]
-                both = (Set.singleton a, Set.singleton S.bob)
-                neither = (Set.empty, Set.empty)
-             in do
-                  HU.assertEqual "taking both round trips" (Just both) (Replay.decode p (Replay.encode p both))
-                  -- Discriminating: CR 701.34a's "any number" includes none, and a
-                  -- decode that defaulted to the offered set would pass one leg.
-                  HU.assertEqual "declining round trips" (Just neither) (Replay.decode p (Replay.encode p neither)),
-          HU.testCase "a short transcript proliferates onto nothing" $
-            HU.assertEqual
-              "declines"
-              (Set.empty, Set.empty)
-              (Replay.defaultAnswer (Prompt.ChooseProliferate decider S.alice [ObjectId.MkObjectId 7] [S.bob])),
-          -- CR 704.5j: which legend its controller kept is a decision, so it has to
-          -- survive a transcript like any other.
-          HU.testCase "ChooseLegend round-trips through the transcript" $
-            let a = ObjectId.MkObjectId 7
-                b = ObjectId.MkObjectId 9
-                p = Prompt.ChooseLegend decider S.alice (a NonEmpty.:| [b])
-             in do
-                  HU.assertEqual "keeping the second round trips" (Just b) (Replay.decode p (Replay.encode p b))
-                  -- Discriminating: a decode that ignored the response and returned
-                  -- the head would pass one leg by accident.
-                  HU.assertEqual "keeping the first round trips" (Just a) (Replay.decode p (Replay.encode p a)),
-          HU.testCase "a legend choice does not decode as a mana-source choice" $
-            -- Discriminating: fails if ChooseLegend reuses ChoseManaSource rather
-            -- than getting its own ObjectId-shaped constructor.
-            let p = Prompt.ChooseLegend decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
-             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
-          -- CR 603.7c: which of several minted tokens "it" names is a decision, so
-          -- it has to survive a transcript like any other.
-          HU.testCase "ChooseBoundToken round-trips through the transcript" $
-            let a = ObjectId.MkObjectId 7
-                b = ObjectId.MkObjectId 9
-                p = Prompt.ChooseBoundToken decider S.alice oid (a NonEmpty.:| [b])
-             in do
-                  HU.assertEqual "binding the second round trips" (Just b) (Replay.decode p (Replay.encode p b))
-                  -- Discriminating: a decode that ignored the response and returned
-                  -- the head would pass one leg by accident.
-                  HU.assertEqual "binding the first round trips" (Just a) (Replay.decode p (Replay.encode p a)),
-          HU.testCase "a bound-token choice does not decode as a legend choice" $
-            -- Discriminating: fails if ChooseBoundToken reuses ChoseLegend rather
-            -- than getting its own ObjectId-shaped constructor.
-            let p = Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
-             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))),
-          HU.testCase "a short transcript binds the first token minted" $
-            -- CR 603.7c: every minted token is a legal referent, so the head is
-            -- legal -- and it is what the engine bound before the choice existed.
-            HU.assertEqual
-              "the head"
-              (ObjectId.MkObjectId 7)
-              (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
-          -- CR 118.13a: which way a Phyrexian mana symbol was announced to be
-          -- paid is a decision made as the spell is proposed, so it has to
-          -- survive a transcript like any other.
-          HU.testCase "AnnouncePhyrexianPayment round-trips through the transcript" $
-            let p =
-                  Prompt.AnnouncePhyrexianPayment
+   in Spec.describe s "CombatReplay" $ do
+        Spec.it s "attackers round-trip through the transcript" $
+          Spec.assertEqWith s "round trip" (Replay.decode attackPrompt (Replay.encode attackPrompt [oid])) (Just [oid])
+        Spec.it s "blockers round-trip through the transcript" $ do
+          let answer = Map.singleton oid oid
+          Spec.assertEqWith s "round trip" (Replay.decode blockPrompt (Replay.encode blockPrompt answer)) (Just answer)
+        Spec.it s "a damage assignment round-trips through the transcript" $ do
+          let answer :: Map.Map Recipient.Recipient Natural.Natural
+              answer = Map.singleton (Recipient.ToCreature oid) 2
+          Spec.assertEqWith s "round trip" (Replay.decode damagePrompt (Replay.encode damagePrompt answer)) (Just answer)
+        Spec.it s "a mismatched response decodes to Nothing" $
+          Spec.assertEqWith s "mismatch" (Replay.decode attackPrompt (Response.Shuffled [oid])) Nothing
+        -- The recorded answer is 4 while the prompt's bound is 2: the transcript
+        -- carries what the player SAID, and CR 601.2b lets them say more than
+        -- the board can pay. A codec that folded the bound into the response
+        -- would replay a different game (#417).
+        Spec.it s "ChooseX records and replays a Natural" $ do
+          let p = Prompt.ChooseX decider S.alice oid 2
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 4)) (Just (4 :: Natural.Natural))
+        -- CR 601.2b / 700.2a: a modal choice (Response.ChoseModes, a Set
+        -- ModeIndex) round-trips through the DecisionLog exactly like every
+        -- other response -- no JSON codec is involved: Response has never had
+        -- one (only Prompt/Response answers get serialized, via Replay's
+        -- encode/decode, not Pawl.Codec's JSON arms).
+        Spec.it s "ChooseModes records and replays a Set ModeIndex" $ do
+          let legal = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 1]
+              p = Prompt.ChooseModes decider S.alice oid legal 1
+              answer = Set.singleton (ModeIndex.MkModeIndex 1)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        -- CR 702.42a: whether the entwine cost was paid decides how many modes
+        -- the spell has, so a transcript that lost it would replay a different
+        -- spell. Both answers are checked: a decode that ignored the response
+        -- and returned a fixed value would pass one leg by accident.
+        Spec.it s "ChooseEntwine records and replays an EntwineDecision" $ do
+          let entwineCost =
+                Cost.Type.MkCost
+                  { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                    Cost.Type.components = []
+                  }
+              p = Prompt.ChooseEntwine decider S.alice oid entwineCost
+          Spec.assertEqWith
+            s
+            "entwining round trips"
+            (Replay.decode p (Replay.encode p EntwineDecision.Entwines))
+            (Just EntwineDecision.Entwines)
+          Spec.assertEqWith
+            s
+            "declining round trips"
+            (Replay.decode p (Replay.encode p EntwineDecision.Declines))
+            (Just EntwineDecision.Declines)
+          -- Discriminating: fails if ChooseEntwine reuses another
+          -- two-valued response rather than getting its own constructor.
+          Spec.assertEqWith
+            s
+            "an optional decision is not an entwine announcement"
+            (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises))
+            Nothing
+        Spec.it s "a short transcript declines entwine" $
+          -- CR 702.42a: declining is always legal and costs nothing, so it is
+          -- the least-eventful fallback when a transcript runs short.
+          Spec.assertEqWith
+            s
+            "declines"
+            ( Replay.defaultAnswer
+                ( Prompt.ChooseEntwine
+                    decider
+                    S.alice
+                    oid
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                        Cost.Type.components = []
+                      }
+                )
+            )
+            EntwineDecision.Declines
+        Spec.it s "ChooseCopyTarget records and replays a Maybe ObjectId" $ do
+          let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
+              answer = Just (ObjectId.MkObjectId 7)
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        -- CR 208.2b: Primal Plasma is in no deck, so no gameplay-level test
+        -- reaches Response.ChoseEntryOption through the record/replay path --
+        -- this exercises the transcript codec directly, matching the shape
+        -- of every other payload-carrying prompt above.
+        Spec.it s "ChooseEntryOption records and replays a Natural" $ do
+          let options = [EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}]
+              p = Prompt.ChooseEntryOption decider S.alice oid options
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 1)) (Just (1 :: Natural.Natural))
+        Spec.it s "DeclareMulligan records and replays a MulliganDecision" $ do
+          let offer = MulliganOffer.MkMulliganOffer {MulliganOffer.taken = 0, MulliganOffer.bottomCount = 1}
+              p = Prompt.DeclareMulligan decider S.alice offer
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p MulliganDecision.Mulligan)) (Just MulliganDecision.Mulligan)
+        Spec.it s "Bottom records and replays an ordered [ObjectId]" $ do
+          let p = Prompt.Bottom decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8] 1
+              answer = [ObjectId.MkObjectId 8]
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        Spec.it s "MulliganAction records and replays a Maybe ObjectId" $ do
+          let p = Prompt.MulliganAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
+              answer = Just (ObjectId.MkObjectId 8)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        Spec.it s "OpeningHandAction records and replays a Maybe ObjectId" $ do
+          let p = Prompt.OpeningHandAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
+              answer = Just (ObjectId.MkObjectId 7)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        -- CR 603.5: both answers to a printed "may", so the transcript is
+        -- proved to distinguish them -- a codec that collapsed them would
+        -- replay a declined Renewed Faith as a taken one.
+        Spec.it s "ChooseOptional records and replays both answers" $ do
+          let p = Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)
+          Spec.assertEqWith s "exercised" (Replay.decode p (Replay.encode p OptionalDecision.Exercises)) (Just OptionalDecision.Exercises)
+          Spec.assertEqWith s "declined" (Replay.decode p (Replay.encode p OptionalDecision.Declines)) (Just OptionalDecision.Declines)
+        -- CR 603.5: a transcript that runs short must not silently take an
+        -- option its author never chose.
+        Spec.it s "defaultAnswer declines a may" $
+          Spec.assertEqWith
+            s
+            "declines"
+            (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)))
+            OptionalDecision.Declines
+        Spec.it s "a mismatched response does not decode as a may" $
+          Spec.assertEqWith
+            s
+            "mismatch"
+            (Replay.decode (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)) (Response.Conceded Concession.Continues))
+            Nothing
+        Spec.it s "defaultAnswer attacks with nothing" $
+          Spec.assertEqWith s "no attacks" (Replay.defaultAnswer attackPrompt) []
+        Spec.it s "defaultAnswer blocks with nothing" $
+          Spec.assertEqWith s "no blocks" (Replay.defaultAnswer blockPrompt) Map.empty
+        Spec.it s "defaultAnswer assigns a LEGAL division" $
+          -- Total must equal the attacker's power, or the fallback would be
+          -- rejected by validation and deal no damage at all.
+          Spec.assertEqWith s "all to one blocker" (Replay.defaultAnswer damagePrompt) (Map.singleton (Recipient.ToCreature oid) 2)
+        -- The payload mixes both kinds of entry (CR 113.7's borne trigger and
+        -- CR 725.2's sourceless one), which is what the batch really looks like
+        -- when the monarch controls a trigger of her own at the same moment.
+        Spec.it s "OrderTriggers records and replays a permutation" $ do
+          let p = Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless]
+              answer = [1, 0] :: [Natural.Natural]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        Spec.it s "defaultAnswer keeps the canonical order" $
+          Spec.assertEqWith
+            s
+            "identity permutation"
+            (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless]))
+            [0, 1 :: Natural.Natural]
+        Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
+          let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+              answer = Set.singleton (ObjectId.MkObjectId 8)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        Spec.it s "defaultAnswer sacrifices the first `count` offered, in order" $
+          Spec.assertEqWith
+            s
+            "the ascending prefix"
+            (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
+            (Set.singleton oid)
+        Spec.it s "ChooseCost records and replays a Cost" $ do
+          let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
+              alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]
+              p = Prompt.ChooseCost decider S.alice oid [printed, alternative]
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p alternative)) (Just alternative)
+        Spec.it s "defaultAnswer takes the first offered cost (the printed one)" $ do
+          let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
+              alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]
+          Spec.assertEqWith
+            s
+            "the printed one"
+            (Replay.defaultAnswer (Prompt.ChooseCost decider S.alice oid [printed, alternative]))
+            printed
+        -- #136 / CR 729.2: "Randomly determine which player goes first." The
+        -- determination is randomness, not a choice, so the prompt carries NO
+        -- Decider -- Shuffle is the only other such constructor. Recording it
+        -- is what keeps a subgame replayable: the randomness lives in the
+        -- interpreter, and the transcript carries what it rolled.
+        Spec.it s "RandomFirstPlayer round-trips through the transcript" $ do
+          let p = Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob])
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
+        Spec.it s "a short transcript starts the head of the turn order" $
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob])))
+            S.alice
+        -- CR 507.1 / 703.4h: the defending-player choice round-trips like every
+        -- other prompt. NonEmpty because the action only runs when there is at
+        -- least one candidate.
+        Spec.it s "ChooseDefender round-trips through the transcript" $ do
+          let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
+          Spec.assertEqWith s "carol round trips" (Replay.decode p (Replay.encode p S.carol)) (Just S.carol)
+          -- Discriminating: both legs must round-trip. A decode that
+          -- ignored the response and returned the head would pass the
+          -- carol leg only by accident of which one was written first.
+          Spec.assertEqWith s "bob round trips" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
+        Spec.it s "a first-player roll does not decode as a defender choice" $ do
+          -- Discriminating: this is the assertion that fails if ChooseDefender
+          -- reuses Response.DeterminedFirstPlayer instead of getting its own
+          -- constructor. Both carry a PlayerId, so the types would not object.
+          let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.DeterminedFirstPlayer S.bob)) Nothing
+        -- CR 601.2g: the mana-source choice round-trips like every other prompt.
+        Spec.it s "ChooseManaSource round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseManaSource decider S.alice (a NonEmpty.:| [b])
+          Spec.assertEqWith s "the second source round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating for the same reason ChooseDefender's pair is: a
+          -- decode that ignored the response and returned the head would
+          -- pass one leg by accident.
+          Spec.assertEqWith s "the first source round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a discard choice does not decode as a mana-source choice" $ do
+          -- Discriminating: this fails if ChooseManaSource reuses another
+          -- ObjectId-shaped response instead of getting its own constructor.
+          let p = Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseDiscard [ObjectId.MkObjectId 7])) Nothing
+        Spec.it s "a short transcript taps the first offered source" $
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            (ObjectId.MkObjectId 7)
+        -- CR 605.3b / 105.4: the mana an any-colour source was tapped for is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseManaYield round-trips through the transcript" $ do
+          let black = oneMana Color.Black
+              red = oneMana Color.Red
+              p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (black NonEmpty.:| [red])
+          Spec.assertEqWith s "black round trips" (Replay.decode p (Replay.encode p black)) (Just black)
+          -- Discriminating for the same reason the pair above is: a decode
+          -- that returned the head would pass one leg by accident.
+          Spec.assertEqWith s "red round trips" (Replay.decode p (Replay.encode p red)) (Just red)
+        Spec.it s "a mana-source choice does not decode as a mana-yield choice" $ do
+          -- Discriminating: this fails if ChooseManaYield reuses ChoseManaSource
+          -- rather than getting its own constructor.
+          let p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))) Nothing
+        -- CR 701.34a: who was proliferated onto is a decision, so it has to
+        -- survive a transcript like any other.
+        Spec.it s "ChooseProliferate round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              p = Prompt.ChooseProliferate decider S.alice [a] [S.bob]
+              both = (Set.singleton a, Set.singleton S.bob)
+              neither = (Set.empty, Set.empty)
+          Spec.assertEqWith s "taking both round trips" (Replay.decode p (Replay.encode p both)) (Just both)
+          -- Discriminating: CR 701.34a's "any number" includes none, and a
+          -- decode that defaulted to the offered set would pass one leg.
+          Spec.assertEqWith s "declining round trips" (Replay.decode p (Replay.encode p neither)) (Just neither)
+        Spec.it s "a short transcript proliferates onto nothing" $
+          Spec.assertEqWith
+            s
+            "declines"
+            (Replay.defaultAnswer (Prompt.ChooseProliferate decider S.alice [ObjectId.MkObjectId 7] [S.bob]))
+            (Set.empty, Set.empty)
+        -- CR 704.5j: which legend its controller kept is a decision, so it has to
+        -- survive a transcript like any other.
+        Spec.it s "ChooseLegend round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseLegend decider S.alice (a NonEmpty.:| [b])
+          Spec.assertEqWith s "keeping the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned
+          -- the head would pass one leg by accident.
+          Spec.assertEqWith s "keeping the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a legend choice does not decode as a mana-source choice" $ do
+          -- Discriminating: fails if ChooseLegend reuses ChoseManaSource rather
+          -- than getting its own ObjectId-shaped constructor.
+          let p = Prompt.ChooseLegend decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))) Nothing
+        -- CR 603.7c: which of several minted tokens "it" names is a decision, so
+        -- it has to survive a transcript like any other.
+        Spec.it s "ChooseBoundToken round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseBoundToken decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "binding the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned
+          -- the head would pass one leg by accident.
+          Spec.assertEqWith s "binding the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a bound-token choice does not decode as a legend choice" $ do
+          -- Discriminating: fails if ChooseBoundToken reuses ChoseLegend rather
+          -- than getting its own ObjectId-shaped constructor.
+          let p = Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
+        Spec.it s "a short transcript binds the first token minted" $
+          -- CR 603.7c: every minted token is a legal referent, so the head is
+          -- legal -- and it is what the engine bound before the choice existed.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            (ObjectId.MkObjectId 7)
+        -- CR 118.13a: which way a Phyrexian mana symbol was announced to be
+        -- paid is a decision made as the spell is proposed, so it has to
+        -- survive a transcript like any other.
+        Spec.it s "AnnouncePhyrexianPayment round-trips through the transcript" $ do
+          let p =
+                Prompt.AnnouncePhyrexianPayment
+                  decider
+                  S.alice
+                  oid
+                  Color.Green
+                  (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
+          Spec.assertEqWith
+            s
+            "the life route round trips"
+            (Replay.decode p (Replay.encode p PhyrexianPayment.PaysLife))
+            (Just PhyrexianPayment.PaysLife)
+          -- Discriminating for the same reason the pairs above are: a
+          -- decode that ignored the response and returned the head would
+          -- pass one leg by accident.
+          Spec.assertEqWith
+            s
+            "the mana route round trips"
+            (Replay.decode p (Replay.encode p PhyrexianPayment.PaysMana))
+            (Just PhyrexianPayment.PaysMana)
+        Spec.it s "an optional decision does not decode as a Phyrexian announcement" $ do
+          -- Discriminating: fails if AnnouncePhyrexianPayment reuses another
+          -- two-valued response (ChoseOptional, Conceded, DeclaredMulligan)
+          -- rather than getting its own constructor.
+          let p =
+                Prompt.AnnouncePhyrexianPayment
+                  decider
+                  S.alice
+                  oid
+                  Color.Green
+                  (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        Spec.it s "a short transcript announces the first offered Phyrexian route" $
+          -- Every offered route is payable (the prompt is raised only with two
+          -- payable routes), so the head is a legal answer.
+          Spec.assertEqWith
+            s
+            "the head"
+            ( Replay.defaultAnswer
+                ( Prompt.AnnouncePhyrexianPayment
                     decider
                     S.alice
                     oid
                     Color.Green
-                    (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
-             in do
-                  HU.assertEqual
-                    "the life route round trips"
-                    (Just PhyrexianPayment.PaysLife)
-                    (Replay.decode p (Replay.encode p PhyrexianPayment.PaysLife))
-                  -- Discriminating for the same reason the pairs above are: a
-                  -- decode that ignored the response and returned the head would
-                  -- pass one leg by accident.
-                  HU.assertEqual
-                    "the mana route round trips"
-                    (Just PhyrexianPayment.PaysMana)
-                    (Replay.decode p (Replay.encode p PhyrexianPayment.PaysMana)),
-          HU.testCase "an optional decision does not decode as a Phyrexian announcement" $
-            -- Discriminating: fails if AnnouncePhyrexianPayment reuses another
-            -- two-valued response (ChoseOptional, Conceded, DeclaredMulligan)
-            -- rather than getting its own constructor.
-            let p =
-                  Prompt.AnnouncePhyrexianPayment
-                    decider
-                    S.alice
-                    oid
-                    Color.Green
-                    (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
-             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)),
-          HU.testCase "a short transcript announces the first offered Phyrexian route" $
-            -- Every offered route is payable (the prompt is raised only with two
-            -- payable routes), so the head is a legal answer.
-            HU.assertEqual
-              "the head"
-              PhyrexianPayment.PaysLife
-              ( Replay.defaultAnswer
-                  ( Prompt.AnnouncePhyrexianPayment
-                      decider
-                      S.alice
-                      oid
-                      Color.Green
-                      (PhyrexianPayment.PaysLife NonEmpty.:| [PhyrexianPayment.PaysMana])
-                  )
-              ),
-          HU.testCase "a short transcript produces the first offered mana yield" $
-            HU.assertEqual
-              "the head"
-              (oneMana Color.Black)
-              (Replay.defaultAnswer (Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red]))),
-          HU.testCase "a short transcript defends with the first candidate" $
-            -- Discriminating against a defaultAnswer that returned the active
-            -- player, or a candidate not on the offered list: the first candidate
-            -- is always legal, since the prompt is only asked with candidates.
-            HU.assertEqual
-              "the head"
-              S.bob
-              (Replay.defaultAnswer (Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol]))),
-          -- #133: the concede channel round-trips like every other prompt. Note
-          -- the prompt takes a PlayerId and NO Decider (CR 723.6).
-          HU.testCase "Concede round-trips both ways" $
-            let p = Prompt.Concede S.alice
-             in do
-                  HU.assertEqual "concedes" (Just Concession.Concedes) (Replay.decode p (Replay.encode p Concession.Concedes))
-                  HU.assertEqual "continues" (Just Concession.Continues) (Replay.decode p (Replay.encode p Concession.Continues)),
-          HU.testCase "a short transcript defaults a Concede to Continues" $
-            -- NOT "least eventful", unlike the arms around it: dropping a
-            -- concession hands the win to the other player (CR 104.2a), which
-            -- is why Replay.replay reports the desync.
-            HU.assertEqual "the game keeps running" Concession.Continues (Replay.defaultAnswer (Prompt.Concede S.alice))
-        ]
+                    (PhyrexianPayment.PaysLife NonEmpty.:| [PhyrexianPayment.PaysMana])
+                )
+            )
+            PhyrexianPayment.PaysLife
+        Spec.it s "a short transcript produces the first offered mana yield" $
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red])))
+            (oneMana Color.Black)
+        Spec.it s "a short transcript defends with the first candidate" $
+          -- Discriminating against a defaultAnswer that returned the active
+          -- player, or a candidate not on the offered list: the first candidate
+          -- is always legal, since the prompt is only asked with candidates.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])))
+            S.bob
+        -- #133: the concede channel round-trips like every other prompt. Note
+        -- the prompt takes a PlayerId and NO Decider (CR 723.6).
+        Spec.it s "Concede round-trips both ways" $ do
+          let p = Prompt.Concede S.alice
+          Spec.assertEqWith s "concedes" (Replay.decode p (Replay.encode p Concession.Concedes)) (Just Concession.Concedes)
+          Spec.assertEqWith s "continues" (Replay.decode p (Replay.encode p Concession.Continues)) (Just Concession.Continues)
+        Spec.it s "a short transcript defaults a Concede to Continues" $
+          -- NOT "least eventful", unlike the arms around it: dropping a
+          -- concession hands the win to the other player (CR 104.2a), which
+          -- is why Replay.replay reports the desync.
+          Spec.assertEqWith s "the game keeps running" (Replay.defaultAnswer (Prompt.Concede S.alice)) Concession.Continues
 
 -- Concedes whenever asked, and otherwise takes the identity answer. Delegating
 -- through a wildcard keeps this out of the -Werror exhaustiveness net.
@@ -443,85 +448,84 @@ recordedGame registry = do
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
   pure (start, game, recorded, transcript)
 
-replayTests :: Registry.Registry -> Tasty.TestTree
-replayTests registry =
-  Tasty.testGroup
-    "Replay"
-    [ HU.testCase "replaying a recorded game reproduces the final state" $ do
-        (start, game, recorded, transcript) <- recordedGame registry
-        let ((_, replayed), desync) = Replay.replay transcript start game
-        HU.assertEqual "final states equal" recorded replayed
-        HU.assertEqual "and the transcript answered every prompt" Nothing desync,
-      HU.testCase "the transcript is what carries the decisions" $ do
-        (start, game, recorded, _) <- recordedGame registry
-        let ((_, replayed), desync) = Replay.replay [] start game
-        HU.assertBool "empty log diverges" (recorded /= replayed)
-        -- The divergence is REPORTED rather than silent. An empty log runs out
-        -- at the very first prompt, so the report names index 0.
-        HU.assertEqual "and says where it ran out" (Just (Desync.Exhausted 0)) desync,
-      HU.testCase "a recorded goldfish also replays" $ do
-        (start, game, _, _) <- recordedGame registry
-        let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
-            ((_, replayed), desync) = Replay.replay gfLog start game
-        HU.assertEqual "goldfish" gf replayed
-        HU.assertEqual "no desync" Nothing desync,
-      -- #144. Pawl.Engine.Replay.defaultAnswer is deliberately total, so a transcript
-      -- that has drifted out of step with the prompts the engine actually asks
-      -- does not crash -- it silently answers everything from the fallback and
-      -- plays out a DIFFERENT game. For Prompt.Concede that fallback is
-      -- Concession.Continues, so a dropped concession changes who WINS (CR
-      -- 104.2a), not merely how a choice was filled. These pin the report that
-      -- makes that visible: replay names the first prompt the transcript failed
-      -- to answer, and nothing after it can be trusted.
-      HU.testCase "a truncated transcript reports where it ran out" $ do
-        (start, game, _, transcript) <- recordedGame registry
-        let (_, desync) = Replay.replay (List.init transcript) start game
-        case desync of
-          Just (Desync.Exhausted _) -> pure ()
-          _ -> HU.assertFailure ("expected an Exhausted report, got " <> show desync),
-      HU.testCase "a mismatched entry is reported, not silently defaulted" $ do
-        (start, game, recorded, transcript) <- recordedGame registry
-        -- A response of the wrong SHAPE for the first prompt, which is the
-        -- opening Prompt.Shuffle: Response.ChoseX answers Prompt.ChooseX and
-        -- nothing else, so decode rejects it.
-        let bogus = Response.ChoseX 0
-            ((_, replayed), desync) = Replay.replay (bogus : transcript) start game
-        HU.assertEqual "reported at index 0, carrying the offending entry" (Just (Desync.Mismatched 0 bogus)) desync
-        HU.assertBool "and the replay is not the recorded game" (recorded /= replayed),
-      -- The one that matters: a dropped concession replays to the OTHER winner.
-      HU.testCase "#144 a concession lost to a desync silently flips the winner" $
-        let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
-            ((_, conceded), transcript) = Replay.record concedeAnswer base Engine.runStep
-            -- One spurious entry ahead of the log is enough: decode rejects it,
-            -- replay does not consume it, and every later prompt meets the same
-            -- entry -- so the whole transcript is stranded behind it.
-            ((_, drifted), desync) = Replay.replay (Response.ChoseX 0 : transcript) base Engine.runStep
-         in do
-              HU.assertEqual "recorded: alice conceded, bob wins" (Just (Result.Won S.bob)) (GameState.result conceded)
-              HU.assertEqual "replayed: the concession is gone" Nothing (GameState.result drifted)
-              HU.assertEqual "and the report says so" (Just (Desync.Mismatched 0 (Response.ChoseX 0))) desync,
-      HU.testCase "a ChooseTargets answer round-trips through the transcript" $
-        let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
-            p = Prompt.ChooseTargets (Decider.MkDecider S.alice) S.alice (ObjectId.MkObjectId 0) sets
-            answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer S.bob)
-         in HU.assertEqual "decode . encode = Just" (Just answer) (Replay.decode p (Replay.encode p answer)),
-      -- CR 700.2b/603.3d: the mode chosen as Aether Channeler's ETB trigger is
-      -- placed (Engine.placeOne prompts ChooseModes) records/replays exactly
-      -- like a spell's ChooseModes -- a Response.ChoseModes round-trips through
-      -- the DecisionLog byte-identically.
-      HU.testCase "Aether Channeler's trigger ChooseModes records and replays a Set ModeIndex" $ do
-        acPrinting <- Registry.printing registry "Aether Channeler"
-        let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
-            decider = Decide.deciderFor S.alice gs
-        case Card.Type.triggeredAbilities (Printing.card acPrinting) of
-          [ability] -> do
-            let legal = Target.fillableModes Nothing acId Map.empty (TriggeredAbility.modal ability) gs
-                p = Prompt.ChooseModes decider S.alice acId legal 1
-                answer = Set.singleton (ModeIndex.MkModeIndex 2)
-            HU.assertEqual "legal modes are 0 and 2 (bounce self-excluded)" (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]) legal
-            HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer))
-          _ -> HU.assertFailure "Aether Channeler must have exactly one triggered ability"
-    ]
+replaySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+replaySpec s registry =
+  Spec.describe s "Replay" $ do
+    Spec.it s "replaying a recorded game reproduces the final state" $ do
+      (start, game, recorded, transcript) <- recordedGame registry
+      let ((_, replayed), desync) = Replay.replay transcript start game
+      Spec.assertEqWith s "final states equal" replayed recorded
+      Spec.assertEqWith s "and the transcript answered every prompt" desync Nothing
+    Spec.it s "the transcript is what carries the decisions" $ do
+      (start, game, recorded, _) <- recordedGame registry
+      let ((_, replayed), desync) = Replay.replay [] start game
+      Spec.assertBool s (recorded /= replayed) "empty log diverges"
+      -- The divergence is REPORTED rather than silent. An empty log runs out
+      -- at the very first prompt, so the report names index 0.
+      Spec.assertEqWith s "and says where it ran out" desync (Just (Desync.Exhausted 0))
+    Spec.it s "a recorded goldfish also replays" $ do
+      (start, game, _, _) <- recordedGame registry
+      let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
+          ((_, replayed), desync) = Replay.replay gfLog start game
+      Spec.assertEqWith s "goldfish" replayed gf
+      Spec.assertEqWith s "no desync" desync Nothing
+    -- #144. Pawl.Engine.Replay.defaultAnswer is deliberately total, so a transcript
+    -- that has drifted out of step with the prompts the engine actually asks
+    -- does not crash -- it silently answers everything from the fallback and
+    -- plays out a DIFFERENT game. For Prompt.Concede that fallback is
+    -- Concession.Continues, so a dropped concession changes who WINS (CR
+    -- 104.2a), not merely how a choice was filled. These pin the report that
+    -- makes that visible: replay names the first prompt the transcript failed
+    -- to answer, and nothing after it can be trusted.
+    Spec.it s "a truncated transcript reports where it ran out" $ do
+      (start, game, _, transcript) <- recordedGame registry
+      let (_, desync) = Replay.replay (List.init transcript) start game
+      case desync of
+        Just (Desync.Exhausted _) -> pure ()
+        _ -> Spec.assertFailure s ("expected an Exhausted report, got " <> show desync)
+    Spec.it s "a mismatched entry is reported, not silently defaulted" $ do
+      (start, game, recorded, transcript) <- recordedGame registry
+      -- A response of the wrong SHAPE for the first prompt, which is the
+      -- opening Prompt.Shuffle: Response.ChoseX answers Prompt.ChooseX and
+      -- nothing else, so decode rejects it.
+      let bogus = Response.ChoseX 0
+          ((_, replayed), desync) = Replay.replay (bogus : transcript) start game
+      Spec.assertEqWith s "reported at index 0, carrying the offending entry" desync (Just (Desync.Mismatched 0 bogus))
+      Spec.assertBool s (recorded /= replayed) "and the replay is not the recorded game"
+    -- The one that matters: a dropped concession replays to the OTHER winner.
+    Spec.it s "#144 a concession lost to a desync silently flips the winner" $ do
+      let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
+          ((_, conceded), transcript) = Replay.record concedeAnswer base Engine.runStep
+          -- One spurious entry ahead of the log is enough: decode rejects it,
+          -- replay does not consume it, and every later prompt meets the same
+          -- entry -- so the whole transcript is stranded behind it.
+          ((_, drifted), desync) = Replay.replay (Response.ChoseX 0 : transcript) base Engine.runStep
+      Spec.assertEqWith s "recorded: alice conceded, bob wins" (GameState.result conceded) (Just (Result.Won S.bob))
+      Spec.assertEqWith s "replayed: the concession is gone" (GameState.result drifted) Nothing
+      Spec.assertEqWith s "and the report says so" desync (Just (Desync.Mismatched 0 (Response.ChoseX 0)))
+    Spec.it s "a ChooseTargets answer round-trips through the transcript" $ do
+      let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
+          p = Prompt.ChooseTargets (Decider.MkDecider S.alice) S.alice (ObjectId.MkObjectId 0) sets
+          answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer S.bob)
+      Spec.assertEqWith s "decode . encode = Just" (Replay.decode p (Replay.encode p answer)) (Just answer)
+    -- CR 700.2b/603.3d: the mode chosen as Aether Channeler's ETB trigger is
+    -- placed (Engine.placeOne prompts ChooseModes) records/replays exactly
+    -- like a spell's ChooseModes -- a Response.ChoseModes round-trips through
+    -- the DecisionLog byte-identically.
+    Spec.it s "Aether Channeler's trigger ChooseModes records and replays a Set ModeIndex" $ do
+      acPrinting <- Registry.printing registry "Aether Channeler"
+      let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
+          decider = Decide.deciderFor S.alice gs
+      case Card.Type.triggeredAbilities (Printing.card acPrinting) of
+        [ability] -> do
+          let legal = Target.fillableModes Nothing acId Map.empty (TriggeredAbility.modal ability) gs
+              p = Prompt.ChooseModes decider S.alice acId legal 1
+              answer = Set.singleton (ModeIndex.MkModeIndex 2)
+          Spec.assertEqWith s "legal modes are 0 and 2 (bounce self-excluded)" legal (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2])
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        _ -> Spec.assertFailure s "Aether Channeler must have exactly one triggered ability"
 
-tests :: Registry.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Replay" [replayTests registry, combatReplayTests]
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec s registry = Spec.describe s "Pawl.Engine.Replay" $ do
+  replaySpec s registry
+  combatReplaySpec s

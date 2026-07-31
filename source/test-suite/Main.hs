@@ -51,7 +51,7 @@ import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
-import qualified Pawl.ReplaySpec as ReplaySpec
+import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
@@ -86,7 +86,6 @@ testTree registry =
       MulliganSpec.tests registry,
       DamageSpec.tests registry,
       ExpirySpec.tests registry,
-      ReplaySpec.tests registry,
       PropertySpec.tests registry,
       CodecSpec.tests registry,
       ManaSpec.tests registry,
@@ -140,5 +139,6 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.RegistrySpec.spec s
+  Pawl.ReplaySpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
