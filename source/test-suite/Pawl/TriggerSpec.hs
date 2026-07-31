@@ -1811,7 +1811,9 @@ diesTriggerTests registry =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
       spiritsOf pid gs =
         filter
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Spirit"))
+          -- CR 111.4: Doomed Traveler does not specify the token's name, so the
+          -- name is its subtype plus the word "Token".
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Spirit Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
       travelerName = Text.pack "Doomed Traveler"
    in Tasty.testGroup
@@ -2091,7 +2093,9 @@ lookBackInterveningTests registry =
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
       tokensOf pid gs =
         filter
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Zombie Berserker"))
+          -- CR 111.4: the name is BOTH subtypes plus "Token", which is exactly
+          -- the rule's own Dwarven Reinforcements example.
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Zombie Berserker Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
    in Tasty.testGroup
         "CR 603.4 an intervening if over last known information"
@@ -2375,7 +2379,7 @@ aetherFlashTests registry =
             let (_, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
                 (gs, spellId) = S.handOne dragonFodder withFlash
                 after = castIt (gs, spellId)
-            HU.assertEqual "no Goblin token survived" 0 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
+            HU.assertEqual "no Goblin token survived" 0 (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after)
             HU.assertEqual "two damage events of 2, one per token" [2, 2] (fmap DamageEvent.amount (damageEventsIn after))
             HU.assertEqual
               "and they were dealt to two different objects"

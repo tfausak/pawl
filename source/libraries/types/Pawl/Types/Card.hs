@@ -5,6 +5,7 @@ import Data.Set (Set)
 import Data.Text (Text)
 import Pawl.Types.AbilityName (AbilityName)
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
+import Pawl.Types.AttackRequirement (AttackRequirement)
 import Pawl.Types.BlockRequirement (BlockRequirement)
 import Pawl.Types.CastingPermission (CastingPermission)
 import Pawl.Types.CastingRestriction (CastingRestriction)
@@ -202,6 +203,14 @@ data Card = MkCard
     -- since CR 613.11 applies these after the layer system rather than inside it.
     -- Empty for every other printing.
     blockRequirements :: [BlockRequirement],
+    -- CR 604.1/604.2 / 508.1d: this card's printed ATTACKING REQUIREMENTS --
+    -- "creatures enchanted player controls attack each combat if able" (Curse of
+    -- the Nightly Hunt). The FOURTH printed-static-ability field, and the twin of
+    -- blockRequirements on the other side of the combat phase; read by
+    -- Pawl.AttackRequirement and never by Pawl.Projection, since CR 613.11 applies
+    -- these after the layer system rather than inside it. Empty for every other
+    -- printing.
+    attackRequirements :: [AttackRequirement],
     -- CR 103.5b: the effects of this card's "any time you could mulligan"
     -- action, in written order. Empty for every printing but Serum Powder.
     --

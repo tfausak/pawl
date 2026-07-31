@@ -69,7 +69,7 @@
                     ],
                     "keywords": [],
                     "manaCost": null,
-                    "name": "Human",
+                    "name": "Human Token",
                     "power": {
                       "type": "Literal",
                       "value": 1
