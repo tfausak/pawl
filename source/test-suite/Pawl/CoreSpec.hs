@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count.Type
@@ -28,8 +29,6 @@ import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.HUnit as HU
 
 -- CR 608.2h: the "you" player's hand (Inner Calm, Outer Strength's shape).
 cardsInYourHand :: Count.Type.Count Quantity.Type.Quantity
@@ -57,24 +56,22 @@ toyProgram = do
   y <- Program.prompt Ask
   pure (x + y)
 
-programTests :: Tasty.TestTree
-programTests =
-  Tasty.testGroup
-    "Program"
-    [ HU.testCase "pure interpreter threads answers" $
-        let answer :: Toy b -> b
-            answer i = case i of Ask -> 21
-         in HU.assertEqual "21 + 21" 42 (Program.foldProgram answer toyProgram),
-      HU.testCase "effectful interpreter runs in order" $
-        let answer :: Toy b -> State.State [Int] b
-            answer i = case i of
-              Ask -> do
-                xs <- State.get
-                case xs of
-                  h : t -> do State.put t; pure h
-                  [] -> pure 0
-         in HU.assertEqual "1 + 2" 3 (State.evalState (Program.foldProgramM answer toyProgram) [1, 2])
-    ]
+programSpec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
+programSpec s = Spec.describe s "Pawl.Types.Program" $ do
+  Spec.it s "pure interpreter threads answers" $ do
+    let answer :: Toy b -> b
+        answer i = case i of Ask -> 21
+    Spec.assertEq s (Program.foldProgram answer toyProgram) 42
+
+  Spec.it s "effectful interpreter runs in order" $ do
+    let answer :: Toy b -> State.State [Int] b
+        answer i = case i of
+          Ask -> do
+            xs <- State.get
+            case xs of
+              h : t -> do State.put t; pure h
+              [] -> pure 0
+    Spec.assertEq s (State.evalState (Program.foldProgramM answer toyProgram) [1, 2]) 3
 
 -- A GameState holding one object whose binding environment carries the given
 -- chosen X (Nothing = no amount bound), for exercising Quantity.evaluate's X arm.
@@ -93,103 +90,102 @@ noView _ = Nothing
 noContext :: Filter.Context
 noContext = Filter.MkContext Nothing Nothing
 
-quantityTests :: Registry.Registry -> Tasty.TestTree
-quantityTests registry =
-  Tasty.testGroup
-    "Quantity"
-    [ HU.testCase "a literal evaluates to itself" $
-        HU.assertEqual
-          "literal"
-          (Just 2)
-          (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal 2)),
-      HU.testCase "a literal may be negative" $
-        HU.assertEqual
-          "negative"
-          (Just (-1))
-          (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal (-1))),
-      HU.testCase "evaluate reads X from the object's binding environment" $ do
-        mountain <- Registry.printing registry "Mountain"
-        let (oid, gs) = withBoundAmount mountain (Just 5)
-        HU.assertEqual "X = 5" (Just 5) (Quantity.evaluate noView noContext gs oid Quantity.Type.X),
-      HU.testCase "evaluate X is Nothing when no amount was bound" $ do
-        mountain <- Registry.printing registry "Mountain"
-        let (oid, gs) = withBoundAmount mountain Nothing
-        HU.assertEqual "unbound X" Nothing (Quantity.evaluate noView noContext gs oid Quantity.Type.X),
-      HU.testCase "CR 208.2 Star alone is not evaluable -- it is notation, resolved at the seed" $
-        HU.assertEqual
-          "Star"
-          Nothing
-          (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) Quantity.Type.Star),
-      HU.testCase "CR 208.2 Plus adds, so 1+* composes without a new case" $
-        HU.assertEqual
-          "1 + 2"
-          (Just 3)
-          ( Quantity.evaluate
-              noView
-              noContext
-              (Setup.emptyGame S.bothPlayers)
-              (ObjectId.MkObjectId 0)
-              (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))
-          ),
-      HU.testCase "Plus is Nothing when either side is unevaluable" $
-        HU.assertEqual
-          "1 + Star"
-          Nothing
-          ( Quantity.evaluate
-              noView
-              noContext
-              (Setup.emptyGame S.bothPlayers)
-              (ObjectId.MkObjectId 0)
-              (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
-          ),
-      HU.testCase "substituteStar replaces Star everywhere, including inside Plus" $
-        HU.assertEqual
-          "1 + Literal 7"
-          (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 7))
-          ( Quantity.substituteStar
-              (Quantity.Type.Literal 7)
-              (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
-          ),
-      HU.testCase "Count CardsInYourHand is Nothing with no 'you'" $
-        let gs = Setup.emptyGame S.bothPlayers
-            viewOf = Projection.fullView gs
-         in HU.assertEqual
-              "no player"
-              Nothing
-              ( Quantity.evaluate
-                  viewOf
-                  (Filter.MkContext Nothing Nothing)
-                  gs
-                  (ObjectId.MkObjectId 0)
-                  (Quantity.Type.Count cardsInYourHand)
-              ),
-      HU.testCase "Count CardsInYourHand counts that player's hand" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        let (gs, _) = S.handOne piker (Setup.emptyGame S.bothPlayers)
-            viewOf = Projection.fullView gs
-        HU.assertEqual
-          "one card"
-          (Just 1)
-          (Quantity.evaluate viewOf (Filter.MkContext (Just S.alice) Nothing) gs (ObjectId.MkObjectId 0) (Quantity.Type.Count cardsInYourHand)),
-      HU.testCase "Count CardTypesInAllGraveyards counts DISTINCT card types, not cards" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        warMammoth <- Registry.printing registry "War Mammoth"
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (_, one) = S.addGraveyardCard piker S.alice gs0
-            (_, two) = S.addGraveyardCard warMammoth S.bob one
-            (_, three) = S.addGraveyardCard lightningBolt S.alice two
-            viewOfTwo = Projection.fullView two
-            viewOfThree = Projection.fullView three
-        HU.assertEqual
-          "two creatures in two graveyards is one type"
-          (Just 1)
-          (Quantity.evaluate viewOfTwo noContext two (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
-        HU.assertEqual
-          "adding an instant makes two"
-          (Just 2)
-          (Quantity.evaluate viewOfThree noContext three (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
-    ]
+quantitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
+  Spec.it s "a literal evaluates to itself" $ do
+    Spec.assertEq s (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal 2)) $ Just 2
 
-tests :: Registry.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Core" [programTests, quantityTests registry]
+  Spec.it s "a literal may be negative" $ do
+    Spec.assertEq s (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal (-1))) $ Just (-1)
+
+  Spec.it s "evaluate reads X from the object's binding environment" $ do
+    mountain <- Registry.printing registry "Mountain"
+    let (oid, gs) = withBoundAmount mountain (Just 5)
+    Spec.assertEq s (Quantity.evaluate noView noContext gs oid Quantity.Type.X) $ Just 5
+
+  Spec.it s "evaluate X is Nothing when no amount was bound" $ do
+    mountain <- Registry.printing registry "Mountain"
+    let (oid, gs) = withBoundAmount mountain Nothing
+    Spec.assertEq s (Quantity.evaluate noView noContext gs oid Quantity.Type.X) Nothing
+
+  Spec.it s "CR 208.2 Star alone is not evaluable -- it is notation, resolved at the seed" $ do
+    Spec.assertEq s (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) Quantity.Type.Star) Nothing
+
+  Spec.it s "CR 208.2 Plus adds, so 1+* composes without a new case" $ do
+    Spec.assertEq
+      s
+      ( Quantity.evaluate
+          noView
+          noContext
+          (Setup.emptyGame S.bothPlayers)
+          (ObjectId.MkObjectId 0)
+          (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))
+      )
+      $ Just 3
+
+  Spec.it s "Plus is Nothing when either side is unevaluable" $ do
+    Spec.assertEq
+      s
+      ( Quantity.evaluate
+          noView
+          noContext
+          (Setup.emptyGame S.bothPlayers)
+          (ObjectId.MkObjectId 0)
+          (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+      )
+      Nothing
+
+  Spec.it s "substituteStar replaces Star everywhere, including inside Plus" $ do
+    Spec.assertEq
+      s
+      ( Quantity.substituteStar
+          (Quantity.Type.Literal 7)
+          (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+      )
+      $ Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 7)
+
+  Spec.it s "Count CardsInYourHand is Nothing with no 'you'" $ do
+    let gs = Setup.emptyGame S.bothPlayers
+        viewOf = Projection.fullView gs
+    Spec.assertEq
+      s
+      ( Quantity.evaluate
+          viewOf
+          (Filter.MkContext Nothing Nothing)
+          gs
+          (ObjectId.MkObjectId 0)
+          (Quantity.Type.Count cardsInYourHand)
+      )
+      Nothing
+
+  Spec.it s "Count CardsInYourHand counts that player's hand" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    let (gs, _) = S.handOne piker (Setup.emptyGame S.bothPlayers)
+        viewOf = Projection.fullView gs
+    Spec.assertEq s (Quantity.evaluate viewOf (Filter.MkContext (Just S.alice) Nothing) gs (ObjectId.MkObjectId 0) (Quantity.Type.Count cardsInYourHand)) $ Just 1
+
+  Spec.it s "Count CardTypesInAllGraveyards counts DISTINCT card types, not cards" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    warMammoth <- Registry.printing registry "War Mammoth"
+    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, one) = S.addGraveyardCard piker S.alice gs0
+        (_, two) = S.addGraveyardCard warMammoth S.bob one
+        (_, three) = S.addGraveyardCard lightningBolt S.alice two
+        viewOfTwo = Projection.fullView two
+        viewOfThree = Projection.fullView three
+    Spec.assertEqWith
+      s
+      "two creatures in two graveyards is one type"
+      (Quantity.evaluate viewOfTwo noContext two (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
+      $ Just 1
+    Spec.assertEqWith
+      s
+      "adding an instant makes two"
+      (Quantity.evaluate viewOfThree noContext three (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
+      $ Just 2
+
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec s registry = do
+  programSpec s
+  quantitySpec s registry

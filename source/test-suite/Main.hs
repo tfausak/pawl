@@ -11,7 +11,7 @@ import qualified Pawl.ColorSpec as ColorSpec
 import qualified Pawl.CombatSpec as CombatSpec
 import qualified Pawl.ConditionSpec
 import qualified Pawl.CopySpec
-import qualified Pawl.CoreSpec as CoreSpec
+import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec as CostSpec
 import qualified Pawl.CountSpec as CountSpec
 import qualified Pawl.DamageSpec as DamageSpec
@@ -49,7 +49,7 @@ import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.Registry as Registry
-import qualified Pawl.RegistrySpec as RegistrySpec
+import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
@@ -79,8 +79,7 @@ testTree :: Registry.Registry -> Tasty.TestTree
 testTree registry =
   Tasty.testGroup
     "pawl"
-    [ CoreSpec.tests registry,
-      CardSpec.tests registry,
+    [ CardSpec.tests registry,
       CardsSpec.tests registry,
       TurnSpec.tests registry,
       GameSpec.tests registry,
@@ -109,7 +108,6 @@ testTree registry =
       ColorSpec.tests registry,
       TriggerSpec.tests registry,
       FilterSpec.tests,
-      RegistrySpec.tests,
       AuraSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
     ]
@@ -121,6 +119,7 @@ spec s registry = do
   Pawl.BindingSpec.spec s
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
+  Pawl.CoreSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
   Pawl.Extra.BuilderSpec.spec s
@@ -141,4 +140,5 @@ spec s registry = do
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
   Pawl.JsonSpec.spec s
+  Pawl.RegistrySpec.spec s
   Pawl.SlugSpec.spec s
