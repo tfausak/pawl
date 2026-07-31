@@ -978,7 +978,10 @@ turnScopedSkipTests registry =
                 -- it as though it didn't exist", and CR 614.1b replaces it with
                 -- nothing -- so CR 502.3's turn-based action never happens.
                 afterExtra = runTurns 1 atExtra
-            HU.assertEqual "one turn was created" 1 (length (GameState.extraTurns resolved))
+            HU.assertEqual
+              "one turn was created, alice's, carrying the untap skip"
+              [(S.alice, Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))]
+              (fmap (\e -> (ExtraTurn.taker e, ExtraTurn.skipped e)) (GameState.extraTurns resolved))
             HU.assertEqual "the extra turn is alice's" S.alice (GameState.activePlayer atExtra)
             HU.assertEqual "and it untapped nothing" tapped (tapStateOf piker afterExtra)
             -- CR 614.10a: the skip named ONE turn and is gone with it. bob's turn
@@ -1006,10 +1009,19 @@ turnScopedSkipTests registry =
                 -- player taps the chosen creatures").
                 atSavorTurn = S.tapObject piker (runTurns 1 atWarpTurn)
                 afterSavorTurn = runTurns 1 atSavorTurn
-            HU.assertEqual "two extra turns are pending" 2 (length (GameState.extraTurns resolved))
-            HU.assertEqual "Time Warp's turn is taken first, and is alice's" S.alice (GameState.activePlayer atWarpTurn)
+            -- Both turns are alice's, so the active player cannot tell them
+            -- apart. The pending stack can: Time Warp's entry is at the head
+            -- (created last) and carries no skip, and Savor's is behind it,
+            -- carrying the one skip either of them has.
+            HU.assertEqual
+              "Time Warp's turn is at the head with no skip, Savor's behind it with the untap skip"
+              [ (S.alice, Set.empty),
+                (S.alice, Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))
+              ]
+              (fmap (\e -> (ExtraTurn.taker e, ExtraTurn.skipped e)) (GameState.extraTurns resolved))
+            HU.assertEqual "so Time Warp's is turn 2, and alice's" (2, S.alice) (GameState.turnNumber atWarpTurn, GameState.activePlayer atWarpTurn)
             HU.assertEqual "and it DID untap" untapped (tapStateOf piker (runTurns 1 atWarpTurn))
-            HU.assertEqual "Savor's turn is taken second, and is alice's" S.alice (GameState.activePlayer atSavorTurn)
+            HU.assertEqual "Savor's is turn 3, and alice's" (3, S.alice) (GameState.turnNumber atSavorTurn, GameState.activePlayer atSavorTurn)
             HU.assertEqual "but Savor's own turn did NOT untap" tapped (tapStateOf piker afterSavorTurn)
         ]
 
