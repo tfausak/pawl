@@ -64,6 +64,7 @@ library codec
   -- cabal-gild: discover source/libraries/codec
   exposed-modules:
     Pawl.Codec.AbilityName
+    Pawl.Codec.ActivatedAbility
     Pawl.Codec.ActivationTiming
     Pawl.Codec.Affected
     Pawl.Codec.Aggregation
@@ -71,6 +72,7 @@ library codec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.BeginningStep
     Pawl.Codec.BlockRequirement
+    Pawl.Codec.Card
     Pawl.Codec.CardType
     Pawl.Codec.CastingPermission
     Pawl.Codec.CastingRestriction
@@ -92,6 +94,7 @@ library codec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DiscardCause
     Pawl.Codec.Duration
+    Pawl.Codec.Effect
     Pawl.Codec.EndingStep
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryRewrite
@@ -105,6 +108,8 @@ library codec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaSymbol
     Pawl.Codec.ManaType
+    Pawl.Codec.Modal
+    Pawl.Codec.Mode
     Pawl.Codec.ModeIndex
     Pawl.Codec.ModeSelection
     Pawl.Codec.Modification
@@ -141,6 +146,7 @@ library codec
     Pawl.Codec.TokenPattern
     Pawl.Codec.Toughness
     Pawl.Codec.TriggerCondition
+    Pawl.Codec.TriggeredAbility
     Pawl.Codec.TriggerFrequency
     Pawl.Codec.TurnScope
     Pawl.Codec.TypeLine
