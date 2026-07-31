@@ -497,7 +497,14 @@ tests registry =
           HU.testCase "PlayerRelation round-trips" $
             mapM_
               (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)
-              [PlayerRelation.You, PlayerRelation.Opponent]
+              [PlayerRelation.You, PlayerRelation.Opponent],
+          -- Every supertype the type models, so a new constructor whose codec
+          -- arm is forgotten fails here rather than at the one card that carries
+          -- it. CR 205.4a lists five; Ongoing is scheme-only (#131).
+          HU.testCase "every Supertype round-trips" $
+            mapM_
+              (roundTrip "supertype" Codec.supertypeToJson Codec.jsonToSupertype)
+              [Supertype.Basic, Supertype.Legendary, Supertype.Snow, Supertype.World]
         ],
       -- Sits beside "filter (P9)": a TargetSpec is Pool + Maybe Filter, so these
       -- exercise the Filter arm above in its embedded position. Covers a bare
