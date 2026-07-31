@@ -50,7 +50,7 @@ import qualified Pawl.ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
-import qualified Pawl.ReplacementSpec as ReplacementSpec
+import qualified Pawl.ReplacementSpec
 import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
 import qualified Pawl.SetupSpec
@@ -79,11 +79,18 @@ testTree :: Registry.Registry -> Tasty.TestTree
 testTree registry =
   Tasty.testGroup
     "pawl"
-    [ CardSpec.tests registry,
-      PropertySpec.tests registry,
-      ReplacementSpec.tests registry,
-      Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
-    ]
+    ( [ CardSpec.tests registry,
+        PropertySpec.tests registry,
+        Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
+      ]
+        -- Pawl.ReplacementSpec is wired separately because its timeout is a
+        -- tasty option and Pawl.Spec cannot express one. The rationale for the
+        -- timeout is at that module's `spec`; it guards CR 616.1's termination,
+        -- where a regression hangs rather than fails.
+        <> fmap
+          (Tasty.localOption (Tasty.mkTimeout 5000000))
+          (Writer.execWriter (Pawl.ReplacementSpec.spec tasty registry))
+    )
 
 -- Specs that reach for card data are pinned to IO, since Registry.printing is an
 -- IO action. The rest stay polymorphic in the assertion monad.
