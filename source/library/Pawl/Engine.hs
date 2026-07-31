@@ -1014,9 +1014,9 @@ runStep = do
         else runStepThatBegan phase
 
 -- CR 500.11: proceed past a SKIPPED PHASE "as though it didn't exist" -- so the
--- rest of its steps leave the schedule and `advance` picks up whatever follows
--- the phase (CR 511.3's postcombat main phase, for the combat one Stonehorn
--- Dignitary takes).
+-- rest of its steps leave the schedule and `advance` picks up whatever CR
+-- 500.1's fixed order puts after the phase -- the postcombat main phase, for the
+-- combat one Stonehorn Dignitary takes.
 --
 -- Positional, via Turn.dropRestOfPhase, not a filter: CR 500.8 lets a second
 -- combat phase be added later in the same turn, and skipping this one says

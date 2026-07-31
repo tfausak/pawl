@@ -491,7 +491,7 @@ castingSkirmishAnswer victim p = case p of
 --
 -- CR 500.11: "to skip a step, phase, or turn is to proceed past it as though it
 -- didn't exist" -- past the PHASE, so no step of it begins and the turn carries
--- on at the postcombat main phase, which CR 511.3 names as combat's successor.
+-- on at the postcombat main phase, which is what CR 500.1's order puts next.
 --
 -- Everything Fatigue proved about a skip's LIFETIME rides along unchanged: the
 -- skip is created by an effect, scoped to the player its resolution named, and
@@ -551,8 +551,9 @@ stonehornTests registry =
             HU.assertEqual "no combat step began at all" [] (combatStepsOf S.bob mid)
             HU.assertEqual "so the Piker never attacked" [] (S.attackerDeclarationsOf mid)
             HU.assertEqual "and alice took nothing" (Just 20) (S.lifeOf S.alice mid)
-            -- CR 511.3 names the postcombat main phase as what follows combat;
-            -- CR 500.11's "proceed past it" is past the PHASE and no further.
+            -- CR 500.1 fixes the order of the five phases, so the postcombat
+            -- main phase is what follows combat; CR 500.11's "proceed past it"
+            -- is past the PHASE and no further.
             HU.assertEqual "the turn proceeded to the postcombat main phase" Phase.PostcombatMain (GameState.phase mid)
             HU.assertEqual "and the skip was used up (CR 614.3)" 0 (armed mid),
           -- CR 614.10a: "anything scheduled for the 'next' occurrence of something
