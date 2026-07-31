@@ -19,7 +19,7 @@ import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec
 import qualified Pawl.EventSpec
-import qualified Pawl.ExpirySpec as ExpirySpec
+import qualified Pawl.ExpirySpec
 import qualified Pawl.Extra.BuilderSpec
 import qualified Pawl.Extra.EitherSpec
 import qualified Pawl.Extra.IntSpec
@@ -83,7 +83,6 @@ testTree registry =
       TurnSpec.tests registry,
       GameSpec.tests registry,
       DamageSpec.tests registry,
-      ExpirySpec.tests registry,
       PropertySpec.tests registry,
       CodecSpec.tests registry,
       ManaSpec.tests registry,
@@ -115,6 +114,7 @@ spec s registry = do
   Pawl.DecimalSpec.spec s
   Pawl.DepartureSpec.spec s registry
   Pawl.EventSpec.spec s registry
+  Pawl.ExpirySpec.spec s registry
   Pawl.Extra.BuilderSpec.spec s
   Pawl.Extra.EitherSpec.spec s
   Pawl.Extra.IntSpec.spec s
