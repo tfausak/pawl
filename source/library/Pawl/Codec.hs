@@ -621,6 +621,8 @@ filterToJson filter_ = case filter_ of
   Filter.IsBlocking -> nullary (Text.pack "IsBlocking")
   Filter.AttackedThisTurn -> nullary (Text.pack "AttackedThisTurn")
   Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
+  Filter.IsAttachedToPermanent -> nullary (Text.pack "IsAttachedToPermanent")
+  Filter.CanHostSubject -> nullary (Text.pack "CanHostSubject")
   Filter.IsToken -> nullary (Text.pack "IsToken")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (MkArray (fmap filterToJson fs))))
   Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (MkArray (fmap filterToJson fs))))
@@ -642,6 +644,8 @@ jsonToFilter value = do
     ("IsBlocking", _) -> Right Filter.IsBlocking
     ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
+    ("IsAttachedToPermanent", _) -> Right Filter.IsAttachedToPermanent
+    ("CanHostSubject", _) -> Right Filter.CanHostSubject
     ("IsToken", _) -> Right Filter.IsToken
     ("And", Just (Array (MkArray vs))) -> Filter.And <$> traverse jsonToFilter vs
     ("Or", Just (Array (MkArray vs))) -> Filter.Or <$> traverse jsonToFilter vs

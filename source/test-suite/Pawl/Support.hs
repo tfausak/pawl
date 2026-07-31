@@ -1483,6 +1483,8 @@ stubView table oid =
                 Filter.blocking = False,
                 Filter.attackedThisTurn = False,
                 Filter.attachedToCreature = False,
+                Filter.attachedToPermanent = False,
+                Filter.canHostSubject = False,
                 Filter.token = False
               }
         [] -> Nothing

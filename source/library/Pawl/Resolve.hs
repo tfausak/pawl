@@ -1595,6 +1595,16 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         Just subject -> do
           gs <- State.get
           let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
+              -- One candidate's view, with the one field a projection cannot fill:
+              -- whether the SUBJECT could legally be attached here (CR 701.3a).
+              -- The answer comes from attachmentFor -- the same function the move
+              -- itself goes through below, so an offer and a move cannot disagree
+              -- -- and the field is lazy, so a filter that never names the atom
+              -- pays nothing for it.
+              viewOf oid =
+                (Projection.viewOfObject oid gs)
+                  { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
+                  }
               -- The destinations the card's own TEXT admits: battlefield
               -- permanents matching the Filter, less the one the subject already
               -- holds. That exclusion is CR 701.3b's second sentence -- attaching
@@ -1602,10 +1612,12 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- and it is also how Crown of the Ages' "ANOTHER creature" is
               -- spelled, so a card omitting the word would behave identically.
               --
-              -- Deliberately NOT narrowed to destinations the move would be
-              -- LEGAL for. "Another creature" is the whole of what the card says;
-              -- pre-filtering past it would answer CR 303.4j's question on the
-              -- player's behalf, and CR 303.4j exists precisely because the
+              -- Narrowed to destinations the move would be LEGAL for only when the
+              -- card SAYS so, which is Filter.CanHostSubject's whole job: Aura
+              -- Graft's "another permanent IT CAN ENCHANT" narrows, and Crown of
+              -- the Ages' bare "another creature" does not. Narrowing a filter
+              -- that does not carry the atom would answer CR 303.4j's question on
+              -- the player's behalf, and CR 303.4j exists precisely because the
               -- choice can land somewhere the subject may not go.
               --
               -- Ascending, so both the elision below and a transcript are
@@ -1616,7 +1628,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               candidates =
                 List.sort
                   ( filter
-                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (Projection.viewOfObject oid gs) filter_)
+                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (viewOf oid) filter_)
                       (Set.toList (GameState.battlefield gs))
                   )
           case candidates of

@@ -185,6 +185,12 @@ snapshotView shape event = case event of
                 -- explicitly), and the snapshot records no attachment either --
                 -- so IsAttachedToCreature is vacuously False here too.
                 Filter.attachedToCreature = False,
+                -- Nor whether that attachment was to a permanent rather than a
+                -- player (CR 303.4), for the same reason.
+                Filter.attachedToPermanent = False,
+                -- And no attach is being performed over a past event, so there is
+                -- no subject for CanHostSubject to be about (CR 701.3a).
+                Filter.canHostSubject = False,
                 -- Nor is what a permanent is represented by (CR 111.6: a token
                 -- "isn't a card"), and the snapshot records characteristics only
                 -- -- so IsToken is vacuously False over a past event, the third
