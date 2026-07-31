@@ -57,7 +57,7 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- CR 613.1: the layer a modification applies in. THE ABI classification the
--- rules core would ask -- never the modification's identity. One of two case-on-
+-- rules core would ask -- never the modification's identity. One of the case-on-
 -- Modification functions this module is the sole home of.
 layer :: Modification -> Layer
 layer m = case m of

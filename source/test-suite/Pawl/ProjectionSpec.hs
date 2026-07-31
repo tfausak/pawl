@@ -303,12 +303,14 @@ tests registry =
         HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId gs),
       -- The freeze's proving card. CR 608.2h: "the answer is determined only
       -- once, when the effect is applied", and CR 611.2d says the same of a
-      -- variable such as X. X is bound on the SPELL, and by the time these
-      -- assertions run the spell has finished resolving and left the stack (CR
-      -- 608.2m), so a stored `Quantity.X` would be re-read against the PIKER,
-      -- which carries no such binding -- an unevaluable delta that addPT drops,
-      -- leaving the Piker its printed 2/1. Frozen, the pump is a pair of
-      -- Literals and survives for the rest of the turn.
+      -- variable such as X. X is bound on the SPELL, which by the time these
+      -- assertions run is in its owner's graveyard: CR 608.2n puts it there "as
+      -- the final part of an instant or sorcery spell's resolution". A stored
+      -- `Quantity.X` would be re-read against the PIKER all the same --
+      -- applyModification evaluates against the AFFECTED object wherever the
+      -- source sits -- and the Piker carries no such binding, so the delta is
+      -- unevaluable and addPT drops it, leaving the printed 2/1. Frozen, the pump
+      -- is a pair of Literals and survives for the rest of the turn.
       HU.testCase "CR 608.2h/611.2d Untamed Might's X is frozen at resolution, not re-read" $ do
         forest <- Registry.printing registry "Forest"
         piker <- Registry.printing registry "Goblin Piker"
