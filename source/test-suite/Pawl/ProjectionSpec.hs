@@ -570,11 +570,14 @@ tests registry =
       -- a land type nor a card type, so it survives untouched.
       -- CR 205.3i's list, directly: the classification the arm above folds with,
       -- and the boundary that makes "keeps its creature types" mean anything.
-      -- Pawl.Mana.subtypeMana answers the different CR 305.6 question and happens
-      -- to agree on all five constructors this type has today.
+      -- Desert is in the list too, and is why this is not the same question as
+      -- Pawl.Mana.subtypeMana's CR 305.6 one: "Of that list, Forest, Island,
+      -- Mountain, Plains, and Swamp are the basic land types", so a Desert is a
+      -- land type that grants no intrinsic mana ability. Pawl.ManaSpec pins the
+      -- other half of that pair.
       HU.testCase "CR 205.3i a land type is a land type and a creature type is not"
-        . HU.assertEqual "Forest and Mountain in, Goblin and Wall out" [True, True, False, False]
-        $ fmap Subtype.isLandType [Subtype.Type.Forest, Subtype.Type.Mountain, Subtype.Type.Goblin, Subtype.Type.Wall],
+        . HU.assertEqual "Forest, Mountain and Desert in, Goblin and Wall out" [True, True, True, False, False]
+        $ fmap Subtype.isLandType [Subtype.Type.Forest, Subtype.Type.Mountain, Subtype.Type.Desert, Subtype.Type.Goblin, Subtype.Type.Wall],
       HU.testCase "CR 305.7 a Blood Moon'd creature-land keeps its creature types" $ do
         forest <- Registry.printing registry "Forest"
         piker <- Registry.printing registry "Goblin Piker"
