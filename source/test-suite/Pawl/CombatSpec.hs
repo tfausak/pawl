@@ -1141,7 +1141,7 @@ attackRequirementTests registry =
         HU.assertBool "no attack is legal" (Combat.legalAttackDeclaration S.alice [] withAura),
       HU.testCase "CR 508.1d whole cards: a Curse forces an attack through a real declare attackers step" $ do
         -- The gameplay-level case, run through Engine.runStep -- the priority loop
-        -- and the CR 703.4c turn-based action, not a direct call -- with an
+        -- and the CR 703.4i turn-based action, not a direct call -- with an
         -- interpreter that declines to attack. Declining is now an illegal answer,
         -- and the maximum leaves the rules forcing the attack rather than the
         -- engine choosing it.

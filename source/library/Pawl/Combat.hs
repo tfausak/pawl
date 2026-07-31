@@ -223,10 +223,10 @@ attackRequirementsMet :: Set ObjectId -> Set ObjectId -> Int
 attackRequirementsMet required declaration = Set.size (Set.intersection required declaration)
 
 -- CR 508.1d asked of a declaration that has already passed CR 508.1a and CR
--- 508.1c: does it obey at least as many requirements as the maximum? Split out
--- from legalAttackDeclaration so declareAttackers can ask it against a ceiling it
--- computed once, and so the check the engine applies is the same expression the
--- one a caller asks is built from.
+-- 508.1c: does it obey at least as many requirements as the maximum? Split out of
+-- legalAttackDeclaration so that declareAttackers can ask it against a ceiling it
+-- computed once, rather than paying for a second one -- and so that the two of
+-- them cannot drift, since the caller's check is built from this same expression.
 obeysAttackRequirements :: (Set ObjectId, Set ObjectId) -> [ObjectId] -> Bool
 obeysAttackRequirements (required, best) chosen =
   attackRequirementsMet required (Set.fromList chosen) >= attackRequirementsMet required best
@@ -661,9 +661,10 @@ chooseDefender = do
 -- minted from the candidate list, so with no candidate there is nothing to
 -- require.
 --
--- The steps run here are CR 508.1a, 508.1c, 508.1d, 508.1f, 508.1k and 508.1m, in
--- the rule's own order. CR 508.1b's announcement (#59) and CR 508.1g-508.1j's
--- costs to attack (#460) are not implemented.
+-- The steps run here are CR 508.1a, 508.1c, 508.1d, 508.1f and 508.1k, in the
+-- rule's own order, plus the event CR 508.1m's triggers watch. CR 508.1b's
+-- announcement (#59) and CR 508.1g-508.1j's costs to attack (#460) are not
+-- implemented.
 declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
@@ -713,6 +714,12 @@ declareAttackers pid = do
             -- interpreter never arrives here, and the player's answer was taken and
             -- rejected before this ran. Where a requirement leaves exactly one
             -- legal declaration, this hands back the one the rules already forced.
+            -- Where it leaves several -- any SUPERSET of the required creatures
+            -- also attains the maximum, since attacking with more is always legal
+            -- -- this takes the smallest, which is the least the rules can be said
+            -- to have forced. That is a real choice among distinguishable
+            -- declarations, and it is why nothing but a broken interpreter may
+            -- reach it; the same is true of forcedBlockDeclaration.
             attacking =
               if obeysAttackRequirements bound offered
                 then offered
