@@ -3,7 +3,7 @@
 -- functions -- no type classes -- over the transitive closure of @Card@'s
 -- fields. Every @Pawl.Types.*@ module stays JSON-free; casing on an effect's
 -- identity here is open-half machinery, not the rules core.
-module Pawl.Codec.All where
+module Pawl.Codec.All (module Pawl.Codec.All, module Pawl.Codec.AbilityName, module Pawl.Codec.Aggregation, module Pawl.Codec.BeginningStep, module Pawl.Codec.CardType, module Pawl.Codec.CastingPermission, module Pawl.Codec.Color, module Pawl.Codec.CombatStep, module Pawl.Codec.Comparison, module Pawl.Codec.ControllerRelation, module Pawl.Codec.Counterability, module Pawl.Codec.DamageKind, module Pawl.Codec.DamageRewrite, module Pawl.Codec.DestructionRewrite, module Pawl.Codec.DiscardCause, module Pawl.Codec.EndingStep, module Pawl.Codec.ExtraPhase, module Pawl.Codec.ModeIndex, module Pawl.Codec.ModeSelection, module Pawl.Codec.MonarchTarget, module Pawl.Codec.ObjectId, module Pawl.Codec.Optionality, module Pawl.Codec.PlayerCounterKind, module Pawl.Codec.PlayerId, module Pawl.Codec.PlayerRelation, module Pawl.Codec.PlayerScope, module Pawl.Codec.Pool, module Pawl.Codec.Regenerability, module Pawl.Codec.Scaling, module Pawl.Codec.SearchDestination, module Pawl.Codec.SlotName, module Pawl.Codec.Subtype, module Pawl.Codec.Supertype, module Pawl.Codec.TapState, module Pawl.Codec.TriggerFrequency, module Pawl.Codec.TurnScope, module Pawl.Codec.Uses, module Pawl.Codec.Zone, module Pawl.Codec.ZoneChangeSubject) where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -11,27 +11,57 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Pawl.Codec.AbilityName (abilityNameToJson, jsonToAbilityName)
+import Pawl.Codec.Aggregation (aggregationToJson, jsonToAggregation)
+import Pawl.Codec.BeginningStep (beginningStepToJson, jsonToBeginningStep)
+import Pawl.Codec.CardType (cardTypeToJson, jsonToCardType)
+import Pawl.Codec.CastingPermission (castingPermissionToJson, jsonToCastingPermission)
+import Pawl.Codec.Color (colorToJson, jsonToColor)
+import Pawl.Codec.CombatStep (combatStepToJson, jsonToCombatStep)
+import Pawl.Codec.Comparison (comparisonToJson, jsonToComparison)
+import Pawl.Codec.ControllerRelation (controllerRelationToJson, jsonToControllerRelation)
+import Pawl.Codec.Counterability (counterabilityToJson, jsonToCounterability, jsonToCounterabilityDefault)
+import Pawl.Codec.DamageKind (damageKindToJson, jsonToDamageKind)
+import Pawl.Codec.DamageRewrite (damageRewriteToJson, jsonToDamageRewrite)
+import Pawl.Codec.DestructionRewrite (destructionRewriteToJson, jsonToDestructionRewrite)
+import Pawl.Codec.DiscardCause (discardCauseToJson, jsonToDiscardCause)
+import Pawl.Codec.EndingStep (endingStepToJson, jsonToEndingStep)
+import Pawl.Codec.ExtraPhase (extraPhaseToJson, jsonToExtraPhase)
 import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.ModeIndex (jsonToModeIndex, modeIndexToJson)
+import Pawl.Codec.ModeSelection (jsonToModeSelection, modeSelectionToJson)
+import Pawl.Codec.MonarchTarget (jsonToMonarchTarget, monarchTargetToJson)
+import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
+import Pawl.Codec.Optionality (jsonToOptionality, jsonToOptionalityDefault, optionalityToJson)
+import Pawl.Codec.PlayerCounterKind (jsonToPlayerCounterKind, playerCounterKindToJson)
+import Pawl.Codec.PlayerId (jsonToPlayerId, playerIdToJson)
+import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
+import Pawl.Codec.PlayerScope (jsonToPlayerScope, playerScopeToJson)
+import Pawl.Codec.Pool (jsonToPool, poolToJson)
+import Pawl.Codec.Regenerability (jsonToRegenerability, regenerabilityToJson)
+import Pawl.Codec.Scaling (jsonToScaling, scalingToJson)
+import Pawl.Codec.SearchDestination (jsonToSearchDestination, searchDestinationToJson)
+import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
+import Pawl.Codec.Subtype (jsonToSubtype, jsonToSubtypePair, subtypeToJson)
+import Pawl.Codec.Supertype (jsonToSupertype, supertypeToJson)
+import Pawl.Codec.TapState (jsonToTapState, tapStateToJson)
+import Pawl.Codec.TriggerFrequency (jsonToTriggerFrequency, triggerFrequencyToJson)
+import Pawl.Codec.TurnScope (jsonToTurnScope, turnScopeToJson)
+import Pawl.Codec.Uses (jsonToUses, usesToJson)
+import Pawl.Codec.Zone (jsonToZone, zoneToJson)
+import Pawl.Codec.ZoneChangeSubject (jsonToZoneChangeSubject, zoneChangeSubjectToJson)
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array, Null, Object))
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
-import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as CardT
-import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
-import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.CombatStep as CombatStep
-import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
-import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
@@ -39,20 +69,14 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
-import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
-import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
-import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Expiry as Expiry
-import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.Keyword as Keyword
@@ -62,101 +86,40 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.MonarchTarget as MonarchTarget
-import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
-import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.PlayerRelation as PlayerRelation
-import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
-import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
-import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StaticAbility as StaticAbility
-import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TokenEntry as TokenEntry
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
-import qualified Pawl.Types.Uses as Uses
-import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- Helpers --------------------------------------------------------------------
 
 -- Leaf enums -----------------------------------------------------------------
 
-colorToJson :: Color.Color -> Value
-colorToJson c = Json.nullary . Text.pack $ case c of
-  Color.White -> "White"
-  Color.Blue -> "Blue"
-  Color.Black -> "Black"
-  Color.Red -> "Red"
-  Color.Green -> "Green"
-
-jsonToColor :: Value -> Either Text Color.Color
-jsonToColor =
-  Json.decodeNullary
-    (Text.pack "Color")
-    [ (Text.pack "White", Color.White),
-      (Text.pack "Blue", Color.Blue),
-      (Text.pack "Black", Color.Black),
-      (Text.pack "Red", Color.Red),
-      (Text.pack "Green", Color.Green)
-    ]
-
-cardTypeToJson :: CardType.CardType -> Value
-cardTypeToJson c = Json.nullary . Text.pack $ case c of
-  CardType.Land -> "Land"
-  CardType.Creature -> "Creature"
-  CardType.Instant -> "Instant"
-  CardType.Enchantment -> "Enchantment"
-  CardType.Artifact -> "Artifact"
-  CardType.Sorcery -> "Sorcery"
-  CardType.Kindred -> "Kindred"
-
-jsonToCardType :: Value -> Either Text CardType.CardType
-jsonToCardType =
-  Json.decodeNullary
-    (Text.pack "CardType")
-    [ (Text.pack "Land", CardType.Land),
-      (Text.pack "Creature", CardType.Creature),
-      (Text.pack "Instant", CardType.Instant),
-      (Text.pack "Enchantment", CardType.Enchantment),
-      (Text.pack "Artifact", CardType.Artifact),
-      (Text.pack "Sorcery", CardType.Sorcery),
-      (Text.pack "Kindred", CardType.Kindred)
-    ]
-
--- No longer uniformly Json.nullary: CR 122.1b's keyword counter carries the keyword it
+-- No longer uniformly nullary: CR 122.1b's keyword counter carries the keyword it
 -- grants, so this tags like every other payload-bearing sum here rather than
 -- delegating the whole type to the Json.nullary helper.
 counterKindToJson :: CounterKind.CounterKind -> Value
@@ -174,176 +137,12 @@ jsonToCounterKind value = do
     ("Keyword", Just v) -> CounterKind.Keyword <$> jsonToKeyword v
     _ -> Left (Text.pack "unknown CounterKind: " <> t)
 
-playerCounterKindToJson :: PlayerCounterKind.PlayerCounterKind -> Value
-playerCounterKindToJson k = Json.nullary . Text.pack $ case k of
-  PlayerCounterKind.Energy -> "Energy"
-  PlayerCounterKind.Poison -> "Poison"
-
-jsonToPlayerCounterKind :: Value -> Either Text PlayerCounterKind.PlayerCounterKind
-jsonToPlayerCounterKind =
-  Json.decodeNullary
-    (Text.pack "PlayerCounterKind")
-    [ (Text.pack "Energy", PlayerCounterKind.Energy),
-      (Text.pack "Poison", PlayerCounterKind.Poison)
-    ]
-
-subtypeToJson :: Subtype.Subtype -> Value
-subtypeToJson s = Json.nullary . Text.pack $ case s of
-  Subtype.Mountain -> "Mountain"
-  Subtype.Swamp -> "Swamp"
-  Subtype.Forest -> "Forest"
-  Subtype.Island -> "Island"
-  Subtype.Plains -> "Plains"
-  Subtype.Goblin -> "Goblin"
-  Subtype.Warrior -> "Warrior"
-  Subtype.Human -> "Human"
-  Subtype.Bird -> "Bird"
-  Subtype.Ogre -> "Ogre"
-  Subtype.Centaur -> "Centaur"
-  Subtype.Cat -> "Cat"
-  Subtype.Dinosaur -> "Dinosaur"
-  Subtype.Beast -> "Beast"
-  Subtype.Rat -> "Rat"
-  Subtype.Elephant -> "Elephant"
-  Subtype.Myr -> "Myr"
-  Subtype.Skeleton -> "Skeleton"
-  Subtype.Wall -> "Wall"
-  Subtype.Wizard -> "Wizard"
-  Subtype.Shapeshifter -> "Shapeshifter"
-  Subtype.Lhurgoyf -> "Lhurgoyf"
-  Subtype.Arcane -> "Arcane"
-  Subtype.Barbarian -> "Barbarian"
-  Subtype.Zombie -> "Zombie"
-  Subtype.Fungus -> "Fungus"
-  Subtype.Elemental -> "Elemental"
-  Subtype.Rogue -> "Rogue"
-  Subtype.Hag -> "Hag"
-  Subtype.Warlock -> "Warlock"
-  Subtype.Soldier -> "Soldier"
-  Subtype.Phyrexian -> "Phyrexian"
-  Subtype.Elf -> "Elf"
-  Subtype.Nightmare -> "Nightmare"
-  Subtype.Horse -> "Horse"
-  Subtype.Aura -> "Aura"
-  Subtype.Equipment -> "Equipment"
-  Subtype.Scout -> "Scout"
-  Subtype.Artificer -> "Artificer"
-  Subtype.Troll -> "Troll"
-  Subtype.Nomad -> "Nomad"
-  Subtype.Shaman -> "Shaman"
-  Subtype.Demon -> "Demon"
-  Subtype.Cleric -> "Cleric"
-  Subtype.Illusion -> "Illusion"
-  Subtype.Spirit -> "Spirit"
-  Subtype.Angel -> "Angel"
-  Subtype.Insect -> "Insect"
-  Subtype.Berserker -> "Berserker"
-  Subtype.Thopter -> "Thopter"
-  Subtype.Dragon -> "Dragon"
-  Subtype.Unicorn -> "Unicorn"
-  Subtype.Curse -> "Curse"
-  Subtype.Desert -> "Desert"
-  Subtype.Faerie -> "Faerie"
-  Subtype.Rhino -> "Rhino"
-
-jsonToSubtype :: Value -> Either Text Subtype.Subtype
-jsonToSubtype =
-  Json.decodeNullary
-    (Text.pack "Subtype")
-    [ (Text.pack "Mountain", Subtype.Mountain),
-      (Text.pack "Swamp", Subtype.Swamp),
-      (Text.pack "Forest", Subtype.Forest),
-      (Text.pack "Island", Subtype.Island),
-      (Text.pack "Plains", Subtype.Plains),
-      (Text.pack "Goblin", Subtype.Goblin),
-      (Text.pack "Warrior", Subtype.Warrior),
-      (Text.pack "Human", Subtype.Human),
-      (Text.pack "Bird", Subtype.Bird),
-      (Text.pack "Ogre", Subtype.Ogre),
-      (Text.pack "Centaur", Subtype.Centaur),
-      (Text.pack "Cat", Subtype.Cat),
-      (Text.pack "Dinosaur", Subtype.Dinosaur),
-      (Text.pack "Beast", Subtype.Beast),
-      (Text.pack "Rat", Subtype.Rat),
-      (Text.pack "Elephant", Subtype.Elephant),
-      (Text.pack "Myr", Subtype.Myr),
-      (Text.pack "Skeleton", Subtype.Skeleton),
-      (Text.pack "Wall", Subtype.Wall),
-      (Text.pack "Wizard", Subtype.Wizard),
-      (Text.pack "Shapeshifter", Subtype.Shapeshifter),
-      (Text.pack "Lhurgoyf", Subtype.Lhurgoyf),
-      (Text.pack "Arcane", Subtype.Arcane),
-      (Text.pack "Barbarian", Subtype.Barbarian),
-      (Text.pack "Zombie", Subtype.Zombie),
-      (Text.pack "Fungus", Subtype.Fungus),
-      (Text.pack "Elemental", Subtype.Elemental),
-      (Text.pack "Rogue", Subtype.Rogue),
-      (Text.pack "Hag", Subtype.Hag),
-      (Text.pack "Warlock", Subtype.Warlock),
-      (Text.pack "Soldier", Subtype.Soldier),
-      (Text.pack "Phyrexian", Subtype.Phyrexian),
-      (Text.pack "Elf", Subtype.Elf),
-      (Text.pack "Nightmare", Subtype.Nightmare),
-      (Text.pack "Horse", Subtype.Horse),
-      (Text.pack "Aura", Subtype.Aura),
-      (Text.pack "Equipment", Subtype.Equipment),
-      (Text.pack "Scout", Subtype.Scout),
-      (Text.pack "Artificer", Subtype.Artificer),
-      (Text.pack "Troll", Subtype.Troll),
-      (Text.pack "Nomad", Subtype.Nomad),
-      (Text.pack "Shaman", Subtype.Shaman),
-      (Text.pack "Demon", Subtype.Demon),
-      (Text.pack "Cleric", Subtype.Cleric),
-      (Text.pack "Illusion", Subtype.Illusion),
-      (Text.pack "Spirit", Subtype.Spirit),
-      (Text.pack "Angel", Subtype.Angel),
-      (Text.pack "Insect", Subtype.Insect),
-      (Text.pack "Berserker", Subtype.Berserker),
-      (Text.pack "Thopter", Subtype.Thopter),
-      (Text.pack "Dragon", Subtype.Dragon),
-      (Text.pack "Unicorn", Subtype.Unicorn),
-      (Text.pack "Curse", Subtype.Curse),
-      (Text.pack "Desert", Subtype.Desert),
-      (Text.pack "Faerie", Subtype.Faerie),
-      (Text.pack "Rhino", Subtype.Rhino)
-    ]
-
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
 -- omitted key, because this rides inside a positional pair.
 optionalFilter :: Value -> Either Text (Maybe Filter.Filter)
 optionalFilter value = case value of
   Null _ -> Right Nothing
   _ -> fmap Just (jsonToFilter value)
-
-searchDestinationToJson :: SearchDestination.SearchDestination -> Value
-searchDestinationToJson d = Json.nullary . Text.pack $ case d of
-  SearchDestination.BattlefieldTapped -> "BattlefieldTapped"
-  SearchDestination.RevealThenHand -> "RevealThenHand"
-
-jsonToSearchDestination :: Value -> Either Text SearchDestination.SearchDestination
-jsonToSearchDestination =
-  Json.decodeNullary
-    (Text.pack "SearchDestination")
-    [ (Text.pack "BattlefieldTapped", SearchDestination.BattlefieldTapped),
-      (Text.pack "RevealThenHand", SearchDestination.RevealThenHand)
-    ]
-
-supertypeToJson :: Supertype.Supertype -> Value
-supertypeToJson s = Json.nullary . Text.pack $ case s of
-  Supertype.Basic -> "Basic"
-  Supertype.Legendary -> "Legendary"
-  Supertype.Snow -> "Snow"
-  Supertype.World -> "World"
-
-jsonToSupertype :: Value -> Either Text Supertype.Supertype
-jsonToSupertype =
-  Json.decodeNullary
-    (Text.pack "Supertype")
-    [ (Text.pack "Basic", Supertype.Basic),
-      (Text.pack "Legendary", Supertype.Legendary),
-      (Text.pack "Snow", Supertype.Snow),
-      (Text.pack "World", Supertype.World)
-    ]
 
 -- Not Json.decodeNullary's table shape any more: CR 702.164a's toxic and CR 702.70a's
 -- poisonous each carry an N, so this is the tagged-with-an-optional-payload case
@@ -392,76 +191,6 @@ jsonToKeyword value = do
     ("Devoid", _) -> Right Keyword.Devoid
     ("Toxic", Just v) -> Keyword.Toxic <$> Json.natFrom v
     _ -> Left (Text.pack "unknown Keyword: " <> t)
-
-zoneToJson :: Zone.Zone -> Value
-zoneToJson z = Json.nullary . Text.pack $ case z of
-  Zone.Library -> "Library"
-  Zone.Hand -> "Hand"
-  Zone.Graveyard -> "Graveyard"
-  Zone.Battlefield -> "Battlefield"
-  Zone.Stack -> "Stack"
-  Zone.Exile -> "Exile"
-  Zone.Command -> "Command"
-
-jsonToZone :: Value -> Either Text Zone.Zone
-jsonToZone =
-  Json.decodeNullary
-    (Text.pack "Zone")
-    [ (Text.pack "Library", Zone.Library),
-      (Text.pack "Hand", Zone.Hand),
-      (Text.pack "Graveyard", Zone.Graveyard),
-      (Text.pack "Battlefield", Zone.Battlefield),
-      (Text.pack "Stack", Zone.Stack),
-      (Text.pack "Exile", Zone.Exile),
-      (Text.pack "Command", Zone.Command)
-    ]
-
-beginningStepToJson :: BeginningStep.BeginningStep -> Value
-beginningStepToJson s = Json.nullary . Text.pack $ case s of
-  BeginningStep.Untap -> "Untap"
-  BeginningStep.Upkeep -> "Upkeep"
-  BeginningStep.DrawStep -> "DrawStep"
-
-jsonToBeginningStep :: Value -> Either Text BeginningStep.BeginningStep
-jsonToBeginningStep =
-  Json.decodeNullary
-    (Text.pack "BeginningStep")
-    [ (Text.pack "Untap", BeginningStep.Untap),
-      (Text.pack "Upkeep", BeginningStep.Upkeep),
-      (Text.pack "DrawStep", BeginningStep.DrawStep)
-    ]
-
-combatStepToJson :: CombatStep.CombatStep -> Value
-combatStepToJson s = Json.nullary . Text.pack $ case s of
-  CombatStep.BeginningOfCombat -> "BeginningOfCombat"
-  CombatStep.DeclareAttackers -> "DeclareAttackers"
-  CombatStep.DeclareBlockers -> "DeclareBlockers"
-  CombatStep.CombatDamage -> "CombatDamage"
-  CombatStep.EndOfCombat -> "EndOfCombat"
-
-jsonToCombatStep :: Value -> Either Text CombatStep.CombatStep
-jsonToCombatStep =
-  Json.decodeNullary
-    (Text.pack "CombatStep")
-    [ (Text.pack "BeginningOfCombat", CombatStep.BeginningOfCombat),
-      (Text.pack "DeclareAttackers", CombatStep.DeclareAttackers),
-      (Text.pack "DeclareBlockers", CombatStep.DeclareBlockers),
-      (Text.pack "CombatDamage", CombatStep.CombatDamage),
-      (Text.pack "EndOfCombat", CombatStep.EndOfCombat)
-    ]
-
-endingStepToJson :: EndingStep.EndingStep -> Value
-endingStepToJson s = Json.nullary . Text.pack $ case s of
-  EndingStep.EndStep -> "EndStep"
-  EndingStep.Cleanup -> "Cleanup"
-
-jsonToEndingStep :: Value -> Either Text EndingStep.EndingStep
-jsonToEndingStep =
-  Json.decodeNullary
-    (Text.pack "EndingStep")
-    [ (Text.pack "EndStep", EndingStep.EndStep),
-      (Text.pack "Cleanup", EndingStep.Cleanup)
-    ]
 
 phaseToJson :: Phase.Phase -> Value
 phaseToJson p = case p of
@@ -515,47 +244,6 @@ jsonToDuration value = do
     ("UntilYourNextTurn", _) -> Right Duration.UntilYourNextTurn
     ("ForAsLongAs", Just v) -> Duration.ForAsLongAs <$> jsonToCondition v
     _ -> Left (Text.pack "unknown Duration: " <> t)
-
-usesToJson :: Uses.Uses -> Value
-usesToJson u = Json.nullary . Text.pack $ case u of
-  Uses.Unlimited -> "Unlimited"
-  Uses.Once -> "Once"
-
-jsonToUses :: Value -> Either Text Uses.Uses
-jsonToUses =
-  Json.decodeNullary
-    (Text.pack "Uses")
-    [ (Text.pack "Unlimited", Uses.Unlimited),
-      (Text.pack "Once", Uses.Once)
-    ]
-
-controllerRelationToJson :: ControllerRelation.ControllerRelation -> Value
-controllerRelationToJson r = Json.nullary . Text.pack $ case r of
-  ControllerRelation.Yours -> "Yours"
-  ControllerRelation.Anyones -> "Anyones"
-  ControllerRelation.Opponents -> "Opponents"
-
-jsonToControllerRelation :: Value -> Either Text ControllerRelation.ControllerRelation
-jsonToControllerRelation =
-  Json.decodeNullary
-    (Text.pack "ControllerRelation")
-    [ (Text.pack "Yours", ControllerRelation.Yours),
-      (Text.pack "Anyones", ControllerRelation.Anyones),
-      (Text.pack "Opponents", ControllerRelation.Opponents)
-    ]
-
-playerRelationToJson :: PlayerRelation.PlayerRelation -> Value
-playerRelationToJson r = Json.nullary . Text.pack $ case r of
-  PlayerRelation.You -> "You"
-  PlayerRelation.Opponent -> "Opponent"
-
-jsonToPlayerRelation :: Value -> Either Text PlayerRelation.PlayerRelation
-jsonToPlayerRelation =
-  Json.decodeNullary
-    (Text.pack "PlayerRelation")
-    [ (Text.pack "You", PlayerRelation.You),
-      (Text.pack "Opponent", PlayerRelation.Opponent)
-    ]
 
 -- Recursive, mirroring quantityToJson/jsonToQuantity: And/Or carry their
 -- operands as a JSON Array, Not as a single nested object, and each atom
@@ -659,41 +347,6 @@ jsonToScope value = do
     ("InHistory", Just v) -> Scope.InHistory <$> jsonToEventShape v
     _ -> Left (Text.pack "unknown Scope: " <> t)
 
--- No longer wholly Json.nullary, and so no longer Json.decodeNullary's shape: Greatest
--- carries the per-member Quantity it reads.
--- Parametric in the per-member quantity, exactly as Pawl.Types.Aggregation is:
--- the codec reaches its payload only through `codec`, which is what keeps this
--- module below Quantity's rather than in a cycle with it (#481).
-aggregationToJson :: (q -> Value) -> Aggregation.Aggregation q -> Value
-aggregationToJson codec a = case a of
-  Aggregation.Objects -> Json.nullary (Text.pack "Objects")
-  Aggregation.DistinctCardTypes -> Json.nullary (Text.pack "DistinctCardTypes")
-  Aggregation.Greatest q -> Json.tagged (Text.pack "Greatest") (Just (codec q))
-
-jsonToAggregation :: (Value -> Either Text q) -> Value -> Either Text (Aggregation.Aggregation q)
-jsonToAggregation decode value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("Objects", Nothing) -> Right Aggregation.Objects
-    ("DistinctCardTypes", Nothing) -> Right Aggregation.DistinctCardTypes
-    ("Greatest", Just v) -> Aggregation.Greatest <$> decode v
-    _ -> Left (Text.pack "unknown Aggregation: " <> t)
-
-comparisonToJson :: Comparison.Comparison -> Value
-comparisonToJson c = Json.nullary . Text.pack $ case c of
-  Comparison.Exactly -> "Exactly"
-  Comparison.AtLeast -> "AtLeast"
-  Comparison.AtMost -> "AtMost"
-
-jsonToComparison :: Value -> Either Text Comparison.Comparison
-jsonToComparison =
-  Json.decodeNullary
-    (Text.pack "Comparison")
-    [ (Text.pack "Exactly", Comparison.Exactly),
-      (Text.pack "AtLeast", Comparison.AtLeast),
-      (Text.pack "AtMost", Comparison.AtMost)
-    ]
-
 countToJson :: (q -> Value) -> Count.Type.Count q -> Value
 countToJson codec (Count.Type.MkCount s f a) =
   Json.tagged (Text.pack "Count") (Just (Array (MkArray [scopeToJson s, filterToJson f, aggregationToJson codec a])))
@@ -722,21 +375,6 @@ jsonToCondition value = do
     ("Condition", Just (Array (MkArray [m, cmp, q]))) -> Condition.Type.MkCondition <$> jsonToQuantity m <*> jsonToComparison cmp <*> jsonToQuantity q
     _ -> Left (Text.pack "unknown Condition: " <> t)
 
-playerScopeToJson :: PlayerScope.PlayerScope -> Value
-playerScopeToJson s = Json.nullary . Text.pack $ case s of
-  PlayerScope.You -> "You"
-  PlayerScope.Opponents -> "Opponents"
-  PlayerScope.EachPlayer -> "EachPlayer"
-
-jsonToPlayerScope :: Value -> Either Text PlayerScope.PlayerScope
-jsonToPlayerScope =
-  Json.decodeNullary
-    (Text.pack "PlayerScope")
-    [ (Text.pack "You", PlayerScope.You),
-      (Text.pack "Opponents", PlayerScope.Opponents),
-      (Text.pack "EachPlayer", PlayerScope.EachPlayer)
-    ]
-
 playerEffectToJson :: PlayerEffect.PlayerEffect -> Value
 playerEffectToJson e = case e of
   PlayerEffect.CantCastSpells -> Json.nullary (Text.pack "CantCastSpells")
@@ -757,35 +395,6 @@ jsonToPlayerEffect value = do
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     ("DontLoseUnspentMana", _) -> Right PlayerEffect.DontLoseUnspentMana
     _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
-
-damageRewriteToJson :: DamageRewrite.DamageRewrite -> Value
-damageRewriteToJson r = Json.nullary . Text.pack $ case r of
-  DamageRewrite.PreventAll -> "PreventAll"
-
-jsonToDamageRewrite :: Value -> Either Text DamageRewrite.DamageRewrite
-jsonToDamageRewrite =
-  Json.decodeNullary (Text.pack "DamageRewrite") [(Text.pack "PreventAll", DamageRewrite.PreventAll)]
-
-destructionRewriteToJson :: DestructionRewrite.DestructionRewrite -> Value
-destructionRewriteToJson r = Json.nullary . Text.pack $ case r of
-  DestructionRewrite.Regenerate -> "Regenerate"
-
-jsonToDestructionRewrite :: Value -> Either Text DestructionRewrite.DestructionRewrite
-jsonToDestructionRewrite =
-  Json.decodeNullary (Text.pack "DestructionRewrite") [(Text.pack "Regenerate", DestructionRewrite.Regenerate)]
-
-scalingToJson :: Scaling.Scaling -> Value
-scalingToJson s = case s of
-  Scaling.Multiply n -> Json.tagged (Text.pack "Multiply") (Just (Json.natTo n))
-  Scaling.AddMore n -> Json.tagged (Text.pack "AddMore") (Just (Json.natTo n))
-
-jsonToScaling :: Value -> Either Text Scaling.Scaling
-jsonToScaling value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("Multiply", Just v) -> fmap Scaling.Multiply (Json.natFrom v)
-    ("AddMore", Just v) -> fmap Scaling.AddMore (Json.natFrom v)
-    _ -> Left (Text.pack "unknown Scaling: " <> t)
 
 entryOptionToJson :: EntryOption.EntryOption -> Value
 entryOptionToJson o =
@@ -841,19 +450,6 @@ jsonToZoneChangePattern value = do
         ZoneChangePattern.whichObject = s,
         ZoneChangePattern.whoseObject = w
       }
-
-zoneChangeSubjectToJson :: ZoneChangeSubject.ZoneChangeSubject -> Value
-zoneChangeSubjectToJson s = Json.nullary . Text.pack $ case s of
-  ZoneChangeSubject.AnyObject -> "AnyObject"
-  ZoneChangeSubject.TheSource -> "TheSource"
-
-jsonToZoneChangeSubject :: Value -> Either Text ZoneChangeSubject.ZoneChangeSubject
-jsonToZoneChangeSubject =
-  Json.decodeNullary
-    (Text.pack "ZoneChangeSubject")
-    [ (Text.pack "AnyObject", ZoneChangeSubject.AnyObject),
-      (Text.pack "TheSource", ZoneChangeSubject.TheSource)
-    ]
 
 counterPatternToJson :: CounterPattern.CounterPattern -> Value
 counterPatternToJson p =
@@ -914,7 +510,7 @@ jsonToDamagePattern value = do
   k <- Json.field (Text.pack "whichKind") ps >>= Json.maybeFrom jsonToDamageKind
   pure DamagePattern.MkDamagePattern {DamagePattern.whichKind = k}
 
--- Tagged rather than bare-Json.nullary from the start: this family grows
+-- Tagged rather than bare-nullary from the start: this family grows
 -- payload-carrying constructors (PayLife, Sacrifice), so the decoder is written
 -- against Json.tag and only gains arms.
 costComponentToJson :: CostComponent.CostComponent -> Value
@@ -945,27 +541,6 @@ jsonToCostComponent value = do
     ("PayEnergy", Just v) -> fmap CostComponent.PayEnergy (Json.natFrom v)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 
-poolToJson :: Pool.Pool -> Value
-poolToJson p = Json.nullary . Text.pack $ case p of
-  Pool.Creatures -> "Creatures"
-  Pool.Players -> "Players"
-  Pool.AnyTarget -> "AnyTarget"
-  Pool.Permanents -> "Permanents"
-  Pool.Spells -> "Spells"
-  Pool.SpellsAndPermanents -> "SpellsAndPermanents"
-
-jsonToPool :: Value -> Either Text Pool.Pool
-jsonToPool =
-  Json.decodeNullary
-    (Text.pack "Pool")
-    [ (Text.pack "Creatures", Pool.Creatures),
-      (Text.pack "Players", Pool.Players),
-      (Text.pack "AnyTarget", Pool.AnyTarget),
-      (Text.pack "Permanents", Pool.Permanents),
-      (Text.pack "Spells", Pool.Spells),
-      (Text.pack "SpellsAndPermanents", Pool.SpellsAndPermanents)
-    ]
-
 -- The product shape: {"pool": <pool>, "filter": <filter | omitted>}. The filter
 -- key is omitted when Nothing (a bare "target creature" narrows nothing),
 -- mirroring how optional fields are encoded elsewhere. CR 601.2c's "another" is
@@ -986,19 +561,6 @@ jsonToTargetSpec value = do
     Nothing -> Right Nothing
     Just v -> Just <$> jsonToFilter v
   pure (TargetSpec.MkTargetSpec pool restriction)
-
-turnScopeToJson :: TurnScope.TurnScope -> Value
-turnScopeToJson s = Json.nullary . Text.pack $ case s of
-  TurnScope.EachTurn -> "EachTurn"
-  TurnScope.ControllersTurn -> "ControllersTurn"
-
-jsonToTurnScope :: Value -> Either Text TurnScope.TurnScope
-jsonToTurnScope =
-  Json.decodeNullary
-    (Text.pack "TurnScope")
-    [ (Text.pack "EachTurn", TurnScope.EachTurn),
-      (Text.pack "ControllersTurn", TurnScope.ControllersTurn)
-    ]
 
 triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
 triggerConditionToJson c = case c of
@@ -1031,19 +593,6 @@ jsonToTriggerCondition value = do
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
-castingPermissionToJson :: CastingPermission.CastingPermission -> Value
-castingPermissionToJson c = Json.nullary . Text.pack $ case c of
-  CastingPermission.CastFromLibraryWhileSearching -> "CastFromLibraryWhileSearching"
-  CastingPermission.CastFromGraveyard -> "CastFromGraveyard"
-
-jsonToCastingPermission :: Value -> Either Text CastingPermission.CastingPermission
-jsonToCastingPermission =
-  Json.decodeNullary
-    (Text.pack "CastingPermission")
-    [ (Text.pack "CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching),
-      (Text.pack "CastFromGraveyard", CastingPermission.CastFromGraveyard)
-    ]
-
 castingRestrictionToJson :: CastingRestriction.CastingRestriction -> Value
 castingRestrictionToJson r = case r of
   CastingRestriction.DuringPhase p -> Json.tagged (Text.pack "DuringPhase") (Just (phaseToJson p))
@@ -1059,30 +608,6 @@ jsonToCastingRestriction value = do
 
 -- Newtypes -------------------------------------------------------------------
 
-slotNameToJson :: SlotName.SlotName -> Value
-slotNameToJson (SlotName.MkSlotName t) = Json.jText t
-
-jsonToSlotName :: Value -> Either Text SlotName.SlotName
-jsonToSlotName value = SlotName.MkSlotName <$> Json.asText value
-
-objectIdToJson :: ObjectId.ObjectId -> Value
-objectIdToJson (ObjectId.MkObjectId n) = Json.natTo n
-
-jsonToObjectId :: Value -> Either Text ObjectId.ObjectId
-jsonToObjectId value = ObjectId.MkObjectId <$> Json.natFrom value
-
--- SetController's PlayerId is meant to be runtime-only (a SetController effect
--- is baked at GainControl resolution, not authored on a card), but the codec
--- must stay total, so this arm ACCEPTS one from card JSON and Pawl.CardSpec
--- lints the pool against it instead (#199). Mirrors ObjectId's Natural encoding
--- (Json.natTo/Json.natFrom), not a bare Integer: PlayerId wraps a Natural (no partial
--- fromInteger on a negative wire value).
-playerIdToJson :: PlayerId.PlayerId -> Value
-playerIdToJson (PlayerId.MkPlayerId n) = Json.natTo n
-
-jsonToPlayerId :: Value -> Either Text PlayerId.PlayerId
-jsonToPlayerId value = PlayerId.MkPlayerId <$> Json.natFrom value
-
 -- Mana, quantity, power/toughness --------------------------------------------
 
 manaTypeToJson :: ManaType.ManaType -> Value
@@ -1097,65 +622,6 @@ jsonToManaType value = do
     ("Colored", Just v) -> ManaType.Colored <$> jsonToColor v
     ("Colorless", _) -> Right ManaType.Colorless
     _ -> Left (Text.pack "unknown ManaType: " <> t)
-
-regenerabilityToJson :: Regenerability.Regenerability -> Value
-regenerabilityToJson r = Json.nullary . Text.pack $ case r of
-  Regenerability.Regenerable -> "Regenerable"
-  Regenerability.CantBeRegenerated -> "CantBeRegenerated"
-
-triggerFrequencyToJson :: TriggerFrequency.TriggerFrequency -> Value
-triggerFrequencyToJson f = Json.nullary . Text.pack $ case f of
-  TriggerFrequency.EveryTime -> "EveryTime"
-  TriggerFrequency.FirstTimeEachTurn -> "FirstTimeEachTurn"
-
-extraPhaseToJson :: ExtraPhase.ExtraPhase -> Value
-extraPhaseToJson e = Json.nullary . Text.pack $ case e of
-  ExtraPhase.ExtraCombat -> "ExtraCombat"
-  ExtraPhase.ExtraMain -> "ExtraMain"
-
-counterabilityToJson :: Counterability.Counterability -> Value
-counterabilityToJson c = Json.nullary . Text.pack $ case c of
-  Counterability.Counterable -> "Counterable"
-  Counterability.CantBeCountered -> "CantBeCountered"
-
--- Absent means Counterable (CR 113.6g is printed text: a card either says it or
--- does not), the shape Json.jsonToBoolDefault gives the other defaulted keys.
-jsonToCounterabilityDefault :: Value -> Either Text Counterability.Counterability
-jsonToCounterabilityDefault value = case value of
-  Null _ -> Right Counterability.Counterable
-  _ -> jsonToCounterability value
-
-jsonToCounterability :: Value -> Either Text Counterability.Counterability
-jsonToCounterability =
-  Json.decodeNullary
-    (Text.pack "Counterability")
-    [ (Text.pack "Counterable", Counterability.Counterable),
-      (Text.pack "CantBeCountered", Counterability.CantBeCountered)
-    ]
-
-jsonToRegenerability :: Value -> Either Text Regenerability.Regenerability
-jsonToRegenerability =
-  Json.decodeNullary
-    (Text.pack "Regenerability")
-    [ (Text.pack "Regenerable", Regenerability.Regenerable),
-      (Text.pack "CantBeRegenerated", Regenerability.CantBeRegenerated)
-    ]
-
-jsonToTriggerFrequency :: Value -> Either Text TriggerFrequency.TriggerFrequency
-jsonToTriggerFrequency =
-  Json.decodeNullary
-    (Text.pack "TriggerFrequency")
-    [ (Text.pack "EveryTime", TriggerFrequency.EveryTime),
-      (Text.pack "FirstTimeEachTurn", TriggerFrequency.FirstTimeEachTurn)
-    ]
-
-jsonToExtraPhase :: Value -> Either Text ExtraPhase.ExtraPhase
-jsonToExtraPhase =
-  Json.decodeNullary
-    (Text.pack "ExtraPhase")
-    [ (Text.pack "ExtraCombat", ExtraPhase.ExtraCombat),
-      (Text.pack "ExtraMain", ExtraPhase.ExtraMain)
-    ]
 
 manaProductionToJson :: ManaProduction.ManaProduction -> Value
 manaProductionToJson mp = case mp of
@@ -1314,19 +780,6 @@ jsonToRecipient value = do
     ("ToObject", Just v) -> Recipient.ToObject <$> jsonToObjectId v
     _ -> Left (Text.pack "unknown Recipient: " <> t)
 
-damageKindToJson :: DamageKind.DamageKind -> Value
-damageKindToJson k = Json.nullary . Text.pack $ case k of
-  DamageKind.Combat -> "Combat"
-  DamageKind.Noncombat -> "Noncombat"
-
-jsonToDamageKind :: Value -> Either Text DamageKind.DamageKind
-jsonToDamageKind =
-  Json.decodeNullary
-    (Text.pack "DamageKind")
-    [ (Text.pack "Combat", DamageKind.Combat),
-      (Text.pack "Noncombat", DamageKind.Noncombat)
-    ]
-
 damageEventToJson :: DamageEvent.DamageEvent -> Value
 damageEventToJson ev =
   Json.jObject
@@ -1438,19 +891,6 @@ jsonToQuantityPair value = case value of
     pure (p_, t_)
   _ -> Left (Text.pack "expected a [power, toughness] quantity pair")
 
-discardCauseToJson :: DiscardCause.DiscardCause -> Value
-discardCauseToJson c = Json.nullary . Text.pack $ case c of
-  DiscardCause.Ordinary -> "Ordinary"
-  DiscardCause.ToPayCyclingCost -> "ToPayCyclingCost"
-
-jsonToDiscardCause :: Value -> Either Text DiscardCause.DiscardCause
-jsonToDiscardCause =
-  Json.decodeNullary
-    (Text.pack "DiscardCause")
-    [ (Text.pack "Ordinary", DiscardCause.Ordinary),
-      (Text.pack "ToPayCyclingCost", DiscardCause.ToPayCyclingCost)
-    ]
-
 gameEventToJson :: GameEvent.GameEvent -> Value
 gameEventToJson e = case e of
   GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array (MkArray [zoneChangeToJson zc, projectedCharacteristicsToJson pc])))
@@ -1480,33 +920,7 @@ jsonToGameEvent value = do
 
 -- MonarchTarget ----------------------------------------------------------------
 
-monarchTargetToJson :: MonarchTarget.MonarchTarget -> Value
-monarchTargetToJson t = Json.nullary . Text.pack $ case t of
-  MonarchTarget.TheController -> "TheController"
-  MonarchTarget.ControllerOfSource -> "ControllerOfSource"
-
-jsonToMonarchTarget :: Value -> Either Text MonarchTarget.MonarchTarget
-jsonToMonarchTarget =
-  Json.decodeNullary
-    (Text.pack "MonarchTarget")
-    [ (Text.pack "TheController", MonarchTarget.TheController),
-      (Text.pack "ControllerOfSource", MonarchTarget.ControllerOfSource)
-    ]
-
 -- TokenEntry -----------------------------------------------------------------
-
-tapStateToJson :: TapState.TapState -> Value
-tapStateToJson t = Json.nullary . Text.pack $ case t of
-  TapState.Untapped -> "Untapped"
-  TapState.Tapped -> "Tapped"
-
-jsonToTapState :: Value -> Either Text TapState.TapState
-jsonToTapState =
-  Json.decodeNullary
-    (Text.pack "TapState")
-    [ (Text.pack "Untapped", TapState.Untapped),
-      (Text.pack "Tapped", TapState.Tapped)
-    ]
 
 tokenEntryToJson :: TokenEntry.TokenEntry -> Value
 tokenEntryToJson e =
@@ -1823,7 +1237,7 @@ activatedAbilityToJson codec aa =
              _ -> [(Text.pack "timing", activationTimingToJson (ActivatedAbility.timing aa))]
          )
 
--- Tagged rather than bare-Json.nullary since CR 500.1's DuringPhase carries a phase,
+-- Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a phase,
 -- the shape costComponentToJson takes. AnyTime and SorcerySpeed still render as
 -- the bare tag they always did, so every committed card file is unchanged.
 activationTimingToJson :: ActivationTiming.ActivationTiming -> Value
@@ -1918,12 +1332,6 @@ jsonToTriggeredAbility decode value = do
         TriggeredAbility.intervening = i
       }
 
-abilityNameToJson :: AbilityName.AbilityName -> Value
-abilityNameToJson (AbilityName.MkAbilityName t) = Json.jText t
-
-jsonToAbilityName :: Value -> Either Text AbilityName.AbilityName
-jsonToAbilityName value = AbilityName.MkAbilityName <$> Json.asText value
-
 -- The targetSpecsToJson shape: a name-keyed map as a sorted array of entries, so
 -- the render is deterministic and the file byte-stable.
 delayedAbilitiesToJson :: (card -> Value) -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card) -> Value
@@ -1970,14 +1378,6 @@ jsonToBinding value = do
         Binding.modes = m,
         Binding.copy = c
       }
-
-jsonToSubtypePair :: Value -> Either Text (Subtype.Subtype, Subtype.Subtype)
-jsonToSubtypePair value = case value of
-  Array (MkArray [f, t]) -> do
-    f_ <- jsonToSubtype f
-    t_ <- jsonToSubtype t
-    pure (f_, t_)
-  _ -> Left (Text.pack "expected a [from, to] subtype pair")
 
 bindingsToJson :: Map.Map SlotName.SlotName Binding.Binding -> Value
 bindingsToJson m =
@@ -2045,44 +1445,6 @@ jsonToDelayedTrigger value = do
       }
 
 -- Modal -----------------------------------------------------------------------
-
-modeIndexToJson :: ModeIndex.ModeIndex -> Value
-modeIndexToJson (ModeIndex.MkModeIndex n) = Json.natTo n
-
-jsonToModeIndex :: Value -> Either Text ModeIndex.ModeIndex
-jsonToModeIndex value = ModeIndex.MkModeIndex <$> Json.natFrom value
-
-modeSelectionToJson :: ModeSelection.ModeSelection -> Value
-modeSelectionToJson (ModeSelection.ChooseExactly n) =
-  Json.tagged (Text.pack "ChooseExactly") (Just (Json.natTo n))
-
-jsonToModeSelection :: Value -> Either Text ModeSelection.ModeSelection
-jsonToModeSelection value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("ChooseExactly", Just n) -> ModeSelection.ChooseExactly <$> Json.natFrom n
-    _ -> Left (Text.pack "unknown ModeSelection: " <> t)
-
-optionalityToJson :: Optionality.Optionality -> Value
-optionalityToJson o = Json.nullary . Text.pack $ case o of
-  Optionality.Mandatory -> "Mandatory"
-  Optionality.Optional -> "Optional"
-
-jsonToOptionality :: Value -> Either Text Optionality.Optionality
-jsonToOptionality =
-  Json.decodeNullary
-    (Text.pack "Optionality")
-    [ (Text.pack "Mandatory", Optionality.Mandatory),
-      (Text.pack "Optional", Optionality.Optional)
-    ]
-
--- An omitted optionality decodes to Mandatory, the counterability posture (and
--- for the same reason): almost every mode in the corpus prints no "may", and a
--- required key would have meant editing every card file to say nothing.
-jsonToOptionalityDefault :: Value -> Either Text Optionality.Optionality
-jsonToOptionalityDefault value = case value of
-  Null _ -> Right Optionality.Mandatory
-  _ -> jsonToOptionality value
 
 modeToJson :: (card -> Value) -> Mode.Mode card -> Value
 modeToJson codec m =

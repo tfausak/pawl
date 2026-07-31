@@ -63,8 +63,46 @@ library codec
   hs-source-dirs: source/libraries/codec
   -- cabal-gild: discover source/libraries/codec
   exposed-modules:
+    Pawl.Codec.AbilityName
+    Pawl.Codec.Aggregation
     Pawl.Codec.All
+    Pawl.Codec.BeginningStep
+    Pawl.Codec.CardType
+    Pawl.Codec.CastingPermission
+    Pawl.Codec.Color
+    Pawl.Codec.CombatStep
+    Pawl.Codec.Comparison
+    Pawl.Codec.ControllerRelation
+    Pawl.Codec.Counterability
+    Pawl.Codec.DamageKind
+    Pawl.Codec.DamageRewrite
+    Pawl.Codec.DestructionRewrite
+    Pawl.Codec.DiscardCause
+    Pawl.Codec.EndingStep
+    Pawl.Codec.ExtraPhase
     Pawl.Codec.Json
+    Pawl.Codec.ModeIndex
+    Pawl.Codec.ModeSelection
+    Pawl.Codec.MonarchTarget
+    Pawl.Codec.ObjectId
+    Pawl.Codec.Optionality
+    Pawl.Codec.PlayerCounterKind
+    Pawl.Codec.PlayerId
+    Pawl.Codec.PlayerRelation
+    Pawl.Codec.PlayerScope
+    Pawl.Codec.Pool
+    Pawl.Codec.Regenerability
+    Pawl.Codec.Scaling
+    Pawl.Codec.SearchDestination
+    Pawl.Codec.SlotName
+    Pawl.Codec.Subtype
+    Pawl.Codec.Supertype
+    Pawl.Codec.TapState
+    Pawl.Codec.TriggerFrequency
+    Pawl.Codec.TurnScope
+    Pawl.Codec.Uses
+    Pawl.Codec.Zone
+    Pawl.Codec.ZoneChangeSubject
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
 -- scientific packages.
