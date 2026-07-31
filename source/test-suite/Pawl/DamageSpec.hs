@@ -970,7 +970,7 @@ trampleSpec s registry =
     Spec.it s "CR 702.19b a non-trample control spills nothing" $ do
       -- Ogre Sentry is a 3/3 that cannot attack (defender), so use the Piker's
       -- existing behavior as the control: a blocked non-trample attacker deals
-      -- nothing to the player. (combatDamageTests already asserts bob = 20.)
+      -- nothing to the player. (combatDamageSpec already asserts bob = 20.)
       piker <- Registry.printing registry "Goblin Piker"
       let (gs, _, _) = S.combatBoardOf [piker] [piker]
           after = S.fightWith tramplingAnswer gs
@@ -996,7 +996,7 @@ trampleSpec s registry =
       -- War Mammoth (3/3 trample) blocked by TWO Ogre Sentries (3/3 each): it
       -- cannot reach lethal on both (needs 6, has 3), so no overflow -- bob is
       -- untouched -- and the division among the Ogres is free. Real cards, for
-      -- the under-assignment case assignmentLegalityTests pins on the predicate.
+      -- the under-assignment case assignmentLegalitySpec pins on the predicate.
       warMammoth <- Registry.printing registry "War Mammoth"
       ogreSentry <- Registry.printing registry "Ogre Sentry"
       let (gs, _, _) = S.combatBoardOf [warMammoth] [ogreSentry, ogreSentry]
@@ -1445,7 +1445,7 @@ m2cPropertySpec s registry =
 -- effect can build a damage event out of it.
 --
 -- Aether Flash exercises the two answers this function gives in a real game
--- (TriggerSpec's aetherFlashTests): a creature entrant becomes ToCreature, and
+-- (TriggerSpec's aetherFlashSpec): a creature entrant becomes ToCreature, and
 -- an entrant already dead by the time the ability resolves (CR 608.2h) becomes
 -- Nothing. The third, a permanent that exists and is not a creature, no card in
 -- the pool can produce -- every DealDamage on a generically named slot belongs

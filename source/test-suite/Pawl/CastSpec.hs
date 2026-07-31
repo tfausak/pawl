@@ -829,7 +829,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
--- mode and a Card.Type.enchant of "target creature" (CardSpec's auraCardTests).
+-- mode and a Card.Type.enchant of "target creature" (CardSpec's auraCardSpec).
 -- Task 6 merges Card.enchantSpecs into allTargetSpecs/modesTargetSpecs and
 -- teaches Target.fillableModes the extra slots a card declares outside its
 -- modes, so castability sees the enchant slot too -- without either function

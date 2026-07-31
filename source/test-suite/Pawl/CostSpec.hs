@@ -394,7 +394,7 @@ villageRitesSpec s registry =
     -- The cost payment went through Event.sacrifice, the CR 701.21 funnel,
     -- so the turn history saw it. A direct zone poke passes both cases
     -- above and fails this one. The settle/resolve shape is
-    -- Pawl.TriggerSpec's historyTests, verbatim.
+    -- Pawl.TriggerSpec's historySpec, verbatim.
     Spec.it s "CR 608.2i Khabál Ghoul counts a creature sacrificed to pay a cost" $ do
       swamp <- Registry.printing registry "Swamp"
       piker <- Registry.printing registry "Goblin Piker"

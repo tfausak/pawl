@@ -1305,7 +1305,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
 
 -- The single activated ability of a printing that has exactly one -- Moltensteel
 -- Dragon's "{R/P}: This creature gets +1/+0 until end of turn." Total because
--- HUnit needs a value; a printing with no ability would fail the assertions that
+-- the spec needs a value; a printing with no ability would fail the assertions that
 -- follow rather than this lookup.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of

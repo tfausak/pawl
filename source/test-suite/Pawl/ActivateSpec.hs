@@ -283,7 +283,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   -- observable. Aladdin's can: "{1}{R}{R}, {T}: Gain control of target
   -- artifact for as long as you control this creature" is the same
   -- GainControl/ForAsLongAs shape Master Thief's ETB uses in
-  -- Pawl.ExpirySpec's masterThiefTests, but on the ACTIVATED path -- which
+  -- Pawl.ExpirySpec's masterThiefSpec, but on the ACTIVATED path -- which
   -- is what retired the synthetic ability these two tests used to carry.
   Spec.it s "CR 113.8 an activated ability resolves under whoever activated it, not a later controller" $ do
     darksteelMyr <- Registry.printing registry "Darksteel Myr"
@@ -778,7 +778,7 @@ isActivationOf oid a = case a of
 -- Nights) prints "{T}: This land deals 1 damage to target attacking creature.
 -- Activate only during the end of combat step."
 --
--- The mirror of Pawl.CastSpec's printedCastingRestrictionTests, and deliberately
+-- The mirror of Pawl.CastSpec's printedCastingRestrictionSpec, and deliberately
 -- not the same type -- see Pawl.Types.ActivationTiming for why the two gates
 -- cannot share one, CR 307.5's last two sentences being the load-bearing part.
 --
