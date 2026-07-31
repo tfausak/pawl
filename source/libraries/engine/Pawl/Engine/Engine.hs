@@ -1207,11 +1207,17 @@ grantsPriorityNow phase = case phase of
 -- and CR 514.2 finds no marked damage and no "until end of turn" effect left. So
 -- a third cleanup step needs the SECOND one's priority round to have produced
 -- something the first did not -- a card drawn back over the hand size, a
--- permanent put onto the battlefield that dies. In the pool today the only thing
--- that fires a trigger during a cleanup step is CR 514.1's discard (Megrim), and
--- it fires on the first cleanup step only, so every game this engine can play
--- ends its turns in at most two cleanup steps (Pawl.GameSpec's "the second
--- cleanup step finds nothing waiting and ends the turn").
+-- permanent put onto the battlefield that then dies.
+--
+-- The pool has a producer for each half of the check, and neither can produce a
+-- third step. The trigger half is CR 514.1's discard (Megrim), which fires only
+-- on the first cleanup step, because the second finds the hand already trimmed.
+-- The state-based half is CR 514.2 ending an "until end of turn" pump out from
+-- under a creature (CR 704.5f), which the first step's own settle takes to a
+-- fixpoint -- including whatever that death raises in turn -- and which the
+-- second step has no effect left to end. So every game this engine can play ends
+-- its turns in at most two cleanup steps (Pawl.GameSpec's "the second cleanup
+-- step finds nothing waiting and ends the turn").
 --
 -- It is NOT bounded in general, and Magic does not bound it either: an ability
 -- that triggers at the beginning of each cleanup step loops forever, and CR
