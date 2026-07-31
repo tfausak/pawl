@@ -13,7 +13,7 @@ import qualified Pawl.ConditionSpec
 import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec as CostSpec
-import qualified Pawl.CountSpec as CountSpec
+import qualified Pawl.CountSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
@@ -94,7 +94,6 @@ testTree registry =
       CastSpec.tests registry,
       CostSpec.tests registry,
       CombatSpec.tests registry,
-      CountSpec.tests registry,
       ResolveSpec.tests registry,
       ProjectionSpec.tests registry,
       PowerToughnessSpec.tests registry,
@@ -117,6 +116,7 @@ spec s registry = do
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CoreSpec.spec s registry
+  Pawl.CountSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
   Pawl.DepartureSpec.spec s registry
