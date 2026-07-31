@@ -22,9 +22,17 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import Pawl.Types.SlotName (SlotName)
 import Pawl.Types.TargetSpec (TargetSpec)
 
+-- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
+-- inner list per mode, kept apart. The shape a caller wants when the MODE is the
+-- unit of choice but resolution is not in play: Pawl.Mana reads it to enumerate
+-- the ways one mana ability could be activated (CR 700.2), where flattening
+-- would fuse two alternatives into one yield.
+modeEffects :: Modal.Modal card -> [[Effect card]]
+modeEffects m = fmap (Foldable.toList . Mode.effects) (Foldable.toList (Modal.modes m))
+
 -- Every effect across all modes, printed (mode, then written) order (CR 608.2c).
 allEffects :: Modal.Modal card -> [Effect card]
-allEffects m = concatMap (Foldable.toList . Mode.effects) (Modal.modes m)
+allEffects m = concat (modeEffects m)
 
 -- The union of every mode's target specs (slot names unique by authoring
 -- discipline; the D4 lint enforces per-mode resolution).

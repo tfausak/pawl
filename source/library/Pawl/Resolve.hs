@@ -200,8 +200,9 @@ readsX = any effectReadsX
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
 -- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
--- to keep mana abilities off the stack, and by Mana.manaTypesOf to enumerate what
--- a source could produce. Casing on Effect is Resolve's charter.
+-- to keep mana abilities off the stack, and by Mana.manaRoutesOfGiven to
+-- enumerate what one activation of a source would add. Casing on Effect is
+-- Resolve's charter.
 --
 -- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
 -- asks whether the ability "could add mana", which an unresolved colour choice

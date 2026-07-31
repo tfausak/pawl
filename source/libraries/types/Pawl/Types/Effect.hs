@@ -50,8 +50,11 @@ data Effect card
     -- applies it.
     ChangeText SlotName
   | -- CR 605: add one unit of mana, of the type the ManaProduction names -- one
-    -- fixed type, or one colour its controller chooses (CR 105.4). Executed by
-    -- Mana.tapForMana at payment (CR 605.3b: a mana ability never uses the stack);
+    -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
+    -- mode adding more says so by holding the opcode more than once: Sol Ring's
+    -- "{T}: Add {C}{C}" is two of these, and Mana.manaRoutesOfGiven reads a
+    -- mode's whole list as one activation's yield. Executed by Mana.tapForMana at
+    -- payment (CR 605.3b: a mana ability never uses the stack);
     -- Resolve.applyEffect never runs it. Read by Resolve.manaProduced (the
     -- "produces mana?" ABI bit).
     AddMana ManaProduction

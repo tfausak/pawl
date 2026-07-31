@@ -411,17 +411,22 @@ manaTests registry =
         HU.assertBool "bob received none" (null (manaUnitsOf (Mana.poolOf S.bob after)))
     ]
 
--- Answers Prompt.ChooseManaType with `wanted` whenever it is on offer, and
--- defers everything else to S.identityAnswer. The ChooseManaType sibling of
--- prefersSource: a pair of tests differing only in this colour proves the
--- ANSWER decides what is produced, rather than the order Mana.manaTypesOf
--- happens to return.
+-- Answers Prompt.ChooseManaYield with the ONE-UNIT yield of `wanted` whenever it
+-- is on offer, and defers everything else to S.identityAnswer. The
+-- ChooseManaYield sibling of prefersSource: a pair of tests differing only in
+-- this colour proves the ANSWER decides what is produced, rather than the order
+-- Mana.manaYieldsOf happens to return.
+--
+-- One unit, because every candidate a colour choice reaches is one mana: a
+-- source whose yield is longer offers it whole (Sol Ring), and no card in the
+-- pool both chooses a colour and adds twice.
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
-  Prompt.ChooseManaType _ _ _ candidates ->
-    if elem (ManaType.Colored wanted) (NonEmpty.toList candidates)
-      then ManaType.Colored wanted
-      else NonEmpty.head candidates
+  Prompt.ChooseManaYield _ _ _ candidates ->
+    let yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted}]
+     in if elem yield (NonEmpty.toList candidates)
+          then yield
+          else NonEmpty.head candidates
   _ -> S.identityAnswer p
 
 -- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
@@ -434,7 +439,8 @@ castOffBoard answer permanents spell =
    in S.runPure answer afterCast Stack.resolveTop
 
 -- The mana Alice's pool holds after tapping `oid` with every prompt answered by
--- `answer` -- the observable that says which type a multi-type source produced.
+-- `answer` -- the observable that says WHAT a source produced: which type, where
+-- it offers several, and how much, where one activation adds more than one.
 tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> [ManaType.ManaType]
 tappedFor answer oid gs = case Mana.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
@@ -519,13 +525,13 @@ anyColorTests registry =
         HU.assertEqual "choosing black" [ManaType.Colored Color.Black] (tappedFor (prefersColor Color.Black) mountainId gs)
         HU.assertEqual "choosing red" [ManaType.Colored Color.Red] (tappedFor (prefersColor Color.Red) mountainId gs),
       -- The elision side of the invariant: where the rules leave nothing to ask,
-      -- do not ask. A Forest produces one type, so no ChooseManaType is raised.
-      HU.testCase "CR 605 a single-type source is not asked which type to produce" $ do
+      -- do not ask. A Forest offers one yield, so no ChooseManaYield is raised.
+      HU.testCase "CR 605 a single-yield source is not asked what to produce" $ do
         forest <- Registry.printing registry "Forest"
         birds <- Registry.printing registry "Birds of Paradise"
         let countingAnswer :: Prompt.Prompt r -> State.State Int r
             countingAnswer p = case p of
-              Prompt.ChooseManaType {} -> do
+              Prompt.ChooseManaYield {} -> do
                 State.modify (+ 1)
                 pure (S.identityAnswer p)
               _ -> pure (S.identityAnswer p)
@@ -643,6 +649,70 @@ upwellingTests registry =
         HU.assertEqual "Unsummon is on the stack" 1 (length (GameState.stack spent))
     ]
 
+-- CR 605.3b: one activation of one mana ability, adding TWO mana. Sol Ring ({1}
+-- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
+-- unit, and it is what separates "the types this source could produce" from "the
+-- mana this source produces when it is tapped" (#238).
+solRingTests :: Registry.Type.Registry -> Tasty.TestTree
+solRingTests registry =
+  Tasty.testGroup
+    "Sol Ring"
+    [ -- The unit fact. A mode holding two AddMana effects is ONE activation
+      -- yielding two mana, not a choice between two singles.
+      HU.testCase "CR 605 tapping Sol Ring adds two colorless mana, not one" $ do
+        solRing <- Registry.printing registry "Sol Ring"
+        let (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual
+          "two units of {C}"
+          [ManaType.Colorless, ManaType.Colorless]
+          (tappedFor S.identityAnswer solRingId gs),
+      -- The payability half, which reads the same yield through a different door:
+      -- CR 118.3 counts an untapped source as the mana it could make, so one Sol
+      -- Ring is two supplies and pays {2} by itself.
+      HU.testCase "CR 118.3 a lone Sol Ring pays {2} by itself" $ do
+        solRing <- Registry.printing registry "Sol Ring"
+        let (_, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertBool "{2} is affordable" (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs)
+        HU.assertBool "{3} is not" (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)),
+      -- Both supplies a Sol Ring contributes are COLORLESS, so they swell the
+      -- generic count and serve no typed demand. Discriminating against a supply
+      -- model that merely counted a source twice without keeping its types: that
+      -- one passes the first assertion and fails the second.
+      HU.testCase "CR 118.3 a Sol Ring and a Mountain pay {2}{R}, but not {R}{R}" $ do
+        solRing <- Registry.printing registry "Sol Ring"
+        mountain <- Registry.printing registry "Mountain"
+        let (_, g1) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+            (_, gs) = S.addCreature mountain S.alice g1
+            red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        HU.assertBool "{2}{R} is affordable" (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]) gs)
+        HU.assertBool "{R}{R} is not" (not (Mana.canPay S.alice (ManaCost.MkManaCost [red, red]) gs)),
+      -- The gameplay-level proof (design.md section 4): a real spell cast end to
+      -- end off a single permanent, which no one-mana-per-source engine can do.
+      HU.testCase "CR 601.2g Sapphire Medallion is cast off a lone Sol Ring" $ do
+        solRing <- Registry.printing registry "Sol Ring"
+        sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
+        let resolved = castOffBoard S.identityAnswer [solRing] sapphireMedallion
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertEqual "the Medallion resolved" 1 (S.countOnBattlefieldByName (Text.pack "Sapphire Medallion") S.alice resolved)
+        HU.assertEqual "the Sol Ring is tapped" 1 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and both mana were spent" 0 (poolSize S.alice resolved),
+      -- The elision side of the invariant: Sol Ring offers exactly one yield, so
+      -- there is nothing to ask -- and NOT because its two mana are the same
+      -- type, which would be the engine choosing. "CR 605 a single-yield source
+      -- is not asked what to produce" above is the counterpart that keeps a real
+      -- choice asked.
+      HU.testCase "CR 605 Sol Ring is not asked what to produce" $ do
+        solRing <- Registry.printing registry "Sol Ring"
+        let countingAnswer :: Prompt.Prompt r -> State.State Int r
+            countingAnswer p = case p of
+              Prompt.ChooseManaYield {} -> do
+                State.modify' (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (S.identityAnswer p)
+            (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "nothing to ask" 0 (State.execState (Engine.runGame countingAnswer gs (Mana.tapForMana solRingId)) 0)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
@@ -650,6 +720,7 @@ tests registry =
     [ manaTests registry,
       castabilityTests registry,
       anyColorTests registry,
+      solRingTests registry,
       hybridTests registry,
       monocoloredHybridTests registry,
       phyrexianTests registry,

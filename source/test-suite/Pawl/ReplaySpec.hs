@@ -26,9 +26,11 @@ import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
@@ -47,6 +49,11 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+
+-- The one-unit yield of a single-colour mana ability, which is what a
+-- ChooseManaYield candidate looks like for every source but Sol Ring.
+oneMana :: Color.Color -> Mana.Mana
+oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color}]
 
 combatReplayTests :: Tasty.TestTree
 combatReplayTests =
@@ -225,21 +232,21 @@ combatReplayTests =
               "the head"
               (ObjectId.MkObjectId 7)
               (Replay.defaultAnswer (Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
-          -- CR 605.3b / 105.4: the colour an any-colour source was tapped for is a
+          -- CR 605.3b / 105.4: the mana an any-colour source was tapped for is a
           -- decision, so it has to survive a transcript like any other.
-          HU.testCase "ChooseManaType round-trips through the transcript" $
-            let black = ManaType.Colored Color.Black
-                red = ManaType.Colored Color.Red
-                p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (black NonEmpty.:| [red])
+          HU.testCase "ChooseManaYield round-trips through the transcript" $
+            let black = oneMana Color.Black
+                red = oneMana Color.Red
+                p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (black NonEmpty.:| [red])
              in do
                   HU.assertEqual "black round trips" (Just black) (Replay.decode p (Replay.encode p black))
                   -- Discriminating for the same reason the pair above is: a decode
                   -- that returned the head would pass one leg by accident.
                   HU.assertEqual "red round trips" (Just red) (Replay.decode p (Replay.encode p red)),
-          HU.testCase "a mana-source choice does not decode as a mana-type choice" $
-            -- Discriminating: this fails if ChooseManaType reuses ChoseManaSource
+          HU.testCase "a mana-source choice does not decode as a mana-yield choice" $
+            -- Discriminating: this fails if ChooseManaYield reuses ChoseManaSource
             -- rather than getting its own constructor.
-            let p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red])
+            let p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red])
              in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
           -- CR 701.34a: who was proliferated onto is a decision, so it has to
           -- survive a transcript like any other.
@@ -347,11 +354,11 @@ combatReplayTests =
                       (PhyrexianPayment.PaysLife NonEmpty.:| [PhyrexianPayment.PaysMana])
                   )
               ),
-          HU.testCase "a short transcript produces the first offered mana type" $
+          HU.testCase "a short transcript produces the first offered mana yield" $
             HU.assertEqual
               "the head"
-              (ManaType.Colored Color.Black)
-              (Replay.defaultAnswer (Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red]))),
+              (oneMana Color.Black)
+              (Replay.defaultAnswer (Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red]))),
           HU.testCase "a short transcript defends with the first candidate" $
             -- Discriminating against a defaultAnswer that returned the active
             -- player, or a candidate not on the offered list: the first candidate
