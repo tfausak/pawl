@@ -11,6 +11,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
+import Pawl.Types.PhaseSelector (PhaseSelector)
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 
 allPhases :: [Phase]
@@ -111,6 +113,40 @@ thisPhase :: Phase -> Seq Phase -> (Seq Phase, Seq Phase)
 thisPhase phase remaining = case lastStepOf phase >>= \step -> Seq.elemIndexL step remaining of
   Nothing -> (Seq.empty, remaining)
   Just i -> Seq.splitAt (i + 1) remaining
+
+-- CR 500.11: everything left of the turn AFTER this phase -- what remains once a
+-- skipped phase has been proceeded past "as though it didn't exist".
+--
+-- The other half of `thisPhase`'s split, exactly as dropSkippedCombatSteps below
+-- keeps the first half. Positional for the same CR 500.8 reason: skipping THIS
+-- combat phase says nothing about a second one added later in the turn.
+dropRestOfPhase :: Phase -> Seq Phase -> Seq Phase
+dropRestOfPhase phase = snd . thisPhase phase
+
+-- CR 500.1: the whole PHASE that is about to begin, if this step is its first.
+-- Nothing for every other step, and for both main phases -- CR 505.2 makes a
+-- main phase its own single schedule entry, so PhaseSelector.Step already names
+-- it and a second question about it would be the same question twice.
+--
+-- This is what pins CR 614.10's "once a step, phase, or turn has started, it can
+-- no longer be skipped" for a phase rather than a step: Engine.runStep asks the
+-- phase question only where this answers Just, so a skip that arrives during a
+-- phase cannot take the rest of it.
+--
+-- CR 501.1 names the beginning phase's first step (untap), CR 506.1 the combat
+-- phase's (beginning of combat) and CR 512.1 the ending phase's (end). A CR
+-- 500.8 additional combat phase begins at that same step, because
+-- expandExtraPhase below builds it from CR 506.1's list.
+phaseBeginningAt :: Phase -> Maybe PhaseSelector
+phaseBeginningAt phase = case phase of
+  Phase.Beginning BeginningStep.Untap -> Just PhaseSelector.BeginningPhase
+  Phase.Beginning _ -> Nothing
+  Phase.PrecombatMain -> Nothing
+  Phase.Combat CombatStep.BeginningOfCombat -> Just PhaseSelector.CombatPhase
+  Phase.Combat _ -> Nothing
+  Phase.PostcombatMain -> Nothing
+  Phase.Ending EndingStep.EndStep -> Just PhaseSelector.EndingPhase
+  Phase.Ending _ -> Nothing
 
 -- CR 508.8 / 500.11: drop the declare blockers and combat damage steps of THE
 -- COMBAT PHASE NOW UNDER WAY from what is left of the turn, so it proceeds "as

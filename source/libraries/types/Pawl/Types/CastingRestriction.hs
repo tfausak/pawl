@@ -31,8 +31,8 @@ data CastingRestriction
     -- naming a step and naming a STEPLESS phase (the two main phases) are the same
     -- act here. A phase that HAS steps is not nameable -- "Cast this spell only
     -- during combat" (Mandate of Peace, Angelic Favor) would have to name five
-    -- steps at once -- which is the same gap Pawl.Types.PhasePattern already
-    -- records (#337).
+    -- steps at once. Pawl.Types.PhaseSelector is the type that already says it,
+    -- for skips; this arm does not carry one (#455).
     --
     -- WHOSE turn is a second axis this arm does not carry: "only during an
     -- opponent's upkeep" (Festival) and "only during your end step" (Necrologia)

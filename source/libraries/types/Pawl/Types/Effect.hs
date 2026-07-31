@@ -9,7 +9,7 @@ import Pawl.Types.ManaProduction (ManaProduction)
 import Pawl.Types.Modification (Modification)
 import Pawl.Types.MonarchTarget (MonarchTarget)
 import Pawl.Types.ObjectRef (ObjectRef)
-import Pawl.Types.Phase (Phase)
+import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import Pawl.Types.PlayerRef (PlayerRef)
@@ -248,7 +248,9 @@ data Effect card
     Replace Duration Uses ReplacementEffect
   | -- CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue is
-    -- `SkipNextPhase (InSlot "target") (Beginning DrawStep)`.
+    -- `SkipNextPhase (InSlot "target") (Step (Beginning DrawStep))`; Stonehorn
+    -- Dignitary is `SkipNextPhase (InSlot "target") CombatPhase`, naming a phase
+    -- rather than one of its steps (CR 500.1).
     --
     -- NOT a Replace carrying a PhaseR, and not for want of trying: CR 614.1b
     -- makes this a replacement effect and Replace already installs floating ones,
@@ -269,7 +271,7 @@ data Effect card
     -- Targetless in itself, like GainPlayerCounters: the slot a PlayerRef reads
     -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
     -- "target player", but nothing here demands it.
-    SkipNextPhase PlayerRef Phase
+    SkipNextPhase PlayerRef PhaseSelector
   | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
     -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
     -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way

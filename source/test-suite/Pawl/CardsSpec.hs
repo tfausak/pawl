@@ -34,8 +34,10 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
@@ -44,6 +46,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TokenEntry as TokenEntry
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -332,7 +335,7 @@ tests registry =
           "players skip their upkeep steps"
           [ ReplacementEffect.PhaseR
               PhasePattern.MkPhasePattern
-                { PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep,
+                { PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep),
                   PhasePattern.whosePhase = Nothing
                 }
           ]
@@ -349,7 +352,7 @@ tests registry =
         HU.assertEqual
           "target player skips their next draw step"
           [ ( Optionality.Mandatory,
-              [Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Phase.Beginning BeginningStep.DrawStep)]
+              [Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep))]
             )
           ]
           (modeShapes (CardT.spell c))
@@ -402,7 +405,37 @@ tests registry =
         HU.assertEqual
           "and it targets nothing"
           [[Map.empty]]
+          (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- CR 500.1 / 500.11: the pool's first card to skip a phase that HAS steps.
+      -- The whole point of the card is the second element of the SkipNextPhase
+      -- payload: PhaseSelector.CombatPhase, which no Pawl.Types.Phase value can
+      -- spell, next to Fatigue's PhaseSelector.Step just above.
+      HU.testCase "stonehorn-dignitary.json loads as a {3}{W} 1/4 whose enters trigger skips a whole combat phase" $ do
+        c <- Registry.card registry "Stonehorn Dignitary"
+        HU.assertEqual "name" (Text.pack "Stonehorn Dignitary") (CardT.name c)
+        HU.assertEqual "{3}{W}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.White)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Rhino Soldier"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Rhino, Subtype.Soldier]))
+          (CardT.typeLine c)
+        HU.assertEqual "1/4" (Just (Power.MkPower (Quantity.Literal 1)), Just (Toughness.MkToughness (Quantity.Literal 4))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual
+          "one trigger, on this creature entering"
+          [TriggerCondition.SelfEnters]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "target opponent skips their next combat phase"
+          [ [ ( Optionality.Mandatory,
+                [Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase]
+              )
+            ]
+          ]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "aimed at an OPPONENT, which is what makes the skip theirs and not yours"
+          [[Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players (Just (Filter.IsPlayer PlayerRelation.Opponent)))]]
           (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
+        HU.assertEqual "nothing of it is a static or a replacement" ([], []) (CardT.staticAbilities c, CardT.replacementEffects c)
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion

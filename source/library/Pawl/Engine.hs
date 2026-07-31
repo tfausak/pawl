@@ -54,6 +54,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Program as Program
 import Pawl.Types.Prompt (Prompt)
@@ -988,10 +989,41 @@ runStep = do
   -- difference is that CR 508.8 is a RULE, known one step ahead, while a
   -- replacement effect has to be asked at the moment the event would happen,
   -- because CR 616.1's loop reads the board as it then is.
-  begins <- Replacement.beginsPhase phase active
-  if not begins
-    then advance
-    else runStepThatBegan phase
+  --
+  -- TWO questions, in CR 500.1's own order: a phase that has steps is offered
+  -- first, then the step. `Turn.phaseBeginningAt` answers Just only at a stepped
+  -- phase's FIRST step, so the phase question is asked once per phase and never
+  -- once the phase is under way -- CR 614.10 again, read at phase grain. A main
+  -- phase raises only the step question, because CR 505.2 makes it one schedule
+  -- entry and asking twice about it would be asking the same thing twice.
+  phaseBegins <- case Turn.phaseBeginningAt phase of
+    Nothing -> pure True
+    Just selector -> Replacement.beginsPhase selector active
+  if not phaseBegins
+    then skipWholePhase phase
+    else do
+      begins <- Replacement.beginsPhase (PhaseSelector.Step phase) active
+      if not begins
+        then advance
+        else runStepThatBegan phase
+
+-- CR 500.11: proceed past a SKIPPED PHASE "as though it didn't exist" -- so the
+-- rest of its steps leave the schedule and `advance` picks up whatever follows
+-- the phase (CR 511.3's postcombat main phase, for the combat one Stonehorn
+-- Dignitary takes).
+--
+-- Positional, via Turn.dropRestOfPhase, not a filter: CR 500.8 lets a second
+-- combat phase be added later in the same turn, and skipping this one says
+-- nothing about that one -- the same reason CR 508.8's step skip is positional.
+--
+-- Nothing about the skipped phase is announced. CR 614.6 makes a replaced event
+-- one that "never happens", and CR 500.6's "at the beginning of" triggers hang
+-- off the CR 603.2b step records `runStepThatBegan` writes, none of which this
+-- path reaches.
+skipWholePhase :: Phase.Phase -> Game ()
+skipWholePhase phase = do
+  State.modify' (\gs -> gs {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)})
+  advance
 
 -- The body of a step that was not skipped, split out only so `runStep`'s CR
 -- 614.1b check reads as a guard rather than as a nesting level.

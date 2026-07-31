@@ -256,6 +256,7 @@ library types
     Pawl.Types.PendingTrigger
     Pawl.Types.Phase
     Pawl.Types.PhasePattern
+    Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Player
     Pawl.Types.PlayerCounterKind

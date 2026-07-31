@@ -77,6 +77,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -319,10 +320,13 @@ tests registry =
               Codec.jsonToEffect
               (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells),
           -- CR 614.10a: Fatigue's slot read, plus the self-scoped arm Avizoa's
-          -- "you skip your next untap step" would write.
+          -- "you skip your next untap step" would write -- and Stonehorn
+          -- Dignitary's whole-phase selector, the arm a Phase alone cannot spell
+          -- (CR 500.1).
           HU.testCase "SkipNextPhase" $ do
-            roundTrip "skip slot" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Phase.Beginning BeginningStep.DrawStep))
-            roundTrip "skip you" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (Phase.Beginning BeginningStep.Untap)),
+            roundTrip "skip slot" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep)))
+            roundTrip "skip you" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))
+            roundTrip "skip a whole phase" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase),
           -- CR 500.7: Time Warp's slot read, plus the self-scoped arm a "take an
           -- extra turn after this one" card would write.
           HU.testCase "TakeExtraTurn" $ do
@@ -672,10 +676,15 @@ tests registry =
           -- is covered here for the same reason SetController's PlayerId is --
           -- the codec has to carry it either way.
           HU.testCase "a PhaseR replacement round-trips" $ do
-            let re = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep, PhasePattern.whosePhase = Nothing}
+            let re = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep), PhasePattern.whosePhase = Nothing}
             HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re))
-            let scoped = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.DrawStep, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
+            let scoped = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep), PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
             HU.assertEqual "and so does a player-scoped one" (Right scoped) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson scoped))
+            -- CR 500.1: the whole-phase arm, which is the shape a Phase value
+            -- cannot carry -- Stonehorn Dignitary's, once Resolve has baked the
+            -- player its resolution named.
+            let wholePhase = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
+            HU.assertEqual "and so does a whole-phase one" (Right wholePhase) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson wholePhase))
         ],
       Tasty.testGroup
         "modal"

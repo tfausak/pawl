@@ -52,8 +52,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -336,6 +336,13 @@ applies gs event candidate =
         -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
         -- names exactly which one -- and, for a player-scoped skip, whose.
         --
+        -- EQUALITY on the PhaseSelector, so a pattern naming a whole phase
+        -- (Stonehorn Dignitary's CombatPhase) matches only the phase question
+        -- Engine.runStep raises at that phase's first step, and one naming a step
+        -- matches only the step question. Neither can be mistaken for the other,
+        -- which is what keeps CR 500.1's "further broken down into steps" out of
+        -- this comparison.
+        --
         -- The event's PlayerId is the ACTIVE player (Engine.runStep), which is
         -- also whose step this is: every step and phase in a turn belongs to the
         -- player whose turn it is. So Fatigue's "target player skips their next
@@ -347,8 +354,8 @@ applies gs event candidate =
         -- The SOURCE's controller is not consulted: unlike matchesController's CR
         -- 109.5 "you", the player here was named by the effect, not derived, and
         -- Fatigue's caster is free to name themselves.
-        (ReplacementEffect.PhaseR pat, ProposedEvent.WouldBeginPhase phase pid) ->
-          PhasePattern.whichPhase pat == phase
+        (ReplacementEffect.PhaseR pat, ProposedEvent.WouldBeginPhase selector pid) ->
+          PhasePattern.whichPhase pat == selector
             && maybe True (== pid) (PhasePattern.whosePhase pat)
         -- Every row below falls through to False, because an arm ABOVE already
         -- matches every event of that class -- a row below only fires for a
@@ -901,7 +908,9 @@ asTokens event = case event of
 -- of `pid`. False means a skip took it, and CR 500.11's "proceed past it as
 -- though it didn't exist" is then the caller's whole obligation -- there is no
 -- rewritten event to carry out, because CR 614.1b replaces a skipped step "with
--- nothing".
+-- nothing". How far "past it" reaches is the caller's too: one schedule entry
+-- for a PhaseSelector.Step, the phase's remaining entries for a whole phase
+-- (Engine.runStep, Turn.dropRestOfPhase).
 --
 -- Answers a Bool rather than the settled event, unlike resolveDestruction, whose
 -- `Just` had to carry an identity because a rewrite can redirect which object is
@@ -910,14 +919,14 @@ asTokens event = case event of
 -- was proposed and there is no second identity for the caller to learn.
 --
 -- The typed door Pawl.Engine uses, so Engine never cases on a ProposedEvent.
-beginsPhase :: Phase -> PlayerId -> Game Bool
-beginsPhase phase pid = do
-  outcome <- applyReplacements (ProposedEvent.WouldBeginPhase phase pid)
+beginsPhase :: PhaseSelector -> PlayerId -> Game Bool
+beginsPhase selector pid = do
+  outcome <- applyReplacements (ProposedEvent.WouldBeginPhase selector pid)
   pure (Maybe.isJust (outcome >>= asPhaseBegin))
 
-asPhaseBegin :: ProposedEvent -> Maybe (Phase, PlayerId)
+asPhaseBegin :: ProposedEvent -> Maybe (PhaseSelector, PlayerId)
 asPhaseBegin event = case event of
-  ProposedEvent.WouldBeginPhase phase pid -> Just (phase, pid)
+  ProposedEvent.WouldBeginPhase selector pid -> Just (selector, pid)
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing

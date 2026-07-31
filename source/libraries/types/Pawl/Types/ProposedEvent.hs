@@ -5,7 +5,7 @@ import Pawl.Types.Card (Card)
 import Pawl.Types.CounterKind (CounterKind)
 import Pawl.Types.DamageEvent (DamageEvent)
 import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.Phase (Phase)
+import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.Regenerability (Regenerability)
 import Pawl.Types.ZoneChange (ZoneChange)
@@ -45,5 +45,12 @@ data ProposedEvent
     -- a skip that takes it leaves no trace -- CR 614.10's "once a step, phase, or
     -- turn has started, it can no longer be skipped" read as the moment this
     -- event exists.
-    WouldBeginPhase Phase PlayerId
+    --
+    -- A PhaseSelector, not a Phase, because CR 500.11 lets a skip name a whole
+    -- PHASE and CR 500.1's beginning, combat and ending phases are more than one
+    -- schedule entry each. Engine.runStep therefore raises this TWICE at the
+    -- first step of such a phase -- once for the phase, once for the step -- and
+    -- CR 614.10's "once a step, phase, or turn has started" is what keeps the
+    -- phase question to that one moment.
+    WouldBeginPhase PhaseSelector PlayerId
   deriving (Eq, Show)

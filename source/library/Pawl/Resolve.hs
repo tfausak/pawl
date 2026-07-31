@@ -1422,7 +1422,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   ActiveReplacement.uses = uses
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
-  Effect.SkipNextPhase ref phase -> do
+  Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the
     -- sorcery (CR 614.3: floating replacements "last until they're used up").
@@ -1441,6 +1441,10 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     -- yet -- "the other will remain until another occurrence can be skipped".
     --
     -- CR 113.7: the SOURCE is this effect's source, as Replace's is.
+    --
+    -- The PhaseSelector goes in untouched: whether it names one step or a whole
+    -- phase (CR 500.1) is card data, and only Pawl.Replacement's comparison and
+    -- Pawl.Engine's boundary question read it.
     gs <- State.get
     let named = playerRefPlayers chosen legality controller gs ref
         install pid g =
@@ -1450,7 +1454,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   { ActiveReplacement.effect =
                       ReplacementEffect.PhaseR
                         PhasePattern.MkPhasePattern
-                          { PhasePattern.whichPhase = phase,
+                          { PhasePattern.whichPhase = selector,
                             -- The player the resolution named, baked now. Card
                             -- data cannot name one (see
                             -- Pawl.Types.PhasePattern).
