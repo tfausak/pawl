@@ -24,6 +24,23 @@ data Modification
   | ModifyPowerToughness Quantity Quantity -- layer 7c (Giant Growth +3/+3)
   | SetLandSubtype Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
   | AddLandSubtype Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
+  | -- layer 4, CR 205.1a/205.1b set (Turn to Frog -> Frog). A SET over the
+    -- CREATURE types only, which is narrower than either land arm above: CR
+    -- 205.1b's last sentence says such an effect lets the object "retain all of
+    -- its prior card types and subtypes other than creature types, but replace
+    -- any existing creature types". CR 205.3m (Pawl.Engine.Subtype.isCreatureType)
+    -- is the list of what that reaches.
+    --
+    -- No AddCreatureSubtype beside it. Unlike SetColor's missing AddColor -- a
+    -- RULES answer, since CR 105.3 makes every colour change a replacement --
+    -- adding a creature type is a real thing an effect can do ("in addition to
+    -- its other types"). It is absent only because no card in the pool does it,
+    -- so the constructor would have no producer.
+    --
+    -- CR 205.1b says "[creature type or types]" and this carries exactly one,
+    -- the same narrowing SetLandSubtype takes and for the same reason -- no card
+    -- in the pool sets more than one.
+    SetCreatureSubtype Subtype
   | AddCardType CardType -- layer 4 (Opalescence -> Creature)
   | ChangeSubtypeWord Subtype Subtype -- layer 3, CR 612 (Magical Hack: from -> to)
   | -- layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at

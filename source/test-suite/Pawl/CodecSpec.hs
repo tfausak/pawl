@@ -351,6 +351,15 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "m3" modificationToJson jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)
     Spec.it s "SetControllerToSource" $
       roundTrip s "m4" modificationToJson jsonToModification Modification.SetControllerToSource
+    -- Both subtype SETS carry a bare Subtype, so what this pins is the TAG:
+    -- Turn to Frog decoding as a SetLandSubtype would strip its target's
+    -- abilities under CR 305.7 and leave a creature that is a Frog LAND.
+    Spec.it s "SetCreatureSubtype does not share SetLandSubtype's tag" $ do
+      roundTrip s "m5" modificationToJson jsonToModification (Modification.SetCreatureSubtype Subtype.Frog)
+      Spec.assertBool
+        s
+        (modificationToJson (Modification.SetCreatureSubtype Subtype.Frog) /= modificationToJson (Modification.SetLandSubtype Subtype.Frog))
+        "the creature set and the land set encode differently"
     Spec.it s "Affected round-trips (TheseObjects, Matching, Matching's \"each other\" shape, and AttachedPlayerControls)" $
       mapM_
         (roundTrip s "affected" affectedToJson jsonToAffected)

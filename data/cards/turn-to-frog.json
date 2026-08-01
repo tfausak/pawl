@@ -1,0 +1,123 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Turn to Frog",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "LoseAllAbilities"
+              },
+              "target"
+            ]
+          },
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "SetColor",
+                "value": [
+                  {
+                    "type": "Blue"
+                  }
+                ]
+              },
+              "target"
+            ]
+          },
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "SetCreatureSubtype",
+                "value": {
+                  "type": "Frog"
+                }
+              },
+              "target"
+            ]
+          },
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "SetBasePowerToughness",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              },
+              "target"
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "pool": {
+                "type": "Creatures"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}
