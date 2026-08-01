@@ -89,11 +89,12 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 -- and Turn.dropSkippedCombatSteps does not touch it -- that phase reaches its
 -- own declare attackers step and asks this question again for itself.
 --
--- No GAMEPLAY-level test exercises the second clause on its own -- a creature put
--- onto the battlefield attacking while nothing was declared. The pool's only
--- source of one is an attack trigger, which cannot fire unless its own creature
--- was declared, so TurnSpec proves that clause by calling
--- putOntoBattlefieldAttacking directly (#370).
+-- The second clause on its own -- a creature put onto the battlefield attacking
+-- while NOTHING was declared -- is proved at gameplay level by Meandering
+-- Towershell, in CombatSpec's MeanderingTowershell group: its delayed ability
+-- returns it attacking on a later turn, on which its controller declares
+-- nothing. TurnSpec's direct call to putOntoBattlefieldAttacking states the same
+-- clause with no card in the way, and both are kept.
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
   if not (Combat.attackersJoined (GameState.combat gs))
@@ -843,8 +844,10 @@ declareAttackers pid = do
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
 -- chooses which defending player, planeswalker a defending player controls, or
 -- battle a defending player protects it's attacking as it enters the
--- battlefield." Resolve's Create arm calls this for each token an effect says is
--- attacking; nothing else does.
+-- battlefield." Resolve calls this for each permanent an effect's EntryRiders say
+-- is attacking -- a token its Create arm minted (Hanweir Garrison's), or a card
+-- its MoveToZone arm returned to the battlefield (Meandering Towershell's);
+-- nothing else does.
 --
 -- The creature was never DECLARED, and this function's whole difference from
 -- declareAttackers is what follows from that. It records no
@@ -878,10 +881,13 @@ declareAttackers pid = do
 -- defending player (CR 506.2 at two seats; CR 802's attack-multiple-players
 -- option is unavailable, #175), no ATTACKABLE planeswalkers (the card type
 -- exists, but CR 306.6 does not, #493) and no battles (#302).
--- Hanweir Garrison's own ruling is what makes the choice real once any of those
--- lands -- "You choose which player, planeswalker, or battle each token is
--- attacking as you create the tokens ... the tokens don't both have to attack the
--- same one" -- so this becomes a per-token prompt then (#367).
+-- Two rulings make the choice real once any of those lands -- Hanweir Garrison's
+-- ("You choose which player, planeswalker, or battle each token is attacking as
+-- you create the tokens ... the tokens don't both have to attack the same one")
+-- and Meandering Towershell's ("you choose which opponent or opposing
+-- planeswalker it's attacking. It doesn't have to attack the same opponent ...
+-- that it was when it was exiled") -- so this becomes a per-permanent prompt
+-- then (#367).
 --
 -- CR 508.4d ("a creature that's put onto the battlefield attacking during the
 -- declare blockers step, combat damage step, or end of combat step enters the

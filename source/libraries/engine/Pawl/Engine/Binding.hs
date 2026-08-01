@@ -59,8 +59,9 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- delayed one (CardSpec.hs, "every slot a delayed ability reads is bound by its
 -- card") and the triggered one ("every slot a triggered ability reads is bound
 -- for its condition") -- and neither runs into the equality trap above: both add
--- Binding.triggerSource to the AVAILABLE side (the slots a Create binds, plus
--- this one, plus the condition's own event slots for the triggered lint) and
+-- Binding.triggerSource to the AVAILABLE side (the slots a Create or a
+-- MoveToZone binds, plus this one, plus the condition's own event slots for the
+-- triggered lint) and
 -- check the read slots are a SUBSET of that, never an equality. A subset check
 -- has no "declared but never read" half to retire, so reserved-slot subtraction
 -- is not needed in either. This warning is about a DIFFERENT, still-hypothetical

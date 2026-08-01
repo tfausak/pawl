@@ -2,6 +2,7 @@ module Pawl.Types.LastKnown where
 
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
+import Pawl.Types.Source (Source)
 
 -- CR 608.2h: what an object WAS, filed under the id it had while it existed --
 -- "if it's no longer in that zone ... the effect uses the object's last known
@@ -9,14 +10,24 @@ import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 -- (Pawl.Engine.Event.changeZoneAttaching) as the object ceases, from the same
 -- pre-move state the GameEvent.Moved snapshot is taken against.
 --
--- A record of TWO things rather than the characteristics alone, because CR
--- 613.1b control is not one of them: CR 109.3 lists an object's characteristics
--- and then says outright that "characteristics don't include ... an object's
--- owner or controller", so control has no home in ProjectedCharacteristics --
--- while "who controlled it" is exactly what CR 603.3a asks of a triggered
--- ability whose source is already gone.
+-- A record of THREE things rather than the characteristics alone, because two of
+-- the questions CR 608.2h is asked have no home in ProjectedCharacteristics.
 --
--- Both fields STRICT (!), for GameEvent.Moved's reason: entries are keyed by an
+-- CR 613.1b control is not a characteristic: CR 109.3 lists an object's
+-- characteristics and then says outright that "characteristics don't include ...
+-- an object's owner or controller" -- while "who controlled it" is exactly what
+-- CR 603.3a asks of a triggered ability whose source is already gone.
+--
+-- Neither is the object's SOURCE -- what kind of object it was, and the card or
+-- token text behind it. The projection is a fold over characteristics and CR
+-- 603.7's delayed-ability declarations are not among them (they are read
+-- straight from the card; see Pawl.Types.Card.delayedAbilities), so an
+-- ArmDelayedTrigger whose source has just exiled itself -- Meandering
+-- Towershell's, which does exactly that one opcode earlier -- has nowhere else
+-- to find the ability it names. Pawl.Engine.Game.cardOfWithLastKnown is the
+-- reader.
+--
+-- All three fields STRICT (!), for GameEvent.Moved's reason: entries are keyed by an
 -- id that no longer exists and are never pruned, so an unforced field would be a
 -- thunk closing over the whole pre-move GameState, retained for the rest of the
 -- game instead of the one small value this record is meant to carry.
@@ -28,6 +39,10 @@ data LastKnown = MkLastKnown
     -- since. A permanent stolen by Control Magic was controlled by the thief
     -- right up to the moment it died, and CR 603.3a hands that player its
     -- trigger.
-    controller :: !PlayerId
+    controller :: !PlayerId,
+    -- CR 608.2h: what KIND of object it was and the card behind it -- the same
+    -- Object.source the live object carried, copied as it ceased. Strict for the
+    -- reason the other two are.
+    source :: !Source
   }
   deriving (Eq, Show)

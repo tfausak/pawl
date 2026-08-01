@@ -20,6 +20,9 @@ delayedTriggerToJson d =
       (Text.pack "source", objectIdToJson (DelayedTrigger.source d)),
       (Text.pack "controller", playerIdToJson (DelayedTrigger.controller d)),
       (Text.pack "bindings", bindingsToJson (DelayedTrigger.bindings d)),
+      -- CR 603.7a: absent for an ability armed with no onset gate, which is the
+      -- rule's default and every entry in the pool but Meandering Towershell's.
+      (Text.pack "notBefore", Json.maybeTo Json.natTo (DelayedTrigger.notBefore d)),
       -- CR 603.7b: absent for an ability with no stated duration, which is the
       -- rule's default and every entry in the pool but Full Throttle's.
       (Text.pack "expiry", Json.maybeTo expiryToJson (DelayedTrigger.expiry d))
@@ -32,6 +35,7 @@ jsonToDelayedTrigger value = do
   s <- Json.field (Text.pack "source") ps >>= jsonToObjectId
   c <- Json.field (Text.pack "controller") ps >>= jsonToPlayerId
   b <- Json.field (Text.pack "bindings") ps >>= jsonToBindings
+  n <- Json.maybeFrom Json.natFrom (Json.getOpt (Text.pack "notBefore") ps)
   e <- Json.maybeFrom jsonToExpiry (Json.getOpt (Text.pack "expiry") ps)
   pure
     DelayedTrigger.MkDelayedTrigger
@@ -39,6 +43,7 @@ jsonToDelayedTrigger value = do
         DelayedTrigger.source = s,
         DelayedTrigger.controller = c,
         DelayedTrigger.bindings = b,
+        DelayedTrigger.notBefore = n,
         DelayedTrigger.expiry = e
       }
 

@@ -108,6 +108,8 @@ data Subtype
     Wraith
   | -- CR 205.3m (a creature type; Icehide Golem's).
     Golem
+  | -- CR 205.3m (a creature type; Meandering Towershell's).
+    Turtle
   | -- CR 205.3m (a creature type; Blurred Mongoose's).
     Mongoose
   deriving (Eq, Ord, Show)

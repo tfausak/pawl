@@ -8,7 +8,7 @@ import Pawl.Json.Value (Value (Object))
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- An ObjectRef is told apart by JSON TYPE rather than by a tag, the shape
--- Effect.Create's optional TokenEntry already uses: a slot name is a string
+-- Effect.Create's optional EntryRiders already uses: a slot name is a string
 -- (slotNameToJson) and a Filter is an object, so the two can never be confused.
 -- Untagged on purpose -- `"target"` is what an object-affecting effect has always
 -- written, and it goes on meaning the one slot it always meant.

@@ -1,0 +1,140 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "SacrificeThis"
+          }
+        ],
+        "mana": []
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Trample"
+                    }
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      },
+      "timing": {
+        "type": "DuringPhase",
+        "value": [
+          {
+            "type": "Beginning",
+            "value": {
+              "type": "Upkeep"
+            }
+          },
+          {
+            "type": "ControllersTurn"
+          }
+        ]
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Llanowar Augur",
+  "power": {
+    "type": "Literal",
+    "value": 0
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Elf"
+      },
+      {
+        "type": "Shaman"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

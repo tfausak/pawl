@@ -8,6 +8,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -139,9 +140,37 @@ insertIntoZone zone pid oid gs = case zone of
 
 -- The card an object is a copy of. Nothing when the id is unknown.
 cardOf :: ObjectId -> GameState -> Maybe Card
-cardOf oid gs = case lookupObject oid gs of
+cardOf oid gs = cardOfSource (fmap Object.source (lookupObject oid gs))
+
+-- CR 608.2h: `cardOf` for an object that may already be gone -- "if the effect
+-- requires information from a specific object, INCLUDING THE SOURCE OF THE
+-- ABILITY ITSELF, the effect uses the current information of that object if it's
+-- in the public zone it was expected to be in; if it's no longer in that zone ...
+-- the effect uses the object's last known information." The live object first,
+-- then the record filed under the id it had while it existed.
+--
+-- Projection.viewWithLastKnown is the same fallback for an object's
+-- CHARACTERISTICS; this is the one for its printed card, which the projection
+-- cannot answer for -- CR 603.7's delayed-ability declarations are card data and
+-- are never projected (see Pawl.Types.Card.delayedAbilities). Its one caller is
+-- Resolve's ArmDelayedTrigger, whose source can have exiled itself an opcode
+-- earlier (Meandering Towershell).
+--
+-- A separate name rather than widening `cardOf`, whose ~20 callers ask a
+-- different question: "what card is this object" is about an object that IS
+-- there, and answering it for one that is not would quietly resurrect a
+-- permanent for every projection and quantity read that goes through it.
+cardOfWithLastKnown :: ObjectId -> GameState -> Maybe Card
+cardOfWithLastKnown oid gs = case lookupObject oid gs of
+  Just obj -> cardOfSource (Just (Object.source obj))
+  Nothing -> cardOfSource (fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs)))
+
+-- The card behind a Source, if it has one. An ability on the stack does not: it
+-- is an object in its own right (CR 113.7a), and the card is its SOURCE's.
+cardOfSource :: Maybe Source.Source -> Maybe Card
+cardOfSource mSource = case mSource of
   Nothing -> Nothing
-  Just obj -> case Object.source obj of
+  Just source -> case source of
     Source.OfCard printing -> Just (Printing.card printing)
     Source.OfToken card -> Just card
     Source.OfAbility _ _ -> Nothing

@@ -22,6 +22,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
@@ -67,7 +68,7 @@ resolveTopWith runSubgame = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          Monad.void (Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs))
+                          Monad.void (Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped)
         -- A token is never on the stack (created onto the battlefield, never cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
