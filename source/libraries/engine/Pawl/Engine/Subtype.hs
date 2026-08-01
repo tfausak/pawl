@@ -96,3 +96,5 @@ isLandType subtype = case subtype of
   -- saying out loud here, because Bog Wraith is also the pool's first card with
   -- landwalk, and the land type its keyword NAMES is Swamp rather than this.
   Subtype.Wraith -> False
+  -- CR 205.3m: a creature type (Blurred Mongoose's).
+  Subtype.Mongoose -> False

@@ -568,6 +568,7 @@ test-suite pawl-test-suite
     Pawl.ResolveSpec
     Pawl.SetupSpec
     Pawl.Support
+    Pawl.TargetSpec
     Pawl.TriggerSpec
     Pawl.TurnSpec
 

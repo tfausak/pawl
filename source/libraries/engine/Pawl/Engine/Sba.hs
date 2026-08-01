@@ -258,11 +258,12 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- is the proof.
 --
 -- The third clause goes through stillLegalEnchant below rather than calling
--- Target.stillLegal directly, so that the common enchant spec is answered off
+-- Target.stillAdmitted directly, so that the common enchant spec is answered off
 -- `pcs` -- the SAME pre-pass Projection.projectAll performStateBasedActions
--- computed once for every other CR 704.4 classification. (A spec carrying a Filter
--- still reaches stillLegal, by that function's own fallthrough; see its haddock.)
--- stillLegal reaches Target.legalRecipients -> basePool Pool.Creatures ->
+-- computed once for every other CR 704.4 classification. (A spec carrying a
+-- Filter still reaches stillAdmitted, by that function's own fallthrough; see
+-- its haddock.)
+-- stillAdmitted reaches Target.admittedRecipients -> basePool Pool.Creatures ->
 -- creatureRecipients -> Projection.isCreatureOf, and THAT is `project oid gs` --
 -- a fresh `gather` PER Aura. Every other classify here shares one `gather`
 -- precisely because gather's neighbouring lesson (Projection.hs's `liveGiven`
@@ -295,11 +296,19 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
           Recipient.objectOf recipient == Just oid
             || not (stillLegalEnchant pcs gs oid spec recipient)
 
--- CR 303.4c / 608.2b: is `recipient` still a legal one for the enchanting Aura
--- `source`'s spec? Answered off `pcs` -- the pre-pass projection every other
+-- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s spec
+-- ADMITS? Answered off `pcs` -- the pre-pass projection every other
 -- classification in performStateBasedActions shares (CR 704.4 simultaneity) --
 -- for the one spec shape that reduces to a lookup, and by the general
--- Target.stillLegal for every other.
+-- Target.stillAdmitted for every other.
+--
+-- Admission, NOT target legality: CR 303.4c asks whether the Aura enchants "an
+-- illegal object or player as defined by its enchant ability and other
+-- applicable effects", which rule 702's TARGETING restrictions do not speak to.
+-- Protection would bury this Aura, but by its own separate clause (CR 702.16c),
+-- while shroud (CR 702.18) and hexproof (CR 702.11) restrict targeting and
+-- nothing else -- so an Aura stays attached to a host that gains either. See
+-- Target.admittedRecipients.
 --
 -- Pool.Creatures with no Filter is the shape MOST Card.enchant specs in this pool
 -- carry (Unholy Strength's "enchant creature"). Target.creatureRecipients
@@ -310,12 +319,13 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 -- which is what the Pool.Creatures arm below reads off `pcs` (a Map.lookup) plus
 -- one owner check. This is not an approximation: `pcs Map.! target`, when it
 -- exists, IS `Projection.project target gs` (projectAll folds the SAME gathered
--- candidate list stillLegal would rebuild from scratch), and a missing key means
--- exactly what Target.creatureRecipients' own battlefield scan would have missed
--- it for -- target is not on the battlefield at all.
+-- candidate list stillAdmitted would rebuild from scratch), and a missing key
+-- means exactly what Target.creatureRecipients' own battlefield scan would have
+-- missed it for -- target is not on the battlefield at all.
 --
--- Any OTHER shape falls through to the general, slower Target.stillLegal, which
--- reuses the SAME legality Cast/Resolve already judge -- rather than assuming the
+-- Any OTHER shape falls through to the general, slower Target.stillAdmitted,
+-- which reuses the SAME pool and Filter Cast/Resolve already judge -- rather
+-- than assuming the
 -- Creatures-with-no-Filter shape holds regardless, a shortcut that would go
 -- silently wrong the day it stops holding. That day has come: Setessan Training's
 -- "Enchant creature you control" is a Creatures spec that DOES carry a Filter, and
@@ -358,7 +368,7 @@ stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   -- The Aura is on the battlefield when this SBA asks, so its controller is
   -- live -- the CR 608.2b case this perspective exists for cannot arise here.
-  _ -> Target.stillLegal (Projection.controllerOf source gs) source recipient spec gs
+  _ -> Target.stillAdmitted (Projection.controllerOf source gs) source recipient spec gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the

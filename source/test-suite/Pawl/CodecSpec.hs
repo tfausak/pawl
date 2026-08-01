@@ -206,6 +206,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "kw" keywordToJson jsonToKeyword Keyword.Trample
     Spec.it s "Keyword.Infect" $
       roundTrip s "infect" keywordToJson jsonToKeyword Keyword.Infect
+    -- CR 702.18a's shroud is nullary, so what this pins is the TAG: a Blurred
+    -- Mongoose that decoded as anything else would be a legal Doom Blade target.
+    Spec.it s "Keyword.Shroud" $ do
+      roundTrip s "shroud" keywordToJson jsonToKeyword Keyword.Shroud
+      Spec.assertBool s (keywordToJson Keyword.Shroud /= keywordToJson Keyword.Trample) "shroud is not trample"
     -- CR 702.164a's N rides the constructor, so this is the first keyword
     -- that is not a bare tag.
     Spec.it s "Keyword.Toxic carries its N" $ do

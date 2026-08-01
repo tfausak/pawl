@@ -25,6 +25,7 @@ keywordToJson k = case k of
   Keyword.Indestructible -> Json.nullary (Text.pack "Indestructible")
   Keyword.Landwalk subtype -> Json.tagged (Text.pack "Landwalk") (Just (subtypeToJson subtype))
   Keyword.Reach -> Json.nullary (Text.pack "Reach")
+  Keyword.Shroud -> Json.nullary (Text.pack "Shroud")
   Keyword.Trample -> Json.nullary (Text.pack "Trample")
   Keyword.Vigilance -> Json.nullary (Text.pack "Vigilance")
   Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array (MkArray [costToJson cost, maybe Json.jNull filterToJson searchFor])))
@@ -49,6 +50,7 @@ jsonToKeyword value = do
     ("Indestructible", _) -> Right Keyword.Indestructible
     ("Landwalk", Just v) -> Keyword.Landwalk <$> jsonToSubtype v
     ("Reach", _) -> Right Keyword.Reach
+    ("Shroud", _) -> Right Keyword.Shroud
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
     ("Cycling", Just (Array (MkArray [c, f]))) -> Keyword.Cycling <$> jsonToCost c <*> optionalFilter f
