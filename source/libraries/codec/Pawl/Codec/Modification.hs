@@ -9,7 +9,7 @@ import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import qualified Pawl.Codec.PlayerId as PlayerId
 import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
-import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
+import qualified Pawl.Codec.Subtype as Subtype
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
 import qualified Pawl.Types.Modification as Modification
@@ -20,10 +20,10 @@ modificationToJson m = case m of
   Modification.LoseAllAbilities -> Json.nullary (Text.pack "LoseAllAbilities")
   Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
   Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
-  Modification.SetLandSubtype s -> Json.tagged (Text.pack "SetLandSubtype") (Just (subtypeToJson s))
-  Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (subtypeToJson s))
+  Modification.SetLandSubtype s -> Json.tagged (Text.pack "SetLandSubtype") (Just (Subtype.toJson s))
+  Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (Subtype.toJson s))
   Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (CardType.toJson c))
-  Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array (MkArray [subtypeToJson a, subtypeToJson b])))
+  Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array (MkArray [Subtype.toJson a, Subtype.toJson b])))
   Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (PlayerId.toJson p))
   Modification.SetControllerToSource -> Json.nullary (Text.pack "SetControllerToSource")
   Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (Json.setTo Color.toJson cs))
@@ -40,10 +40,10 @@ jsonToModification value = do
     "LoseAllAbilities" -> Right Modification.LoseAllAbilities
     "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
     "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
-    "SetLandSubtype" -> Json.withValue mv (fmap Modification.SetLandSubtype . jsonToSubtype)
-    "AddLandSubtype" -> Json.withValue mv (fmap Modification.AddLandSubtype . jsonToSubtype)
+    "SetLandSubtype" -> Json.withValue mv (fmap Modification.SetLandSubtype . Subtype.fromJson)
+    "AddLandSubtype" -> Json.withValue mv (fmap Modification.AddLandSubtype . Subtype.fromJson)
     "AddCardType" -> Json.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
-    "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
+    "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Subtype.fromJson x <*> Subtype.fromJson y
     "SetController" -> Json.withValue mv (fmap Modification.SetController . PlayerId.fromJson)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
     "SetColor" -> Json.withValue mv (fmap Modification.SetColor . Json.setFrom Color.fromJson)

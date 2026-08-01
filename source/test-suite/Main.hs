@@ -39,6 +39,7 @@ import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
+import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
@@ -177,6 +178,7 @@ spec s registry = do
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
+  Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s

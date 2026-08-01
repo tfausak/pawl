@@ -7,7 +7,7 @@ import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
-import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array, Null))
@@ -28,7 +28,7 @@ filterToJson filter_ = case filter_ of
   Filter.HasCardType t -> Json.tagged (Text.pack "HasCardType") (Just (CardType.toJson t))
   Filter.HasSupertype s -> Json.tagged (Text.pack "HasSupertype") (Just (Supertype.toJson s))
   Filter.HasColor c -> Json.tagged (Text.pack "HasColor") (Just (Color.toJson c))
-  Filter.HasSubtype s -> Json.tagged (Text.pack "HasSubtype") (Just (subtypeToJson s))
+  Filter.HasSubtype s -> Json.tagged (Text.pack "HasSubtype") (Just (Subtype.toJson s))
   Filter.PowerAtLeast n -> Json.tagged (Text.pack "PowerAtLeast") (Just (Json.jInt n))
   Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (PlayerRelation.toJson r))
   Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (PlayerRelation.toJson r))
@@ -51,7 +51,7 @@ jsonToFilter value = do
     ("HasCardType", Just v) -> Filter.HasCardType <$> CardType.fromJson v
     ("HasSupertype", Just v) -> Filter.HasSupertype <$> Supertype.fromJson v
     ("HasColor", Just v) -> Filter.HasColor <$> Color.fromJson v
-    ("HasSubtype", Just v) -> Filter.HasSubtype <$> jsonToSubtype v
+    ("HasSubtype", Just v) -> Filter.HasSubtype <$> Subtype.fromJson v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Json.asInteger v
     ("ControlledBy", Just v) -> Filter.ControlledBy <$> PlayerRelation.fromJson v
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> PlayerRelation.fromJson v

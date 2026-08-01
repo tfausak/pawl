@@ -182,6 +182,7 @@ library codec
     Pawl.Codec.SlotNameSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.Subtype
+    Pawl.Codec.SubtypeSpec
     Pawl.Codec.Supertype
     Pawl.Codec.SupertypeSpec
     Pawl.Codec.TapState

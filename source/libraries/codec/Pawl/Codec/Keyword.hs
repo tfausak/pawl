@@ -6,7 +6,7 @@ import qualified Data.Text as Text
 import Pawl.Codec.Cost (costToJson, jsonToCost)
 import Pawl.Codec.Filter (filterToJson, optionalFilter)
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
+import qualified Pawl.Codec.Subtype as Subtype
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
 import qualified Pawl.Types.Keyword as Keyword
@@ -23,7 +23,7 @@ keywordToJson k = case k of
   Keyword.Flying -> Json.nullary (Text.pack "Flying")
   Keyword.Haste -> Json.nullary (Text.pack "Haste")
   Keyword.Indestructible -> Json.nullary (Text.pack "Indestructible")
-  Keyword.Landwalk subtype -> Json.tagged (Text.pack "Landwalk") (Just (subtypeToJson subtype))
+  Keyword.Landwalk subtype -> Json.tagged (Text.pack "Landwalk") (Just (Subtype.toJson subtype))
   Keyword.Reach -> Json.nullary (Text.pack "Reach")
   Keyword.Shroud -> Json.nullary (Text.pack "Shroud")
   Keyword.Trample -> Json.nullary (Text.pack "Trample")
@@ -48,7 +48,7 @@ jsonToKeyword value = do
     ("Flying", _) -> Right Keyword.Flying
     ("Haste", _) -> Right Keyword.Haste
     ("Indestructible", _) -> Right Keyword.Indestructible
-    ("Landwalk", Just v) -> Keyword.Landwalk <$> jsonToSubtype v
+    ("Landwalk", Just v) -> Keyword.Landwalk <$> Subtype.fromJson v
     ("Reach", _) -> Right Keyword.Reach
     ("Shroud", _) -> Right Keyword.Shroud
     ("Trample", _) -> Right Keyword.Trample

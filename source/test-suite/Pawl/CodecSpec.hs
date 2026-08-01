@@ -1139,7 +1139,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- only a Binding's `target` field via Binding.toObject. The codec is
     -- meant to be total over every Binding field -- subtypes, amount, modes,
     -- and copy too -- so round-trip a Binding with all five populated at
-    -- once, exercising jsonToSubtypePair along the way. No real slot ever
+    -- once, exercising Subtype.fromJsonPair along the way. No real slot ever
     -- carries all five together (copy lives only under the dedicated
     -- copySource slot in practice); this is a codec totality check, not a
     -- claim about a reachable game state.

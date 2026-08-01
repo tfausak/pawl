@@ -12,7 +12,7 @@ import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import qualified Pawl.Codec.Loyalty as Loyalty
 import Pawl.Codec.Quantity (jsonToQuantityPair, quantityToJson)
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
-import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
 import Pawl.Json.Array (Array (MkArray))
@@ -31,7 +31,7 @@ projectedCharacteristicsToJson pc =
       (Text.pack "loyalty", Json.maybeTo Loyalty.toJson (PC.loyalty pc)),
       (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [quantityToJson p, quantityToJson t])) (PC.characteristicPT pc)),
       (Text.pack "cardTypes", Json.setTo CardType.toJson (PC.cardTypes pc)),
-      (Text.pack "subtypes", Json.setTo subtypeToJson (PC.subtypes pc)),
+      (Text.pack "subtypes", Json.setTo Subtype.toJson (PC.subtypes pc)),
       (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (PC.activatedAbilities pc)),
       (Text.pack "replacementEffects", Json.listTo replacementEffectToJson (PC.replacementEffects pc)),
       (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (PC.triggeredAbilities pc))
@@ -53,7 +53,7 @@ jsonToProjectedCharacteristics value = do
   loy <- Json.field (Text.pack "loyalty") ps >>= Json.maybeFrom Loyalty.fromJson
   cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom jsonToQuantityPair
   cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom CardType.fromJson
-  subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom jsonToSubtype
+  subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom Subtype.fromJson
   acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
   reps <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect
   trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)

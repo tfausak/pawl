@@ -1,6 +1,6 @@
 module Pawl.Types.Subtype where
 
--- Grows: other land types, other creature types, …
+-- | Grows: other land types, other creature types, …
 data Subtype
   = Mountain
   | Swamp
