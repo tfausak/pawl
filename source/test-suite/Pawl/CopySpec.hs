@@ -70,7 +70,7 @@ resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> G
 resolveAndSettle answer gs =
   snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "Clone copies a creature and projects its P/T (CR 707.2)" $ do
     piker <- S.printingOf s registry "Goblin Piker"

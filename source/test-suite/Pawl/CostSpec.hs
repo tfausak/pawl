@@ -75,7 +75,7 @@ theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
 
-doorSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+doorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 doorSpec s registry =
   Spec.describe s "Door" $ do
     -- CR 118.3's own second example: "a permanent that's already tapped can't
@@ -235,7 +235,7 @@ greedBoard swamp greed piker life =
           }
       )
 
-greedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+greedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 greedSpec s registry =
   Spec.describe s "Greed" $ do
     let isActivate a = case a of
@@ -353,7 +353,7 @@ villageRitesBoard swamp piker villageRites n =
 -- Its one ruling: "You must sacrifice exactly one creature to cast this spell;
 -- you can't cast it without sacrificing a creature, and you can't sacrifice
 -- additional creatures."
-villageRitesSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+villageRitesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 villageRitesSpec s registry =
   Spec.describe s "Village Rites" $ do
     Spec.it s "CR 118.8 the additional cost is paid and the spell resolves" $ do
@@ -463,7 +463,7 @@ fireblastBoard mountain fireblastPrinting n tap =
 -- this spell's mana cost. Fireblast deals 4 damage to any target."
 --
 -- Scryfall returned no rulings for this card.
-fireblastSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+fireblastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fireblastSpec s registry =
   Spec.describe s "Fireblast" $ do
     -- The headline test: the printed cost is unaffordable and the spell is
@@ -531,7 +531,7 @@ crossCheckWithPriority gs =
       GameState.priority = Just S.alice
     }
 
-crossCheckSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+crossCheckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 crossCheckSpec s registry =
   Spec.describe s "CrossChecks" $ do
     -- Blood Moon: "Nonbasic lands are Mountains." Evolving Wilds is a
@@ -599,7 +599,7 @@ crossCheckSpec s registry =
 -- feeds an energy-paid pump (CR 118 / 122.6). The ability is extracted via the
 -- file-local total `theAbility` (no partial functions); the card-characteristics
 -- case guards that the extraction sees a real ability.
-longtuskCubSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+longtuskCubSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 longtuskCubSpec s registry =
   Spec.describe s "LongtuskCub" $ do
     Spec.it s "Longtusk Cub is a {1}{G} 2/2 Cat with a pay-energy ability" $ do
@@ -625,7 +625,7 @@ longtuskCubSpec s registry =
           after = S.runCombat S.aggressiveAnswer gs
       Spec.assertEqWith s "alice gained two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
   greedSpec s registry
@@ -655,7 +655,7 @@ sentryBoard plains safeholdSentry tapped =
 
 -- Safehold Sentry {1}{W} Creature -- Elf Warrior 2/2: "{2}{W}, {Q}: This creature
 -- gets +0/+2 until end of turn." The card CR 107.6's untap symbol was waiting for.
-safeholdSentrySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+safeholdSentrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 safeholdSentrySpec s registry =
   Spec.describe s "Safehold Sentry" $ do
     Spec.it s "CR 107.6 whole card: a TAPPED Sentry untaps to pay {Q} and gets +0/+2" $ do
@@ -722,7 +722,7 @@ noDiscardAnswer p = case p of
 -- Cathartic Reunion {1}{R} Sorcery: "As an additional cost to cast this spell,
 -- discard two cards. Draw three cards." The card CR 601.2f's "discarding cards"
 -- clause was waiting for.
-catharticReunionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+catharticReunionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 catharticReunionSpec s registry =
   Spec.describe s "Cathartic Reunion" $ do
     Spec.it s "CR 118.8 whole card: the two cards are discarded and three are drawn" $ do

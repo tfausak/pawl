@@ -90,7 +90,7 @@ noView _ = Nothing
 noContext :: Filter.Context
 noContext = Filter.MkContext Nothing Nothing
 
-quantitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+quantitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
   Spec.it s "a literal evaluates to itself" $ do
     Spec.assertEq s (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal 2)) $ Just 2
@@ -185,7 +185,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
       (Quantity.evaluate viewOfThree noContext three (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
       $ Just 2
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   programSpec s
   quantitySpec s registry

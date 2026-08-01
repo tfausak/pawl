@@ -53,7 +53,7 @@ import qualified Pawl.Types.Zone as Zone
 -- and CR 704.5n's detach-rather-than-bury state-based action (#193). The
 -- Reattach group below is the same keyword action aimed the other way, at a
 -- permanent the effect TARGETS rather than at its own source.
-equipmentSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+equipmentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- CR 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
   -- creature you control." The Equipment is the ability's SOURCE; the slot is
@@ -216,7 +216,7 @@ aimAt oid p = case p of
 -- CR 704.5p, the sibling of CR 704.5n above: 704.5n asks whether the HOST is
 -- still legal, and this asks whether the attached permanent may be attached to
 -- anything at all. Both detach and leave the permanent on the battlefield.
-unattachableSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+unattachableSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 unattachableSpec s registry = Spec.describe s "Unattachable" $ do
   -- CR 704.5p, first sentence: "If a battle or creature is attached to an
   -- object or player, it becomes unattached and remains on the battlefield."
@@ -344,7 +344,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
 -- BOTH halves of an enchant-player Aura: the Pool.Players enchant spec, which
 -- Card.enchant could already express, and a static ability whose affected set is
 -- reached THROUGH the enchanted player (Affected.AttachedPlayerControls).
-enchantPlayerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+enchantPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- The gameplay proof design.md section 4 asks for: cast the real card at a
   -- real player, let it resolve, and see the creatures on the other side of
@@ -428,7 +428,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
           (Target.legalRecipients (Just S.alice) crownId theSpec gs)
           (Set.singleton (Recipient.ToObject onCreature))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraSpec s registry
   equipmentSpec s registry
@@ -498,7 +498,7 @@ crownTargetSpec printing = case Card.Type.activatedAbilities (Printing.card prin
 -- opcode that moves an Aura already on the battlefield, which the Auras unit left
 -- unbuilt. Crown of the Ages is the proving card -- "{4}, {T}: Attach target Aura
 -- attached to a creature to another creature".
-reattachSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+reattachSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- The gameplay-level proof design.md section 4 asks for: cast the Aura, cast
   -- the Crown, activate its printed ability through the real activation path,
@@ -766,7 +766,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
 -- which is the backstop for a card that does NOT say it: the Crown offers a
 -- creature its Aura may not enchant and the move then fails, where Aura Graft may
 -- not offer one at all. The pair of cards is what keeps the two apart.
-auraGraftSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+auraGraftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- The gameplay-level proof design.md section 4 asks for, and the one the
   -- control clause exists for: CR 303.4e says an Aura's controller is separate
@@ -975,7 +975,7 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     Spec.assertEqWith s "but alice controls it" (Projection.controllerOf aura after) (Just S.alice)
     Spec.assertEqWith s "so the creature it holds is hers" (Projection.controllerOf host after) (Just S.alice)
 
-auraSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+auraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraSpec s registry = Spec.describe s "Aura" $ do
   Spec.it s "CR 303.4: a resolving Aura spell enters the battlefield attached to its target" $ do
     swamp <- S.printingOf s registry "Swamp"

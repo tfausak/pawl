@@ -181,7 +181,7 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "layer classification matches CR 613.1" $ do
     Spec.assertEqWith s "grant is layer 6" (Projection.layer (Modification.GainKeyword Keyword.Deathtouch)) Layer.Ability
@@ -1350,7 +1350,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 -- CR 122.1b: "A keyword counter on a permanent ... causes that object to gain
 -- that keyword", and CR 613.1f puts that grant in LAYER 6 -- not the layer 7c
 -- where CR 122.1a's +1/+1 counters land.
-keywordCounterSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+keywordCounterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
   Spec.it s "CR 122.1b a flying counter grants flying; without one there is none" $ do
     piker <- S.printingOf s registry "Goblin Piker"

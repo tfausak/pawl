@@ -90,7 +90,7 @@ singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpe
 singleModeAbility effects specs =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationTimingSpec s registry
 
@@ -377,7 +377,7 @@ aimAt who p = case p of
 -- the stack, "otherwise, it will check that information when it resolves. In both
 -- instances, if the source is no longer in the zone it's expected to be in, its
 -- last known information is used."
-lastKnownSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+lastKnownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
   Spec.it s "CR 113.7a whole card: a sacrificed Ghitu Fire-Eater still deals damage equal to its power" $ do
     ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
@@ -453,7 +453,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
 -- Alice holds it, two Forests pay the {2}, and her library has a card to draw --
 -- otherwise CR 704.5b would end the game around the assertion rather than the
 -- draw being observable.
-cyclingBoard :: Spec.Spec IO n -> Registry.Registry IO -> IO (ObjectId.ObjectId, GameState.GameState)
+cyclingBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
 cyclingBoard s registry = do
   mauler <- S.printingOf s registry "Barkhide Mauler"
   forest <- S.printingOf s registry "Forest"
@@ -462,7 +462,7 @@ cyclingBoard s registry = do
       (g1, oid) = S.handOne mauler g0
   pure (oid, g1 {GameState.priority = Just S.alice})
 
-cyclingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+cyclingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- CR 702.29a: "Cycling is an activated ability that functions only while
   -- the card with cycling is in a player's hand."
@@ -812,7 +812,7 @@ pingAnswer p = case p of
     [] -> A.Pass
   _ -> S.aggressiveAnswer p
 
-printedActivationTimingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+printedActivationTimingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTiming" $ do
   -- The rider, isolated. bob is in the declare attackers step with an
   -- untapped Desert, a legal target (CR 508.1f has just tapped alice's

@@ -80,7 +80,7 @@ neverAskModes p = case p of
   Prompt.ChooseModes {} -> error "ChooseModes prompt issued for a non-modal spell"
   _ -> S.identityAnswer p
 
-gateSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+gateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gateSpec s registry = Spec.describe s "Gate" $ do
   Spec.it s "CR 608.2c mode 1 (damage) deals 1 to the chosen creature" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
@@ -125,7 +125,7 @@ gateSpec s registry = Spec.describe s "Gate" $ do
 -- all-slots-fillable engine, which would have called Chaos Charm uncastable
 -- the moment ANY mode (here, the Wall mode with no Wall in play) had an
 -- unfillable slot.
-falsifierSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+falsifierSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 falsifierSpec s registry = Spec.describe s "Falsifier" $ do
   Spec.it s "CR 700.2c/601.2c castable via the damage/haste modes with no Wall on the board" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
@@ -142,7 +142,7 @@ falsifierSpec s registry = Spec.describe s "Falsifier" $ do
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
 -- on the stack object -- an unchosen mode's slot name never appears at all.
-onlyChosenModeSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+onlyChosenModeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 onlyChosenModeSpec s registry = Spec.describe s "OnlyChosenModeTargets" $ do
   Spec.it s "casting the damage mode binds the 'creature' slot, never 'wall'" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
@@ -163,7 +163,7 @@ onlyChosenModeSpec s registry = Spec.describe s "OnlyChosenModeTargets" $ do
                 Spec.assertBool s (Set.member (SlotName.MkSlotName (Text.pack "creature")) keys) "has the 'creature' slot"
                 Spec.assertBool s (not (Set.member (SlotName.MkSlotName (Text.pack "wall")) keys)) "does not have the 'wall' slot"
 
-fizzleSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+fizzleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
   Spec.it s "CR 608.2b the damage mode fizzles when its only target leaves before resolution" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
@@ -182,7 +182,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
     Spec.assertEqWith s "no damage was dealt" (S.damageEventsOf after) []
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
 
-forcedSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+forcedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 forcedSpec s registry = Spec.describe s "ForcedNoPrompt" $ do
   Spec.it s "CR 700.2a casting a non-modal spell (Lightning Bolt) never issues ChooseModes" $ do
     -- No creature on the battlefield, so neverAskModes's identityAnswer
@@ -201,7 +201,7 @@ forcedSpec s registry = Spec.describe s "ForcedNoPrompt" $ do
 -- Pool.Permanents narrowed by Not (HasCardType Land), with CR 601.2c's "another"
 -- as the Not IsSource conjunct (#163). This proves the spec and the exclusion in
 -- isolation; the wiring to a consumer is a later M4h task.
-nonlandPermanentTargetSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+nonlandPermanentTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 nonlandPermanentTargetSpec s registry = Spec.describe s "M4h NonlandPermanentTarget" $ do
   Spec.it s "NonlandPermanentTarget excludes lands (CR 109.2/110.4)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -257,7 +257,7 @@ modalReaderSpec s = Spec.describe s "M4h Modal reader" $ do
 -- with just the activator and one victim on the battlefield (CreatureTarget
 -- does not self-exclude), so `legal = {0,1}` and `count = 1`: a real prompt,
 -- not the forced/single-mode path.
-activationModalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+activationModalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2b)" $ do
   Spec.it s "activating a modal ability prompts the mode; only the chosen mode resolves" $ do
     syntheticModalActivated <- S.printingOf s registry "Synthetic Modal Activator"
@@ -321,7 +321,7 @@ triggerModalOf acPrinting = case Card.Type.triggeredAbilities (Printing.card acP
   [ab] -> Just (TriggeredAbility.modal ab)
   _ -> Nothing
 
-triggerModalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+triggerModalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.3d)" $ do
   Spec.it s "create mode ({0}) makes a 1/1 flying Bird; nothing bounced or drawn" $ do
     aetherChanneler <- S.printingOf s registry "Aether Channeler"
@@ -434,7 +434,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
     Spec.assertEqWith s "alice's hand is still empty (nothing bounced)" (length (Game.zoneMembers Zone.Hand S.alice placed)) 0
     Spec.assertEqWith s "nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice placed)) 0
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   gateSpec s registry
   falsifierSpec s registry

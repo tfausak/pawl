@@ -29,7 +29,7 @@ import qualified Pawl.Types.Zone as Zone
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 104.3a a conceding player leaves immediately, with Conceded as the reason" $ do
     let gs = Setup.emptyGame S.bothPlayers

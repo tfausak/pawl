@@ -62,7 +62,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
-creatureSbaSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+creatureSbaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 creatureSbaSpec s registry =
   Spec.describe s "CreatureSba" $ do
     Spec.it s "CR 704.5g a creature with lethal damage is destroyed" $ do
@@ -160,7 +160,7 @@ creatureSbaSpec s registry =
           Spec.assertEqWith s "damage healed" (Object.damage obj) 0
         Nothing -> Spec.assertFailure s "victim vanished"
 
-damageSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+damageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageSpec s registry =
   Spec.describe s "Damage" $ do
     Spec.it s "a permanent starts with no damage marked" $ do
@@ -221,7 +221,7 @@ damageSpec s registry =
           dropped = Expiry.dropAtCleanup (S.addReplacement shield base)
        in Spec.assertEqWith s "no replacements remain" (GameState.replacements dropped) []
 
-infectSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+infectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 infectSpec s registry =
   Spec.describe s "Infect" $ do
     Spec.it s "CR 120.3b infect damage to a player becomes poison, not life loss" $ do
@@ -263,7 +263,7 @@ infectSpec s registry =
           Spec.assertEqWith s "no marked damage on the blocker" (S.damageOf blocker fought) (Just 0)
           Spec.assertEqWith s "blocker buried by 704.5f" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 1
 
-toxicSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+toxicSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 toxicSpec s registry =
   Spec.describe s "Toxic" $ do
     Spec.it s "CR 120.3g toxic poison is IN ADDITION to the damage, not instead of it" $ do
@@ -409,7 +409,7 @@ copiesAndKeeps target keep p = case p of
 inPlay :: ObjectId.ObjectId -> GameState.GameState -> Bool
 inPlay oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
-legendRuleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+legendRuleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 legendRuleSpec s registry =
   Spec.describe s "LegendRule" $ do
     -- CR 704.5j: "If two or more legendary permanents with the same name are
@@ -525,13 +525,13 @@ legendRuleSpec s registry =
 -- The two world enchantments in the pool, fetched together: most tests below
 -- want two DIFFERENTLY NAMED world permanents, since a rule that ignores names
 -- is half of the contrast with the legend rule above.
-worldPair :: Spec.Spec IO n -> Registry.Registry IO -> IO (Printing.Printing, Printing.Printing)
+worldPair :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Printing.Printing, Printing.Printing)
 worldPair s registry = do
   crossroads <- S.printingOf s registry "Concordant Crossroads"
   livingPlane <- S.printingOf s registry "Living Plane"
   pure (crossroads, livingPlane)
 
-worldRuleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+worldRuleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 worldRuleSpec s registry =
   Spec.describe s "WorldRule" $ do
     -- CR 704.5k: "If two or more permanents have the supertype world, all
@@ -712,7 +712,7 @@ sbaSpec s =
           after = S.settleSba gs
        in Spec.assertEqWith s "bob still playing" (fmap Player.status (Map.lookup S.bob (GameState.players after))) (Just Status.Playing)
 
-damageEventSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+damageEventSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageEventSpec s registry =
   Spec.describe s "DamageEvent" $ do
     Spec.it s "a blocked 2/1 trade emits both damage events" $ do
@@ -746,7 +746,7 @@ damageEventSpec s registry =
             [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat]
         _ -> Spec.assertFailure s "fixture should have an attacker"
 
-deathtouchSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+deathtouchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 deathtouchSpec s registry =
   Spec.describe s "Deathtouch" $ do
     Spec.it s "CR 704.5h a 1/1 deathtoucher destroys a 3/3 it deals 1 to" $ do
@@ -953,7 +953,7 @@ tramplingAnswer p = case p of
           [] -> toBlockers
   _ -> S.aggressiveAnswer p
 
-trampleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+trampleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trampleSpec s registry =
   Spec.describe s "Trample" $ do
     Spec.it s "CR 702.19b a 3/3 trampler spills excess onto the defending player" $ do
@@ -1047,7 +1047,7 @@ dumpOntoFirstCreature p = case p of
       [] -> Map.empty
   _ -> S.aggressiveAnswer p
 
-departedBlockerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+departedBlockerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedBlockerSpec s registry =
   Spec.describe s "Departed blockers (#29)" $ do
     Spec.it s "CR 702.19d a trampler whose only blocker left assigns everything to the player" $ do
@@ -1136,7 +1136,7 @@ boltBlockerMidCombat blocks bolt blocker gs =
 -- Both end at the same observable: the attacker assigns no combat damage at all
 -- (CR 510.1c), so the defending player takes nothing. Reading emptiness as
 -- unblocked -- the bug this group pins -- lets the attacker through instead.
-blockedStaysBlockedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+blockedStaysBlockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blockedStaysBlockedSpec s registry =
   Spec.describe s "Blocked stays blocked (CR 509.1h)" $ do
     Spec.it s "CR 510.1c a blocker Bolted after blocks are declared leaves the attacker blocked, so the defender takes nothing" $ do
@@ -1205,7 +1205,7 @@ killAttackerMidCombat victim gs =
     Event.destroy Regenerability.Regenerable [victim]
     Monad.void Damage.dealCombatDamage
 
-departedAttackerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+departedAttackerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedAttackerSpec s registry =
   Spec.describe s "Departed attackers (CR 510.1d)" $ do
     Spec.it s "CR 510.1d a blocker whose attacker was destroyed mid-combat assigns no combat damage" $ do
@@ -1296,7 +1296,7 @@ defenderOrBlockerAnswer p = case p of
             [] -> toBlockers
   _ -> S.aggressiveAnswer p
 
-departedDefenderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+departedDefenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedDefenderSpec s registry =
   Spec.describe s "Departed defender (CR 800.4e)" $ do
     Spec.it s "CR 800.4e no combat damage is assigned to a player who has left the game" $ do
@@ -1382,7 +1382,7 @@ grantDeathtouch oid gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
-trampleDeathtouchSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+trampleDeathtouchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trampleDeathtouchSpec s registry =
   Spec.describe s "TrampleDeathtouch" $ do
     Spec.it s "CR 702.2c a deathtouch-granted trampler needs only 1 on the blocker, spilling the rest" $ do
@@ -1410,7 +1410,7 @@ trampleDeathtouchSpec s registry =
           after = S.settleSba (S.fightWith tramplingAnswer gs)
       Spec.assertEqWith s "bob untouched without deathtouch" (S.lifeOf S.bob after) (Just 20)
 
-m2cPropertySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m2cPropertySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m2cPropertySpec s registry =
   Spec.describe s "M2cProperties" $ do
     Spec.it s "a deathtoucher's victim with toughness > 0 is gone after the SBA" $ do
@@ -1450,7 +1450,7 @@ m2cPropertySpec s registry =
 -- Nothing. The third, a permanent that exists and is not a creature, no card in
 -- the pool can produce -- every DealDamage on a generically named slot belongs
 -- to a condition whose Filter admits only creatures -- so it is pinned here.
-damageRecipientSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+damageRecipientSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageRecipientSpec s registry =
   Spec.describe s "CR 120.1a which recipients damage can be dealt to" $ do
     Spec.it s "a generically named creature becomes CR 120.3e's creature recipient" $ do
@@ -1484,7 +1484,7 @@ damageRecipientSpec s registry =
       Spec.assertEqWith s "creature" (Damage.damageRecipient gs (Recipient.ToCreature oid)) (Just (Recipient.ToCreature oid))
       Spec.assertEqWith s "player" (Damage.damageRecipient gs (Recipient.ToPlayer S.bob)) (Just (Recipient.ToPlayer S.bob))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   damageSpec s registry
   damageRecipientSpec s registry

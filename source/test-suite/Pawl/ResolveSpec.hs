@@ -111,7 +111,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
-targetSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+targetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 targetSpec s registry = Spec.describe s "Target" $ do
   Spec.it s "CR 115.4 AnyTarget offers every creature and every playing player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -463,7 +463,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
             Spec.assertBool s (not (Set.member (Recipient.ToCreature defender) legal)) "the creature that stayed home is not"
           _ -> Spec.assertFailure s "fixture should have one creature a side"
 
-resolveSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+resolveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 608 a resolved spell's damage is Noncombat" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1390,7 +1390,7 @@ racingCounters island piker cancel =
       r2 = snd (Engine.runGamePure atVictim r1 Stack.resolveTop) -- A fizzles
    in r2
 
-counterSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+counterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterSpec s registry = Spec.describe s "Counter" $ do
   Spec.it s "CR 701.6 Cancel counters a spell into its owner's graveyard" $ do
     island <- S.printingOf s registry "Island"
@@ -1440,7 +1440,7 @@ counterSpec s registry = Spec.describe s "Counter" $ do
     Spec.assertEqWith s "the countered spell is not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
     Spec.assertEqWith s "the countered spell is exiled" (length (Game.zoneMembers Zone.Exile S.bob resolved)) 1
 
-fizzleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+fizzleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
   Spec.it s "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1508,7 +1508,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
     Spec.assertEqWith s "alice wins" (GameState.result after) (Just (Result.Won S.alice))
     Spec.assertEqWith s "the loop released priority" (GameState.priority after) Nothing
 
-indestructibleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+indestructibleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 indestructibleSpec s registry = Spec.describe s "Indestructible" $ do
   Spec.it s "CR 704.5g an indestructible creature survives lethal marked damage" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
@@ -1608,7 +1608,7 @@ drawersOf gs = Maybe.mapMaybe drawer (S.zoneChangesOf gs)
         then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
         else Nothing
 
-zoneChangeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+zoneChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   Spec.it s "CR 701.8 Murder destroys a normal creature into its owner's graveyard" $ do
     swamp <- S.printingOf s registry "Swamp"
@@ -1938,7 +1938,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "two distinct cards discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
     Spec.assertEqWith s "one card left in bob's hand" (S.handSize S.bob after) 1
 
-drawCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+drawCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 drawCardSpec s registry = Spec.describe s "DrawCard" $ do
   Spec.it s "CR 121.2 drawCard moves the top library card to hand" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1951,7 +1951,7 @@ drawCardSpec s registry = Spec.describe s "DrawCard" $ do
     let after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Event.drawCard S.alice)
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "drewFromEmpty marked"
 
-loseLifeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+loseLifeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
   -- Both cases are Sign in Blood, the card that proves the opcode (#273): its
   -- two clauses share one target slot, so the player who draws is the player
@@ -2003,7 +2003,7 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
 -- Alice's board is Bonesplitter ({1}), Serum Powder ({3}) and Mindslaver ({6}),
 -- chosen so that greatest (6), count (3), sum (10) and least (1) are four
 -- DIFFERENT numbers: one hand-size assertion falsifies every other fold.
-greatestSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+greatestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 greatestSpec s registry = Spec.describe s "Greatest" $ do
   Spec.it s "CR 202.3 One with the Machine draws the GREATEST mana value, not the count, the sum or the least" $ do
     island <- S.printingOf s registry "Island"
@@ -2080,7 +2080,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     Spec.assertEqWith s "alice drew nothing" (S.handSize S.alice after) 0
     Spec.assertEqWith s "and her library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 10
 
-countersSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+countersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 countersSpec s registry = Spec.describe s "Counters" $ do
   Spec.it s "CR 122.6 Battlegrowth puts a +1/+1 counter (gate)" $ do
     -- alice casts Battlegrowth on bob's Piker (2/1). After resolution the Piker
@@ -2174,7 +2174,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
         handCounters = fmap (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h after)) (Game.zoneMembers Zone.Hand S.bob after)
     Spec.assertEqWith s "the bounced incarnation in hand has no counters" handCounters [Map.empty]
 
-untapSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+untapSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 untapSpec s registry = Spec.describe s "Untap" $ do
   Spec.it s "CR 701.26b Untap untaps the slot's target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2192,7 +2192,7 @@ untapSpec s registry = Spec.describe s "Untap" $ do
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "target is untapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Untapped)
 
-gainControlSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+gainControlSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainControlSpec s registry = Spec.describe s "GainControl" $ do
   Spec.it s "GainControl gives the source's controller control until end of turn and re-Sicks (CR 302.6)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2236,7 +2236,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
     Spec.assertEqWith s "and still does" (Projection.controllerOf oid after) (Just S.alice)
     Spec.assertEqWith s "its settle under alice is untouched" (fmap Object.sickness (Game.lookupObject oid after)) (Just (Sickness.Settled S.alice))
 
-gainPlayerCountersSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+gainPlayerCountersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
   Spec.it s "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2263,7 +2263,7 @@ proliferate :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameStat
 proliferate answer src gs =
   S.runPure answer gs (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)
 
-proliferateSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+proliferateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 proliferateSpec s registry = Spec.describe s "Proliferate" $ do
   -- CR 701.34a: "give each one additional counter of each kind that permanent
   -- or player already has." One more, never a doubling, and never a kind that
@@ -2487,7 +2487,7 @@ sacrifices wanted p = case p of
     if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
   _ -> S.identityAnswer p
 
-playerSacrificesSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+playerSacrificesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
   -- CR 701.21a: "its controller moves it from the battlefield directly to its
   -- owner's graveyard." Diabolic Edict names a PLAYER, and that player picks.
@@ -2565,7 +2565,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertBool s (not (S.onBattlefield his resolved)) "bob's creature was sacrificed"
 
-createEmblemSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+createEmblemSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 createEmblemSpec s registry = Spec.describe s "CreateEmblem" $ do
   Spec.it s "CR 114.2 CreateEmblem puts an emblem in the command zone under the resolver" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2576,7 +2576,7 @@ createEmblemSpec s registry = Spec.describe s "CreateEmblem" $ do
     Spec.assertEqWith s "one emblem in command" (Set.size (GameState.command after)) 1
     Spec.assertEqWith s "owned by the resolver" (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems) [Just S.alice]
 
-becomeMonarchSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+becomeMonarchSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 becomeMonarchSpec s registry = Spec.describe s "BecomeMonarch" $ do
   Spec.it s "CR 725 BecomeMonarch TheController makes the resolver the monarch" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2595,7 +2595,7 @@ becomeMonarchSpec s registry = Spec.describe s "BecomeMonarch" $ do
 --
 -- So the watch is for an EVENT -- a new monarch being crowned who is an opponent
 -- -- not for the STATE "an opponent currently holds the crown".
-exileUntilMonarchSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+exileUntilMonarchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
   -- Reachable at two seats: CR 603.3b lets alice order Palace Jailer's two
   -- entry triggers, so the exile can resolve BEFORE she becomes the monarch,
@@ -2669,7 +2669,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
 
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
-actOfTreasonSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+actOfTreasonSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 actOfTreasonSpec s registry = Spec.describe s "Act of Treason" $ do
   Spec.it s "steal, untap, haste, attack, then revert" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -2695,7 +2695,7 @@ actOfTreasonSpec s registry = Spec.describe s "Act of Treason" $ do
 -- {1}{W}, and "When you cycle this card, you may gain 2 life". It targets
 -- nothing, so nothing here can be passing on the targeting machinery: the only
 -- new thing is whether the trigger's one effect happens.
-optionalEffectSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+optionalEffectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 optionalEffectSpec s registry =
   let -- Takes the option ONLY if the prompt names the right decider, the right
       -- player and the right mode. A prompt addressed to anybody else, or naming
@@ -2835,7 +2835,7 @@ castDayOfJudgment plains dayOfJudgment board =
       afterCast = S.runPure S.identityAnswer withSpell (Cast.castSpell S.alice spell)
    in S.runPure S.identityAnswer afterCast Stack.resolveTop
 
-destroyAllSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+destroyAllSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
   -- CR 109.2: "Destroy all creatures" includes no "card" or "spell", so it
   -- means every CREATURE PERMANENT on the battlefield -- both players' and,
@@ -3078,7 +3078,7 @@ attackerIds = Map.keys . Combat.Type.attackers . GameState.combat
 -- The modification is layer 7c (CR 613.4c: "effects and counters that modify
 -- power and/or toughness"), the same layer Giant Growth's already lands in --
 -- what is new here is the affected set, not the modification.
-trumpetBlastSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+trumpetBlastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trumpetBlastSpec s registry = Spec.describe s "TrumpetBlast" $ do
   -- CR 109.2: "attacking creatures" names no zone and no card, so it means
   -- attacking creature PERMANENTS on the battlefield -- both players', if both
@@ -3186,7 +3186,7 @@ trumpetBlastSpec s registry = Spec.describe s "TrumpetBlast" $ do
 -- The printed reminder "(You don't get to move Auras.)" is not a rule this
 -- opcode has to implement: nothing in GainControl moves an attachment, and CR
 -- 701.3 is the only thing that does.
-auraThiefSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+auraThiefSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraThiefSpec s registry =
   let -- alice: one Mountain (the Bolt's {R}), an Aura Thief, and a Greed of her
       -- own; bob: a Bad Moon and a Hardened Scales. All four enchantments are
@@ -3336,7 +3336,7 @@ plusOnePlusOnesOn moid gs =
     obj <- Game.lookupObject oid gs
     Map.lookup CounterKind.PlusOnePlusOne (Object.counters obj)
 
-baneOfProgressSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+baneOfProgressSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
   -- The proving case for #380: a mass effect whose RIDER reads the sweep back.
   -- The board is arranged so that the three readings a wrong implementation
@@ -3421,7 +3421,7 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     Spec.assertEqWith s "no counters" (plusOnePlusOnesOn entered resolved) 0
     Spec.assertEqWith s "so Bane is the printed 2/2" (entered >>= \oid -> Projection.powerOf oid resolved) (Just 2)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
   resolveSpec s registry

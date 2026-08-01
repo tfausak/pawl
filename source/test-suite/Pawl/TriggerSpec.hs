@@ -146,7 +146,7 @@ castWave tidalWave island =
    in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid)))
 
 -- CR 608.2i: the log records; it is never emptied by a reader.
-logSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+logSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 logSpec s registry =
   Spec.describe s "EventLog" $ do
     -- CR 400.7 / 603.2g: a zone change appends a Moved event carrying the
@@ -212,7 +212,7 @@ logSpec s registry =
       Spec.assertEqWith s "the log was cleared afterwards" (GameState.events after) Seq.empty
 
 -- CR 603.2b / 603.6a: a step begins, and EVERY permanent is checked.
-scanSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+scanSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 scanSpec s registry =
   Spec.describe s "Scan" $ do
     Spec.it s "CR 603.2b running a step records that it began, on the active player's turn" $ do
@@ -370,7 +370,7 @@ scanSpec s registry =
       Spec.assertEqWith s "bob discarded exactly one" (S.handSize S.bob settled) (bobBefore - 1)
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
-sacrificeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+sacrificeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sacrificeSpec s registry =
   Spec.describe s "Sacrifice" $ do
     Spec.it s "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $ do
@@ -441,7 +441,7 @@ sacrificeSpec s registry =
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
 -- shape ("a player controlling no permanents of a particular card type"), chosen
 -- by the rulebook to illustrate the rule.
-stateTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+stateTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stateTriggerSpec s registry =
   let triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
       isTriggerObject gs oid = case Game.lookupObject oid gs of
@@ -579,7 +579,7 @@ stateTriggerSpec s registry =
 -- Scryfall's only ruling on the card is the design in one sentence: the count
 -- "includes creature tokens ... as well as creatures put into a graveyard before
 -- Khabál Ghoul entered the battlefield."
-historySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+historySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 historySpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs =
@@ -665,7 +665,7 @@ historySpec s registry =
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
 -- delayed ability -- "it" must survive the resolution that armed it.
-delayedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+delayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 delayedSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -928,7 +928,7 @@ delayedSpec s registry =
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an
 -- order that changes the answer.
-orderingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+orderingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 orderingSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -1072,7 +1072,7 @@ orderingSpec s registry =
 -- collision is reachable from the pool: Palace Jailer crowns its controller, and
 -- Khabál Ghoul triggers "at the beginning of each end step", so one player's end
 -- step fires her Ghoul's trigger and the monarch's inherent draw in one batch.
-monarchOrderingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+monarchOrderingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchOrderingSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -1193,7 +1193,7 @@ monarchOrderingSpec s registry =
 -- Sarcomancy {B} Enchantment: "When this enchantment enters, create a 2/2 black
 -- Zombie creature token. At the beginning of your upkeep, if there are no Zombies
 -- on the battlefield, this enchantment deals 1 damage to you."
-interveningSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+interveningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 interveningSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
@@ -1266,7 +1266,7 @@ zombieTokenOf sarcomancy pikerFallback =
 -- ability, so it is minted by Pawl.Engine.Keyword and gathered by the same
 -- Pawl.Engine.Event.eventTriggers scan a printed trigger goes through, with the damaged
 -- player carried across in the reserved Binding.triggerPlayer slot.
-poisonousSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+poisonousSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 poisonousSpec s registry =
   let -- Hang `n` Auras off `host`, each owned by alice. Attached directly rather
       -- than cast: the cast path is proved once, by the whole-card test below.
@@ -1418,7 +1418,7 @@ poisonousSpec s registry =
 -- "When you cycle this card, target creature gains flying until end of turn".
 -- The trigger is mandatory and its effect is Serpent's Gift's exact shape, so
 -- the only new thing any test below can be passing on is the trigger itself.
-cyclingTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+cyclingTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclingTriggerSpec s registry =
   Spec.describe s "CyclingTrigger" $ do
     -- The whole card: cycle the Aven for {U}, its trigger targets the Piker as
@@ -1514,7 +1514,7 @@ cyclingTriggerSpec s registry =
 --
 -- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
 -- every "an opponent" below is alice.
-discardTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+discardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 discardTriggerSpec s registry =
   Spec.describe s "DiscardTrigger" $ do
     -- CR 601.2f's "costs may include ... discarding cards", and CR 701.9a is
@@ -1611,7 +1611,7 @@ discardTriggerSpec s registry =
 --
 -- Baral's reflexive "if you do" is one Optional mode over both instructions
 -- (#487), so `Exercises` below draws AND discards.
-counterTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+counterTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterTriggerSpec s registry =
   let -- bob: a Baral, three Islands, one card in his library and a Cancel in
       -- hand. alice: `victim` on the stack. bob's library and hand each hold
@@ -1772,7 +1772,7 @@ counterTriggerSpec s registry =
 -- about the entering creature, so these cases isolate the trigger CONDITION;
 -- its "another" is Filter.Not Filter.IsSource inside the condition's own
 -- Filter, never a second exclusion mechanism (#163).
-permanentEntersSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+permanentEntersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 permanentEntersSpec s registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
@@ -1887,7 +1887,7 @@ permanentEntersSpec s registry =
 -- Narcomoeba; Soul Warden rides along in the same graveyard as the control,
 -- because its CR 603.6a trigger functions ONLY on the battlefield and so must
 -- stay silent even when a creature enters right in front of it.
-graveyardTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+graveyardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graveyardTriggerSpec s registry =
   let -- alice: one Island in play (Tome Scour's {U}), Tome Scour in hand, and a
       -- three-card library of Narcomoeba, Soul Warden and a Goblin Piker. Five
@@ -1987,7 +1987,7 @@ graveyardTriggerSpec s registry =
 -- the time the scan runs, the Traveler is a card in a graveyard with a fresh id
 -- (CR 400.7) and nothing is on the battlefield to find -- which is what makes
 -- the token appearing at all the discriminating assertion here.
-diesTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+diesTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 diesTriggerSpec s registry =
   let -- alice: one Mountain (Lightning Bolt's {R}), a Doomed Traveler in play,
       -- and the Bolt in hand. S.identityAnswer targets the least Recipient, and
@@ -2156,7 +2156,7 @@ everyTriggerCondition =
 -- arriving card, because SelfPutIntoGraveyardFromLibrary matches on the
 -- ARRIVING incarnation; here it is not, because CR 603.10a makes this condition
 -- match on the DEPARTING one. That contrast is why there are two slots.
-becameSlotSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+becameSlotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 becameSlotSpec s registry =
   let -- alice: one Mountain (Lightning Bolt's {R}), the Cockroaches in play, and
       -- the Bolt in hand. S.identityAnswer targets the least Recipient, and
@@ -2262,7 +2262,7 @@ becameSlotSpec s registry =
 -- Bad Moon supplies the third power, and it does so through the LAYERS
 -- (CR 613.4c, layer 7c), which is what makes the graveyard card's printed value
 -- visibly the wrong answer rather than merely a different route to the same one.
-lookBackInterveningSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+lookBackInterveningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lookBackInterveningSpec s registry =
   let berserkerBoard withBadMoon = do
         mountain <- S.printingOf s registry "Mountain"
@@ -2327,7 +2327,7 @@ lookBackInterveningSpec s registry =
 -- settle. CR 603.6a checks every battlefield permanent against the event, and it
 -- reads each one's PROJECTION -- so a Blood Moon that has already made the
 -- Fountain a Mountain leaves nothing there to trigger.
-strippedTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+strippedTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 strippedTriggerSpec s registry =
   let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
@@ -2387,7 +2387,7 @@ tramplingAnswer p = case p of
 -- put the trigger's event and the bearer's death in ONE batch: the excess
 -- reaches bob while the blocker's damage kills the Skelemental at the very next
 -- CR 704.5g check, before any player gets priority.
-bystanderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+bystanderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bystanderSpec s registry =
   Spec.describe s "Bystander" $ do
     -- The proving test. bob holds THREE cards, so "discarded once" (one left)
@@ -2476,7 +2476,7 @@ bystanderSpec s registry =
 -- Creature -- Ogre Warrior 3/3, defender) are the pair: identical costs and
 -- colors, so two Mountains cast either, and the ONLY difference the test can be
 -- reading is the toughness the 2 damage is measured against.
-aetherFlashSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+aetherFlashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 aetherFlashSpec s registry =
   let -- alice: Aether Flash already on the battlefield and two Mountains, with
       -- one creature card in hand. Casting it is the only thing on offer, so
@@ -2602,7 +2602,7 @@ aetherFlashSpec s registry =
 -- upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token
 -- with flying." The pool's first KINDRED card (CR 308), and so the first object
 -- of any kind that carries a creature type without being a creature.
-kindredSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+kindredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kindredSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
@@ -2666,7 +2666,7 @@ kindredSpec s registry =
               Spec.assertBool s (Projection.isCreatureOf token after) "and it, unlike its maker, IS a creature"
             other -> Spec.assertFailure s ("expected exactly one token beside Bitterblossom, got " <> show (length other) <> " other permanents")
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
   scanSpec s registry

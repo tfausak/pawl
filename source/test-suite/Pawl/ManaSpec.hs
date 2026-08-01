@@ -98,7 +98,7 @@ avoidsSource unwanted p = case p of
     [] -> NonEmpty.head candidates
   _ -> S.identityAnswer p
 
-castabilitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+castabilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castabilitySpec s registry = Spec.describe s "Castability" $ do
   Spec.it s "War Mammoth is cast off four Forests and resolves onto the battlefield" $ do
     forest <- S.printingOf s registry "Forest"
@@ -123,7 +123,7 @@ poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Mana.poolOf pid gs of
   Mana.Type.MkMana units -> length units
 
-manaSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+manaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 manaSpec s registry = Spec.describe s "Mana" $ do
   Spec.it s "substituteX replaces each Variable with Generic X, keeping order" $
     let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -482,7 +482,7 @@ tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.
 tappedFor answer oid gs = case Mana.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
 
-anyColorSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+anyColorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- CR 105.4: "If a player is asked to choose a color, they must choose one of
   -- the five colors. 'Multicolored' is not a color. Neither is 'colorless.'"
@@ -612,7 +612,7 @@ floatedPools alices forest =
 --
 -- Upwelling ({3}{G} Enchantment, "Players don't lose unspent mana as steps and
 -- phases end.") is the card that stops it, and it stops it for EVERY player.
-upwellingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+upwellingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 upwellingSpec s registry = Spec.describe s "Upwelling" $ do
   -- The control. Same board, same float, no Upwelling: both pools go.
   Spec.it s "CR 500.5 without Upwelling both players lose their unspent mana" $ do
@@ -696,7 +696,7 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
 -- unit, and it is what separates "the types this source could produce" from "the
 -- mana this source produces when it is tapped" (#238).
-solRingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+solRingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- The unit fact. A mode holding two AddMana effects is ONE activation
   -- yielding two mana, not a choice between two singles.
@@ -758,7 +758,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
         (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (Mana.tapForMana solRingId)) 0) 0
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
   castabilitySpec s registry
@@ -788,7 +788,7 @@ redSymbol = ManaSymbol.OfType (ManaType.Colored Color.Red)
 -- CR 107.4e: "A hybrid symbol such as {W/U} can be paid with either white or blue
 -- mana." Its example is exactly this shape: "{G/W}{G/W} can be paid by spending
 -- {G}{G}, {G}{W}, or {W}{W}."
-hybridSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+hybridSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hybridSpec s registry = Spec.describe s "Hybrid" $ do
   Spec.it s "CR 107.4e one {R/G} is payable from either half, and from neither otherwise" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -863,7 +863,7 @@ javelinCost = ManaCost.MkManaCost [twoOrRed, twoOrRed, twoOrRed]
 -- Flame Javelin ({2/R}{2/R}{2/R}) throughout, because the symbol only becomes
 -- interesting in bulk: one of them is barely distinguishable from {R}, three of
 -- them span {R}{R}{R} to {6}.
-monocoloredHybridSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+monocoloredHybridSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   let -- How many objects the stack holds after alice tries to cast the Javelin
       -- with `gs` already on the battlefield: 1 when the cost was paid, 0 when
@@ -1048,7 +1048,7 @@ aliceAt n =
 -- decides (#373); a case going through Cast.castSpell announces first, under CR
 -- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
 -- are the second path.
-phyrexianSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+phyrexianSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- The mana route. The life assertion is what makes this discriminating:
   -- both routes are open here, and paying life as WELL as the mana, or
@@ -1338,7 +1338,7 @@ withPermanent land printing n = snd (S.addCreature printing S.alice (S.landsInPl
 --     own "the game returns to the moment before the casting of that spell was
 --     proposed" would also do -- but the answer was never a real option. Thalia
 --     and Mutagenic Growth, below.
-totalCostSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+totalCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 totalCostSpec s registry = Spec.describe s "TotalCost" $ do
   -- THE reduction case. Sapphire Medallion is "Blue spells you cast cost {1}
   -- less to cast", Spined Thopter is {2}{U/P}, and two Islands are exactly
@@ -1431,7 +1431,7 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
 -- in printed order, each asked knowing the answers before it, and an earlier
 -- answer narrowing a later one's offer -- CR 601.2b's last sentence, "previously
 -- made choices ... may restrict the player's options when making these choices."
-dismemberSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+dismemberSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 dismemberSpec s registry = Spec.describe s "Dismember" $ do
   -- Two Swamps: the first symbol is a real choice, and answering MANA leaves
   -- {1}{B} to pay off two Swamps -- which the second symbol's mana route
@@ -1524,7 +1524,7 @@ pikerOn gs =
 -- names "the activation cost of an activated ability" in its own words -- so the
 -- announcement happens at CR 601.2b's position for an activation too. Until this
 -- card there was nothing in the pool for Pawl.Engine.Activate's Cost.announce call to do.
-moltensteelSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+moltensteelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- The activation cost's symbol IS a choice off a Mountain, and answering
   -- mana taps it. CR 118.13b/c are not what governs this -- the cost is an

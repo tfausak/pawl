@@ -27,7 +27,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   Spec.it s "CR 604.3 the seed carries the CDA as QUANTITIES, with the printed star substituted" $ do
     -- CR 707.2a: a copy acquires the ABILITY, so what the seed (and therefore

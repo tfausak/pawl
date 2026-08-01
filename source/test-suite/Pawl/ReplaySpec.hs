@@ -54,7 +54,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 oneMana :: Color.Color -> Mana.Mana
 oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color}]
 
-combatReplaySpec :: (Monad n) => Spec.Spec IO n -> n ()
+combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 combatReplaySpec s =
   let decider = Decide.deciderFor S.alice (Setup.emptyGame S.bothPlayers)
       oid = ObjectId.MkObjectId 7
@@ -440,7 +440,7 @@ concedeAnswer p = case p of
 -- playLandAnswer (whose choices differ from Replay's exhausted-transcript
 -- fallback, keeping the assertions below honest: the transcript has to
 -- actually carry the decisions).
-recordedGame :: Spec.Spec IO n -> Registry.Registry IO -> IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
+recordedGame :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
 recordedGame s registry = do
   matchup <- S.redRed (S.printingOf s registry)
   let start = Setup.emptyGame (fmap fst matchup)
@@ -448,7 +448,7 @@ recordedGame s registry = do
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
   pure (start, game, recorded, transcript)
 
-replaySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+replaySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 replaySpec s registry =
   Spec.describe s "Replay" $ do
     Spec.it s "replaying a recorded game reproduces the final state" $ do
@@ -525,7 +525,7 @@ replaySpec s registry =
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         _ -> Spec.assertFailure s "Aether Channeler must have exactly one triggered ability"
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replay" $ do
   replaySpec s registry
   combatReplaySpec s

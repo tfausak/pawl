@@ -96,7 +96,7 @@ alicesNextTurn gs =
       back = S.runPure S.identityAnswer bobs Engine.handoffTurn
    in back {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
   Spec.it s "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
     island <- S.printingOf s registry "Island"

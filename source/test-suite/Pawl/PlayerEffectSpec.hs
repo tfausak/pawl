@@ -78,7 +78,7 @@ ruleOfLawAfterFirst plains ruleOfLaw =
       (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
    in (a, b, resolveAll (S.runPure S.identityAnswer board (Cast.castSpell S.alice a)))
 
-ruleOfLawSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+ruleOfLawSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ruleOfLawSpec s registry =
   Spec.describe s "RuleOfLaw" $ do
     Spec.it s "before any spell is cast, both cards are castable" $ do
@@ -345,7 +345,7 @@ thaliaUntaxed mountain lightningBolt n =
 
 -- Thalia, Guardian of Thraben {1}{W} Legendary Creature -- Human Soldier 2/1:
 -- "First strike / Noncreature spells cost {1} more to cast."
-thaliaSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+thaliaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 thaliaSpec s registry =
   Spec.describe s "Thalia" $ do
     Spec.it s "CR 601.2f a noncreature spell's total cost is one more" $ do
@@ -492,7 +492,7 @@ medallionBothBoard island sapphireMedallion thalia unsummonPrinting =
       )
 
 -- Sapphire Medallion {2} Artifact: "Blue spells you cast cost {1} less to cast."
-medallionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+medallionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 medallionSpec s registry =
   Spec.describe s "SapphireMedallion" $ do
     -- Ruling: "The ability can't reduce the amount of colored mana you pay
@@ -608,7 +608,7 @@ medallionSpec s registry =
 -- AFTER the seven layers have run, so one never starts to apply before layer 6
 -- and the cut is unconditional. Same shape as the layer-7-only static ability
 -- gatherStatic drops.
-humilitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+humilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 humilitySpec s registry =
   Spec.describe s "Humility" $ do
     -- THE PROVING CASE. Thalia is a creature, so Humility reaches her with no
@@ -720,7 +720,7 @@ edgewalkerBoard plains edgewalker piker copies n =
 -- excess as dropped rather than spilled (#309). Edgewalker is itself a Cleric,
 -- so the spell it discounts is another copy of itself and the pool needs no
 -- second Cleric to make the point.
-edgewalkerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+edgewalkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 edgewalkerSpec s registry =
   Spec.describe s "Edgewalker" $ do
     Spec.it s "CR 118.7 a Cleric spell loses one white and one black symbol" $ do
@@ -812,7 +812,7 @@ reliquaryCleanup :: GameState.GameState -> GameState.GameState
 reliquaryCleanup gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
 
 -- Reliquary Tower, a Land: "You have no maximum hand size. / {T}: Add {C}."
-reliquaryTowerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+reliquaryTowerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 reliquaryTowerSpec s registry =
   Spec.describe s "ReliquaryTower" $ do
     Spec.it s "CR 402.2 the maximum hand size is normally seven" $ do
@@ -907,7 +907,7 @@ storedConditional piker =
 -- The STORED carrier: a player effect that outlives the object that made it.
 -- Hand-built here, exactly as ExpirySpec hand-builds a ContinuousEffect, so the
 -- carrier and its sweeps are proven before an opcode can produce one.
-storedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+storedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 storedSpec s registry =
   Spec.describe s "Stored" $ do
     let base = Setup.emptyGame S.bothPlayers
@@ -1048,7 +1048,7 @@ isSilenceActivate action = case action of
   Action.Type.Pass -> False
 
 -- Silence {W} Instant: "Your opponents can't cast spells this turn."
-silenceSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+silenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 silenceSpec s registry =
   Spec.describe s "Silence" $ do
     Spec.it s "before Silence resolves, bob may cast his creature" $ do
@@ -1168,7 +1168,7 @@ matchesSpellBoard lightningBolt piker =
 -- over the PROJECTED view (CR 613.1d layer 4 for a card type, CR 613.1e layer 5
 -- for a colour) rather than the retired SpellCriterion. A noncreature spell is
 -- Filter.Not (Filter.HasCardType Creature); a coloured spell is Filter.HasColor.
-matchesSpellSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+matchesSpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 matchesSpellSpec s registry =
   Spec.describe s "matchesSpell" $ do
     let noncreature = Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
@@ -1197,7 +1197,7 @@ matchesSpellSpec s registry =
       let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
       Spec.assertBool s (not (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
   adjustmentSpec s

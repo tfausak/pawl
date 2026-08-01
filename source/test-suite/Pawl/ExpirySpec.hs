@@ -165,7 +165,7 @@ handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
     Spec.assertEqWith s "alice takes the turn (wrapping past both departed seats)" (GameState.activePlayer after) S.alice
     Spec.assertEqWith s "carol's effect ended at carol's seat, two hops past alice" (GameState.continuousEffects after) []
 
-cleanupSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+cleanupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cleanupSpec s registry = Spec.describe s "DropAtCleanup" $ do
   Spec.it s "CR 514.2 cleanup drops an AtCleanup continuous effect and keeps a Never one" $ do
     let gs0 = Setup.emptyGame S.bothPlayers
@@ -232,7 +232,7 @@ board piker warMammoth =
       (targetId, gs2) = S.addCreature warMammoth S.bob gs1
    in (srcId, targetId, whileEffect srcId targetId S.alice gs2)
 
-conditionalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+conditionalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 conditionalSpec s registry = Spec.describe s "Conditional" $ do
   Spec.it s "CR 611.2b YouControlSource holds while the source is controlled" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -349,7 +349,7 @@ masterThiefThreeWay darksteelMyr masterThief =
 -- enters, gain control of target artifact for as long as you control this
 -- creature." CR 611.2b's own printed example; the three assertions below in
 -- tests 2-4 are its three Gatherer rulings, verbatim.
-masterThiefSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+masterThiefSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   Spec.it s "CR 611.2b it works: the ETB resolves and control of the artifact changes" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
@@ -491,7 +491,7 @@ monarchSettle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
 monarchResolveAll :: GameState.GameState -> GameState.GameState
 monarchResolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
 
-monarchSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+monarchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchSpec s registry = Spec.describe s "Monarch" $ do
   Spec.it s "CR 725.2 the monarch draws at the beginning of their own end step" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -609,7 +609,7 @@ hagBoardWith hag printing =
 -- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of
 -- your upkeep, target creature an opponent controls gets -2/-1 until your next
 -- turn." No Gatherer rulings exist, so these derive from CR 611.2a and CR 514.2.
-hagSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+hagSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
   Spec.it s "CR 613.4c it works: the opponent's 3/3 becomes 1/2" $ do
     hag <- S.printingOf s registry "Hag of Inner Weakness"
@@ -711,7 +711,7 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     Spec.assertEqWith s "but the trigger still resolved against bob's Mammoth" (Projection.powerOf mammoth resolved) (Just 1)
     Spec.assertEqWith s "and its toughness" (Projection.toughnessOf mammoth resolved) (Just 2)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   armSpec s
   cleanupSpec s registry

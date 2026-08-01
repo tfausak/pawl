@@ -57,7 +57,7 @@ check swamp n comparison threshold =
         (ObjectId.MkObjectId 0)
         (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   Spec.describe s "Exactly" $ do
     Spec.it s "CR 603.8 holds when the count equals the threshold" $ do

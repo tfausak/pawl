@@ -70,7 +70,7 @@ import qualified Pawl.Types.Zone as Zone
 sicknessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Sickness.Sickness
 sicknessOf oid gs = fmap Object.sickness (Game.lookupObject oid gs)
 
-sicknessSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+sicknessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sicknessSpec s registry = Spec.describe s "Sickness" $ do
   Spec.it s "CR 302.6 a permanent entering the battlefield is summoning sick" $ do
     -- changeZone mints a new object, so the id to inspect is the new one.
@@ -96,12 +96,12 @@ sicknessSpec s registry = Spec.describe s "Sickness" $ do
         after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
     Spec.assertEqWith s "still sick" (sicknessOf oid after) (Just Sickness.Sick)
 
-castGameState :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+castGameState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 castGameState s registry = do
   matchup <- S.redRed (S.printingOf s registry)
   pure (snd (Engine.runMatchPure S.castAnswer matchup))
 
-castEngineSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+castEngineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castEngineSpec s registry = Spec.describe s "CastEngine" $ do
   Spec.it s "a castable Piker is offered as a legal action" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -145,7 +145,7 @@ pikerOnStack mountain piker =
   let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
    in snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
 
-stackSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+stackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stackSpec s registry = Spec.describe s "Stack" $ do
   Spec.it s "CR 608.3 a resolving creature spell becomes a permanent" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -233,7 +233,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
          in Spec.assertEqWith s "Panglacial still in the library" (S.countByName (Text.pack "Panglacial Wurm") S.alice after) 1
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
 
-castSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do
   Spec.it s "a Piker is castable with two Mountains in a main phase" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -457,7 +457,7 @@ lastN :: Natural -> [a] -> [a]
 lastN n xs = reverse (List.genericTake n (reverse xs))
 
 -- Bob draws to eight, then discards at cleanup under discardLastAnswer.
-bobDiscardChoice :: Spec.Spec IO n -> Registry.Registry IO -> IO (GameState.GameState, [ObjectId.ObjectId])
+bobDiscardChoice :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, [ObjectId.ObjectId])
 bobDiscardChoice s registry = do
   matchup <- S.redRed (S.printingOf s registry)
   let start = Setup.emptyGame S.bothPlayers
@@ -471,7 +471,7 @@ bobDiscardChoice s registry = do
       (held, final) = Engine.runGamePure discardLastAnswer start steps
   pure (final, held)
 
-discardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+discardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 discardSpec s registry = Spec.describe s "Discard" $ do
   Spec.it s "CR 514.2 discard trims to hand size" $ do
     (final, _held) <- bobDiscardChoice s registry
@@ -521,7 +521,7 @@ hackAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
   _ -> S.identityAnswer p
 
-magicalHackSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+magicalHackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 magicalHackSpec s registry = Spec.describe s "MagicalHack" $ do
   Spec.it s "CR 612/305.6 a hacked basic Mountain taps for its new color" $ do
     -- alice: one Mountain to hack and one Island (blue for the {U}), plus a
@@ -579,7 +579,7 @@ answerAboveBound p = case p of
 blazeInHand :: GameState.GameState -> Int
 blazeInHand gs = length (filter (nameOnStack (Text.pack "Blaze") gs) (Game.zoneMembers Zone.Hand S.alice gs))
 
-blazeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
   Spec.it s "Blaze at X=3 deals 3 to the opponent (CR 601.2b/f/h, 608.2)" $ do
     -- Falsifier: an engine that ignored the chosen value (treated X as 0, or
@@ -667,7 +667,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
 -- Chaos Charm has three modes (destroy target Wall / damage target creature /
 -- give target creature haste); the falsifier is castability via the damage or
 -- haste mode with no Wall on the board at all.
-modalCastSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+modalCastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 modalCastSpec s registry = Spec.describe s "ModalCast" $ do
   Spec.it s "CR 700.2a Chaos Charm is castable off its non-Wall modes with no Wall in play" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
@@ -745,7 +745,7 @@ castAndResolve answer gs oid =
 
 -- CR 702.42: entwine, the first keyword that decides a modal spell's SELECTION
 -- while it is being cast rather than reading it off the card.
-entwineSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+entwineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- CR 702.42a's "you MAY choose all modes": declining is a real answer, and
   -- it leaves the printed ChooseExactly 1 alone.
@@ -834,7 +834,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
 -- teaches Target.fillableModes the extra slots a card declares outside its
 -- modes, so castability sees the enchant slot too -- without either function
 -- learning what an Aura is.
-auraTargetSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+auraTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
   Spec.it s "CR 303.4a: an Aura spell targets, so it prompts for the creature it enchants" $ do
     swamp <- S.printingOf s registry "Swamp"
@@ -892,7 +892,7 @@ theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
 -- afterward, whether it resolves, is countered, or leaves the stack in some
 -- other way." "The mana value of the spell is determined only by its mana cost,
 -- no matter what the total cost to cast the spell was."
-fireboltSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+fireboltSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fireboltSpec s registry = Spec.describe s "Firebolt" $ do
   -- The headline loop, end to end: hand -> stack -> graveyard -> stack ->
   -- EXILE. The exile is the discriminating assertion -- rule 702.34a's
@@ -1014,7 +1014,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
 -- CREATURE. Mindslaver is a legendary ARTIFACT -- the case that fails if the
 -- check reads the supertype and forgets the card type. And Thalia under bob's
 -- control is the case that fails if the check forgets "that player controls".
-legendarySpellSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+legendarySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
   -- The control for every negative below: same board, same one Mountain,
   -- plus a legendary creature. Thalia taxes the sorcery {1} (her own
@@ -1122,7 +1122,7 @@ rallyBoard piker plains rally =
         -- unreachable; a bogus id fails the assertions rather than the suite.
         [] -> (bobsRally, alicesRally, S.noSource, tapped)
 
-printedCastingRestrictionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
   -- Both clauses satisfied: bob is the defending player (CR 506.2), attackers
   -- have joined (CR 508.8), and the game is in the declare attackers step.
@@ -1211,7 +1211,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
   castEngineSpec s registry

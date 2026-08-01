@@ -34,7 +34,7 @@ import qualified Pawl.Types.Zone as Zone
 nonblackCreature :: TargetSpec.TargetSpec
 nonblackCreature = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 202.2 a mono-black card's colour is black" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"

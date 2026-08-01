@@ -389,7 +389,7 @@ reversingShuffle p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> S.identityAnswer p
 
-trustedAnswerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+trustedAnswerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trustedAnswerSpec s registry =
   Spec.describe s "TrustedAnswers" $ do
     -- CR 103.5: after mulliganing twice, alice bottoms exactly two cards and
@@ -435,7 +435,7 @@ trustedAnswerSpec s registry =
       Spec.assertEqWith s "the fixture really has two cards" (List.sort before) [a, b]
       Spec.assertEqWith s "the order is the reversal the interpreter asked for" (Game.zoneMembers Zone.Library S.alice after) (reverse before)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry =
   Spec.describe s "Pawl.Engine.Mulligan" $ do
     Spec.it s "CR 103.5b: a hand card granting an action is offered at the declaration" $ do

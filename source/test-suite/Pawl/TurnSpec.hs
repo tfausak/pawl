@@ -177,7 +177,7 @@ turnDataSpec s = Spec.describe s "TurnData" $ do
               ]
           )
 
-skipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+skipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 skipSpec s registry = Spec.describe s "Skip" $ do
   Spec.it s "CR 511.3 thisPhase inside a combat phase ends at ITS end of combat" $
     -- Two whole combat phases back to back -- the arrangement CR 500.8
@@ -497,7 +497,7 @@ castAndResolveWith answer spell gs =
 -- main phase. Activate only as a sorcery.) and Relentless Assault ({2}{R}{R}:
 -- Untap all creatures that attacked this turn. After this main phase, there is
 -- an additional combat phase followed by an additional main phase.)
-extraPhaseSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+extraPhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
   Spec.it s "CR 500.8 splicePhases from a MAIN phase goes at the head" $
     -- CR 505.2: a main phase has no steps, so nothing of it is left in the
@@ -815,7 +815,7 @@ turnTakers n gs =
 -- ANOTHER player: Time Warp ({3}{U}{U} Sorcery, "Target player takes an extra
 -- turn after this one."). Savor the Moment creates one too, and what it adds --
 -- a skip scoped to that turn -- is turnScopedSkipSpec below.
-extraTurnSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+extraTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
   let boardOf n = do
         island <- S.printingOf s registry "Island"
@@ -959,7 +959,7 @@ tapStateOf oid = fmap Object.tapped . Game.lookupObject oid
 -- created after this one and taken BEFORE it, and the printed card skips the
 -- untap step of the turn IT made, not of whichever turn comes next. Two cards
 -- already in the pool reach that divergence.
-turnScopedSkipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+turnScopedSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
   let boardOf = do
         island <- S.printingOf s registry "Island"
@@ -1039,7 +1039,7 @@ turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
     Spec.assertEqWith s "Savor's is turn 3, and alice's" (GameState.turnNumber atSavorTurn, GameState.activePlayer atSavorTurn) (3, S.alice)
     Spec.assertEqWith s "but Savor's own turn did NOT untap" (tapStateOf piker afterSavorTurn) tapped
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   turnSpec s
   turnDataSpec s

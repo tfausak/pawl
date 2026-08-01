@@ -44,7 +44,7 @@ counteringsOf gs =
         _ -> Nothing
    in Maybe.mapMaybe counteringOf (Foldable.toList (GameState.events gs))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614: with Rest in Peace out, a creature sent to the graveyard is exiled" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"

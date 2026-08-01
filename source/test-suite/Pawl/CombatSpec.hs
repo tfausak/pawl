@@ -55,7 +55,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
-combatDamageSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+combatDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.1b an unblocked attacker damages the defending player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -136,7 +136,7 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
 declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
 
-declareSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+declareSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 declareSpec s registry = Spec.describe s "Declare" $ do
   Spec.it s "CR 508.1f declaring an attacker taps it" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -212,7 +212,7 @@ declareSpec s registry = Spec.describe s "Declare" $ do
     Spec.assertEqWith s "cannot attack the turn it arrives" (declaredAttackers sameTurn) []
     Spec.assertEqWith s "can attack after untapping" (length (declaredAttackers nextTurn)) 1
 
-defenderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+defenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defenderSpec s registry = Spec.describe s "Defender" $ do
   Spec.it s "CR 702.3b a creature with defender can't attack" $ do
     ogreSentry <- S.printingOf s registry "Ogre Sentry"
@@ -298,7 +298,7 @@ runRecordingBlockers gs =
 
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderSpec, which is the Defender KEYWORD (CR 702.3b).
-defendingPlayerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+defendingPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
   Spec.it s "CR 703.4h/507.1 the active player chooses which opponent is the defending player" $ do
     -- THREE seats: the whole point. Discriminating against the behaviour this
@@ -554,7 +554,7 @@ justArrived gs =
   let sicken o = if Object.owner o == S.alice then o {Object.sickness = Sickness.Sick} else o
    in gs {GameState.objects = fmap sicken (GameState.objects gs)}
 
-hasteSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+hasteSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hasteSpec s registry = Spec.describe s "Haste" $ do
   Spec.it s "CR 702.10b a creature with haste attacks the turn it arrives" $ do
     goblinChariot <- S.printingOf s registry "Goblin Chariot"
@@ -596,7 +596,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
       [chariot, _] -> Spec.assertEqWith s "only the chariot" (declaredAttackers after) [chariot]
       _ -> Spec.assertFailure s "fixture should have two creatures"
 
-controlChangeSicknessSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+controlChangeSicknessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $ do
   -- A live steal, with nothing forced: bob's Piker settles under bob at his
   -- untap step, then alice's Control Magic takes it. CR 302.6 asks whether
@@ -665,7 +665,7 @@ withFear oid gs =
 withLands :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
 withLands lands gs = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs lands
 
-evasionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+evasionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.9b a declaration in which a ground creature blocks a flier is illegal" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
@@ -897,7 +897,7 @@ luring lure mine theirs =
 -- carrier, and the one CR 604.2's layer-6 strip needs: it is a CREATURE, so
 -- Humility's "each creature loses all abilities" reaches its requirement with no
 -- animator in between.
-blockRequirementSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+blockRequirementSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
   Spec.it s "CR 509.1c declining to block a Lured attacker is illegal" $ do
     -- THE FALSIFIER for a restrictions-only reading of CR 509.1: the empty
@@ -1085,7 +1085,7 @@ cursing curse who mine theirs =
 -- Pawl.Engine.Combat.legalAttackers, so a creature that could not have attacked anyway
 -- carries no requirement and cannot make declining illegal. Half the group is
 -- that half.
-attackRequirementSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+attackRequirementSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
   Spec.it s "CR 508.1d declining to attack under a Curse of the Nightly Hunt is illegal" $ do
     -- THE FALSIFIER for a restrictions-only reading of CR 508.1: the empty
@@ -1206,7 +1206,7 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
         Spec.assertEqWith s "and tapped" (tapStateOf a after) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have a creature"
 
-vigilanceSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+vigilanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
   Spec.it s "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $ do
     -- Both creatures in ONE declaration, so a blanket "nothing taps" bug
@@ -1242,7 +1242,7 @@ vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
       [] -> Spec.assertFailure s "fixture should have an attacker"
       attacker : _ -> Spec.assertEqWith s "blocked" (Combat.blockersOf attacker after) (Set.fromList theirs)
 
-combatLegalitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+combatLegalitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
   Spec.it s "a Settled untapped creature may attack" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1326,7 +1326,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
     Spec.assertEqWith s "starts empty" (Combat.Type.attackers (GameState.combat gs)) Map.empty
     Spec.assertEqWith s "clears" (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy))) Map.empty
 
-keywordSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+keywordSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 keywordSpec s registry = Spec.describe s "Keyword" $ do
   let gs0 = Setup.emptyGame S.bothPlayers
       -- Each M2a printing carries exactly its one keyword and no other.
@@ -1371,7 +1371,7 @@ runToFirstStrikeDone answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 24 gs0
 
-firstStrikeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+firstStrikeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
   Spec.it s "CR 702.7b a first striker kills a vanilla blocker and lives" $ do
     -- The tiger (2/1 first strike) kills the Piker (2/1) in the first-strike
@@ -1495,7 +1495,7 @@ runToEndOfCombat = runToStep (Phase.Combat CombatStep.EndOfCombat)
 -- round (CR 511.1), where the active player may cast an instant. Kill Shot
 -- ("Destroy target attacking creature") is what makes the window observable: it
 -- has a legal target during the end of combat step and none after it.
-endOfCombatSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+endOfCombatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 endOfCombatSpec s registry = Spec.describe s "EndOfCombat" $ do
   Spec.it s "CR 511.3 whole card: Kill Shot destroys an attacker during the end of combat step" $ do
     plains <- S.printingOf s registry "Plains"
@@ -1534,7 +1534,7 @@ endOfCombatSpec s registry = Spec.describe s "EndOfCombat" $ do
 frst :: (a, b, c) -> a
 frst (a, _, _) = a
 
-m2bExitSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+m2bExitSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 m2bExitSpec s registry = Spec.describe s "M2bExit" $ do
   Spec.it s "the milestone: first strike breaks the trade, double strike doubles the hit, no attacker no damage" $ do
     sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
@@ -1600,7 +1600,7 @@ snatch victim p = case p of
 -- test is the engine's own and the removal is observed where a player would see
 -- it: at the CR 117.5 settle that follows the spell resolving. Each leg stops at
 -- the end of combat step, where CR 511.3 says the record still reads live.
-controlChangeRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+controlChangeRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ do
   Spec.it s "CR 506.4 whole card: Ray of Command on an attacker removes THAT attacker from combat, and it deals no combat damage" $ do
     island <- S.printingOf s registry "Island"
@@ -1789,7 +1789,7 @@ stayHomeAnswer homebody p = case p of
 -- Removal is removal only. Nothing here puts a creature back into combat, which
 -- is what the rules say too -- the glossary's "removed from combat" entry has
 -- the permanent take "no further involvement in that combat phase".
-effectRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+effectRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
   Spec.it s "CR 506.4 whole card: Labyrinth of Skophos removes target ATTACKING creature, and it deals no combat damage" $ do
     island <- S.printingOf s registry "Island"
@@ -1974,7 +1974,7 @@ unblock blocker victim p = case p of
 --
 -- Every leg runs whole steps through Engine.runStep and stops at the end of
 -- combat step, where CR 511.3 says the record still reads live.
-typeChangeRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+typeChangeRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
   Spec.it s "CR 506.4 whole cards: an attacking Forest that stops being a creature is removed from combat" $ do
     forest <- S.printingOf s registry "Forest"
@@ -2069,7 +2069,7 @@ typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
 -- Hanweir Garrison is the pool's only source of one: "Whenever this creature
 -- attacks, create two 1/1 red Human creature tokens that are tapped and
 -- attacking."
-putOntoBattlefieldAttackingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+putOntoBattlefieldAttackingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefieldAttacking" $ do
   Spec.it s "CR 508.4 whole card: Hanweir Garrison's two Humans enter tapped and attacking" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
@@ -2123,7 +2123,7 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     -- The 2/3 Garrison plus two 1/1 tokens, all unblocked, against bob's 20.
     Spec.assertEqWith s "bob takes 2 + 1 + 1" (S.lifeOf S.bob after) (Just 16)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
   declareSpec s registry

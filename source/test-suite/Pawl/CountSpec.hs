@@ -47,7 +47,7 @@ swampsYouControl =
     (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
     Aggregation.Objects
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   Spec.it s "Objects counts the matching members of a zone" $ do
     -- Two Swamps Alice controls, one Bob controls; ControlledBy You keeps

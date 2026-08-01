@@ -33,7 +33,7 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone
 
-deckSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+deckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 deckSpec s registry = Spec.describe s "Deck" $ do
   Spec.it s "the red deck is 60 cards" $ do
     deck <- Cards.redDeck (S.printingOf s registry)
@@ -125,12 +125,12 @@ deckSpec s registry = Spec.describe s "Deck" $ do
     gs <- setupState s registry
     Spec.assertEqWith s "chaos charms" (S.countByName (Text.pack "Chaos Charm") S.alice gs) 4
 
-setupState :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+setupState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 setupState s registry = do
   matchup <- S.redRed (S.printingOf s registry)
   pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
-setupSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+setupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 setupSpec s registry = Spec.describe s "Setup" $ do
   Spec.it s "120 objects after setup" $ do
     gs <- setupState s registry
@@ -175,12 +175,12 @@ setupSpec s registry = Spec.describe s "Setup" $ do
   Spec.it s "CR 800.1 a three-player game has three players still in it at the start" $
     Spec.assertEqWith s "all three playing" (Game.stillPlaying S.threePlayerGame) [S.alice, S.bob, S.carol]
 
-greenBlackSetup :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+greenBlackSetup :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 greenBlackSetup s registry = do
   matchup <- S.greenBlack (S.printingOf s registry)
   pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
-greenBlackSetupSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+greenBlackSetupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 greenBlackSetupSpec s registry = Spec.describe s "GreenBlackSetup" $ do
   Spec.it s "alice's green deck deals 36 Forests" $ do
     gs <- greenBlackSetup s registry
@@ -200,7 +200,7 @@ addMany :: Printing.Printing -> Int -> PlayerId -> GameState.GameState -> GameSt
 addMany mountain n pid gs =
   List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
 
-restartSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+restartSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
   Spec.it s "startGameFromCards: libraries are rebuilt from the existing owned cards, hands drawn" $ do
     -- alice and bob each own 8 cards, all currently on the battlefield. After
@@ -354,7 +354,7 @@ poolToLibrary pid gs =
           GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
         }
 
-subgameSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+subgameSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 729.2: subgameStateFrom takes ONLY library cards; battlefield/hand do not enter" $ do
     -- alice owns 5 cards: 2 relocated to her library, 3 left on the battlefield.
@@ -483,7 +483,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "carol goes first" (GameState.activePlayer sub) S.carol
     Spec.assertEqWith s "CR 800.1: a two-seat subgame is not a multiplayer game, so no free mulligan" (Mulligan.freeMulligans sub) 0
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Setup" $ do
   setupSpec s registry
   greenBlackSetupSpec s registry

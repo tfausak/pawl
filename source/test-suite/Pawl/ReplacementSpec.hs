@@ -234,7 +234,7 @@ leylineShape src ts =
 -- Sarcomancy is placed straight onto the battlefield, so its enters-trigger
 -- never resolves and no Zombie token exists: CR 603.4's intervening "if" holds
 -- and the upkeep ability really would fire.
-stepSkipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+stepSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stepSkipSpec s registry = Spec.describe s "Skip" $ do
   let untap = Phase.Beginning BeginningStep.Untap
       upkeep = Phase.Beginning BeginningStep.Upkeep
@@ -310,7 +310,7 @@ aimPlayer pid p = case p of
 -- skipped step cannot be confused with a step that happened and drew nothing:
 -- the CR 603.2b StepBegan record (CR 614.6, "if an event is replaced, it never
 -- happens"), and alice's library, which a real draw step empties by one.
-fatigueSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+fatigueSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fatigueSpec s registry = Spec.describe s "Fatigue" $ do
   let drawStep = Phase.Beginning BeginningStep.DrawStep
       -- alice's turn, positioned at her draw step with the precombat main phase
@@ -491,7 +491,7 @@ castingSkirmishAnswer victim p = case p of
 -- Everything Fatigue proved about a skip's LIFETIME rides along unchanged: the
 -- skip is created by an effect, scoped to the player its resolution named, and
 -- consumed by one occurrence (CR 614.10a).
-stonehornSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+stonehornSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
   let -- alice in her precombat main phase on turn 2, holding Stonehorn Dignitary
       -- with four untapped Plains (exactly {3}{W}); bob has one Settled Goblin
@@ -591,7 +591,7 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
 -- would only risk becoming a CI flake. The timeout is not applied here --
 -- Pawl.Spec cannot express one -- but where this spec is wired into the tasty
 -- runner.
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- P9: a pattern's permanent match runs through the lower Pawl.Engine.Filter over
   -- the PROJECTED view, the same evaluator Pawl.Engine.Cost narrows sacrifices with
