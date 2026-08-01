@@ -4,7 +4,7 @@ import Numeric.Natural (Natural)
 import Pawl.Types.Color (Color)
 import Pawl.Types.ManaType (ManaType)
 
--- CR 107.4. Grows: hybrid Phyrexian (#364), snow.
+-- CR 107.4. Grows: hybrid Phyrexian (#364).
 data ManaSymbol
   = Generic Natural
   | OfType ManaType
@@ -67,6 +67,37 @@ data ManaSymbol
     -- with either of two colours or with 2 life -- is not this constructor and
     -- has none of its own (#364).
     Phyrexian Color
+  | -- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
+    -- that can be paid with one mana of any type produced by a snow source (see
+    -- rule 106.3)." Icehide Golem, whose whole cost this is.
+    --
+    -- CARRIES NOTHING, and the two things it might have carried are both wrong.
+    -- Not a ManaType, because CR 107.4h's last sentence forbids it: "Snow is
+    -- neither a color nor a type of mana" -- ANY type of mana pays it. Not a
+    -- Generic 1 either, because CR 107.4h's second sentence separates the two
+    -- outright: "Effects that reduce the amount of generic mana you pay don't
+    -- affect {S} costs." So this is the first symbol whose payability turns on
+    -- how a mana was PRODUCED rather than on what it is --
+    -- Pawl.Types.ProductionTag.Snow is that fact, and Pawl.Engine.Mana.waysOf
+    -- turns this symbol into a demand for one mana of any type carrying it.
+    --
+    -- The OTHER direction is not this constructor. CR 106.11 -- "if an effect
+    -- would add mana represented by one or more snow mana symbols ... that much
+    -- colorless mana is added" -- is about PRODUCING mana, which is
+    -- Pawl.Types.ManaProduction's business, and nothing there can say {S}
+    -- (#514).
+    --
+    -- CR 118.7g's reduction BY {S} is a third thing again, and the rule turns it
+    -- back into a plain generic one: "the cost is reduced by that much generic
+    -- mana." The SYMBOL is not generic and the REDUCTION it names is, which is
+    -- why that does not contradict CR 107.4h's second sentence -- and why
+    -- Pawl.Engine.Cost.applyAdjustments, which answers one question for both
+    -- sides, gets the reduction side wrong (#516).
+    --
+    -- CR 107.4h's own third sentence is not implemented either: "The {S} symbol
+    -- can also be used to refer to mana of any type produced by a snow source
+    -- SPENT to pay a cost" (#515).
+    Snow
   | -- CR 107.3 / 601.2b: the {X} symbol in a cost. Contributes the chosen value
     -- of X once chosen (0 before, for the CR 601.2b castability floor and for a
     -- mana value off the stack, CR 202.3e).

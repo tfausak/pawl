@@ -779,6 +779,11 @@ symbolColors symbol = case symbol of
   -- by ManaSpec's "Mutagenic Growth is green on the stack even when 2 life paid
   -- for it".
   ManaSymbol.Phyrexian c -> [c]
+  -- CR 107.4h's last sentence, which settles this outright: "Snow is neither a
+  -- color nor a type of mana." CR 202.2d's colour-granting list names the hybrid
+  -- and Phyrexian symbols and not this one, so Icehide Golem is colorless (CR
+  -- 202.2b) despite having a mana cost.
+  ManaSymbol.Snow -> []
   ManaSymbol.Generic _ -> []
   ManaSymbol.Variable -> []
 
@@ -1958,7 +1963,13 @@ nameOf oid gs = PC.name (project oid gs)
 
 -- CR 205.4: the object's projected supertypes, the sibling of subtypesOf.
 supertypesOf :: ObjectId -> GameState -> Set Supertype.Supertype
-supertypesOf oid gs = PC.supertypes (project oid gs)
+supertypesOf = supertypesGiven Map.empty
+
+-- The same supertypes against a pre-projected board, the subtypesGiven shape and
+-- carrying its reason (#200): Mana.productionTagsGiven asks this of every mana
+-- source in a sweep that has already gathered one.
+supertypesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Set Supertype.Supertype
+supertypesGiven pcs oid gs = PC.supertypes (projectGiven pcs oid gs)
 
 cardTypesOf :: ObjectId -> GameState -> Set CardType.CardType
 cardTypesOf = cardTypesGiven Map.empty

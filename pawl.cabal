@@ -455,6 +455,7 @@ library types
     Pawl.Types.Pool
     Pawl.Types.Power
     Pawl.Types.Printing
+    Pawl.Types.ProductionTag
     Pawl.Types.Program
     Pawl.Types.ProjectedCharacteristics
     Pawl.Types.Prompt
