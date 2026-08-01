@@ -81,6 +81,7 @@ library codec
     Pawl.Codec.Color
     Pawl.Codec.CombatStep
     Pawl.Codec.Common
+    Pawl.Codec.CommonSpec
     Pawl.Codec.Comparison
     Pawl.Codec.Condition
     Pawl.Codec.ControllerRelation
