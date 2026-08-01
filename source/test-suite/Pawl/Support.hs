@@ -1545,6 +1545,7 @@ stubView table oid =
                 Filter.supertypes = Set.empty,
                 Filter.colors = Set.empty,
                 Filter.subtypes = ss,
+                Filter.keywords = Set.empty,
                 Filter.power = Nothing,
                 Filter.controller = ctrl,
                 Filter.identity = Just o,

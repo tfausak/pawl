@@ -430,7 +430,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         s
         "and a set is the Filter object"
         (payloadHead (effectToJson cardToJson swept))
-        (filterToJson (Filter.Type.HasCardType CardType.Creature))
+        (filterToJson keywordToJson (Filter.Type.HasCardType CardType.Creature))
     -- Bane of Progress' "destroyed this way": the third element is the slot
     -- the sweep binds its count into, and it is ELIDED when absent -- so
     -- every Destroy already on disk keeps its two-element payload.
@@ -670,9 +670,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
           labyrinthOfSkophos = Filter.Type.Or [Filter.Type.IsAttacking, Filter.Type.IsBlocking]
           auraGraftTarget = Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToPermanent]
           auraGraftDestination = Filter.Type.CanHostSubject
+          plummet = Filter.Type.HasKeyword Keyword.Flying
        in mapM_
-            (roundTrip s "filter" filterToJson jsonToFilter)
-            [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, relentlessAssault, crownOfTheAges, labyrinthOfSkophos, auraGraftTarget, auraGraftDestination]
+            (roundTrip s "filter" (filterToJson keywordToJson) (jsonToFilter jsonToKeyword))
+            [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, relentlessAssault, crownOfTheAges, labyrinthOfSkophos, auraGraftTarget, auraGraftDestination, plummet]
     Spec.it s "PlayerRelation round-trips" $
       mapM_
         (roundTrip s "relation" playerRelationToJson jsonToPlayerRelation)
@@ -738,24 +739,24 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.describe s "cost (P8)" $ do
       Spec.it s "every CostComponent round-trips" $
         mapM_
-          (roundTrip s "component" costComponentToJson jsonToCostComponent)
+          (roundTrip s "component" (costComponentToJson keywordToJson) (jsonToCostComponent jsonToKeyword))
           [ CostComponent.TapThis,
             CostComponent.SacrificeThis,
             CostComponent.PayLife 2,
             CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
           ]
       Spec.it s "PayEnergy" $
-        roundTrip s "pe" costComponentToJson jsonToCostComponent (CostComponent.PayEnergy 2)
+        roundTrip s "pe" (costComponentToJson keywordToJson) (jsonToCostComponent jsonToKeyword) (CostComponent.PayEnergy 2)
       -- CR 606.4's two halves, Jace Beleren's +2 and -1.
       Spec.it s "loyalty costs" $ do
-        roundTrip s "add" costComponentToJson jsonToCostComponent (CostComponent.AddLoyaltyToThis 2)
-        roundTrip s "remove" costComponentToJson jsonToCostComponent (CostComponent.RemoveLoyaltyFromThis 1)
+        roundTrip s "add" (costComponentToJson keywordToJson) (jsonToCostComponent jsonToKeyword) (CostComponent.AddLoyaltyToThis 2)
+        roundTrip s "remove" (costComponentToJson keywordToJson) (jsonToCostComponent jsonToKeyword) (CostComponent.RemoveLoyaltyFromThis 1)
       Spec.it s "a Cost with a mana part and components round-trips" $
         roundTrip
           s
           "cost"
-          costToJson
-          jsonToCost
+          (costToJson keywordToJson)
+          (jsonToCost jsonToKeyword)
           Cost.Type.MkCost
             { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
               Cost.Type.components = [CostComponent.TapThis, CostComponent.SacrificeThis]
@@ -766,8 +767,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         roundTrip
           s
           "zero"
-          costToJson
-          jsonToCost
+          (costToJson keywordToJson)
+          (jsonToCost jsonToKeyword)
           Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []}
       -- CR 118.6: an ABSENT mana field is an UNPAYABLE cost, not {0}. This is
       -- the footgun the corpus migration exists to avoid, pinned so a future
@@ -777,7 +778,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
          in Spec.assertEqWith
               s
               "unpayable"
-              (jsonToCost value)
+              (jsonToCost jsonToKeyword value)
               (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
       Spec.it s "a Card carrying an additional cost round-trips" $ do
         lightningBolt <- S.printingOf s registry "Lightning Bolt"

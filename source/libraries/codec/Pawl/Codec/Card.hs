@@ -92,11 +92,11 @@ cardToJson c =
            )
         <> ( if null (CardT.additionalCosts c)
                then []
-               else [(Text.pack "additionalCosts", Json.listTo costComponentToJson (CardT.additionalCosts c))]
+               else [(Text.pack "additionalCosts", Json.listTo (costComponentToJson keywordToJson) (CardT.additionalCosts c))]
            )
         <> ( if null (CardT.alternativeCosts c)
                then []
-               else [(Text.pack "alternativeCosts", Json.listTo costToJson (CardT.alternativeCosts c))]
+               else [(Text.pack "alternativeCosts", Json.listTo (costToJson keywordToJson) (CardT.alternativeCosts c))]
            )
         -- Omitted when Counterable, the posture every other defaulted key here
         -- takes: one card in the pool prints "this spell can't be countered", and
@@ -151,8 +151,8 @@ jsonToCard value = do
   playerAbilities <- Json.listFromDefault jsonToPlayerStaticAbility (Json.getOpt (Text.pack "playerAbilities") ps)
   blockRequirements <- Json.listFromDefault jsonToBlockRequirement (Json.getOpt (Text.pack "blockRequirements") ps)
   attackRequirements <- Json.listFromDefault jsonToAttackRequirement (Json.getOpt (Text.pack "attackRequirements") ps)
-  additionalCosts <- Json.listFromDefault jsonToCostComponent (Json.getOpt (Text.pack "additionalCosts") ps)
-  alternativeCosts <- Json.listFromDefault jsonToCost (Json.getOpt (Text.pack "alternativeCosts") ps)
+  additionalCosts <- Json.listFromDefault (jsonToCostComponent jsonToKeyword) (Json.getOpt (Text.pack "additionalCosts") ps)
+  alternativeCosts <- Json.listFromDefault (jsonToCost jsonToKeyword) (Json.getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
   openingHandAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)
   enchant <- Json.maybeFrom jsonToTargetSpec (Json.getOpt (Text.pack "enchant") ps)

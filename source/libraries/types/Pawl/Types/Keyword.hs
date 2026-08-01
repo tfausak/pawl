@@ -35,6 +35,13 @@ import Pawl.Types.Subtype (Subtype)
 -- ability twice, which Pawl.Types.ProjectedCharacteristics.keywords carries as a
 -- count. This type says only WHICH ability, so a card's printed keywords stay a
 -- Set (each printed once) -- see Pawl.Types.Card.keywords.
+--
+-- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
+-- Filter has a HasKeyword arm (Plummet's "target creature with flying") and this
+-- type carries a Filter (702.29e typecycling) and a Cost (702.29a/702.34a/702.42a)
+-- whose components carry one too, so the three of them would be a module cycle if
+-- any were concrete. They are parametric and this one is not, which makes
+-- `Filter Keyword` and `Cost Keyword` the only instantiations anywhere.
 data Keyword
   = Deathtouch -- 702.2
   | Defender -- 702.3
@@ -106,7 +113,7 @@ data Keyword
     -- type is usually a subtype (as in 'mountaincycling') but can be any card
     -- type, subtype, supertype, or combination thereof (as in 'basic
     -- landcycling')" -- which is a Filter's whole job.
-    Cycling Cost (Maybe Filter)
+    Cycling (Cost Keyword) (Maybe (Filter Keyword))
   | -- 702.34a: "Flashback appears on some instants and sorceries. It represents
     -- two static abilities: one that functions while the card is in a player's
     -- graveyard and another that functions while the card is on the stack.
@@ -125,7 +132,7 @@ data Keyword
     -- Pawl.Engine.Cost.costsFor only in the graveyard), the permission
     -- (Keyword.castingPermissionsOf) and the exile replacement
     -- (Keyword.flashbackExile).
-    Flashback Cost
+    Flashback (Cost Keyword)
   | Fear -- 702.36
   | -- 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
     -- that functions while the spell is on the stack. 'Entwine [cost]' means
@@ -145,7 +152,7 @@ data Keyword
     -- completely -- "all modes", never some other number -- so Pawl.Engine.Cast reads
     -- the payload's own mode count (Modal.modeCount) rather than a number
     -- restated here, and Pawl.Types.ModeSelection stays what the card PRINTS.
-    Entwine Cost
+    Entwine (Cost Keyword)
   | -- 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
     -- this creature deals combat damage to a player, that player gets N poison
     -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the

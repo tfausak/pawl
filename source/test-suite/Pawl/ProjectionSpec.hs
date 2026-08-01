@@ -1212,6 +1212,60 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         let settled = snd (Engine.runGamePure (aimAtObject landId) coated Engine.settleForPriority)
         Spec.assertBool s (not (Set.member landId (GameState.battlefield settled))) "so CR 704.5f buries it"
 
+  -- CR 613.8a through a KEYWORD, which Filter.HasKeyword made a real question:
+  -- filterReads maps that atom to the Keywords aspect and modificationWrites maps
+  -- GainKeyword to it, so a keyword grant can move an affected set exactly as a
+  -- type change can. Two layer-6 effects on one Piker:
+  --
+  --   A (t=10) "each creature with flying gains deathtouch"  reads Keywords
+  --   B (t=20) grant flying to THIS Piker                    writes Keywords
+  --
+  -- A depends on B by clause (b) -- applying B changes whether A applies to the
+  -- Piker -- so B goes first despite its later timestamp, and the deathtouch
+  -- lands. Timestamp order alone would ask A about a Piker that does not fly yet
+  -- and grant nothing, which is exactly what this asserted before the Keywords
+  -- aspect existed. B's set names an object id (CR 611.2c), so B does not depend
+  -- on A and there is no loop.
+  Spec.it s "CR 613.8b within layer 6, a keyword grant reorders a keyword-reading effect" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, gs0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasKeyword Keyword.Flying)) (Timestamp.MkTimestamp 10) (Modification.GainKeyword Keyword.Deathtouch) gs0
+        gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.GainKeyword Keyword.Flying) gsA
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "the grant itself landed"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch pikerId gs) "the newer flying-granter applied first, so the deathtouch lands"
+
+  -- The same rule with a real ability-REMOVING card, which is the other half of
+  -- what modificationWrites now declares: Humility (CR 613.1f, "all creatures
+  -- lose all abilities and have base power and toughness 1/1") writes Keywords
+  -- too, because applyModification's LoseAllAbilities arm empties PC.keywords.
+  --
+  --   A (older than Humility) "each creature WITHOUT flying gains deathtouch"
+  --   Humility                 strips every creature's abilities
+  --
+  -- Bird Maiden prints flying, so A does not apply to it while Humility is
+  -- unapplied. A depends on Humility, so Humility goes first, the flying goes,
+  -- and A then applies -- and because A applied AFTER Humility, its grant is not
+  -- one of the abilities Humility erased (the pair pinned by "a grant older than
+  -- Humility is erased; newer survives" above). Timestamp order alone would ask A
+  -- first, get "it flies, skip it", and leave the Maiden with nothing.
+  --
+  -- Asserted about the FLIER only. Goblin Piker beside it never flew, so applying
+  -- Humility does not change A's answer for the Piker, and pawl decides the
+  -- dependency per projected object rather than over the whole affected set
+  -- (#236) -- which is where the two would diverge.
+  Spec.it s "CR 613.8b Humility reorders an effect whose set reads a keyword" $ do
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    humility <- S.printingOf s registry "Humility"
+    let (flierId, gs0) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+        withHum = S.withHumility humility gs0
+        Timestamp.MkTimestamp h = humilityTimestamp humility withHum
+        groundling = Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.HasKeyword Keyword.Flying)])
+        withA = withDynamicEffect groundling (Timestamp.MkTimestamp (h - 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
+        withoutHumility = withDynamicEffect groundling (Timestamp.MkTimestamp (h - 1)) (Modification.GainKeyword Keyword.Deathtouch) gs0
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch flierId withoutHumility)) "with no Humility the Maiden flies, so the set excludes it"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying flierId withA)) "Humility took the flying"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch flierId withA) "so the older effect waited for Humility, applied after it, and its grant survives"
+
   Spec.it s "CR 614: Rest in Peace projects its graveyard->exile replacement" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     let (rip, gs) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)

@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -23,6 +24,14 @@ data View = MkView
     supertypes :: Set.Set Supertype.Supertype,
     colors :: Set.Set Color.Color,
     subtypes :: Set.Set Subtype.Subtype,
+    -- CR 702: the keyword abilities the candidate has. A SET and not the
+    -- projection's Map Keyword Natural, because HasKeyword asks membership and
+    -- nothing else: CR 702 lets an object have the same keyword ability twice
+    -- (ProjectedCharacteristics.keywords counts it), and no card text asks how
+    -- many. Read from the PROJECTION on the battlefield and from the printed card
+    -- off it, exactly as cardTypes and colors are -- so a creature that gains
+    -- flying at layer 6 matches, and a Humility'd one (CR 613.1f) does not.
+    keywords :: Set.Set Keyword.Keyword,
     power :: Maybe Integer,
     controller :: Maybe PlayerId.PlayerId,
     -- Which object this view is OF. Nothing for a printed card off the
@@ -128,6 +137,10 @@ playerView pid =
       supertypes = Set.empty,
       colors = Set.empty,
       subtypes = Set.empty,
+      -- CR 702.1: a keyword ability is an ability OF AN OBJECT, and CR 109.1's
+      -- list of what an object is has no player in it -- so a player candidate
+      -- has none, the vacuous posture cardTypes and colors already take here.
+      keywords = Set.empty,
       power = Nothing,
       controller = Nothing,
       identity = Nothing,
@@ -167,12 +180,17 @@ data Context = MkContext
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
 -- supplied Context, not information baked into the predicate.
-matches :: Context -> View -> Filter.Filter -> Bool
+matches :: Context -> View -> Filter.Filter Keyword.Keyword -> Bool
 matches context view predicate = case predicate of
   Filter.HasCardType t -> Set.member t (cardTypes view)
   Filter.HasSupertype s -> Set.member s (supertypes view)
   Filter.HasColor c -> Set.member c (colors view)
   Filter.HasSubtype s -> Set.member s (subtypes view)
+  -- CR 702.1 / CR 109.3: abilities ARE a characteristic, so this is the same kind
+  -- of read HasCardType is -- off the projection where there is one, which is what
+  -- makes "target creature with flying" (Plummet, CR 702.9) track a grant and a
+  -- Humility alike rather than the printed type line.
+  Filter.HasKeyword k -> Set.member k (keywords view)
   Filter.PowerAtLeast n -> case power view of
     Nothing -> False
     Just p -> p >= n
@@ -250,12 +268,13 @@ matches context view predicate = case predicate of
 -- module owns. Pawl.Engine.Resolve threads one call per Filter-carrying effect arm
 -- rather than learning what is inside each one.
 --
--- HasSubtype is the only atom that can carry a basic land type (CR 205.3i); the
--- rest name a card type, a supertype, a colour, a number, a relation or a
--- status, none of which CR 612's word swap reaches. Written out exhaustively
--- rather than with a catch-all, so a later atom that CAN carry one fails to
--- compile here instead of silently going unrewritten.
-rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter -> Filter.Filter
+-- HasSubtype is the only atom REWRITTEN here. Most of the rest name a card type,
+-- a supertype, a colour, a number, a relation or a status, none of which CR 612's
+-- word swap reaches; HasKeyword is the one exception, and its own arm below says
+-- why it is left alone anyway. Written out exhaustively rather than with a
+-- catch-all, so a later atom that can carry a land type fails to compile here
+-- instead of silently going unrewritten.
+rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter Keyword.Keyword -> Filter.Filter Keyword.Keyword
 rewrite pairs predicate = case predicate of
   Filter.HasSubtype s -> Filter.HasSubtype (Maybe.fromMaybe s (lookup s pairs))
   Filter.And fs -> Filter.And (fmap (rewrite pairs) fs)
@@ -264,6 +283,12 @@ rewrite pairs predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
+  -- Not rewritten, and CR 702.14a is why it is a live question rather than an
+  -- obvious no: landwalk carries a land type (Keyword.Landwalk Swamp), so a
+  -- text-changing effect could in principle reach the word inside this atom. It
+  -- does not here, matching Pawl.Engine.Projection.rewriteModification's identical
+  -- silence on Modification.GainKeyword (#523).
+  Filter.HasKeyword _ -> predicate
   Filter.PowerAtLeast _ -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.IsSource -> predicate

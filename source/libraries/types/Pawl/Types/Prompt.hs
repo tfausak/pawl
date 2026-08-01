@@ -13,6 +13,7 @@ import Pawl.Types.Cost (Cost)
 import Pawl.Types.Decider (Decider)
 import Pawl.Types.EntryOption (EntryOption)
 import Pawl.Types.EntwineDecision (EntwineDecision)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.Mana (Mana)
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.MulliganDecision (MulliganDecision)
@@ -252,7 +253,7 @@ data Prompt r where
   -- when one of them can't be chosen), and some candidate cost plus this one is
   -- payable. Where the rules leave nothing to ask, don't prompt; where they do,
   -- the engine never decides to pay on the player's behalf.
-  ChooseEntwine :: Decider -> PlayerId -> ObjectId -> Cost -> Prompt EntwineDecision
+  ChooseEntwine :: Decider -> PlayerId -> ObjectId -> Cost Keyword -> Prompt EntwineDecision
   -- CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.
@@ -423,7 +424,7 @@ data Prompt r where
   -- CR 118.9b makes an alternative cost optional, so a player who can afford both
   -- is genuinely choosing. Asked ONLY when two or more candidates are payable;
   -- one is forced, and where the rules leave nothing to ask, don't prompt.
-  ChooseCost :: Decider -> PlayerId -> ObjectId -> [Cost] -> Prompt Cost
+  ChooseCost :: Decider -> PlayerId -> ObjectId -> [Cost Keyword] -> Prompt (Cost Keyword)
   -- CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
   -- both halves of what a player at a table can see -- how many mulligans they
   -- have already taken, and how many cards taking another would bottom. Those

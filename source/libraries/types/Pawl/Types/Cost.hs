@@ -26,8 +26,12 @@ import Pawl.Types.ManaCost (ManaCost)
 --
 -- Scryfall spells the difference exactly: Ancestral Vision's mana_cost is '',
 -- Ornithopter's is '{0}'.
-data Cost = MkCost
+--
+-- PARAMETRIC in the keyword for the components it carries, and for
+-- Pawl.Types.Filter's reason alone -- CR 702.29e's cycling carries a Cost, and a
+-- Filter can now name a Keyword. Every caller writes `Cost Keyword`.
+data Cost keyword = MkCost
   { mana :: Maybe ManaCost,
-    components :: [CostComponent]
+    components :: [CostComponent keyword]
   }
   deriving (Eq, Ord, Show)

@@ -195,6 +195,24 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- separate rules: CR 113.6g's "can't be countered" functions on the stack and
   -- grants no targeting immunity, while CR 702.18a's shroud functions on the
   -- battlefield and grants nothing else.
+  -- The pool's first card whose target Filter names a KEYWORD (#434). Everything
+  -- else about it is Doom Blade's shape, so the HasKeyword atom is the only thing
+  -- this file adds -- which is why the filter is what the assertion is about.
+  Spec.it s "plummet.json loads as a {1}{G} Instant whose target filter is HasKeyword Flying" $ do
+    c <- S.cardOf s registry "Plummet"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Plummet")
+    Spec.assertEqWith
+      s
+      "{1}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "Instant" (TypeLine.types (CardT.typeLine c)) (Set.singleton CardType.Instant)
+    Spec.assertEqWith s "no keywords of its own" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "CR 702.9: target creature with flying"
+      [Map.toList (Mode.targetSpecs m) | m <- Foldable.toList (Modal.modes (CardT.spell c))]
+      [[(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.HasKeyword Keyword.Flying)))]]
   Spec.it s "blurred-mongoose.json loads as a {1}{G} 2/1 Mongoose that is uncounterable and has shroud" $ do
     c <- S.cardOf s registry "Blurred Mongoose"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Blurred Mongoose")
