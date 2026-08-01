@@ -208,6 +208,12 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "kw" keywordToJson jsonToKeyword Keyword.Trample
     Spec.it s "Keyword.Infect" $
       roundTrip s "infect" keywordToJson jsonToKeyword Keyword.Infect
+    -- CR 702.111b's menace is nullary too, and what this pins is again the TAG:
+    -- a Boggart Brute that decoded as fear would be blockable by one black
+    -- creature, and one that decoded as nothing at all by any one creature.
+    Spec.it s "Keyword.Menace" $ do
+      roundTrip s "menace" keywordToJson jsonToKeyword Keyword.Menace
+      Spec.assertBool s (keywordToJson Keyword.Menace /= keywordToJson Keyword.Fear) "menace is not fear"
     -- CR 702.18a's shroud is nullary, so what this pins is the TAG: a Blurred
     -- Mongoose that decoded as anything else would be a legal Doom Blade target.
     Spec.it s "Keyword.Shroud" $ do

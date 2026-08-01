@@ -106,6 +106,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
+  Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
@@ -151,6 +152,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
+  Keyword.Menace -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
@@ -246,6 +248,7 @@ permissionsFor keyword = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
+  Keyword.Menace -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []

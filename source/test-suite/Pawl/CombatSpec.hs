@@ -879,6 +879,212 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
+-- CR 702.111: grant menace to `oid` with a stored continuous effect, withFear's
+-- twin. Used only by the CR 509.1b "after a legal block has been declared" case
+-- below, which needs menace to ARRIVE mid-combat; every other case here reads
+-- Boggart Brute's printed keyword.
+withMenace :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withMenace oid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = oid,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
+            ContinuousEffect.modification = Modification.GainKeyword Keyword.Menace,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- CR 702.111b, proved by Boggart Brute ("Creature -- Goblin Warrior 3/2,
+-- Menace") -- the first restriction of the SET shape #533 named, and the first
+-- evasion ability that is not a question about a (blocker, attacker) pair. Only
+-- the blocking side of that issue; its attacking side has no card and no gate
+-- (see attackCeiling).
+--
+-- The whole group turns on the difference between "two or more creatures block
+-- it" and "each creature blocking it passes some test". Flying, reach, fear and
+-- landwalk are all the second kind, so they are checked in
+-- Pawl.Engine.Combat.pairAllowed; menace is the first of the first kind, and is
+-- checked in declarationAllowed, which sees the whole map at once. The
+-- zero-blockers case below is what separates 702.111b's "can't be blocked EXCEPT
+-- BY two or more" from the naive "at least two creatures must block it".
+menaceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+menaceSpec s registry = Spec.describe s "Menace" $ do
+  Spec.it s "CR 702.111b a declaration in which ONE creature blocks a menace attacker is illegal" $ do
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [boggartBrute] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.111b a declaration in which TWO creatures block a menace attacker is legal" $ do
+    -- THE FALSIFIER for reading 702.111b as "can't be blocked": the same
+    -- attacker, blocked by two of the very creature that could not block it
+    -- alone. The block also survives a real declare blockers step, so this is
+    -- not a claim about legalBlockDeclaration alone.
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [boggartBrute] [piker, piker]
+    case (mine, theirs) of
+      (a : _, [b, c]) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(b, a), (c, a)]) gs) "legal"
+        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        Spec.assertEqWith s "both block" (Combat.blockersOf a after) (Set.fromList [b, c])
+      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
+  Spec.it s "CR 702.111b declining to block a menace attacker is legal, on the very board where one blocker is not" $ do
+    -- 702.111b says "can't be blocked EXCEPT BY two or more creatures", not
+    -- "must be blocked by two or more creatures". A naive "count the blockers
+    -- of each attacker and demand two" rejects the empty declaration, which is
+    -- always legal under restrictions alone. Both halves are asserted on ONE
+    -- board so neither can be satisfied by a different fixture.
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [boggartBrute] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "declining is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "one blocker is not"
+        -- And the engine reaches that legal answer for itself: S.aggressiveAnswer
+        -- blocks with everything, which here is the illegal single block, so
+        -- declareBlockers falls back to the forced declaration -- which is the
+        -- empty one, not "block with two" and not a repaired partial block.
+        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.111b a whole combat: one Piker cannot stop the Brute, two can" $ do
+    -- The gameplay-level case, run through S.fightWith rather than asked of
+    -- legalBlockDeclaration -- and it is precise rather than vacuous, because
+    -- the two legs differ in every observable. WITH one blocker: nobody may
+    -- block, bob takes 3, and both creatures live. WITH two: both block,
+    -- bob takes 0, and the Brute (3/2) dies to 2+2 while killing the first
+    -- Piker (2/1) with its 3.
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let fight theirs =
+          let (gs, _, _) = S.combatBoardOf [boggartBrute] theirs
+           in S.settleSba (S.fightWith S.aggressiveAnswer gs)
+        one = fight [piker]
+        two = fight [piker, piker]
+    Spec.assertEqWith s "one blocker: bob takes 3" (S.lifeOf S.bob one) (Just 17)
+    Spec.assertEqWith s "one blocker: the Brute lives" (S.creaturesInPlay S.alice one) 1
+    Spec.assertEqWith s "one blocker: so does the Piker it could not block with" (S.creaturesInPlay S.bob one) 1
+    Spec.assertEqWith s "two blockers: bob takes nothing" (S.lifeOf S.bob two) (Just 20)
+    Spec.assertEqWith s "two blockers: the Brute dies to 2+2" (S.creaturesInPlay S.alice two) 0
+    Spec.assertEqWith s "two blockers: taking one Piker with it" (S.creaturesInPlay S.bob two) 1
+  Spec.it s "CR 702.111b menace constrains the set blocking ITS attacker, not every attacker" $ do
+    -- The control that keeps the restriction narrow: a Piker attacking beside
+    -- the Brute still takes exactly one blocker. Fails against any
+    -- implementation that reads menace off the declaration as a whole rather
+    -- than per attacker.
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [boggartBrute, piker] [piker]
+    case (mine, theirs) of
+      ([brute, plain], b : _) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b plain) gs) "one blocker on the plain attacker is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b brute) gs)) "one blocker on the menace attacker is not"
+      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  Spec.it s "CR 509.1b menace and fear are cumulative: two blockers, and both must pass fear" $ do
+    -- "Different evasion abilities are cumulative." A Boggart Brute granted
+    -- fear needs TWO blockers, and each of them must be an artifact creature
+    -- and/or a black creature (CR 702.36b). Typhoid Rats is black, Darksteel
+    -- Myr is a colourless artifact, and the Piker is neither.
+    --
+    -- Fails against an implementation that lets menace REPLACE the pairwise
+    -- checks (leg two would pass) or that lets a passing pair excuse the count
+    -- (leg three would pass).
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs0, mine, theirs) = attacking [boggartBrute] [typhoidRats, darksteelMyr, piker]
+    case (mine, theirs) of
+      (a : _, [rats, myr, plain]) -> do
+        let gs = withFear a gs0
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(rats, a), (myr, a)]) gs) "two fear-legal blockers"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(rats, a), (plain, a)]) gs)) "two blockers, one of which fear forbids"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton rats a) gs)) "one fear-legal blocker is still one blocker"
+      _ -> Spec.assertFailure s "fixture should have an attacker and three blockers"
+  Spec.it s "CR 702.111b menace restricts being blocked, never attacking or blocking" $ do
+    -- The asymmetry every evasion gate here has (see evasionAllows), stated for
+    -- menace on both sides at once: the Brute attacks alone, and the Brute
+    -- blocks alone.
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    -- canAttack is asked BEFORE the declaration, since attacking taps the
+    -- attacker (CR 508.1f) and a tapped creature fails CR 508.1a for a reason
+    -- that has nothing to do with menace.
+    let (before, mine, theirs) = S.combatBoardOf [boggartBrute] [boggartBrute]
+        gs = snd (Engine.runGamePure S.aggressiveAnswer before (Combat.declareAttackers S.alice))
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        Spec.assertBool s (Combat.canAttack S.alice a before) "a menace creature may attack"
+        Spec.assertEqWith s "and it does" (Map.keys (Combat.Type.attackers (GameState.combat gs))) [a]
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "but one creature may not block it"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+    let (gs2, mine2, theirs2) = attacking [piker] [boggartBrute]
+    case (mine2, theirs2) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs2) "a menace creature blocking alone is legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 509.1c a Lured menace attacker must be blocked by BOTH creatures or by neither" $ do
+    -- CR 509.1c's own worked example, in the pool's cards: "A player controls
+    -- one creature that 'blocks if able' and another creature with no
+    -- abilities. If a creature with menace attacks that player, the player must
+    -- block with both creatures." Lure requires every able creature rather than
+    -- one of them, which lands on the same answer.
+    --
+    -- What this proves is that the two halves of CR 509.1 compose: the
+    -- maximization ranges over declarations menace ALREADY allows, so the
+    -- single block is not merely worse than the double one, it is not a
+    -- candidate at all. `luring` is blockRequirementSpec's helper, below.
+    lure <- S.printingOf s registry "Lure"
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = luring lure [boggartBrute] [piker, piker]
+    case (mine, theirs) of
+      (a : _, [b, c]) -> do
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "neither blocking is illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "one blocking is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(b, a), (c, a)]) gs) "both blocking is legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
+  Spec.it s "CR 509.1c a Lured menace attacker with only ONE creature to block it may go unblocked" $ do
+    -- CR 509.1c maximizes over the requirements "that could be obeyed WITHOUT
+    -- DISOBEYING ANY RESTRICTIONS", so menace BOUNDS the maximization rather
+    -- than competing with it. The lone Piker is able to block (the requirement
+    -- instance exists), but no legal declaration has it blocking, so the
+    -- maximum is zero and declining attains it.
+    --
+    -- THE FALSIFIER for computing CR 509.1c's maximum over the pairwise-legal
+    -- declarations and only then filtering by the set-shaped restriction: that
+    -- order makes the maximum one, and declining illegal, with no legal answer
+    -- left for the defending player to give.
+    lure <- S.printingOf s registry "Lure"
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = luring lure [boggartBrute] [piker]
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "no blocks is legal"
+  Spec.it s "CR 509.1b gaining menace AFTER a legal block has been declared doesn't affect that block" $ do
+    -- "If an attacking creature gains or loses an evasion ability after a legal
+    -- block has been declared, it doesn't affect that block." One Piker blocks
+    -- one Piker legally; the attacker then gains menace, which would have
+    -- forbidden that block had it been there at declaration time. The block
+    -- stands.
+    --
+    -- Both assertions are needed: the keyword one is what stops this passing
+    -- vacuously against a board where menace never arrived at all.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        let blocked = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+            after = withMenace a blocked
+        Spec.assertBool s (Projection.hasKeyword Keyword.Menace a after) "the attacker now has menace"
+        Spec.assertEqWith s "and is still blocked by the one creature" (Combat.blockersOf a after) (Set.singleton b)
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
 -- Declare attackers with everything, then put a Lure on the first attacker.
 -- Attaching directly is S.attach's state-fixture posture -- Pawl.Engine.Cast can cast
 -- the Aura, but a combat fixture cannot reach a sorcery-speed cast mid-step --
@@ -2663,6 +2869,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   vigilanceSpec s registry
   hasteSpec s registry
   evasionSpec s registry
+  menaceSpec s registry
   blockRequirementSpec s registry
   attackRequirementSpec s registry
   combatRestrictionSpec s registry

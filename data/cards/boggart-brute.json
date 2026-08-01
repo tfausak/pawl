@@ -1,0 +1,64 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Menace"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Boggart Brute",
+  "power": {
+    "type": "Literal",
+    "value": 3
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Goblin"
+      },
+      {
+        "type": "Warrior"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}
