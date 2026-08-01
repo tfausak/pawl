@@ -5,6 +5,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
 import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.PhaseSelector (jsonToPhaseSelector, phaseSelectorToJson)
 import Pawl.Codec.PlayerId (jsonToPlayerId, playerIdToJson)
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
@@ -20,6 +21,7 @@ expiryToJson e = case e of
   Expiry.Never -> Json.nullary (Text.pack "Never")
   Expiry.While p c -> Json.tagged (Text.pack "While") (Just (Array (MkArray [playerIdToJson p, conditionToJson c])))
   Expiry.AtTurnOf p -> Json.tagged (Text.pack "AtTurnOf") (Just (playerIdToJson p))
+  Expiry.AtEndOf sel -> Json.tagged (Text.pack "AtEndOf") (Just (phaseSelectorToJson sel))
 
 jsonToExpiry :: Value -> Either Text Expiry.Expiry
 jsonToExpiry value = do
@@ -29,4 +31,5 @@ jsonToExpiry value = do
     ("Never", _) -> Right Expiry.Never
     ("While", Just (Array (MkArray [p, c]))) -> Expiry.While <$> jsonToPlayerId p <*> jsonToCondition c
     ("AtTurnOf", Just v) -> Expiry.AtTurnOf <$> jsonToPlayerId v
+    ("AtEndOf", Just v) -> Expiry.AtEndOf <$> jsonToPhaseSelector v
     _ -> Left (Text.pack "unknown Expiry: " <> t)

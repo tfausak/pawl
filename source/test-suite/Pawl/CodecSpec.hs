@@ -531,14 +531,22 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "timing" activationTimingToJson jsonToActivationTiming ActivationTiming.AnyTime
       roundTrip s "timing" activationTimingToJson jsonToActivationTiming ActivationTiming.SorcerySpeed
       -- Desert's own rider (CR 511.1), and a stepless phase alongside it:
-      -- Pawl.Types.Phase spans both, so the arm has to carry both.
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn)
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase Phase.PostcombatMain TurnScope.EachTurn)
+      -- Pawl.Types.Phase spans both, so PhaseSelector.Step has to carry both.
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)) TurnScope.EachTurn)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (PhaseSelector.Step Phase.PostcombatMain) TurnScope.EachTurn)
+      -- Jade Statue's "Activate only during combat" (CR 500.1), the arm CR
+      -- 506.1's five combat steps cannot be spelled as a Phase. A separate
+      -- round-trip from the step above and NOT interchangeable with it: the two
+      -- encode to different JSON, which is the one-spelling-per-window property
+      -- Pawl.Types.PhaseSelector exists for.
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase PhaseSelector.CombatPhase TurnScope.EachTurn)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase PhaseSelector.BeginningPhase TurnScope.ControllersTurn)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase PhaseSelector.EndingPhase TurnScope.EachTurn)
       -- Llanowar Augur's "Activate only during your upkeep", the arm's
       -- second axis: the SAME phase under each scope, so a codec that dropped
       -- the scope would collapse these two into one and fail here.
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep)) TurnScope.ControllersTurn)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep)) TurnScope.EachTurn)
     Spec.it s "ExileUntilMonarch" $
       roundTrip s "eum" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target")))
     Spec.it s "PlaySubgame round-trips" $
@@ -552,6 +560,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "Duration.ForAsLongAs round-trips with its condition" $
       let d = Duration.ForAsLongAs S.youControlSource
        in Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson d)) (Right d)
+    -- CR 500.5a's duration, and the only end-of-window one a card can print.
+    -- Nullary on the PRINTED side even though the stored Expiry it arms to
+    -- carries a whole PhaseSelector -- see Pawl.Types.Duration for why.
+    Spec.it s "Duration.UntilEndOfCombat round-trips" $
+      Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson Duration.UntilEndOfCombat)) (Right Duration.UntilEndOfCombat)
   Spec.describe s "player effects (P7)" $ do
     Spec.it s "every PlayerScope round-trips" $
       mapM_
@@ -1249,6 +1262,12 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
             -- the same pair of cases on the other end of the envelope.
             roundTrip s "delayed" delayedTriggerToJson jsonToDelayedTrigger entry
             roundTrip s "delayed1" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
+            -- CR 500.5's window, the stored side of Duration.UntilEndOfCombat.
+            -- The two grains CR 500.5 names, both round-tripped: a phase and a
+            -- step of it, which the codec must keep apart because
+            -- Pawl.Engine.Expiry.dropAtEndOf tells them apart by equality.
+            roundTrip s "delayed1a" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just (Expiry.AtEndOf PhaseSelector.CombatPhase)}
+            roundTrip s "delayed1b" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)))}
             roundTrip s "delayed2" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.notBefore = Just 7}
     Spec.it s "a TriggeredAbility with an intervening if round-trips" $
       let ability =

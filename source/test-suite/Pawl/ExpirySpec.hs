@@ -1,10 +1,15 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers Pawl.Engine.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
--- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 611.2a, 611.2b),
--- and the two gate cards (Master Thief, Hag of Inner Weakness).
+-- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 500.5, 611.2a,
+-- 611.2b), and the three gate cards (Master Thief, Hag of Inner Weakness, Jade
+-- Statue).
 module Pawl.ExpirySpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Departure as Departure
@@ -13,14 +18,17 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -32,17 +40,23 @@ import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -711,12 +725,266 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     Spec.assertEqWith s "but the trigger still resolved against bob's Mammoth" (Projection.powerOf mammoth resolved) (Just 1)
     Spec.assertEqWith s "and its toughness" (Projection.toughnessOf mammoth resolved) (Just 2)
 
+-- The steps and phases left of alice's turn once the combat phase is under way,
+-- so a runStep-driven test can play out of combat and into the main phase after
+-- it (CR 511.3: "After the end of combat step ends, the combat phase is over and
+-- the postcombat main phase begins").
+restOfTurnFromDeclareAttackers :: Seq.Seq Phase.Phase
+restOfTurnFromDeclareAttackers =
+  Seq.fromList
+    [ Phase.Combat CombatStep.DeclareAttackers,
+      Phase.Combat CombatStep.DeclareBlockers,
+      Phase.Combat CombatStep.CombatDamage,
+      Phase.Combat CombatStep.EndOfCombat,
+      Phase.PostcombatMain,
+      Phase.Ending EndingStep.EndStep,
+      Phase.Ending EndingStep.Cleanup
+    ]
+
+-- alice controls a Jade Statue and two Mountains, bob controls each printing in
+-- `theirs`, and the game sits at the BEGINNING OF COMBAT step (CR 506.1's first)
+-- with the rest of the turn scheduled.
+--
+-- Beginning of combat and not declare attackers, because CR 500.5a is exactly
+-- the claim that the animation outlives the step it was made in: it has to be
+-- created in one combat step and still be there in a later one. The two
+-- Mountains are the {2}, and there are exactly two so the ability can be
+-- activated ONCE -- which is what keeps `animateAnswer` below from re-animating
+-- in every step it is offered.
+jadeBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+jadeBoard statue mountain theirs =
+  let gs0 = Setup.emptyGame S.bothPlayers
+      (statueId, gs1) = S.addCreature statue S.alice gs0
+      (_, gs2) = S.addCreature mountain S.alice gs1
+      (_, gs3) = S.addCreature mountain S.alice gs2
+      addAll (ids, g) p = let (oid, g1) = S.addCreature p S.bob g in (ids <> [oid], g1)
+      (theirIds, gs4) = List.foldl' addAll ([], gs3) theirs
+   in ( statueId,
+        theirIds,
+        gs4
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+            GameState.remaining = restOfTurnFromDeclareAttackers
+          }
+      )
+
+isActivate :: A.Action -> Bool
+isActivate a = case a of
+  A.Activate _ _ -> True
+  _ -> False
+
+-- Takes any activation the engine offers, and otherwise attacks and blocks with
+-- everything. On the boards below the only activations that ever reach
+-- Action.legalActions are alice's Jade Statue animation and bob's Desert ping --
+-- a Mountain's and a Desert's mana abilities are excluded by CR 605.1a -- and
+-- each belongs to a different player, so "the first one offered" is never a
+-- choice between two different abilities.
+animateAnswer :: Prompt.Prompt r -> r
+animateAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivate options of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+-- animateAnswer for alice only: bob passes on every action. The control for the
+-- Desert test below, where what has to be isolated is bob's ping and not alice's
+-- animation.
+aliceOnlyAnswer :: Prompt.Prompt r -> r
+aliceOnlyAnswer p = case p of
+  Prompt.ChooseAction _ who _ | who /= S.alice -> A.Pass
+  _ -> animateAnswer p
+
+-- One whole step through the engine, under `animateAnswer`.
+animateStep :: GameState.GameState -> GameState.GameState
+animateStep gs = S.runPure animateAnswer gs Engine.runStep
+
+-- CR 500.5's whole moment, and the duration that fills its first clause.
+--
+-- Jade Statue ({4} Artifact, Arabian Nights): "{2}: This artifact becomes a 3/6
+-- Golem artifact creature until end of combat. Activate only during combat."
+-- The card is the producer for BOTH halves -- Duration.UntilEndOfCombat and
+-- ActivationTiming.DuringPhase's whole-phase window -- which is why the two
+-- landed together.
+--
+-- The Golem creature type is not modelled: no layer-4 Modification sets or adds
+-- a creature subtype (#512).
+untilEndOfCombatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
+  -- CR 500.5a: "Effects that last 'until end of combat' expire at the end of the
+  -- combat PHASE, not at the beginning of the end of combat step." So the
+  -- printed duration arms to the PHASE window and never to the step, and the two
+  -- are different values of the same type -- which is what makes the sweep's
+  -- equality test able to tell them apart at all.
+  Spec.it s "CR 500.5a an until-end-of-combat duration arms to the end of the combat PHASE" $
+    Spec.assertEqWith
+      s
+      "armed"
+      (Expiry.arm S.alice S.noSource Duration.UntilEndOfCombat armGs)
+      (Just (Expiry.Type.AtEndOf PhaseSelector.CombatPhase))
+  -- The unit-level half of CR 500.5a, and the sharpest statement of it: the end
+  -- of combat STEP ending does not reach the effect, and the combat PHASE ending
+  -- does. A containment test in place of the equality would fail this, and so
+  -- would arming to PhaseSelector.Step.
+  Spec.it s "CR 500.5a the end of combat STEP ending does not expire it; the PHASE ending does" $ do
+    let armed = effectWith (Expiry.Type.AtEndOf PhaseSelector.CombatPhase) (Setup.emptyGame S.bothPlayers)
+        stepEnded = Expiry.dropAtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)) armed
+        phaseEnded = Expiry.dropAtEndOf PhaseSelector.CombatPhase armed
+    Spec.assertEqWith s "the end of combat step's own end leaves it alone" (length (GameState.continuousEffects stepEnded)) 1
+    Spec.assertEqWith s "an earlier combat step's end leaves it alone too" (length (GameState.continuousEffects (Expiry.dropAtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.BeginningOfCombat)) armed))) 1
+    Spec.assertEqWith s "and the combat phase's end takes it" (GameState.continuousEffects phaseEnded) []
+  -- The window is compared by equality, so a DIFFERENT phase's end is not this
+  -- one's -- CR 500.1 fixes the set of phases and the beginning phase's end is
+  -- not the combat phase's.
+  Spec.it s "CR 500.1 dropAtEndOf is scoped to the window that ended" $ do
+    let armed = effectWith (Expiry.Type.AtEndOf PhaseSelector.CombatPhase) (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "the ending phase's end is not the combat phase's" (length (GameState.continuousEffects (Expiry.dropAtEndOf PhaseSelector.EndingPhase armed))) 1
+  -- The other three sweeps own other rules, and none of them owns this one: CR
+  -- 514.2's cleanup, CR 611.2a's turn handoff and CR 611.2b's condition check
+  -- all leave an AtEndOf entry alone. The mirror of "dropAtTurnOf touches no
+  -- other expiry" above.
+  Spec.it s "CR 514.2 / 611.2a no other sweep touches an AtEndOf effect" $ do
+    let armed = effectWith (Expiry.Type.AtEndOf PhaseSelector.CombatPhase) (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "cleanup keeps it" (length (GameState.continuousEffects (Expiry.dropAtCleanup armed))) 1
+    Spec.assertEqWith s "the turn handoff keeps it" (length (GameState.continuousEffects (Expiry.dropAtTurnOf S.alice armed))) 1
+    Spec.assertEqWith s "and so does the CR 611.2b sweep" (length (GameState.continuousEffects (S.runPure S.identityAnswer armed Expiry.sweepConditional))) 1
+  -- CR 500.5's ORDER, which no other test can reach: "those effects expire. THEN
+  -- any unspent mana left in a player's mana pool empties."
+  --
+  -- PlayerEffect.DontLoseUnspentMana (Upwelling's, CR 106.4) is read LIVE by
+  -- Mana.emptyManaPools, so an entry that expires as the combat phase ends keeps
+  -- nothing, while the same entry swept AFTERWARDS would keep the pool for a
+  -- phase it no longer covers. That is the whole of the ordering, made visible.
+  --
+  -- The stored effect is installed directly rather than printed by a card: no
+  -- card in the pool joins an end-of-combat duration to mana retention (CR
+  -- 702.189a firebending -- "Until end of combat, you don't lose this mana as
+  -- steps and phases end" -- is the shape that would). The Never-scoped control
+  -- in the same test is what keeps this from passing for the wrong reason.
+  Spec.it s "CR 500.5 an end-of-combat retention effect expires BEFORE the pool empties" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let staged expiry =
+          let gs0 = Setup.emptyGame S.bothPlayers
+              (mtn, gs1) = S.addCreature mountain S.alice gs0
+              floated = S.runPure S.identityAnswer gs1 (Mana.tapForMana mtn)
+           in S.addPlayerEffect
+                expiry
+                PlayerScope.EachPlayer
+                PlayerEffect.DontLoseUnspentMana
+                S.alice
+                floated
+                  { GameState.activePlayer = S.alice,
+                    GameState.phase = Phase.Combat CombatStep.EndOfCombat,
+                    GameState.remaining = Seq.fromList [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+                  }
+        expiring = staged (Expiry.Type.AtEndOf PhaseSelector.CombatPhase)
+        permanent = staged Expiry.Type.Never
+    Spec.assertEqWith s "alice floated one mana" (poolSize S.alice expiring) 1
+    Spec.assertEqWith
+      s
+      "the retention expired with the phase, so the pool emptied"
+      (poolSize S.alice (S.runPure S.identityAnswer expiring Engine.runStep))
+      0
+    Spec.assertEqWith
+      s
+      "and a retention that does NOT expire keeps it across the same boundary"
+      (poolSize S.alice (S.runPure S.identityAnswer permanent Engine.runStep))
+      1
+  -- The gameplay-level proof (design.md section 4), driven through
+  -- Engine.runStep: alice animates her Jade Statue in the BEGINNING OF COMBAT
+  -- step, and it is still a 3/6 creature once that step has ended.
+  --
+  -- This is the case a step-scoped duration fails. An implementation that ended
+  -- the effect at the end of the step it was created in would leave a plain
+  -- artifact here, and it would still pass a test that only asked "is it a
+  -- creature during combat and not next turn".
+  Spec.it s "CR 500.5a whole card: the animation outlives the step it was made in" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    let (statueId, _, jade) = jadeBoard statue mountain []
+        afterBeginningOfCombat = animateStep jade
+    Spec.assertBool s (not (Projection.isCreatureOf statueId jade)) "a Jade Statue is a noncreature artifact to begin with"
+    Spec.assertEqWith s "the beginning of combat step is over" (GameState.phase afterBeginningOfCombat) (Phase.Combat CombatStep.DeclareAttackers)
+    Spec.assertBool s (Projection.isCreatureOf statueId afterBeginningOfCombat) "and it is a creature in the NEXT step, not just the one it was animated in"
+    Spec.assertEqWith s "a 3/6" (S.powerToughnessOf statueId afterBeginningOfCombat) (Just (3, 6))
+    Spec.assertEqWith
+      s
+      "CR 500.5a stored against the combat PHASE's end, not the step's"
+      (fmap ContinuousEffect.expiry (GameState.continuousEffects afterBeginningOfCombat))
+      [Expiry.Type.AtEndOf PhaseSelector.CombatPhase, Expiry.Type.AtEndOf PhaseSelector.CombatPhase]
+  -- The other half of CR 500.5a, step by step through the whole combat phase:
+  -- the animation is live at the START of the end of combat step -- "not at the
+  -- beginning of the end of combat step" is the rule's own wording -- and gone
+  -- once the phase is over.
+  --
+  -- Each step is taken separately so the state can be read BETWEEN them, which
+  -- is the only place the difference shows: S.runCombat would run past the whole
+  -- phase and could not tell an effect that ended at the step's beginning from
+  -- one that ended at the phase's end.
+  Spec.it s "CR 500.5a whole card: live throughout the end of combat step, gone once the phase ends" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    let (statueId, _, jade) = jadeBoard statue mountain []
+        afterDeclareAttackers = animateStep (animateStep jade)
+        afterDeclareBlockers = animateStep afterDeclareAttackers
+        afterCombatDamage = animateStep afterDeclareBlockers
+        afterEndOfCombat = animateStep afterCombatDamage
+    Spec.assertEqWith s "the end of combat step is the one about to run" (GameState.phase afterCombatDamage) (Phase.Combat CombatStep.EndOfCombat)
+    Spec.assertBool s (Projection.isCreatureOf statueId afterCombatDamage) "CR 500.5a it is STILL a creature as the end of combat step begins"
+    Spec.assertEqWith s "still a 3/6" (S.powerToughnessOf statueId afterCombatDamage) (Just (3, 6))
+    Spec.assertEqWith s "CR 511.3 the combat phase is over" (GameState.phase afterEndOfCombat) Phase.PostcombatMain
+    Spec.assertBool s (not (Projection.isCreatureOf statueId afterEndOfCombat)) "and the animation expired with the phase"
+    Spec.assertEqWith s "nothing is left stored" (GameState.continuousEffects afterEndOfCombat) []
+    Spec.assertEqWith s "it kept its printed 3 damage to bob on the way through" (S.lifeOf S.bob afterEndOfCombat) (Just 17)
+  -- The same claim made by a CARD rather than by a projection query, which is
+  -- what makes it a gameplay-level observation of the end of combat step itself.
+  --
+  -- Desert (Arabian Nights): "{T}: This land deals 1 damage to target attacking
+  -- creature. Activate only during the end of combat step." bob can only ping
+  -- something that is an attacking CREATURE while that step is running. If the
+  -- animation expired at the beginning of that step -- the reading CR 500.5a
+  -- exists to forbid -- the Jade Statue would be a noncreature artifact, CR
+  -- 506.4 would have taken it out of combat, the ping would have no legal target
+  -- and no damage would be marked.
+  Spec.it s "CR 500.5a whole card: Desert can still ping the animated Statue in the end of combat step" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    desert <- S.printingOf s registry "Desert"
+    let (statueId, deserts, jade) = jadeBoard statue mountain [desert]
+        after = S.runCombat animateAnswer jade
+    Spec.assertEqWith s "the whole combat phase ran" (GameState.phase after) Phase.PostcombatMain
+    Spec.assertEqWith s "bob took 3 from a 3/6 attacker" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "and pinged it for 1 while it was still an attacking creature" (S.damageOf statueId after) (Just 1)
+    Spec.assertEqWith s "the Desert paid its {T}" (fmap Object.tapped (Maybe.listToMaybe deserts >>= \d -> Game.lookupObject d after)) (Just TapState.Tapped)
+    Spec.assertBool s (not (Projection.isCreatureOf statueId after)) "the animation still expired with the phase"
+    -- The control, isolating the ping: the same board and the same animation,
+    -- with an interpreter under which bob never activates anything. The Statue
+    -- takes no damage, so the 1 above came from the Desert and not from combat.
+    let unpinged = S.runCombat aliceOnlyAnswer jade
+    Spec.assertEqWith s "bob still took 3 from the same attacker" (S.lifeOf S.bob unpinged) (Just 17)
+    Spec.assertEqWith s "and the Statue took nothing when bob declined" (S.damageOf statueId unpinged) (Just 0)
+  -- The control for the two whole-card tests above: the same board, an
+  -- interpreter that never activates. The Statue stays a noncreature artifact,
+  -- so what animated it was the ability and nothing about the fixture.
+  Spec.it s "CR 500.5a whole card: an unactivated Jade Statue never becomes a creature" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    let (statueId, _, jade) = jadeBoard statue mountain []
+        after = S.runCombat S.aggressiveAnswer jade
+    Spec.assertEqWith s "the whole combat phase ran" (GameState.phase after) Phase.PostcombatMain
+    Spec.assertBool s (not (Projection.isCreatureOf statueId after)) "never a creature"
+    Spec.assertEqWith s "so it never attacked" (S.lifeOf S.bob after) (Just 20)
+
+poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
+poolSize pid gs = case Mana.poolOf pid gs of
+  Mana.Type.MkMana units -> length units
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   armSpec s
   cleanupSpec s registry
   handoffSpec s
   conditionalSpec s registry
+  untilEndOfCombatSpec s registry
   masterThiefSpec s registry
   monarchSpec s registry
   hagSpec s registry

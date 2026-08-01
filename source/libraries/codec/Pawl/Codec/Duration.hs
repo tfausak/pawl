@@ -14,6 +14,7 @@ durationToJson d = case d of
   Duration.Indefinite -> Json.nullary (Text.pack "Indefinite")
   Duration.UntilYourNextTurn -> Json.nullary (Text.pack "UntilYourNextTurn")
   Duration.ForAsLongAs c -> Json.tagged (Text.pack "ForAsLongAs") (Just (conditionToJson c))
+  Duration.UntilEndOfCombat -> Json.nullary (Text.pack "UntilEndOfCombat")
 
 jsonToDuration :: Value -> Either Text Duration.Duration
 jsonToDuration value = do
@@ -23,4 +24,5 @@ jsonToDuration value = do
     ("Indefinite", _) -> Right Duration.Indefinite
     ("UntilYourNextTurn", _) -> Right Duration.UntilYourNextTurn
     ("ForAsLongAs", Just v) -> Duration.ForAsLongAs <$> jsonToCondition v
+    ("UntilEndOfCombat", _) -> Right Duration.UntilEndOfCombat
     _ -> Left (Text.pack "unknown Duration: " <> t)

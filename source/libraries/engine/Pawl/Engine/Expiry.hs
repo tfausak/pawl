@@ -27,6 +27,8 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PhaseSelector (PhaseSelector)
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 
 -- CR 611.2: the moment a duration BEGINS. `controller` is the effect's
@@ -48,6 +50,13 @@ arm controller source duration gs = case duration of
     if Condition.holds (Projection.fullView gs) (Filter.MkContext (Just controller) (Just source)) gs source cond
       then Just (Expiry.While controller cond)
       else Nothing
+  -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
+  -- the stored window is PhaseSelector.CombatPhase and never the end of combat
+  -- step. Naming the phase is the whole of the arming: unlike UntilYourNextTurn
+  -- there is nothing about the game to bake in, because the sweep ends the
+  -- effect at the first combat phase whose end it sees and every producer can
+  -- only be activated during one (#525).
+  Duration.UntilEndOfCombat -> Just (Expiry.AtEndOf PhaseSelector.CombatPhase)
 
 -- CR 514.2: during the cleanup step, "all 'until end of turn' and 'this turn'
 -- effects end". Delete-and-recompute (design.md 2.5): dropping the stored entry
@@ -65,6 +74,7 @@ dropAtCleanup gs =
         Expiry.Never -> True
         Expiry.While _ _ -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtEndOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -102,6 +112,7 @@ sweepConditional = do
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtEndOf _ -> True
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
@@ -151,6 +162,45 @@ dropAtTurnOf pid gs =
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.While _ _ -> True
+        Expiry.AtEndOf _ -> True
+      keepEffect eff = survives (ContinuousEffect.expiry eff)
+      keepReplacement active = survives (ActiveReplacement.expiry active)
+      keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
+      keepDelayed = maybe True survives . DelayedTrigger.expiry
+   in gs
+        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+          GameState.replacements = filter keepReplacement (GameState.replacements gs),
+          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
+        }
+
+-- CR 500.5's FIRST clause: "As a step or phase ends, if there are effects that
+-- last until the end of that step or phase, those effects expire. Then any
+-- unspent mana left in a player's mana pool empties." The window that is ending
+-- is passed in, because only Engine.runStepThatBegan knows which one it is --
+-- and at the end of the last step of a stepped phase there are TWO, the step and
+-- the phase, so it calls this twice.
+--
+-- EQUALITY on the selector, not containment: CR 500.5a is precisely the claim
+-- that an "until end of combat" effect does NOT expire when the end of combat
+-- step ends as a step -- "effects that last 'until end of combat' expire at the
+-- end of the combat phase, not at the beginning of the end of combat step" --
+-- and CR 511.2 repeats it. Containment would end such an effect at the end of
+-- the very first combat step it saw. Pawl.Engine.Turn.inWindow is the containment
+-- test, and it answers a different question (is the game IN this window) for a
+-- different reader (an activation's printed rider).
+--
+-- One sweep over the four carriers, as the neighbouring sweeps do. AtCleanup,
+-- Never, While and AtTurnOf are untouched, and so is a delayed entry on no
+-- duration.
+dropAtEndOf :: PhaseSelector -> GameState -> GameState
+dropAtEndOf ending gs =
+  let survives expiry = case expiry of
+        Expiry.AtEndOf window -> window /= ending
+        Expiry.AtCleanup -> True
+        Expiry.Never -> True
+        Expiry.While _ _ -> True
+        Expiry.AtTurnOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)

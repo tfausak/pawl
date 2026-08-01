@@ -146,6 +146,76 @@ turnDataSpec s = Spec.describe s "TurnData" $ do
         Just PhaseSelector.EndingPhase,
         Nothing
       ]
+  -- CR 500.5's other grain, and phaseBeginningAt's exact mirror: a phase ENDS
+  -- as its LAST step ends. CR 511.3 names combat's ("After the end of combat
+  -- step ends, the combat phase is over"), CR 501.1 the beginning phase's three
+  -- steps and CR 512.1 the ending phase's two.
+  --
+  -- The two lists must not agree anywhere except on the Nothings: a phase begins
+  -- at one step and ends at another, and an implementation that confused them
+  -- would expire an "until end of combat" effect at the START of combat.
+  Spec.it s "CR 500.5 phaseEndingAt closes a phase only at its last step" $
+    Spec.assertEqWith
+      s
+      "one Just per stepped phase"
+      (fmap Turn.phaseEndingAt Turn.allPhases)
+      [ Nothing,
+        Nothing,
+        Just PhaseSelector.BeginningPhase,
+        Nothing,
+        Nothing,
+        Nothing,
+        Nothing,
+        Nothing,
+        Just PhaseSelector.CombatPhase,
+        Nothing,
+        Nothing,
+        Just PhaseSelector.EndingPhase
+      ]
+  -- CR 500.1: "during" is CONTAINMENT, and it is what tells a rider naming a
+  -- whole phase (Jade Statue's "only during combat") from one naming a step of
+  -- it (Desert's "only during the end of combat step"). Both are PhaseSelectors,
+  -- so nothing but this function distinguishes them.
+  Spec.it s "CR 500.1/506.1 inWindow: a whole-phase window covers every step of it" $ do
+    Spec.assertEqWith
+      s
+      "CombatPhase covers all five of CR 506.1's steps and nothing else"
+      (filter (Turn.inWindow PhaseSelector.CombatPhase) Turn.allPhases)
+      [ Phase.Combat CombatStep.BeginningOfCombat,
+        Phase.Combat CombatStep.DeclareAttackers,
+        Phase.Combat CombatStep.DeclareBlockers,
+        Phase.Combat CombatStep.CombatDamage,
+        Phase.Combat CombatStep.EndOfCombat
+      ]
+    Spec.assertEqWith
+      s
+      "CR 501.1 BeginningPhase covers untap, upkeep and draw"
+      (filter (Turn.inWindow PhaseSelector.BeginningPhase) Turn.allPhases)
+      [ Phase.Beginning BeginningStep.Untap,
+        Phase.Beginning BeginningStep.Upkeep,
+        Phase.Beginning BeginningStep.DrawStep
+      ]
+    Spec.assertEqWith
+      s
+      "CR 512.1 EndingPhase covers the end step and the cleanup step"
+      (filter (Turn.inWindow PhaseSelector.EndingPhase) Turn.allPhases)
+      [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+  -- The other arm, and the reason Desert goes on working unchanged: a Step
+  -- window matches exactly its own schedule entry. CR 505.2 makes a main phase
+  -- one such entry, so naming it and naming "the phase" are the same act -- and
+  -- there is deliberately no whole-phase spelling of either main phase to
+  -- disagree with it.
+  Spec.it s "CR 500.1 inWindow: a Step window matches exactly one schedule entry" $ do
+    Spec.assertEqWith
+      s
+      "Desert's end of combat step, and only it"
+      (filter (Turn.inWindow (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))) Turn.allPhases)
+      [Phase.Combat CombatStep.EndOfCombat]
+    Spec.assertEqWith
+      s
+      "CR 505.2 a stepless main phase is its own window"
+      (filter (Turn.inWindow (PhaseSelector.Step Phase.PostcombatMain)) Turn.allPhases)
+      [Phase.PostcombatMain]
   -- CR 500.11: "to skip a step, phase, or turn is to proceed past it as
   -- though it didn't exist" -- past the PHASE, so its four remaining steps go
   -- and the postcombat main phase (CR 511.3) is what is left.

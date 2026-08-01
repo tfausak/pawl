@@ -179,11 +179,15 @@ timingOk :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState
 timingOk pid ability gs = case ActivatedAbility.timing ability of
   ActivationTiming.AnyTime -> True
   ActivationTiming.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
-  -- CR 500.1's phases and steps, compared for equality: GameState.phase is the
-  -- one the game is in, and Pawl.Types.Phase spans both kinds. That comparison is
-  -- the one Pawl.Engine.Cast makes for CastingRestriction.DuringPhase, deliberately
-  -- duplicated rather than shared -- the two gates differ in what else they may
-  -- read, which is the whole of the paragraph above.
+  -- CR 500.1's phases and steps: GameState.phase is the schedule entry the game
+  -- is in, and Turn.inWindow asks whether it falls inside the window the rider
+  -- names. CONTAINMENT rather than equality, because a rider may name a phase
+  -- that has steps -- Jade Statue's "Activate only during combat" is live in all
+  -- five of CR 506.1's combat steps, while Desert's names one of them and
+  -- matches only there. Pawl.Engine.Cast makes the equality comparison for
+  -- CastingRestriction.DuringPhase, whose arm still carries a bare Phase (#527);
+  -- deliberately duplicated rather than shared -- the two gates differ in what
+  -- else they may read, which is the whole of the paragraph above.
   --
   -- CR 102.1 supplies the second conjunct, and it is a genuinely separate fact:
   -- "A player is one of the people in the game. The active player is the player
@@ -197,8 +201,8 @@ timingOk pid ability gs = case ActivatedAbility.timing ability of
   -- above has already pinned it to Activate.activatorOf, CR 602.2's controller --
   -- so no separate controller lookup is needed here, and a stolen permanent's
   -- rider follows the thief the way CR 109.5 says it must.
-  ActivationTiming.DuringPhase phase scope ->
-    GameState.phase gs == phase
+  ActivationTiming.DuringPhase window scope ->
+    Turn.inWindow window (GameState.phase gs)
       && case scope of
         TurnScope.EachTurn -> True
         TurnScope.ControllersTurn -> GameState.activePlayer gs == pid
