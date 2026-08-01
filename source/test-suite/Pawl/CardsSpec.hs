@@ -713,7 +713,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "one adds {C}, the other deals 1 to its target"
       (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
       [ [(Optionality.Mandatory, [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)])],
-        [(Optionality.Mandatory, [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)])]
+        [(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 1)])]
       ]
     -- CR 601.2c reaches an activation through CR 602.2b, and this is the
     -- pool it announces from: creatures, narrowed to the attacking ones.
@@ -891,7 +891,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "dealing 2 damage to the became slot"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Mandatory, [Effect.DealDamage Binding.became (Quantity.Literal 2)])]]
+      [[(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot Binding.became) (Quantity.Literal 2)])]]
     Spec.assertEqWith
       s
       "and it targets nothing"
@@ -946,7 +946,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "CR 205.4g: damage equal to the snow permanents you control"
       (modeShapes (CardT.spell c))
-      [(Optionality.Mandatory, [Effect.DealDamage target (Quantity.Count snowPermanentsYouControl)])]
+      [(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot target) (Quantity.Count snowPermanentsYouControl)])]
   -- The pool's first {S} (CR 107.4h). Exactly two cards print one in a MANA cost
   -- -- this and Arcum's Astrolabe, which costs the same {S} and prints real text
   -- on top of it -- so this is the minimal card the symbol has, and the whole
@@ -1109,7 +1109,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "dealing 2 damage to the that-player slot"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Mandatory, [Effect.DealDamage Binding.triggerPlayer (Quantity.Literal 2)])]]
+      [[(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot Binding.triggerPlayer) (Quantity.Literal 2)])]]
     Spec.assertEqWith
       s
       "and it targets nothing"
@@ -1149,6 +1149,40 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       ]
     -- CR 115.10a: no "target" anywhere on the card, so no target spec and
     -- nothing for CR 608.2b to fizzle.
+    Spec.assertEqWith s "and it targets nothing" (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c)))) [Map.empty]
+  -- The pool's first DealDamage over a SET rather than a slot, and the first
+  -- producer of ObjectRef.EachMatching whose filter names a keyword. The mana
+  -- cost is the other half of what this card is here for: CR 107.3's {X} beside
+  -- CR 107.4f's Phyrexian symbol, which no other card in the pool prints
+  -- together (#417).
+  --
+  -- The filter is And [HasCardType Creature, HasKeyword Flying] for the reason
+  -- trumpet-blast.json's comment gives: an EachMatching has no Pool to narrow
+  -- it, so the card type the printed text names ("each creature with flying")
+  -- has to be written into the filter.
+  Spec.it s "corrosive-gale.json loads as an {X}{G/P} sorcery damaging every creature with flying" $ do
+    c <- S.cardOf s registry "Corrosive Gale"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Corrosive Gale")
+    Spec.assertEqWith s "{X}{G/P}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Variable, ManaSymbol.Phyrexian Color.Green]))
+    Spec.assertEqWith
+      s
+      "Sorcery"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Sorcery) Set.empty)
+    Spec.assertEqWith s "no keywords of its own" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "X damage to each creature with flying"
+      (modeShapes (CardT.spell c))
+      [ ( Optionality.Mandatory,
+          [ Effect.DealDamage
+              (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.HasKeyword Keyword.Flying]))
+              Quantity.X
+          ]
+        )
+      ]
+    -- CR 115.10a again: "each creature with flying" is not "target", so there
+    -- is no target spec and nothing for CR 608.2b to fizzle.
     Spec.assertEqWith s "and it targets nothing" (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c)))) [Map.empty]
   -- The control-side twin of trumpet-blast.json, and the other half of what
   -- CR 611.2c names: a resolution effect that CHANGES THE CONTROLLER of a

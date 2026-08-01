@@ -1,0 +1,69 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Variable"
+    },
+    {
+      "type": "Phyrexian",
+      "value": {
+        "type": "Green"
+      }
+    }
+  ],
+  "name": "Corrosive Gale",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "DealDamage",
+            "value": [
+              {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "HasKeyword",
+                    "value": {
+                      "type": "Flying"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "X"
+              }
+            ]
+          }
+        ],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Sorcery"
+      }
+    ]
+  }
+}

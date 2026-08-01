@@ -1452,16 +1452,21 @@ m2cPropertySpec s registry =
 -- ToCreature, ToPlaneswalker, or Nothing -- plus the pass-through for a
 -- recipient that arrives already classified.
 --
--- Aether Flash exercises two of them in a real game (TriggerSpec's
+-- Two of them happen in real games. Aether Flash reaches both (TriggerSpec's
 -- aetherFlashSpec): a creature entrant becomes ToCreature, and an entrant
 -- already dead by the time the ability resolves (CR 608.2h) becomes Nothing.
--- The other two are pinned here and nowhere else, because no card in the pool
--- can produce them. Every DealDamage in data/cards/ takes its slot from an
--- AnyTarget, Creatures or Players pool -- none of which tags a candidate
--- ToObject -- or from a bound slot, and the one bound slot that names a
--- permanent is Aether Flash's `became`, whose trigger condition Filter admits
--- only creatures. A planeswalker or a land therefore reaches this function's
--- ToObject arm only from a direct call like these.
+-- Corrosive Gale reaches the first from the other direction (ResolveSpec's
+-- CorrosiveGale group), since every member of an ObjectRef.EachMatching sweep
+-- arrives here tagged ToObject.
+--
+-- The PLANESWALKER answer is pinned here and nowhere else, because no card in
+-- the pool can produce it. A DealDamage takes its recipient from an AnyTarget,
+-- Creatures or Players pool -- none of which tags a candidate ToObject -- or
+-- from a bound slot, or from a swept set, and neither of the two that can name
+-- a permanent generically admits a planeswalker: Aether Flash's `became` has a
+-- trigger condition Filter that admits only creatures, and Corrosive Gale's
+-- sweep filter says HasCardType Creature. A planeswalker or a land therefore
+-- reaches this function's ToObject arm only from a direct call like these.
 damageRecipientSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageRecipientSpec s registry =
   Spec.describe s "CR 120.1a which recipients damage can be dealt to" $ do

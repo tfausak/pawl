@@ -40,7 +40,22 @@ import Pawl.Types.Zone (Zone)
 -- is structural, not a recursive CALL -- resolving a maker never evaluates the
 -- embedded card's effects, so the control-flow non-recursion above still holds.
 data Effect card
-  = DealDamage SlotName Quantity
+  = -- CR 120.1: "Objects can deal damage to battles, creatures, planeswalkers,
+    -- and players." Deal this much of it to what the ObjectRef names.
+    --
+    -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
+    -- gives at length -- one opcode for both the chosen recipient (Lightning
+    -- Bolt's InSlot, filled by targeting) and the named set (Corrosive Gale's
+    -- "each creature with flying", an EachMatching swept at resolution) rather
+    -- than a sibling DamageAll to keep in step with it -- and with one wrinkle
+    -- the other ObjectRef-taking opcodes do not have: CR 120.1a lets damage go to
+    -- a PLAYER as well ("any target", CR 115.4), which no ObjectRef can name.
+    -- That asymmetry is Resolve's to reconcile, and it is why the InSlot arm
+    -- still reads a Recipient rather than an ObjectId.
+    --
+    -- A one-shot under CR 608.2c/608.2f: nothing is stored, so unlike
+    -- ModifyTarget and GainControl this arm owes CR 611.2c no frozen set.
+    DealDamage ObjectRef Quantity
   | -- CR 611: create a continuous effect on the objects the ObjectRef names, for
     -- a duration. Giant Growth and Serpent's Gift are this one opcode, differing
     -- only in the Modification (layer 7c vs 6). Resolve stores it -- or, when a
@@ -118,11 +133,11 @@ data Effect card
     -- DestroyAll opcode was the alternative, and it would have had to carry its
     -- own copy of the CR 702.12b gate, the CR 616.1 funnel and the CR 701.19c
     -- rider -- the duplication PlayerRef already exists to avoid on the player
-    -- side (Draw's comment). Untap, ModifyTarget and GainControl have since
-    -- taken the same parameter for the same reason -- the last two additionally
-    -- owing CR 611.2c a frozen set, since they STORE what they build; the other
-    -- object-affecting opcodes still take a bare SlotName, none of them having a
-    -- card that names a set (#378).
+    -- side (Draw's comment). Tap, Untap, ModifyTarget, GainControl and DealDamage
+    -- have since taken the same parameter for the same reason -- ModifyTarget and
+    -- GainControl additionally owing CR 611.2c a frozen set, since they STORE
+    -- what they build; the other object-affecting opcodes still take a bare
+    -- SlotName, none of them having a card that names a set (#378).
     --
     -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
     -- destroyed into the effect SOURCE's live bindings -- the resolving spell

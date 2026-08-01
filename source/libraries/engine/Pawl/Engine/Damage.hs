@@ -421,9 +421,11 @@ applyDamage events = do
            in g {GameState.players = Map.adjust hit pid (GameState.players g)}
         -- CR 120.1a, and defensive: combat never builds this shape (CR 510.1b-d
         -- name a creature, a player or a planeswalker), and the one producer
-        -- that can -- Resolve's DealDamage arm, reading a slot that names a permanent
-        -- generically -- runs it through damageRecipient above first, which
-        -- turns it into ToCreature or ToPlaneswalker, or into no event at all.
+        -- that can -- Resolve's DealDamage arm, naming a permanent generically
+        -- through a bound slot or sweeping a set of them out of an
+        -- ObjectRef.EachMatching -- runs every recipient through damageRecipient
+        -- above first, which turns each into ToCreature or ToPlaneswalker, or
+        -- into no event at all.
         -- Doing anything here would be the wrong answer if anything did reach
         -- it: nothing has said which of CR 120.3's results applies.
         Recipient.ToObject _ -> g

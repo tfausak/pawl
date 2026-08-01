@@ -98,8 +98,9 @@ targetable pid oid gs = case Game.cardOf oid gs of
 -- CR 118.13a's announcement is measured against the same total, and castSpell
 -- hands Cost.totalMana in for exactly that reason: a gate and an offer that
 -- disagree about what a cost is are two ways of getting the same question wrong.
--- The X=0 floor is the one place they still can disagree, since the announcement
--- runs on the value the player named (#417).
+-- The X=0 floor USED to be one place they still could, since the announcement
+-- runs on the value the player named; castSpell now asks this same predicate
+-- again once that value exists, which is what closed it (#417).
 payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
 
@@ -555,68 +556,103 @@ castSpell pid oid = do
               if Cost.hasVariable chosenCost
                 then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid (affordableX pid oid gs chosenCost))))
                 else pure Nothing
-            -- CR 601.2b's own order puts the Phyrexian announcement AFTER the
-            -- value of X and before CR 601.2c's targets: "If a cost that will be
-            -- paid as the spell is being cast includes Phyrexian mana symbols,
-            -- the player announces whether they intend to pay 2 life or a
-            -- corresponding colored mana cost for each of those symbols." CR
-            -- 118.13a is what forbids deferring it to payment time.
+            -- CR 601.2: "If a player is unable to comply with the requirements of
+            -- a step listed below while performing that step, the casting of the
+            -- spell is illegal; the game returns to the moment before the casting
+            -- of that spell was proposed." The X the player just named is where
+            -- that can first become true, and this is the step it becomes true in:
+            -- every candidate offered above passed payableCost at CR 601.2b's X=0
+            -- FLOOR, which is the only value castability can measure before the
+            -- announcement exists.
             --
-            -- Cost.totalMana is handed in so that the routes offered are the ones
-            -- CR 601.2f's total can pay -- the same adjusted cost payableCost
-            -- gated this cast on, and read from the same `gs` the total below is
-            -- (ManaSpec's Mana.TotalCost group).
-            announcedCost <- Cost.announce pid oid (Cost.totalMana pid oid gs) (maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount)
-            chosen <-
-              if Map.null sets
-                then pure Map.empty
-                else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
-            let keysAgree = Map.keysSet chosen == Map.keysSet sets
-                eachLegal = and (Map.intersectionWith Set.member chosen sets)
-            Monad.when (keysAgree && eachLegal) $ do
-              -- CR 612 binding: choose the basic land types for each
-              -- text-change slot. Always answerable (the five basics), so no
-              -- castability gate.
-              let textSlots = Resolve.textChangeSlots card
-                  ask slot = do
-                    pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
-                    pure (slot, pair)
-              bound <- fmap Map.fromList (traverse ask textSlots)
-              -- CR 601.2b then 601.2f: substitute X and announce the Phyrexian
-              -- symbols (both above), then compute the total cost. The object is
-              -- still in HAND here, one step before 601.2a moves it to the
-              -- stack, so a criterion is read against its hand projection (#89).
-              let paidCost = Cost.total pid oid announcedCost gs
-              payment <- Cost.pay pid oid paidCost
-              case payment of
-                Payment.Unpaid -> pure ()
-                -- Which of the candidate costs was paid is not recorded past
-                -- this point (#101); the chosen Cost is discarded once paid.
-                Payment.Paid -> do
-                  -- Read BEFORE the move, which is the last moment the zone the
-                  -- spell was cast from is knowable: CR 400.7 mints a new
-                  -- incarnation on the stack with no memory of where it came
-                  -- from. Read from the LIVE state rather than the `gs` this
-                  -- cast opened with, so nothing a cost payment did is missed.
-                  castFrom <- State.gets (fmap Object.zone . Game.lookupObject oid)
-                  Event.changeZone oid Zone.Stack
-                  -- CR 601.2i: the spell has been cast. Emitted here, AFTER
-                  -- the last step that can fail, so a rejected announcement
-                  -- records nothing.
-                  State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
-                  moved <- State.get
-                  case GameState.stack moved of
-                    [] -> pure ()
-                    top : _ -> do
-                      State.put
-                        moved
-                          { GameState.objects =
-                              Map.adjust
-                                (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount chosenModes})
-                                top
-                                (GameState.objects moved)
-                          }
-                      Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard card top)
+            -- Asked with the same predicate the floor was asked with, on the cost
+            -- carrying the announced value, so a gate and an announcement cannot
+            -- disagree about what a cost is. That matters beyond tidiness: CR
+            -- 118.13a's Phyrexian announcement below runs on this cost, and on a
+            -- {X}{G/P} (Corrosive Gale) a large enough X leaves NEITHER of CR
+            -- 107.4f's two routes payable -- whereupon Mana.announcePhyrexian has
+            -- no offer to make and would have to invent one. This gate is what
+            -- keeps that arm out of reach, and its haddock says so.
+            --
+            -- Reject-not-repair, the posture every other step here takes: the
+            -- announcement is NOT clamped to affordableX (CR 601.2b lets the
+            -- player announce the value of the variable freely), it is honoured
+            -- and then loses the spell. Reversing here rather than at CR 601.2h's
+            -- failed payment costs the player nothing, since everything between
+            -- is undone by the same reversal -- and it is the posture castability
+            -- itself already takes, measuring payability at CR 601.2b instead of
+            -- waiting for the payment to fail (#56 is the prompts that reversal
+            -- still owes).
+            --
+            -- Asked unconditionally rather than only when there is an {X}: for a
+            -- cost with none, `announcedAtX` IS the chosen candidate and this
+            -- re-asks a question already answered above, which costs a payability
+            -- check and buys one predicate over one cost instead of two spellings
+            -- of when the gate applies.
+            let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
+            Monad.when (payableCost pid oid gs announcedAtX) $ do
+              -- CR 601.2b's own order puts the Phyrexian announcement AFTER the
+              -- value of X and before CR 601.2c's targets: "If a cost that will be
+              -- paid as the spell is being cast includes Phyrexian mana symbols,
+              -- the player announces whether they intend to pay 2 life or a
+              -- corresponding colored mana cost for each of those symbols." CR
+              -- 118.13a is what forbids deferring it to payment time.
+              --
+              -- Cost.totalMana is handed in so that the routes offered are the ones
+              -- CR 601.2f's total can pay -- the same adjusted cost payableCost
+              -- gated this cast on, and read from the same `gs` the total below is
+              -- (ManaSpec's Mana.TotalCost group).
+              announcedCost <- Cost.announce pid oid (Cost.totalMana pid oid gs) announcedAtX
+              chosen <-
+                if Map.null sets
+                  then pure Map.empty
+                  else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
+              let keysAgree = Map.keysSet chosen == Map.keysSet sets
+                  eachLegal = and (Map.intersectionWith Set.member chosen sets)
+              Monad.when (keysAgree && eachLegal) $ do
+                -- CR 612 binding: choose the basic land types for each
+                -- text-change slot. Always answerable (the five basics), so no
+                -- castability gate.
+                let textSlots = Resolve.textChangeSlots card
+                    ask slot = do
+                      pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
+                      pure (slot, pair)
+                bound <- fmap Map.fromList (traverse ask textSlots)
+                -- CR 601.2b then 601.2f: substitute X and announce the Phyrexian
+                -- symbols (both above), then compute the total cost. The object is
+                -- still in HAND here, one step before 601.2a moves it to the
+                -- stack, so a criterion is read against its hand projection (#89).
+                let paidCost = Cost.total pid oid announcedCost gs
+                payment <- Cost.pay pid oid paidCost
+                case payment of
+                  Payment.Unpaid -> pure ()
+                  -- Which of the candidate costs was paid is not recorded past
+                  -- this point (#101); the chosen Cost is discarded once paid.
+                  Payment.Paid -> do
+                    -- Read BEFORE the move, which is the last moment the zone the
+                    -- spell was cast from is knowable: CR 400.7 mints a new
+                    -- incarnation on the stack with no memory of where it came
+                    -- from. Read from the LIVE state rather than the `gs` this
+                    -- cast opened with, so nothing a cost payment did is missed.
+                    castFrom <- State.gets (fmap Object.zone . Game.lookupObject oid)
+                    Event.changeZone oid Zone.Stack
+                    -- CR 601.2i: the spell has been cast. Emitted here, AFTER
+                    -- the last step that can fail, so a rejected announcement
+                    -- records nothing.
+                    State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
+                    moved <- State.get
+                    case GameState.stack moved of
+                      [] -> pure ()
+                      top : _ -> do
+                        State.put
+                          moved
+                            { GameState.objects =
+                                Map.adjust
+                                  (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount chosenModes})
+                                  top
+                                  (GameState.objects moved)
+                            }
+                        Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard card top)
 
 -- CR 702.34a's SECOND static ability -- "exile this card instead of putting it
 -- anywhere else any time it would leave the stack" -- installed onto the spell's

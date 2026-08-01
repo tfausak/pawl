@@ -235,9 +235,12 @@ data Prompt r where
   -- variable freely, and an announcement the total cost cannot pay is answered by
   -- CR 601.2 reversing the whole casting -- "the game returns to the moment
   -- before the casting of that spell was proposed" -- which is pawl's no-op,
-  -- minus the prompts (#56). What the bound adds is the INFORMATION a player at a
-  -- table has and an answerer, which sees only this payload and never the
-  -- GameState, did not (#417) -- the shape #176 gave DeclareMulligan.
+  -- minus the prompts (#56). Cast.castSpell takes that reversal at THIS step,
+  -- the one the player was unable to comply with, rather than carrying an
+  -- already lost cast as far as CR 601.2h's payment. What the bound adds is the
+  -- INFORMATION a player at a table has and an answerer, which sees only this
+  -- payload and never the GameState, did not (#417) -- the shape #176 gave
+  -- DeclareMulligan.
   --
   -- COUNTS LIFE, not only mana: Cost.canPay measures CR 601.2b's nonhybrid
   -- resolutions, so a Phyrexian symbol's 2 life (CR 107.4f) is one of the routes

@@ -36,7 +36,7 @@ import qualified Pawl.Types.Onset as Onset
 
 effectToJson :: (card -> Value) -> Effect.Effect card -> Value
 effectToJson codec e = case e of
-  Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
+  Effect.DealDamage r q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [objectRefToJson r, quantityToJson q])))
   Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, objectRefToJson r])))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
@@ -118,8 +118,8 @@ jsonToEffect decode value = do
   (t, mv) <- Json.tag value
   case Text.unpack t of
     "DealDamage" -> case mv of
-      Just (Array (MkArray [s, q])) -> Effect.DealDamage <$> jsonToSlotName s <*> jsonToQuantity q
-      _ -> Left (Text.pack "DealDamage expects [slot, quantity]")
+      Just (Array (MkArray [r, q])) -> Effect.DealDamage <$> jsonToObjectRef r <*> jsonToQuantity q
+      _ -> Left (Text.pack "DealDamage expects [objectRef, quantity]")
     "ModifyTarget" -> case mv of
       Just (Array (MkArray [d, m, r])) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToObjectRef r
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, objectRef]")

@@ -372,8 +372,12 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
           Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)
         ]
   Spec.describe s "effect" $ do
-    Spec.it s "DealDamage" $
-      roundTrip s "e1" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3))
+    -- DealDamage takes the same untagged ObjectRef ModifyTarget does, so both
+    -- arms have to survive the trip: Lightning Bolt's slot and Corrosive Gale's
+    -- filter-selected set.
+    Spec.it s "DealDamage round-trips both ObjectRef arms" $ do
+      roundTrip s "e1" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3))
+      roundTrip s "e1b" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.DealDamage (ObjectRef.EachMatching (Filter.Type.HasKeyword Keyword.Flying)) Quantity.X)
     -- ModifyTarget takes the same untagged ObjectRef Destroy and Untap do,
     -- so both arms have to survive the trip: Giant Growth's slot and
     -- Trumpet Blast's filter-selected set.
@@ -935,7 +939,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         ( Modal.MkModal
             ( Seq.fromList
                 [ Mode.MkMode
-                    (Seq.fromList [Effect.DealDamage (SlotName.MkSlotName (Text.pack "creature")) (Quantity.Literal 1)])
+                    (Seq.fromList [Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature"))) (Quantity.Literal 1)])
                     (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
                     Optionality.Mandatory
                 ]

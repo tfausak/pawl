@@ -50,6 +50,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
@@ -331,7 +332,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)]
+                  [Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
               ActivatedAbility.timing = ActivationTiming.AnyTime
             }
