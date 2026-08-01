@@ -224,20 +224,31 @@ data Prompt r where
   -- (per the ruling), so multiple copies may be cast. CR 605.3a permits mana
   -- activation to pay.
   CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
-  -- CR 601.2b: choose the value of X while casting (the ObjectId is the spell).
+  -- CR 601.2b: choose the value of X while casting a spell -- or, through CR
+  -- 602.2b, while activating an ability, which is the same rule reached by "the
+  -- remainder of the process for activating an ability is identical to the
+  -- process for casting a spell listed in rules 601.2b-i". The ObjectId is
+  -- whichever object is on the stack: the spell, or the ability object
+  -- (Activate.activateAbility, #544).
+  --
   -- The Natural is the greatest value this player could actually PAY for right
-  -- now: the largest X at which the cost being cast, totalled at CR 601.2f, is
-  -- still payable (Cast.affordableX, which climbs the very predicate
-  -- Cast.payableCost gated this cast on at CR 601.2b's X=0 floor).
+  -- now: the largest X at which the cost being announced is still payable
+  -- (Cast.affordableX and Activate.affordableX, each climbing the very predicate
+  -- its own castability / activatability gate asked at CR 601.2b's X=0 floor).
+  -- The two measure different costs -- a spell's is totalled at CR 601.2f, an
+  -- activation cost is not routed through `total` at all (#90) -- so the bound is
+  -- the greatest payable X of the cost that will really be paid, whichever that
+  -- is.
   --
   -- ADVISORY, not a limit, and emphatically not a clamp. The answer is filtered
   -- against it nowhere: CR 601.2b lets the player announce the value of the
   -- variable freely, and an announcement the total cost cannot pay is answered by
-  -- CR 601.2 reversing the whole casting -- "the game returns to the moment
-  -- before the casting of that spell was proposed" -- which is pawl's no-op,
-  -- minus the prompts (#56). Cast.castSpell takes that reversal at THIS step,
-  -- the one the player was unable to comply with, rather than carrying an
-  -- already lost cast as far as CR 601.2h's payment. What the bound adds is the
+  -- a reversal -- CR 601.2's "the game returns to the moment before the casting of
+  -- that spell was proposed", and CR 602.2's "the game returns to the moment
+  -- before that ability started to be activated" -- which is pawl's no-op, minus
+  -- the prompts (#56). Both callers take that reversal at THIS step, the one the
+  -- player was unable to comply with, rather than carrying an already lost spell
+  -- or ability as far as CR 601.2h's payment. What the bound adds is the
   -- INFORMATION a player at a table has and an answerer, which sees only this
   -- payload and never the GameState, did not (#417) -- the shape #176 gave
   -- DeclareMulligan.
@@ -253,14 +264,14 @@ data Prompt r where
   -- player being asked.
   --
   -- A bare Natural rather than a Maybe: this prompt is issued only for a
-  -- candidate cost that already passed the X=0 floor, so a greatest payable X
-  -- always exists, and 0 is a real answer (cast the spell for its X-free
-  -- remainder) rather than an absent one. There is no "unbounded" case to
+  -- cost that already passed the X=0 floor, so a greatest payable X
+  -- always exists, and 0 is a real answer (cast the spell, or activate the
+  -- ability, for its X-free remainder) rather than an absent one. There is no "unbounded" case to
   -- represent -- a player's mana is finite, and every {X} spends it.
   --
   -- Prompted before targets (CR 601.2b precedes 601.2c), and only when the cost
-  -- contains a Variable symbol -- a spell with no {X} is not asked (where the
-  -- rules leave nothing to choose, don't prompt).
+  -- contains a Variable symbol -- a spell or ability with no {X} is not asked
+  -- (where the rules leave nothing to choose, don't prompt).
   ChooseX :: Decider -> PlayerId -> ObjectId -> Natural -> Prompt Natural
   -- CR 702.42a: whether this player uses the entwine ability of the modal spell
   -- they are casting -- "You may choose all modes of this spell instead of just

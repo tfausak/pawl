@@ -4,6 +4,7 @@
 -- gating, and the CR 605 mana-ability exclusion from stack activations.
 module Pawl.ActivateSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -11,8 +12,10 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -98,6 +101,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationTimingSpec s registry
   printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
+  variableActivationCostSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -1098,3 +1102,186 @@ printedActivationTurnScopeSpec s registry = Spec.describe s "PrintedActivationTu
     Spec.assertEqWith s "the Piker is still a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Trample pikerId after)) "and has no trample"
     Spec.assertBool s (Set.member augurId (GameState.battlefield after)) "and the Augur is still on the battlefield"
+
+-- Alice with `n` untapped Mountains and a settled Cinder Elemental, holding
+-- priority. `n` is the whole of what the {X} is measured against: the activation
+-- cost is {X}{R}, so n Mountains pay every X up to n-1 and nothing above it.
+cinderBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Int ->
+  m (Printing.Printing, ObjectId.ObjectId, GameState.GameState)
+cinderBoard s registry n = do
+  cinder <- S.printingOf s registry "Cinder Elemental"
+  mountain <- S.printingOf s registry "Mountain"
+  let (srcId, g0) = S.addCreature cinder S.alice (S.landsInPlay mountain n)
+  pure (cinder, srcId, g0 {GameState.priority = Just S.alice})
+
+-- Announces X and aims every target slot at `who`.
+answerXAt :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+answerXAt x who p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> aimAt who p
+
+-- Answers Prompt.ChooseX with the affordability bound the prompt carries, and
+-- records that bound in the State -- the CastSpec answerer, aimed at a player.
+-- The log is how a test sees a payload nothing on the board records; answering
+-- WITH it is what proves the bound is payable rather than merely reported.
+answerAtBound :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [Natural] r
+answerAtBound who p = case p of
+  Prompt.ChooseX _ _ _ bound -> do
+    State.modify' (\seen -> seen <> [bound])
+    pure bound
+  _ -> pure (aimAt who p)
+
+-- Announces ONE MORE than the bound -- legal under CR 601.2b and unaffordable by
+-- construction, whatever the board is.
+answerAboveBound :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+answerAboveBound who p = case p of
+  Prompt.ChooseX _ _ _ bound -> bound + 1
+  _ -> aimAt who p
+
+-- answerAtBound and answerAboveBound in one, COUNTING the CR 601.2c target
+-- questions the activation asks: `offset` 0 announces the bound and 1 announces
+-- one past it. The count is the only way a test can see a step the activation did
+-- NOT take, since an activation reversed at CR 601.2h leaves a board identical to
+-- one reversed earlier.
+answerAtBoundOffsetCounting :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> State.State Int r
+answerAtBoundOffsetCounting offset who p = case p of
+  Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
+  Prompt.ChooseTargets {} -> do
+    State.modify' (+ 1)
+    pure (aimAt who p)
+  _ -> pure (aimAt who p)
+
+-- Counts the CR 601.2b value-of-X questions asked, so a test can assert one was
+-- put to the player -- and that none is put where the cost has no {X}.
+countingX :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State Int r
+countingX who p = case p of
+  Prompt.ChooseX {} -> do
+    State.modify' (+ 1)
+    pure (aimAt who p)
+  _ -> pure (aimAt who p)
+
+-- CR 602.2b: "The remainder of the process for activating an ability is identical
+-- to the process for casting a spell listed in rules 601.2b-i. Those rules apply
+-- to activating an ability just as they apply to casting a spell. An activated
+-- ability's analog to a spell's mana cost (as referenced in rule 601.2f) is its
+-- activation cost." So CR 601.2b's "If the spell has a variable cost that will be
+-- paid as it's being cast (such as an {X} in its mana cost; see rule 107.3), the
+-- player announces the value of that variable" reaches an ACTIVATION cost's {X}
+-- exactly as it reaches a spell's.
+--
+-- Cinder Elemental -- "{X}{R}, {T}, Sacrifice this creature: It deals X damage to
+-- any target" -- is the pool's first card with one (#544), and it exercises both
+-- halves at once: the X is paid AND read, so an engine that dropped it would
+-- both undercharge and underdeal.
+--
+-- THE FALSIFIER for the whole group is the engine answering 0 on the player's
+-- behalf. An unannounced ManaSymbol.Variable demands nothing at payment
+-- (Mana.waysOf's Variable arm is [(Nothing, 0, 0)]), so a missing announcement is
+-- not a missing question but a free {X}: Cinder Elemental would cost {R} and deal
+-- nothing, and every mana assertion below would read 1 instead of n.
+variableActivationCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost" $ do
+  Spec.it s "CR 601.2b/602.2b whole card: Cinder Elemental at X=2 pays {2}{R} and deals 2" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 3
+    let after =
+          snd
+            ( Engine.runGamePure
+                (answerXAt 2 S.bob)
+                g1
+                (do Activate.activateAbility S.alice srcId (theAbility cinder); Stack.resolveTop)
+            )
+    Spec.assertEqWith s "bob took the announced 2, not 0" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "all three Mountains paid the {2}{R}" (S.tappedCount S.alice after) 3
+    Spec.assertBool s (not (Set.member srcId (GameState.battlefield after))) "and the cost really sacrificed it"
+    Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
+
+  -- CR 601.2b's announced value is STAMPED, and this is the read half of #544's
+  -- gap: the value reaches the effect through the ABILITY object's bindings, and
+  -- the source permanent it names is in a graveyard by then, sacrificed to pay.
+  Spec.it s "CR 601.2b the announced X is stamped on the ability object, not the source" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let after = snd (Engine.runGamePure (answerXAt 3 S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder)))
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId after)) "the source id names nothing"
+    case GameState.stack after of
+      [] -> Spec.assertFailure s "expected the ability on the stack"
+      top : _ -> case Game.lookupObject top after of
+        Nothing -> Spec.assertFailure s "stack id should resolve"
+        Just obj -> Spec.assertEqWith s "amount bound" (Binding.amountOf Binding.variableX (Object.bindings obj)) (Just 3)
+
+  -- The bound is what the BOARD can pay, so it moves with the board: {X}{R} off
+  -- four Mountains admits X=3, off six admits X=5, and off the one Mountain that
+  -- only just makes the ability activatable admits nothing but CR 601.2b's floor.
+  -- No constant, and nothing read off the printed cost, satisfies all three.
+  Spec.it s "CR 601.2b the ChooseX bound is the greatest X the board can pay" $ do
+    let boundsOff n = do
+          (cinder, srcId, g1) <- cinderBoard s registry n
+          pure (State.execState (Engine.runGame (answerAtBound S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder))) [])
+    four <- boundsOff 4
+    six <- boundsOff 6
+    one <- boundsOff 1
+    Spec.assertEqWith s "four Mountains bound X at 3" four [3]
+    Spec.assertEqWith s "six Mountains bound X at 5" six [5]
+    Spec.assertEqWith s "one Mountain bounds X at 0" one [0]
+
+  -- The bound is PAYABLE and not merely reported: announcing exactly it activates
+  -- the ability, taps every Mountain, and resolves. An off-by-one bound would
+  -- reverse the activation here (CR 602.2) and leave bob at 20.
+  Spec.it s "CR 601.2b announcing X at the bound activates the ability and resolves it" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let act = do Activate.activateAbility S.alice srcId (theAbility cinder); Stack.resolveTop
+        after = snd (State.evalState (Engine.runGame (answerAtBound S.bob) g1 act) [])
+    Spec.assertEqWith s "bob at 17, so the bound of 3 was announced and paid" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "all four Mountains paid the {3}{R}" (S.tappedCount S.alice after) 4
+
+  -- The assertion that keeps the bound honest. It is ADVISORY: CR 601.2b lets the
+  -- player announce the value of the variable freely, so one more than the bound
+  -- is announced, is unaffordable, and reverses the whole activation -- CR 602.2's
+  -- "the activation is illegal; the game returns to the moment before that ability
+  -- started to be activated". A bound quietly turned into a clamp would deal 3
+  -- damage and tap four Mountains here.
+  Spec.it s "CR 602.2 the bound does not clamp: X one above it is a no-op" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let after = snd (Engine.runGamePure (answerAboveBound S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder)))
+    Spec.assertBool s (Set.member srcId (GameState.battlefield after)) "the Elemental was not sacrificed"
+    Spec.assertEqWith s "and not tapped" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Untapped)
+    Spec.assertEqWith s "no mana spent" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "bob unharmed" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
+
+  -- WHERE the reversal happens, which the no-op above cannot see. CR 602.2 puts it
+  -- at the step the player is unable to comply with, and the announced value of X
+  -- is the first step that can be one -- activatability measured the cost at CR
+  -- 601.2b's X=0 floor, the only value it can know before the announcement exists.
+  -- So the activation ends there, and CR 601.2c's target question is never put to a
+  -- player whose ability is already lost.
+  Spec.it s "CR 602.2 an unaffordable X ends the activation before CR 601.2c's targets are asked for" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let asked offset = State.execState (Engine.runGame (answerAtBoundOffsetCounting offset S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder))) 0
+    Spec.assertEqWith s "at the bound the activation goes on and asks for its target" (asked 0) 1
+    Spec.assertEqWith s "one above it, there is nothing left to target for" (asked 1) 0
+
+  -- The question is asked exactly where the rules leave something to ask. Ghitu
+  -- Fire-Eater's "{T}, Sacrifice this creature" has no variable in it, so no value
+  -- is announced for it (CR 601.2b's clause is conditional on one).
+  Spec.it s "CR 601.2b the value of X is asked for once, and only for a cost that has one" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    let (ghituId, g2) = S.addCreature ghitu S.alice g1
+        asks oid ability = State.execState (Engine.runGame (countingX S.bob) g2 (Activate.activateAbility S.alice oid ability)) 0
+    Spec.assertEqWith s "Cinder Elemental's {X}{R} is announced" (asks srcId (theAbility cinder)) 1
+    Spec.assertEqWith s "the Fire-Eater's costs nothing to announce" (asks ghituId (theAbility ghitu)) 0
+
+  -- CR 601.2b's X=0 FLOOR, which is what activatability can measure before any
+  -- value exists: one Mountain pays {X}{R} at X=0 and the ability is on offer,
+  -- while no Mountain pays the {R} and it is not. A floor that demanded {X} > 0
+  -- would refuse the first board; a cost that never demanded the {X} at all would
+  -- still accept the second.
+  Spec.it s "CR 601.2b activatability is measured at the X=0 floor" $ do
+    (cinder, srcId, one) <- cinderBoard s registry 1
+    (_, noneId, none) <- cinderBoard s registry 0
+    Spec.assertBool s (Activate.activatable S.alice srcId (theAbility cinder) one) "one Mountain admits X=0"
+    Spec.assertBool s (not (Activate.activatable S.alice noneId (theAbility cinder) none)) "no Mountain pays even the {R}"

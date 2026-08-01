@@ -170,11 +170,43 @@ substituteX :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 substituteX x cost = cost {Cost.mana = fmap (Mana.substituteX x) (Cost.mana cost)}
 
 -- Does this cost's mana part contain an {X} (CR 107.3)? What decides whether the
--- caster is asked for a value at CR 601.2b -- a spell with no {X} is not asked.
+-- caster is asked for a value at CR 601.2b -- a spell with no {X} is not asked,
+-- and CR 602.2b sends an activation cost through the same question.
 hasVariable :: Cost Keyword.Type.Keyword -> Bool
 hasVariable cost = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+
+-- CR 601.2b: the greatest value of X this player could actually pay for -- what
+-- Prompt.ChooseX carries -- found by ASCENDING SEARCH from 0 over the caller's
+-- own payability-at-X predicate. Advisory, and nothing here clamps: see
+-- Prompt.ChooseX for why announcing past this is legal and what it costs.
+--
+-- The PREDICATE is the caller's, for the reason `announce` above takes its
+-- totalling as a parameter -- the two callers measure different costs. A spell's
+-- is measured through CR 601.2f's totalling (Cast.payableCostAt); an activation
+-- cost is not routed through `total` at all (Activate.payableCostAt, #90). What
+-- each must hand in is the SAME predicate its own castability / activatability
+-- gate asked at CR 601.2b's X=0 floor, so that what a gate measures and what a
+-- bound reports cannot drift apart.
+--
+-- SOUND AND TERMINATING only because payability is MONOTONE in X -- unpayable at
+-- n means unpayable at every value above n, while the demand grows without bound
+-- and the supplies are finite. That is a property of the PREDICATE and is
+-- discharged at the call site; Cast.affordableX carries the argument in full, and
+-- Activate.affordableX's cost is the same one with CR 601.2f's totalling taken
+-- out, which can only shorten it.
+--
+-- Answers 0 for a cost with no {X} in it, which is a totality guard rather than a
+-- rule: X cannot affect such a cost's payability, so the climb would never end,
+-- and there is no variable to report a greatest value of. Neither caller asks --
+-- both gate the prompt on the same `hasVariable`. Also 0 for a cost unpayable
+-- even at X=0, where no value is affordable and 0 is the least misleading number
+-- to report.
+greatestPayableX :: (Natural -> Bool) -> Cost Keyword.Type.Keyword -> Natural
+greatestPayableX payableAt cost =
+  let climb x = if payableAt (x + 1) then climb (x + 1) else x
+   in if hasVariable cost then climb 0 else 0
 
 -- CR 118.13a: "If the mana cost of a spell or the activation cost of an
 -- activated ability contains a mana symbol that can be paid in multiple ways,
@@ -206,8 +238,13 @@ hasVariable cost = case Cost.mana cost of
 -- cost instead let a reduction hide a route and this function elide the prompt
 -- (ManaSpec's Mana.TotalCost group). Pawl.Engine.Activate passes `id`, because an
 -- activation cost is deliberately not routed through `total` at all (#90), so the
--- printed cost IS what `Activate.activatable` checked and what will be paid. When
--- #90 lands both sites change together, which is the point of the parameter.
+-- cost `Activate.activatable` checked and the cost that will be paid are the
+-- printed one. When #90 lands both sites change together, which is the point of
+-- the parameter.
+--
+-- The COST that arrives already carries CR 601.2b's announced value of X from
+-- either caller, because that rule puts the value of the variable before this
+-- announcement. Substituting it is the caller's job, not this parameter's.
 --
 -- Named `total_` rather than `total` only because this module's own `total` is in
 -- scope, the `filter_` convention elsewhere here.

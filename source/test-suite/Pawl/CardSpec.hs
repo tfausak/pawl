@@ -441,6 +441,16 @@ triggeredAbilityCounts ability =
 -- about. Static abilities are absent on purpose: a static ability's
 -- modification is never stored.
 --
+-- CR 107.3: does this mana cost print an {X}? Asked of a CARD's mana cost for a
+-- spell and of an ACTIVATION cost's mana part for an ability -- the two costs CR
+-- 602.2b calls each other's analog -- so the two halves of the "reads X iff {X}
+-- is declared" lint ask it in the same words. Nothing (CR 118.6, an unpayable
+-- cost) declares nothing.
+declaresVariable :: Maybe ManaCost.ManaCost -> Bool
+declaresVariable m = case m of
+  Nothing -> False
+  Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
+
 -- Hand-maintained, with cardCounts' caveat: a NEW Card field holding effects
 -- must be added here too.
 cardResolutionEffects :: Card.Type.Card -> [Effect.Effect Card.Type.Card]
@@ -724,17 +734,37 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a dangling reference" $
     let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))]
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
+  -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
+  -- announced against the card's own mana cost.
   Spec.it s "every printing that reads X declares {X}, and vice versa" $ do
     ps <- S.allPrintings s
     let readsX c = Resolve.readsX (Card.allEffects c)
-        hasVariable c = case Card.Type.manaCost c of
-          Nothing -> False
-          Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
         offenders =
           filter
-            (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
+            (\p -> readsX (Printing.card p) /= declaresVariable (Card.Type.manaCost (Printing.card p)))
             ps
     Spec.assertEqWith s "X read iff {X} declared" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The ACTIVATED-ABILITY half, and it is a separate sweep because it is a
+  -- separate cost: CR 602.2b makes "an activated ability's analog to a spell's
+  -- mana cost (as referenced in rule 601.2f) ... its activation cost", so an
+  -- ability's X is announced against the cost before its own colon and never
+  -- against the card's. Cinder Elemental is the pool's producer -- "{X}{R}, {T},
+  -- Sacrifice this creature: It deals X damage to any target" reads an X its
+  -- CARD's {3}{R} does not declare, which the sweep above would have called an
+  -- offender and this one calls correct (#544).
+  Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
+    ps <- S.allPrintings s
+    let abilitiesOf p = fmap ((,) (Card.Type.name (Printing.card p))) (Card.Type.activatedAbilities (Printing.card p))
+        abilities = concatMap abilitiesOf ps
+        offends (_, ab) =
+          Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab))
+            /= declaresVariable (Cost.Type.mana (ActivatedAbility.cost ab))
+    -- Guards the sweep against passing vacuously, in both directions: an empty
+    -- pool of abilities, and a pool in which no activation cost prints an {X} at
+    -- all (where the lint would hold for every card by agreeing on False).
+    Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
+    Spec.assertBool s (any (declaresVariable . Cost.Type.mana . ActivatedAbility.cost . snd) abilities) "and one of them prints an {X}"
+    Spec.assertEqWith s "X read iff {X} declared" (fmap fst (filter offends abilities)) []
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
     let tokensOf card = [token | Effect.Create _ token _ _ <- cardResolutionEffects card]
