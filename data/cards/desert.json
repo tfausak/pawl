@@ -78,12 +78,17 @@
       },
       "timing": {
         "type": "DuringPhase",
-        "value": {
-          "type": "Combat",
-          "value": {
-            "type": "EndOfCombat"
+        "value": [
+          {
+            "type": "Combat",
+            "value": {
+              "type": "EndOfCombat"
+            }
+          },
+          {
+            "type": "EachTurn"
           }
-        }
+        ]
       }
     }
   ],

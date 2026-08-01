@@ -29,6 +29,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -36,6 +37,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -93,6 +95,7 @@ singleModeAbility effects specs =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationTimingSpec s registry
+  printedActivationTurnScopeSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -899,3 +902,123 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
         after = S.runCombat S.aggressiveAnswer board
     Spec.assertEqWith s "the Piker still connected" (S.lifeOf S.bob after) (Just 18)
     Spec.assertBool s (Set.member attackerId (GameState.battlefield after)) "and is still on the battlefield"
+
+-- CR 307.5's rider narrowed by TURN as well as by step: Llanowar Augur
+-- (Future Sight) prints "Sacrifice this creature: Target creature gets +3/+3 and
+-- gains trample until end of turn. Activate only during your upkeep."
+--
+-- Desert above carries the same arm with no turn clause, so between them the two
+-- groups pin both axes: CR 500.1 breaks a turn into phases and steps and says
+-- nothing about whose turn it is, and CR 102.1 ("The active player is the player
+-- whose turn it is") makes that a second, independent fact.
+--
+-- alice controls both permanents: the Piker is added FIRST so it holds the lower
+-- ObjectId, which is what makes S.aggressiveAnswer's `Set.lookupMin` over the
+-- target set pick it rather than the Augur (itself a legal target: CR 602.2b
+-- routes an activation through CR 601.2b-i, and CR 601.2c chooses targets before
+-- CR 601.2h pays the sacrifice).
+augurBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+augurBoard piker augur =
+  let (pikerId, gs1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      (augurId, gs2) = S.addCreature augur S.alice gs1
+   in (augurId, pikerId, gs2)
+
+-- The upkeep step of `active`'s turn, with alice -- the Augur's controller --
+-- holding priority either way. CR 117.3a gives the active player priority first,
+-- but a nonactive player reaches an upkeep of someone else's turn all the same,
+-- which is exactly the case the turn axis has to refuse.
+--
+-- The schedule loses its head because Setup.emptyGame's `remaining` still begins
+-- with the upkeep step; dropping it leaves the draw step next, so a runStep-driven
+-- test advances out of the upkeep instead of back into it.
+augurUpkeep :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+augurUpkeep active gs =
+  gs
+    { GameState.activePlayer = active,
+      GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+      GameState.priority = Just S.alice,
+      GameState.remaining = Seq.drop 1 (GameState.remaining gs)
+    }
+
+-- Activates the first offered activation, else passes -- pingAnswer's twin for
+-- the Augur, and the interpreter that takes the pump the moment it is offered.
+pumpAnswer :: Prompt.Prompt r -> r
+pumpAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivate options of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+printedActivationTurnScopeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationTurnScopeSpec s registry = Spec.describe s "PrintedActivationTurnScope" $ do
+  -- The window the card names, reached: alice's own upkeep.
+  Spec.it s "CR 307.5 the Augur's pump IS offered during its controller's upkeep" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    augur <- S.printingOf s registry "Llanowar Augur"
+    let (augurId, _, board) = augurBoard piker augur
+        mine = augurUpkeep S.alice board
+    Spec.assertEqWith s "exactly one activation, the pump" (length (activationsOf augurId (Action.legalActions S.alice mine))) 1
+
+  -- The discriminating half: the SAME step, one turn earlier. CR 109.5 -- "The
+  -- words 'you' and 'your' on an object refer to the object's controller ... For
+  -- an activated ability, this is the player who activated the ability" -- is
+  -- what makes the printed "your upkeep" alice's and not bob's, and CR 102.1 is
+  -- what makes the two steps distinguishable at all. An implementation carrying
+  -- only CR 500.1's phase passes the test above and fails this one.
+  --
+  -- Carries its own control on the same board, for the same player, in the same
+  -- step: alice's Prodigal Sorcerer ("{T}: This creature deals 1 damage to any
+  -- target", CR 602.2 and no rider) IS offered, so what withholds the Augur is
+  -- the rider and not alice being shut out of a nonactive player's upkeep.
+  Spec.it s "CR 307.5/109.5 the Augur's pump is NOT offered during the opponent's upkeep" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    augur <- S.printingOf s registry "Llanowar Augur"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (augurId, _, board) = augurBoard piker augur
+        (sorcererId, withSorcerer) = S.addCreature prodigalSorcerer S.alice board
+        theirs = augurUpkeep S.bob withSorcerer
+        offered = Action.legalActions S.alice theirs
+    Spec.assertEqWith s "no activation of the Augur" (activationsOf augurId offered) []
+    Spec.assertBool s (not (null (activationsOf sorcererId offered))) "but alice's unrestricted ability is offered in the same step"
+
+  -- The phase axis, still enforced: alice's own turn, one step later. CR 501.1 --
+  -- "The beginning phase consists of three steps, in this order: untap, upkeep,
+  -- and draw" -- and the draw step is not the one the card names.
+  Spec.it s "CR 500.1 the Augur's pump is NOT offered during its controller's draw step" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    augur <- S.printingOf s registry "Llanowar Augur"
+    let (augurId, _, board) = augurBoard piker augur
+        mine = augurUpkeep S.alice board
+        later = mine {GameState.phase = Phase.Beginning BeginningStep.DrawStep}
+    Spec.assertEqWith s "still offered in the step it names" (length (activationsOf augurId (Action.legalActions S.alice mine))) 1
+    Spec.assertEqWith s "and not one step later" (activationsOf augurId (Action.legalActions S.alice later)) []
+
+  -- The gameplay-level proof (design.md section 4), driven through
+  -- Engine.runStep and the priority loop rather than by calling
+  -- Activate.activateAbility: alice takes every activation the engine offers her
+  -- and the whole upkeep step runs.
+  --
+  -- Goblin Piker is a 2/1, so +3/+3 (CR 613.4c, layer 7c) makes it a 5/4, and CR
+  -- 702.19's trample arrives with it. The Augur is gone: CR 602.1a puts the
+  -- sacrifice in the activation cost, so it left the battlefield on the way to
+  -- the stack and the ability resolved all the same.
+  Spec.it s "CR 307.5 whole card: the Augur pumps in its controller's upkeep" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    augur <- S.printingOf s registry "Llanowar Augur"
+    let (augurId, pikerId, board) = augurBoard piker augur
+        after = S.runPure pumpAnswer (augurUpkeep S.alice board) Engine.runStep
+    Spec.assertEqWith s "the Piker is a 5/4" (S.powerToughnessOf pikerId after) (Just (5, 4))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Trample pikerId after) "and has trample"
+    Spec.assertBool s (not (Set.member augurId (GameState.battlefield after))) "the Augur paid itself"
+
+  -- The same board, the same interpreter, the same step -- on bob's turn. The
+  -- gameplay-level twin of the enumeration test above, and the one an
+  -- implementation that reads only the phase cannot pass: nothing happens at all.
+  Spec.it s "CR 307.5/109.5 whole card: the Augur does nothing in the opponent's upkeep" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    augur <- S.printingOf s registry "Llanowar Augur"
+    let (augurId, pikerId, board) = augurBoard piker augur
+        after = S.runPure pumpAnswer (augurUpkeep S.bob board) Engine.runStep
+    Spec.assertEqWith s "the Piker is still a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Trample pikerId after)) "and has no trample"
+    Spec.assertBool s (Set.member augurId (GameState.battlefield after)) "and the Augur is still on the battlefield"

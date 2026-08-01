@@ -36,6 +36,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
@@ -166,9 +167,10 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
 -- that player from casting a sorcery spell don't affect the player's capability
 -- to perform that action" -- and no rule extends Pawl.Engine.Cast's CR 601.3 list to an
 -- activation either, since CR 601.3 is about beginning to CAST a spell. That is
--- why this function reads GameState.phase directly rather than reaching for
--- Pawl.Types.CastingRestriction, whose DuringPhase arm is spelled the same way
--- and answers a different question (see Pawl.Types.ActivationTiming).
+-- why this function reads GameState.phase and GameState.activePlayer directly
+-- rather than reaching for Pawl.Types.CastingRestriction, whose DuringPhase arm is
+-- spelled the same way and answers a different question (see
+-- Pawl.Types.ActivationTiming).
 --
 -- This gate makes the ability un-OFFERED. Engine.priorityLoop is what makes that
 -- binding: it rejects an action the interpreter was not offered, so a
@@ -178,11 +180,28 @@ timingOk pid ability gs = case ActivatedAbility.timing ability of
   ActivationTiming.AnyTime -> True
   ActivationTiming.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
   -- CR 500.1's phases and steps, compared for equality: GameState.phase is the
-  -- one the game is in, and Pawl.Types.Phase spans both kinds. The same one-line
-  -- comparison Pawl.Engine.Cast makes for CastingRestriction.DuringPhase, deliberately
+  -- one the game is in, and Pawl.Types.Phase spans both kinds. That comparison is
+  -- the one Pawl.Engine.Cast makes for CastingRestriction.DuringPhase, deliberately
   -- duplicated rather than shared -- the two gates differ in what else they may
   -- read, which is the whole of the paragraph above.
-  ActivationTiming.DuringPhase phase -> GameState.phase gs == phase
+  --
+  -- CR 102.1 supplies the second conjunct, and it is a genuinely separate fact:
+  -- "A player is one of the people in the game. The active player is the player
+  -- whose turn it is." Desert's rider names no turn (EachTurn, and the step alone
+  -- decides); Llanowar Augur's "Activate only during your upkeep" names alice's
+  -- upkeep and not bob's.
+  --
+  -- CR 109.5 is why `pid` answers "your": "The words 'you' and 'your' on an
+  -- object refer to the object's controller ... For an activated ability, this is
+  -- the player who activated the ability." `pid` IS that player -- `activatable`
+  -- above has already pinned it to Activate.activatorOf, CR 602.2's controller --
+  -- so no separate controller lookup is needed here, and a stolen permanent's
+  -- rider follows the thief the way CR 109.5 says it must.
+  ActivationTiming.DuringPhase phase scope ->
+    GameState.phase gs == phase
+      && case scope of
+        TurnScope.EachTurn -> True
+        TurnScope.ControllersTurn -> GameState.activePlayer gs == pid
 
 -- CR 606.3: "A player may activate a loyalty ability of a permanent they control
 -- any time they have priority and the stack is empty during a main phase of their

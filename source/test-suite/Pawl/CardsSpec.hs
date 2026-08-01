@@ -535,11 +535,13 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "Land -- Desert"
       (CardT.typeLine c)
       (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Land) (Set.singleton Subtype.Desert))
+    -- TurnScope.EachTurn is the whole of Desert's turn axis: the card prints no
+    -- "your", so ANY player's end of combat step qualifies.
     Spec.assertEqWith
       s
       "the mana ability is unrestricted and the ping is not"
       (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
-      [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat)]
+      [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn]
     -- CR 605.1a: "An activated ability is a mana ability if it meets all of
     -- the following criteria: it doesn't require a target ..., it could add
     -- mana to a player's mana pool when it resolves, and it's not a loyalty
@@ -566,6 +568,61 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       [ [],
         [(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures (Just Filter.IsAttacking))]
       ]
+  -- CR 307.5 again, with the axis Desert above does not print: the pool's first
+  -- card whose ACTIVATED ability names a turn as well as a step. "Sacrifice this
+  -- creature: Target creature gets +3/+3 and gains trample until end of turn.
+  -- Activate only during your upkeep."
+  --
+  -- The two files together are what pin both halves of the arm: Desert's rider
+  -- decodes to TurnScope.EachTurn and this one's to TurnScope.ControllersTurn,
+  -- from the same DuringPhase constructor.
+  Spec.it s "llanowar-augur.json loads as a {G} Elf Shaman whose pump is gated to its controller's upkeep" $ do
+    c <- S.cardOf s registry "Llanowar Augur"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Llanowar Augur")
+    Spec.assertEqWith
+      s
+      "{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith
+      s
+      "Creature -- Elf Shaman"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Elf, Subtype.Shaman]))
+    Spec.assertEqWith s "0/3" (CardT.power c, CardT.toughness c) (Just (Power.MkPower (Quantity.Literal 0)), Just (Toughness.MkToughness (Quantity.Literal 3)))
+    Spec.assertEqWith
+      s
+      "one ability, gated to the controller's upkeep"
+      (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
+      [ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn]
+    -- CR 602.1a: "The activation cost is everything before the colon (:)." The
+    -- sacrifice is on that side, so it is SacrificeThis in the cost and not an
+    -- effect. There is no mana in it at all -- the printed cost is the sacrifice
+    -- alone.
+    Spec.assertEqWith
+      s
+      "sacrificing itself is the whole cost"
+      (fmap (\ab -> (Cost.mana (ActivatedAbility.cost ab), Cost.components (ActivatedAbility.cost ab))) (CardT.activatedAbilities c))
+      [(Just (ManaCost.MkManaCost []), [CostComponent.SacrificeThis])]
+    -- CR 613.4c/702.19: two ModifyTarget effects on one slot rather than one
+    -- effect saying both things -- Pawl.Types.Modification is one modification per
+    -- effect, and layer 7c and layer 6 are different layers in any case.
+    Spec.assertEqWith
+      s
+      "+3/+3 and trample, both until end of turn"
+      (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
+      [ [ ( Optionality.Mandatory,
+            [ Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+              Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
+            ]
+          )
+        ]
+      ]
+    Spec.assertEqWith
+      s
+      "targeting any creature, unfiltered"
+      [Map.toList (Mode.targetSpecs m) | ab <- CardT.activatedAbilities c, m <- Foldable.toList (Modal.modes (ActivatedAbility.modal ab))]
+      [[(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures Nothing)]]
   -- The pool's first card whose ENTERS trigger acts on the permanent that
   -- entered. Soul Warden shares the condition and names nothing about the
   -- entrant; endless-cockroaches.json shares the slot but reads it from a

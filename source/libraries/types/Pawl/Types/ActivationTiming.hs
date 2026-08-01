@@ -1,6 +1,7 @@
 module Pawl.Types.ActivationTiming where
 
 import Pawl.Types.Phase (Phase)
+import Pawl.Types.TurnScope (TurnScope)
 
 -- CR 307.5: when an activated ability may be activated.
 --
@@ -18,7 +19,8 @@ import Pawl.Types.Phase (Phase)
 -- consult casting prohibitions (Rule of Law, Silence). For SorcerySpeed it is
 -- three facts about the game state and nothing else. DuringPhase below is held
 -- to the same discipline, and for the same reason -- Pawl.Engine.Activate.timingOk
--- reads GameState.phase and never Pawl.Types.CastingRestriction.
+-- reads GameState.phase and GameState.activePlayer, and never
+-- Pawl.Types.CastingRestriction.
 --
 -- Deliberately NOT a synonym for Pawl.Types.CastingRestriction, which carries an
 -- arm spelled the same way. Three reasons, and the first is the one that would
@@ -43,8 +45,18 @@ data ActivationTiming
   | -- CR 702.6a's "Activate only as a sorcery", and every other ability that
     -- carries the same phrase.
     SorcerySpeed
-  | -- CR 500.1: activatable only while the game is in this step or phase.
-    -- Desert's "Activate only during the end of combat step" (CR 511.1).
+  | -- CR 500.1: activatable only while the game is in this step or phase, on a
+    -- turn the scope admits. Desert's "Activate only during the end of combat
+    -- step" (CR 511.1) is EachTurn; Llanowar Augur's "Activate only during your
+    -- upkeep" is ControllersTurn.
+    --
+    -- TWO axes because CR 500.1 supplies only one. It breaks a turn into phases
+    -- and steps and says nothing about whose turn it is, and CR 102.1 -- "The
+    -- active player is the player whose turn it is" -- makes that a separate
+    -- fact. A rider that names both narrows both, so an arm carrying only the
+    -- phase is strictly more permissive than the card. Pawl.ActivateSpec's
+    -- PrintedActivationTurnScope group is what proves the two axes are read
+    -- independently.
     --
     -- Pawl.Types.Phase is one type over the CR 500.1 phases and their steps, so
     -- naming a step and naming a STEPLESS phase (the two main phases) are the
@@ -52,8 +64,15 @@ data ActivationTiming
     -- during combat" (Najeela, the Blade-Blossom, Jade Statue) would have to
     -- name five steps at once (#455).
     --
-    -- WHOSE turn is a second axis this arm does not carry: "Activate only during
-    -- your upkeep" (Hell's Caretaker, Augur il-Vec) narrows the same window by
-    -- turn as well (#454).
-    DuringPhase Phase
+    -- The TurnScope is the same type Pawl.Types.TriggerCondition.StepBegins
+    -- carries, and means the same thing on the same axis: CR 109.5 is what makes
+    -- a printed "your" name the ability's controller, and for an activated
+    -- ability that is "the player who activated the ability" -- the player CR
+    -- 602.2 already restricts activation to. Sharing the SCOPE type is not the
+    -- same as sharing the timing type, which the paragraphs above argue against.
+    --
+    -- Neither "an opponent's turn" (Trade Caravan, Nettling Imp) nor a turn named
+    -- with no phase at all (Lavinia, Foil to Conspiracy) is sayable: TurnScope has
+    -- two arms, and this one requires a Phase (#520).
+    DuringPhase Phase TurnScope
   deriving (Eq, Ord, Show)
