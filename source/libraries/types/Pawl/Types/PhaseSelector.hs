@@ -2,7 +2,7 @@ module Pawl.Types.PhaseSelector where
 
 import Pawl.Types.Phase (Phase)
 
--- CR 500.11 / 614.10: which step-or-phase a skip names, and which one
+-- | CR 500.11 / 614.10: which step-or-phase a skip names, and which one
 -- Pawl.Engine.Engine offers up as it is about to begin. The two sides of CR 614.1b are
 -- compared by EQUALITY on this type, so a pattern that names a phase can never
 -- be confused with one that names a step of it.

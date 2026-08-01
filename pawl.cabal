@@ -143,6 +143,7 @@ library codec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaProductionSpec
     Pawl.Codec.ManaSymbol
+    Pawl.Codec.ManaSymbolSpec
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec
     Pawl.Codec.Modal
@@ -157,6 +158,7 @@ library codec
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
+    Pawl.Codec.ObjectRefSpec
     Pawl.Codec.Onset
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
@@ -164,6 +166,7 @@ library codec
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
     Pawl.Codec.PhaseSelector
+    Pawl.Codec.PhaseSelectorSpec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
@@ -191,6 +194,7 @@ library codec
     Pawl.Codec.Scaling
     Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
+    Pawl.Codec.ScopeSpec
     Pawl.Codec.SearchDestination
     Pawl.Codec.SearchDestinationSpec
     Pawl.Codec.SlotName
@@ -203,6 +207,7 @@ library codec
     Pawl.Codec.TapState
     Pawl.Codec.TapStateSpec
     Pawl.Codec.TargetSpec
+    Pawl.Codec.TargetSpecSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
     Pawl.Codec.Toughness

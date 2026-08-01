@@ -33,7 +33,7 @@ import Pawl.Codec.Power (jsonToPower, powerToJson)
 import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
-import Pawl.Codec.TargetSpec (jsonToTargetSpec, targetSpecToJson)
+import qualified Pawl.Codec.TargetSpec as TargetSpec
 import Pawl.Codec.Toughness (jsonToToughness, toughnessToJson)
 import Pawl.Codec.TriggeredAbility (delayedAbilitiesToJson, jsonToDelayedAbilities, jsonToTriggeredAbility, triggeredAbilityToJson)
 import qualified Pawl.Codec.TypeLine as TypeLine
@@ -116,7 +116,7 @@ cardToJson c =
            )
         <> ( case CardT.enchant c of
                Nothing -> []
-               Just spec -> [(Text.pack "enchant", targetSpecToJson spec)]
+               Just spec -> [(Text.pack "enchant", TargetSpec.toJson spec)]
            )
         -- Omitted when empty, unlike the required `castingPermissions` key it
         -- mirrors: one card in the pool prints a casting restriction, and a
@@ -155,7 +155,7 @@ jsonToCard value = do
   alternativeCosts <- Json.listFromDefault jsonToCost (Json.getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
   openingHandAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)
-  enchant <- Json.maybeFrom jsonToTargetSpec (Json.getOpt (Text.pack "enchant") ps)
+  enchant <- Json.maybeFrom TargetSpec.fromJson (Json.getOpt (Text.pack "enchant") ps)
   counterability <- Counterability.fromJsonDefault (Json.getOpt (Text.pack "counterability") ps)
   pure
     CardT.MkCard

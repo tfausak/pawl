@@ -20,12 +20,10 @@ import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
-import qualified Pawl.Codec.Filter as Filter
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
-import Pawl.Codec.ManaSymbol (jsonToManaSymbol, manaSymbolToJson)
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.Mode (jsonToMode, modeToJson)
 import qualified Pawl.Codec.ModeSelection as ModeSelection
@@ -39,7 +37,6 @@ import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
-import Pawl.Codec.TargetSpec (jsonToTargetSpec, targetSpecToJson)
 import Pawl.Codec.TriggerCondition (jsonToTriggerCondition, triggerConditionToJson)
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
 import qualified Pawl.Codec.Zone as Zone
@@ -148,14 +145,6 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 roundTrip :: (Applicative m, Eq a, Show a) => Spec.Spec m n -> String -> (a -> Value.Value) -> (Value.Value -> Either Text a) -> a -> m ()
 roundTrip s label enc dec x = Spec.assertEqWith s label (dec (enc x)) (Right x)
-
--- The first element of an encoded effect's positional payload -- for Destroy,
--- the ObjectRef. JSON null when the effect is nullary or the payload is not an
--- array, neither of which any caller passes.
-payloadHead :: Value.Value -> Value.Value
-payloadHead value = case J.tag value of
-  Right (_, Just (Value.Array (Array.MkArray (h : _)))) -> h
-  _ -> J.jNull
 
 -- How many elements a tagged effect's array payload holds -- what an ELIDED
 -- optional trailing element is asserted by. -1 for a payload that is not an
@@ -282,8 +271,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         manaCostToJson
         jsonToManaCost
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)])
-    Spec.it s "ManaSymbol.Variable round-trips" $
-      roundTrip s "var" manaSymbolToJson jsonToManaSymbol ManaSymbol.Variable
     Spec.it s "Power round-trips" $
       roundTrip s "pow" powerToJson jsonToPower (Power.MkPower (Quantity.Literal 2))
   Spec.describe s "modification + affected" $ do
@@ -343,27 +330,13 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
             /= effectToJson cardToJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
         )
         "Tap and Untap of the same slot encode differently"
+    -- ObjectRef's own untagged shape (a slot is a bare string, a swept set is
+    -- an object) is Pawl.Codec.ObjectRefSpec's business now; the third case
+    -- here keeps Destroy's own coverage of the EachMatching arm.
     Spec.it s "Destroy carries its CR 701.19c rider both ways" $ do
       roundTrip s "e5a" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing)
       roundTrip s "e5b" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing)
-    -- An ObjectRef is untagged and told apart by JSON type, so the two arms
-    -- have to be pinned together: a string is the slot, an object is the
-    -- filter-selected set. A round trip alone would not catch a decoder that
-    -- read every payload as one arm, so the wire form is spelled out.
-    Spec.it s "ObjectRef's two arms are told apart by JSON type, not by a tag" $ do
-      let slotted = Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing
-          swept = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing
-      roundTrip s "e5c" (effectToJson cardToJson) (jsonToEffect jsonToCard) swept
-      Spec.assertEqWith
-        s
-        "a slot is still a bare string, so every Destroy card on disk is unchanged"
-        (payloadHead (effectToJson cardToJson slotted))
-        (J.jText (Text.pack "target"))
-      Spec.assertEqWith
-        s
-        "and a set is the Filter object"
-        (payloadHead (effectToJson cardToJson swept))
-        (Filter.toJson (Filter.Type.HasCardType CardType.Creature))
+      roundTrip s "e5c" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing)
     -- Bane of Progress' "destroyed this way": the third element is the slot
     -- the sweep binds its count into, and it is ELIDED when absent -- so
     -- every Destroy already on disk keeps its two-element payload.
@@ -565,21 +538,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       case J.asObject (cardToJson base) of
         Left err -> Spec.assertFailure s (Text.unpack err)
         Right pairs -> Spec.assertBool s (notElem (Text.pack "openingHandAction") (fmap fst pairs)) "key absent"
-  -- Filter's own per-constructor and nested-And/Or/Not coverage lives in
-  -- Pawl.Codec.FilterSpec now; a TargetSpec is Pool + Maybe Filter, so these
-  -- exercise the Filter arm above in its embedded position. Covers a bare
-  -- pool (Nothing filter, omitted key), a filtered pool, and the Not
-  -- IsSource conjunct that carries CR 601.2c's "another" (#163).
-  Spec.describe s "target spec (P9)" $ do
-    Spec.it s "TargetSpec bare pool round-trips" $
-      let spec' = TargetSpec.MkTargetSpec Pool.Creatures Nothing
-       in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
-    Spec.it s "TargetSpec filtered pool round-trips" $
-      let spec' = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))
-       in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
-    Spec.it s "TargetSpec \"another\" (Not IsSource) round-trips" $
-      let spec' = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]))
-       in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
+  -- TargetSpec's own per-constructor coverage (a bare pool, a filtered pool,
+  -- and the Not IsSource conjunct that carries CR 601.2c's "another", #163)
+  -- lives in Pawl.Codec.TargetSpecSpec now; Filter's own per-constructor and
+  -- nested-And/Or/Not coverage lives in Pawl.Codec.FilterSpec.
   Spec.describe s "records" $ do
     -- CR 614.1c / 306.5b: the intrinsic enters-with-counters rewrite.
     Spec.it s "EntryRewrite (with counters)" $

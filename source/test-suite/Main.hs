@@ -35,13 +35,16 @@ import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaProductionSpec
+import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.ObjectIdSpec
+import qualified Pawl.Codec.ObjectRefSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
+import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerIdSpec
@@ -52,11 +55,13 @@ import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ScalingSpec
+import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TapStateSpec
+import qualified Pawl.Codec.TargetSpecSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TurnScopeSpec
@@ -193,13 +198,16 @@ spec s registry = do
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaProductionSpec.spec s
+  Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
+  Pawl.Codec.ObjectRefSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
+  Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerIdSpec.spec s
@@ -210,11 +218,13 @@ spec s registry = do
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ScalingSpec.spec s
+  Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
+  Pawl.Codec.TargetSpecSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s

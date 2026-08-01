@@ -4,11 +4,11 @@ import Numeric.Natural (Natural)
 import Pawl.Types.Color (Color)
 import Pawl.Types.ManaType (ManaType)
 
--- CR 107.4. Grows: hybrid Phyrexian (#364).
+-- | CR 107.4. Grows: hybrid Phyrexian (#364).
 data ManaSymbol
   = Generic Natural
   | OfType ManaType
-  | -- CR 107.4e: "Each one represents a cost that can be paid in one of two ways,
+  | -- | CR 107.4e: "Each one represents a cost that can be paid in one of two ways,
     -- as represented by the two halves of the symbol. A hybrid symbol such as
     -- {W/U} can be paid with either white or blue mana."
     --
@@ -23,7 +23,7 @@ data ManaSymbol
     -- `Hybrid t t` is degenerate rather than illegal -- it simply means `OfType
     -- t`, and no card prints one.
     Hybrid ManaType ManaType
-  | -- CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
+  | -- | CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
     -- either one black mana or two mana of any type."
     --
     -- The {2/X} shape ONLY, and the generic half is always two -- CR 107.4 prints
@@ -42,7 +42,7 @@ data ManaSymbol
     -- cost" is enumerated above the search, so each symbol is still paid one way
     -- at a time and nothing below ever sees a demand that eats two units.
     MonocoloredHybrid ManaType
-  | -- CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid
+  | -- | CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid
     -- either with one mana of its color or by paying 2 life" (Mutagenic Growth).
     --
     -- A Color and not a ManaType, which makes CR 107.4f's FIRST clause true by
@@ -67,7 +67,7 @@ data ManaSymbol
     -- with either of two colours or with 2 life -- is not this constructor and
     -- has none of its own (#364).
     Phyrexian Color
-  | -- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
+  | -- | CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
     -- that can be paid with one mana of any type produced by a snow source (see
     -- rule 106.3)." Icehide Golem, whose whole cost this is.
     --
@@ -98,7 +98,7 @@ data ManaSymbol
     -- can also be used to refer to mana of any type produced by a snow source
     -- SPENT to pay a cost" (#515).
     Snow
-  | -- CR 107.3 / 601.2b: the {X} symbol in a cost. Contributes the chosen value
+  | -- | CR 107.3 / 601.2b: the {X} symbol in a cost. Contributes the chosen value
     -- of X once chosen (0 before, for the CR 601.2b castability floor and for a
     -- mana value off the stack, CR 202.3e).
     Variable

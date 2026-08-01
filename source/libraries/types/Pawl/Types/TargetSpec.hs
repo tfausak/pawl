@@ -3,7 +3,7 @@ module Pawl.Types.TargetSpec where
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.Pool (Pool)
 
--- What a target slot may hold: a closed Pool of candidate recipients (CR 115),
+-- | What a target slot may hold: a closed Pool of candidate recipients (CR 115),
 -- narrowed by an open Filter (Nothing = the whole pool, e.g. bare "target
 -- creature"). This retires the whole hand-carved family of colour- and
 -- type-restricted specs (#40): each is now one data value.

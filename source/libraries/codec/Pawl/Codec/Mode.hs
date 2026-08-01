@@ -6,7 +6,7 @@ import qualified Data.Text as Text
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Optionality as Optionality
-import Pawl.Codec.TargetSpec (jsonToTargetSpecs, targetSpecsToJson)
+import qualified Pawl.Codec.TargetSpec as TargetSpec
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Optionality as Optionality
@@ -15,7 +15,7 @@ modeToJson :: (card -> Value) -> Mode.Mode card -> Value
 modeToJson codec m =
   Json.jObject
     ( [ (Text.pack "effects", Json.seqTo (effectToJson codec) (Mode.effects m)),
-        (Text.pack "targetSpecs", targetSpecsToJson (Mode.targetSpecs m))
+        (Text.pack "targetSpecs", TargetSpec.toJsonMap (Mode.targetSpecs m))
       ]
         -- Omitted when Mandatory; see Optionality.fromJsonDefault.
         <> ( case Mode.optionality m of
@@ -28,6 +28,6 @@ jsonToMode :: (Value -> Either Text card) -> Value -> Either Text (Mode.Mode car
 jsonToMode decode value = do
   ps <- Json.asObject value
   es <- Json.field (Text.pack "effects") ps >>= Json.seqFrom (jsonToEffect decode)
-  ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
+  ts <- Json.field (Text.pack "targetSpecs") ps >>= TargetSpec.fromJsonMap
   o <- Optionality.fromJsonDefault (Json.getOpt (Text.pack "optionality") ps)
   pure (Mode.MkMode es ts o)

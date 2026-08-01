@@ -14,9 +14,9 @@ import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
-import Pawl.Codec.ObjectRef (jsonToObjectRef, objectRefToJson)
+import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Onset as Onset
-import Pawl.Codec.PhaseSelector (jsonToPhaseSelector, phaseSelectorToJson)
+import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import Pawl.Codec.PlayerEffect (jsonToPlayerEffect, playerEffectToJson)
 import qualified Pawl.Codec.PlayerRef as PlayerRef
@@ -36,7 +36,7 @@ import qualified Pawl.Types.Onset as Onset
 effectToJson :: (card -> Value) -> Effect.Effect card -> Value
 effectToJson codec e = case e of
   Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [SlotName.toJson s, quantityToJson q])))
-  Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, objectRefToJson r])))
+  Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, ObjectRef.toJson r])))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (SlotName.toJson s))
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (ManaProduction.toJson production))
   Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [Filter.toJson f, SearchDestination.toJson d])))
@@ -51,7 +51,7 @@ effectToJson codec e = case e of
   -- counting its sweep stays byte-for-byte as it was written.
   Effect.Destroy s r ms ->
     Json.tagged (Text.pack "Destroy") . Just . Array . MkArray $
-      [objectRefToJson s, Regenerability.toJson r] <> fmap SlotName.toJson (Maybe.maybeToList ms)
+      [ObjectRef.toJson s, Regenerability.toJson r] <> fmap SlotName.toJson (Maybe.maybeToList ms)
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (SlotName.toJson s))
   Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (SlotName.toJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (SlotName.toJson s))
@@ -84,13 +84,13 @@ effectToJson codec e = case e of
         <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [durationToJson d, Uses.toJson u, replacementEffectToJson re])))
-  Effect.SkipNextPhase r sel -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [PlayerRef.toJson r, phaseSelectorToJson sel])))
+  Effect.SkipNextPhase r sel -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [PlayerRef.toJson r, PhaseSelector.toJson sel])))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [counterKindToJson k, quantityToJson q, SlotName.toJson s])))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [PlayerRef.toJson r, PlayerCounterKind.toJson k, quantityToJson q])))
-  Effect.Tap r -> Json.tagged (Text.pack "Tap") (Just (objectRefToJson r))
-  Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
+  Effect.Tap r -> Json.tagged (Text.pack "Tap") (Just (ObjectRef.toJson r))
+  Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (ObjectRef.toJson r))
   Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (MkArray (fmap ExtraPhase.toJson ps))))
-  Effect.GainControl d r -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, objectRefToJson r])))
+  Effect.GainControl d r -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, ObjectRef.toJson r])))
   -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
   -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
   -- states a duration writes the two-element form. The ONSET is elided when it is CR 603.7a's default (the ability is armed the
@@ -110,7 +110,7 @@ effectToJson codec e = case e of
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (SlotName.toJson s))
   Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [SlotName.toJson s, Filter.toJson f])))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (SlotName.toJson s))
-  Effect.TakeExtraTurn r skips -> Json.tagged (Text.pack "TakeExtraTurn") (Just (Array (MkArray [PlayerRef.toJson r, Json.setTo phaseSelectorToJson skips])))
+  Effect.TakeExtraTurn r skips -> Json.tagged (Text.pack "TakeExtraTurn") (Just (Array (MkArray [PlayerRef.toJson r, Json.setTo PhaseSelector.toJson skips])))
 
 jsonToEffect :: (Value -> Either Text card) -> Value -> Either Text (Effect.Effect card)
 jsonToEffect decode value = do
@@ -120,7 +120,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [s, q])) -> Effect.DealDamage <$> SlotName.fromJson s <*> jsonToQuantity q
       _ -> Left (Text.pack "DealDamage expects [slot, quantity]")
     "ModifyTarget" -> case mv of
-      Just (Array (MkArray [d, m, r])) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToObjectRef r
+      Just (Array (MkArray [d, m, r])) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> ObjectRef.fromJson r
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, objectRef]")
     "ChangeText" -> Json.withValue mv (fmap Effect.ChangeText . SlotName.fromJson)
     "AddMana" -> Json.withValue mv (fmap Effect.AddMana . ManaProduction.fromJson)
@@ -136,8 +136,8 @@ jsonToEffect decode value = do
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> Json.withValue mv (fmap Effect.ControlPlayerNextTurn . SlotName.fromJson)
     "Destroy" -> case mv of
-      Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> Regenerability.fromJson rv <*> pure Nothing
-      Just (Array (MkArray [sv, rv, nv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> Regenerability.fromJson rv <*> (Just <$> SlotName.fromJson nv)
+      Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> ObjectRef.fromJson sv <*> Regenerability.fromJson rv <*> pure Nothing
+      Just (Array (MkArray [sv, rv, nv])) -> Effect.Destroy <$> ObjectRef.fromJson sv <*> Regenerability.fromJson rv <*> (Just <$> SlotName.fromJson nv)
       _ -> Left (Text.pack "Destroy expects [objectRef, regenerability], optionally with a slot")
     "Sacrifice" -> Json.withValue mv (fmap Effect.Sacrifice . SlotName.fromJson)
     "RemoveFromCombat" -> Json.withValue mv (fmap Effect.RemoveFromCombat . SlotName.fromJson)
@@ -191,7 +191,7 @@ jsonToEffect decode value = do
         pure (Effect.Replace duration uses effect)
       _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
     "SkipNextPhase" -> case mv of
-      Just (Array (MkArray [r, sel])) -> Effect.SkipNextPhase <$> PlayerRef.fromJson r <*> jsonToPhaseSelector sel
+      Just (Array (MkArray [r, sel])) -> Effect.SkipNextPhase <$> PlayerRef.fromJson r <*> PhaseSelector.fromJson sel
       _ -> Left (Text.pack "SkipNextPhase expects [playerRef, phaseSelector]")
     "PutCounters" -> case mv of
       Just (Array (MkArray [k, q, s])) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> SlotName.fromJson s
@@ -199,13 +199,13 @@ jsonToEffect decode value = do
     "GainPlayerCounters" -> case mv of
       Just (Array (MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> PlayerRef.fromJson r <*> PlayerCounterKind.fromJson k <*> jsonToQuantity q
       _ -> Left (Text.pack "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]")
-    "Tap" -> Json.withValue mv (fmap Effect.Tap . jsonToObjectRef)
-    "Untap" -> Json.withValue mv (fmap Effect.Untap . jsonToObjectRef)
+    "Tap" -> Json.withValue mv (fmap Effect.Tap . ObjectRef.fromJson)
+    "Untap" -> Json.withValue mv (fmap Effect.Untap . ObjectRef.fromJson)
     "AddPhases" -> case mv of
       Just (Array (MkArray ps)) -> Effect.AddPhases <$> traverse ExtraPhase.fromJson ps
       _ -> Left (Text.pack "AddPhases expects [ExtraPhase]")
     "GainControl" -> case mv of
-      Just (Array (MkArray [d, r])) -> Effect.GainControl <$> jsonToDuration d <*> jsonToObjectRef r
+      Just (Array (MkArray [d, r])) -> Effect.GainControl <$> jsonToDuration d <*> ObjectRef.fromJson r
       _ -> Left (Text.pack "GainControl expects [duration, objectRef]")
     "AffectPlayers" -> case mv of
       Just (Array (MkArray [d, s, pe])) -> Effect.AffectPlayers <$> jsonToDuration d <*> PlayerScope.fromJson s <*> jsonToPlayerEffect pe
@@ -219,6 +219,6 @@ jsonToEffect decode value = do
       _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
     "PlaySubgame" -> Json.withValue mv (fmap Effect.PlaySubgame . SlotName.fromJson)
     "TakeExtraTurn" -> case mv of
-      Just (Array (MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Json.setFrom jsonToPhaseSelector skips
+      Just (Array (MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Json.setFrom PhaseSelector.fromJson skips
       _ -> Left (Text.pack "TakeExtraTurn expects [playerRef, phaseSelectors]")
     _ -> Left (Text.pack "unknown Effect: " <> t)
