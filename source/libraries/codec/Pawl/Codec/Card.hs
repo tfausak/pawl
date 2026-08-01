@@ -19,6 +19,7 @@ import Pawl.Codec.BlockRequirement (blockRequirementToJson, jsonToBlockRequireme
 import Pawl.Codec.CastingPermission (castingPermissionToJson, jsonToCastingPermission)
 import Pawl.Codec.CastingRestriction (castingRestrictionToJson, jsonToCastingRestriction)
 import Pawl.Codec.Color (colorToJson, jsonToColor)
+import Pawl.Codec.CombatRestriction (combatRestrictionToJson, jsonToCombatRestriction)
 import Pawl.Codec.Cost (costToJson, jsonToCost)
 import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
 import Pawl.Codec.Counterability (counterabilityToJson, jsonToCounterabilityDefault)
@@ -90,6 +91,10 @@ cardToJson c =
                then []
                else [(Text.pack "attackRequirements", Json.listTo attackRequirementToJson (CardT.attackRequirements c))]
            )
+        <> ( if null (CardT.combatRestrictions c)
+               then []
+               else [(Text.pack "combatRestrictions", Json.listTo combatRestrictionToJson (CardT.combatRestrictions c))]
+           )
         <> ( if null (CardT.additionalCosts c)
                then []
                else [(Text.pack "additionalCosts", Json.listTo costComponentToJson (CardT.additionalCosts c))]
@@ -151,6 +156,7 @@ jsonToCard value = do
   playerAbilities <- Json.listFromDefault jsonToPlayerStaticAbility (Json.getOpt (Text.pack "playerAbilities") ps)
   blockRequirements <- Json.listFromDefault jsonToBlockRequirement (Json.getOpt (Text.pack "blockRequirements") ps)
   attackRequirements <- Json.listFromDefault jsonToAttackRequirement (Json.getOpt (Text.pack "attackRequirements") ps)
+  combatRestrictions <- Json.listFromDefault jsonToCombatRestriction (Json.getOpt (Text.pack "combatRestrictions") ps)
   additionalCosts <- Json.listFromDefault jsonToCostComponent (Json.getOpt (Text.pack "additionalCosts") ps)
   alternativeCosts <- Json.listFromDefault jsonToCost (Json.getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
@@ -179,6 +185,7 @@ jsonToCard value = do
         CardT.playerAbilities = playerAbilities,
         CardT.blockRequirements = blockRequirements,
         CardT.attackRequirements = attackRequirements,
+        CardT.combatRestrictions = combatRestrictions,
         CardT.additionalCosts = additionalCosts,
         CardT.alternativeCosts = alternativeCosts,
         CardT.mulliganAction = mulliganAction,

@@ -48,7 +48,7 @@ import Pawl.Types.ObjectId (ObjectId)
 -- there, CR 509.1b's restrictions are pairwise (flying, fear) and cannot be
 -- decided per blocker. Every attacking restriction pawl models today is per
 -- creature and already inside Pawl.Engine.Combat.canAttack, so the two collapse into
--- the one argument (#459).
+-- the one argument. A set-shaped restriction would break that (#533).
 instances :: [ObjectId] -> GameState -> Set ObjectId
 instances candidates gs =
   let -- Hoisted out of the walk exactly as Pawl.Engine.BlockRequirement.instances hoists

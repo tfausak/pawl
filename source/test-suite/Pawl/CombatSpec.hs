@@ -4,7 +4,8 @@
 -- Covers Pawl.Engine.Combat: attack/block legality, combat damage, and the combat
 -- keywords (flying, reach, defender, vigilance, haste, first/double strike).
 -- Also Pawl.Engine.BlockRequirement, whose only consumer is Pawl.Engine.Combat's CR 509.1c
--- check.
+-- check, and Pawl.Engine.CombatRestriction, whose only consumer is that module's CR
+-- 508.1c and CR 509.1b checks.
 module Pawl.CombatSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -1207,6 +1208,179 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
         Spec.assertEqWith s "and tapped" (tapStateOf a after) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have a creature"
 
+-- Put a Pacifism onto the battlefield under alice's control and attach it to
+-- `host`. Attaching directly is `luring`'s state-fixture posture, for the same
+-- reason -- Pawl.Engine.Cast can cast the Aura, but a combat fixture cannot reach a
+-- sorcery-speed cast mid-step -- and the printing is the real Pacifism.
+--
+-- The Aura's id comes back alongside the board, which `luring` and `cursing` do
+-- not need: one case below removes it to watch the restriction lift. alice
+-- controls it in every case, even when it sits on bob's blocker, and that never
+-- matters -- CR 508.1c and CR 509.1b ask the declaring player about their own
+-- creatures, not about whose ability is talking.
+pacifying :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+pacifying pacifism host gs =
+  let (aura, withAura) = S.addCreature pacifism S.alice gs
+   in (aura, S.attach aura host withAura)
+
+-- CR 508.1c and CR 509.1b, proved by Pacifism ("Enchanted creature can't attack
+-- or block") -- the pool's first printed combat RESTRICTION that is not CR
+-- 702.3b's defender keyword, and the first card that prints both sides of the
+-- pair at once.
+--
+-- A restriction is not a requirement turned around. CR 508.1d and CR 509.1c
+-- maximize over the requirements "that could be obeyed WITHOUT DISOBEYING ANY
+-- RESTRICTIONS", so a restriction bounds the maximization rather than competing
+-- with it; the two interaction cases below are what state that, and they are the
+-- cases a "requirements win" implementation gets wrong.
+combatRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
+  Spec.it s "CR 508.1c an enchanted creature can't attack, and the Piker beside it still can" $ do
+    -- Both creatures on ONE board, so a blanket "nothing may attack" bug cannot
+    -- pass: the restriction has to be narrow to the enchanted creature.
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker, piker] []
+    case mine of
+      [pacified, other] -> do
+        let board = snd (pacifying pacifism pacified gs)
+        Spec.assertBool s (not (Combat.canAttack S.alice pacified board)) "the enchanted creature cannot attack"
+        Spec.assertBool s (Combat.canAttack S.alice other board) "the one beside it can"
+        Spec.assertEqWith s "and only that one is offered" (Combat.legalAttackers S.alice board) [other]
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pacified] board)) "declaring the enchanted creature is illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [other] board) "declaring the other one is legal"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 509.1b an enchanted creature can't block either, and the Piker beside it still can" $ do
+    -- The other half of Pacifism's one line, on the other side of the combat
+    -- phase. CR 702.3b's defender is the contrast: that keyword stops an attack
+    -- and says nothing about blocking, so a restriction carrier that reused it
+    -- could not print this card.
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker, piker]
+    case (mine, theirs) of
+      (a : _, [pacified, other]) -> do
+        let board = snd (pacifying pacifism pacified gs)
+        Spec.assertBool s (not (Combat.canBlock S.bob pacified board)) "the enchanted creature cannot block"
+        Spec.assertBool s (Combat.canBlock S.bob other board) "the one beside it can"
+        Spec.assertEqWith s "and only that one is offered" (Combat.legalBlockers S.bob board) [other]
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton pacified a) board)) "blocking with the enchanted creature is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other a) board) "blocking with the other one is legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
+  Spec.it s "CR 604.2 the restriction lifts the moment the Aura leaves the battlefield" $ do
+    -- A restriction is gathered LIVE from the battlefield and never captured, the
+    -- posture Pawl.Types.BlockRequirement's header argues for a requirement -- so an
+    -- Aura leaving lifts it with nothing to unwind. Both worlds on ONE board, so
+    -- the pair cannot drift.
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] []
+    case mine of
+      [creature] -> do
+        let (aura, board) = pacifying pacifism creature gs
+            gone = S.runPure S.identityAnswer board (Event.changeZone aura Zone.Graveyard)
+        Spec.assertBool s (not (Combat.canAttack S.alice creature board)) "under the Aura it cannot attack"
+        Spec.assertBool s (Combat.canAttack S.alice creature gone) "with the Aura in the graveyard it can again"
+        -- The block half lifts on the same board. Asked of alice, who controls
+        -- the creature: CR 509.1a's chosen-from set is a controller question, not
+        -- a defending-player one, so canBlock answers it for either seat.
+        Spec.assertBool s (not (Combat.canBlock S.alice creature board)) "under the Aura it cannot block"
+        Spec.assertBool s (Combat.canBlock S.alice creature gone) "with the Aura in the graveyard it can again"
+      _ -> Spec.assertFailure s "fixture should have a creature"
+  Spec.it s "CR 508.1d a creature under BOTH a Curse and a Pacifism is not forced to attack" $ do
+    -- THE INTERACTION CASE. Curse of the Nightly Hunt requires the creature to
+    -- attack and Pacifism says it can't, and CR 508.1d settles it: the maximum is
+    -- over the requirements obeyable "without disobeying any restrictions", so a
+    -- creature that cannot attack carries no requirement instance and declining
+    -- becomes legal again. The third assertion is what discriminates that from
+    -- "the requirement was satisfied somehow" -- attacking with the creature is
+    -- still illegal, so it left the candidate list rather than obeying anything.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [piker] []
+    case mine of
+      [creature] -> do
+        let board = snd (pacifying pacifism creature gs)
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "without the Pacifism, declining is illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] board) "with it, declining is legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [creature] board)) "and attacking with it is illegal, requirement or no requirement"
+      _ -> Spec.assertFailure s "fixture should have a creature"
+  Spec.it s "CR 508.1d the same Curse still forces the creature the Pacifism does not touch" $ do
+    -- The control for the case above, and the reason it is not "requirements
+    -- stopped working": one Curse over two creatures is two requirements, the
+    -- Pacifism removes exactly one of them, and the maximum drops from two to
+    -- one rather than to zero.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [piker, piker] []
+    case mine of
+      [pacified, other] -> do
+        let board = snd (pacifying pacifism pacified gs)
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] board)) "declining is still illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [other] board) "the unenchanted creature alone attains the maximum"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pacified, other] board)) "and the enchanted one may not attack even to obey"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 509.1c a Lure does not require a Pacifism'd creature to block" $ do
+    -- The blocking-side twin of the interaction case, on CR 509.1c's identically
+    -- worded maximization. Both worlds on ONE board.
+    lure <- S.printingOf s registry "Lure"
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, theirs) = luring lure [piker] [piker]
+    case theirs of
+      [blocker] -> do
+        let board = snd (pacifying pacifism blocker gs)
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "without the Pacifism, declining to block is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty board) "with it, declining is legal"
+      _ -> Spec.assertFailure s "fixture should have one blocker"
+  Spec.it s "CR 303.4m a Pacifism that is not attached to anything restricts nothing" $ do
+    -- CR 303.4m reads the SOURCE's attachment, so an unattached Pacifism names no
+    -- creature and restricts none. The Aura stays ON the battlefield throughout,
+    -- so this is not a test that removing it works -- CR 704.5m would bury it, and
+    -- no state-based-action pass is run here.
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] []
+        withAura = snd (S.addCreature pacifism S.alice gs)
+    case mine of
+      [creature] -> Spec.assertBool s (Combat.canAttack S.alice creature withAura) "it may still attack"
+      _ -> Spec.assertFailure s "fixture should have a creature"
+  Spec.it s "CR 508.1c whole cards: a Pacifism'd creature sits out a real declare attackers step" $ do
+    -- The gameplay-level case, run through Engine.runStep -- the priority loop and
+    -- the CR 703.4i turn-based action, not a direct call -- with the interpreter
+    -- that attacks with everything it is offered. Both worlds asserted: without
+    -- the Aura both 2/1 Pikers connect for 4, with it only one connects for 2.
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker, piker] []
+    case mine of
+      [pacified, other] -> do
+        let board = snd (pacifying pacifism pacified gs)
+            after = S.runCombat S.aggressiveAnswer board
+            control = S.runCombat S.aggressiveAnswer gs
+        Spec.assertEqWith s "without the Aura, bob takes four" (S.lifeOf S.bob control) (Just 16)
+        Spec.assertEqWith s "with it, bob takes two" (S.lifeOf S.bob after) (Just 18)
+        Spec.assertEqWith s "and only the unenchanted Piker was ever declared" (S.attackerDeclarationsOf after) [other]
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 509.1b whole cards: a Pacifism'd creature sits out a real declare blockers step" $ do
+    -- The blocking-side gameplay case. Without the Aura the interpreter blocks and
+    -- the two 2/1s trade, so bob takes nothing; with it the block cannot happen and
+    -- the attacker connects.
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, theirs) = S.combatBoardOf [piker] [piker]
+    case theirs of
+      [blocker] -> do
+        let board = snd (pacifying pacifism blocker gs)
+            after = S.settleSba (S.runCombat S.aggressiveAnswer board)
+            control = S.settleSba (S.runCombat S.aggressiveAnswer gs)
+        Spec.assertEqWith s "without the Aura, the block happens and bob takes nothing" (S.lifeOf S.bob control) (Just 20)
+        Spec.assertEqWith s "with it, the attacker connects" (S.lifeOf S.bob after) (Just 18)
+        Spec.assertEqWith s "and bob's creature is alive, having blocked nothing" (S.creaturesInPlay S.bob after) 1
+      _ -> Spec.assertFailure s "fixture should have one blocker"
+
 vigilanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
   Spec.it s "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $ do
@@ -2279,6 +2453,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   evasionSpec s registry
   blockRequirementSpec s registry
   attackRequirementSpec s registry
+  combatRestrictionSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry
