@@ -725,6 +725,18 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "TargetSpec \"another\" (Not IsSource) round-trips" $
       let spec' = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]))
        in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
+    -- The ONE Pool arm with a payload (CR 400.1's per-player graveyard), which is
+    -- what turned poolToJson from a nullary table into a tagged one. Both
+    -- relations, because a decoder that hardcoded one of them -- the shape the
+    -- old nullary table would have invited -- round-trips perfectly if only that
+    -- one is tried.
+    Spec.it s "CR 115.2 clause (a) TargetSpec over a graveyard round-trips, relation and all" $
+      mapM_
+        ( \relation ->
+            let spec' = TargetSpec.MkTargetSpec (Pool.CardsInGraveyard relation) (Just (Filter.Type.HasCardType CardType.Creature))
+             in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
+        )
+        [PlayerRelation.You, PlayerRelation.Opponent]
   Spec.describe s "records" $ do
     Spec.it s "TypeLine" $
       roundTrip

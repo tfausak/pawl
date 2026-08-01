@@ -1,5 +1,7 @@
 module Pawl.Types.Pool where
 
+import Pawl.Types.PlayerRelation (PlayerRelation)
+
 -- CR 115: the closed set of recipient kinds a target slot may draw from, fixing
 -- both WHICH objects are candidates and HOW they are referenced
 -- (Recipient.ToCreature / ToPlaneswalker / ToPlayer / ToObject). Closed-half
@@ -42,4 +44,35 @@ data Pool
     -- enumerated here.
     Abilities
   | SpellsAndPermanents -- CR 115: spells on the stack + battlefield permanents (ToObject).
+  | -- CR 404.1: the cards in a graveyard (ToObject) -- Raise Dead's "target
+    -- creature card in your graveyard". CR 115.2's OTHER escape hatch, the one
+    -- Spells and Abilities above are not: "only permanents are legal targets for
+    -- spells and abilities, unless a spell or ability (a) SPECIFIES THAT IT CAN
+    -- TARGET AN OBJECT IN ANOTHER ZONE or a player, or (b) targets an object that
+    -- can't exist on the battlefield". Those two are clause (b), and Players is
+    -- already clause (a)'s "or a player" half; this is the first pool admitted by
+    -- clause (a)'s OTHER-ZONE half, and so the first that reaches past the
+    -- battlefield and the stack. (Those letters are prose inside rule 115.2, not
+    -- subrule numbers -- there is no CR 115.2a.)
+    --
+    -- ToObject, not ToCreature, because the candidates are CARDS: CR 109.2's
+    -- battlefield default ("doesn't refer to a specific zone or include the word
+    -- 'card' ... means a permanent of that card type ... on the battlefield")
+    -- does not apply to text that says the word outright. So "creature" here is a
+    -- Filter (HasCardType Creature) over an untagged card, exactly as it is for
+    -- Permanents, and the pool is DISJOINT from Creatures rather than a widening
+    -- of it -- the same relation Abilities has to Spells.
+    --
+    -- The PlayerRelation is the axis no battlefield pool needs and this one
+    -- cannot do without: CR 400.1 says "each player has their own library, hand,
+    -- and graveyard", so "your graveyard" (Raise Dead) and "an opponent's" are
+    -- different candidate sets. It cannot be pushed down into the Filter, because
+    -- CR 108.4 says "a card doesn't have a controller unless that card represents
+    -- a permanent or spell" -- so Filter.ControlledBy is vacuously False for
+    -- every card in every graveyard, and a pool that ignored whose graveyard it
+    -- was would offer the whole table's.
+    --
+    -- "Target creature card in A graveyard" -- every player's at once, which is
+    -- not a relation this type can spell -- is not authorable (#548).
+    CardsInGraveyard PlayerRelation
   deriving (Eq, Ord, Show)

@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -20,6 +21,8 @@ import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import Pawl.Types.Recipient (Recipient)
@@ -127,7 +130,7 @@ admittedGiven pcs perspective source spec gs =
       against view = case narrowing of
         Nothing -> True
         Just f -> Filter.matches context view f
-   in Set.filter keep (basePoolGiven pcs pool gs)
+   in Set.filter keep (basePoolGiven pcs context pool gs)
 
 -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
 -- player can't be the target of spells or abilities.'"
@@ -172,13 +175,19 @@ targetable pcs gs recipient = case Recipient.objectOf recipient of
       )
 
 -- The closed part: build the pool's base recipient set over zones, tagging each
--- candidate with how it is referenced (CR 115). The per-zone member expressions
--- are exactly those the old per-constructor arms used.
-basePool :: Pool.Pool -> GameState -> Set Recipient
-basePool pool gs = basePoolGiven (Projection.projectAll gs) pool gs
-
-basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Pool.Pool -> GameState -> Set Recipient
-basePoolGiven pcs pool gs = case pool of
+-- candidate with how it is referenced (CR 115). Each arm is one of the
+-- per-recipient builders below and nothing else.
+--
+-- The Context is the SAME one the Filter is matched against, and only the
+-- graveyard arm reads it: CR 400.1's per-player zones make a pool that names one
+-- have to say whose, and the Context's perspective is what answers. CR 109.5 is
+-- why that is the right frame -- "the words 'you' and 'your' on an object refer
+-- to the object's controller, its WOULD-BE CONTROLLER (if a player is attempting
+-- to play, cast, or activate it)" -- which is the player CR 601.2c has choosing
+-- targets. Every battlefield and stack arm ignores it, because those zones are
+-- shared by all players (CR 400.1 again).
+basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Filter.Context -> Pool.Pool -> GameState -> Set Recipient
+basePoolGiven pcs context pool gs = case pool of
   Pool.Creatures -> creatureRecipientsGiven pcs gs
   Pool.Players -> playerRecipients gs
   Pool.AnyTarget ->
@@ -191,6 +200,7 @@ basePoolGiven pcs pool gs = case pool of
   Pool.Spells -> spellRecipients gs
   Pool.Abilities -> abilityRecipients gs
   Pool.SpellsAndPermanents -> Set.union (spellRecipients gs) (permanentRecipients gs)
+  Pool.CardsInGraveyard relation -> graveyardRecipients context relation gs
 
 -- CR 115.1a: creatures on the battlefield, per playing player's zone, tagged
 -- ToCreature. Reads Projection.isCreatureOf so a permanent made a creature by the
@@ -262,6 +272,40 @@ spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game
 -- those rules -- see Pawl.Types.Pool.Abilities.
 abilityRecipients :: GameState -> Set Recipient
 abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game.isAbility oid gs) (GameState.stack gs)))
+
+-- CR 404.1: the cards in the graveyards the relation names, tagged ToObject --
+-- Raise Dead's "target creature card in your graveyard". CR 115.2's clause (a),
+-- "a spell or ability ... specifies that it can target an object in another
+-- zone" -- its OTHER-ZONE half, since playerRecipients above is already the "or a
+-- player" one -- and so the first pool that leaves the battlefield and the stack
+-- behind.
+--
+-- ToObject, like permanentRecipients and unlike creatureRecipients, because the
+-- candidates are CARDS: CR 109.2's battlefield default is switched off by the
+-- card's own word "card", so "creature" is a Filter over an untagged card here.
+-- Game.zoneMembers Zone.Graveyard is per-OWNER (CR 400.3 sends every card to its
+-- owner's graveyard, so a graveyard holds nothing else), which is what makes the
+-- relation answerable at all -- CR 108.4 gives a card in a graveyard no
+-- controller to ask about.
+--
+-- Whose graveyard is Count.playersFor's answer rather than a second reading of
+-- CR 109.5 written here: that function is where PlayerRelation.Opponent's CR
+-- 806.1 free-for-all argument lives, and its own haddock warns that two readings
+-- of the same relation must not disagree. Wrapped in PlayerRef.Relative, which is
+-- the arm it answers for; the pool's axis is deliberately narrower than a full
+-- PlayerRef (#548).
+--
+-- Nothing -> empty, which is Count.playersFor's report of an absent perspective
+-- (CR 109.5's "you" with nobody to be) -- the vacuous posture every
+-- player-referencing Filter atom already takes.
+graveyardRecipients :: Filter.Context -> PlayerRelation.PlayerRelation -> GameState -> Set Recipient
+graveyardRecipients context relation gs =
+  case Count.playersFor context gs (PlayerRef.Relative relation) of
+    Nothing -> Set.empty
+    Just pids ->
+      Set.fromList
+        . fmap Recipient.ToObject
+        $ concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) pids
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
