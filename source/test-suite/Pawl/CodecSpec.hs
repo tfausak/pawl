@@ -219,6 +219,14 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "Keyword.Shroud" $ do
       roundTrip s "shroud" keywordToJson jsonToKeyword Keyword.Shroud
       Spec.assertBool s (keywordToJson Keyword.Shroud /= keywordToJson Keyword.Trample) "shroud is not trample"
+    -- CR 702.11b's hexproof is nullary too, and the tag it must not share is
+    -- SHROUD's: the two restrictions differ only in whether the candidate's own
+    -- controller is stopped, so a Slippery Bogle that decoded as shroud would be
+    -- untargetable by its own controller and every other assertion about it would
+    -- still hold.
+    Spec.it s "Keyword.Hexproof" $ do
+      roundTrip s "hexproof" keywordToJson jsonToKeyword Keyword.Hexproof
+      Spec.assertBool s (keywordToJson Keyword.Hexproof /= keywordToJson Keyword.Shroud) "hexproof is not shroud"
     -- CR 702.164a's N rides the constructor, so this is the first keyword
     -- that is not a bare tag.
     Spec.it s "Keyword.Toxic carries its N" $ do

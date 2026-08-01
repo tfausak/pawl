@@ -34,7 +34,8 @@ import qualified Pawl.Types.Zone as Zone
 
 -- CR 115: a target slot's legal recipients -- the set its spec admits
 -- (admittedRecipients below), less every candidate rule 702 forbids TARGETING
--- (targetable below, where shroud and the restrictions after it live).
+-- (targetable below, where shroud, hexproof and the restrictions after them
+-- live).
 --
 -- The two frames are SEPARATE, and keeping them apart is the whole point:
 --
@@ -69,7 +70,7 @@ legalRecipients perspective source spec gs =
   -- The SAME thunk both halves read, so the whole-board projection is still
   -- taken at most once per slot (admittedGiven's own note).
   let pcs = Projection.projectAll gs
-   in Set.filter (targetable pcs gs) (admittedGiven pcs perspective source spec gs)
+   in Set.filter (targetable pcs perspective gs) (admittedGiven pcs perspective source spec gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures and
@@ -135,17 +136,32 @@ admittedGiven pcs perspective source spec gs =
 -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
 -- player can't be the target of spells or abilities.'"
 --
--- THE targeting-restriction gate -- the pool's first, and the one every
--- restriction rule 702 states lands in. It is asked of a candidate the spec has
--- already admitted, and it answers with CR 101.2's "can't": what it rejects is
--- gone, so no Filter can put it back. Both of CR 115's moments route through
--- legalRecipients -- CR 601.2c's choosing and CR 608.2b's re-validation -- so
--- neither needs a clause of its own here.
+-- CR 702.11b: "'Hexproof' on a permanent means 'This permanent can't be the
+-- target of spells or abilities your opponents control.'"
 --
--- MEMBERSHIP, never the projection's per-keyword count, which is CR 702.18b:
--- "Multiple instances of shroud on the same permanent or player are redundant."
--- The POST-layer keywords, like every other keyword reader, so a shroud granted
--- at layer 6 restricts and a Humility'd Blurred Mongoose does not.
+-- THE targeting-restriction gate -- the one every restriction rule 702 states
+-- lands in. It is asked of a candidate the spec has already admitted, and it
+-- answers with CR 101.2's "can't": what it rejects is gone, so no Filter can put
+-- it back. Both of CR 115's moments route through legalRecipients -- CR 601.2c's
+-- choosing and CR 608.2b's re-validation -- so neither needs a clause of its own
+-- here.
+--
+-- The two restrictions differ in ONE thing, and it is the whole reason they are
+-- separate keywords rather than one keyword with a field: shroud names no
+-- player, so it stops the permanent's own controller as readily as anyone else,
+-- while hexproof's "your opponents control" makes the answer depend on WHO is
+-- aiming the spell or ability. `perspective` is that player -- CR 109.5's "you",
+-- the same value legalRecipients hands the Filter -- and rule 702.11b's "your"
+-- is the CANDIDATE's controller, which CR 109.5 fixes for a static ability as
+-- "the current controller of the object it's on". opponentOfController below is
+-- that comparison.
+--
+-- MEMBERSHIP, never the projection's per-keyword count, which both rules say
+-- outright: CR 702.18b ("multiple instances of shroud on the same permanent or
+-- player are redundant") and CR 702.11h ("multiple instances of the same
+-- hexproof ability on the same permanent or player are redundant"). The
+-- POST-layer keywords, like every other keyword reader, so a hexproof granted at
+-- layer 6 restricts and a Humility'd Slippery Bogle does not.
 --
 -- The battlefield conjunct is CR 113.6: "Abilities of an instant or sorcery
 -- spell usually function only while that object is on the stack. Abilities of
@@ -156,23 +172,48 @@ admittedGiven pcs perspective source spec gs =
 -- carries the card's printed keywords. (It also short-circuits `pcs` for a slot
 -- whose candidates are all off the battlefield.)
 --
--- The restrictions after this one widen this function and nothing else. Hexproof
--- (CR 702.11b, "spells or abilities your opponents control") needs the targeting
--- player and the candidate's controller; protection (CR 702.16b, "spells with
--- the stated quality") needs the source's characteristics. legalRecipients
--- already holds `perspective` and `source`, and `pcs` already holds every
--- projected object, so each is an argument added here rather than a new seam.
+-- The restrictions after these two widen this function and nothing else.
+-- Protection (CR 702.16b, "spells with the stated quality") needs the SOURCE's
+-- characteristics, which legalRecipients already holds; CR 702.11d's "hexproof
+-- from [quality]" is that same reader rather than a payload on this arm (#555).
 --
--- CR 702.18a's "or player" half is NOT implemented: a player in this engine has
--- no keywords to read, so a player candidate is always targetable (#518).
-targetable :: Map ObjectId PC.ProjectedCharacteristics -> GameState -> Recipient -> Bool
-targetable pcs gs recipient = case Recipient.objectOf recipient of
+-- CR 702.18a's "or player" half is NOT implemented, and neither is CR 702.11c's
+-- ("'Hexproof' on a player means 'You can't be the target of spells or abilities
+-- your opponents control'"): a player in this engine has no keywords to read, so
+-- a player candidate is always targetable (#518).
+targetable :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> GameState -> Recipient -> Bool
+targetable pcs perspective gs recipient = case Recipient.objectOf recipient of
   Nothing -> True
   Just oid ->
-    not
-      ( Set.member oid (GameState.battlefield gs)
-          && Projection.hasKeywordGiven pcs Keyword.Shroud oid gs
-      )
+    let has keyword = Projection.hasKeywordGiven pcs keyword oid gs
+        restricted =
+          has Keyword.Shroud
+            || (has Keyword.Hexproof && opponentOfController perspective oid gs)
+     in not (Set.member oid (GameState.battlefield gs) && restricted)
+
+-- CR 702.11b's "your opponents": is `perspective` -- CR 109.5's "you" for the
+-- spell or ability being aimed -- someone other than `oid`'s controller?
+--
+-- Every other player is an opponent by construction (CR 806.1). CR 102.3 makes a
+-- TEAMMATE not an opponent, which is the only reading this is wrong for, and
+-- pawl has no teams -- the same argument Count.playersFor's
+-- PlayerRelation.Opponent arm carries and Filter.matches repeats, phrased the
+-- same way on purpose.
+--
+-- Projection.controllerOf and not the grant list admittedGiven hoists: this is
+-- asked only of a candidate that already HAS hexproof, which the `&&` above
+-- guarantees and which is no candidate at all on almost every board. Threading
+-- that list through is the fix if one ever makes the rebuild matter.
+--
+-- Nothing either way is False, the vacuous posture every player-referencing
+-- question here already takes (see legalRecipients): a question with no "you" in
+-- it names no opponent, and neither does a candidate with no controller -- which
+-- CR 110.2's last sentence ("every permanent has a controller") makes
+-- unreachable for the battlefield candidates the caller above asks about.
+opponentOfController :: Maybe PlayerId -> ObjectId -> GameState -> Bool
+opponentOfController perspective oid gs = case (perspective, Projection.controllerOf oid gs) of
+  (Just you, Just controller) -> you /= controller
+  _ -> False
 
 -- The closed part: build the pool's base recipient set over zones, tagging each
 -- candidate with how it is referenced (CR 115). Each arm is one of the
