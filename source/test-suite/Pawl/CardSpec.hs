@@ -1269,7 +1269,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
   -- Unsummon's effect exactly, over a different pool: the same MoveToZone to the
   -- hand, so the whole card is its target spec. CR 115.2's clause (a) admits it
   -- ("specifies that it can target an object in another zone"), CR 400.1 is why
-  -- the pool carries a relation, and CR 109.2's default is switched off by the
+  -- the pool carries a scope, and CR 109.2's default is switched off by the
   -- printed word "card" -- which is why the creature-ness is a Filter over a
   -- ToObject candidate rather than a Pool.Creatures slot.
   Spec.it s "Raise Dead is a {B} Sorcery returning a creature card from your graveyard to your hand" $ do
@@ -1284,7 +1284,42 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
       s
       "one creature-card-in-your-graveyard slot"
       (Card.allTargetSpecs c)
-      (Map.singleton target (TargetSpec.MkTargetSpec (Pool.CardsInGraveyard PlayerRelation.You) (Just (Filter.Type.HasCardType CardType.Creature))))
+      (Map.singleton target (TargetSpec.MkTargetSpec (Pool.CardsInGraveyard PlayerScope.You) (Just (Filter.Type.HasCardType CardType.Creature))))
+  -- Raise Dead's pool, on the OTHER end of CR 400.1's axis and with no Filter at
+  -- all: "{1}: Exile target card from a graveyard" says neither whose graveyard
+  -- nor what kind of card, so the scope is EachPlayer and the Filter is Nothing.
+  -- Both absences are asserted, because either one written in by mistake would
+  -- narrow the card without changing anything else about it.
+  Spec.it s "Withered Wretch is a {B}{B} Zombie Cleric exiling any card from any graveyard" $ do
+    wretch <- S.printingOf s registry "Withered Wretch"
+    let c = Printing.card wretch
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [black, black]))
+    Spec.assertEqWith
+      s
+      "a Zombie Cleric (CR 205.3m)"
+      (TypeLine.subtypes (Card.Type.typeLine c))
+      (Set.fromList [Subtype.Zombie, Subtype.Cleric])
+    Spec.assertEqWith s "the spell itself does nothing (a vanilla creature spell)" (Card.allEffects c) []
+    case Card.Type.activatedAbilities c of
+      [ability] -> do
+        Spec.assertEqWith
+          s
+          "one ability, costing {1} and nothing else"
+          (ActivatedAbility.cost ability)
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
+        Spec.assertEqWith
+          s
+          "which exiles the target (CR 406.2)"
+          (Modal.allEffects (ActivatedAbility.modal ability))
+          [Effect.MoveToZone target Zone.Exile defaultEntryRiders Nothing]
+        Spec.assertEqWith
+          s
+          "off one unfiltered any-graveyard slot"
+          (Modal.allTargetSpecs (ActivatedAbility.modal ability))
+          (Map.singleton target (TargetSpec.MkTargetSpec (Pool.CardsInGraveyard PlayerScope.EachPlayer) Nothing))
+      abilities -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abilities))
   -- Three modifications on ONE target, in printed order. Spelled out rather
   -- than spot-checked because the toxic 1 grant is what makes this card the
   -- CR 702.164b proof in DamageSpec: a card that granted toxic 2 by mistake

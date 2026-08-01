@@ -62,6 +62,32 @@ inScope pid controller scope = case scope of
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True
 
+-- The same scope as a SET rather than as a membership test -- CR 400.1's "each
+-- player has their own library, hand, and graveyard" asked in the direction a
+-- zone fold needs it (Pawl.Engine.Target.graveyardRecipients). Built ON inScope
+-- rather than beside it, so there is exactly one reading of what a PlayerScope
+-- names; Pawl.Engine.Count.playersFor's own haddock is where the cost of two
+-- readings disagreeing is written down.
+--
+-- CR 102.1: "A player is one of the people in the game." A player who has left
+-- keeps their row in GameState.players -- Player.status turns Departed, the key
+-- stays -- so the fold is over Game.stillPlaying rather than the map's keys, and
+-- no scope names a departed seat. That is playersFor's rule, honoured here for
+-- the same reason.
+--
+-- Nothing is an ABSENT perspective, which is CR 109.5's "you" with nobody to be
+-- -- the vacuous posture every player-referencing Filter atom takes. EachPlayer
+-- is answerable anyway, because it never asks the perspective a question: "target
+-- card in a graveyard" names the whole table whoever is reading it.
+playersInScope :: Maybe PlayerId -> GameState -> PlayerScope -> Maybe [PlayerId]
+playersInScope perspective gs scope =
+  let everyone = Game.stillPlaying gs
+      relative = fmap (\you -> filter (\pid -> inScope pid you scope) everyone) perspective
+   in case scope of
+        PlayerScope.You -> relative
+        PlayerScope.Opponents -> relative
+        PlayerScope.EachPlayer -> Just everyone
+
 -- CR 604.2: every player effect applying to `pid` right now. Gathered LIVE from
 -- the battlefield on every read and never captured, the same posture
 -- Projection.gather takes for staticAbilities -- which is why Rule of Law

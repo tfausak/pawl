@@ -4,14 +4,18 @@ module Pawl.Codec.Pool where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
+import Pawl.Codec.PlayerScope (jsonToPlayerScope, playerScopeToJson)
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.Pool as Pool
 
 -- Tagged rather than nullary-only, because CR 400.1's per-player graveyard makes
--- one arm carry a payload: the PlayerRelation saying whose. The nullary arms keep
+-- one arm carry a payload: the PlayerScope saying whose. The nullary arms keep
 -- emitting exactly what they did, since Json.nullary IS Json.tagged with no
 -- value, so no committed card file changes shape.
+--
+-- The payload widened from a PlayerRelation to a PlayerScope and no committed
+-- file moved either: both types spell their shared arm "You", which is the only
+-- one any card had written.
 poolToJson :: Pool.Pool -> Value
 poolToJson p = case p of
   Pool.Creatures -> Json.nullary (Text.pack "Creatures")
@@ -21,7 +25,7 @@ poolToJson p = case p of
   Pool.Spells -> Json.nullary (Text.pack "Spells")
   Pool.Abilities -> Json.nullary (Text.pack "Abilities")
   Pool.SpellsAndPermanents -> Json.nullary (Text.pack "SpellsAndPermanents")
-  Pool.CardsInGraveyard r -> Json.tagged (Text.pack "CardsInGraveyard") (Just (playerRelationToJson r))
+  Pool.CardsInGraveyard scope -> Json.tagged (Text.pack "CardsInGraveyard") (Just (playerScopeToJson scope))
 
 jsonToPool :: Value -> Either Text Pool.Pool
 jsonToPool value = do
@@ -37,5 +41,5 @@ jsonToPool value = do
     -- Json.withValue, not a `Just v` pattern with a fallthrough: a
     -- CardsInGraveyard with no value is a MALFORMED known constructor, and the
     -- fallthrough would report it as an unknown one.
-    ("CardsInGraveyard", _) -> Json.withValue mv (fmap Pool.CardsInGraveyard . jsonToPlayerRelation)
+    ("CardsInGraveyard", _) -> Json.withValue mv (fmap Pool.CardsInGraveyard . jsonToPlayerScope)
     _ -> Left (Text.pack "unknown Pool: " <> t)

@@ -1,0 +1,111 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 1
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "MoveToZone",
+                "value": [
+                  "target",
+                  {
+                    "type": "Exile"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "CardsInGraveyard",
+                    "value": {
+                      "type": "EachPlayer"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Withered Wretch",
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Zombie"
+      },
+      {
+        "type": "Cleric"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}
