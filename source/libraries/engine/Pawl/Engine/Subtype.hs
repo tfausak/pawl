@@ -104,3 +104,5 @@ isLandType subtype = case subtype of
   -- worth saying out loud for the same reason Wraith is: the Towershell prints
   -- ISLANDWALK, and the land type its keyword names is Island rather than this.
   Subtype.Turtle -> False
+  -- CR 205.3m: a creature type (Blurred Mongoose's).
+  Subtype.Mongoose -> False

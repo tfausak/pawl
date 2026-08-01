@@ -110,4 +110,6 @@ data Subtype
     Golem
   | -- CR 205.3m (a creature type; Meandering Towershell's).
     Turtle
+  | -- CR 205.3m (a creature type; Blurred Mongoose's).
+    Mongoose
   deriving (Eq, Ord, Show)

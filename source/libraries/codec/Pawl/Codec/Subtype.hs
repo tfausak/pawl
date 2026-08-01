@@ -70,6 +70,7 @@ subtypeToJson s = Json.nullary . Text.pack $ case s of
   Subtype.Wraith -> "Wraith"
   Subtype.Golem -> "Golem"
   Subtype.Turtle -> "Turtle"
+  Subtype.Mongoose -> "Mongoose"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -134,7 +135,8 @@ jsonToSubtype =
       (Text.pack "Jace", Subtype.Jace),
       (Text.pack "Wraith", Subtype.Wraith),
       (Text.pack "Golem", Subtype.Golem),
-      (Text.pack "Turtle", Subtype.Turtle)
+      (Text.pack "Turtle", Subtype.Turtle),
+      (Text.pack "Mongoose", Subtype.Mongoose)
     ]
 
 jsonToSubtypePair :: Value -> Either Text (Subtype.Subtype, Subtype.Subtype)

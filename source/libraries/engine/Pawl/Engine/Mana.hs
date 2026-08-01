@@ -155,6 +155,7 @@ subtypeMana subtype = case subtype of
   -- type, so CR 305.6's intrinsic mana ability never applies to it.
   Subtype.Golem -> Nothing
   Subtype.Turtle -> Nothing
+  Subtype.Mongoose -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an

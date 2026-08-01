@@ -62,6 +62,19 @@ data Keyword
     -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
     Landwalk Subtype
   | Reach -- 702.17
+  | -- 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
+    -- player can't be the target of spells or abilities.'"
+    --
+    -- The pool's first TARGETING RESTRICTION, and so far the only keyword the CR
+    -- 115 target-legality gate reads -- Pawl.Engine.Target.targetable, which is
+    -- where every restriction rule 702 states lands.
+    --
+    -- Nullary, because rule 702.18a takes no parameter. It is neither hexproof's
+    -- "your opponents control" (702.11b) nor protection's stated quality
+    -- (702.16a), and that those two ask about the targeting player and the
+    -- source respectively is exactly why they are separate keywords rather than
+    -- fields here.
+    Shroud
   | Trample -- 702.19
   | Vigilance -- 702.20
   | -- 702.29a: "Cycling is an activated ability that functions only while the

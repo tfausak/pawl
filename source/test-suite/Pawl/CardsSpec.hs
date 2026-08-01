@@ -32,6 +32,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -186,6 +187,27 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 3)))
     Spec.assertEqWith s "Creature -- Wraith" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Wraith)
     Spec.assertEqWith s "one keyword: swampwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk Subtype.Swamp))
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file to carry BOTH a keyword and a counterability, and the
+  -- first whose CR 113.6g clause sits on a creature rather than an instant
+  -- (Rending Volley's). The two clauses are separate fields because they are
+  -- separate rules: CR 113.6g's "can't be countered" functions on the stack and
+  -- grants no targeting immunity, while CR 702.18a's shroud functions on the
+  -- battlefield and grants nothing else.
+  Spec.it s "blurred-mongoose.json loads as a {1}{G} 2/1 Mongoose that is uncounterable and has shroud" $ do
+    c <- S.cardOf s registry "Blurred Mongoose"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Blurred Mongoose")
+    Spec.assertEqWith
+      s
+      "{1}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 2)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 1)))
+    Spec.assertEqWith s "Creature -- Mongoose" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Mongoose)
+    Spec.assertEqWith s "one keyword: shroud" (CardT.keywords c) (Set.singleton Keyword.Shroud)
+    Spec.assertEqWith s "CR 113.6g: this spell can't be countered" (CardT.counterability c) Counterability.CantBeCountered
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
   -- The first card file whose keyword carries a payload that is not a

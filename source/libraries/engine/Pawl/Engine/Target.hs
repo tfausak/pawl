@@ -13,6 +13,7 @@ import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.Card (Card)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
@@ -28,13 +29,9 @@ import Pawl.Types.TargetSpec (TargetSpec)
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
--- CR 115: a target slot's legal recipients are its Pool's base candidate set
--- (CR 115.4's "any target" is creatures and planeswalkers on the battlefield plus
--- players still in the game; the battles that rule also names are not admitted,
--- #302) narrowed by its Filter (a
--- bare "target creature" carries Nothing and narrows nothing). No restriction
--- (protection, hexproof, shroud) exists in the pool -- this function is where
--- they will all land.
+-- CR 115: a target slot's legal recipients -- the set its spec admits
+-- (admittedRecipients below), less every candidate rule 702 forbids TARGETING
+-- (targetable below, where shroud and the restrictions after it live).
 --
 -- The two frames are SEPARATE, and keeping them apart is the whole point:
 --
@@ -66,7 +63,40 @@ import qualified Pawl.Types.Zone as Zone
 -- vacuously False.
 legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
 legalRecipients perspective source spec gs =
-  let TargetSpec.MkTargetSpec pool restriction = spec
+  -- The SAME thunk both halves read, so the whole-board projection is still
+  -- taken at most once per slot (admittedGiven's own note).
+  let pcs = Projection.projectAll gs
+   in Set.filter (targetable pcs gs) (admittedGiven pcs perspective source spec gs)
+
+-- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
+-- Pool's base candidate set (CR 115.4's "any target" is creatures and
+-- planeswalkers on the battlefield plus players still in the game; the battles
+-- that rule also names are not admitted, #302) narrowed by its Filter (a bare
+-- "target creature" carries Nothing and narrows nothing). Rule 702's targeting
+-- restrictions are NOT applied.
+--
+-- Separate from legalRecipients because "can't be the target of" and "is an
+-- illegal object to be attached to" are different questions, and rule 702 says
+-- so itself. Protection states both halves, separately: CR 702.16b for targeting
+-- and CR 702.16c for attachment ("can't be enchanted by Auras that have the
+-- stated quality. Such Auras attached to the permanent ... will be put into
+-- their owners' graveyards as a state-based action"). Shroud (CR 702.18) and
+-- hexproof (CR 702.11) state only the first, so an Aura already attached to a
+-- permanent that has shroud stays attached, and Resolve.attachmentFor may move
+-- one onto it.
+--
+-- Hence the two callers here rather than at legalRecipients:
+-- Sba.stillLegalEnchant's general path (CR 303.4c's "illegal object ... as
+-- defined by its enchant ability and other applicable effects") and
+-- Resolve.attachmentFor (CR 701.3a's "can't be attached to an object or player
+-- it couldn't enchant"). Both ask what the enchant SPEC admits; neither is a
+-- player choosing a target.
+admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
+admittedRecipients perspective source spec gs = admittedGiven (Projection.projectAll gs) perspective source spec gs
+
+admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
+admittedGiven pcs perspective source spec gs =
+  let TargetSpec.MkTargetSpec pool narrowing = spec
       context = Filter.MkContext perspective (Just source)
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
@@ -77,10 +107,12 @@ legalRecipients perspective source spec gs =
       -- snapshot argument is at Projection.projectGiven, and holds here because
       -- this is a pure function of one GameState.
       --
+      -- `pcs` is the CALLER's thunk so that legalRecipients' restriction pass and
+      -- this admission pass share one projection rather than taking two.
+      --
       -- Thunks, so a slot that asks neither question pays for neither: a
-      -- Pool.Players or Pool.Permanents spec with no Filter forces neither, which
-      -- is what it cost before.
-      pcs = Projection.projectAll gs
+      -- Pool.Players spec with no Filter forces neither, which is what it cost
+      -- before.
       grants = Projection.controlGrants gs
       keep recipient = case recipient of
         -- CR 115.1: a player candidate is narrowed too ("target opponent"), by a
@@ -92,10 +124,52 @@ legalRecipients perspective source spec gs =
         Recipient.ToCreature oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToPlaneswalker oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToObject oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
-      against view = case restriction of
+      against view = case narrowing of
         Nothing -> True
         Just f -> Filter.matches context view f
    in Set.filter keep (basePoolGiven pcs pool gs)
+
+-- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
+-- player can't be the target of spells or abilities.'"
+--
+-- THE targeting-restriction gate -- the pool's first, and the one every
+-- restriction rule 702 states lands in. It is asked of a candidate the spec has
+-- already admitted, and it answers with CR 101.2's "can't": what it rejects is
+-- gone, so no Filter can put it back. Both of CR 115's moments route through
+-- legalRecipients -- CR 601.2c's choosing and CR 608.2b's re-validation -- so
+-- neither needs a clause of its own here.
+--
+-- MEMBERSHIP, never the projection's per-keyword count, which is CR 702.18b:
+-- "Multiple instances of shroud on the same permanent or player are redundant."
+-- The POST-layer keywords, like every other keyword reader, so a shroud granted
+-- at layer 6 restricts and a Humility'd Blurred Mongoose does not.
+--
+-- The battlefield conjunct is CR 113.6: "Abilities of an instant or sorcery
+-- spell usually function only while that object is on the stack. Abilities of
+-- all other objects usually function only while that object is on the
+-- battlefield." Shroud is printed on a creature card, so a Blurred Mongoose
+-- SPELL has none and Cancel may target it. That is load-bearing rather than
+-- defensive: Pool.Spells tags a stack object ToObject, and its projection still
+-- carries the card's printed keywords. (It also short-circuits `pcs` for a slot
+-- whose candidates are all off the battlefield.)
+--
+-- The restrictions after this one widen this function and nothing else. Hexproof
+-- (CR 702.11b, "spells or abilities your opponents control") needs the targeting
+-- player and the candidate's controller; protection (CR 702.16b, "spells with
+-- the stated quality") needs the source's characteristics. legalRecipients
+-- already holds `perspective` and `source`, and `pcs` already holds every
+-- projected object, so each is an argument added here rather than a new seam.
+--
+-- CR 702.18a's "or player" half is NOT implemented: a player in this engine has
+-- no keywords to read, so a player candidate is always targetable (#518).
+targetable :: Map ObjectId PC.ProjectedCharacteristics -> GameState -> Recipient -> Bool
+targetable pcs gs recipient = case Recipient.objectOf recipient of
+  Nothing -> True
+  Just oid ->
+    not
+      ( Set.member oid (GameState.battlefield gs)
+          && Projection.hasKeywordGiven pcs Keyword.Shroud oid gs
+      )
 
 -- The closed part: build the pool's base recipient set over zones, tagging each
 -- candidate with how it is referenced (CR 115). The per-zone member expressions
@@ -173,6 +247,12 @@ spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game
 -- otherwise re-judged against the spec in the current state.
 stillLegal :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
 stillLegal perspective source recipient spec gs = Set.member recipient (legalRecipients perspective source spec gs)
+
+-- CR 303.4c: is `recipient` still one the spec ADMITS -- the same membership
+-- question stillLegal asks, minus rule 702's targeting restrictions. See
+-- admittedRecipients for why an attached Aura is not asked a targeting question.
+stillAdmitted :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
+stillAdmitted perspective source recipient spec gs = Set.member recipient (admittedRecipients perspective source spec gs)
 
 -- One legal set per named slot; casting prompts with exactly this map. `source`
 -- is the object the targeting is relative to -- the spell object at cast, the

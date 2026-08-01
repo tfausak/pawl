@@ -742,10 +742,14 @@ cease abilId gs =
 -- legally be attached to anything that isn't a creature."
 --
 -- Aura: CR 303.4, "what an Aura can be attached to is defined by its enchant
--- keyword ability" -- so this asks the Aura's own enchant spec the question CR
--- 608.2b asks of a target, through Target.legalRecipients rather than a
--- hand-rolled creature test, which is what makes an enchant spec that narrows
--- further (a colour, a controller) honoured here for free. CR 109.5's "you" on
+-- keyword ability" -- so this asks the Aura's own enchant spec which recipients
+-- it ADMITS, through Target.admittedRecipients rather than a hand-rolled
+-- creature test, which is what makes an enchant spec that narrows further (a
+-- colour, a controller) honoured here for free. Admission and not target
+-- legality: CR 702.5a says the enchant ability "restricts what an Aura spell can
+-- target AND what an Aura can enchant", and this is the second of those, so rule
+-- 702's targeting restrictions (CR 702.18a's shroud is the first) do not reach
+-- here -- see Target.admittedRecipients. CR 109.5's "you" on
 -- that spec is the AURA's controller, not the moving effect's -- proven by
 -- Pawl.AuraSpec's "CR 303.4j whole cards", where Crown of the Ages cannot move
 -- Setessan Training ("Enchant creature you control") onto an opponent's
@@ -798,7 +802,7 @@ attachmentFor src destination gs
           Just spec ->
             List.find
               (names destination)
-              (Set.toList (Target.legalRecipients (Projection.controllerOf src gs) src spec gs))
+              (Set.toList (Target.admittedRecipients (Projection.controllerOf src gs) src spec gs))
   | otherwise = Nothing
   where
     subtypes = Projection.subtypesOf src gs
