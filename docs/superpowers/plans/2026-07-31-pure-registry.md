@@ -122,9 +122,20 @@ Mechanical and dispatchable to subagents, one module each, same protocol as the
 pawl:spec conversion: edit one file, do not build, do not touch `Main.hs`, report
 before/after counts so a dropped site is visible.
 
-`Pawl.Support`'s deck loaders (`redRed`, `landsOnly`, `matchups`, …) take a
-registry outside any `Spec.it` and so have no `s`. See the open question below;
-default is to thread `s` through them too.
+**The deck loaders take a fetch function, not a registry.** `redRed`,
+`greenBlack` and `threeWayMirror` are called from spec modules (which become
+polymorphic in `m`); `matchups`, `landsOnly` and `threePlayerLandsOnly` are
+called only from `PropertySpec`, which is tasty-based and has no `s`. Since
+`matchups` calls `redRed`, neither can simply be `IO`-only. So:
+
+```haskell
+redRed :: (Monad m) => (String -> m Printing.Printing) -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+orThrow :: Registry.Registry IO -> String -> IO Printing.Printing
+```
+
+Spec modules pass `S.printingOf s registry`; `PropertySpec` passes
+`S.orThrow registry`, which turns a `Left` into an exception — correct at
+`m ~ IO`, and the reason `PropertySpec` needs no spec record.
 
 **Verify:** build warning-free; suite 2042;
 `grep -c "Registry\.printing\|Registry\.card " source/test-suite` is 0.
@@ -160,7 +171,35 @@ assertions on the returned `CardError`, which is the point of the change.
 **Verify:** build warning-free; suite 2042; `grep -r UnknownCard source/` finds
 nothing.
 
-### Task 7: comment sweep and docs
+### Task 7: hoist deck loading out of the property iterations
+
+`PropertySpec` loads its decks *inside* `QC.ioProperty`, so `S.matchups` runs
+once per QuickCheck iteration — 48 loads where 3 would do.
+
+Measured, this is not a performance problem: the Properties group is 20.8s of the
+24s suite, but that is 96 played-out games (4 matchups + 2 lands-only mirrors ×
+16 seeds) at ~217ms each. The redundant loads are cached lookups and 60-element
+list building — noise beside the games. This task is worth doing for what it does
+to the *shape*, not the clock.
+
+`Main.hs` loads the three deck sets once, in the `IO` it already has, and passes
+them in:
+
+```haskell
+tests :: [NonEmpty …] -> NonEmpty … -> NonEmpty … -> Tasty.TestTree
+```
+
+Every `QC.ioProperty $ do { ms <- S.matchups registry; pure … }` then collapses
+to a plain `QC.property`, because nothing in the body is effectful any more. The
+properties become pure functions of the seed, which is what they always were.
+
+Also correct the group's header comment: it says one game costs "~66 ms" and that
+"the other 948 tests together take ~1 s". Both are stale — ~217ms and 2042 tests.
+
+**Verify:** build warning-free; suite 2042; no `QC.ioProperty` remains in
+`PropertySpec`; Properties group wall time unchanged within noise.
+
+### Task 8: comment sweep and docs
 
 The pawl:spec conversion taught that a rename of this size silently invalidates
 prose. Sweep for:
@@ -186,12 +225,5 @@ returns only live references.
 | 3+4 | clean | 2042 | no `Registry.printing/card` in the suite |
 | 5 | clean | 2042 | `Spec.Spec IO n` only in `RegistrySpec` |
 | 6 | clean | 2042 | three exception modules gone |
-| 7 | clean | 2042 | no stale prose |
-
-## Open question for the owner
-
-Task 4 changes `Pawl.Support`'s deck loaders to take the spec record. That is the
-only place the sweep touches something that is not a test case, and it is
-load-bearing for `PropertySpec`, which stays on tasty and QuickCheck — threading
-`s` into a `QC.ioProperty` may be awkward. Fallback is an `IO`-only helper for
-`PropertySpec` alone. Flagged rather than decided mid-sweep.
+| 7 | clean | 2042 | no `QC.ioProperty` in `PropertySpec` |
+| 8 | clean | 2042 | no stale prose |
