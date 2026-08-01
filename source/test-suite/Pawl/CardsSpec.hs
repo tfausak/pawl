@@ -195,6 +195,24 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- separate rules: CR 113.6g's "can't be countered" functions on the stack and
   -- grants no targeting immunity, while CR 702.18a's shroud functions on the
   -- battlefield and grants nothing else.
+  -- The pool's first card whose target Filter names a KEYWORD (#434). Everything
+  -- else about it is Doom Blade's shape, so the HasKeyword atom is the only thing
+  -- this file adds -- which is why the filter is what the assertion is about.
+  Spec.it s "plummet.json loads as a {1}{G} Instant whose target filter is HasKeyword Flying" $ do
+    c <- S.cardOf s registry "Plummet"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Plummet")
+    Spec.assertEqWith
+      s
+      "{1}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "Instant" (TypeLine.types (CardT.typeLine c)) (Set.singleton CardType.Instant)
+    Spec.assertEqWith s "no keywords of its own" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "CR 702.9: target creature with flying"
+      [Map.toList (Mode.targetSpecs m) | m <- Foldable.toList (Modal.modes (CardT.spell c))]
+      [[(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.HasKeyword Keyword.Flying)))]]
   Spec.it s "blurred-mongoose.json loads as a {1}{G} 2/1 Mongoose that is uncounterable and has shroud" $ do
     c <- S.cardOf s registry "Blurred Mongoose"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Blurred Mongoose")
@@ -679,7 +697,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "the mana ability is unrestricted and the ping is not"
       (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
-      [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn]
+      [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)) TurnScope.EachTurn]
     -- CR 605.1a: "An activated ability is a mana ability if it meets all of
     -- the following criteria: it doesn't require a target ..., it could add
     -- mana to a player's mana pool when it resolves, and it's not a loyalty
@@ -732,7 +750,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "one ability, gated to the controller's upkeep"
       (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
-      [ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn]
+      [ActivationTiming.DuringPhase (PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep)) TurnScope.ControllersTurn]
     -- CR 602.1a: "The activation cost is everything before the colon (:)." The
     -- sacrifice is on that side, so it is SacrificeThis in the cost and not an
     -- effect. There is no mana in it at all -- the printed cost is the sacrifice
@@ -761,6 +779,77 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "targeting any creature, unfiltered"
       [Map.toList (Mode.targetSpecs m) | ab <- CardT.activatedAbilities c, m <- Foldable.toList (Modal.modes (ActivatedAbility.modal ab))]
       [[(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures Nothing)]]
+  -- CR 307.5 a third time, with the axis neither Desert nor Llanowar Augur can
+  -- print: the pool's first card whose timing rider names a PHASE THAT HAS STEPS
+  -- (CR 500.1, CR 506.1's five combat steps), and the first to print an
+  -- end-of-window duration at all (CR 500.5a). "{2}: This artifact becomes a 3/6
+  -- Golem artifact creature until end of combat. Activate only during combat."
+  --
+  -- The three files together pin the whole arm: Desert's window decodes to a
+  -- PhaseSelector.Step, Llanowar Augur's adds TurnScope.ControllersTurn, and
+  -- this one is the whole-phase arm no Pawl.Types.Phase value can spell.
+  Spec.it s "jade-statue.json loads as a {4} artifact whose animation is gated to the whole combat phase" $ do
+    c <- S.cardOf s registry "Jade Statue"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Jade Statue")
+    Spec.assertEqWith
+      s
+      "{4}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
+    -- CR 205.1b: "these effects also allow the object to retain all of its prior
+    -- card types and subtypes other than creature types" -- so the printed type
+    -- line stays a bare Artifact and the Creature card type arrives in layer 4.
+    Spec.assertEqWith
+      s
+      "Artifact"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Artifact) Set.empty)
+    -- No printed power or toughness: it is not a creature until the ability
+    -- resolves, and the 3/6 arrives as a layer-7b base-setting modification the
+    -- way Titania's Song's does.
+    Spec.assertEqWith s "no printed P/T" (CardT.power c, CardT.toughness c) (Nothing, Nothing)
+    -- The whole point of the file. PhaseSelector.CombatPhase, not
+    -- PhaseSelector.Step -- and TurnScope.EachTurn, because the card prints no
+    -- "your".
+    Spec.assertEqWith
+      s
+      "one ability, gated to the whole combat phase on any turn"
+      (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
+      [ActivationTiming.DuringPhase PhaseSelector.CombatPhase TurnScope.EachTurn]
+    -- CR 602.1a: "The activation cost is everything before the colon (:)." {2}
+    -- and nothing else -- no {T}, which is what lets the Statue attack in the
+    -- same combat it was animated in.
+    Spec.assertEqWith
+      s
+      "{2} is the whole cost"
+      (fmap (\ab -> (Cost.mana (ActivatedAbility.cost ab), Cost.components (ActivatedAbility.cost ab))) (CardT.activatedAbilities c))
+      [(Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]), [])]
+    -- Two ModifyTarget effects on the reserved "self" slot rather than one:
+    -- Pawl.Types.Modification is one modification per effect, and CR 613.1d's
+    -- layer 4 (the card type) and CR 613.4b's layer 7b (the base P/T) are
+    -- different layers in any case. Both carry Duration.UntilEndOfCombat.
+    --
+    -- The GOLEM creature type is absent, and deliberately: no layer-4
+    -- Modification sets or adds a creature subtype (#512). Nothing in the pool
+    -- reads Golem, so no game can tell.
+    Spec.assertEqWith
+      s
+      "becomes an artifact creature with base 3/6, until end of combat"
+      (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
+      [ [ ( Optionality.Mandatory,
+            [ Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.AddCardType CardType.Creature) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))),
+              Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.SetBasePowerToughness (Quantity.Literal 3) (Quantity.Literal 6)) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")))
+            ]
+          )
+        ]
+      ]
+    -- CR 115.10a: nothing here is a target. The ability names its own source
+    -- through the reserved slot, so there is no TargetSpec to announce.
+    Spec.assertEqWith
+      s
+      "and targets nothing"
+      [Map.toList (Mode.targetSpecs m) | ab <- CardT.activatedAbilities c, m <- Foldable.toList (Modal.modes (ActivatedAbility.modal ab))]
+      [[]]
   -- The pool's first card whose ENTERS trigger acts on the permanent that
   -- entered. Soul Warden shares the condition and names nothing about the
   -- entrant; endless-cockroaches.json shares the slot but reads it from a
@@ -1174,6 +1263,56 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
       [[Map.empty]]
     Spec.assertEqWith s "nothing of it is a static or a replacement" (CardT.staticAbilities c, CardT.replacementEffects c) ([], [])
+  -- The pool's first producer of Modification.SetCreatureSubtype, and the first
+  -- card whose one sentence lands in FOUR layers at once: 4 (Frog), 5 (blue), 6
+  -- (loses all abilities) and 7b (base 1/1). Titania's Song is the pool's next
+  -- widest at three. One ModifyTarget per modification, for the reason
+  -- llanowar-augur.json states -- Pawl.Types.Modification is one modification per
+  -- effect -- and here the four are in four different layers besides.
+  --
+  -- The Frog is a SET, not an add: CR 205.1b's last sentence says such an effect
+  -- lets the object "retain all of its prior card types and subtypes other than
+  -- creature types, but replace any existing creature types". Pawl.ProjectionSpec
+  -- proves that end to end, including that a land type Ashaya gave the target
+  -- survives it.
+  --
+  -- No AddCardType Creature beside it: the target is already a creature (the
+  -- spell targets one), and CR 205.1a's last sentence -- "Removing an object's
+  -- subtype doesn't affect its card types at all" -- is why the subtype set
+  -- carries no card-type change of its own.
+  Spec.it s "turn-to-frog.json loads as a {1}{U} instant whose four modifications sit in four layers" $ do
+    c <- S.cardOf s registry "Turn to Frog"
+    let target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Turn to Frog")
+    Spec.assertEqWith
+      s
+      "{1}{U}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
+    Spec.assertEqWith
+      s
+      "Instant, with no subtype of its own"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty)
+    Spec.assertEqWith s "no P/T" (CardT.power c, CardT.toughness c) (Nothing, Nothing)
+    Spec.assertEqWith
+      s
+      "four ModifyTargets on one slot, all until end of turn"
+      (modeShapes (CardT.spell c))
+      [ ( Optionality.Mandatory,
+          [ Effect.ModifyTarget Duration.UntilEndOfTurn Modification.LoseAllAbilities (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetColor (Set.singleton Color.Blue)) (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetCreatureSubtype Subtype.Frog) (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)) (ObjectRef.InSlot target)
+          ]
+        )
+      ]
+    Spec.assertEqWith
+      s
+      "targeting any creature, unfiltered"
+      (fmap (Map.toList . Mode.targetSpecs) (Foldable.toList (Modal.modes (CardT.spell c))))
+      [[(target, TargetSpec.MkTargetSpec Pool.Creatures Nothing)]]
+    Spec.assertEqWith s "no permanent text at all" (CardT.staticAbilities c, CardT.triggeredAbilities c, CardT.replacementEffects c) ([], [], [])
 
 checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
 checkFile s root p = do

@@ -12,21 +12,21 @@ import qualified Pawl.Types.CostComponent as CostComponent
 -- Tagged rather than bare-nullary from the start: this family grows
 -- payload-carrying constructors (PayLife, Sacrifice), so the decoder is written
 -- against Json.tag and only gains arms.
-costComponentToJson :: CostComponent.CostComponent -> Value
-costComponentToJson c = case c of
+costComponentToJson :: (keyword -> Value) -> CostComponent.CostComponent keyword -> Value
+costComponentToJson encode c = case c of
   CostComponent.TapThis -> Json.nullary (Text.pack "TapThis")
   CostComponent.UntapThis -> Json.nullary (Text.pack "UntapThis")
   CostComponent.SacrificeThis -> Json.nullary (Text.pack "SacrificeThis")
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (Json.natTo n))
-  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array (MkArray [Json.natTo n, filterToJson c_])))
+  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array (MkArray [Json.natTo n, filterToJson encode c_])))
   CostComponent.DiscardCards n -> Json.tagged (Text.pack "DiscardCards") (Just (Json.natTo n))
   CostComponent.DiscardThis -> Json.nullary (Text.pack "DiscardThis")
   CostComponent.PayEnergy n -> Json.tagged (Text.pack "PayEnergy") (Just (Json.natTo n))
   CostComponent.AddLoyaltyToThis n -> Json.tagged (Text.pack "AddLoyaltyToThis") (Just (Json.natTo n))
   CostComponent.RemoveLoyaltyFromThis n -> Json.tagged (Text.pack "RemoveLoyaltyFromThis") (Just (Json.natTo n))
 
-jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
-jsonToCostComponent value = do
+jsonToCostComponent :: (Value -> Either Text keyword) -> Value -> Either Text (CostComponent.CostComponent keyword)
+jsonToCostComponent decode value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
     ("TapThis", _) -> Right CostComponent.TapThis
@@ -35,7 +35,7 @@ jsonToCostComponent value = do
     ("PayLife", Just v) -> fmap CostComponent.PayLife (Json.natFrom v)
     ("Sacrifice", Just (Array (MkArray [n, c_]))) -> do
       count <- Json.natFrom n
-      filter_ <- jsonToFilter c_
+      filter_ <- jsonToFilter decode c_
       pure (CostComponent.Sacrifice count filter_)
     ("DiscardCards", Just v) -> fmap CostComponent.DiscardCards (Json.natFrom v)
     ("DiscardThis", _) -> Right CostComponent.DiscardThis

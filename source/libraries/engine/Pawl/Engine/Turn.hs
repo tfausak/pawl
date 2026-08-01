@@ -165,6 +165,48 @@ phaseBeginningAt phase = case phase of
   Phase.Ending EndingStep.EndStep -> Just PhaseSelector.EndingPhase
   Phase.Ending _ -> Nothing
 
+-- CR 500.1: the STEPPED phase this schedule entry belongs to, named as a whole.
+-- Nothing for both main phases, because CR 505.2 gives them no steps -- so
+-- PhaseSelector.Step already names the phase and there is no second, coarser
+-- window to report. Exactly the set of arms Pawl.Types.PhaseSelector carries,
+-- for exactly the reason its own comment gives.
+wholePhaseOf :: Phase -> Maybe PhaseSelector
+wholePhaseOf phase = case phase of
+  Phase.Beginning _ -> Just PhaseSelector.BeginningPhase
+  Phase.PrecombatMain -> Nothing
+  Phase.Combat _ -> Just PhaseSelector.CombatPhase
+  Phase.PostcombatMain -> Nothing
+  Phase.Ending _ -> Just PhaseSelector.EndingPhase
+
+-- CR 500.1: is the game's current schedule entry INSIDE the window this selector
+-- names? A containment test, and that is the whole point of the type: a
+-- selector naming a step matches only that step, while one naming a stepped
+-- phase matches every step of it -- Jade Statue's "Activate only during combat"
+-- is live in all five of CR 506.1's combat steps.
+--
+-- Not the same question Pawl.Engine.Replacement asks of a skip, which compares
+-- two selectors by EQUALITY (CR 614.1b) so that skipping a phase and skipping a
+-- step of it stay distinct events. This one compares a selector against the
+-- phase the game is IN, where containment is what "during" means.
+inWindow :: PhaseSelector -> Phase -> Bool
+inWindow selector phase = selector == PhaseSelector.Step phase || wholePhaseOf phase == Just selector
+
+-- CR 500.5: the whole PHASE that is ending, if the step that just ended is its
+-- last. Nothing for every other step, and for both main phases -- CR 505.2 makes
+-- a main phase its own single schedule entry, so PhaseSelector.Step has already
+-- named the window that ended and a second answer would name it twice.
+--
+-- The mirror of phaseBeginningAt above, and CR 500.5a is why the engine needs
+-- both grains rather than one: "effects that last 'until end of combat' expire
+-- at the end of the combat phase, not at the beginning of the end of combat
+-- step". `lastStepOf` is where CR 511.3, CR 501.1 and CR 512.1 are cited for
+-- which step that is.
+--
+-- Answers from the step alone, so a phase whose last step never runs -- skipped,
+-- or dropped with the rest of the phase -- never reports its end (#526).
+phaseEndingAt :: Phase -> Maybe PhaseSelector
+phaseEndingAt phase = if lastStepOf phase == Just phase then wholePhaseOf phase else Nothing
+
 -- CR 508.8 / 500.11: drop the declare blockers and combat damage steps of THE
 -- COMBAT PHASE NOW UNDER WAY from what is left of the turn, so it proceeds "as
 -- though they didn't exist". Positional, not a filter over the whole schedule:

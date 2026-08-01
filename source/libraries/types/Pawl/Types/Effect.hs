@@ -7,6 +7,7 @@ import Pawl.Types.Duration (Duration)
 import Pawl.Types.EntryRiders (EntryRiders)
 import Pawl.Types.ExtraPhase (ExtraPhase)
 import Pawl.Types.Filter (Filter)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.ManaProduction (ManaProduction)
 import Pawl.Types.Modification (Modification)
 import Pawl.Types.MonarchTarget (MonarchTarget)
@@ -87,7 +88,7 @@ data Effect card
     --
     -- Finds at most one card, always: no card in the pool searches for two
     -- (#283).
-    Search Filter SearchDestination
+    Search (Filter Keyword) SearchDestination
   | -- CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards
@@ -195,7 +196,7 @@ data Effect card
     -- ability resolves normally. Only a card whose text does NOT already exclude
     -- such a destination can reach it -- Crown of the Ages can, Aura Graft cannot
     -- -- which is why the rule and the atom are not the same thing.
-    AttachTarget SlotName Filter
+    AttachTarget SlotName (Filter Keyword)
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
     -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is
@@ -538,7 +539,7 @@ data Effect card
     -- CR 609.3: a player with fewer matching permanents than the count sacrifices
     -- all of them, and one with none sacrifices nothing -- "as much as possible",
     -- and forced, so neither case is prompted.
-    PlayerSacrifices SlotName Filter Quantity
+    PlayerSacrifices SlotName (Filter Keyword) Quantity
   | -- CR 500.7: "Some effects can give a player extra turns. They do this by
     -- adding the turns directly after the specified turn." The players the
     -- PlayerRef names each get one extra turn, added directly after the turn

@@ -33,6 +33,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -98,13 +99,13 @@ targetable pid oid gs = case Game.cardOf oid gs of
 -- disagree about what a cost is are two ways of getting the same question wrong.
 -- The X=0 floor is the one place they still can disagree, since the announcement
 -- runs on the value the player named (#417).
-payableCost :: PlayerId -> ObjectId -> GameState -> Cost -> Bool
+payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
 
 -- The same question asked at some OTHER value of X. `payableCost` is this at CR
 -- 601.2b's floor, and `affordableX` is this climbed; one predicate, so what the
 -- gate measures and what the bound reports cannot drift apart.
-payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost -> Bool
+payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.substituteX x cost) gs) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
@@ -154,7 +155,7 @@ payableCostAt x pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.
 -- Answers 0 for a cost unpayable even at X=0 too, where no value of X is
 -- affordable and 0 is the least misleading number to report. Unreachable from
 -- castSpell, which asks only about a candidate that already passed payableCost.
-affordableX :: PlayerId -> ObjectId -> GameState -> Cost -> Natural
+affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
 affordableX pid oid gs cost =
   let climb x = if payableCostAt (x + 1) pid oid gs cost then climb (x + 1) else x
    in if Cost.hasVariable cost then climb 0 else 0
@@ -190,7 +191,7 @@ affordableX pid oid gs cost =
 -- WHICH candidate will carry the cost is not decided here: this answers only
 -- whether SOME route pays it, and castSpell narrows the candidates to the routes
 -- that really do once the answer is in.
-entwineOffer :: PlayerId -> ObjectId -> GameState -> Maybe Cost
+entwineOffer :: PlayerId -> ObjectId -> GameState -> Maybe (Cost Keyword)
 entwineOffer pid oid gs = case Game.cardOf oid gs of
   Nothing -> Nothing
   Just card -> do

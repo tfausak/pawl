@@ -2,6 +2,7 @@ module Pawl.Types.TriggerCondition where
 
 import Pawl.Types.Condition (Condition)
 import Pawl.Types.Filter (Filter)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.Phase (Phase)
 import Pawl.Types.PlayerRelation (PlayerRelation)
 import Pawl.Types.TriggerFrequency (TriggerFrequency)
@@ -36,7 +37,7 @@ data TriggerCondition
     -- `Not IsSource` -- the one spelling Filter.IsSource's own haddock already
     -- fixes for "another" (#163) -- rather than into a parallel exclusion flag
     -- here.
-    PermanentEnters Filter
+    PermanentEnters (Filter Keyword)
   | -- CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
     StepBegins Phase TurnScope

@@ -1285,7 +1285,7 @@ installControlBy mindslaver controller target gs0 =
 -- CR 205.4c / 701.23a: a basic land card is one with the Land card type and the
 -- Basic supertype -- Evolving Wilds' search filter, the printed-card predicate
 -- that replaced CardCriterion.BasicLandCard.
-basicLandFilter :: Filter.Type.Filter
+basicLandFilter :: Filter.Type.Filter Keyword.Keyword
 basicLandFilter =
   Filter.Type.And
     [ Filter.Type.HasCardType CardType.Land,
@@ -2465,7 +2465,7 @@ slotTarget :: SlotName.SlotName
 slotTarget = SlotName.MkSlotName (Text.pack "target")
 
 -- Diabolic Edict's "a creature of their choice".
-creatureFilter :: Filter.Type.Filter
+creatureFilter :: Filter.Type.Filter Keyword.Keyword
 creatureFilter = Filter.Type.HasCardType CardType.Creature
 
 -- Targets `victim` with every slot that offers them, deferring the rest to
@@ -3433,9 +3433,83 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     Spec.assertEqWith s "no counters" (plusOnePlusOnesOn entered resolved) 0
     Spec.assertEqWith s "so Bane is the printed 2/2" (entered >>= \oid -> Projection.powerOf oid resolved) (Just 2)
 
+-- Plummet ({1}{G} Instant, "Destroy target creature with flying"), the pool's
+-- first card whose Filter names a KEYWORD (Filter.HasKeyword, CR 702.9).
+--
+-- The negative half of every pair here is the one that carries the claim: a
+-- Filter that admitted everything would pass the positive assertions unchanged.
+plummetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+plummetSpec s registry = Spec.describe s "Plummet" $ do
+  -- CR 702.9b: "A creature with flying can't be blocked except by creatures with
+  -- flying and/or reach" -- the ability Bird Maiden prints and Goblin Piker does
+  -- not. Nothing else separates the two here, so only the keyword can be what
+  -- decides the offer.
+  Spec.it s "CR 702.9 HasKeyword Flying admits the flier and rejects the ground creature" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case S.spellTargetSpec plummet of
+      Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
+      Just theSpec -> do
+        let (flierId, gs1) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+            (groundId, gs) = S.addCreature piker S.bob gs1
+            legal = Target.legalRecipients Nothing S.noSource theSpec gs
+        Spec.assertBool s (Set.member (Recipient.ToCreature flierId) legal) "the flier is a legal target"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) legal)) "the creature without flying is not"
+  -- CR 613.1f: layer 6 is where abilities are added, so the read has to go
+  -- through the PROJECTION rather than the printed card. Spontaneous Flight
+  -- ({2}{W}, "+2/+2 and a flying counter") is the pool's grant, and the Piker it
+  -- lands on printed no flying at all.
+  Spec.it s "CR 613.1f a Piker that GAINS flying becomes a legal target" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
+    case S.spellTargetSpec plummet of
+      Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
+      Just theSpec -> do
+        let (groundId, before) = S.addCreature piker S.alice (S.landsInPlay plains 3)
+            (withSpell, spellId) = S.handOne spontaneousFlight before
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) (Target.legalRecipients Nothing S.noSource theSpec before))) "no flying, no offer"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying groundId after) "the grant landed"
+        Spec.assertBool s (Set.member (Recipient.ToCreature groundId) (Target.legalRecipients Nothing S.noSource theSpec after)) "and the grant makes it a legal target"
+  -- The other direction, and the one that proves the read is not of the printed
+  -- card: Humility (CR 613.1f, "all creatures lose all abilities") takes the
+  -- flying off a creature that PRINTS it, and the offer goes with it.
+  Spec.it s "CR 613.1f Humility strips the printed flying, and the offer goes with it" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    humility <- S.printingOf s registry "Humility"
+    case S.spellTargetSpec plummet of
+      Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
+      Just theSpec -> do
+        let (flierId, before) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+            after = S.withHumility humility before
+        Spec.assertBool s (Set.member (Recipient.ToCreature flierId) (Target.legalRecipients Nothing S.noSource theSpec before)) "legal while it flies"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying flierId after)) "Humility took the flying"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature flierId) (Target.legalRecipients Nothing S.noSource theSpec after))) "so it is no longer a legal target"
+  -- CR 701.8: the whole card, cast and resolved. The Piker beside the flier is
+  -- the control: it survives because Plummet could never have been aimed at it.
+  Spec.it s "CR 701.8 Plummet destroys the flier it targets, and leaves the ground creature standing" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    let (flierId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 2)
+        (groundId, g2) = S.addCreature piker S.bob g1
+        (gs, spellId) = S.handOne plummet g2
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+    Spec.assertBool s (not (S.onBattlefield flierId after)) "the flier was destroyed"
+    Spec.assertBool s (S.onBattlefield groundId after) "the creature without flying was never a candidate"
+    Spec.assertEqWith s "and the flier is in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
+  plummetSpec s registry
   resolveSpec s registry
   fizzleSpec s registry
   indestructibleSpec s registry

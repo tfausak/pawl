@@ -7,6 +7,7 @@ import Pawl.Types.Action (Action)
 import Pawl.Types.Concession (Concession)
 import Pawl.Types.Cost (Cost)
 import Pawl.Types.EntwineDecision (EntwineDecision)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.Mana (Mana)
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.MulliganDecision (MulliganDecision)
@@ -103,7 +104,7 @@ data Response
     ChoseAttachment ObjectId
   | -- CR 601.2b: the cost a caster announced they would pay, serialized so a
     -- DecisionLog replays an alternative-cost cast deterministically.
-    ChoseCost Cost
+    ChoseCost (Cost Keyword)
   | -- CR 103.5: a player's mulligan declaration, serialized so a DecisionLog
     -- replays the mulligan round deterministically.
     DeclaredMulligan MulliganDecision

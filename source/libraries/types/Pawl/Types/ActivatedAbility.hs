@@ -2,6 +2,7 @@ module Pawl.Types.ActivatedAbility where
 
 import Pawl.Types.ActivationTiming (ActivationTiming)
 import Pawl.Types.Cost (Cost)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.Modal (Modal)
 
 -- CR 602.1 / 700.2 / 602.2b: "[cost]: [effect]", now modal-capable. VALUE-typed:
@@ -14,7 +15,7 @@ import Pawl.Types.Modal (Modal)
 -- An activation cost is a Pawl.Types.Cost, the same type a spell's cost takes
 -- (CR 118.1).
 data ActivatedAbility card = MkActivatedAbility
-  { cost :: Cost,
+  { cost :: Cost Keyword,
     modal :: Modal card,
     -- CR 307.5: any timing rider the ability carries. AnyTime for every ability
     -- without one, which is all of them but equip.

@@ -2,6 +2,7 @@ module Pawl.Types.Affected where
 
 import Data.Set (Set)
 import Pawl.Types.Filter (Filter)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.ObjectId (ObjectId)
 
 -- What a continuous effect applies to. CR 611.2c: a resolution effect's set is
@@ -20,7 +21,7 @@ data Affected
     -- other" card text (not a rule -- Opalescence does not animate itself) is
     -- Filter.Not Filter.IsSource inside the Filter, not a separate field -- the
     -- predicate language already names the source that way.
-    Matching Filter
+    Matching (Filter Keyword)
   | -- CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". A THIRD kind of affected set: TheseObjects is fixed at
     -- resolution (CR 611.2c) and Matching is a predicate re-derived per
@@ -52,5 +53,5 @@ data Affected
     -- Filtered rather than payload-free, unlike Attached: "creatures enchanted
     -- player controls" narrows by card type, and CR 303.4m's phrase names only
     -- whose permanents they are.
-    AttachedPlayerControls Filter
+    AttachedPlayerControls (Filter Keyword)
   deriving (Eq, Ord, Show)

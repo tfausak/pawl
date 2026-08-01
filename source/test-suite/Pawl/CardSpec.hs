@@ -324,6 +324,7 @@ durationCounts duration = case duration of
   Duration.Indefinite -> []
   Duration.UntilYourNextTurn -> []
   Duration.ForAsLongAs condition -> conditionCounts condition
+  Duration.UntilEndOfCombat -> []
 
 -- Every Count reachable from a Modification: only its P/T quantities
 -- (layers 7b/7c) carry one.
@@ -335,6 +336,7 @@ modificationCounts modification = case modification of
   Modification.ModifyPowerToughness p t -> quantityCounts p <> quantityCounts t
   Modification.SetLandSubtype _ -> []
   Modification.AddLandSubtype _ -> []
+  Modification.SetCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []

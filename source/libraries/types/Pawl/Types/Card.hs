@@ -177,7 +177,7 @@ data Card = MkCard
     --
     -- CR 118.8d: this does not change the card's mana cost. Card.manaCost, and
     -- every reader of mana value, is unaffected.
-    additionalCosts :: [CostComponent],
+    additionalCosts :: [CostComponent Keyword],
     -- CR 118.9: this card's printed alternative costs -- "a cost listed in a
     -- spell's text ... that its controller MAY pay rather than paying the
     -- spell's mana cost" (Fireblast). Empty for every other printing.
@@ -203,7 +203,7 @@ data Card = MkCard
     -- NOT one of these: a cost here is payable wherever the card can be cast
     -- from, and flashback's may be paid only from the graveyard. It rides its
     -- keyword instead, and Pawl.Engine.Cost.costsFor offers it by zone.
-    alternativeCosts :: [Cost],
+    alternativeCosts :: [Cost Keyword],
     -- CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary
     -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put

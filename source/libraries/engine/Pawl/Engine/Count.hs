@@ -25,6 +25,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -78,7 +79,7 @@ slots slotsOfQuantity (Count.Type.MkCount _ _ aggregation) = case aggregation of
   Aggregation.DistinctCardTypes -> Set.empty
   Aggregation.Greatest quantity -> slotsOfQuantity quantity
 
-keep :: Filter.Type.Filter -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
+keep :: Filter.Type.Filter Keyword.Type.Keyword -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of
   Nothing -> Nothing
   Just v -> if Filter.matches context v predicate then Just v else Nothing
@@ -165,6 +166,11 @@ snapshotView shape event = case event of
                 Filter.supertypes = Set.empty,
                 Filter.colors = PC.colors snapshot,
                 Filter.subtypes = PC.subtypes snapshot,
+                -- CR 109.3 lists abilities among an object's characteristics, and
+                -- CR 608.2h's snapshot is exactly the characteristics the object
+                -- last had -- so unlike the vacuous fields below, this one has a
+                -- real answer to give.
+                Filter.keywords = Map.keysSet (PC.keywords snapshot),
                 Filter.power = PC.power snapshot,
                 Filter.controller = Nothing,
                 Filter.identity = Nothing,

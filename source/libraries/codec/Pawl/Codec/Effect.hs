@@ -11,6 +11,7 @@ import Pawl.Codec.EntryRiders (defaultEntryRiders, entryRidersToJson, jsonToEntr
 import Pawl.Codec.ExtraPhase (extraPhaseToJson, jsonToExtraPhase)
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Codec.ManaProduction (jsonToManaProduction, manaProductionToJson)
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import Pawl.Codec.MonarchTarget (jsonToMonarchTarget, monarchTargetToJson)
@@ -39,11 +40,11 @@ effectToJson codec e = case e of
   Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, objectRefToJson r])))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
-  Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [filterToJson f, searchDestinationToJson d])))
+  Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [filterToJson keywordToJson f, searchDestinationToJson d])))
   Effect.ExileAllGraveyards -> Json.nullary (Text.pack "ExileAllGraveyards")
   Effect.Proliferate -> Json.nullary (Text.pack "Proliferate")
   Effect.ExileHandThenDraw -> Json.nullary (Text.pack "ExileHandThenDraw")
-  Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [slotNameToJson slot, filterToJson f, quantityToJson q])))
+  Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [slotNameToJson slot, filterToJson keywordToJson f, quantityToJson q])))
   Effect.RestartGame -> Json.nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
   -- The bound-count slot is ELIDED when absent, the posture Create's EntryRiders
@@ -108,7 +109,7 @@ effectToJson codec e = case e of
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
   Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (slotNameToJson s))
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
-  Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson f])))
+  Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson keywordToJson f])))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
   Effect.TakeExtraTurn r skips -> Json.tagged (Text.pack "TakeExtraTurn") (Just (Array (MkArray [playerRefToJson r, Json.setTo phaseSelectorToJson skips])))
 
@@ -125,13 +126,13 @@ jsonToEffect decode value = do
     "ChangeText" -> Json.withValue mv (fmap Effect.ChangeText . jsonToSlotName)
     "AddMana" -> Json.withValue mv (fmap Effect.AddMana . jsonToManaProduction)
     "Search" -> case mv of
-      Just (Array (MkArray [f, d])) -> Effect.Search <$> jsonToFilter f <*> jsonToSearchDestination d
+      Just (Array (MkArray [f, d])) -> Effect.Search <$> jsonToFilter jsonToKeyword f <*> jsonToSearchDestination d
       _ -> Left (Text.pack "Search expects [filter, destination]")
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
-      Just (Array (MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> jsonToSlotName sv <*> jsonToFilter fv <*> jsonToQuantity qv
+      Just (Array (MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> jsonToSlotName sv <*> jsonToFilter jsonToKeyword fv <*> jsonToQuantity qv
       _ -> Left (Text.pack "PlayerSacrifices expects [slot, filter, quantity]")
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> Json.withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
@@ -215,7 +216,7 @@ jsonToEffect decode value = do
     "ExileUntilMonarch" -> Json.withValue mv (fmap Effect.ExileUntilMonarch . jsonToSlotName)
     "Attach" -> Json.withValue mv (fmap Effect.Attach . jsonToSlotName)
     "AttachTarget" -> case mv of
-      Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
+      Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter jsonToKeyword f
       _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
     "PlaySubgame" -> Json.withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
     "TakeExtraTurn" -> case mv of
