@@ -180,7 +180,7 @@ handAbilitiesFor keyword = case keyword of
 -- AnyTime because rule 702.29a states no timing restriction, which leaves CR
 -- 117.1b's default: "a player may activate an activated ability any time they
 -- have priority."
-cycling :: Cost -> Maybe Filter -> ActivatedAbility Card
+cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card
 cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
@@ -267,7 +267,7 @@ permissionsFor keyword = case keyword of
 -- flashback abilities is expressible (a Set of two Flashback values with
 -- different costs) and unrepresented in what this returns; no printing does it
 -- (#294).
-flashbackCost :: Set Keyword -> Maybe Cost
+flashbackCost :: Set Keyword -> Maybe (Cost Keyword)
 flashbackCost keywords =
   let costOf keyword = case keyword of
         Keyword.Flashback cost -> Just cost
@@ -284,7 +284,7 @@ flashbackCost keywords =
 --
 -- Nothing beyond the FIRST entwine cost is reachable: a card printing two
 -- entwine abilities is expressible and unrepresented (#474).
-entwineCost :: Set Keyword -> Maybe Cost
+entwineCost :: Set Keyword -> Maybe (Cost Keyword)
 entwineCost keywords =
   let costOf keyword = case keyword of
         Keyword.Entwine cost -> Just cost

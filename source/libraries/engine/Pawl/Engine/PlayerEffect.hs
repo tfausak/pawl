@@ -30,6 +30,7 @@ import qualified Pawl.Types.Card as Card
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.ManaCost (ManaCost)
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerEffect (PlayerEffect)
@@ -179,7 +180,7 @@ prohibitsCasting pid gs =
 -- harmless to today's card-type/colour filters and well-defined for a future
 -- ControlledBy filter. Runs through the identity-blind Filter.matches: this
 -- module never learns which spell produced the Filter.
-matchesSpell :: Filter -> ObjectId -> GameState -> Bool
+matchesSpell :: Filter Keyword -> ObjectId -> GameState -> Bool
 matchesSpell filter_ oid gs =
   -- No source in scope at this site: `oid` is the AFFECTED object, not a source.
   Filter.matches (Filter.MkContext (Projection.controllerOf oid gs) Nothing) (Projection.viewOfObject oid gs) filter_
@@ -199,7 +200,7 @@ matchesSpell filter_ oid gs =
 -- projections at all.
 costAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [ManaCost])
 costAdjustments pid oid gs =
-  let matching :: Filter -> a -> Maybe a
+  let matching :: Filter Keyword -> a -> Maybe a
       matching criterion amount = if matchesSpell criterion oid gs then Just amount else Nothing
       increaseOf effect = case effect of
         PlayerEffect.IncreaseSpellCost criterion amount -> matching criterion amount

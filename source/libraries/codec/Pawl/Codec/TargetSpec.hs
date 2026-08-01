@@ -6,6 +6,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Codec.Pool (jsonToPool, poolToJson)
 import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
 import Pawl.Json.Value (Value)
@@ -21,7 +22,7 @@ targetSpecToJson (TargetSpec.MkTargetSpec pool restriction) =
   let base = [(Text.pack "pool", poolToJson pool)]
       withFilter = case restriction of
         Nothing -> base
-        Just f -> base <> [(Text.pack "filter", filterToJson f)]
+        Just f -> base <> [(Text.pack "filter", filterToJson keywordToJson f)]
    in Json.jObject withFilter
 
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
@@ -30,7 +31,7 @@ jsonToTargetSpec value = do
   pool <- Json.field (Text.pack "pool") ps >>= jsonToPool
   restriction <- case Json.optField (Text.pack "filter") ps of
     Nothing -> Right Nothing
-    Just v -> Just <$> jsonToFilter v
+    Just v -> Just <$> jsonToFilter jsonToKeyword v
   pure (TargetSpec.MkTargetSpec pool restriction)
 
 targetSpecsToJson :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value

@@ -7,6 +7,7 @@ import Pawl.Codec.ControllerRelation (controllerRelationToJson, jsonToController
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.CounterPattern as CounterPattern
 
@@ -15,7 +16,7 @@ counterPatternToJson p =
   Json.jObject
     [ (Text.pack "whichKind", Json.maybeTo counterKindToJson (CounterPattern.whichKind p)),
       (Text.pack "whose", controllerRelationToJson (CounterPattern.whose p)),
-      (Text.pack "onWhat", filterToJson (CounterPattern.onWhat p))
+      (Text.pack "onWhat", filterToJson keywordToJson (CounterPattern.onWhat p))
     ]
 
 jsonToCounterPattern :: Value -> Either Text CounterPattern.CounterPattern
@@ -23,7 +24,7 @@ jsonToCounterPattern value = do
   ps <- Json.asObject value
   k <- Json.field (Text.pack "whichKind") ps >>= Json.maybeFrom jsonToCounterKind
   w <- Json.field (Text.pack "whose") ps >>= jsonToControllerRelation
-  o <- Json.field (Text.pack "onWhat") ps >>= jsonToFilter
+  o <- Json.field (Text.pack "onWhat") ps >>= jsonToFilter jsonToKeyword
   pure
     CounterPattern.MkCounterPattern
       { CounterPattern.whichKind = k,

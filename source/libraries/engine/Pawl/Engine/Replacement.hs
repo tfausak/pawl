@@ -53,6 +53,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -439,7 +440,7 @@ matchesZoneOwner gs src rel oid =
 -- Pawl.Engine.Cost narrows its sacrifice candidates through the SAME call, so there is
 -- no duplicate matcher to keep in step and no Cost->Replacement cycle to avoid
 -- (#111).
-matchesPermanent :: GameState -> Filter.Type.Filter -> ObjectId -> Bool
+matchesPermanent :: GameState -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent gs filter_ oid =
   -- No source in scope at this site.
   Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_

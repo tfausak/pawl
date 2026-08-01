@@ -2,6 +2,7 @@ module Pawl.Types.Count where
 
 import Pawl.Types.Aggregation (Aggregation)
 import Pawl.Types.Filter (Filter)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.Scope (Scope)
 
 -- A number derived from game state: a scope to fold over, a per-object predicate
@@ -17,5 +18,5 @@ import Pawl.Types.Scope (Scope)
 -- is where it is actually used and where the reason for it is written. Every
 -- customer but Pawl.Types.Quantity instantiates it concretely as
 -- `Count Quantity`.
-data Count quantity = MkCount Scope Filter (Aggregation quantity)
+data Count quantity = MkCount Scope (Filter Keyword) (Aggregation quantity)
   deriving (Eq, Ord, Show)

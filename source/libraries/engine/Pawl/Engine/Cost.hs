@@ -35,6 +35,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
@@ -54,12 +55,12 @@ import qualified Pawl.Types.Zone as Zone
 -- ChooseCost fallback needs when no candidate was offered -- a state the engine
 -- never produces, because the prompt is issued only with two or more payable
 -- candidates, and an answer outside the offered set is rejected anyway.
-unpayable :: Cost
+unpayable :: Cost Keyword.Type.Keyword
 unpayable = Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
 
 -- The first offered candidate, or `unpayable` when none was offered. The one
 -- total, documented answer every ChooseCost fallback uses.
-firstOffered :: [Cost] -> Cost
+firstOffered :: [Cost Keyword.Type.Keyword] -> Cost Keyword.Type.Keyword
 firstOffered candidates = case candidates of
   c : _ -> c
   [] -> unpayable
@@ -83,7 +84,7 @@ firstOffered candidates = case candidates of
 -- from there for it -- and a card with no flashback yields no candidate at all,
 -- which is CR 601.3's default prohibition arriving through Cast.castable's
 -- affordability gate as well as through its permission gate.
-costsFor :: ObjectId -> GameState -> [Cost]
+costsFor :: ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
 costsFor oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj -> case Object.source obj of
@@ -127,7 +128,7 @@ costsFor oid gs = case Game.lookupObject oid gs of
 -- CR 118.6a's first sentence needs no special case: "If an unpayable cost is
 -- increased by an effect or an additional cost is imposed, the cost is still
 -- unpayable" -- fmap over the Maybe leaves Nothing as Nothing.
-total :: PlayerId -> ObjectId -> Cost -> GameState -> Cost
+total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
 total pid oid cost gs = cost {Cost.mana = fmap (totalMana pid oid gs) (Cost.mana cost)}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
@@ -155,7 +156,7 @@ totalMana pid oid gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs
 -- cost is imposed, the cost is still unpayable." Either side being Nothing
 -- therefore leaves the whole thing unpayable, which the applicative on Maybe
 -- gives for free.
-plus :: Cost -> Cost -> Cost
+plus :: Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 plus base extra =
   let combine (ManaCost.MkManaCost xs) (ManaCost.MkManaCost ys) = ManaCost.MkManaCost (xs <> ys)
    in Cost.MkCost
@@ -165,12 +166,12 @@ plus base extra =
 
 -- CR 601.2b: substitute the chosen value of X into the mana part. Identity on a
 -- Variable-free cost, and on an unpayable one.
-substituteX :: Natural -> Cost -> Cost
+substituteX :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 substituteX x cost = cost {Cost.mana = fmap (Mana.substituteX x) (Cost.mana cost)}
 
 -- Does this cost's mana part contain an {X} (CR 107.3)? What decides whether the
 -- caster is asked for a value at CR 601.2b -- a spell with no {X} is not asked.
-hasVariable :: Cost -> Bool
+hasVariable :: Cost Keyword.Type.Keyword -> Bool
 hasVariable cost = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
@@ -210,7 +211,7 @@ hasVariable cost = case Cost.mana cost of
 --
 -- Named `total_` rather than `total` only because this module's own `total` is in
 -- scope, the `filter_` convention elsewhere here.
-announce :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost -> Game Cost
+announce :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
 announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
@@ -236,7 +237,7 @@ announce pid oid total_ cost = case Cost.mana cost of
 -- Named for the RULE it answers rather than for one of the two symbols: the
 -- previous name, requiresTapSymbol, made the untap half read like an oversight
 -- at the call site instead of a question the function had never been asked.
-requiresSicknessCheck :: Cost -> Bool
+requiresSicknessCheck :: Cost Keyword.Type.Keyword -> Bool
 requiresSicknessCheck cost =
   any (\c -> elem c (Cost.components cost)) [CostComponent.TapThis, CostComponent.UntapThis]
 
@@ -251,10 +252,10 @@ requiresSicknessCheck cost =
 -- sorcery-speed half of CR 606.3 is the rules core's to know, and a card file
 -- claiming a rider it does not print would be the open half teaching the closed
 -- half a rule it already has.
-isLoyaltyCost :: Cost -> Bool
+isLoyaltyCost :: Cost Keyword.Type.Keyword -> Bool
 isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
 
-isLoyaltyComponent :: CostComponent.CostComponent -> Bool
+isLoyaltyComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 isLoyaltyComponent component = case component of
   CostComponent.AddLoyaltyToThis _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
@@ -292,7 +293,7 @@ removeLoyalty n obj =
 -- The lower Pawl.Engine.Filter is the ONE matcher: Pawl.Engine.Replacement narrows its
 -- permanents through the same call, so there is no duplicate to keep in step and
 -- no Cost->Replacement cycle to avoid (#111).
-matchesFilter :: GameState -> Filter.Type.Filter -> ObjectId -> Bool
+matchesFilter :: GameState -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesFilter gs filter_ oid =
   -- No source in scope at this site.
   Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
@@ -300,7 +301,7 @@ matchesFilter gs filter_ oid =
 -- The permanents this player may sacrifice for a Filter, ascending -- the order
 -- ChooseSacrifices offers them in, which is what makes both the elision test and
 -- the transcript fallback deterministic.
-sacrificeCandidates :: PlayerId -> Filter.Type.Filter -> GameState -> [ObjectId]
+sacrificeCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 sacrificeCandidates pid filter_ gs =
   List.sort (filter (matchesFilter gs filter_) (Projection.controls pid gs))
 
@@ -328,14 +329,14 @@ discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid g
 -- could claim is counted twice. CR 107.4f's Phyrexian symbol is the first mana
 -- symbol that spends life, so a cost holding one alongside a PayLife component
 -- can read as payable when CR 118.3 says it is not (#365).
-canPay :: PlayerId -> ObjectId -> Cost -> GameState -> Bool
+canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
     Mana.canPay pid manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
 
-canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent -> GameState -> Bool
+canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent pid oid component gs = case component of
   -- CR 107.5: "A permanent that's already tapped can't be tapped again to pay
   -- the cost." CR 118.3 gives the same example.
@@ -419,7 +420,7 @@ canPayComponent pid oid component gs = case component of
 -- All or nothing. CR 601.2h: "Partial payments are not allowed." The entry state
 -- is captured and restored on any rejection, so an Unpaid result is a complete
 -- no-op even though paying is monadic and a component may prompt.
-pay :: PlayerId -> ObjectId -> Cost -> Game Payment.Payment
+pay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay pid oid cost = do
   before <- State.get
   case Cost.mana cost of
@@ -439,7 +440,7 @@ pay pid oid cost = do
               State.put before
               pure Payment.Unpaid
 
-payComponents :: PlayerId -> ObjectId -> [CostComponent.CostComponent] -> Game Payment.Payment
+payComponents :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payComponents pid oid components = case components of
   [] -> pure Payment.Paid
   component : rest -> do
@@ -448,7 +449,7 @@ payComponents pid oid components = case components of
       Payment.Unpaid -> pure Payment.Unpaid
       Payment.Paid -> payComponents pid oid rest
 
-payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent -> Game Payment.Payment
+payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent pid oid component = case component of
   CostComponent.TapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)})

@@ -1,6 +1,7 @@
 module Pawl.Types.ObjectRef where
 
 import Pawl.Types.Filter (Filter)
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.SlotName (SlotName)
 
 -- WHICH OBJECTS an object-affecting effect names -- the object-side counterpart
@@ -45,5 +46,5 @@ data ObjectRef
     -- creatures") and Effect.GainControl (Aura Thief's "all enchantments") both
     -- do that, storing Affected.TheseObjects; the one-shots that take this type
     -- store nothing and are governed by CR 608.2c/608.2f instead.
-    EachMatching Filter
+    EachMatching (Filter Keyword)
   deriving (Eq, Ord, Show)

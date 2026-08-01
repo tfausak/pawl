@@ -6,6 +6,7 @@ import qualified Data.Text as Text
 import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
+import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
 import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
 import Pawl.Codec.TriggerFrequency (jsonToTriggerFrequency, triggerFrequencyToJson)
@@ -17,7 +18,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
 triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> Json.nullary (Text.pack "SelfEnters")
-  TriggerCondition.PermanentEnters f -> Json.tagged (Text.pack "PermanentEnters") (Just (filterToJson f))
+  TriggerCondition.PermanentEnters f -> Json.tagged (Text.pack "PermanentEnters") (Just (filterToJson keywordToJson f))
   TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array (MkArray [phaseToJson p, turnScopeToJson s])))
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Json.nullary (Text.pack "SelfDealsCombatDamageToPlayer")
@@ -35,7 +36,7 @@ jsonToTriggerCondition value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
-    ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> jsonToFilter v
+    ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> jsonToFilter jsonToKeyword v
     ("StepBegins", Just (Array (MkArray [p, s]))) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
