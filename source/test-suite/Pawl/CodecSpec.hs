@@ -525,8 +525,13 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "timing" activationTimingToJson jsonToActivationTiming ActivationTiming.SorcerySpeed
       -- Desert's own rider (CR 511.1), and a stepless phase alongside it:
       -- Pawl.Types.Phase spans both, so the arm has to carry both.
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat))
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase Phase.PostcombatMain)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase Phase.PostcombatMain TurnScope.EachTurn)
+      -- Llanowar Augur's "Activate only during your upkeep", the arm's
+      -- second axis: the SAME phase under each scope, so a codec that dropped
+      -- the scope would collapse these two into one and fail here.
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
+      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn)
     Spec.it s "ExileUntilMonarch" $
       roundTrip s "eum" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target")))
     Spec.it s "PlaySubgame round-trips" $
