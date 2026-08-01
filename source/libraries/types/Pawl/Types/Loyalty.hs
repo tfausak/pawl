@@ -2,7 +2,7 @@ module Pawl.Types.Loyalty where
 
 import Numeric.Natural (Natural)
 
--- CR 306.5: "Loyalty is a characteristic only planeswalkers have." CR 109.3
+-- | CR 306.5: "Loyalty is a characteristic only planeswalkers have." CR 109.3
 -- lists it among an object's characteristics, and CR 707.2 makes it a copiable
 -- value, which is why it is projected (Pawl.Types.ProjectedCharacteristics)
 -- rather than read off the printed card.

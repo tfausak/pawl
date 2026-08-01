@@ -1,6 +1,6 @@
 module Pawl.Types.DiscardCause where
 
--- CR 701.9a: why a discard happened. Carried by Pawl.Types.GameEvent's Discarded
+-- | CR 701.9a: why a discard happened. Carried by Pawl.Types.GameEvent's Discarded
 -- so that ONE logged discard answers both of the questions the rules ask about
 -- it -- "was a card discarded?" and "was a card cycled?" -- rather than two log
 -- entries describing one action.
@@ -13,10 +13,10 @@ module Pawl.Types.DiscardCause where
 -- hold by construction; two events would make it a rule every reader had to
 -- remember.
 data DiscardCause
-  = -- CR 701.9a's plain discard, whatever asked for it: a "discard a card"
+  = -- | CR 701.9a's plain discard, whatever asked for it: a "discard a card"
     -- effect, a cost component naming cards, or CR 514.1's cleanup step.
     Ordinary
-  | -- CR 702.29c: "'When you cycle this card' means 'When you discard this card
+  | -- | CR 702.29c: "'When you cycle this card' means 'When you discard this card
     -- to pay an activation cost of a cycling ability.'" Recorded by Pawl.Engine.Cost's
     -- DiscardThis component -- see that arm for what it cannot see.
     ToPayCyclingCost

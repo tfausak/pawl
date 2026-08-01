@@ -103,25 +103,32 @@ library codec
     Pawl.Codec.CounterPattern
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageKind
+    Pawl.Codec.DamageKindSpec
     Pawl.Codec.DamagePattern
     Pawl.Codec.DamageRewrite
+    Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DestructionRewrite
+    Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.DiscardCause
+    Pawl.Codec.DiscardCauseSpec
     Pawl.Codec.Duration
     Pawl.Codec.Effect
     Pawl.Codec.EndingStep
+    Pawl.Codec.EndingStepSpec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryRewrite
     Pawl.Codec.EntryRiders
     Pawl.Codec.EventShape
     Pawl.Codec.Expiry
     Pawl.Codec.ExtraPhase
+    Pawl.Codec.ExtraPhaseSpec
     Pawl.Codec.Filter
     Pawl.Codec.GameEvent
     Pawl.Codec.Json
     Pawl.Codec.Keyword
     Pawl.Codec.Loyalty
+    Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaSymbol
@@ -129,9 +136,12 @@ library codec
     Pawl.Codec.Modal
     Pawl.Codec.Mode
     Pawl.Codec.ModeIndex
+    Pawl.Codec.ModeIndexSpec
     Pawl.Codec.ModeSelection
+    Pawl.Codec.ModeSelectionSpec
     Pawl.Codec.Modification
     Pawl.Codec.MonarchTarget
+    Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectRef
     Pawl.Codec.Onset

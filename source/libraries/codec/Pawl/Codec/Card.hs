@@ -25,7 +25,7 @@ import qualified Pawl.Codec.Counterability as Counterability
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
+import qualified Pawl.Codec.Loyalty as Loyalty
 import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
@@ -64,7 +64,7 @@ cardToJson c =
         -- other card file to say nothing.
         <> ( case CardT.loyalty c of
                Nothing -> []
-               Just l -> [(Text.pack "loyalty", loyaltyToJson l)]
+               Just l -> [(Text.pack "loyalty", Loyalty.toJson l)]
            )
         <> ( if Set.null (CardT.colorIndicator c)
                then []
@@ -136,7 +136,7 @@ jsonToCard value = do
   typeLine <- Json.field (Text.pack "typeLine") ps >>= jsonToTypeLine
   power <- Json.maybeFrom jsonToPower (Json.getOpt (Text.pack "power") ps)
   toughness <- Json.maybeFrom jsonToToughness (Json.getOpt (Text.pack "toughness") ps)
-  loyalty <- Json.maybeFrom jsonToLoyalty (Json.getOpt (Text.pack "loyalty") ps)
+  loyalty <- Json.maybeFrom Loyalty.fromJson (Json.getOpt (Text.pack "loyalty") ps)
   keywords <- Json.field (Text.pack "keywords") ps >>= Json.setFrom jsonToKeyword
   statics <- Json.field (Text.pack "staticAbilities") ps >>= Json.listFrom jsonToStaticAbility
   spell <- Json.field (Text.pack "spell") ps >>= jsonToModal jsonToCard

@@ -5,7 +5,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Countering (counteringToJson, jsonToCountering)
 import Pawl.Codec.DamageEvent (damageEventToJson, jsonToDamageEvent)
-import Pawl.Codec.DiscardCause (discardCauseToJson, jsonToDiscardCause)
+import qualified Pawl.Codec.DiscardCause as DiscardCause
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
 import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
@@ -24,7 +24,7 @@ gameEventToJson e = case e of
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (playerIdToJson pid))
   GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (playerIdToJson pid))
   GameEvent.Discarded pid oid cause ->
-    Json.tagged (Text.pack "Discarded") (Just (Array (MkArray [playerIdToJson pid, objectIdToJson oid, discardCauseToJson cause])))
+    Json.tagged (Text.pack "Discarded") (Just (Array (MkArray [playerIdToJson pid, objectIdToJson oid, DiscardCause.toJson cause])))
   GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array (MkArray [playerIdToJson pid, projectedCharacteristicsToJson pc])))
   GameEvent.AttackerDeclared oid -> Json.tagged (Text.pack "AttackerDeclared") (Just (objectIdToJson oid))
   GameEvent.SpellCountered c -> Json.tagged (Text.pack "SpellCountered") (Just (counteringToJson c))
@@ -40,7 +40,7 @@ jsonToGameEvent value = do
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> jsonToPlayerId v
     ("Discarded", Just (Array (MkArray [pid, oid, cause]))) ->
-      GameEvent.Discarded <$> jsonToPlayerId pid <*> jsonToObjectId oid <*> jsonToDiscardCause cause
+      GameEvent.Discarded <$> jsonToPlayerId pid <*> jsonToObjectId oid <*> DiscardCause.fromJson cause
     ("Revealed", Just (Array (MkArray [pid, pc]))) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
     ("AttackerDeclared", Just v) -> GameEvent.AttackerDeclared <$> jsonToObjectId v
     ("SpellCountered", Just v) -> GameEvent.SpellCountered <$> jsonToCountering v

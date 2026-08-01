@@ -9,7 +9,7 @@ import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
+import qualified Pawl.Codec.Loyalty as Loyalty
 import Pawl.Codec.Quantity (jsonToQuantityPair, quantityToJson)
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
@@ -28,7 +28,7 @@ projectedCharacteristicsToJson pc =
       (Text.pack "colors", Json.setTo Color.toJson (PC.colors pc)),
       (Text.pack "power", Json.maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", Json.maybeTo Json.jInt (PC.toughness pc)),
-      (Text.pack "loyalty", Json.maybeTo loyaltyToJson (PC.loyalty pc)),
+      (Text.pack "loyalty", Json.maybeTo Loyalty.toJson (PC.loyalty pc)),
       (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [quantityToJson p, quantityToJson t])) (PC.characteristicPT pc)),
       (Text.pack "cardTypes", Json.setTo CardType.toJson (PC.cardTypes pc)),
       (Text.pack "subtypes", Json.setTo subtypeToJson (PC.subtypes pc)),
@@ -50,7 +50,7 @@ jsonToProjectedCharacteristics value = do
   -- other field here -- not the optional Json.getOpt a truly-omittable key would need.
   pow <- Json.field (Text.pack "power") ps >>= Json.maybeFrom Json.asInteger
   tou <- Json.field (Text.pack "toughness") ps >>= Json.maybeFrom Json.asInteger
-  loy <- Json.field (Text.pack "loyalty") ps >>= Json.maybeFrom jsonToLoyalty
+  loy <- Json.field (Text.pack "loyalty") ps >>= Json.maybeFrom Loyalty.fromJson
   cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom jsonToQuantityPair
   cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom CardType.fromJson
   subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom jsonToSubtype

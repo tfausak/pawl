@@ -3,7 +3,7 @@ module Pawl.Codec.DamageEvent where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.DamageKind (damageKindToJson, jsonToDamageKind)
+import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
 import Pawl.Codec.Recipient (jsonToRecipient, recipientToJson)
@@ -19,7 +19,7 @@ damageEventToJson ev =
       (Text.pack "dealtByDeathtouch", Json.jBool (DamageEvent.dealtByDeathtouch ev)),
       (Text.pack "dealtByInfect", Json.jBool (DamageEvent.dealtByInfect ev)),
       (Text.pack "dealtByToxic", Json.natTo (DamageEvent.dealtByToxic ev)),
-      (Text.pack "kind", damageKindToJson (DamageEvent.kind ev))
+      (Text.pack "kind", DamageKind.toJson (DamageEvent.kind ev))
     ]
 
 jsonToDamageEvent :: Value -> Either Text DamageEvent.DamageEvent
@@ -31,7 +31,7 @@ jsonToDamageEvent value = do
   d <- Json.field (Text.pack "dealtByDeathtouch") ps >>= Json.jsonToBoolDefault False
   i <- Json.field (Text.pack "dealtByInfect") ps >>= Json.jsonToBoolDefault False
   x <- Json.field (Text.pack "dealtByToxic") ps >>= Json.natFrom
-  k <- Json.field (Text.pack "kind") ps >>= jsonToDamageKind
+  k <- Json.field (Text.pack "kind") ps >>= DamageKind.fromJson
   pure
     DamageEvent.MkDamageEvent
       { DamageEvent.source = s,

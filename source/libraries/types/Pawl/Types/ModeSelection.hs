@@ -2,7 +2,7 @@ module Pawl.Types.ModeSelection where
 
 import Numeric.Natural (Natural)
 
--- CR 700.2: the instruction preceding the bulleted list ("Choose one --"). A sum,
+-- | CR 700.2: the instruction preceding the bulleted list ("Choose one --"). A sum,
 -- not a bare Natural, so it grows without primitive blindness. Only ChooseExactly
 -- exists at M4g: n = 1 for a charm AND for every non-modal card (one mode, forced).
 -- "Choose two"/commands are ChooseExactly 2; "choose one or more" (escalate),
@@ -16,6 +16,7 @@ import Numeric.Natural (Natural)
 -- still says "Choose one --", ChooseExactly 1 -- while entwine is a decision
 -- made as one particular cast is announced. Pawl.Engine.Cast substitutes
 -- Modal.modeCount for this count for that cast alone; nothing rewrites the card.
-newtype ModeSelection
-  = ChooseExactly Natural
+newtype ModeSelection = ChooseExactly
+  { unwrap :: Natural
+  }
   deriving (Eq, Ord, Show)

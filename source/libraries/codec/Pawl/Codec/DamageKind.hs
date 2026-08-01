@@ -1,21 +1,19 @@
--- | The @DamageKind ⇆ Json@ codec (#481).
 module Pawl.Codec.DamageKind where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.DamageKind as DamageKind
 
-damageKindToJson :: DamageKind.DamageKind -> Value
-damageKindToJson k = Json.nullary . Text.pack $ case k of
+toJson :: DamageKind.DamageKind -> Value.Value
+toJson k = Common.nullary $ case k of
   DamageKind.Combat -> "Combat"
   DamageKind.Noncombat -> "Noncombat"
 
-jsonToDamageKind :: Value -> Either Text DamageKind.DamageKind
-jsonToDamageKind =
-  Json.decodeNullary
-    (Text.pack "DamageKind")
-    [ (Text.pack "Combat", DamageKind.Combat),
-      (Text.pack "Noncombat", DamageKind.Noncombat)
+fromJson :: Value.Value -> Either Text.Text DamageKind.DamageKind
+fromJson =
+  Common.decodeNullary
+    "DamageKind"
+    [ ("Combat", DamageKind.Combat),
+      ("Noncombat", DamageKind.Noncombat)
     ]

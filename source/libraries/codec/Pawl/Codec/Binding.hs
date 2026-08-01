@@ -5,7 +5,7 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.ModeIndex (jsonToModeIndex, modeIndexToJson)
+import qualified Pawl.Codec.ModeIndex as ModeIndex
 import Pawl.Codec.ProjectedCharacteristics (jsonToProjectedCharacteristics, projectedCharacteristicsToJson)
 import Pawl.Codec.Recipient (jsonToRecipient, recipientToJson)
 import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
@@ -24,7 +24,7 @@ bindingToJson b =
     [ (Text.pack "target", Json.maybeTo recipientToJson (Binding.target b)),
       (Text.pack "subtypes", Json.maybeTo (\(f, t) -> Array (MkArray [subtypeToJson f, subtypeToJson t])) (Binding.subtypes b)),
       (Text.pack "amount", Json.maybeTo Json.natTo (Binding.amount b)),
-      (Text.pack "modes", Json.maybeTo (Json.setTo modeIndexToJson) (Binding.modes b)),
+      (Text.pack "modes", Json.maybeTo (Json.setTo ModeIndex.toJson) (Binding.modes b)),
       (Text.pack "copy", Json.maybeTo projectedCharacteristicsToJson (Binding.copy b))
     ]
 
@@ -34,7 +34,7 @@ jsonToBinding value = do
   t <- Json.maybeFrom jsonToRecipient (Json.getOpt (Text.pack "target") ps)
   s <- Json.maybeFrom jsonToSubtypePair (Json.getOpt (Text.pack "subtypes") ps)
   a <- Json.maybeFrom Json.natFrom (Json.getOpt (Text.pack "amount") ps)
-  m <- Json.maybeFrom (Json.setFrom jsonToModeIndex) (Json.getOpt (Text.pack "modes") ps)
+  m <- Json.maybeFrom (Json.setFrom ModeIndex.fromJson) (Json.getOpt (Text.pack "modes") ps)
   c <- Json.maybeFrom jsonToProjectedCharacteristics (Json.getOpt (Text.pack "copy") ps)
   pure
     Binding.MkBinding

@@ -17,6 +17,16 @@ import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CounterabilitySpec
+import qualified Pawl.Codec.DamageKindSpec
+import qualified Pawl.Codec.DamageRewriteSpec
+import qualified Pawl.Codec.DestructionRewriteSpec
+import qualified Pawl.Codec.DiscardCauseSpec
+import qualified Pawl.Codec.EndingStepSpec
+import qualified Pawl.Codec.ExtraPhaseSpec
+import qualified Pawl.Codec.LoyaltySpec
+import qualified Pawl.Codec.ModeIndexSpec
+import qualified Pawl.Codec.ModeSelectionSpec
+import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.CodecSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
@@ -126,6 +136,16 @@ spec s registry = do
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
+  Pawl.Codec.DamageKindSpec.spec s
+  Pawl.Codec.DamageRewriteSpec.spec s
+  Pawl.Codec.DestructionRewriteSpec.spec s
+  Pawl.Codec.DiscardCauseSpec.spec s
+  Pawl.Codec.EndingStepSpec.spec s
+  Pawl.Codec.ExtraPhaseSpec.spec s
+  Pawl.Codec.LoyaltySpec.spec s
+  Pawl.Codec.ModeIndexSpec.spec s
+  Pawl.Codec.ModeSelectionSpec.spec s
+  Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.CodecSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry

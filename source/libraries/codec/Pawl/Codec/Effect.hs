@@ -8,12 +8,12 @@ import qualified Pawl.Codec.AbilityName as AbilityName
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.EntryRiders (defaultEntryRiders, entryRidersToJson, jsonToEntryRiders)
-import Pawl.Codec.ExtraPhase (extraPhaseToJson, jsonToExtraPhase)
+import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.ManaProduction (jsonToManaProduction, manaProductionToJson)
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
-import Pawl.Codec.MonarchTarget (jsonToMonarchTarget, monarchTargetToJson)
+import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import Pawl.Codec.ObjectRef (jsonToObjectRef, objectRefToJson)
 import Pawl.Codec.Onset (jsonToOnset, onsetToJson)
 import Pawl.Codec.PhaseSelector (jsonToPhaseSelector, phaseSelectorToJson)
@@ -89,7 +89,7 @@ effectToJson codec e = case e of
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [playerRefToJson r, playerCounterKindToJson k, quantityToJson q])))
   Effect.Tap r -> Json.tagged (Text.pack "Tap") (Just (objectRefToJson r))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
-  Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (MkArray (fmap extraPhaseToJson ps))))
+  Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (MkArray (fmap ExtraPhase.toJson ps))))
   Effect.GainControl d r -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, objectRefToJson r])))
   -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
   -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
@@ -105,7 +105,7 @@ effectToJson codec e = case e of
     _ -> Array (MkArray [AbilityName.toJson n, onsetToJson o, Json.maybeTo durationToJson md])
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array (MkArray [durationToJson d, playerScopeToJson s, playerEffectToJson pe])))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (codec c))
-  Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
+  Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (MonarchTarget.toJson t))
   Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (slotNameToJson s))
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
   Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson f])))
@@ -202,7 +202,7 @@ jsonToEffect decode value = do
     "Tap" -> Json.withValue mv (fmap Effect.Tap . jsonToObjectRef)
     "Untap" -> Json.withValue mv (fmap Effect.Untap . jsonToObjectRef)
     "AddPhases" -> case mv of
-      Just (Array (MkArray ps)) -> Effect.AddPhases <$> traverse jsonToExtraPhase ps
+      Just (Array (MkArray ps)) -> Effect.AddPhases <$> traverse ExtraPhase.fromJson ps
       _ -> Left (Text.pack "AddPhases expects [ExtraPhase]")
     "GainControl" -> case mv of
       Just (Array (MkArray [d, r])) -> Effect.GainControl <$> jsonToDuration d <*> jsonToObjectRef r
@@ -211,7 +211,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [d, s, pe])) -> Effect.AffectPlayers <$> jsonToDuration d <*> jsonToPlayerScope s <*> jsonToPlayerEffect pe
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")
     "CreateEmblem" -> Json.withValue mv (fmap Effect.CreateEmblem . decode)
-    "BecomeMonarch" -> Json.withValue mv (fmap Effect.BecomeMonarch . jsonToMonarchTarget)
+    "BecomeMonarch" -> Json.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
     "ExileUntilMonarch" -> Json.withValue mv (fmap Effect.ExileUntilMonarch . jsonToSlotName)
     "Attach" -> Json.withValue mv (fmap Effect.Attach . jsonToSlotName)
     "AttachTarget" -> case mv of

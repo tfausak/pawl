@@ -19,7 +19,6 @@ import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
 import Pawl.Codec.Count (countToJson, jsonToCount)
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
-import Pawl.Codec.DiscardCause (discardCauseToJson, jsonToDiscardCause)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
@@ -28,15 +27,12 @@ import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
 import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
 import Pawl.Codec.ManaSymbol (jsonToManaSymbol, manaSymbolToJson)
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.Mode (jsonToMode, modeToJson)
-import Pawl.Codec.ModeIndex (jsonToModeIndex, modeIndexToJson)
-import Pawl.Codec.ModeSelection (jsonToModeSelection, modeSelectionToJson)
+import qualified Pawl.Codec.ModeSelection as ModeSelection
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
-import Pawl.Codec.MonarchTarget (jsonToMonarchTarget, monarchTargetToJson)
 import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
 import Pawl.Codec.Optionality (jsonToOptionality, optionalityToJson)
 import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
@@ -116,7 +112,6 @@ import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -716,9 +711,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         typeLineToJson
         jsonToTypeLine
         (TypeLine.MkTypeLine (Set.singleton Supertype.Legendary) (Set.singleton CardType.Planeswalker) (Set.singleton Subtype.Jace))
-    -- CR 306.5a: the printed loyalty number.
-    Spec.it s "Loyalty" $
-      roundTrip s "loyalty" loyaltyToJson jsonToLoyalty (Loyalty.MkLoyalty 3)
     -- CR 614.1c / 306.5b: the intrinsic enters-with-counters rewrite.
     Spec.it s "EntryRewrite (with counters)" $
       roundTrip s "entry-counters" entryRewriteToJson jsonToEntryRewrite (EntryRewrite.WithCounters CounterKind.Loyalty 3)
@@ -889,10 +881,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       let wholePhase = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
       Spec.assertEqWith s "and so does a whole-phase one" (jsonToReplacementEffect (replacementEffectToJson wholePhase)) (Right wholePhase)
   Spec.describe s "modal" $ do
-    Spec.it s "ModeIndex round-trips" $
-      roundTrip s "mi" modeIndexToJson jsonToModeIndex (ModeIndex.MkModeIndex 2)
-    Spec.it s "ModeSelection round-trips" $
-      roundTrip s "ms" modeSelectionToJson jsonToModeSelection (ModeSelection.ChooseExactly 1)
     Spec.it s "Modal round-trips" $
       roundTrip
         s
@@ -935,7 +923,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         ( either
             (const True)
             (const False)
-            (jsonToModal jsonToCard (J.jObject [(Text.pack "modes", J.jArray []), (Text.pack "selection", modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
+            (jsonToModal jsonToCard (J.jObject [(Text.pack "modes", J.jArray []), (Text.pack "selection", ModeSelection.toJson (ModeSelection.ChooseExactly 1))]))
         )
         "left"
   Spec.describe s "honesty round-trip over allPrintings" $ do
@@ -1035,9 +1023,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "step" gameEventToJson jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
     Spec.it s "GameEvent.SpellCast round-trips" $
       roundTrip s "ev" gameEventToJson jsonToGameEvent (GameEvent.SpellCast S.alice)
-    Spec.it s "MonarchTarget" $ do
-      roundTrip s "tc" monarchTargetToJson jsonToMonarchTarget MonarchTarget.TheController
-      roundTrip s "cos" monarchTargetToJson jsonToMonarchTarget MonarchTarget.ControllerOfSource
     Spec.it s "GameEvent.BecameMonarch" $
       roundTrip s "bm" gameEventToJson jsonToGameEvent (GameEvent.BecameMonarch S.alice)
     -- CR 702.29c's event, carrying the incarnation the cycled card became.
@@ -1056,8 +1041,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "GameEvent.Discarded round-trips with either cause" $ do
       roundTrip s "disc" gameEventToJson jsonToGameEvent (GameEvent.Discarded S.alice (ObjectId.MkObjectId 7) DiscardCause.Ordinary)
       roundTrip s "cyc" gameEventToJson jsonToGameEvent (GameEvent.Discarded S.bob (ObjectId.MkObjectId 7) DiscardCause.ToPayCyclingCost)
-    Spec.it s "DiscardCause round-trips" $
-      mapM_ (roundTrip s "cause" discardCauseToJson jsonToDiscardCause) [DiscardCause.Ordinary, DiscardCause.ToPayCyclingCost]
     -- CR 701.20a: the reveal's whole payload IS the snapshot, so it is the
     -- one GameEvent whose round-trip failing would silently erase what the
     -- players were shown rather than merely mislabel it. Typhoid Rats for
