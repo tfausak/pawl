@@ -1,6 +1,6 @@
 module Pawl.Types.PlayerScope where
 
--- Which players a Pawl.Types.PlayerEffect applies to: the player-side analogue of
+-- | Which players a Pawl.Types.PlayerEffect applies to: the player-side analogue of
 -- Pawl.Types.Affected, and much smaller because CR 109.5 fixes what "you" means.
 -- Resolved against the effect's CONTROLLER by Pawl.Engine.PlayerEffect.inScope.
 --
@@ -15,9 +15,9 @@ module Pawl.Types.PlayerScope where
 -- same type on the printed and the stored carrier. Freeze it and Silence, which
 -- resolves with no opponent spell on the stack, does literally nothing.
 data PlayerScope
-  = -- CR 109.5: the effect's controller.
+  = -- | CR 109.5: the effect's controller.
     You
-  | -- Every other player. Not a two-player shortcut: CR 806.1 has a
+  | -- | Every other player. Not a two-player shortcut: CR 806.1 has a
     -- free-for-all's players compete as individuals against each other, so
     -- every other player is an opponent by construction; CR 102.2 says the
     -- same thing for two players. `Pawl.Engine.PlayerEffect.inScope`'s
@@ -28,7 +28,7 @@ data PlayerScope
     -- Pinned at three seats by PlayerEffectSpec's "CR 806.1 at three seats
     -- Silence stops BOTH opponents, and still spares the caster".
     Opponents
-  | -- Every player, the controller included ("including your own", Thalia's own
+  | -- | Every player, the controller included ("including your own", Thalia's own
     -- ruling).
     EachPlayer
   deriving (Eq, Ord, Show)

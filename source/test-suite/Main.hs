@@ -27,6 +27,15 @@ import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
 import qualified Pawl.Codec.MonarchTargetSpec
+import qualified Pawl.Codec.ObjectIdSpec
+import qualified Pawl.Codec.OnsetSpec
+import qualified Pawl.Codec.OptionalitySpec
+import qualified Pawl.Codec.PlayerCounterKindSpec
+import qualified Pawl.Codec.PlayerIdSpec
+import qualified Pawl.Codec.PlayerRelationSpec
+import qualified Pawl.Codec.PlayerScopeSpec
+import qualified Pawl.Codec.PoolSpec
+import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.CodecSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
@@ -146,6 +155,15 @@ spec s registry = do
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
+  Pawl.Codec.ObjectIdSpec.spec s
+  Pawl.Codec.OnsetSpec.spec s
+  Pawl.Codec.OptionalitySpec.spec s
+  Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.PlayerIdSpec.spec s
+  Pawl.Codec.PlayerRelationSpec.spec s
+  Pawl.Codec.PlayerScopeSpec.spec s
+  Pawl.Codec.PoolSpec.spec s
+  Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.CodecSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry

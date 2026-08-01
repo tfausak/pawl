@@ -1,6 +1,6 @@
 module Pawl.Types.Pool where
 
--- CR 115: the closed set of recipient kinds a target slot may draw from, fixing
+-- | CR 115: the closed set of recipient kinds a target slot may draw from, fixing
 -- both WHICH objects are candidates and HOW they are referenced
 -- (Recipient.ToCreature / ToPlaneswalker / ToPlayer / ToObject). Closed-half
 -- vocabulary, like the old TargetSpec enum -- it grows only when the rules define
@@ -8,7 +8,7 @@ module Pawl.Types.Pool where
 data Pool
   = Creatures -- CR 115.1a: creatures on the battlefield (ToCreature).
   | Players -- CR 115: players still in the game (ToPlayer).
-  | -- CR 115.4 names creatures, players, planeswalkers AND battles; battles are
+  | -- | CR 115.4 names creatures, players, planeswalkers AND battles; battles are
     -- the one it does not admit (#302).
     AnyTarget
   | Permanents -- CR 110.1: permanents on the battlefield (ToObject).

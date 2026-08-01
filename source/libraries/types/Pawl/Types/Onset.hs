@@ -1,6 +1,6 @@
 module Pawl.Types.Onset where
 
--- CR 603.7: when a delayed triggered ability BECOMES ARMED, as the card says it
+-- | CR 603.7: when a delayed triggered ability BECOMES ARMED, as the card says it
 -- -- the half of a printed clause like "at the beginning of the declare
 -- attackers step on your next turn" that a TriggerCondition cannot carry, since
 -- that condition says WHICH event and this says which occurrence of it counts.
@@ -34,7 +34,7 @@ module Pawl.Types.Onset where
 -- to.
 data Onset
   = Immediately
-  | -- Duration.UntilYourNextTurn read as a beginning instead of an end.
+  | -- | Duration.UntilYourNextTurn read as a beginning instead of an end.
     --
     -- WHAT THIS ARM ENFORCES ON ITS OWN is the NEXT half of "your next turn" and
     -- only that half: Pawl.Engine.Resolve turns it into a turn NUMBER

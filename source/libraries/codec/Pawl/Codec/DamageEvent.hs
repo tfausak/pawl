@@ -5,7 +5,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
+import qualified Pawl.Codec.ObjectId as ObjectId
 import Pawl.Codec.Recipient (jsonToRecipient, recipientToJson)
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -13,7 +13,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 damageEventToJson :: DamageEvent.DamageEvent -> Value
 damageEventToJson ev =
   Json.jObject
-    [ (Text.pack "source", objectIdToJson (DamageEvent.source ev)),
+    [ (Text.pack "source", ObjectId.toJson (DamageEvent.source ev)),
       (Text.pack "target", recipientToJson (DamageEvent.target ev)),
       (Text.pack "amount", Json.natTo (DamageEvent.amount ev)),
       (Text.pack "dealtByDeathtouch", Json.jBool (DamageEvent.dealtByDeathtouch ev)),
@@ -25,7 +25,7 @@ damageEventToJson ev =
 jsonToDamageEvent :: Value -> Either Text DamageEvent.DamageEvent
 jsonToDamageEvent value = do
   ps <- Json.asObject value
-  s <- Json.field (Text.pack "source") ps >>= jsonToObjectId
+  s <- Json.field (Text.pack "source") ps >>= ObjectId.fromJson
   t <- Json.field (Text.pack "target") ps >>= jsonToRecipient
   a <- Json.field (Text.pack "amount") ps >>= Json.natFrom
   d <- Json.field (Text.pack "dealtByDeathtouch") ps >>= Json.jsonToBoolDefault False

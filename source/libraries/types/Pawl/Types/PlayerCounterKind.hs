@@ -1,6 +1,6 @@
 module Pawl.Types.PlayerCounterKind where
 
--- CR 122: a counter is a marker on an object OR a player (CR 122.1). Player
+-- | CR 122: a counter is a marker on an object OR a player (CR 122.1). Player
 -- counters are a DISJOINT domain from object CounterKind: CR 122 gives no kind
 -- that goes on both -- +1/+1, keyword, shield, stun, finality, loyalty, defense
 -- and lore counters are object-only (CR 122.1a-e,g-i); poison, energy,

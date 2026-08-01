@@ -6,7 +6,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
 import Pawl.Codec.Supertype (jsonToSupertype, supertypeToJson)
 import Pawl.Json.Array (Array (MkArray))
@@ -30,8 +30,8 @@ filterToJson filter_ = case filter_ of
   Filter.HasColor c -> Json.tagged (Text.pack "HasColor") (Just (Color.toJson c))
   Filter.HasSubtype s -> Json.tagged (Text.pack "HasSubtype") (Just (subtypeToJson s))
   Filter.PowerAtLeast n -> Json.tagged (Text.pack "PowerAtLeast") (Just (Json.jInt n))
-  Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (playerRelationToJson r))
-  Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (playerRelationToJson r))
+  Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (PlayerRelation.toJson r))
+  Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (PlayerRelation.toJson r))
   Filter.IsSource -> Json.nullary (Text.pack "IsSource")
   Filter.IsAttacking -> Json.nullary (Text.pack "IsAttacking")
   Filter.IsBlocking -> Json.nullary (Text.pack "IsBlocking")
@@ -53,8 +53,8 @@ jsonToFilter value = do
     ("HasColor", Just v) -> Filter.HasColor <$> Color.fromJson v
     ("HasSubtype", Just v) -> Filter.HasSubtype <$> jsonToSubtype v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Json.asInteger v
-    ("ControlledBy", Just v) -> Filter.ControlledBy <$> jsonToPlayerRelation v
-    ("IsPlayer", Just v) -> Filter.IsPlayer <$> jsonToPlayerRelation v
+    ("ControlledBy", Just v) -> Filter.ControlledBy <$> PlayerRelation.fromJson v
+    ("IsPlayer", Just v) -> Filter.IsPlayer <$> PlayerRelation.fromJson v
     ("IsSource", _) -> Right Filter.IsSource
     ("IsAttacking", _) -> Right Filter.IsAttacking
     ("IsBlocking", _) -> Right Filter.IsBlocking

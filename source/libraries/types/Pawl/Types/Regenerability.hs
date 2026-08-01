@@ -1,6 +1,6 @@
 module Pawl.Types.Regenerability where
 
--- CR 701.19c: whether a would-be-destroyed event admits a regeneration shield.
+-- | CR 701.19c: whether a would-be-destroyed event admits a regeneration shield.
 --
 -- A property of the DESTRUCTION, not of the permanent. Terror's "It can't be
 -- regenerated" says nothing about the creature and everything about the

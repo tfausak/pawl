@@ -33,13 +33,9 @@ import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.Mode (jsonToMode, modeToJson)
 import qualified Pawl.Codec.ModeSelection as ModeSelection
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
-import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
-import Pawl.Codec.Optionality (jsonToOptionality, optionalityToJson)
+import qualified Pawl.Codec.Optionality as Optionality
 import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
-import Pawl.Codec.PlayerCounterKind (jsonToPlayerCounterKind, playerCounterKindToJson)
 import Pawl.Codec.PlayerEffect (jsonToPlayerEffect, playerEffectToJson)
-import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
-import Pawl.Codec.PlayerScope (jsonToPlayerScope, playerScopeToJson)
 import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
 import Pawl.Codec.Power (jsonToPower, powerToJson)
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
@@ -269,9 +265,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "ZoneChangeSubject" $ do
       roundTrip s "any" zoneChangeSubjectToJson jsonToZoneChangeSubject ZoneChangeSubject.AnyObject
       roundTrip s "source" zoneChangeSubjectToJson jsonToZoneChangeSubject ZoneChangeSubject.TheSource
-    Spec.it s "PlayerCounterKind" $ do
-      roundTrip s "energy" playerCounterKindToJson jsonToPlayerCounterKind PlayerCounterKind.Energy
-      roundTrip s "poison" playerCounterKindToJson jsonToPlayerCounterKind PlayerCounterKind.Poison
     Spec.it s "CounterKind" $ do
       Spec.assertEqWith s "plus" (jsonToCounterKind (counterKindToJson CounterKind.PlusOnePlusOne)) (Right CounterKind.PlusOnePlusOne)
       Spec.assertEqWith s "minus" (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne)) (Right CounterKind.MinusOneMinusOne)
@@ -284,8 +277,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   Spec.describe s "newtypes" $ do
     Spec.it s "SlotName" $
       roundTrip s "slot" slotNameToJson jsonToSlotName (SlotName.MkSlotName (Text.pack "x"))
-    Spec.it s "ObjectId" $
-      roundTrip s "oid" objectIdToJson jsonToObjectId (ObjectId.MkObjectId 7)
   Spec.describe s "mana + quantity (tagged-sum trap)" $ do
     Spec.it s "Quantity.Literal is a tagged object with numeric value" $
       Spec.assertEqWith
@@ -538,10 +529,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       let d = Duration.ForAsLongAs S.youControlSource
        in Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson d)) (Right d)
   Spec.describe s "player effects (P7)" $ do
-    Spec.it s "every PlayerScope round-trips" $
-      mapM_
-        (roundTrip s "scope" playerScopeToJson jsonToPlayerScope)
-        [PlayerScope.You, PlayerScope.Opponents, PlayerScope.EachPlayer]
     Spec.it s "every PlayerEffect round-trips" $
       mapM_
         (roundTrip s "effect" playerEffectToJson jsonToPlayerEffect)
@@ -658,10 +645,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
        in mapM_
             (roundTrip s "filter" filterToJson jsonToFilter)
             [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, relentlessAssault, crownOfTheAges, labyrinthOfSkophos, auraGraftTarget, auraGraftDestination]
-    Spec.it s "PlayerRelation round-trips" $
-      mapM_
-        (roundTrip s "relation" playerRelationToJson jsonToPlayerRelation)
-        [PlayerRelation.You, PlayerRelation.Opponent]
     -- Every supertype the type models, so a new constructor whose codec
     -- arm is forgotten fails here rather than at the one card that carries
     -- it. CR 205.4a lists five; Ongoing is scheme-only (#131).
@@ -899,9 +882,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         )
     -- CR 603.5: an Optional mode is what a printed "may" encodes to, and
     -- the key is emitted only for that value.
-    Spec.it s "Optionality round-trips" $ do
-      roundTrip s "mandatory" optionalityToJson jsonToOptionality Optionality.Mandatory
-      roundTrip s "optional" optionalityToJson jsonToOptionality Optionality.Optional
     Spec.it s "an Optional mode round-trips, and says so in the JSON" $ do
       let m = Mode.MkMode Seq.empty Map.empty Optionality.Optional
       roundTrip s "optional mode" (modeToJson cardToJson) (jsonToMode jsonToCard) m
@@ -909,7 +889,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         s
         "the optionality key is present"
         (optionalityKey (modeToJson cardToJson m))
-        (Just (optionalityToJson Optionality.Optional))
+        (Just (Optionality.toJson Optionality.Optional))
     -- The byte-identity guarantee for every card file that prints no
     -- "may": a Mandatory mode emits no key, and a mode with no key decodes
     -- back to Mandatory. The counterability precedent.

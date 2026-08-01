@@ -7,7 +7,7 @@ import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.PlayerId (jsonToPlayerId, playerIdToJson)
+import qualified Pawl.Codec.PlayerId as PlayerId
 import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
 import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
 import Pawl.Json.Array (Array (MkArray))
@@ -24,7 +24,7 @@ modificationToJson m = case m of
   Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (subtypeToJson s))
   Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (CardType.toJson c))
   Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array (MkArray [subtypeToJson a, subtypeToJson b])))
-  Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))
+  Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (PlayerId.toJson p))
   Modification.SetControllerToSource -> Json.nullary (Text.pack "SetControllerToSource")
   Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (Json.setTo Color.toJson cs))
   Modification.SwitchPowerToughness -> Json.nullary (Text.pack "SwitchPowerToughness")
@@ -44,7 +44,7 @@ jsonToModification value = do
     "AddLandSubtype" -> Json.withValue mv (fmap Modification.AddLandSubtype . jsonToSubtype)
     "AddCardType" -> Json.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
-    "SetController" -> Json.withValue mv (fmap Modification.SetController . jsonToPlayerId)
+    "SetController" -> Json.withValue mv (fmap Modification.SetController . PlayerId.fromJson)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
     "SetColor" -> Json.withValue mv (fmap Modification.SetColor . Json.setFrom Color.fromJson)
     "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness

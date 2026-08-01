@@ -6,7 +6,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Pool (jsonToPool, poolToJson)
+import qualified Pawl.Codec.Pool as Pool
 import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.SlotName as SlotName
@@ -18,7 +18,7 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- a Not IsSource conjunct inside that filter, not a key of its own (#163).
 targetSpecToJson :: TargetSpec.TargetSpec -> Value
 targetSpecToJson (TargetSpec.MkTargetSpec pool restriction) =
-  let base = [(Text.pack "pool", poolToJson pool)]
+  let base = [(Text.pack "pool", Pool.toJson pool)]
       withFilter = case restriction of
         Nothing -> base
         Just f -> base <> [(Text.pack "filter", filterToJson f)]
@@ -27,7 +27,7 @@ targetSpecToJson (TargetSpec.MkTargetSpec pool restriction) =
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
 jsonToTargetSpec value = do
   ps <- Json.asObject value
-  pool <- Json.field (Text.pack "pool") ps >>= jsonToPool
+  pool <- Json.field (Text.pack "pool") ps >>= Pool.fromJson
   restriction <- case Json.optField (Text.pack "filter") ps of
     Nothing -> Right Nothing
     Just v -> Just <$> jsonToFilter v

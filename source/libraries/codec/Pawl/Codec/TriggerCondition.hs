@@ -7,7 +7,7 @@ import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
-import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import Pawl.Codec.TriggerFrequency (jsonToTriggerFrequency, triggerFrequencyToJson)
 import Pawl.Codec.TurnScope (jsonToTurnScope, turnScopeToJson)
 import Pawl.Json.Array (Array (MkArray))
@@ -24,11 +24,11 @@ triggerConditionToJson c = case c of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> Json.nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
   TriggerCondition.SelfAttacks f -> Json.tagged (Text.pack "SelfAttacks") (Just (triggerFrequencyToJson f))
   TriggerCondition.SelfCycled -> Json.nullary (Text.pack "SelfCycled")
-  TriggerCondition.PlayerDiscards r -> Json.tagged (Text.pack "PlayerDiscards") (Just (playerRelationToJson r))
+  TriggerCondition.PlayerDiscards r -> Json.tagged (Text.pack "PlayerDiscards") (Just (PlayerRelation.toJson r))
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Json.nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
   TriggerCondition.SelfDies -> Json.nullary (Text.pack "SelfDies")
   TriggerCondition.SelfLeavesTheBattlefield -> Json.nullary (Text.pack "SelfLeavesTheBattlefield")
-  TriggerCondition.SpellOrAbilityCounters r -> Json.tagged (Text.pack "SpellOrAbilityCounters") (Just (playerRelationToJson r))
+  TriggerCondition.SpellOrAbilityCounters r -> Json.tagged (Text.pack "SpellOrAbilityCounters") (Just (PlayerRelation.toJson r))
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
 jsonToTriggerCondition value = do
@@ -42,11 +42,11 @@ jsonToTriggerCondition value = do
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> jsonToTriggerFrequency v
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
-    ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> jsonToPlayerRelation v
+    ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> PlayerRelation.fromJson v
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
     ("SelfLeavesTheBattlefield", _) -> Right TriggerCondition.SelfLeavesTheBattlefield
-    ("SpellOrAbilityCounters", Just v) -> TriggerCondition.SpellOrAbilityCounters <$> jsonToPlayerRelation v
+    ("SpellOrAbilityCounters", Just v) -> TriggerCondition.SpellOrAbilityCounters <$> PlayerRelation.fromJson v
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
 -- Mana, quantity, power/toughness --------------------------------------------

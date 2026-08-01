@@ -143,26 +143,35 @@ library codec
     Pawl.Codec.MonarchTarget
     Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.ObjectId
+    Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
     Pawl.Codec.Onset
+    Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
+    Pawl.Codec.OptionalitySpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
     Pawl.Codec.PhaseSelector
     Pawl.Codec.PlayerCounterKind
+    Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerEffect
     Pawl.Codec.PlayerId
+    Pawl.Codec.PlayerIdSpec
     Pawl.Codec.PlayerRef
     Pawl.Codec.PlayerRelation
+    Pawl.Codec.PlayerRelationSpec
     Pawl.Codec.PlayerScope
+    Pawl.Codec.PlayerScopeSpec
     Pawl.Codec.PlayerStaticAbility
     Pawl.Codec.Pool
+    Pawl.Codec.PoolSpec
     Pawl.Codec.Power
     Pawl.Codec.Printing
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.Quantity
     Pawl.Codec.Recipient
     Pawl.Codec.Regenerability
+    Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.Scaling
     Pawl.Codec.Scope
