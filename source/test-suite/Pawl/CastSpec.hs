@@ -47,6 +47,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -1341,6 +1342,131 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
+-- alice holds one Pouncing Cheetah and one War Mammoth, with four untapped
+-- Forests -- enough for either one alone ({2}{G} and {3}{G}), so nothing below
+-- turns on affordability. Returns the Cheetah's hand id and the Mammoth's.
+--
+-- The Mammoth is the CONTROL, and it is in the same hand and the same state on
+-- purpose: it is a green creature spell whose only difference from the Cheetah
+-- is the keyword, so a case that passed for both would be the timing gate
+-- opening for every creature rather than for flash.
+cheetahAndMammothInHand ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+cheetahAndMammothInHand forest cheetah warMammoth =
+  let (gs0, cheetahId) = S.handOne cheetah (S.landsInPlay forest 4)
+      (mammothId, gs1) = S.addHandCard warMammoth S.alice gs0
+   in (gs1, cheetahId, mammothId)
+
+-- CR 702.8a: "Flash is a static ability that functions in any zone from which
+-- you could play the card it's on. 'Flash' means 'You may play this card any
+-- time you could cast an instant.'"
+--
+-- Pouncing Cheetah is the whole producer: a {2}{G} 3/2 Cat whose entire rules
+-- text is the keyword, so every case here is the keyword and nothing else.
+flashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flashSpec s registry = Spec.describe s "Flash" $ do
+  -- The baseline both halves start from: with no flash in the question at all,
+  -- alice's own main phase and an empty stack is a window BOTH creatures pass.
+  -- Without this the negatives below would also hold on an engine that refused
+  -- the Mammoth everywhere.
+  Spec.it s "CR 302.1 the control: in alice's own main phase with an empty stack, both are castable" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+    Spec.assertBool s (Cast.castable S.alice cheetahId gs) "the Cheetah"
+    Spec.assertBool s (Cast.castable S.alice mammothId gs) "and the Mammoth"
+  -- CR 302.1's "during a main phase of THEIR turn", lifted for the Cheetah and
+  -- not for the Mammoth.
+  Spec.it s "CR 702.8a castable on an opponent's turn, where a creature without flash is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        bobsTurn = gs {GameState.activePlayer = S.bob}
+    Spec.assertBool s (Cast.castable S.alice cheetahId bobsTurn) "the Cheetah is castable"
+    Spec.assertBool s (elem (A.Cast cheetahId) (Action.legalActions S.alice bobsTurn)) "and offered as a legal action"
+    Spec.assertBool s (not (Cast.castable S.alice mammothId bobsTurn)) "the Mammoth is not"
+    Spec.assertBool s (notElem (A.Cast mammothId) (Action.legalActions S.alice bobsTurn)) "and is not offered"
+  -- CR 302.1's "when the stack is empty", same pair.
+  Spec.it s "CR 702.8a castable with a non-empty stack, where a creature without flash is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
+    Spec.assertBool s (Cast.castable S.alice cheetahId busy) "the Cheetah is castable"
+    Spec.assertBool s (not (Cast.castable S.alice mammothId busy)) "the Mammoth is not"
+  -- CR 302.1's "during a MAIN PHASE", same pair.
+  Spec.it s "CR 702.8a castable in the upkeep, where a creature without flash is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        upkeep = gs {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+    Spec.assertBool s (Cast.castable S.alice cheetahId upkeep) "the Cheetah is castable"
+    Spec.assertBool s (not (Cast.castable S.alice mammothId upkeep)) "the Mammoth is not"
+  -- Rule 702.8a's second sentence is about WHEN, and says nothing about WHERE:
+  -- it lets a player play the card any time they could cast an instant, not
+  -- from anywhere they could not already. A graveyard needs a CR 601.3
+  -- permission (flashback's), which flash is not.
+  Spec.it s "CR 601.3 flash is a timing window and not a zone permission: a buried Cheetah is uncastable" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    let (gs, cheetahId) = S.handOne pouncingCheetah (S.landsInPlay forest 4)
+        buried = S.runPure S.identityAnswer gs (Event.changeZone cheetahId Zone.Graveyard)
+    Spec.assertBool s (Cast.castable S.alice cheetahId gs) "castable from the hand"
+    Spec.assertEqWith s "and nothing castable once it is in the graveyard" (Cast.castableSpells S.alice buried) []
+  -- Flash moves the window the cast is PROPOSED in and nothing else. Two rules
+  -- say what is left untouched, and they are two:
+  --
+  --   * CR 601.2a, the stack half: "To propose the casting of a spell, a player
+  --     first moves that card ... from where it is to the stack. It becomes the
+  --     topmost object on the stack." So the Cheetah is a spell before it is a
+  --     permanent, exactly as a sorcery-speed creature spell is.
+  --   * CR 117.3c, the response half: "If a player has priority when they cast a
+  --     spell ... that player receives priority afterward" -- and then CR 117.1a
+  --     lets the opponent cast an instant when priority reaches them.
+  Spec.it s "CR 601.2a / 117.3c an instant-speed creature spell still uses the stack and can be responded to" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (gs0, cheetahId) = S.handOne pouncingCheetah (S.landsInPlay forest 4)
+        (boltId, gs1) = S.addHandCard lightningBolt S.bob (snd (S.addCreature mountain S.bob gs0))
+        bobsTurn = gs1 {GameState.activePlayer = S.bob}
+        cast = S.runPure S.identityAnswer bobsTurn (Cast.castSpell S.alice cheetahId)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "one object on the stack" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "and not on the battlefield yet" (S.creaturesInPlay S.alice cast) 0
+    Spec.assertBool s (Cast.castable S.bob boltId cast) "bob may respond to it"
+    Spec.assertEqWith s "it resolves into a creature like any other" (S.creaturesInPlay S.alice resolved) 1
+  -- Pawl.Engine.Cast reads the PRINTED keyword. This is the case that says the
+  -- CR 613 projection agrees with it for a card in a hand, so the reading is not
+  -- a shortcut that a projected read would have caught.
+  --
+  -- Humility is why that agreement is the RIGHT answer rather than a
+  -- coincidence: CR 109.2 makes its "all creatures" mean permanents on the
+  -- battlefield, and a card in a hand is not one of them, so the window stays
+  -- open and the projection says so.
+  --
+  -- Nothing in the pool could close it either way -- no effect can put a
+  -- keyword-changing modification on a card in a hand at all (#160).
+  -- Pawl.Engine.Keyword.hasFlash carries that argument in full.
+  Spec.it s "CR 702.8a the projection of a card in hand carries flash, and Humility does not reach it" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    humility <- S.printingOf s registry "Humility"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        humbled = (S.withHumility humility gs) {GameState.activePlayer = S.bob}
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flash cheetahId humbled) "the Cheetah projects flash"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash mammothId humbled)) "the Mammoth does not"
+    Spec.assertBool s (Cast.castable S.alice cheetahId humbled) "and it is still castable on bob's turn"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
@@ -1357,6 +1483,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   fireboltSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry
+  flashSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r
