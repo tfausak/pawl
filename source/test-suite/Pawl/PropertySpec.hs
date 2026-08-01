@@ -20,8 +20,8 @@ import qualified Pawl.Types.Source as Source
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.QuickCheck as QC
 
--- Playing one game out is this suite's entire cost (~66 ms; the other 948 tests
--- together take ~1 s), so the iteration count is the only real dial. 16 is the
+-- Playing one game out is this suite's entire cost (~217 ms; the other 2037
+-- tests together take ~3 s), so the iteration count is the only real dial. 16 is the
 -- cheap end of the curve: these are coarse whole-game invariants, so a bug that
 -- breaks one breaks nearly every seed -- a mutation that drops CR 500.5's mana
 -- emptying is caught by the third seed. To crank it for a milestone gate, edit
@@ -134,27 +134,44 @@ universalInvariants matchup gs =
         QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players gs)))
     ]
 
-propertyTests :: Registry.Registry IO -> Tasty.TestTree
-propertyTests registry =
+-- The three deck sets these properties play with, loaded once.
+--
+-- They used to be loaded INSIDE each QC.ioProperty, so every iteration rebuilt
+-- them -- 48 loads where 3 will do. That was never where the time went (96
+-- played-out games are), but it forced every property to be an ioProperty when
+-- none of them is effectful. Taking the decks as arguments is what lets them be
+-- plain properties over a seed, which is what they always were.
+data Decks = MkDecks
+  { everyMatchup :: [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)],
+    twoSeatLands :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck),
+    threeSeatLands :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+  }
+
+loadDecks :: Registry.Registry IO -> IO Decks
+loadDecks registry = do
+  let fetch = S.orThrow registry
+  ms <- S.matchups fetch
+  two <- S.landsOnly fetch
+  three <- S.threePlayerLandsOnly fetch
+  pure MkDecks {everyMatchup = ms, twoSeatLands = two, threeSeatLands = three}
+
+propertyTests :: Decks -> Tasty.TestTree
+propertyTests decks =
   Tasty.localOption iterations
     . Tasty.testGroup "Properties"
     $ [ QC.testProperty "every matchup upholds every universal invariant" $
-          \s -> QC.ioProperty $ do
-            ms <- S.matchups (S.orThrow registry)
-            pure (QC.conjoin (fmap (\m -> universalInvariants m (S.runRandomGame m s)) ms)),
+          \s -> QC.conjoin (fmap (\m -> universalInvariants m (S.runRandomGame m s)) (everyMatchup decks)),
         -- Durable structural property: with a deck that can only ever deck out (60
         -- basic lands, no spells, no attackers), every seed's game ends AND ends by
         -- a player drawing from an empty library (CR 704.5b) -- never by any other
         -- loss condition. Stays true no matter what cards later exist.
         QC.testProperty "a lands-only mirror always ends by deck-out" $
-          \s -> QC.ioProperty $ do
-            decks <- S.landsOnly (S.orThrow registry)
-            let final = S.runRandomGame decks s
-            pure $
-              QC.property
-                ( Maybe.isJust (GameState.result final)
-                    && not (Set.null (GameState.drewFromEmpty final))
-                ),
+          \s ->
+            let final = S.runRandomGame (twoSeatLands decks) s
+             in QC.property
+                  ( Maybe.isJust (GameState.result final)
+                      && not (Set.null (GameState.drewFromEmpty final))
+                  ),
         -- The milestone's headline falsifier (spec sections 0 and 4). Three
         -- lands-only seats can only ever deck out, so the game's shape is
         -- forced: CR 704.5b takes the first player, the game CONTINUES with two
@@ -168,24 +185,22 @@ propertyTests registry =
         -- shape (a result exists AND someone decked out) passes under that
         -- implementation on the first deck-out.
         QC.testProperty "a three-seat lands-only mirror needs TWO deck-outs to find a winner" $
-          \s -> QC.ioProperty $ do
-            decks <- S.threePlayerLandsOnly (S.orThrow registry)
-            let final = S.runRandomGame decks s
+          \s ->
+            let final = S.runRandomGame (threeSeatLands decks) s
                 decked = GameState.drewFromEmpty final
-            pure $
-              QC.conjoin
-                [ QC.counterexample "exactly two players decked out" $
-                    Set.size decked QC.=== 2,
-                  QC.counterexample "and the game was won, not drawn" $
-                    QC.property (case GameState.result final of Just (Result.Won _) -> True; _ -> False),
-                  QC.counterexample "by the one player who did not deck out" $
-                    QC.property
-                      ( case GameState.result final of
-                          Just (Result.Won w) -> not (Set.member w decked)
-                          _ -> False
-                      )
-                ]
+             in QC.conjoin
+                  [ QC.counterexample "exactly two players decked out" $
+                      Set.size decked QC.=== 2,
+                    QC.counterexample "and the game was won, not drawn" $
+                      QC.property (case GameState.result final of Just (Result.Won _) -> True; _ -> False),
+                    QC.counterexample "by the one player who did not deck out" $
+                      QC.property
+                        ( case GameState.result final of
+                            Just (Result.Won w) -> not (Set.member w decked)
+                            _ -> False
+                        )
+                  ]
       ]
 
-tests :: Registry.Registry IO -> Tasty.TestTree
-tests registry = Tasty.testGroup "Properties" [propertyTests registry]
+tests :: Decks -> Tasty.TestTree
+tests decks = Tasty.testGroup "Properties" [propertyTests decks]

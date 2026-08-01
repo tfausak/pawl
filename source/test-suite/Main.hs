@@ -66,7 +66,8 @@ main :: IO ()
 main = do
   root <- Registry.defaultRoot
   registry <- Registry.fileRegistry root
-  Tasty.defaultMain (testTree registry)
+  decks <- PropertySpec.loadDecks registry
+  Tasty.defaultMain (testTree registry decks)
 
 tasty :: Spec.Spec IO (Writer.Writer [Tasty.TestTree])
 tasty =
@@ -76,11 +77,11 @@ tasty =
       Spec.it = \s -> Writer.tell . List.singleton . HU.testCase s
     }
 
-testTree :: Registry.Registry IO -> Tasty.TestTree
-testTree registry =
+testTree :: Registry.Registry IO -> PropertySpec.Decks -> Tasty.TestTree
+testTree registry decks =
   Tasty.testGroup
     "pawl"
-    ( [ PropertySpec.tests registry,
+    ( [ PropertySpec.tests decks,
         Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
       ]
         -- Pawl.ReplacementSpec is wired separately because its timeout is a
