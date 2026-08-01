@@ -6,6 +6,7 @@ import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
 import qualified Pawl.CastSpec
+import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.CodecSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
@@ -104,6 +105,7 @@ spec s registry = do
   Pawl.CardSpec.spec s registry
   Pawl.CardsSpec.spec s registry
   Pawl.CastSpec.spec s registry
+  Pawl.Codec.AbilityNameSpec.spec s
   Pawl.CodecSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry

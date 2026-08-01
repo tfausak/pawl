@@ -57,6 +57,7 @@ library codec
     pawl:decimal,
     pawl:extra,
     pawl:json,
+    pawl:spec,
     pawl:types,
     text ^>=2.1.3,
 
@@ -64,6 +65,7 @@ library codec
   -- cabal-gild: discover source/libraries/codec
   exposed-modules:
     Pawl.Codec.AbilityName
+    Pawl.Codec.AbilityNameSpec
     Pawl.Codec.ActivatedAbility
     Pawl.Codec.ActivationTiming
     Pawl.Codec.Affected
@@ -78,6 +80,7 @@ library codec
     Pawl.Codec.CastingRestriction
     Pawl.Codec.Color
     Pawl.Codec.CombatStep
+    Pawl.Codec.Common
     Pawl.Codec.Comparison
     Pawl.Codec.Condition
     Pawl.Codec.ControllerRelation

@@ -4,7 +4,7 @@ module Pawl.Codec.TriggeredAbility where
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.AbilityName (abilityNameToJson, jsonToAbilityName)
+import qualified Pawl.Codec.AbilityName as AbilityName
 import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
@@ -43,14 +43,14 @@ jsonToTriggeredAbility decode value = do
 delayedAbilitiesToJson :: (card -> Value) -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card) -> Value
 delayedAbilitiesToJson codec m =
   Json.listTo
-    (\(k, v) -> Json.jObject [(Text.pack "name", abilityNameToJson k), (Text.pack "ability", triggeredAbilityToJson codec v)])
+    (\(k, v) -> Json.jObject [(Text.pack "name", AbilityName.toJson k), (Text.pack "ability", triggeredAbilityToJson codec v)])
     (Map.toAscList m)
 
 jsonToDelayedAbilities :: (Value -> Either Text card) -> Value -> Either Text (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card))
 jsonToDelayedAbilities decode value =
   let decodeEntry v = do
         ps <- Json.asObject v
-        k <- Json.field (Text.pack "name") ps >>= jsonToAbilityName
+        k <- Json.field (Text.pack "name") ps >>= AbilityName.fromJson
         a <- Json.field (Text.pack "ability") ps >>= jsonToTriggeredAbility decode
         pure (k, a)
    in Map.fromList <$> Json.listFrom decodeEntry value

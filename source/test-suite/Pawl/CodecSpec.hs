@@ -7,7 +7,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.AbilityName (abilityNameToJson, jsonToAbilityName)
+import qualified Pawl.Codec.AbilityName as AbilityName
 import Pawl.Codec.ActivationTiming (activationTimingToJson, jsonToActivationTiming)
 import Pawl.Codec.Affected (affectedToJson, jsonToAffected)
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
@@ -1171,7 +1171,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "CreatureDealtCombatDamageToMonarch" $
       roundTrip s "cd" triggerConditionToJson jsonToTriggerCondition TriggerCondition.CreatureDealtCombatDamageToMonarch
     Spec.it s "AbilityName round-trips" $
-      roundTrip s "name" abilityNameToJson jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it"))
+      roundTrip s "name" AbilityName.toJson AbilityName.fromJson (AbilityName.MkAbilityName (Text.pack "sacrifice it"))
     Spec.it s "ArmDelayedTrigger round-trips" $
       roundTrip s "arm" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it")) Onset.Immediately Nothing)
     -- CR 603.7b's stated duration takes the two-element form; the absent
@@ -1191,7 +1191,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       Spec.assertEqWith
         s
         "a default Onset is not written"
-        (J.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson named)))
+        (J.tagged (Text.pack "ArmDelayedTrigger") (Just (AbilityName.toJson named)))
         (effectToJson cardToJson (Effect.ArmDelayedTrigger named Onset.Immediately Nothing))
     -- MoveToZone's two riders elide exactly as Create's do, and its
     -- three-element form is the same pair of shapes told apart by JSON type.

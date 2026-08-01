@@ -4,7 +4,7 @@ module Pawl.Codec.Effect where
 import qualified Data.Maybe as Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.AbilityName (abilityNameToJson, jsonToAbilityName)
+import qualified Pawl.Codec.AbilityName as AbilityName
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.EntryRiders (defaultEntryRiders, entryRidersToJson, jsonToEntryRiders)
@@ -100,9 +100,9 @@ effectToJson codec e = case e of
   -- and LENGTH, not JSON type, is what tells the forms apart, because an onset
   -- and a duration are both tagged objects.
   Effect.ArmDelayedTrigger n o md -> Json.tagged (Text.pack "ArmDelayedTrigger") . Just $ case (o, md) of
-    (Onset.Immediately, Nothing) -> abilityNameToJson n
-    (Onset.Immediately, Just d) -> Array (MkArray [abilityNameToJson n, durationToJson d])
-    _ -> Array (MkArray [abilityNameToJson n, onsetToJson o, Json.maybeTo durationToJson md])
+    (Onset.Immediately, Nothing) -> AbilityName.toJson n
+    (Onset.Immediately, Just d) -> Array (MkArray [AbilityName.toJson n, durationToJson d])
+    _ -> Array (MkArray [AbilityName.toJson n, onsetToJson o, Json.maybeTo durationToJson md])
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array (MkArray [durationToJson d, playerScopeToJson s, playerEffectToJson pe])))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (codec c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
@@ -179,10 +179,10 @@ jsonToEffect decode value = do
     -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
       Just (Array (MkArray [n, o, d])) ->
-        Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> jsonToOnset o <*> Json.maybeFrom jsonToDuration d
+        Effect.ArmDelayedTrigger <$> AbilityName.fromJson n <*> jsonToOnset o <*> Json.maybeFrom jsonToDuration d
       Just (Array (MkArray [n, d])) ->
-        Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> pure Onset.Immediately <*> fmap Just (jsonToDuration d)
-      _ -> Json.withValue mv (fmap (\n -> Effect.ArmDelayedTrigger n Onset.Immediately Nothing) . jsonToAbilityName)
+        Effect.ArmDelayedTrigger <$> AbilityName.fromJson n <*> pure Onset.Immediately <*> fmap Just (jsonToDuration d)
+      _ -> Json.withValue mv (fmap (\n -> Effect.ArmDelayedTrigger n Onset.Immediately Nothing) . AbilityName.fromJson)
     "Replace" -> case mv of
       Just (Array (MkArray [d, u, re])) -> do
         duration <- jsonToDuration d
