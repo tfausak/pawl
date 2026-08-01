@@ -1,27 +1,25 @@
--- | The @Cost ⇆ Json@ codec (#481).
 module Pawl.Codec.Cost where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CostComponent as CostComponent
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.ManaCost as ManaCost
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Cost as Cost
 
-costToJson :: Cost.Cost -> Value
-costToJson c =
-  Json.jObject
-    [ (Text.pack "mana", Json.maybeTo manaCostToJson (Cost.mana c)),
-      (Text.pack "components", Json.listTo CostComponent.toJson (Cost.components c))
+toJson :: Cost.Cost -> Value.Value
+toJson c =
+  Common.object
+    [ Common.pair "mana" (Common.encodeMaybe ManaCost.toJson (Cost.mana c)),
+      Common.pair "components" (Common.encodeList CostComponent.toJson (Cost.components c))
     ]
 
--- CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
+-- | CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
 -- never to {0}. Every ability-bearing card file states its mana part explicitly
--- (`[]` for {0}), so the absent case is only ever reached by a malformed file.
-jsonToCost :: Value -> Either Text Cost.Cost
-jsonToCost value = do
-  ps <- Json.asObject value
-  m <- Json.maybeFrom jsonToManaCost (Json.getOpt (Text.pack "mana") ps)
-  cs <- Json.listFromDefault CostComponent.fromJson (Json.getOpt (Text.pack "components") ps)
+-- (@[]@ for {0}), so the absent case is only ever reached by a malformed file.
+fromJson :: Value.Value -> Either Text.Text Cost.Cost
+fromJson value = do
+  ps <- Common.asObject value
+  m <- Common.decodeMaybe ManaCost.fromJson (Common.nullableField "mana" ps)
+  cs <- Common.decodeListDefault CostComponent.fromJson (Common.nullableField "components" ps)
   pure Cost.MkCost {Cost.mana = m, Cost.components = cs}

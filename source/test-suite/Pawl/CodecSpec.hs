@@ -12,8 +12,6 @@ import qualified Pawl.Codec.Affected as Affected
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
 import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
-import Pawl.Codec.Cost (costToJson, jsonToCost)
-import Pawl.Codec.Count (countToJson, jsonToCount)
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
@@ -23,24 +21,21 @@ import qualified Pawl.Codec.EntryRiders as EntryRiders
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.Mode (jsonToMode, modeToJson)
 import qualified Pawl.Codec.ModeSelection as ModeSelection
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import qualified Pawl.Codec.Optionality as Optionality
-import Pawl.Codec.PlayerEffect (jsonToPlayerEffect, playerEffectToJson)
 import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
 import Pawl.Codec.Power (jsonToPower, powerToJson)
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
-import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
+import qualified Pawl.Codec.Quantity as Quantity
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
 import Pawl.Codec.TriggerCondition (jsonToTriggerCondition, triggerConditionToJson)
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
 import qualified Pawl.Codec.Zone as Zone
-import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
@@ -50,8 +45,6 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Json.Array as Array
-import qualified Pawl.Json.Number as Number
-import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -87,7 +80,6 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
-import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter.Type
@@ -234,45 +226,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       Spec.assertEqWith s "minus" (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne)) (Right CounterKind.MinusOneMinusOne)
       -- CR 122.1e, the first kind that modifies no characteristic.
       Spec.assertEqWith s "loyalty" (jsonToCounterKind (counterKindToJson CounterKind.Loyalty)) (Right CounterKind.Loyalty)
-  Spec.describe s "mana + quantity (tagged-sum trap)" $ do
-    Spec.it s "Quantity.Literal is a tagged object with numeric value" $
-      Spec.assertEqWith
-        s
-        "shape"
-        (quantityToJson (Quantity.Literal 3))
-        (J.jObject [(Text.pack "type", Value.String (String.MkString (Text.pack "Literal"))), (Text.pack "value", Value.Number (Number.MkNumber (Decimal.mkDecimal 3 0)))])
-    Spec.it s "Quantity.ManaValue is nullary tagged" $
-      roundTrip s "mv" quantityToJson jsonToQuantity Quantity.ManaValue
-    -- CR 208.1, Ghitu Fire-Eater's "damage equal to its power". Nullary like
-    -- ManaValue, and NOT to be confused with the Power newtype round-tripped
-    -- further down, which wraps a printed power/toughness box.
-    Spec.it s "Quantity.Power is nullary tagged" $
-      roundTrip s "pwr" quantityToJson jsonToQuantity Quantity.Power
-    Spec.it s "Quantity.Literal round-trips" $
-      roundTrip s "lit" quantityToJson jsonToQuantity (Quantity.Literal 5)
-    -- Bane of Progress' "for each permanent destroyed this way": a number an
-    -- earlier effect of the same resolution bound into a slot. Unlike X, it
-    -- carries the slot name on the wire, so the payload is asserted rather
-    -- than only round-tripped -- and nested under Plus, since composition is
-    -- where a recursive decoder loses a payload.
-    Spec.it s "Quantity.InSlot carries its slot name, bare and nested" $ do
-      let slot = SlotName.MkSlotName (Text.pack "destroyed")
-      roundTrip s "qslot" quantityToJson jsonToQuantity (Quantity.InSlot slot)
-      roundTrip s "qslot+" quantityToJson jsonToQuantity (Quantity.Plus (Quantity.Literal 1) (Quantity.InSlot slot))
-      Spec.assertEqWith
-        s
-        "the slot name is on the wire"
-        (quantityToJson (Quantity.InSlot slot))
-        (J.tagged (Text.pack "InSlot") (Just (SlotName.toJson slot)))
-    Spec.it s "ManaCost round-trips" $
-      roundTrip
-        s
-        "cost"
-        manaCostToJson
-        jsonToManaCost
-        (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)])
-    Spec.it s "Power round-trips" $
-      roundTrip s "pow" powerToJson jsonToPower (Power.MkPower (Quantity.Literal 2))
+  -- Quantity's own per-constructor coverage (including the tagged-object shape
+  -- and the InSlot-nested-under-Plus payload check) lives in
+  -- Pawl.Codec.QuantitySpec now; ManaCost's lives in Pawl.Codec.ManaCostSpec.
+  Spec.describe s "mana + quantity (tagged-sum trap)" . Spec.it s "Power round-trips" $
+    roundTrip s "pow" powerToJson jsonToPower (Power.MkPower (Quantity.Literal 2))
   Spec.describe s "modification + affected" $ do
     Spec.it s "GainKeyword" $
       roundTrip s "m1" modificationToJson jsonToModification (Modification.GainKeyword Keyword.Deathtouch)
@@ -441,22 +399,9 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "Duration.ForAsLongAs round-trips with its condition" $
       let d = Duration.ForAsLongAs S.youControlSource
        in Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson d)) (Right d)
+  -- PlayerEffect's own per-constructor coverage, including the Edgewalker
+  -- typed-mana ReduceSpellCost, lives in Pawl.Codec.PlayerEffectSpec now.
   Spec.describe s "player effects (P7)" $ do
-    Spec.it s "every PlayerEffect round-trips" $
-      mapM_
-        (roundTrip s "effect" playerEffectToJson jsonToPlayerEffect)
-        [ PlayerEffect.CantCastSpells,
-          PlayerEffect.CantCastMoreThan 1,
-          PlayerEffect.IncreaseSpellCost (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)) 1,
-          PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
-          -- Edgewalker's: the reduction that names a mana type, which the
-          -- Medallion's generic one would not catch a regression in.
-          PlayerEffect.ReduceSpellCost
-            (Filter.Type.HasSubtype Subtype.Cleric)
-            (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)]),
-          PlayerEffect.NoMaximumHandSize,
-          PlayerEffect.DontLoseUnspentMana
-        ]
     -- CR 613.6 made a static ability "one affected set, one or more parts",
     -- so the wire format has an array where it used to have a single
     -- modification -- and an array can be empty where a single value could
@@ -549,36 +494,9 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- CR 606.3's record.
     Spec.it s "GameEvent (loyalty ability activated)" $
       roundTrip s "loyalty-activated" gameEventToJson jsonToGameEvent (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7))
+    -- Cost's own per-constructor coverage, including the CR 118.6 absent-mana
+    -- and CR 118.5a {0} behavior, lives in Pawl.Codec.CostSpec now.
     Spec.describe s "cost (P8)" $ do
-      Spec.it s "a Cost with a mana part and components round-trips" $
-        roundTrip
-          s
-          "cost"
-          costToJson
-          jsonToCost
-          Cost.Type.MkCost
-            { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
-              Cost.Type.components = [CostComponent.TapThis, CostComponent.SacrificeThis]
-            }
-      -- CR 118.5a: {0} is a real, payable cost, and ManaCost's empty list IS
-      -- {0}. This is the shape every migrated ability now carries.
-      Spec.it s "a {0} cost round-trips as Just an empty ManaCost" $
-        roundTrip
-          s
-          "zero"
-          costToJson
-          jsonToCost
-          Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []}
-      -- CR 118.6: an ABSENT mana field is an UNPAYABLE cost, not {0}. This is
-      -- the footgun the corpus migration exists to avoid, pinned so a future
-      -- card file cannot lose its mana field unnoticed.
-      Spec.it s "an omitted mana field decodes to Nothing, not to {0}" $
-        let value = J.jObject [(Text.pack "components", J.jArray [])]
-         in Spec.assertEqWith
-              s
-              "unpayable"
-              (jsonToCost value)
-              (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
       Spec.it s "a Card carrying an additional cost round-trips" $ do
         lightningBolt <- S.printingOf s registry "Lightning Bolt"
         let base = Printing.card lightningBolt
@@ -902,7 +820,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       Spec.assertEqWith
         s
         "a default EntryRiders is not written"
-        (J.tagged (Text.pack "Create") (Just (J.jArray [quantityToJson (Quantity.Literal 2), cardToJson card])))
+        (J.tagged (Text.pack "Create") (Just (J.jArray [Quantity.toJson (Quantity.Literal 2), cardToJson card])))
         (effectToJson cardToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
     -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
     -- pair rather than the battlefield.
@@ -1033,97 +951,20 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
                 TriggeredAbility.intervening = Just noZombiesOnBattlefield
               }
        in roundTrip s "ta" (triggeredAbilityToJson cardToJson) (jsonToTriggeredAbility jsonToCard) ability
-  Spec.describe s "count + condition (M5.5 T2)" $ do
-    Spec.it s "Count round-trips" $
-      roundTrip
-        s
-        "count"
-        (countToJson quantityToJson)
-        (jsonToCount jsonToQuantity)
-        ( Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-            (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
-            Aggregation.Objects
-        )
-    Spec.it s "Count over the event history round-trips" $
-      roundTrip
-        s
-        "history"
-        (countToJson quantityToJson)
-        (jsonToCount jsonToQuantity)
-        ( Count.Type.MkCount
-            (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
-            (Filter.Type.HasCardType CardType.Creature)
-            Aggregation.DistinctCardTypes
-        )
-    Spec.it s "Count scoped to a slot round-trips" $
-      roundTrip
-        s
-        "slot"
-        (countToJson quantityToJson)
-        (jsonToCount jsonToQuantity)
-        ( Count.Type.MkCount
-            (Scope.InZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-            (Filter.Type.And [])
-            Aggregation.Objects
-        )
-    Spec.it s "Quantity.Count round-trips (Task 5: shares the Count tag, not double-tagged)" $
-      roundTrip
-        s
-        "qcount"
-        quantityToJson
-        jsonToQuantity
-        ( Quantity.Count
-            ( Count.Type.MkCount
-                (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
-                (Filter.Type.And [])
-                Aggregation.DistinctCardTypes
-            )
-        )
-    -- One with the Machine's aggregation, and the arm that proves the
-    -- payload is a whole Quantity rather than a nullary tag: a Greatest
-    -- whose per-member quantity is itself a Count round-trips, which is
-    -- the recursion Pawl.Types.Quantity's parameter exists to permit.
-    Spec.it s "Greatest round-trips, including a nested Count payload" $ do
-      roundTrip
-        s
-        "greatest"
-        (countToJson quantityToJson)
-        (jsonToCount jsonToQuantity)
-        ( Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-            (Filter.Type.And [Filter.Type.HasCardType CardType.Artifact, Filter.Type.ControlledBy PlayerRelation.You])
-            (Aggregation.Greatest Quantity.ManaValue)
-        )
-      roundTrip
-        s
-        "greatest nested"
-        (countToJson quantityToJson)
-        (jsonToCount jsonToQuantity)
-        ( Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-            (Filter.Type.And [])
-            ( Aggregation.Greatest
-                ( Quantity.Count
-                    ( Count.Type.MkCount
-                        (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
-                        (Filter.Type.And [])
-                        Aggregation.DistinctCardTypes
-                    )
-                )
-            )
-        )
-    Spec.it s "Condition round-trips at every comparison" $
-      mapM_
-        (roundTrip s "condition" conditionToJson jsonToCondition)
-        [ Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.Exactly (Quantity.Literal 0),
-          Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtLeast (Quantity.Literal 3),
-          Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtMost (Quantity.Literal 1),
-          -- Both sides non-Count, which the Count-on-the-left shape could
-          -- not say at all: Deathknell Berserker's "if its power was 3 or
-          -- greater" (CR 603.4).
-          Condition.Type.MkCondition Quantity.Power Comparison.AtLeast (Quantity.Literal 3)
-        ]
+  -- Count's own per-constructor coverage (in a zone, over the event history,
+  -- and scoped to a slot) lives in Pawl.Codec.CountSpec now; Quantity's Count
+  -- arm and its nested-Greatest recursion live in Pawl.Codec.QuantitySpec.
+  Spec.describe s "count + condition (M5.5 T2)" . Spec.it s "Condition round-trips at every comparison" $
+    mapM_
+      (roundTrip s "condition" conditionToJson jsonToCondition)
+      [ Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.Exactly (Quantity.Literal 0),
+        Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtLeast (Quantity.Literal 3),
+        Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtMost (Quantity.Literal 1),
+        -- Both sides non-Count, which the Count-on-the-left shape could
+        -- not say at all: Deathknell Berserker's "if its power was 3 or
+        -- greater" (CR 603.4).
+        Condition.Type.MkCondition Quantity.Power Comparison.AtLeast (Quantity.Literal 3)
+      ]
   -- Pawl.Types.Effect is parametric in `card` so that Pawl.Types stays an
   -- acyclic module graph, and the codec mirrors that: the encoder reaches
   -- its card payload ONLY through the codec it is handed. Proving it at two

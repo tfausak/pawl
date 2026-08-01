@@ -2,7 +2,7 @@ module Pawl.Types.BlockRequirement where
 
 import Pawl.Types.Affected (Affected)
 
--- CR 509.1c: one printed BLOCKING REQUIREMENT -- an "effect that says a creature
+-- | CR 509.1c: one printed BLOCKING REQUIREMENT -- an "effect that says a creature
 -- must block, or that it must block if some condition is met". Lure's "All
 -- creatures able to block enchanted creature do so", and Nemesis Mask's
 -- identical line on an Equipment.
@@ -38,7 +38,7 @@ import Pawl.Types.Affected (Affected)
 -- posture both siblings take -- so a Lure leaving the battlefield lifts its
 -- requirement with nothing to unwind.
 newtype BlockRequirement = MkBlockRequirement
-  { -- Which attacking creature every able creature must block. An Affected, and
+  { -- | Which attacking creature every able creature must block. An Affected, and
     -- not a bare ObjectId, because two printings in the pool already name that
     -- creature two different ways: an Aura's requirement names Affected.Attached
     -- (CR 303.4m, "an ability of a permanent that refers to the 'enchanted

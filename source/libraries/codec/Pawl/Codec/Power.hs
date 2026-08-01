@@ -2,12 +2,12 @@
 module Pawl.Codec.Power where
 
 import Data.Text (Text)
-import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
+import qualified Pawl.Codec.Quantity as Quantity
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.Power as Power
 
 powerToJson :: Power.Power -> Value
-powerToJson (Power.MkPower q) = quantityToJson q
+powerToJson (Power.MkPower q) = Quantity.toJson q
 
 jsonToPower :: Value -> Either Text Power.Power
-jsonToPower value = Power.MkPower <$> jsonToQuantity value
+jsonToPower value = Power.MkPower <$> Quantity.fromJson value

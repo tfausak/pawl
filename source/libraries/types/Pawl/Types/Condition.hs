@@ -16,7 +16,7 @@ import Pawl.Types.Quantity (Quantity)
 -- BOTH SIDES are a Quantity, and symmetrically so -- neither side is "the
 -- measured thing" and the other "the threshold". Quantity already embeds
 -- `Count` (its Count arm), so this is strictly wider than the Count-on-the-left
--- shape it replaces and no card file changed: Pawl.Codec's quantityToJson emits
+-- shape it replaces and no card file changed: Pawl.Codec.Quantity's toJson emits
 -- a Count arm as the count's own tag, so the existing `{"type": "Count", ...}`
 -- payloads decode unchanged.
 --

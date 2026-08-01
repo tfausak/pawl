@@ -10,7 +10,7 @@ import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import qualified Pawl.Codec.Loyalty as Loyalty
-import Pawl.Codec.Quantity (jsonToQuantityPair, quantityToJson)
+import qualified Pawl.Codec.Quantity as Quantity
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
@@ -29,7 +29,7 @@ projectedCharacteristicsToJson pc =
       (Text.pack "power", Json.maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", Json.maybeTo Json.jInt (PC.toughness pc)),
       (Text.pack "loyalty", Json.maybeTo Loyalty.toJson (PC.loyalty pc)),
-      (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [quantityToJson p, quantityToJson t])) (PC.characteristicPT pc)),
+      (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc)),
       (Text.pack "cardTypes", Json.setTo CardType.toJson (PC.cardTypes pc)),
       (Text.pack "subtypes", Json.setTo Subtype.toJson (PC.subtypes pc)),
       (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (PC.activatedAbilities pc)),
@@ -51,7 +51,7 @@ jsonToProjectedCharacteristics value = do
   pow <- Json.field (Text.pack "power") ps >>= Json.maybeFrom Json.asInteger
   tou <- Json.field (Text.pack "toughness") ps >>= Json.maybeFrom Json.asInteger
   loy <- Json.field (Text.pack "loyalty") ps >>= Json.maybeFrom Loyalty.fromJson
-  cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom jsonToQuantityPair
+  cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom Quantity.fromJsonPair
   cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom CardType.fromJson
   subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom Subtype.fromJson
   acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)

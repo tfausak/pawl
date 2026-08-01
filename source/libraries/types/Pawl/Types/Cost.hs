@@ -3,7 +3,7 @@ module Pawl.Types.Cost where
 import Pawl.Types.CostComponent (CostComponent)
 import Pawl.Types.ManaCost (ManaCost)
 
--- CR 118.1: "a cost is an action or payment necessary to take another action".
+-- | CR 118.1: "a cost is an action or payment necessary to take another action".
 -- ONE type for both carriers -- a spell's cost (CR 601.2f) and an activated
 -- ability's activation cost (CR 602.1a) -- because the rules make them the same
 -- thing: a mana part plus the non-mana components.

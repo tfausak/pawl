@@ -8,7 +8,7 @@ import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import qualified Pawl.Codec.PlayerId as PlayerId
-import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.Subtype as Subtype
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
@@ -18,8 +18,8 @@ modificationToJson :: Modification.Modification -> Value
 modificationToJson m = case m of
   Modification.GainKeyword k -> Json.tagged (Text.pack "GainKeyword") (Just (keywordToJson k))
   Modification.LoseAllAbilities -> Json.nullary (Text.pack "LoseAllAbilities")
-  Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
-  Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
+  Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array (MkArray [Quantity.toJson p, Quantity.toJson t])))
+  Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array (MkArray [Quantity.toJson p, Quantity.toJson t])))
   Modification.SetLandSubtype s -> Json.tagged (Text.pack "SetLandSubtype") (Just (Subtype.toJson s))
   Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (Subtype.toJson s))
   Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (CardType.toJson c))
@@ -38,8 +38,8 @@ jsonToModification value = do
   case Text.unpack t of
     "GainKeyword" -> Json.withValue mv (fmap Modification.GainKeyword . jsonToKeyword)
     "LoseAllAbilities" -> Right Modification.LoseAllAbilities
-    "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
-    "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
+    "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
+    "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
     "SetLandSubtype" -> Json.withValue mv (fmap Modification.SetLandSubtype . Subtype.fromJson)
     "AddLandSubtype" -> Json.withValue mv (fmap Modification.AddLandSubtype . Subtype.fromJson)
     "AddCardType" -> Json.withValue mv (fmap Modification.AddCardType . CardType.fromJson)

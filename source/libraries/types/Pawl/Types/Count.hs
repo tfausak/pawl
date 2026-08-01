@@ -4,7 +4,7 @@ import Pawl.Types.Aggregation (Aggregation)
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.Scope (Scope)
 
--- A number derived from game state: a scope to fold over, a per-object predicate
+-- | A number derived from game state: a scope to fold over, a per-object predicate
 -- to keep by, and an aggregation. First-order and analyzable -- never a
 -- predicate function -- and evaluated by one generic fold (Pawl.Engine.Count.evaluate)
 -- that never learns which effect or card produced it.

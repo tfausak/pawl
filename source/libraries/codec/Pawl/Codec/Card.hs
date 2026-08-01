@@ -14,23 +14,23 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbility)
-import Pawl.Codec.AttackRequirement (attackRequirementToJson, jsonToAttackRequirement)
-import Pawl.Codec.BlockRequirement (blockRequirementToJson, jsonToBlockRequirement)
+import qualified Pawl.Codec.AttackRequirement as AttackRequirement
+import qualified Pawl.Codec.BlockRequirement as BlockRequirement
 import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
-import Pawl.Codec.Cost (costToJson, jsonToCost)
+import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Counterability as Counterability
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import qualified Pawl.Codec.Loyalty as Loyalty
-import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
+import qualified Pawl.Codec.ManaCost as ManaCost
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
 import Pawl.Codec.Power (jsonToPower, powerToJson)
-import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
+import qualified Pawl.Codec.Quantity as Quantity
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
 import qualified Pawl.Codec.TargetSpec as TargetSpec
@@ -45,7 +45,7 @@ cardToJson :: CardT.Card -> Value
 cardToJson c =
   Json.jObject
     ( [ (Text.pack "name", Json.jText (CardT.name c)),
-        (Text.pack "manaCost", Json.maybeTo manaCostToJson (CardT.manaCost c)),
+        (Text.pack "manaCost", Json.maybeTo ManaCost.toJson (CardT.manaCost c)),
         (Text.pack "typeLine", TypeLine.toJson (CardT.typeLine c)),
         (Text.pack "power", Json.maybeTo powerToJson (CardT.power c)),
         (Text.pack "toughness", Json.maybeTo toughnessToJson (CardT.toughness c)),
@@ -72,7 +72,7 @@ cardToJson c =
            )
         <> ( case CardT.characteristicPT c of
                Nothing -> []
-               Just q -> [(Text.pack "characteristicPT", quantityToJson q)]
+               Just q -> [(Text.pack "characteristicPT", Quantity.toJson q)]
            )
         <> ( if Map.null (CardT.delayedAbilities c)
                then []
@@ -84,11 +84,11 @@ cardToJson c =
            )
         <> ( if null (CardT.blockRequirements c)
                then []
-               else [(Text.pack "blockRequirements", Json.listTo blockRequirementToJson (CardT.blockRequirements c))]
+               else [(Text.pack "blockRequirements", Json.listTo BlockRequirement.toJson (CardT.blockRequirements c))]
            )
         <> ( if null (CardT.attackRequirements c)
                then []
-               else [(Text.pack "attackRequirements", Json.listTo attackRequirementToJson (CardT.attackRequirements c))]
+               else [(Text.pack "attackRequirements", Json.listTo AttackRequirement.toJson (CardT.attackRequirements c))]
            )
         <> ( if null (CardT.additionalCosts c)
                then []
@@ -96,7 +96,7 @@ cardToJson c =
            )
         <> ( if null (CardT.alternativeCosts c)
                then []
-               else [(Text.pack "alternativeCosts", Json.listTo costToJson (CardT.alternativeCosts c))]
+               else [(Text.pack "alternativeCosts", Json.listTo Cost.toJson (CardT.alternativeCosts c))]
            )
         -- Omitted when Counterable, the posture every other defaulted key here
         -- takes: one card in the pool prints "this spell can't be countered", and
@@ -132,7 +132,7 @@ jsonToCard :: Value -> Either Text CardT.Card
 jsonToCard value = do
   ps <- Json.asObject value
   name <- Json.field (Text.pack "name") ps >>= Json.asText
-  manaCost <- Json.maybeFrom jsonToManaCost (Json.getOpt (Text.pack "manaCost") ps)
+  manaCost <- Json.maybeFrom ManaCost.fromJson (Json.getOpt (Text.pack "manaCost") ps)
   typeLine <- Json.field (Text.pack "typeLine") ps >>= TypeLine.fromJson
   power <- Json.maybeFrom jsonToPower (Json.getOpt (Text.pack "power") ps)
   toughness <- Json.maybeFrom jsonToToughness (Json.getOpt (Text.pack "toughness") ps)
@@ -146,13 +146,13 @@ jsonToCard value = do
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= Json.listFrom CastingPermission.fromJson
   restrictions <- Json.listFromDefault CastingRestriction.fromJson (Json.getOpt (Text.pack "castingRestrictions") ps)
   colorIndicator <- Json.setFromDefault Color.fromJson (Json.getOpt (Text.pack "colorIndicator") ps)
-  characteristicPT <- Json.maybeFrom jsonToQuantity (Json.getOpt (Text.pack "characteristicPT") ps)
+  characteristicPT <- Json.maybeFrom Quantity.fromJson (Json.getOpt (Text.pack "characteristicPT") ps)
   delayed <- Json.mapFromDefault (jsonToDelayedAbilities jsonToCard) (Json.getOpt (Text.pack "delayedAbilities") ps)
   playerAbilities <- Json.listFromDefault jsonToPlayerStaticAbility (Json.getOpt (Text.pack "playerAbilities") ps)
-  blockRequirements <- Json.listFromDefault jsonToBlockRequirement (Json.getOpt (Text.pack "blockRequirements") ps)
-  attackRequirements <- Json.listFromDefault jsonToAttackRequirement (Json.getOpt (Text.pack "attackRequirements") ps)
+  blockRequirements <- Json.listFromDefault BlockRequirement.fromJson (Json.getOpt (Text.pack "blockRequirements") ps)
+  attackRequirements <- Json.listFromDefault AttackRequirement.fromJson (Json.getOpt (Text.pack "attackRequirements") ps)
   additionalCosts <- Json.listFromDefault CostComponent.fromJson (Json.getOpt (Text.pack "additionalCosts") ps)
-  alternativeCosts <- Json.listFromDefault jsonToCost (Json.getOpt (Text.pack "alternativeCosts") ps)
+  alternativeCosts <- Json.listFromDefault Cost.fromJson (Json.getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
   openingHandAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)
   enchant <- Json.maybeFrom TargetSpec.fromJson (Json.getOpt (Text.pack "enchant") ps)

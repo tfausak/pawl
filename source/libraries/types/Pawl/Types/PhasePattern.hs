@@ -3,7 +3,7 @@ module Pawl.Types.PhasePattern where
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerId (PlayerId)
 
--- CR 614.1b / 500.11: which step-or-phase beginnings a SKIP intercepts. Eon Hub
+-- | CR 614.1b / 500.11: which step-or-phase beginnings a SKIP intercepts. Eon Hub
 -- is (Step (Beginning Upkeep)) for everybody; Fatigue is
 -- (Step (Beginning DrawStep)) for the one player its resolution named; Stonehorn
 -- Dignitary is CombatPhase for that player -- the whole of CR 506.1's five steps

@@ -74,10 +74,12 @@ library codec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AttackRequirement
+    Pawl.Codec.AttackRequirementSpec
     Pawl.Codec.BeginningStep
     Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
     Pawl.Codec.BlockRequirement
+    Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.Card
     Pawl.Codec.CardType
     Pawl.Codec.CardTypeSpec
@@ -99,6 +101,7 @@ library codec
     Pawl.Codec.Cost
     Pawl.Codec.CostComponent
     Pawl.Codec.CostComponentSpec
+    Pawl.Codec.CostSpec
     Pawl.Codec.Count
     Pawl.Codec.Counterability
     Pawl.Codec.CounterabilitySpec
@@ -106,6 +109,7 @@ library codec
     Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
     Pawl.Codec.CounterPattern
+    Pawl.Codec.CountSpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
@@ -140,6 +144,7 @@ library codec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
+    Pawl.Codec.ManaCostSpec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaProductionSpec
     Pawl.Codec.ManaSymbol
@@ -165,12 +170,14 @@ library codec
     Pawl.Codec.OptionalitySpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
+    Pawl.Codec.PhasePatternSpec
     Pawl.Codec.PhaseSelector
     Pawl.Codec.PhaseSelectorSpec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerEffect
+    Pawl.Codec.PlayerEffectSpec
     Pawl.Codec.PlayerId
     Pawl.Codec.PlayerIdSpec
     Pawl.Codec.PlayerRef
@@ -186,6 +193,7 @@ library codec
     Pawl.Codec.Printing
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.Quantity
+    Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientSpec
     Pawl.Codec.Regenerability

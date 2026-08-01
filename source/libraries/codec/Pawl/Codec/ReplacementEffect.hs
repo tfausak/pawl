@@ -9,7 +9,7 @@ import qualified Pawl.Codec.DamageRewrite as DamageRewrite
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.PhasePattern (jsonToPhasePattern, phasePatternToJson)
+import qualified Pawl.Codec.PhasePattern as PhasePattern
 import qualified Pawl.Codec.Scaling as Scaling
 import qualified Pawl.Codec.TokenPattern as TokenPattern
 import qualified Pawl.Codec.Zone as Zone
@@ -33,7 +33,7 @@ replacementEffectToJson re = case re of
   ReplacementEffect.TokenR p s ->
     Json.tagged (Text.pack "TokenR") (Just (Array (MkArray [TokenPattern.toJson p, Scaling.toJson s])))
   ReplacementEffect.PhaseR p ->
-    Json.tagged (Text.pack "PhaseR") (Just (phasePatternToJson p))
+    Json.tagged (Text.pack "PhaseR") (Just (PhasePattern.toJson p))
 
 jsonToReplacementEffect :: Value -> Either Text ReplacementEffect.ReplacementEffect
 jsonToReplacementEffect value = do
@@ -57,5 +57,5 @@ jsonToReplacementEffect value = do
       pattern_ <- TokenPattern.fromJson p
       scaling <- Scaling.fromJson s
       pure (ReplacementEffect.TokenR pattern_ scaling)
-    ("PhaseR", Just v) -> fmap ReplacementEffect.PhaseR (jsonToPhasePattern v)
+    ("PhaseR", Just v) -> fmap ReplacementEffect.PhaseR (PhasePattern.fromJson v)
     _ -> Left (Text.pack "unknown ReplacementEffect: " <> t)

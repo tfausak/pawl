@@ -1,53 +1,50 @@
--- | The @Quantity ⇆ Json@ codec (#481).
 module Pawl.Codec.Quantity where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Count (countToJson, jsonToCount)
-import qualified Pawl.Codec.Json as Json
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.SlotName as SlotName
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Quantity as Quantity
 
--- Quantity.Count's arm is `countToJson c` directly, NOT re-wrapped in another
--- "Count" tag: countToJson already tags its own output "Count" (it is shared
--- with Condition's embedding of a Count), and the two types happen to use the
--- SAME tag name at two different levels. Re-wrapping would double-tag
--- ({"type":"Count","value":{"type":"Count","value":[...]}}) -- guarded by the
+-- | Quantity.Count's arm is @Count.toJson toJson c@ directly, NOT re-wrapped in
+-- another "Count" tag: 'Count.toJson' already tags its own output "Count" (it is
+-- shared with Condition's embedding of a Count), and the two types happen to use
+-- the SAME tag name at two different levels. Re-wrapping would double-tag
+-- (@{"type":"Count","value":{"type":"Count","value":[...]}}@) -- guarded by the
 -- CodecSpec round-trip test.
-quantityToJson :: Quantity.Quantity -> Value
-quantityToJson q = case q of
-  Quantity.Literal n -> Json.tagged (Text.pack "Literal") (Just (Json.jInt n))
-  Quantity.ManaValue -> Json.nullary (Text.pack "ManaValue")
-  Quantity.Power -> Json.nullary (Text.pack "Power")
-  Quantity.X -> Json.nullary (Text.pack "X")
-  Quantity.InSlot s -> Json.tagged (Text.pack "InSlot") (Just (SlotName.toJson s))
-  Quantity.Star -> Json.nullary (Text.pack "Star")
-  Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array (MkArray [quantityToJson a, quantityToJson b])))
-  Quantity.Count c -> countToJson quantityToJson c
+toJson :: Quantity.Quantity -> Value.Value
+toJson q = case q of
+  Quantity.Literal n -> Common.tagged "Literal" . Just $ Common.integer n
+  Quantity.ManaValue -> Common.nullary "ManaValue"
+  Quantity.Power -> Common.nullary "Power"
+  Quantity.X -> Common.nullary "X"
+  Quantity.InSlot s -> Common.tagged "InSlot" . Just $ SlotName.toJson s
+  Quantity.Star -> Common.nullary "Star"
+  Quantity.Plus a b -> Common.tagged "Plus" . Just . Common.array $ [toJson a, toJson b]
+  Quantity.Count c -> Count.toJson toJson c
 
-jsonToQuantity :: Value -> Either Text Quantity.Quantity
-jsonToQuantity value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("Literal", Just v) -> Quantity.Literal <$> Json.asInteger v
+fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
+    ("Literal", Just v) -> Quantity.Literal <$> Common.asInteger v
     ("ManaValue", _) -> Right Quantity.ManaValue
     ("Power", _) -> Right Quantity.Power
     ("X", _) -> Right Quantity.X
     ("InSlot", Just v) -> Quantity.InSlot <$> SlotName.fromJson v
     ("Star", _) -> Right Quantity.Star
-    ("Plus", Just (Array (MkArray [x, y]))) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
-    -- jsonToCount re-derives the tag from the WHOLE value (see the comment on
-    -- quantityToJson) rather than from `mv`, which has already had it
-    -- stripped.
-    ("Count", _) -> Quantity.Count <$> jsonToCount jsonToQuantity value
-    _ -> Left (Text.pack "unknown Quantity: " <> t)
+    ("Plus", Just (Value.Array (Array.MkArray [x, y]))) -> Quantity.Plus <$> fromJson x <*> fromJson y
+    -- Count.fromJson re-derives the tag from the WHOLE value (see the comment on
+    -- toJson) rather than from `mv`, which has already had it stripped.
+    ("Count", _) -> Quantity.Count <$> Count.fromJson fromJson value
+    _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
-jsonToQuantityPair :: Value -> Either Text (Quantity.Quantity, Quantity.Quantity)
-jsonToQuantityPair value = case value of
-  Array (MkArray [p, t]) -> do
-    p_ <- jsonToQuantity p
-    t_ <- jsonToQuantity t
+fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)
+fromJsonPair value = case value of
+  Value.Array (Array.MkArray [p, t]) -> do
+    p_ <- fromJson p
+    t_ <- fromJson t
     pure (p_, t_)
-  _ -> Left (Text.pack "expected a [power, toughness] quantity pair")
+  _ -> Left $ Text.pack "expected a [power, toughness] quantity pair"

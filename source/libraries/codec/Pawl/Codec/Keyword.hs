@@ -3,7 +3,7 @@ module Pawl.Codec.Keyword where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Cost (costToJson, jsonToCost)
+import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Subtype as Subtype
@@ -13,7 +13,7 @@ import qualified Pawl.Types.Keyword as Keyword
 
 -- Not Json.decodeNullary's table shape any more: CR 702.164a's toxic and CR 702.70a's
 -- poisonous each carry an N, so this is the tagged-with-an-optional-payload case
--- jsonToQuantity uses.
+-- Quantity.fromJson uses.
 keywordToJson :: Keyword.Keyword -> Value
 keywordToJson k = case k of
   Keyword.Deathtouch -> Json.nullary (Text.pack "Deathtouch")
@@ -28,10 +28,10 @@ keywordToJson k = case k of
   Keyword.Shroud -> Json.nullary (Text.pack "Shroud")
   Keyword.Trample -> Json.nullary (Text.pack "Trample")
   Keyword.Vigilance -> Json.nullary (Text.pack "Vigilance")
-  Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array (MkArray [costToJson cost, maybe Json.jNull Filter.toJson searchFor])))
-  Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (costToJson cost))
+  Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array (MkArray [Cost.toJson cost, maybe Json.jNull Filter.toJson searchFor])))
+  Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (Cost.toJson cost))
   Keyword.Fear -> Json.nullary (Text.pack "Fear")
-  Keyword.Entwine cost -> Json.tagged (Text.pack "Entwine") (Just (costToJson cost))
+  Keyword.Entwine cost -> Json.tagged (Text.pack "Entwine") (Just (Cost.toJson cost))
   Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (Json.natTo n))
   Keyword.Infect -> Json.nullary (Text.pack "Infect")
   Keyword.Devoid -> Json.nullary (Text.pack "Devoid")
@@ -53,10 +53,10 @@ jsonToKeyword value = do
     ("Shroud", _) -> Right Keyword.Shroud
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
-    ("Cycling", Just (Array (MkArray [c, f]))) -> Keyword.Cycling <$> jsonToCost c <*> Filter.optional f
-    ("Flashback", Just v) -> Keyword.Flashback <$> jsonToCost v
+    ("Cycling", Just (Array (MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson c <*> Filter.optional f
+    ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson v
     ("Fear", _) -> Right Keyword.Fear
-    ("Entwine", Just v) -> Keyword.Entwine <$> jsonToCost v
+    ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Json.natFrom v
     ("Infect", _) -> Right Keyword.Infect
     ("Devoid", _) -> Right Keyword.Devoid
