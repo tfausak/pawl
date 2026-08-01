@@ -1,20 +1,17 @@
 -- Covers Pawl.Codec.
 module Pawl.CodecSpec where
 
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
-import qualified Pawl.Codec.Affected as Affected
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
 import qualified Pawl.Codec.Condition as Condition
 import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
-import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
@@ -24,9 +21,7 @@ import qualified Pawl.Codec.ModeSelection as ModeSelection
 import qualified Pawl.Codec.Optionality as Optionality
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
 import qualified Pawl.Codec.Quantity as Quantity
-import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import qualified Pawl.Codec.SlotName as SlotName
-import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Engine.Binding as Binding
@@ -43,7 +38,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
-import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Binding as Binding.Type
@@ -52,26 +46,19 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
-import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
-import qualified Pawl.Types.DamagePattern as DamagePattern
-import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.EntryOption as EntryOption
-import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -92,11 +79,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
-import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -107,23 +92,17 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
-import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
-import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 roundTrip :: (Applicative m, Eq a, Show a) => Spec.Spec m n -> String -> (a -> Value.Value) -> (Value.Value -> Either Text a) -> a -> m ()
 roundTrip s label enc dec x = Spec.assertEqWith s label (dec (enc x)) (Right x)
@@ -312,39 +291,9 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   -- PlayerEffect's own per-constructor coverage, including the Edgewalker
   -- typed-mana ReduceSpellCost, lives in Pawl.Codec.PlayerEffectSpec now.
   Spec.describe s "player effects (P7)" $ do
-    -- CR 613.6 made a static ability "one affected set, one or more parts",
-    -- so the wire format has an array where it used to have a single
-    -- modification -- and an array can be empty where a single value could
-    -- not. An ability with no parts is one that does nothing, which no card
-    -- means, so it is a decode FAILURE rather than a permanent that quietly
-    -- under-performs its own text. NonEmpty is what makes that structural;
-    -- this pins that the boundary really says no.
-    Spec.it s "a static ability with an empty modifications array is rejected" $ do
-      let value =
-            J.jObject
-              [ (Text.pack "affected", Affected.toJson Affected.Attached),
-                (Text.pack "modifications", J.jArray [])
-              ]
-      Spec.assertBool
-        s
-        (either (const True) (const False) (jsonToStaticAbility value))
-        "an empty array does not decode"
-      roundTrip
-        s
-        "one part still round-trips"
-        staticAbilityToJson
-        jsonToStaticAbility
-        (StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
-      roundTrip
-        s
-        "and so do several"
-        staticAbilityToJson
-        jsonToStaticAbility
-        ( StaticAbility.MkStaticAbility
-            Affected.Attached
-            (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
-        )
-    -- PlayerStaticAbility's own per-constructor coverage lives in
+    -- StaticAbility's own per-constructor coverage, including the CR 613.6
+    -- empty-modifications-array rejection, lives in Pawl.Codec.StaticAbilitySpec
+    -- now. PlayerStaticAbility's own per-constructor coverage lives in
     -- Pawl.Codec.PlayerStaticAbilitySpec now.
     Spec.it s "a Card carrying player abilities round-trips" $ do
       bloodMoon <- S.printingOf s registry "Blood Moon"
@@ -393,9 +342,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   -- lives in Pawl.Codec.TargetSpecSpec now; Filter's own per-constructor and
   -- nested-And/Or/Not coverage lives in Pawl.Codec.FilterSpec.
   Spec.describe s "records" $ do
-    -- CR 614.1c / 306.5b: the intrinsic enters-with-counters rewrite.
-    Spec.it s "EntryRewrite (with counters)" $
-      roundTrip s "entry-counters" entryRewriteToJson jsonToEntryRewrite (EntryRewrite.WithCounters CounterKind.Loyalty 3)
+    -- EntryRewrite's own per-constructor coverage lives in
+    -- Pawl.Codec.EntryRewriteSpec now.
     -- CR 606.3's record.
     Spec.it s "GameEvent (loyalty ability activated)" $
       roundTrip s "loyalty-activated" gameEventToJson jsonToGameEvent (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7))
@@ -434,93 +382,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         case J.asObject (cardToJson base) of
           Left err -> Spec.assertFailure s (Text.unpack err)
           Right pairs -> Spec.assertBool s (notElem (Text.pack "alternativeCosts") (fmap fst pairs)) "key absent"
-    Spec.it s "a ZoneChangeR replacement round-trips" $
-      let re =
-            ReplacementEffect.ZoneChangeR
-              ZoneChangePattern.MkZoneChangePattern
-                { ZoneChangePattern.whenDestination = Zone.Graveyard,
-                  ZoneChangePattern.whichObject = ZoneChangeSubject.AnyObject,
-                  ZoneChangePattern.whoseObject = ControllerRelation.Anyones
-                }
-              Zone.Exile
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    -- Leyline of the Void's shape: the relation that distinguishes it from
-    -- Rest in Peace has to survive the wire too.
-    Spec.it s "a ZoneChangeR carrying Opponents round-trips" $
-      let re =
-            ReplacementEffect.ZoneChangeR
-              ZoneChangePattern.MkZoneChangePattern
-                { ZoneChangePattern.whenDestination = Zone.Graveyard,
-                  ZoneChangePattern.whichObject = ZoneChangeSubject.AnyObject,
-                  ZoneChangePattern.whoseObject = ControllerRelation.Opponents
-                }
-              Zone.Exile
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    Spec.it s "a CounterR replacement round-trips (pattern and scaling are data)" $
-      let re =
-            ReplacementEffect.CounterR
-              CounterPattern.MkCounterPattern
-                { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
-                  CounterPattern.whose = ControllerRelation.Yours,
-                  CounterPattern.onWhat = Filter.Type.HasCardType CardType.Creature
-                }
-              (Scaling.AddMore 1)
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    Spec.it s "an EntryR ChoiceOf replacement round-trips (P/T and keywords)" $
-      let re =
-            ReplacementEffect.EntryR
-              ( EntryRewrite.ChoiceOf
-                  [ EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty},
-                    EntryOption.MkEntryOption {EntryOption.power = 1, EntryOption.toughness = 6, EntryOption.keywords = Set.singleton Keyword.Defender}
-                  ]
-              )
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    Spec.it s "an EntryR AsCopy replacement round-trips" $
-      let re = ReplacementEffect.EntryR EntryRewrite.AsCopy
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    Spec.it s "a DamageR replacement round-trips (pattern and rewrite are data)" $
-      let re =
-            ReplacementEffect.DamageR
-              DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat}
-              DamageRewrite.PreventAll
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    Spec.it s "a DestructionR replacement round-trips" $
-      let re = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    Spec.it s "a TokenR replacement round-trips (pattern and scaling are data)" $
-      let re =
-            ReplacementEffect.TokenR
-              TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours}
-              (Scaling.Multiply 2)
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    Spec.it s "a CounterR replacement round-trips with whichKind = Nothing (explicit JSON null)" $
-      let re =
-            ReplacementEffect.CounterR
-              CounterPattern.MkCounterPattern
-                { CounterPattern.whichKind = Nothing,
-                  CounterPattern.whose = ControllerRelation.Anyones,
-                  CounterPattern.onWhat = Filter.Type.And []
-                }
-              (Scaling.Multiply 2)
-       in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-    -- CR 614.1b: a skip carries a pattern and no rewrite, so the payload is
-    -- the pattern itself rather than the usual two-element array.
-    --
-    -- Both `whosePhase` shapes: Eon Hub's symmetric Nothing, which is what
-    -- card JSON writes, and the baked Just that only Resolve's
-    -- SkipNextPhase arm produces (Fatigue). The second is runtime-only, and
-    -- is covered here for the same reason SetController's PlayerId is --
-    -- the codec has to carry it either way.
-    Spec.it s "a PhaseR replacement round-trips" $ do
-      let re = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep), PhasePattern.whosePhase = Nothing}
-      Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
-      let scoped = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep), PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
-      Spec.assertEqWith s "and so does a player-scoped one" (jsonToReplacementEffect (replacementEffectToJson scoped)) (Right scoped)
-      -- CR 500.1: the whole-phase arm, which is the shape a Phase value
-      -- cannot carry -- Stonehorn Dignitary's, once Resolve has baked the
-      -- player its resolution named.
-      let wholePhase = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
-      Spec.assertEqWith s "and so does a whole-phase one" (jsonToReplacementEffect (replacementEffectToJson wholePhase)) (Right wholePhase)
+  -- ReplacementEffect's own per-constructor coverage -- including the
+  -- ZoneChangeR Opponents/Anyones distinction, the CounterR/DamageR/TokenR
+  -- "pattern and scaling/rewrite are data" shapes, the CounterR explicit
+  -- JSON null, and the PhaseR whosePhase axis -- lives in
+  -- Pawl.Codec.ReplacementEffectSpec now.
   Spec.describe s "modal" $ do
     Spec.it s "Modal round-trips" $
       roundTrip

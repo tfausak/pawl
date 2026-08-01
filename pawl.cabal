@@ -111,6 +111,7 @@ library codec
     Pawl.Codec.CounterKind
     Pawl.Codec.CounterKindSpec
     Pawl.Codec.CounterPattern
+    Pawl.Codec.CounterPatternSpec
     Pawl.Codec.CountSpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
@@ -133,6 +134,7 @@ library codec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryOptionSpec
     Pawl.Codec.EntryRewrite
+    Pawl.Codec.EntryRewriteSpec
     Pawl.Codec.EntryRiders
     Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EventShape
@@ -208,6 +210,7 @@ library codec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.ReplacementEffect
+    Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.Scaling
     Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
@@ -217,6 +220,7 @@ library codec
     Pawl.Codec.SlotName
     Pawl.Codec.SlotNameSpec
     Pawl.Codec.StaticAbility
+    Pawl.Codec.StaticAbilitySpec
     Pawl.Codec.Subtype
     Pawl.Codec.SubtypeSpec
     Pawl.Codec.Supertype

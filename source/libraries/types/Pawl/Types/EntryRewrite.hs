@@ -4,7 +4,7 @@ import Numeric.Natural (Natural)
 import Pawl.Types.CounterKind (CounterKind)
 import Pawl.Types.EntryOption (EntryOption)
 
--- CR 614.1c: how an "as this permanent enters" replacement modifies the entry.
+-- | CR 614.1c: how an "as this permanent enters" replacement modifies the entry.
 -- AsCopy is Clone (CR 707.5, and a real "may" -- declining is legal); ChoiceOf
 -- is Primal Plasma (CR 208.2b); WithCounters is CR 306.5b's intrinsic loyalty.
 -- The first two write into the object's COPIABLE snapshot,
@@ -28,7 +28,7 @@ import Pawl.Types.EntryOption (EntryOption)
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption]
-  | -- CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b is
+  | -- | CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b is
     -- the one producer today -- "A planeswalker has the intrinsic ability 'This
     -- permanent enters with a number of loyalty counters on it equal to its
     -- printed loyalty number.' This ability creates a replacement effect (see

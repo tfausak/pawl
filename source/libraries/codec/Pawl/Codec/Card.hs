@@ -31,8 +31,8 @@ import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.Power as Power
 import qualified Pawl.Codec.Quantity as Quantity
-import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
-import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
+import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.TargetSpec as TargetSpec
 import qualified Pawl.Codec.Toughness as Toughness
 import Pawl.Codec.TriggeredAbility (delayedAbilitiesToJson, jsonToDelayedAbilities, jsonToTriggeredAbility, triggeredAbilityToJson)
@@ -50,10 +50,10 @@ cardToJson c =
         (Text.pack "power", Json.maybeTo Power.toJson (CardT.power c)),
         (Text.pack "toughness", Json.maybeTo Toughness.toJson (CardT.toughness c)),
         (Text.pack "keywords", Json.setTo Keyword.toJson (CardT.keywords c)),
-        (Text.pack "staticAbilities", Json.listTo staticAbilityToJson (CardT.staticAbilities c)),
+        (Text.pack "staticAbilities", Json.listTo StaticAbility.toJson (CardT.staticAbilities c)),
         (Text.pack "spell", modalToJson cardToJson (CardT.spell c)),
         (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (CardT.activatedAbilities c)),
-        (Text.pack "replacementEffects", Json.listTo replacementEffectToJson (CardT.replacementEffects c)),
+        (Text.pack "replacementEffects", Json.listTo ReplacementEffect.toJson (CardT.replacementEffects c)),
         (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (CardT.triggeredAbilities c)),
         (Text.pack "castingPermissions", Json.listTo CastingPermission.toJson (CardT.castingPermissions c))
       ]
@@ -138,10 +138,10 @@ jsonToCard value = do
   toughness <- Json.maybeFrom Toughness.fromJson (Json.getOpt (Text.pack "toughness") ps)
   loyalty <- Json.maybeFrom Loyalty.fromJson (Json.getOpt (Text.pack "loyalty") ps)
   keywords <- Json.field (Text.pack "keywords") ps >>= Json.setFrom Keyword.fromJson
-  statics <- Json.field (Text.pack "staticAbilities") ps >>= Json.listFrom jsonToStaticAbility
+  statics <- Json.field (Text.pack "staticAbilities") ps >>= Json.listFrom StaticAbility.fromJson
   spell <- Json.field (Text.pack "spell") ps >>= jsonToModal jsonToCard
   activated <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
-  replacements <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect
+  replacements <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom ReplacementEffect.fromJson
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= Json.listFrom CastingPermission.fromJson
   restrictions <- Json.listFromDefault CastingRestriction.fromJson (Json.getOpt (Text.pack "castingRestrictions") ps)

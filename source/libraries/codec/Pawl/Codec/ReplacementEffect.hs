@@ -1,61 +1,59 @@
--- | The @ReplacementEffect ⇆ Json@ codec (#481).
 module Pawl.Codec.ReplacementEffect where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.CounterPattern (counterPatternToJson, jsonToCounterPattern)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.CounterPattern as CounterPattern
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
-import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
-import qualified Pawl.Codec.Json as Json
+import qualified Pawl.Codec.EntryRewrite as EntryRewrite
 import qualified Pawl.Codec.PhasePattern as PhasePattern
 import qualified Pawl.Codec.Scaling as Scaling
 import qualified Pawl.Codec.TokenPattern as TokenPattern
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Codec.ZoneChangePattern as ZoneChangePattern
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
-replacementEffectToJson :: ReplacementEffect.ReplacementEffect -> Value
-replacementEffectToJson re = case re of
+toJson :: ReplacementEffect.ReplacementEffect -> Value.Value
+toJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
-    Json.tagged (Text.pack "ZoneChangeR") (Just (Array (MkArray [ZoneChangePattern.toJson p, Zone.toJson z])))
+    Common.tagged "ZoneChangeR" . Just . Common.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
   ReplacementEffect.EntryR r ->
-    Json.tagged (Text.pack "EntryR") (Just (entryRewriteToJson r))
+    Common.tagged "EntryR" . Just $ EntryRewrite.toJson r
   ReplacementEffect.DamageR p r ->
-    Json.tagged (Text.pack "DamageR") (Just (Array (MkArray [DamagePattern.toJson p, DamageRewrite.toJson r])))
+    Common.tagged "DamageR" . Just . Common.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
   ReplacementEffect.DestructionR r ->
-    Json.tagged (Text.pack "DestructionR") (Just (DestructionRewrite.toJson r))
-  ReplacementEffect.CounterR p s ->
-    Json.tagged (Text.pack "CounterR") (Just (Array (MkArray [counterPatternToJson p, Scaling.toJson s])))
-  ReplacementEffect.TokenR p s ->
-    Json.tagged (Text.pack "TokenR") (Just (Array (MkArray [TokenPattern.toJson p, Scaling.toJson s])))
+    Common.tagged "DestructionR" . Just $ DestructionRewrite.toJson r
+  ReplacementEffect.CounterR p sc ->
+    Common.tagged "CounterR" . Just . Common.array $ [CounterPattern.toJson p, Scaling.toJson sc]
+  ReplacementEffect.TokenR p sc ->
+    Common.tagged "TokenR" . Just . Common.array $ [TokenPattern.toJson p, Scaling.toJson sc]
   ReplacementEffect.PhaseR p ->
-    Json.tagged (Text.pack "PhaseR") (Just (PhasePattern.toJson p))
+    Common.tagged "PhaseR" . Just $ PhasePattern.toJson p
 
-jsonToReplacementEffect :: Value -> Either Text ReplacementEffect.ReplacementEffect
-jsonToReplacementEffect value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("ZoneChangeR", Just (Array (MkArray [p, z]))) -> do
+fromJson :: Value.Value -> Either Text.Text ReplacementEffect.ReplacementEffect
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
+    ("ZoneChangeR", Just (Value.Array (Array.MkArray [p, z]))) -> do
       pattern_ <- ZoneChangePattern.fromJson p
       dest <- Zone.fromJson z
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
-    ("EntryR", Just v) -> fmap ReplacementEffect.EntryR (jsonToEntryRewrite v)
-    ("DamageR", Just (Array (MkArray [p, r]))) -> do
+    ("EntryR", Just v) -> ReplacementEffect.EntryR <$> EntryRewrite.fromJson v
+    ("DamageR", Just (Value.Array (Array.MkArray [p, r]))) -> do
       pattern_ <- DamagePattern.fromJson p
       rewrite <- DamageRewrite.fromJson r
       pure (ReplacementEffect.DamageR pattern_ rewrite)
-    ("DestructionR", Just v) -> fmap ReplacementEffect.DestructionR (DestructionRewrite.fromJson v)
-    ("CounterR", Just (Array (MkArray [p, s]))) -> do
-      pattern_ <- jsonToCounterPattern p
-      scaling <- Scaling.fromJson s
+    ("DestructionR", Just v) -> ReplacementEffect.DestructionR <$> DestructionRewrite.fromJson v
+    ("CounterR", Just (Value.Array (Array.MkArray [p, sc]))) -> do
+      pattern_ <- CounterPattern.fromJson p
+      scaling <- Scaling.fromJson sc
       pure (ReplacementEffect.CounterR pattern_ scaling)
-    ("TokenR", Just (Array (MkArray [p, s]))) -> do
+    ("TokenR", Just (Value.Array (Array.MkArray [p, sc]))) -> do
       pattern_ <- TokenPattern.fromJson p
-      scaling <- Scaling.fromJson s
+      scaling <- Scaling.fromJson sc
       pure (ReplacementEffect.TokenR pattern_ scaling)
-    ("PhaseR", Just v) -> fmap ReplacementEffect.PhaseR (PhasePattern.fromJson v)
-    _ -> Left (Text.pack "unknown ReplacementEffect: " <> t)
+    ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> PhasePattern.fromJson v
+    _ -> Left . Text.pack $ "unknown ReplacementEffect: " <> t

@@ -26,6 +26,7 @@ import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostSpec
 import qualified Pawl.Codec.CountSpec
 import qualified Pawl.Codec.CounterKindSpec
+import qualified Pawl.Codec.CounterPatternSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.DamageEventSpec
@@ -37,6 +38,7 @@ import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntryOptionSpec
+import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExpirySpec
@@ -71,10 +73,12 @@ import qualified Pawl.Codec.PowerSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
+import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
+import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TapStateSpec
@@ -207,6 +211,7 @@ spec s registry = do
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostSpec.spec s
   Pawl.Codec.CounterKindSpec.spec s
+  Pawl.Codec.CounterPatternSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CountSpec.spec s
@@ -219,6 +224,7 @@ spec s registry = do
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
+  Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
@@ -253,10 +259,12 @@ spec s registry = do
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
+  Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
+  Pawl.Codec.StaticAbilitySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TapStateSpec.spec s

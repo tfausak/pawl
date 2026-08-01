@@ -23,7 +23,7 @@ import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.Regenerability as Regenerability
-import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
+import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.SearchDestination as SearchDestination
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Uses as Uses
@@ -83,7 +83,7 @@ effectToJson codec e = case e of
       [Quantity.toJson q, codec c]
         <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
-  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [Duration.toJson d, Uses.toJson u, replacementEffectToJson re])))
+  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [Duration.toJson d, Uses.toJson u, ReplacementEffect.toJson re])))
   Effect.SkipNextPhase r sel -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [PlayerRef.toJson r, PhaseSelector.toJson sel])))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s])))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q])))
@@ -187,7 +187,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [d, u, re])) -> do
         duration <- Duration.fromJson d
         uses <- Uses.fromJson u
-        effect <- jsonToReplacementEffect re
+        effect <- ReplacementEffect.fromJson re
         pure (Effect.Replace duration uses effect)
       _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
     "SkipNextPhase" -> case mv of

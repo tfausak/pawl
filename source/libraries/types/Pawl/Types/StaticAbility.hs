@@ -4,7 +4,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Pawl.Types.Affected (Affected)
 import Pawl.Types.Modification (Modification)
 
--- A card's printed static continuous ability (CR 604.1/604.2: a static ability
+-- | A card's printed static continuous ability (CR 604.1/604.2: a static ability
 -- creates a continuous effect active while its permanent is on the battlefield).
 -- Gathered live from every battlefield permanent by the projection, with the
 -- permanent's own timestamp (CR 613.7a: a static ability's continuous effect has

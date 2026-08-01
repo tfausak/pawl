@@ -11,7 +11,7 @@ import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.Quantity as Quantity
-import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
+import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
@@ -33,7 +33,7 @@ projectedCharacteristicsToJson pc =
       (Text.pack "cardTypes", Json.setTo CardType.toJson (PC.cardTypes pc)),
       (Text.pack "subtypes", Json.setTo Subtype.toJson (PC.subtypes pc)),
       (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (PC.activatedAbilities pc)),
-      (Text.pack "replacementEffects", Json.listTo replacementEffectToJson (PC.replacementEffects pc)),
+      (Text.pack "replacementEffects", Json.listTo ReplacementEffect.toJson (PC.replacementEffects pc)),
       (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (PC.triggeredAbilities pc))
     ]
 
@@ -55,7 +55,7 @@ jsonToProjectedCharacteristics value = do
   cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom CardType.fromJson
   subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom Subtype.fromJson
   acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
-  reps <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect
+  reps <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom ReplacementEffect.fromJson
   trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
   pure
     PC.MkProjectedCharacteristics

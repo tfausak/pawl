@@ -11,7 +11,7 @@ import Pawl.Types.TokenPattern (TokenPattern)
 import Pawl.Types.Zone (Zone)
 import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
 
--- CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
+-- | CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
 -- and the REWRITE SHAPE it applies. One arm per replaceable event class -- the
 -- arm count tracks the ~40 classes the comprehensive rules define, never the card
 -- pool. Rest in Peace is DATA (`ZoneChangeR (MkZoneChangePattern Graveyard
