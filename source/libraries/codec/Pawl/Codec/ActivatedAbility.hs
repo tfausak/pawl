@@ -3,7 +3,7 @@ module Pawl.Codec.ActivatedAbility where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.ActivationTiming (activationTimingToJson, jsonToActivationTiming)
+import qualified Pawl.Codec.ActivationTiming as ActivationTiming
 import Pawl.Codec.Cost (costToJson, jsonToCost)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
@@ -22,7 +22,7 @@ activatedAbilityToJson codec aa =
       -- takes, and it leaves every card without one byte-identical.
       <> ( case ActivatedAbility.timing aa of
              ActivationTiming.AnyTime -> []
-             _ -> [(Text.pack "timing", activationTimingToJson (ActivatedAbility.timing aa))]
+             _ -> [(Text.pack "timing", ActivationTiming.toJson (ActivatedAbility.timing aa))]
          )
 
 jsonToActivatedAbility :: (Value -> Either Text card) -> Value -> Either Text (ActivatedAbility.ActivatedAbility card)
@@ -32,5 +32,5 @@ jsonToActivatedAbility decode value = do
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal decode
   t <- case Json.optField (Text.pack "timing") ps of
     Nothing -> pure ActivationTiming.AnyTime
-    Just v -> jsonToActivationTiming v
+    Just v -> ActivationTiming.fromJson v
   pure (ActivatedAbility.MkActivatedAbility c m t)

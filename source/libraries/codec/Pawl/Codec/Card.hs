@@ -17,10 +17,10 @@ import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbili
 import Pawl.Codec.AttackRequirement (attackRequirementToJson, jsonToAttackRequirement)
 import Pawl.Codec.BlockRequirement (blockRequirementToJson, jsonToBlockRequirement)
 import qualified Pawl.Codec.CastingPermission as CastingPermission
-import Pawl.Codec.CastingRestriction (castingRestrictionToJson, jsonToCastingRestriction)
+import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
 import Pawl.Codec.Cost (costToJson, jsonToCost)
-import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
+import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Counterability as Counterability
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import qualified Pawl.Codec.Json as Json
@@ -92,7 +92,7 @@ cardToJson c =
            )
         <> ( if null (CardT.additionalCosts c)
                then []
-               else [(Text.pack "additionalCosts", Json.listTo costComponentToJson (CardT.additionalCosts c))]
+               else [(Text.pack "additionalCosts", Json.listTo CostComponent.toJson (CardT.additionalCosts c))]
            )
         <> ( if null (CardT.alternativeCosts c)
                then []
@@ -124,7 +124,7 @@ cardToJson c =
         -- nothing.
         <> ( if null (CardT.castingRestrictions c)
                then []
-               else [(Text.pack "castingRestrictions", Json.listTo castingRestrictionToJson (CardT.castingRestrictions c))]
+               else [(Text.pack "castingRestrictions", Json.listTo CastingRestriction.toJson (CardT.castingRestrictions c))]
            )
     )
 
@@ -144,14 +144,14 @@ jsonToCard value = do
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= Json.listFrom CastingPermission.fromJson
-  restrictions <- Json.listFromDefault jsonToCastingRestriction (Json.getOpt (Text.pack "castingRestrictions") ps)
+  restrictions <- Json.listFromDefault CastingRestriction.fromJson (Json.getOpt (Text.pack "castingRestrictions") ps)
   colorIndicator <- Json.setFromDefault Color.fromJson (Json.getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- Json.maybeFrom jsonToQuantity (Json.getOpt (Text.pack "characteristicPT") ps)
   delayed <- Json.mapFromDefault (jsonToDelayedAbilities jsonToCard) (Json.getOpt (Text.pack "delayedAbilities") ps)
   playerAbilities <- Json.listFromDefault jsonToPlayerStaticAbility (Json.getOpt (Text.pack "playerAbilities") ps)
   blockRequirements <- Json.listFromDefault jsonToBlockRequirement (Json.getOpt (Text.pack "blockRequirements") ps)
   attackRequirements <- Json.listFromDefault jsonToAttackRequirement (Json.getOpt (Text.pack "attackRequirements") ps)
-  additionalCosts <- Json.listFromDefault jsonToCostComponent (Json.getOpt (Text.pack "additionalCosts") ps)
+  additionalCosts <- Json.listFromDefault CostComponent.fromJson (Json.getOpt (Text.pack "additionalCosts") ps)
   alternativeCosts <- Json.listFromDefault jsonToCost (Json.getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
   openingHandAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)

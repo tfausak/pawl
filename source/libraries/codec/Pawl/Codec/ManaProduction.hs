@@ -1,22 +1,20 @@
--- | The @ManaProduction ⇆ Json@ codec (#481).
 module Pawl.Codec.ManaProduction where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ManaType as ManaType
-import Pawl.Json.Value (Value)
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ManaProduction as ManaProduction
 
-manaProductionToJson :: ManaProduction.ManaProduction -> Value
-manaProductionToJson mp = case mp of
-  ManaProduction.OfType mt -> Json.tagged (Text.pack "OfType") (Just (ManaType.toJson mt))
-  ManaProduction.AnyColor -> Json.nullary (Text.pack "AnyColor")
+toJson :: ManaProduction.ManaProduction -> Value.Value
+toJson mp = case mp of
+  ManaProduction.OfType mt -> Common.tagged "OfType" . Just $ ManaType.toJson mt
+  ManaProduction.AnyColor -> Common.nullary "AnyColor"
 
-jsonToManaProduction :: Value -> Either Text ManaProduction.ManaProduction
-jsonToManaProduction value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
+fromJson :: Value.Value -> Either Text.Text ManaProduction.ManaProduction
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
     ("OfType", Just v) -> ManaProduction.OfType <$> ManaType.fromJson v
     ("AnyColor", _) -> Right ManaProduction.AnyColor
-    _ -> Left (Text.pack "unknown ManaProduction: " <> t)
+    _ -> Left . Text.pack $ "unknown ManaProduction: " <> t

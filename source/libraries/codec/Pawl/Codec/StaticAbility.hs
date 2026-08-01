@@ -3,7 +3,7 @@ module Pawl.Codec.StaticAbility where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Affected (affectedToJson, jsonToAffected)
+import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import Pawl.Json.Value (Value)
@@ -14,13 +14,13 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 staticAbilityToJson :: StaticAbility.StaticAbility -> Value
 staticAbilityToJson sa =
   Json.jObject
-    [ (Text.pack "affected", affectedToJson (StaticAbility.affected sa)),
+    [ (Text.pack "affected", Affected.toJson (StaticAbility.affected sa)),
       (Text.pack "modifications", Json.nonEmptyTo modificationToJson (StaticAbility.modifications sa))
     ]
 
 jsonToStaticAbility :: Value -> Either Text StaticAbility.StaticAbility
 jsonToStaticAbility value = do
   ps <- Json.asObject value
-  a <- Json.field (Text.pack "affected") ps >>= jsonToAffected
+  a <- Json.field (Text.pack "affected") ps >>= Affected.fromJson
   ms <- Json.field (Text.pack "modifications") ps >>= Json.nonEmptyFrom jsonToModification
   pure (StaticAbility.MkStaticAbility a ms)

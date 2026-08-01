@@ -3,7 +3,7 @@ module Pawl.Codec.Cost where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
+import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
 import Pawl.Json.Value (Value)
@@ -13,7 +13,7 @@ costToJson :: Cost.Cost -> Value
 costToJson c =
   Json.jObject
     [ (Text.pack "mana", Json.maybeTo manaCostToJson (Cost.mana c)),
-      (Text.pack "components", Json.listTo costComponentToJson (Cost.components c))
+      (Text.pack "components", Json.listTo CostComponent.toJson (Cost.components c))
     ]
 
 -- CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
@@ -23,5 +23,5 @@ jsonToCost :: Value -> Either Text Cost.Cost
 jsonToCost value = do
   ps <- Json.asObject value
   m <- Json.maybeFrom jsonToManaCost (Json.getOpt (Text.pack "mana") ps)
-  cs <- Json.listFromDefault jsonToCostComponent (Json.getOpt (Text.pack "components") ps)
+  cs <- Json.listFromDefault CostComponent.fromJson (Json.getOpt (Text.pack "components") ps)
   pure Cost.MkCost {Cost.mana = m, Cost.components = cs}

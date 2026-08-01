@@ -1,0 +1,55 @@
+module Pawl.Codec.AffectedSpec where
+
+import qualified Data.Set as Set
+import qualified Pawl.Codec.Affected as Affected
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Subtype as Subtype
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.Affected" $ do
+  Spec.it s "TheseObjects" $
+    Common.assertJsonCodec
+      s
+      Affected.toJson
+      Affected.fromJson
+      (Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]))
+      "{\"type\":\"TheseObjects\",\"value\":[1,2]}"
+  Spec.it s "Matching" $
+    Common.assertJsonCodec
+      s
+      Affected.toJson
+      Affected.fromJson
+      (Affected.Matching (Filter.HasCardType CardType.Creature))
+      "{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
+  -- Opalescence's shape: its own "each other" card text (not a rule) as Not
+  -- IsSource, nested inside Matching -- the composed form a bare atom case
+  -- above would not exercise.
+  Spec.it s "Matching, Opalescence's \"each other\" shape" $
+    Common.assertJsonCodec
+      s
+      Affected.toJson
+      Affected.fromJson
+      ( Affected.Matching
+          ( Filter.And
+              [ Filter.HasCardType CardType.Enchantment,
+                Filter.Not (Filter.HasSubtype Subtype.Mountain),
+                Filter.Not Filter.IsSource
+              ]
+          )
+      )
+      "{\"type\":\"Matching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}}"
+  Spec.it s "Attached" $
+    Common.assertJsonCodec s Affected.toJson Affected.fromJson Affected.Attached "{\"type\":\"Attached\"}"
+  -- CR 303.4m through a player: Curse of Death's Hold's shape.
+  Spec.it s "AttachedPlayerControls" $
+    Common.assertJsonCodec
+      s
+      Affected.toJson
+      Affected.fromJson
+      (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature))
+      "{\"type\":\"AttachedPlayerControls\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"

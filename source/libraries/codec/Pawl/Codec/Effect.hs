@@ -11,7 +11,7 @@ import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.ManaProduction (jsonToManaProduction, manaProductionToJson)
+import qualified Pawl.Codec.ManaProduction as ManaProduction
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import Pawl.Codec.ObjectRef (jsonToObjectRef, objectRefToJson)
@@ -38,7 +38,7 @@ effectToJson codec e = case e of
   Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [SlotName.toJson s, quantityToJson q])))
   Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, objectRefToJson r])))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (SlotName.toJson s))
-  Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
+  Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (ManaProduction.toJson production))
   Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [Filter.toJson f, SearchDestination.toJson d])))
   Effect.ExileAllGraveyards -> Json.nullary (Text.pack "ExileAllGraveyards")
   Effect.Proliferate -> Json.nullary (Text.pack "Proliferate")
@@ -123,7 +123,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [d, m, r])) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToObjectRef r
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, objectRef]")
     "ChangeText" -> Json.withValue mv (fmap Effect.ChangeText . SlotName.fromJson)
-    "AddMana" -> Json.withValue mv (fmap Effect.AddMana . jsonToManaProduction)
+    "AddMana" -> Json.withValue mv (fmap Effect.AddMana . ManaProduction.fromJson)
     "Search" -> case mv of
       Just (Array (MkArray [f, d])) -> Effect.Search <$> Filter.fromJson f <*> SearchDestination.fromJson d
       _ -> Left (Text.pack "Search expects [filter, destination]")

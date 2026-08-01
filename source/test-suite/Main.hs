@@ -7,17 +7,22 @@ import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.Codec.AbilityNameSpec
+import qualified Pawl.Codec.ActivationTimingSpec
+import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.CardTypeSpec
 import qualified Pawl.Codec.CastingPermissionSpec
+import qualified Pawl.Codec.CastingRestrictionSpec
 import qualified Pawl.Codec.ColorSpec
 import qualified Pawl.Codec.CombatStepSpec
 import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ControllerRelationSpec
+import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
+import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
@@ -29,6 +34,7 @@ import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.LoyaltySpec
+import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
@@ -159,17 +165,22 @@ spec s registry = do
   Pawl.CardsSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
+  Pawl.Codec.ActivationTimingSpec.spec s
+  Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
+  Pawl.Codec.CastingRestrictionSpec.spec s
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatStepSpec.spec s
   Pawl.Codec.CommonSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
+  Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
+  Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
@@ -181,6 +192,7 @@ spec s registry = do
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
+  Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s

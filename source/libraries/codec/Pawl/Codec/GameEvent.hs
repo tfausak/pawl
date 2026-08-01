@@ -4,7 +4,7 @@ module Pawl.Codec.GameEvent where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Countering as Countering
-import Pawl.Codec.DamageEvent (damageEventToJson, jsonToDamageEvent)
+import qualified Pawl.Codec.DamageEvent as DamageEvent
 import qualified Pawl.Codec.DiscardCause as DiscardCause
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -19,7 +19,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 gameEventToJson :: GameEvent.GameEvent -> Value
 gameEventToJson e = case e of
   GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array (MkArray [ZoneChange.toJson zc, projectedCharacteristicsToJson pc])))
-  GameEvent.DamageDealt ev -> Json.tagged (Text.pack "DamageDealt") (Just (damageEventToJson ev))
+  GameEvent.DamageDealt ev -> Json.tagged (Text.pack "DamageDealt") (Just (DamageEvent.toJson ev))
   GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array (MkArray [Phase.toJson p, PlayerId.toJson pid])))
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (PlayerId.toJson pid))
   GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (PlayerId.toJson pid))
@@ -35,7 +35,7 @@ jsonToGameEvent value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
     ("Moved", Just (Array (MkArray [zc, pc]))) -> GameEvent.Moved <$> ZoneChange.fromJson zc <*> jsonToProjectedCharacteristics pc
-    ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> jsonToDamageEvent v
+    ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> DamageEvent.fromJson v
     ("StepBegan", Just (Array (MkArray [p, pid]))) -> GameEvent.StepBegan <$> Phase.fromJson p <*> PlayerId.fromJson pid
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> PlayerId.fromJson v
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> PlayerId.fromJson v

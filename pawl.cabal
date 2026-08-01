@@ -68,7 +68,9 @@ library codec
     Pawl.Codec.AbilityNameSpec
     Pawl.Codec.ActivatedAbility
     Pawl.Codec.ActivationTiming
+    Pawl.Codec.ActivationTimingSpec
     Pawl.Codec.Affected
+    Pawl.Codec.AffectedSpec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AttackRequirement
@@ -82,6 +84,7 @@ library codec
     Pawl.Codec.CastingPermission
     Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
+    Pawl.Codec.CastingRestrictionSpec
     Pawl.Codec.Color
     Pawl.Codec.ColorSpec
     Pawl.Codec.CombatStep
@@ -95,6 +98,7 @@ library codec
     Pawl.Codec.ControllerRelationSpec
     Pawl.Codec.Cost
     Pawl.Codec.CostComponent
+    Pawl.Codec.CostComponentSpec
     Pawl.Codec.Count
     Pawl.Codec.Counterability
     Pawl.Codec.CounterabilitySpec
@@ -103,6 +107,7 @@ library codec
     Pawl.Codec.CounterKind
     Pawl.Codec.CounterPattern
     Pawl.Codec.DamageEvent
+    Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
     Pawl.Codec.DamageKindSpec
     Pawl.Codec.DamagePattern
@@ -136,6 +141,7 @@ library codec
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
     Pawl.Codec.ManaProduction
+    Pawl.Codec.ManaProductionSpec
     Pawl.Codec.ManaSymbol
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec

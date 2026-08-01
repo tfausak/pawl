@@ -8,14 +8,11 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
-import Pawl.Codec.ActivationTiming (activationTimingToJson, jsonToActivationTiming)
-import Pawl.Codec.Affected (affectedToJson, jsonToAffected)
+import qualified Pawl.Codec.Affected as Affected
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
-import Pawl.Codec.CastingRestriction (castingRestrictionToJson, jsonToCastingRestriction)
 import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
 import Pawl.Codec.Cost (costToJson, jsonToCost)
-import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
 import Pawl.Codec.Count (countToJson, jsonToCount)
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
@@ -63,16 +60,13 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -246,13 +240,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         s
         (keywordToJson (Keyword.Landwalk Subtype.Swamp) /= keywordToJson (Keyword.Landwalk Subtype.Island))
         "swampwalk and islandwalk encode differently"
-    Spec.it s "CastingRestriction" $ do
-      let declareAttackers = CastingRestriction.DuringPhase (Phase.Combat CombatStep.DeclareAttackers)
-          upkeep = CastingRestriction.DuringPhase (Phase.Beginning BeginningStep.Upkeep)
-      roundTrip s "declare attackers" castingRestrictionToJson jsonToCastingRestriction declareAttackers
-      roundTrip s "upkeep" castingRestrictionToJson jsonToCastingRestriction upkeep
-      roundTrip s "attacked" castingRestrictionToJson jsonToCastingRestriction CastingRestriction.AttackedThisStep
-      Spec.assertBool s (castingRestrictionToJson declareAttackers /= castingRestrictionToJson upkeep) "the phase is part of the encoding"
     Spec.it s "CounterKind" $ do
       Spec.assertEqWith s "plus" (jsonToCounterKind (counterKindToJson CounterKind.PlusOnePlusOne)) (Right CounterKind.PlusOnePlusOne)
       Spec.assertEqWith s "minus" (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne)) (Right CounterKind.MinusOneMinusOne)
@@ -308,17 +295,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "m3" modificationToJson jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)
     Spec.it s "SetControllerToSource" $
       roundTrip s "m4" modificationToJson jsonToModification Modification.SetControllerToSource
-    Spec.it s "Affected round-trips (TheseObjects, Matching, Matching's \"each other\" shape, and AttachedPlayerControls)" $
-      mapM_
-        (roundTrip s "affected" affectedToJson jsonToAffected)
-        [ Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]),
-          Affected.Matching (Filter.Type.HasCardType CardType.Creature),
-          -- Opalescence's shape: its own "each other" card text (not a
-          -- rule) as Not IsSource.
-          Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain), Filter.Type.Not Filter.Type.IsSource]),
-          -- CR 303.4m through a player: Curse of Death's Hold's shape.
-          Affected.AttachedPlayerControls (Filter.Type.HasCardType CardType.Creature)
-        ]
   Spec.describe s "effect" $ do
     Spec.it s "DealDamage" $
       roundTrip s "e1" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3))
@@ -479,23 +455,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "emblem" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.CreateEmblem (Printing.card piker))
     Spec.it s "BecomeMonarch" $
       roundTrip s "e" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.BecomeMonarch MonarchTarget.TheController)
-    -- Every constructor, even though the encoder never emits AnyTime (it is
-    -- the absent key on a card). Round-tripping the whole family is what
-    -- keeps the decoder honest about the forms it accepts -- including that
-    -- the two nullary arms still render as a bare tag now that DuringPhase
-    -- has made the encoder a tagged one.
-    Spec.it s "ActivationTiming round-trips every way" $ do
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming ActivationTiming.AnyTime
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming ActivationTiming.SorcerySpeed
-      -- Desert's own rider (CR 511.1), and a stepless phase alongside it:
-      -- Pawl.Types.Phase spans both, so the arm has to carry both.
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn)
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase Phase.PostcombatMain TurnScope.EachTurn)
-      -- Llanowar Augur's "Activate only during your upkeep", the arm's
-      -- second axis: the SAME phase under each scope, so a codec that dropped
-      -- the scope would collapse these two into one and fail here.
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
-      roundTrip s "timing" activationTimingToJson jsonToActivationTiming (ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn)
     Spec.it s "ExileUntilMonarch" $
       roundTrip s "eum" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target")))
     Spec.it s "PlaySubgame round-trips" $
@@ -535,7 +494,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "a static ability with an empty modifications array is rejected" $ do
       let value =
             J.jObject
-              [ (Text.pack "affected", affectedToJson Affected.Attached),
+              [ (Text.pack "affected", Affected.toJson Affected.Attached),
                 (Text.pack "modifications", J.jArray [])
               ]
       Spec.assertBool
@@ -629,20 +588,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "GameEvent (loyalty ability activated)" $
       roundTrip s "loyalty-activated" gameEventToJson jsonToGameEvent (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7))
     Spec.describe s "cost (P8)" $ do
-      Spec.it s "every CostComponent round-trips" $
-        mapM_
-          (roundTrip s "component" costComponentToJson jsonToCostComponent)
-          [ CostComponent.TapThis,
-            CostComponent.SacrificeThis,
-            CostComponent.PayLife 2,
-            CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
-          ]
-      Spec.it s "PayEnergy" $
-        roundTrip s "pe" costComponentToJson jsonToCostComponent (CostComponent.PayEnergy 2)
-      -- CR 606.4's two halves, Jace Beleren's +2 and -1.
-      Spec.it s "loyalty costs" $ do
-        roundTrip s "add" costComponentToJson jsonToCostComponent (CostComponent.AddLoyaltyToThis 2)
-        roundTrip s "remove" costComponentToJson jsonToCostComponent (CostComponent.RemoveLoyaltyFromThis 1)
       Spec.it s "a Cost with a mana part and components round-trips" $
         roundTrip
           s

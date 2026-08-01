@@ -2,7 +2,7 @@ module Pawl.Types.ManaProduction where
 
 import Pawl.Types.ManaType (ManaType)
 
--- CR 106.3: how an AddMana effect decides WHICH mana it puts into the pool.
+-- | CR 106.3: how an AddMana effect decides WHICH mana it puts into the pool.
 -- Either one fixed type -- Llanowar Elves' "Add {G}" -- or one mana of a colour
 -- the producing player chooses (Birds of Paradise), which CR 105.4 restricts to
 -- the five colours, never colourless.
