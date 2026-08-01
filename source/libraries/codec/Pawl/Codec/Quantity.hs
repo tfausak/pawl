@@ -12,8 +12,9 @@ import qualified Pawl.Types.Quantity as Quantity
 -- another "Count" tag: 'Count.toJson' already tags its own output "Count" (it is
 -- shared with Condition's embedding of a Count), and the two types happen to use
 -- the SAME tag name at two different levels. Re-wrapping would double-tag
--- (@{"type":"Count","value":{"type":"Count","value":[...]}}@) -- guarded by the
--- CodecSpec round-trip test.
+-- (@{"type":"Count","value":{"type":"Count","value":[...]}}@) -- guarded by
+-- Pawl.Codec.QuantitySpec's "Count shares Count's own tag, not double-tagged"
+-- test.
 toJson :: Quantity.Quantity -> Value.Value
 toJson q = case q of
   Quantity.Literal n -> Common.tagged "Literal" . Just $ Common.integer n

@@ -9,7 +9,7 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 
--- CR 500.1's five steps and none of them individually is PhaseSelector's own
+-- CR 506.1's five steps and none of them individually is PhaseSelector's own
 -- coverage (Pawl.Codec.PhaseSelectorSpec); the three cases here are
 -- MkPhasePattern's own axis -- Eon Hub's symmetric `whosePhase = Nothing`,
 -- Fatigue's baked `Just`, and Stonehorn Dignitary's whole-phase selector, the
