@@ -165,7 +165,7 @@ handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
     Spec.assertEqWith s "alice takes the turn (wrapping past both departed seats)" (GameState.activePlayer after) S.alice
     Spec.assertEqWith s "carol's effect ended at carol's seat, two hops past alice" (GameState.continuousEffects after) []
 
-cleanupSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+cleanupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cleanupSpec s registry = Spec.describe s "DropAtCleanup" $ do
   Spec.it s "CR 514.2 cleanup drops an AtCleanup continuous effect and keeps a Never one" $ do
     let gs0 = Setup.emptyGame S.bothPlayers
@@ -174,7 +174,7 @@ cleanupSpec s registry = Spec.describe s "DropAtCleanup" $ do
     Spec.assertEqWith s "two stored before" (length (GameState.continuousEffects gs1)) 2
     Spec.assertEqWith s "one survives" (fmap ContinuousEffect.expiry (GameState.continuousEffects after)) [Expiry.Type.Never]
   Spec.it s "CR 514.2 the same sweep drops an AtCleanup floating replacement" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (oid, gs1) = S.addCreature piker S.alice gs0
         shielded = S.addRegenShield oid gs1
@@ -232,28 +232,28 @@ board piker warMammoth =
       (targetId, gs2) = S.addCreature warMammoth S.bob gs1
    in (srcId, targetId, whileEffect srcId targetId S.alice gs2)
 
-conditionalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+conditionalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 conditionalSpec s registry = Spec.describe s "Conditional" $ do
   Spec.it s "CR 611.2b YouControlSource holds while the source is controlled" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, _, gs) = board piker warMammoth
     Spec.assertBool s (holdsYouControlSource S.alice srcId gs) "holds"
   Spec.it s "CR 613.1b it stops holding when another player gains control of the source" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, _, gs) = board piker warMammoth
         stolen = S.giveControl srcId S.bob gs
     Spec.assertBool s (not (holdsYouControlSource S.alice srcId stolen)) "no longer holds"
   Spec.it s "CR 400.7 it stops holding when the source leaves the battlefield" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, _, gs) = board piker warMammoth
         gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [srcId])
     Spec.assertBool s (not (holdsYouControlSource S.alice srcId gone)) "no longer holds"
   Spec.it s "CR 611.2b arm returns Nothing when the condition is already false" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, _, gs) = board piker warMammoth
         gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [srcId])
     Spec.assertEqWith
@@ -262,8 +262,8 @@ conditionalSpec s registry = Spec.describe s "Conditional" $ do
       (Expiry.arm S.alice srcId (Duration.ForAsLongAs S.youControlSource) gone)
       Nothing
   Spec.it s "CR 611.2b arm returns a While when the condition holds now" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, _, gs) = board piker warMammoth
     Spec.assertEqWith
       s
@@ -271,8 +271,8 @@ conditionalSpec s registry = Spec.describe s "Conditional" $ do
       (Expiry.arm S.alice srcId (Duration.ForAsLongAs S.youControlSource) gs)
       (Just (Expiry.Type.While S.alice S.youControlSource))
   Spec.it s "CR 611.2b the sweep DELETES the effect once the condition fails" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, targetId, gs) = board piker warMammoth
         gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [srcId])
         (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
@@ -281,21 +281,21 @@ conditionalSpec s registry = Spec.describe s "Conditional" $ do
     Spec.assertEqWith s "the effect is gone, not masked" (GameState.continuousEffects swept) []
     Spec.assertEqWith s "control reverted" (Projection.controllerOf targetId swept) (Just S.bob)
   Spec.it s "CR 611.2b a sweep that changes nothing reports False" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (_, _, gs) = board piker warMammoth
         (changed, _) = Engine.runGamePure S.identityAnswer gs Expiry.sweepConditional
     Spec.assertBool s (not changed) "no change"
   Spec.it s "CR 704.3 settleForPriority runs the sweep" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, targetId, gs) = board piker warMammoth
         gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [srcId])
         settled = S.runPure S.identityAnswer gone Engine.settleForPriority
     Spec.assertEqWith s "control reverted at the settle" (Projection.controllerOf targetId settled) (Just S.bob)
   Spec.it s "CR 611.2b the sweep's replacements half survives while the source stands, then deletes once it doesn't" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (srcId, _, gs0) = board piker warMammoth
         gs = whileReplacement srcId S.alice gs0
         (unchanged, stillUp) = Engine.runGamePure S.identityAnswer gs Expiry.sweepConditional
@@ -349,11 +349,11 @@ masterThiefThreeWay darksteelMyr masterThief =
 -- enters, gain control of target artifact for as long as you control this
 -- creature." CR 611.2b's own printed example; the three assertions below in
 -- tests 2-4 are its three Gatherer rulings, verbatim.
-masterThiefSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+masterThiefSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   Spec.it s "CR 611.2b it works: the ETB resolves and control of the artifact changes" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    masterThief <- Registry.printing registry "Master Thief"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    masterThief <- S.printingOf s registry "Master Thief"
     let (_, myr, entering) = masterThiefBoard darksteelMyr masterThief
         stolen = masterThiefResolveAll (masterThiefSettle entering)
     Spec.assertEqWith s "alice controls the Myr" (Projection.controllerOf myr stolen) (Just S.alice)
@@ -362,8 +362,8 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   -- Ruling: "If Master Thief leaves the battlefield, you no longer
   -- control it, and its control-change effect ends."
   Spec.it s "CR 611.2b leaving the battlefield ends it" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    masterThief <- Registry.printing registry "Master Thief"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, entering) = masterThiefBoard darksteelMyr masterThief
         stolen = masterThiefResolveAll (masterThiefSettle entering)
         dead = S.runPure S.identityAnswer stolen (Event.destroy Regenerability.Regenerable [thief])
@@ -376,8 +376,8 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   -- on the stack; the trigger still RESOLVES (its target is legal, CR
   -- 608.2b), but the duration never starts.
   Spec.it s "CR 611.2b the duration never starts, so no effect is stored" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    masterThief <- Registry.printing registry "Master Thief"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, entering) = masterThiefBoard darksteelMyr masterThief
         onStack = masterThiefSettle entering
         lethal = S.settleSba (S.markDamage thief 2 onStack)
@@ -403,8 +403,8 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   -- Resolve.resolveEffects must read that frozen value rather than bob's
   -- live control of the thief).
   Spec.it s "CR 611.2b ceasing to be under your control (not leaving the battlefield) also stops it" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    masterThief <- Registry.printing registry "Master Thief"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, entering) = masterThiefBoard darksteelMyr masterThief
         onStack = masterThiefSettle entering
         taken = S.giveControl thief S.bob onStack
@@ -427,8 +427,8 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   -- implementation that filters the effect out of the projection while
   -- the condition is false, instead of deleting it, fails exactly here.
   Spec.it s "CR 611.2b the latch: regaining the source does not regain the artifact" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    masterThief <- Registry.printing registry "Master Thief"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, entering) = masterThiefBoard darksteelMyr masterThief
         stolen = masterThiefResolveAll (masterThiefSettle entering)
         taken = S.giveControl thief S.bob stolen
@@ -443,8 +443,8 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   -- leaves the game." The stolen object is owned by the departing player, so
   -- it goes with them -- the thief keeps nothing.
   Spec.it s "CR 800.4a the stolen artifact's OWNER departs: the artifact leaves the game and Master Thief stays" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    masterThief <- Registry.printing registry "Master Thief"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, stolen) = masterThiefThreeWay darksteelMyr masterThief
         gone = Departure.depart Departure.Type.Conceded S.bob stolen
     Spec.assertEqWith s "alice really had it before bob left" (Projection.controllerOf myr stolen) (Just S.alice)
@@ -467,8 +467,8 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   -- leaves; what matters is that the effect ends AT THE DEPARTURE and not at
   -- some later sweep.
   Spec.it s "CR 800.4a the THIEF departs: the control effect ends immediately and the artifact reverts" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    masterThief <- Registry.printing registry "Master Thief"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, stolen) = masterThiefThreeWay darksteelMyr masterThief
         gone = Departure.depart Departure.Type.Conceded S.alice stolen
     Spec.assertEqWith s "alice really had it before she left" (Projection.controllerOf myr stolen) (Just S.alice)
@@ -491,38 +491,38 @@ monarchSettle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
 monarchResolveAll :: GameState.GameState -> GameState.GameState
 monarchResolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
 
-monarchSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+monarchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchSpec s registry = Spec.describe s "Monarch" $ do
   Spec.it s "CR 725.2 the monarch draws at the beginning of their own end step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (_, gs0) = S.addLibraryCard piker S.alice (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
         began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "alice drew (one card now in hand)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
   Spec.it s "CR 725.2 the end-step draw fires only on the monarch's own end step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (_, gs0) = S.addLibraryCard piker S.bob (S.withMonarch S.bob (Setup.emptyGame S.bothPlayers))
         -- alice is the active player; her end step is not bob's (the monarch).
         began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "bob did not draw on alice's end step" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
   Spec.it s "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
         dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False 0 DamageKind.Combat
         began = S.withEvents [GameEvent.DamageDealt dmg] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "bob took the crown" (GameState.monarch after) (Just S.bob)
   Spec.it s "CR 725.2 noncombat damage to the monarch does not hand over the crown" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
         dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False 0 DamageKind.Noncombat
         began = S.withEvents [GameEvent.DamageDealt dmg] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "alice keeps the crown" (GameState.monarch after) (Just S.alice)
   Spec.it s "CR 725 Palace Jailer: ETB makes the caster monarch and exiles an opponent's creature until an opponent takes the crown" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    palaceJailer <- Registry.printing registry "Palace Jailer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceJailer <- S.printingOf s registry "Palace Jailer"
     let gs0 = Setup.emptyGame S.bothPlayers
         (victim, gs1) = S.addCreature piker S.bob gs0
         (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
@@ -558,8 +558,8 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
     --     last known information -- in a free-for-all with no teams, every
     --     other player who was in the game. Carol is necessarily in that set,
     --     so the prisoner returns as part of the same departure.
-    piker <- Registry.printing registry "Goblin Piker"
-    palaceJailer <- Registry.printing registry "Palace Jailer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceJailer <- S.printingOf s registry "Palace Jailer"
     let (victim, gs1) = S.addCreature piker S.bob S.threePlayerGame
         (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
@@ -609,11 +609,11 @@ hagBoardWith hag printing =
 -- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of
 -- your upkeep, target creature an opponent controls gets -2/-1 until your next
 -- turn." No Gatherer rulings exist, so these derive from CR 611.2a and CR 514.2.
-hagSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+hagSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
   Spec.it s "CR 613.4c it works: the opponent's 3/3 becomes 1/2" $ do
-    hag <- Registry.printing registry "Hag of Inner Weakness"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    hag <- S.printingOf s registry "Hag of Inner Weakness"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (mammoth, afterTrigger) = hagBoardWith hag warMammoth
     Spec.assertEqWith s "power" (Projection.powerOf mammoth afterTrigger) (Just 1)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf mammoth afterTrigger) (Just 2)
@@ -622,8 +622,8 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
   -- a matching StepBegan: the effect was CREATED on a turn whose untap
   -- step has already happened, so a log scan kills it the turn it is born.
   Spec.it s "CR 514.2 it survives cleanup and the whole of the opponent's turn" $ do
-    hag <- Registry.printing registry "Hag of Inner Weakness"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    hag <- S.printingOf s registry "Hag of Inner Weakness"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (mammoth, afterTrigger) = hagBoardWith hag warMammoth
         ended = Expiry.dropAtCleanup afterTrigger
         bobsTurn = hagHandoff ended
@@ -635,8 +635,8 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     Spec.assertEqWith s "power survives bob's own CR 514.2 cleanup sweep too" (Projection.powerOf mammoth bobsTurnSwept) (Just 1)
     Spec.assertEqWith s "toughness survives bob's own CR 514.2 cleanup sweep too" (Projection.toughnessOf mammoth bobsTurnSwept) (Just 2)
   Spec.it s "CR 611.2a it expires as the controller's next turn begins" $ do
-    hag <- Registry.printing registry "Hag of Inner Weakness"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    hag <- S.printingOf s registry "Hag of Inner Weakness"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let (mammoth, afterTrigger) = hagBoardWith hag warMammoth
         alicesTurn = hagHandoff (hagHandoff (Expiry.dropAtCleanup afterTrigger))
     Spec.assertEqWith s "alice is active again" (GameState.activePlayer alicesTurn) S.alice
@@ -646,8 +646,8 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     Spec.assertEqWith s "back to 3/3" (Projection.toughnessOf mammoth alicesTurn) (Just 3)
     Spec.assertEqWith s "nothing stored" (GameState.continuousEffects alicesTurn) []
   Spec.it s "CR 704.5f the modification really applies: a 2/1 becomes 0/0 and dies" $ do
-    hag <- Registry.printing registry "Hag of Inner Weakness"
-    piker <- Registry.printing registry "Goblin Piker"
+    hag <- S.printingOf s registry "Hag of Inner Weakness"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (_, afterPiker) = hagBoardWith hag piker
     Spec.assertEqWith s "bob's Piker is gone" (S.creaturesInPlay S.bob afterPiker) 0
   -- CR 608.2b: "If the source of an ability has left the zone it was in, its
@@ -660,8 +660,8 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
   -- ability's own controller is still known, and that is the perspective the
   -- rule means.
   Spec.it s "CR 608.2b killing the Hag in response does not fizzle its trigger" $ do
-    hag <- Registry.printing registry "Hag of Inner Weakness"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    hag <- S.printingOf s registry "Hag of Inner Weakness"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.bothPlayers
         (hagId, gs1) = S.addCreature hag S.alice gs0
         (mammoth, gs2) = S.addCreature warMammoth S.bob gs1
@@ -677,8 +677,8 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
   -- actually became illegal is the target. This fails if the fix were "stop
   -- re-checking targets" rather than "read the right perspective".
   Spec.it s "CR 608.2b killing the TARGET in response does fizzle the trigger" $ do
-    hag <- Registry.printing registry "Hag of Inner Weakness"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    hag <- S.printingOf s registry "Hag of Inner Weakness"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, gs1) = S.addCreature hag S.alice gs0
         (mammoth, gs2) = S.addCreature warMammoth S.bob gs1
@@ -695,9 +695,9 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
   -- of view, making bob's own Mammoth illegal and the trigger fizzle. Alice
   -- keeps a creature of her own precisely so that flip would be visible.
   Spec.it s "CR 603.3a stealing the Hag mid-trigger does not flip its perspective" $ do
-    hag <- Registry.printing registry "Hag of Inner Weakness"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    piker <- Registry.printing registry "Goblin Piker"
+    hag <- S.printingOf s registry "Hag of Inner Weakness"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (hagId, gs1) = S.addCreature hag S.alice gs0
         (_, gs2) = S.addCreature piker S.alice gs1
@@ -711,7 +711,7 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     Spec.assertEqWith s "but the trigger still resolved against bob's Mammoth" (Projection.powerOf mammoth resolved) (Just 1)
     Spec.assertEqWith s "and its toughness" (Projection.toughnessOf mammoth resolved) (Just 2)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   armSpec s
   cleanupSpec s registry

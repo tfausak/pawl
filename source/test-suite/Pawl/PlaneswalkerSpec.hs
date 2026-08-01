@@ -96,18 +96,18 @@ alicesNextTurn gs =
       back = S.runPure S.identityAnswer bobs Engine.handoffTurn
    in back {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
   Spec.it s "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
     let (jaceId, after) = jaceOnBattlefield island jace
     Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "on the battlefield"
     Spec.assertEqWith s "loyalty 3" (S.counterOf CounterKind.Loyalty jaceId after) 3
 
   Spec.it s "CR 606.4 the +2 adds two loyalty counters and each player draws" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
     let (jaceId, board) = jaceOnBattlefield island jace
         after = useAbility plusTwo jace jaceId board
     Spec.assertEqWith s "loyalty 3 + 2" (S.counterOf CounterKind.Loyalty jaceId after) 5
@@ -115,16 +115,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "bob drew too" (S.handSize S.bob after) 1
 
   Spec.it s "CR 606.4 the -1 removes a loyalty counter and the targeted player draws" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
     let (jaceId, board) = jaceOnBattlefield island jace
         after = useAbility minusOne jace jaceId board
     Spec.assertEqWith s "loyalty 3 - 1" (S.counterOf CounterKind.Loyalty jaceId after) 2
     Spec.assertEqWith s "exactly one player drew exactly one card" (S.handSize S.alice after + S.handSize S.bob after) 1
 
   Spec.it s "CR 606.6 the -10 is not offered at 3 loyalty, while the other two are" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
     let (jaceId, board) = jaceOnBattlefield island jace
         offered = Action.legalActions S.alice board
         isOffered i = not (null (activation jaceId i jace)) && all (`elem` offered) (activation jaceId i jace)
@@ -137,8 +137,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
       "and it is not activatable either"
 
   Spec.it s "CR 606.3 a second loyalty ability is not offered in the same turn" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
     let (jaceId, board) = jaceOnBattlefield island jace
         after = useAbility plusTwo jace jaceId board
         offered = Action.legalActions S.alice after
@@ -151,8 +151,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
       "but the limit expires with the turn"
 
   Spec.it s "CR 606.3 a loyalty ability is not offered on an opponent's turn" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
     let (jaceId, board) = jaceOnBattlefield island jace
         theirTurn = board {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
     Spec.assertBool
@@ -166,9 +166,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
   -- modified wasn't itself an effect", and CR 306.5b's entry counters are
   -- placed by a replacement effect.
   Spec.it s "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
-    doublingSeason <- Registry.printing registry "Doubling Season"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
     let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
         after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
     Spec.assertEqWith s "three doubled to six" (S.counterOf CounterKind.Loyalty (theJace after) after) 6
@@ -178,9 +178,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
   -- counter-scaling replacement to counters an EFFECT puts on, and CR 606.4's
   -- loyalty symbol is a cost. Doubling Season's own ruling says so.
   Spec.it s "CR 614.16 Doubling Season does not double a loyalty ability's own cost" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
-    doublingSeason <- Registry.printing registry "Doubling Season"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
     let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
         board = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
         jaceId = theJace board
@@ -188,8 +188,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "six plus two, not six plus four" (S.counterOf CounterKind.Loyalty jaceId after) 8
 
   Spec.it s "CR 704.5i three -1s across three turns bury Jace in his owner's graveyard" $ do
-    island <- Registry.printing registry "Island"
-    jace <- Registry.printing registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
     let (jaceId, board) = jaceOnBattlefield island jace
         turn gs = S.settleSba (alicesNextTurn (useAbility minusOne jace jaceId gs))
         afterOne = turn board

@@ -62,18 +62,18 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
-creatureSbaSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+creatureSbaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 creatureSbaSpec s registry =
   Spec.describe s "CreatureSba" $ do
     Spec.it s "CR 704.5g a creature with lethal damage is destroyed" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           after = S.settleSba (S.markDamage oid 1 gs)
       Spec.assertEqWith s "off the battlefield" (Game.zoneMembers Zone.Battlefield S.alice after) []
       Spec.assertEqWith s "in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
     Spec.it s "CR 704.5g damage below toughness is not lethal" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           -- A Piker is 2/1, so 0 marked damage is survivable and 1 is not.
           after = S.settleSba (S.markDamage oid 0 gs)
@@ -82,7 +82,7 @@ creatureSbaSpec s registry =
     Spec.it s "CR 704.5g a Mountain with damage marked is not destroyed" $ do
       -- Not a creature: 704.5f/g do not apply. This is the classification
       -- doing its job -- the check never asks WHICH card it is.
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 1
       case Game.zoneMembers Zone.Battlefield S.alice gs of
         [] -> Spec.assertFailure s "fixture should have one Mountain"
@@ -94,7 +94,7 @@ creatureSbaSpec s registry =
             1
 
     Spec.it s "a destroyed creature conserves objects" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           marked = S.markDamage oid 1 gs
       Spec.assertEqWith
@@ -107,14 +107,14 @@ creatureSbaSpec s registry =
     -- creature to the graveyard" property: two 2/1 Pikers trade in combat and
     -- both die to the CR 704.5g state-based action.
     Spec.it s "a creature dies in a played-out combat" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, _) = S.combatBoard piker 1 1
           after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
       Spec.assertEqWith s "attacker died" (S.creaturesInPlay S.alice after) 0
       Spec.assertEqWith s "blocker died" (S.creaturesInPlay S.bob after) 0
 
     Spec.it s "CR 704.5d a token off the battlefield ceases to exist" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let base = Setup.emptyGame S.bothPlayers
           goblinCard = Printing.card piker
           (tokId, gs) = S.addToken goblinCard S.alice base
@@ -126,7 +126,7 @@ creatureSbaSpec s registry =
       Spec.assertEqWith s "no token objects remain" (Game.objectCount settled) 0
 
     Spec.it s "CR 704.5d a token on the battlefield does NOT cease" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let base = Setup.emptyGame S.bothPlayers
           goblinCard = Printing.card piker
           (_, gs) = S.addToken goblinCard S.alice base
@@ -134,7 +134,7 @@ creatureSbaSpec s registry =
       Spec.assertEqWith s "the token survives on the battlefield" (Game.objectCount settled) 1
 
     Spec.it s "CR 704.5d/704.5g a 1/1 token dies to lethal damage and ceases to exist" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let base = Setup.emptyGame S.bothPlayers
           goblinCard = Printing.card piker
           -- A real 2/1 Piker (bob's) is the damage source; alice's 1/1 token takes 2.
@@ -146,7 +146,7 @@ creatureSbaSpec s registry =
       Spec.assertEqWith s "and NOT sitting in a graveyard (the falsifier)" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 0
 
     Spec.it s "CR 704.5g regeneration saves a creature from lethal combat damage" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let base = Setup.emptyGame S.bothPlayers
           (victim, gs0) = S.addCreature piker S.alice base -- 2/1
           shielded = S.addRegenShield victim gs0
@@ -160,28 +160,28 @@ creatureSbaSpec s registry =
           Spec.assertEqWith s "damage healed" (Object.damage obj) 0
         Nothing -> Spec.assertFailure s "victim vanished"
 
-damageSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+damageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageSpec s registry =
   Spec.describe s "Damage" $ do
     Spec.it s "a permanent starts with no damage marked" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
       Spec.assertEqWith s "none" (S.damageOf oid gs) (Just 0)
 
     Spec.it s "CR 514.2 marked damage is removed" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
       Spec.assertEqWith s "removed" (S.damageOf oid (Damage.removeAllDamage (S.markDamage oid 1 gs))) (Just 0)
 
     Spec.it s "CR 514.2 damage wears off at the cleanup step" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           marked = S.markDamage oid 1 gs
           after = snd (Engine.runGamePure S.identityAnswer marked (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
       Spec.assertEqWith s "worn off" (S.damageOf oid after) (Just 0)
 
     Spec.it s "CR 400.7 a new object carries no damage forward" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           marked = S.markDamage oid 1 gs
           after = S.runPure S.identityAnswer marked (Event.changeZone oid Zone.Graveyard)
@@ -190,7 +190,7 @@ damageSpec s registry =
         new : _ -> Spec.assertEqWith s "fresh object, no damage" (S.damageOf new after) (Just 0)
 
     Spec.it s "CR 615 a prevention drops combat damage but spares Noncombat" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let base = Setup.emptyGame S.bothPlayers
           (victim, gs0) = S.addCreature piker S.alice base
           shield =
@@ -221,11 +221,11 @@ damageSpec s registry =
           dropped = Expiry.dropAtCleanup (S.addReplacement shield base)
        in Spec.assertEqWith s "no replacements remain" (GameState.replacements dropped) []
 
-infectSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+infectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 infectSpec s registry =
   Spec.describe s "Infect" $ do
     Spec.it s "CR 120.3b infect damage to a player becomes poison, not life loss" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True 0 DamageKind.Combat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
@@ -234,7 +234,7 @@ infectSpec s registry =
       Spec.assertEqWith s "the source's controller gains no poison" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
 
     Spec.it s "CR 120.3d infect damage to a creature becomes -1/-1 counters, not marked damage" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (victim, gs1) = S.addCreature piker S.bob gs0
           ev = DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False True 0 DamageKind.Combat
@@ -243,7 +243,7 @@ infectSpec s registry =
       Spec.assertEqWith s "no marked damage" (S.damageOf victim after) (Just 0)
 
     Spec.it s "CR 702.90 Glistener Elf poisons an unblocked player, drains no life" $ do
-      glistenerElf <- Registry.printing registry "Glistener Elf"
+      glistenerElf <- S.printingOf s registry "Glistener Elf"
       let (gs, _, _) = S.combatBoardOf [glistenerElf] []
           after = S.fightWith S.aggressiveAnswer gs
       Spec.assertEqWith s "bob has one poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
@@ -251,8 +251,8 @@ infectSpec s registry =
       Spec.assertEqWith s "alice (controller) has no poison" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
 
     Spec.it s "CR 702.90c Glistener Elf shrinks and kills a blocker with -1/-1 counters" $ do
-      glistenerElf <- Registry.printing registry "Glistener Elf"
-      piker <- Registry.printing registry "Goblin Piker"
+      glistenerElf <- S.printingOf s registry "Glistener Elf"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, blockers) = S.combatBoardOf [glistenerElf] [piker]
           fought = S.fightWith S.aggressiveAnswer gs
           settled = S.settleSba fought
@@ -263,11 +263,11 @@ infectSpec s registry =
           Spec.assertEqWith s "no marked damage on the blocker" (S.damageOf blocker fought) (Just 0)
           Spec.assertEqWith s "blocker buried by 704.5f" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 1
 
-toxicSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+toxicSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 toxicSpec s registry =
   Spec.describe s "Toxic" $ do
     Spec.it s "CR 120.3g toxic poison is IN ADDITION to the damage, not instead of it" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 DamageKind.Combat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
@@ -276,7 +276,7 @@ toxicSpec s registry =
       Spec.assertEqWith s "the source's controller gains no poison" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
 
     Spec.it s "CR 120.3g toxic gives no poison on NONCOMBAT damage" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 DamageKind.Noncombat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
@@ -288,7 +288,7 @@ toxicSpec s registry =
     -- still drains no life. No card in the pool has both, so the event is
     -- hand-built.
     Spec.it s "CR 120.3b/120.3g infect and toxic stack: poison is amount plus N, and no life is lost" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True 2 DamageKind.Combat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
@@ -296,7 +296,7 @@ toxicSpec s registry =
       Spec.assertEqWith s "bob's life unchanged" (S.lifeOf S.bob after) (Just 20)
 
     Spec.it s "CR 702.164c Branchblight Stalker poisons an unblocked player AND drains its life" $ do
-      stalker <- Registry.printing registry "Branchblight Stalker"
+      stalker <- S.printingOf s registry "Branchblight Stalker"
       let (gs, _, _) = S.combatBoardOf [stalker] []
           after = S.fightWith S.aggressiveAnswer gs
       Spec.assertEqWith s "bob has two poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 2
@@ -307,8 +307,8 @@ toxicSpec s registry =
     -- creature hands its poison to nobody, and marks its blocker normally --
     -- toxic is not infect, so the blocker takes damage, not -1/-1 counters.
     Spec.it s "CR 120.3g a blocked Branchblight Stalker gives no poison and marks its blocker" $ do
-      stalker <- Registry.printing registry "Branchblight Stalker"
-      piker <- Registry.printing registry "Goblin Piker"
+      stalker <- S.printingOf s registry "Branchblight Stalker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, blockers) = S.combatBoardOf [stalker] [piker]
           fought = S.fightWith S.aggressiveAnswer gs
       Spec.assertEqWith s "bob has no poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob fought) 0
@@ -324,7 +324,7 @@ toxicSpec s registry =
     -- grant is a layer-6 GainKeyword rather than a card, since no printing in
     -- the pool has both double strike and toxic.
     Spec.it s "CR 702.4b/120.3g a double-striking Branchblight Stalker poisons twice" $ do
-      stalker <- Registry.printing registry "Branchblight Stalker"
+      stalker <- S.printingOf s registry "Branchblight Stalker"
       let (gs0, attackers, _) = S.combatBoardOf [stalker] []
       case attackers of
         [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -345,9 +345,9 @@ toxicSpec s registry =
     -- redundant: the Stalker simply flies, and bob (with no creatures) is not
     -- blocking either way.
     Spec.it s "CR 702.164b two Aspirant's Ascents make Branchblight Stalker toxic 4" $ do
-      stalker <- Registry.printing registry "Branchblight Stalker"
-      island <- Registry.printing registry "Island"
-      ascent <- Registry.printing registry "Aspirant's Ascent"
+      stalker <- S.printingOf s registry "Branchblight Stalker"
+      island <- S.printingOf s registry "Island"
+      ascent <- S.printingOf s registry "Aspirant's Ascent"
       let (gs0, attackers, _) = S.combatBoardOf [stalker] []
       case attackers of
         [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -369,7 +369,7 @@ toxicSpec s registry =
     -- toxic implementation that reads the rider off the event batch instead of
     -- off the survivors.
     Spec.it s "CR 615.6 prevented combat damage gives no toxic poison" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           shield =
             ActiveReplacement.MkActiveReplacement
@@ -409,14 +409,14 @@ copiesAndKeeps target keep p = case p of
 inPlay :: ObjectId.ObjectId -> GameState.GameState -> Bool
 inPlay oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
-legendRuleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+legendRuleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 legendRuleSpec s registry =
   Spec.describe s "LegendRule" $ do
     -- CR 704.5j: "If two or more legendary permanents with the same name are
     -- controlled by the same player, that player chooses one of them, and the
     -- rest are put into their owners' graveyards."
     Spec.it s "CR 704.5j a second Thalia sends one of them to the graveyard" $ do
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       let (first, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
           (second, gs) = S.addCreature thalia S.alice g0
           kept = S.runPure (keepsLegend first) gs Sba.checkStateBasedActions
@@ -429,7 +429,7 @@ legendRuleSpec s registry =
     -- The discriminating twin: same board, opposite answer. This fails if the
     -- engine picks the survivor itself.
     Spec.it s "CR 704.5j which Thalia survives is the controller's choice" $ do
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       let (first, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
           (second, gs) = S.addCreature thalia S.alice g0
           keptSecond = S.runPure (keepsLegend second) gs Sba.checkStateBasedActions
@@ -439,7 +439,7 @@ legendRuleSpec s registry =
     -- CR 704.5j is per CONTROLLER: one legend each is legal, and the rule has
     -- nothing to say about the two of them.
     Spec.it s "CR 704.5j two players may each control a Thalia" $ do
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       let (hers, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
           (his, gs) = S.addCreature thalia S.bob g0
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
@@ -449,7 +449,7 @@ legendRuleSpec s registry =
     -- "Legendary" is half the condition; a duplicated ordinary creature is not
     -- the legend rule's business.
     Spec.it s "CR 704.5j two copies of a NON-legendary creature both survive" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (a, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (b, gs) = S.addCreature piker S.alice g0
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
@@ -457,8 +457,8 @@ legendRuleSpec s registry =
 
     -- "With the same name" is the other half: two DIFFERENT legends coexist.
     Spec.it s "CR 704.5j a Thalia and an Urborg coexist under one controller" $ do
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
       let (t, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
           (u, gs) = S.addCreature urborg S.alice g0
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
@@ -467,7 +467,7 @@ legendRuleSpec s registry =
     -- "Put into their OWNERS' graveyards" -- not the controller's. Alice
     -- controls both, but bob owns the one she stole, so that is where it goes.
     Spec.it s "CR 704.5j the loser goes to its OWNER's graveyard, not the controller's" $ do
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       let (hers, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
           (his, g1) = S.addCreature thalia S.bob g0
           stolen = S.giveControl his S.alice g1
@@ -486,8 +486,8 @@ legendRuleSpec s registry =
     -- name and supertype alike, so the copy IS a second Thalia and the rule
     -- fires on it.
     Spec.it s "CR 707.2/704.5j a Clone copying Thalia is a second Thalia and the rule fires" $ do
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      clone <- Registry.printing registry "Clone"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      clone <- S.printingOf s registry "Clone"
       let (original, board) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
           (_, staged) = S.spellOnStack clone S.alice board
           settled = snd (Engine.runGamePure (copiesAndKeeps original original) staged (Stack.resolveTop >> Engine.settleForPriority))
@@ -503,7 +503,7 @@ legendRuleSpec s registry =
     -- and strand a copy alive that they chose to lose -- which is what this
     -- branch did before review caught it.
     Spec.it s "CR 704.3/704.5j keeping a Thalia that is already dying buries both" $ do
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       let (healthy, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
           (dying, g1) = S.addCreature thalia S.alice g0
           -- Thalia is 2/1, so -2/-1 makes this copy a 0/0: CR 704.5f applies to
@@ -525,13 +525,13 @@ legendRuleSpec s registry =
 -- The two world enchantments in the pool, fetched together: most tests below
 -- want two DIFFERENTLY NAMED world permanents, since a rule that ignores names
 -- is half of the contrast with the legend rule above.
-worldPair :: Registry.Registry -> IO (Printing.Printing, Printing.Printing)
-worldPair registry = do
-  crossroads <- Registry.printing registry "Concordant Crossroads"
-  livingPlane <- Registry.printing registry "Living Plane"
+worldPair :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Printing.Printing, Printing.Printing)
+worldPair s registry = do
+  crossroads <- S.printingOf s registry "Concordant Crossroads"
+  livingPlane <- S.printingOf s registry "Living Plane"
   pure (crossroads, livingPlane)
 
-worldRuleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+worldRuleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 worldRuleSpec s registry =
   Spec.describe s "WorldRule" $ do
     -- CR 704.5k: "If two or more permanents have the supertype world, all
@@ -541,7 +541,7 @@ worldRuleSpec s registry =
     -- Shortest amount of time is the NEWEST arrival, so the second one to
     -- enter is the one that lives.
     Spec.it s "CR 704.5k the newer of two world permanents survives" $ do
-      (crossroads, livingPlane) <- worldPair registry
+      (crossroads, livingPlane) <- worldPair s registry
       let (older, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (newer, gs) = S.addCreature livingPlane S.alice g0
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
@@ -554,7 +554,7 @@ worldRuleSpec s registry =
     -- anything but the clock -- an object id, a name, or the order Sba happens
     -- to enumerate the battlefield in.
     Spec.it s "CR 704.5k which one survives is the entry order, not the card" $ do
-      (crossroads, livingPlane) <- worldPair registry
+      (crossroads, livingPlane) <- worldPair s registry
       let (older, g0) = S.addCreature livingPlane S.alice (Setup.emptyGame S.bothPlayers)
           (newer, gs) = S.addCreature crossroads S.alice g0
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
@@ -565,7 +565,7 @@ worldRuleSpec s registry =
     -- says "if two or more permanents", full stop. Two players each with a
     -- world permanent is exactly the board the legend rule leaves alone.
     Spec.it s "CR 704.5k two players may NOT each keep a world permanent" $ do
-      (crossroads, livingPlane) <- worldPair registry
+      (crossroads, livingPlane) <- worldPair s registry
       let (hers, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (his, gs) = S.addCreature livingPlane S.bob g0
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
@@ -575,7 +575,7 @@ worldRuleSpec s registry =
     -- "All except the one" -- so a third arrival buries BOTH incumbents in the
     -- same pass, rather than peeling one off per pass.
     Spec.it s "CR 704.5k a third world permanent buries both incumbents at once" $ do
-      (crossroads, livingPlane) <- worldPair registry
+      (crossroads, livingPlane) <- worldPair s registry
       let (first, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (second, g1) = S.addCreature livingPlane S.alice g0
           (third, gs) = S.addCreature crossroads S.alice g1
@@ -587,7 +587,7 @@ worldRuleSpec s registry =
 
     -- "Two or more": one world permanent is nobody's business.
     Spec.it s "CR 704.5k a lone world permanent survives" $ do
-      (crossroads, _) <- worldPair registry
+      (crossroads, _) <- worldPair s registry
       let (only, gs) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
       Spec.assertBool s (inPlay only after) "it stays"
@@ -596,8 +596,8 @@ worldRuleSpec s registry =
     -- world one is not a pair. Bad Moon is the control -- an enchantment in
     -- every way except the supertype.
     Spec.it s "CR 704.5k a world permanent and an ordinary enchantment coexist" $ do
-      (crossroads, _) <- worldPair registry
-      badMoon <- Registry.printing registry "Bad Moon"
+      (crossroads, _) <- worldPair s registry
+      badMoon <- S.printingOf s registry "Bad Moon"
       let (world, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (ordinary, gs) = S.addCreature badMoon S.alice g0
           after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
@@ -609,7 +609,7 @@ worldRuleSpec s registry =
     -- fresh id on the way, so this counts the zone rather than naming the old
     -- one.)
     Spec.it s "CR 704.5k the loser goes to its OWNER's graveyard" $ do
-      (crossroads, livingPlane) <- worldPair registry
+      (crossroads, livingPlane) <- worldPair s registry
       let (his, g0) = S.addCreature crossroads S.bob (Setup.emptyGame S.bothPlayers)
           stolen = S.giveControl his S.alice g0
           (hers, gs) = S.addCreature livingPlane S.alice stolen
@@ -629,8 +629,8 @@ worldRuleSpec s registry =
     -- name the same permanent; the deduplicated batch they share is pinned by
     -- the legend rule's own tests above.)
     Spec.it s "CR 704.3 the world rule and the legend rule share one pass" $ do
-      (crossroads, _) <- worldPair registry
-      night <- Registry.printing registry "Night of Souls' Betrayal"
+      (crossroads, _) <- worldPair s registry
+      night <- S.printingOf s registry "Night of Souls' Betrayal"
       let (oldWorld, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (firstNight, g1) = S.addCreature night S.alice g0
           (secondNight, g2) = S.addCreature night S.alice g1
@@ -651,9 +651,9 @@ worldRuleSpec s registry =
     -- twice, or its zone change (and any dies-trigger watching) would fire
     -- again.
     Spec.it s "CR 704.5f/704.5k a permanent both rules name is moved once" $ do
-      (crossroads, livingPlane) <- worldPair registry
-      opalescence <- Registry.printing registry "Opalescence"
-      night <- Registry.printing registry "Night of Souls' Betrayal"
+      (crossroads, livingPlane) <- worldPair s registry
+      opalescence <- S.printingOf s registry "Opalescence"
+      night <- S.printingOf s registry "Night of Souls' Betrayal"
       let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
           (_, g1) = S.addCreature night S.alice g0
           (doomed, g2) = S.addCreature crossroads S.alice g1
@@ -669,8 +669,8 @@ worldRuleSpec s registry =
     -- asked, and the incumbent is in the graveyard by the time she has
     -- priority again -- the world rule as a player would meet it.
     Spec.it s "CR 704.5k whole cards: resolving Living Plane buries the Concordant Crossroads already out" $ do
-      (crossroads, livingPlane) <- worldPair registry
-      forest <- Registry.printing registry "Forest"
+      (crossroads, livingPlane) <- worldPair s registry
+      forest <- S.printingOf s registry "Forest"
       let base = S.landsInPlay forest 4 -- {2}{G}{G}
           (incumbent, withCrossroads) = S.addCreature crossroads S.alice base
           (withSpell, spellId) = S.handOne livingPlane withCrossroads
@@ -712,11 +712,11 @@ sbaSpec s =
           after = S.settleSba gs
        in Spec.assertEqWith s "bob still playing" (fmap Player.status (Map.lookup S.bob (GameState.players after))) (Just Status.Playing)
 
-damageEventSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+damageEventSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageEventSpec s registry =
   Spec.describe s "DamageEvent" $ do
     Spec.it s "a blocked 2/1 trade emits both damage events" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, mine, theirs) = S.combatBoard piker 1 1
           after = S.fightWith S.aggressiveAnswer gs
           events = S.damageEventsOf after
@@ -734,7 +734,7 @@ damageEventSpec s registry =
         _ -> Spec.assertFailure s "fixture should have one creature per side"
 
     Spec.it s "an unblocked 2/1 emits a ToPlayer event" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, mine, _) = S.combatBoard piker 1 0
           after = S.fightWith S.aggressiveAnswer gs
       case mine of
@@ -746,29 +746,29 @@ damageEventSpec s registry =
             [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat]
         _ -> Spec.assertFailure s "fixture should have an attacker"
 
-deathtouchSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+deathtouchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 deathtouchSpec s registry =
   Spec.describe s "Deathtouch" $ do
     Spec.it s "CR 704.5h a 1/1 deathtoucher destroys a 3/3 it deals 1 to" $ do
       -- Typhoid Rats attacks, Ogre Sentry blocks. Rat deals 1 -> Ogre dies by
       -- 704.5h (toughness 3, not lethal by the numbers); Ogre's 3 kills the Rat.
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, _, _) = S.combatBoardOf [typhoidRats] [ogreSentry]
           after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
       Spec.assertEqWith s "the Ogre is dead" (S.creaturesInPlay S.bob after) 0
       Spec.assertEqWith s "the Rat is dead" (S.creaturesInPlay S.alice after) 0
 
     Spec.it s "CR 704.5g the control: a 2/1 without deathtouch leaves the 3/3 alive" $ do
-      piker <- Registry.printing registry "Goblin Piker"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      piker <- S.printingOf s registry "Goblin Piker"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, _, _) = S.combatBoardOf [piker] [ogreSentry]
           after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
       Spec.assertEqWith s "the Ogre survives" (S.creaturesInPlay S.bob after) 1
 
     Spec.it s "the SBA check consumes the damage events by watermark, not by draining" $ do
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, _, _) = S.combatBoardOf [typhoidRats] [ogreSentry]
           after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
       Spec.assertEqWith s "nothing left unscanned" (Event.unscannedDamage after) []
@@ -778,8 +778,8 @@ deathtouchSpec s registry =
       -- Typhoid Rats (deathtouch) and Ogre Sentry trade combat damage under
       -- aggressiveAnswer (which DOES declare attackers). fightWith runs no SBAs,
       -- so the wave is still unscanned in the turn log.
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, rats, ogres) = S.combatBoardOf [typhoidRats] [ogreSentry]
           fought = S.fightWith S.aggressiveAnswer gs
           ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
@@ -791,9 +791,9 @@ deathtouchSpec s registry =
     Spec.it s "CR 702.2e Humility removes deathtouch, so the deal-time bit is false" $ do
       -- Under Humility the Rat loses deathtouch (layer 6); its combat-damage
       -- event's bit is false -- asserted directly on the event, not via a kill.
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
-      humility <- Registry.printing registry "Humility"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
+      humility <- S.printingOf s registry "Humility"
       let (gs0, rats, _) = S.combatBoardOf [typhoidRats] [ogreSentry]
           gs = S.withHumility humility gs0
           fought = S.fightWith S.aggressiveAnswer gs
@@ -953,14 +953,14 @@ tramplingAnswer p = case p of
           [] -> toBlockers
   _ -> S.aggressiveAnswer p
 
-trampleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+trampleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trampleSpec s registry =
   Spec.describe s "Trample" $ do
     Spec.it s "CR 702.19b a 3/3 trampler spills excess onto the defending player" $ do
       -- War Mammoth (3/3 trample) blocked by a Piker (2/1): 1 lethal to the
       -- Piker, 2 to bob. Mammoth survives (2 marked < 3).
-      warMammoth <- Registry.printing registry "War Mammoth"
-      piker <- Registry.printing registry "Goblin Piker"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, _) = S.combatBoardOf [warMammoth] [piker]
           after = S.settleSba (S.fightWith tramplingAnswer gs)
       Spec.assertEqWith s "bob took the 2 overflow" (S.lifeOf S.bob after) (Just 18)
@@ -971,7 +971,7 @@ trampleSpec s registry =
       -- Ogre Sentry is a 3/3 that cannot attack (defender), so use the Piker's
       -- existing behavior as the control: a blocked non-trample attacker deals
       -- nothing to the player. (combatDamageSpec already asserts bob = 20.)
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, _) = S.combatBoardOf [piker] [piker]
           after = S.fightWith tramplingAnswer gs
       Spec.assertEqWith s "bob untouched by a non-trampler" (S.lifeOf S.bob after) (Just 20)
@@ -979,8 +979,8 @@ trampleSpec s registry =
     Spec.it s "CR 702.19b defender-short assignment is rejected" $ do
       -- A cheat responder gives bob 3 while the Piker gets 0. Illegal: the
       -- attacker deals nothing, bob untouched, Piker survives.
-      warMammoth <- Registry.printing registry "War Mammoth"
-      piker <- Registry.printing registry "Goblin Piker"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, _) = S.combatBoardOf [warMammoth] [piker]
           cheat p = case p of
             Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -997,8 +997,8 @@ trampleSpec s registry =
       -- cannot reach lethal on both (needs 6, has 3), so no overflow -- bob is
       -- untouched -- and the division among the Ogres is free. Real cards, for
       -- the under-assignment case assignmentLegalitySpec pins on the predicate.
-      warMammoth <- Registry.printing registry "War Mammoth"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, _, _) = S.combatBoardOf [warMammoth] [ogreSentry, ogreSentry]
           dumpOne p = case p of
             Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -1047,7 +1047,7 @@ dumpOntoFirstCreature p = case p of
       [] -> Map.empty
   _ -> S.aggressiveAnswer p
 
-departedBlockerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+departedBlockerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedBlockerSpec s registry =
   Spec.describe s "Departed blockers (#29)" $ do
     Spec.it s "CR 702.19d a trampler whose only blocker left assigns everything to the player" $ do
@@ -1057,8 +1057,8 @@ departedBlockerSpec s registry =
       -- to choose. dumpOntoFirstCreature sinks everything into a creature
       -- recipient if one is offered, so an offered ghost shows up as bob
       -- taking nothing.
-      warMammoth <- Registry.printing registry "War Mammoth"
-      piker <- Registry.printing registry "Goblin Piker"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, theirs) = S.combatBoardOf [warMammoth] [piker]
       case theirs of
         blocker : _ ->
@@ -1073,7 +1073,7 @@ departedBlockerSpec s registry =
       -- currently blocking it ... it assigns no combat damage." bob is untouched
       -- either way, so the observable is the history: the engine must not record
       -- a DamageDealt addressed to a creature that is not there.
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, theirs) = S.combatBoardOf [piker] [piker]
       case theirs of
         blocker : _ ->
@@ -1089,8 +1089,8 @@ departedBlockerSpec s registry =
       -- divide, so this is forced: all 3 onto the survivor, which then dies.
       -- With the ghost still in the list the assignment is a free division and
       -- the whole 3 can sink into it, leaving the survivor untouched.
-      warMammoth <- Registry.printing registry "War Mammoth"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, _, theirs) = S.combatBoardOf [warMammoth] [ogreSentry, ogreSentry]
       case theirs of
         dead : _ : _ ->
@@ -1136,13 +1136,13 @@ boltBlockerMidCombat blocks bolt blocker gs =
 -- Both end at the same observable: the attacker assigns no combat damage at all
 -- (CR 510.1c), so the defending player takes nothing. Reading emptiness as
 -- unblocked -- the bug this group pins -- lets the attacker through instead.
-blockedStaysBlockedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+blockedStaysBlockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blockedStaysBlockedSpec s registry =
   Spec.describe s "Blocked stays blocked (CR 509.1h)" $ do
     Spec.it s "CR 510.1c a blocker Bolted after blocks are declared leaves the attacker blocked, so the defender takes nothing" $ do
-      piker <- Registry.printing registry "Goblin Piker"
-      mountain <- Registry.printing registry "Mountain"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let (board, mine, theirs) = S.combatBoardOf [piker] [piker]
           (_, withLand) = S.addCreature mountain S.alice board
           (bolt, gs) = S.addHandCard lightningBolt S.alice withLand
@@ -1170,10 +1170,10 @@ blockedStaysBlockedSpec s registry =
       -- dead. The shield is seeded rather than activated: what is under test is
       -- CR 509.1h, and bob paying {B} for his own ability is ActivateSpec's
       -- subject.
-      piker <- Registry.printing registry "Goblin Piker"
-      mountain <- Registry.printing registry "Mountain"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+      piker <- S.printingOf s registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
       let (board, mine, theirs) = S.combatBoardOf [piker] [drudgeSkeletons]
           (_, withLand) = S.addCreature mountain S.alice board
           (bolt, gs0) = S.addHandCard lightningBolt S.alice withLand
@@ -1205,7 +1205,7 @@ killAttackerMidCombat victim gs =
     Event.destroy Regenerability.Regenerable [victim]
     Monad.void Damage.dealCombatDamage
 
-departedAttackerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+departedAttackerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedAttackerSpec s registry =
   Spec.describe s "Departed attackers (CR 510.1d)" $ do
     Spec.it s "CR 510.1d a blocker whose attacker was destroyed mid-combat assigns no combat damage" $ do
@@ -1223,7 +1223,7 @@ departedAttackerSpec s registry =
       -- CR 608.2i history is. The control leg proves the assertion is not
       -- vacuous: with the attacker alive the same board records exactly that
       -- event.
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (gs, mine, _) = S.combatBoardOf [piker] [piker]
       case mine of
         attacker : _ -> do
@@ -1238,7 +1238,7 @@ departedAttackerSpec s registry =
       -- but the Combat.blockers KEY survives -- deliberately, since CR 509.1h's
       -- last sentence is about the blockers' side of that record -- so bob's
       -- blocker is still handed a dead attacker to hit.
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (attacker, b1) = S.addCreature piker S.alice S.threePlayerGame
           (blocker, b2) = S.addCreature piker S.bob b1
           fighting =
@@ -1296,7 +1296,7 @@ defenderOrBlockerAnswer p = case p of
             [] -> toBlockers
   _ -> S.aggressiveAnswer p
 
-departedDefenderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+departedDefenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedDefenderSpec s registry =
   Spec.describe s "Departed defender (CR 800.4e)" $ do
     Spec.it s "CR 800.4e no combat damage is assigned to a player who has left the game" $ do
@@ -1304,7 +1304,7 @@ departedDefenderSpec s registry =
       -- the game, that damage isn't assigned." Reachable: a defending player can
       -- concede between the declare-attackers step and the combat damage step.
       -- Three seats, because at two the concession ends the game (CR 104.2a).
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (attacker, board) = S.addCreature piker S.alice S.threePlayerGame
           attacking =
             board
@@ -1343,8 +1343,8 @@ departedDefenderSpec s registry =
       -- group comment above): it never picks a player recipient, so a blocked
       -- trampler's excess lands on the blocker whether the defender is offered
       -- or not. defenderOrBlockerAnswer is used for both legs instead.
-      warMammoth <- Registry.printing registry "War Mammoth"
-      piker <- Registry.printing registry "Goblin Piker"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (attacker, b1) = S.addCreature warMammoth S.alice S.threePlayerGame
           (blocker, b2) = S.addCreature piker S.bob b1
           attacking =
@@ -1382,7 +1382,7 @@ grantDeathtouch oid gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
-trampleDeathtouchSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+trampleDeathtouchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trampleDeathtouchSpec s registry =
   Spec.describe s "TrampleDeathtouch" $ do
     Spec.it s "CR 702.2c a deathtouch-granted trampler needs only 1 on the blocker, spilling the rest" $ do
@@ -1390,8 +1390,8 @@ trampleDeathtouchSpec s registry =
       -- lethal collapses to 1, so 1 to the Ogre and 2 tramples to bob; the Ogre
       -- still dies (704.5h, via the deal-time bit). Real cards replace M2c's
       -- synthetic deathtrampler.
-      warMammoth <- Registry.printing registry "War Mammoth"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs0, mammoths, _) = S.combatBoardOf [warMammoth] [ogreSentry]
           mammothId = case mammoths of
             m : _ -> m
@@ -1404,13 +1404,13 @@ trampleDeathtouchSpec s registry =
     Spec.it s "CR 702.19b the control: plain trample into the same 3/3 spills nothing" $ do
       -- War Mammoth (3/3 trample, NO deathtouch) into Ogre Sentry (3/3): lethal
       -- is 3, all 3 go to the Ogre, 0 tramples. Only deathtouch changes the spill.
-      warMammoth <- Registry.printing registry "War Mammoth"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, _, _) = S.combatBoardOf [warMammoth] [ogreSentry]
           after = S.settleSba (S.fightWith tramplingAnswer gs)
       Spec.assertEqWith s "bob untouched without deathtouch" (S.lifeOf S.bob after) (Just 20)
 
-m2cPropertySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+m2cPropertySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m2cPropertySpec s registry =
   Spec.describe s "M2cProperties" $ do
     Spec.it s "a deathtoucher's victim with toughness > 0 is gone after the SBA" $ do
@@ -1418,10 +1418,10 @@ m2cPropertySpec s registry =
       -- the M2c coverage; it becomes a random-game property when a deathtoucher
       -- joins a deck -- the castability work, #23). Every toughness we throw at
       -- the 1/1 deathtoucher dies to it.
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
-      piker <- Registry.printing registry "Goblin Piker"
-      nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
+      piker <- S.printingOf s registry "Goblin Piker"
+      nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let victims = [piker, nimbleBirdsticker, ogreSentry]
           killsIt v =
             let (gs, _, _) = S.combatBoardOf [typhoidRats] [v]
@@ -1450,11 +1450,11 @@ m2cPropertySpec s registry =
 -- Nothing. The third, a permanent that exists and is not a creature, no card in
 -- the pool can produce -- every DealDamage on a generically named slot belongs
 -- to a condition whose Filter admits only creatures -- so it is pinned here.
-damageRecipientSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+damageRecipientSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageRecipientSpec s registry =
   Spec.describe s "CR 120.1a which recipients damage can be dealt to" $ do
     Spec.it s "a generically named creature becomes CR 120.3e's creature recipient" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
       Spec.assertEqWith
         s
@@ -1463,7 +1463,7 @@ damageRecipientSpec s registry =
         (Just (Recipient.ToCreature oid))
 
     Spec.it s "a generically named NONcreature permanent can be dealt no damage" $ do
-      plains <- Registry.printing registry "Plains"
+      plains <- S.printingOf s registry "Plains"
       let (oid, gs) = S.addCreature plains S.alice (Setup.emptyGame S.bothPlayers)
       Spec.assertBool s (Set.member oid (GameState.battlefield gs)) "the land is really there"
       Spec.assertEqWith s "and takes nothing" (Damage.damageRecipient gs (Recipient.ToObject oid)) Nothing
@@ -1479,12 +1479,12 @@ damageRecipientSpec s registry =
     -- target out of a typed Pool were classified when they were built, so this
     -- function is not a second, later reading of the same question.
     Spec.it s "a creature or player recipient is unchanged" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
       Spec.assertEqWith s "creature" (Damage.damageRecipient gs (Recipient.ToCreature oid)) (Just (Recipient.ToCreature oid))
       Spec.assertEqWith s "player" (Damage.damageRecipient gs (Recipient.ToPlayer S.bob)) (Just (Recipient.ToPlayer S.bob))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   damageSpec s registry
   damageRecipientSpec s registry

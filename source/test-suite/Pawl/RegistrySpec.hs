@@ -10,45 +10,27 @@ import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
-import qualified Pawl.Exceptions.CorruptCard as CorruptCard
-import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
-import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardError as CardError
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Printing as Printing
 import qualified System.Directory as Directory
 
--- A registry over a throwaway directory holding `files` (name, contents). The
--- label keeps concurrently running cases in separate directories, since tasty
--- runs them in parallel.
-withCorpus :: String -> [(FilePath, Text.Text)] -> (Registry.Registry -> IO a) -> IO a
-withCorpus label files action = do
-  tmp <- Directory.getTemporaryDirectory
-  let dir = tmp <> "/pawl-registry-spec-" <> label
-  Exception.bracket_
-    ( do
-        Directory.createDirectoryIfMissing True dir
-        mapM_ (\(name, contents) -> TextIO.writeFile (dir <> "/" <> name) contents) files
-    )
-    (Directory.removeDirectoryRecursive dir)
-    (Registry.new dir >>= action)
-
--- The committed Goblin Piker file, used as a known-good card in a throwaway
--- corpus. Read rather than inlined so this spec never becomes a second source
--- of truth for a card's contents.
-pikerJson :: IO Text.Text
-pikerJson = do
-  root <- Registry.defaultRoot
-  TextIO.readFile (root <> "/goblin-piker.json")
+-- A registry over a throwaway corpus, handing the case both the root (for the
+-- paths it asserts on) and the registry itself.
+withCorpus :: String -> [(FilePath, Text.Text)] -> (FilePath -> Registry.Registry IO -> IO a) -> IO a
+withCorpus label files action =
+  S.withCorpusDir label files (\dir -> Registry.fileRegistry dir >>= action dir)
 
 -- Like withCorpus, but writes a single file's raw bytes rather than Text:
 -- withCorpus cannot express a file containing invalid UTF-8, since Text.Text
--- cannot hold one. This exercises Registry.load's decodeUtf8' failure branch,
+-- cannot hold one. This exercises Registry.loadFile's decodeUtf8' failure branch,
 -- otherwise unreached by any case here.
-withInvalidUtf8Corpus :: String -> (Registry.Registry -> IO a) -> IO a
+withInvalidUtf8Corpus :: String -> (FilePath -> Registry.Registry IO -> IO a) -> IO a
 withInvalidUtf8Corpus label action = do
   tmp <- Directory.getTemporaryDirectory
   let dir = tmp <> "/pawl-registry-spec-" <> label
@@ -66,12 +48,12 @@ withInvalidUtf8Corpus label action = do
         ByteString.writeFile (dir <> "/goblin-piker.json") badBytes
     )
     (Directory.removeDirectoryRecursive dir)
-    (Registry.new dir >>= action)
+    (Registry.fileRegistry dir >>= action dir)
 
 -- An IO action that must fail with a specific exception VALUE. The `expected`
--- argument fixes Exception.try's type, so no ScopedTypeVariables is needed --
--- which is the point of the typed failures: a caller says which failure it means
--- rather than matching prose (#167).
+-- argument fixes Exception.try's type, so no ScopedTypeVariables is needed.
+-- Only the root check still throws; a card that will not load is a returned
+-- CardError, asserted on directly by the cases below.
 expectException :: (Exception.Exception e, Eq e) => Spec.Spec IO n -> String -> e -> IO a -> IO ()
 expectException s label expected action = do
   result <- Exception.try action
@@ -79,141 +61,101 @@ expectException s label expected action = do
     Left err -> Spec.assertEqWith s label err expected
     Right _ -> Spec.assertFailure s (label <> ": expected " <> show expected <> ", got a value")
 
--- Like expectException where the payload is not worth pinning exactly (a parser
--- message). The continuation's own field accessors fix the exception type.
-expectExceptionWith :: (Exception.Exception e) => Spec.Spec IO n -> String -> (e -> IO ()) -> IO a -> IO ()
-expectExceptionWith s label check action = do
-  result <- Exception.try action
-  case result of
-    Left err -> check err
-    Right _ -> Spec.assertFailure s (label <> ": expected an exception, got a value")
-
 nameOf :: Printing.Printing -> Text.Text
 nameOf = Card.name . Printing.card
+
+-- The message an Invalid carries, for cases that assert on its content rather
+-- than on the constructor alone.
+reasonOf :: CardError.CardError -> String
+reasonOf err = case err of
+  CardError.Missing _ -> ""
+  CardError.Invalid _ reason -> reason
 
 spec :: (Monad n) => Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Registry" $ do
   Spec.it s "a card loads by its real name" $ do
-    piker <- pikerJson
-    withCorpus "by-name" [("goblin-piker.json", piker)] $ \registry -> do
-      p <- Registry.printing registry "Goblin Piker"
+    piker <- S.pikerJson
+    withCorpus "by-name" [("goblin-piker.json", piker)] $ \_ registry -> do
+      p <- S.printingOf s registry "Goblin Piker"
       Spec.assertEq s (nameOf p) $ Text.pack "Goblin Piker"
 
   Spec.it s "the same card loads by its slug -- slugify is idempotent" $ do
-    piker <- pikerJson
-    withCorpus "by-slug" [("goblin-piker.json", piker)] $ \registry -> do
-      byName <- Registry.card registry "Goblin Piker"
-      bySlug <- Registry.card registry "goblin-piker"
+    piker <- S.pikerJson
+    withCorpus "by-slug" [("goblin-piker.json", piker)] $ \_ registry -> do
+      byName <- Registry.named registry "Goblin Piker"
+      bySlug <- Registry.named registry "goblin-piker"
       Spec.assertEq s byName bySlug
 
   Spec.it s "a card is parsed at most once: the file may vanish after the first load" $ do
-    piker <- pikerJson
-    withCorpus "cached" [("goblin-piker.json", piker)] $ \registry -> do
-      first <- Registry.card registry "Goblin Piker"
-      Directory.removeFile (Registry.root registry <> "/goblin-piker.json")
-      second <- Registry.card registry "Goblin Piker"
-      Spec.assertEqWith s "served from the cache" first second
+    piker <- S.pikerJson
+    withCorpus "cached" [("goblin-piker.json", piker)] $ \root registry -> do
+      first <- Registry.named registry "Goblin Piker"
+      Directory.removeFile (root <> "/goblin-piker.json")
+      second <- Registry.named registry "Goblin Piker"
+      Spec.assertEqWith s "served from the memo" first second
 
-  -- The three failure kinds the loader can raise were distinguishable only
-  -- by their message prose, so a caller wanting "unknown card X, did you
-  -- mean...?" versus "that file is broken" had to string-match a `show`
-  -- (#167). Each is now its own type, and these cases catch it AT that type
-  -- -- which is the assertion: catching UnknownCard cannot succeed on a
-  -- CorruptCard however similar the two messages are.
-  Spec.it s "an unknown card raises UnknownCard, naming the slug and the path it looked for"
+  -- CardError says nothing about files, because it belongs to the interface and
+  -- a map-backed registry has no path to report. What #167 bought survives as
+  -- the constructor split: a caller wanting "unknown card X, did you mean...?"
+  -- matches Missing, one wanting "that card is broken" matches Invalid, and
+  -- neither has to read a message to tell them apart. The cases below assert
+  -- the constructor first and the message second.
+  Spec.it s "an unknown card is Missing, naming the card"
     . withCorpus "missing" []
-    $ \registry ->
-      expectExceptionWith
-        s
-        "missing file"
-        ( \err -> do
-            Spec.assertEqWith s "names the slug" (Slug.unwrap (UnknownCard.slug err)) $ Text.pack "goblin-piker"
-            Spec.assertEqWith s "names the path" (UnknownCard.path err) $ Registry.root registry <> "/goblin-piker.json"
-        )
-        (Registry.card registry "Goblin Piker")
+    $ \_ registry -> do
+      result <- Registry.named registry "Goblin Piker"
+      Spec.assertEqWith s "missing, by name" result . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Goblin Piker"
 
-  Spec.it s "a malformed file raises CorruptCard, not UnknownCard"
+  Spec.it s "a malformed file is Invalid, not Missing"
     . withCorpus "malformed" [("goblin-piker.json", Text.pack "{oh no")]
-    $ \registry ->
-      expectExceptionWith
-        s
-        "malformed json"
-        ( \err -> do
-            Spec.assertEqWith s "names the path" (CorruptCard.path err) $ Registry.root registry <> "/goblin-piker.json"
-            Spec.assertBool s (not (Text.null (CorruptCard.reason err))) "says why"
-        )
-        (Registry.card registry "Goblin Piker")
+    $ \root registry -> do
+      result <- Registry.named registry "Goblin Piker"
+      case result of
+        Right _ -> Spec.assertFailure s "expected a malformed file to fail"
+        Left err -> do
+          Spec.assertBool s (List.isInfixOf (root <> "/goblin-piker.json") (reasonOf err)) ("names the path: " <> show err)
+          Spec.assertBool s (not (null (reasonOf err))) "says why"
 
-  Spec.it s "a file whose card is named something else raises MisfiledCard, naming both slugs" $ do
-    piker <- pikerJson
-    withCorpus "misfiled" [("bird-maiden.json", piker)] $ \registry ->
-      expectExceptionWith
-        s
-        "misfiled card"
-        ( \err -> do
-            Spec.assertEqWith s "names the path" (MisfiledCard.path err) $ Registry.root registry <> "/bird-maiden.json"
-            Spec.assertEqWith s "names the card" (MisfiledCard.name err) $ Text.pack "Goblin Piker"
-            Spec.assertEqWith s "names the file's slug" (Slug.unwrap (MisfiledCard.expected err)) $ Text.pack "bird-maiden"
-            Spec.assertEqWith s "names the card's slug" (Slug.unwrap (MisfiledCard.actual err)) $ Text.pack "goblin-piker"
-        )
-        (Registry.card registry "Bird Maiden")
+  Spec.it s "a file whose card is named something else is Invalid, naming both names" $ do
+    piker <- S.pikerJson
+    withCorpus "misfiled" [("bird-maiden.json", piker)] $ \root registry -> do
+      result <- Registry.named registry "Bird Maiden"
+      case result of
+        Right _ -> Spec.assertFailure s "expected a misfiled card to fail"
+        Left err -> do
+          Spec.assertBool s (List.isInfixOf (root <> "/bird-maiden.json") (reasonOf err)) ("names the path: " <> show err)
+          Spec.assertBool s (List.isInfixOf "is named Goblin Piker" (reasonOf err)) ("names the card: " <> show err)
+          Spec.assertBool s (List.isInfixOf "files under goblin-piker" (reasonOf err)) ("names where it belongs: " <> show err)
 
-  Spec.it s "a file with invalid UTF-8 bytes raises CorruptCard naming the path and the decode failure"
+  Spec.it s "a file with invalid UTF-8 bytes is Invalid, naming the path and the decode failure"
     . withInvalidUtf8Corpus "invalid-utf8"
-    $ \registry ->
-      expectExceptionWith
-        s
-        "invalid utf-8"
-        ( \err -> do
-            Spec.assertEqWith s "names the path" (CorruptCard.path err) $ Registry.root registry <> "/goblin-piker.json"
-            -- Specifically the decodeUtf8' failure, not merely any
-            -- CorruptCard: an incomplete JSON payload (this file's
-            -- contents) would fail for an unrelated reason (missing
-            -- fields) once decoded, so this pins the decode branch rather
-            -- than any downstream one.
-            Spec.assertBool s (List.isInfixOf "not valid UTF-8" (Text.unpack (CorruptCard.reason err))) ("names the decode failure: " <> show err)
-        )
-        (Registry.card registry "Goblin Piker")
+    $ \root registry -> do
+      result <- Registry.named registry "Goblin Piker"
+      case result of
+        Right _ -> Spec.assertFailure s "expected invalid UTF-8 to fail"
+        Left err -> do
+          Spec.assertBool s (List.isInfixOf (root <> "/goblin-piker.json") (reasonOf err)) ("names the path: " <> show err)
+          -- Specifically the decodeUtf8' failure, not merely any Invalid: an
+          -- incomplete JSON payload (this file's contents) would fail for an
+          -- unrelated reason (missing fields) once decoded, so this pins the
+          -- decode branch rather than any downstream one.
+          Spec.assertBool s (List.isInfixOf "not valid UTF-8" (reasonOf err)) ("names the decode failure: " <> show err)
 
-  Spec.it s "a failed load is not cached: fixing the file fixes the lookup" $ do
-    piker <- pikerJson
-    withCorpus "retry" [("goblin-piker.json", Text.pack "{oh no")] $ \registry -> do
-      expectExceptionWith
-        s
-        "malformed json"
-        ( \err -> do
-            Spec.assertEqWith s "names the path" (CorruptCard.path err) $ Registry.root registry <> "/goblin-piker.json"
-            Spec.assertBool s (not (Text.null (CorruptCard.reason err))) "says why"
-        )
-        (Registry.card registry "Goblin Piker")
-      TextIO.writeFile (Registry.root registry <> "/goblin-piker.json") piker
-      c <- Registry.card registry "Goblin Piker"
+  Spec.it s "a failed load is not memoized: fixing the file fixes the lookup" $ do
+    piker <- S.pikerJson
+    withCorpus "retry" [("goblin-piker.json", Text.pack "{oh no")] $ \root registry -> do
+      broken <- Registry.named registry "Goblin Piker"
+      Spec.assertBool s (either (const True) (const False) broken) "the malformed file fails first"
+      TextIO.writeFile (root <> "/goblin-piker.json") piker
+      c <- S.cardOf s registry "Goblin Piker"
       Spec.assertEq s (Card.name c) $ Text.pack "Goblin Piker"
 
   -- (b) A mistyped --cards-dir should fail once, at startup, rather than
-  -- once per card looked up (#167).
-  Spec.it s "a root that does not exist is rejected by new, not by the first lookup" $ do
+  -- once per card looked up (#167). This is the one failure that is still an
+  -- exception: it is a failure of CONSTRUCTING a file registry, not of
+  -- fetching a card, so no CardError can express it.
+  Spec.it s "a root that does not exist is rejected when the registry is built, not at the first lookup" $ do
     tmp <- Directory.getTemporaryDirectory
     let missing = tmp <> "/pawl-registry-spec-no-such-root"
     Directory.removePathForcibly missing
-    expectException s "missing root" MissingRoot.MkMissingRoot {MissingRoot.path = missing} (Registry.new missing)
-
-  -- (a) A CLI, a scenario loader, a deckbuilder and a linter all want "every
-  -- card in this pool", which only the test suite could express before.
-  Spec.it s "slugs enumerates the pool in ascending order, ignoring non-.json entries" $ do
-    piker <- pikerJson
-    withCorpus
-      "enumerate"
-      [ ("goblin-piker.json", piker),
-        ("bird-maiden.json", piker),
-        ("README.md", Text.pack "not a card")
-      ]
-      $ \registry -> do
-        found <- Registry.slugs registry
-        Spec.assertEqWith s "sorted, .json only" (fmap Slug.unwrap found) [Text.pack "bird-maiden", Text.pack "goblin-piker"]
-
-  Spec.it s "cards loads every card the pool enumerates" $ do
-    piker <- pikerJson
-    withCorpus "load-all" [("goblin-piker.json", piker)] $ \registry -> do
-      loaded <- Registry.cards registry
-      Spec.assertEqWith s "one card, by name" (fmap Card.name loaded) [Text.pack "Goblin Piker"]
+    expectException s "missing root" MissingRoot.MkMissingRoot {MissingRoot.path = missing} (Registry.fileRegistry missing)

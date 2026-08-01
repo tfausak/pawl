@@ -70,11 +70,11 @@ resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> G
 resolveAndSettle answer gs =
   snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "Clone copies a creature and projects its P/T (CR 707.2)" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    clone <- Registry.printing registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, board) = S.addCreature piker S.alice gs0
         (_, staged) = S.spellOnStack clone S.alice board
@@ -88,7 +88,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertBool s (Projection.powerOf pikerId resolved == Just 2) "the copied Piker is untouched"
 
   Spec.it s "Clone with no creature to copy enters as a 0/0 and dies (CR 704.5f)" $ do
-    clone <- Registry.printing registry "Clone"
+    clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, staged) = S.spellOnStack clone S.alice gs0
         resolved = resolveAndSettle copyNewest staged
@@ -100,7 +100,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- fixture as the "no creature to copy" test above, so the only variable is
   -- the answer.
   Spec.it s "#222 a copy target that was never offered is refused" $ do
-    clone <- Registry.printing registry "Clone"
+    clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, staged) = S.spellOnStack clone S.alice gs0
         phantom = ObjectId.MkObjectId 9999
@@ -108,8 +108,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "the Clone copied nothing and died as a 0/0" (cloneOnBattlefield resolved) Nothing
 
   Spec.it s "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    clone <- Registry.printing registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, board0) = S.addCreature piker S.alice gs0
         -- Put a +1/+1 counter on the Piker: projected 3/2, base 2/1.
@@ -124,8 +124,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "Clone copies the base 1, not 2" (Projection.toughnessOf cloneId resolved) $ Just 1
 
   Spec.it s "Clone copies a creature's activated abilities (CR 707.2)" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-    clone <- Registry.printing registry "Clone"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, board) = S.addCreature prodigalSorcerer S.alice gs0
         (_, staged) = S.spellOnStack clone S.alice board
@@ -139,8 +139,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
           "Clone has the copied activated ability"
 
   Spec.it s "a copy of a copy resolves to the underlying creature (self-reference)" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    clone <- Registry.printing registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, board) = S.addCreature piker S.alice gs0
         (_, stagedA) = S.spellOnStack clone S.alice board
@@ -156,8 +156,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertBool s (Projection.isCreatureOf bId afterB) "the copy-of-a-copy is a creature"
 
   Spec.it s "a copy survives its source leaving the battlefield (CR 707.5 lock)" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    clone <- Registry.printing registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, board) = S.addCreature piker S.alice gs0
         (_, staged) = S.spellOnStack clone S.alice board
@@ -176,10 +176,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     -- derived from its rules text. Seeding the CDA as an evaluated integer
     -- would freeze the Clone at the graveyards' contents at the moment it
     -- entered -- P2's deferred bill, paid here.
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
-    clone <- Registry.printing registry "Clone"
-    piker <- Registry.printing registry "Goblin Piker"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    clone <- S.printingOf s registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
         (goyfId, board) = S.addCreature tarmogoyf S.alice withBolt

@@ -54,7 +54,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 oneMana :: Color.Color -> Mana.Mana
 oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color}]
 
-combatReplaySpec :: (Monad n) => Spec.Spec IO n -> n ()
+combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 combatReplaySpec s =
   let decider = Decide.deciderFor S.alice (Setup.emptyGame S.bothPlayers)
       oid = ObjectId.MkObjectId 7
@@ -440,31 +440,31 @@ concedeAnswer p = case p of
 -- playLandAnswer (whose choices differ from Replay's exhausted-transcript
 -- fallback, keeping the assertions below honest: the transcript has to
 -- actually carry the decisions).
-recordedGame :: Registry.Registry -> IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
-recordedGame registry = do
-  matchup <- S.redRed registry
+recordedGame :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
+recordedGame s registry = do
+  matchup <- S.redRed (S.printingOf s registry)
   let start = Setup.emptyGame (fmap fst matchup)
       game = Engine.playFrom matchup
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
   pure (start, game, recorded, transcript)
 
-replaySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+replaySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 replaySpec s registry =
   Spec.describe s "Replay" $ do
     Spec.it s "replaying a recorded game reproduces the final state" $ do
-      (start, game, recorded, transcript) <- recordedGame registry
+      (start, game, recorded, transcript) <- recordedGame s registry
       let ((_, replayed), desync) = Replay.replay transcript start game
       Spec.assertEqWith s "final states equal" replayed recorded
       Spec.assertEqWith s "and the transcript answered every prompt" desync Nothing
     Spec.it s "the transcript is what carries the decisions" $ do
-      (start, game, recorded, _) <- recordedGame registry
+      (start, game, recorded, _) <- recordedGame s registry
       let ((_, replayed), desync) = Replay.replay [] start game
       Spec.assertBool s (recorded /= replayed) "empty log diverges"
       -- The divergence is REPORTED rather than silent. An empty log runs out
       -- at the very first prompt, so the report names index 0.
       Spec.assertEqWith s "and says where it ran out" desync (Just (Desync.Exhausted 0))
     Spec.it s "a recorded goldfish also replays" $ do
-      (start, game, _, _) <- recordedGame registry
+      (start, game, _, _) <- recordedGame s registry
       let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
           ((_, replayed), desync) = Replay.replay gfLog start game
       Spec.assertEqWith s "goldfish" replayed gf
@@ -478,13 +478,13 @@ replaySpec s registry =
     -- makes that visible: replay names the first prompt the transcript failed
     -- to answer, and nothing after it can be trusted.
     Spec.it s "a truncated transcript reports where it ran out" $ do
-      (start, game, _, transcript) <- recordedGame registry
+      (start, game, _, transcript) <- recordedGame s registry
       let (_, desync) = Replay.replay (List.init transcript) start game
       case desync of
         Just (Desync.Exhausted _) -> pure ()
         _ -> Spec.assertFailure s ("expected an Exhausted report, got " <> show desync)
     Spec.it s "a mismatched entry is reported, not silently defaulted" $ do
-      (start, game, recorded, transcript) <- recordedGame registry
+      (start, game, recorded, transcript) <- recordedGame s registry
       -- A response of the wrong SHAPE for the first prompt, which is the
       -- opening Prompt.Shuffle: Response.ChoseX answers Prompt.ChooseX and
       -- nothing else, so decode rejects it.
@@ -513,7 +513,7 @@ replaySpec s registry =
     -- like a spell's ChooseModes -- a Response.ChoseModes round-trips through
     -- the DecisionLog byte-identically.
     Spec.it s "Aether Channeler's trigger ChooseModes records and replays a Set ModeIndex" $ do
-      acPrinting <- Registry.printing registry "Aether Channeler"
+      acPrinting <- S.printingOf s registry "Aether Channeler"
       let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
           decider = Decide.deciderFor S.alice gs
       case Card.Type.triggeredAbilities (Printing.card acPrinting) of
@@ -525,7 +525,7 @@ replaySpec s registry =
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         _ -> Spec.assertFailure s "Aether Channeler must have exactly one triggered ability"
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replay" $ do
   replaySpec s registry
   combatReplaySpec s

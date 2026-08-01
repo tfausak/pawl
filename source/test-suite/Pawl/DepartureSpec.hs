@@ -29,7 +29,7 @@ import qualified Pawl.Types.Zone as Zone
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 104.3a a conceding player leaves immediately, with Conceded as the reason" $ do
     let gs = Setup.emptyGame S.bothPlayers
@@ -146,8 +146,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "and the roster is untouched" (GameState.turnOrder gone) [S.alice, S.bob, S.carol]
 
   Spec.it s "CR 800.4a a departing player's objects leave the game, from every zone that can hold one" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    mountain <- Registry.printing registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
     let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
         (inHand, g2) = S.addHandCard mountain S.bob g1
         (inLibrary, g3) = S.addLibraryCard mountain S.bob g2
@@ -170,14 +170,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "and alice's permanent is untouched -- the sweep is keyed to the OWNER" (fmap Object.owner (Game.lookupObject aliceKeeps gone)) (Just S.alice)
 
   Spec.it s "CR 510.4 a departing player's id is dropped from the struckFirst snapshot" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
         snapshotted = g1 {GameState.combat = (GameState.combat g1) {Combat.Type.struckFirst = Just (Set.singleton onField)}}
         gone = Departure.depart Departure.Type.Conceded S.bob snapshotted
     Spec.assertEqWith s "bob's id is pruned from the CR 510.4 first-strike snapshot" (Combat.Type.struckFirst (GameState.combat gone)) (Just Set.empty)
 
   Spec.it s "CR 725 an exiledUntilMonarch entry KEYED on the departing player's own object is dropped" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
         exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField (MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Nothing})}
         gone = Departure.depart Departure.Type.Conceded S.bob exiled
@@ -190,7 +190,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- blocked-ness (Combat.isBlocked), and Damage.attackerAssignment filters the
   -- gone id out at damage ASSIGNMENT time rather than here.
   Spec.it s "CR 509.1h a blocked attacker stays blocked when its blocker's OWNER departs" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (attacker, g1) = S.addCreature piker S.alice S.threePlayerGame
         (blocker, g2) = S.addCreature piker S.bob g1
         combat =
@@ -213,7 +213,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     -- Setup.funnelBack does that from the finished subgame's object pool. If
     -- the loser's cards left the game, funnelBack would have nothing to
     -- return and they would be destroyed.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (onField, twoSeats) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         (alsoOnField, threeSeats) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
         twoGone = Departure.depart Departure.Type.Conceded S.bob twoSeats
@@ -247,9 +247,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     -- Piker and a Mindslaver, both added via S.addCreature) and a spell on
     -- the stack; he has also stolen control of alice's Darksteel Myr, a
     -- permanent she still owns, with a stored SetController.
-    piker <- Registry.printing registry "Goblin Piker"
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    mindslaver <- Registry.printing registry "Mindslaver"
+    piker <- S.printingOf s registry "Goblin Piker"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    mindslaver <- S.printingOf s registry "Mindslaver"
     let (bobsPiker, g1) = S.addCreature piker S.bob S.threePlayerGame
         (aliceMyr, g2) = S.addCreature darksteelMyr S.alice g1
         (bobsSpell, g3) = S.spellOnStack piker S.bob g2
@@ -273,8 +273,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- her and the static ability goes with its source (CR 611.3b); clause 2
   -- never has to look at it.
   Spec.it s "CR 800.4a: a departing player's own Control Magic leaves with her and releases the creature" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let (creature, withCreature) = S.addCreature piker S.bob S.threePlayerGame
         (aura, withAura) = S.addCreature controlMagic S.alice withCreature
         attached = S.attach aura creature withAura
@@ -295,8 +295,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- it -- which is the chain nonCardStackObjectsCease and
   -- remainingControlledExiled rely on being closed.
   Spec.it s "CR 800.4a: a departing player's stolen Control Magic reverts to its owner, taking the creature with it" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let (creature, withCreature) = S.addCreature piker S.carol S.threePlayerGame
         (aura, withAura) = S.addCreature controlMagic S.alice withCreature
         attached = S.attach aura creature withAura

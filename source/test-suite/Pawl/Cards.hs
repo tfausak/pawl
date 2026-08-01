@@ -1,23 +1,28 @@
--- The decks the random-game properties and setup tests play with. Cards
--- themselves come from Pawl.Registry, one file per card, loaded on demand; this
--- module is only the four hand-tuned 60-card lists, whose comments explain the
--- swap-ins that keep each at 60 cards (and so the CR 400.7 conservation count
--- at 120).
+-- The decks the random-game properties and setup tests play with. This module is
+-- only the four hand-tuned 60-card lists, whose comments explain the swap-ins
+-- that keep each at 60 cards (and so the CR 400.7 conservation count at 120).
+--
+-- Each takes HOW TO FETCH a printing rather than a registry, because its two
+-- kinds of caller disagree about what to do with a failure: a spec case folds it
+-- into an assertion, and Pawl.PropertySpec -- which is tasty-based and has no
+-- spec record -- throws. One deck list, two adapters.
 module Pawl.Cards where
 
 import qualified Data.Map.Strict as Map
-import qualified Pawl.Registry as Registry
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Printing as Printing
 
-redDeck :: Registry.Registry -> IO Deck.Deck
-redDeck registry = do
-  mountain <- Registry.printing registry "Mountain"
-  piker <- Registry.printing registry "Goblin Piker"
-  birdMaiden <- Registry.printing registry "Bird Maiden"
-  bolt <- Registry.printing registry "Lightning Bolt"
-  blaze <- Registry.printing registry "Blaze"
-  dragonFodder <- Registry.printing registry "Dragon Fodder"
-  chaosCharm <- Registry.printing registry "Chaos Charm"
+type Fetch m = String -> m Printing.Printing
+
+redDeck :: (Monad m) => Fetch m -> m Deck.Deck
+redDeck fetch = do
+  mountain <- fetch "Mountain"
+  piker <- fetch "Goblin Piker"
+  birdMaiden <- fetch "Bird Maiden"
+  bolt <- fetch "Lightning Bolt"
+  blaze <- fetch "Blaze"
+  dragonFodder <- fetch "Dragon Fodder"
+  chaosCharm <- fetch "Chaos Charm"
   pure . Deck.MkDeck $
     Map.fromList
       [ (mountain, 36),
@@ -39,14 +44,14 @@ redDeck registry = do
         (chaosCharm, 4)
       ]
 
-greenDeck :: Registry.Registry -> IO Deck.Deck
-greenDeck registry = do
-  forest <- Registry.printing registry "Forest"
-  warMammoth <- Registry.printing registry "War Mammoth"
-  fog <- Registry.printing registry "Fog"
-  giantGrowth <- Registry.printing registry "Giant Growth"
-  serpentsGift <- Registry.printing registry "Serpent's Gift"
-  battlegrowth <- Registry.printing registry "Battlegrowth"
+greenDeck :: (Monad m) => Fetch m -> m Deck.Deck
+greenDeck fetch = do
+  forest <- fetch "Forest"
+  warMammoth <- fetch "War Mammoth"
+  fog <- fetch "Fog"
+  giantGrowth <- fetch "Giant Growth"
+  serpentsGift <- fetch "Serpent's Gift"
+  battlegrowth <- fetch "Battlegrowth"
   pure . Deck.MkDeck $
     Map.fromList
       [ (forest, 36),
@@ -65,12 +70,12 @@ greenDeck registry = do
 -- Blue, no creatures: Divination accelerates its own deck-out, Unsummon bounces
 -- the opponent's creatures, Tome Scour mills them. Gives bounce/draw/mill random
 -- coverage (M4b fast follow).
-blueDeck :: Registry.Registry -> IO Deck.Deck
-blueDeck registry = do
-  island <- Registry.printing registry "Island"
-  unsummon <- Registry.printing registry "Unsummon"
-  divination <- Registry.printing registry "Divination"
-  tomeScour <- Registry.printing registry "Tome Scour"
+blueDeck :: (Monad m) => Fetch m -> m Deck.Deck
+blueDeck fetch = do
+  island <- fetch "Island"
+  unsummon <- fetch "Unsummon"
+  divination <- fetch "Divination"
+  tomeScour <- fetch "Tome Scour"
   pure . Deck.MkDeck $
     Map.fromList
       [ (island, 40),
@@ -79,14 +84,14 @@ blueDeck registry = do
         (tomeScour, 4)
       ]
 
-blackDeck :: Registry.Registry -> IO Deck.Deck
-blackDeck registry = do
-  swamp <- Registry.printing registry "Swamp"
-  typhoidRats <- Registry.printing registry "Typhoid Rats"
-  drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
-  murder <- Registry.printing registry "Murder"
-  mindRot <- Registry.printing registry "Mind Rot"
-  instillInfection <- Registry.printing registry "Instill Infection"
+blackDeck :: (Monad m) => Fetch m -> m Deck.Deck
+blackDeck fetch = do
+  swamp <- fetch "Swamp"
+  typhoidRats <- fetch "Typhoid Rats"
+  drudgeSkeletons <- fetch "Drudge Skeletons"
+  murder <- fetch "Murder"
+  mindRot <- fetch "Mind Rot"
+  instillInfection <- fetch "Instill Infection"
   pure . Deck.MkDeck $
     Map.fromList
       [ (swamp, 36),

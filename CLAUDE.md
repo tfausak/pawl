@@ -160,7 +160,7 @@ Pick the sublibrary by what the module *is*, not by who calls it. Each is
 | `exceptions` | the catalog of exceptions pawl throws |
 | `types` | type definitions, without behavior |
 | `codec` | JSON encoders and decoders for pawl's types |
-| `registry` | loading and caching card data from disk |
+| `registry` | answering "what card is this name?", plus a file-backed answer |
 | `engine` | the rules engine itself |
 
 Every library module belongs to one of those; only the executable, benchmark and

@@ -98,19 +98,19 @@ avoidsSource unwanted p = case p of
     [] -> NonEmpty.head candidates
   _ -> S.identityAnswer p
 
-castabilitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+castabilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castabilitySpec s registry = Spec.describe s "Castability" $ do
   Spec.it s "War Mammoth is cast off four Forests and resolves onto the battlefield" $ do
-    forest <- Registry.printing registry "Forest"
-    warMammoth <- Registry.printing registry "War Mammoth"
+    forest <- S.printingOf s registry "Forest"
+    warMammoth <- S.printingOf s registry "War Mammoth"
     let gs = resolvedCreature forest warMammoth 4
     Spec.assertEqWith s "stack empty" (length (GameState.stack gs)) 0
     Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
     Spec.assertEqWith s "lands tapped" (S.tappedCount S.alice gs) 4
 
   Spec.it s "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $ do
-    swamp <- Registry.printing registry "Swamp"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    swamp <- S.printingOf s registry "Swamp"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs = resolvedCreature swamp typhoidRats 1
     Spec.assertEqWith s "stack empty" (length (GameState.stack gs)) 0
     Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
@@ -123,7 +123,7 @@ poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Mana.poolOf pid gs of
   Mana.Type.MkMana units -> length units
 
-manaSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+manaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 manaSpec s registry = Spec.describe s "Mana" $ do
   Spec.it s "substituteX replaces each Variable with Generic X, keeping order" $
     let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -170,11 +170,11 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertEqWith s "no mana" (Mana.subtypeMana Subtype.Desert) Nothing
 
   Spec.it s "an empty pool starts empty" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "empty" (poolSize S.alice (S.landsInPlay mountain 2)) 0
 
   Spec.it s "tapping a Mountain taps it and adds one red unit" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
@@ -188,29 +188,29 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}])
 
   Spec.it s "two Mountains can pay {1}{R}" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 2)) "affordable"
 
   Spec.it s "one Mountain cannot pay {1}{R}" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (not (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 1))) "unaffordable"
 
   Spec.it s "no Mountains cannot pay {1}{R}" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (not (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 0))) "unaffordable"
 
   -- Three identical Mountains: every candidate is a copy of the same card, so
   -- the choice is genuinely indistinguishable and payCost must NOT ask (#12).
   -- S.identityAnswer would answer anyway; what this pins is the tap count.
   Spec.it s "paying {1}{R} taps exactly two of three Mountains and leaves no float" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 3) (Mana.payCost S.alice pikerCost)
     Spec.assertBool s paid "three Mountains should pay {1}{R}"
     Spec.assertEqWith s "tapped" (S.tappedCount S.alice after) 2
     Spec.assertEqWith s "no float" (poolSize S.alice after) 0
 
   Spec.it s "CR 500.5 mana pools empty" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
@@ -218,8 +218,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         Spec.assertEqWith s "emptied" (poolSize S.alice (Mana.emptyManaPools (S.runPure S.identityAnswer gs (Mana.tapForMana oid)))) 0
 
   Spec.it s "CR 305.6/305.7 an Urborg'd Mountain taps for black too" $ do
-    mountain <- Registry.printing registry "Mountain"
-    urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+    mountain <- S.printingOf s registry "Mountain"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let base = Setup.emptyGame S.bothPlayers
         (mountainId, g1) = S.addCreature mountain S.alice base
         (_, gs) = S.addCreature urborg S.alice g1
@@ -228,8 +228,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf mountainId gs) "red still available"
 
   Spec.it s "CR 305.6/305.7 a Blood Moon'd Urborg taps for red only" $ do
-    urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
-    bloodMoon <- Registry.printing registry "Blood Moon"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
         (urborgId, g1) = S.addCreature urborg S.alice base
         (_, gs) = S.addCreature bloodMoon S.alice g1
@@ -244,8 +244,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- reaches all of a land's rules text: PlayerEffectSpec already pins the
   -- other half of this same card's text going away under the same Blood Moon.
   Spec.it s "CR 305.7 a Blood Moon'd Reliquary Tower taps for red, not colorless" $ do
-    reliquaryTower <- Registry.printing registry "Reliquary Tower"
-    bloodMoon <- Registry.printing registry "Blood Moon"
+    reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
         (towerId, g1) = S.addCreature reliquaryTower S.alice base
         (_, gs) = S.addCreature bloodMoon S.alice g1
@@ -254,8 +254,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 
   -- The same strip, on a land whose rules text is not a mana ability at all.
   Spec.it s "CR 305.7 a Blood Moon'd Evolving Wilds has no activated ability left" $ do
-    evolvingWilds <- Registry.printing registry "Evolving Wilds"
-    bloodMoon <- Registry.printing registry "Blood Moon"
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
         (wildsId, g1) = S.addCreature evolvingWilds S.alice base
         (_, gs) = S.addCreature bloodMoon S.alice g1
@@ -267,8 +267,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- creature taps for green, and Blood Moon (CR 305.7) rewrites that to red
   -- by setting the same subtype it reads.
   Spec.it s "CR 305.6 a creature Ashaya made a Forest land taps for green" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     let base = Setup.emptyGame S.bothPlayers
         (pikerId, g1) = S.addCreature piker S.alice base
         (_, gs) = S.addCreature ashaya S.alice g1
@@ -276,9 +276,9 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertBool s (pikerId `elem` Mana.manaSources S.alice gs) "and it is a mana source"
 
   Spec.it s "CR 305.7 Blood Moon turns that same creature-land red" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
-    bloodMoon <- Registry.printing registry "Blood Moon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
         (pikerId, g1) = S.addCreature piker S.alice base
         (_, g2) = S.addCreature bloodMoon S.alice g1
@@ -293,8 +293,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- be built for this; it falls out of Mana.manaSources reading the PROJECTED
   -- card types.
   Spec.it s "CR 302.6 a summoning-sick creature Ashaya animated still cannot tap for mana" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     let base = Setup.emptyGame S.bothPlayers
         (pikerId, g1) = S.addCreature piker S.alice base
         (_, g2) = S.addCreature ashaya S.alice g1
@@ -337,13 +337,13 @@ manaSpec s registry = Spec.describe s "Mana" $ do
      in Spec.assertBool s (not (Mana.isManaAbility ab)) "no mana produced -> not mana"
 
   Spec.it s "CR 605 a settled Llanowar Elves is a green mana source" $ do
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (elfId, gs) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertBool s (elem (ManaType.Colored Color.Green) (Mana.manaTypesOf elfId gs)) "taps green"
     Spec.assertBool s (elem elfId (Mana.manaSources S.alice gs)) "is a mana source"
 
   Spec.it s "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $ do
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (elfId, g0) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
         sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
     Spec.assertBool s (notElem elfId (Mana.manaSources S.alice sick)) "sick elf excluded"
@@ -352,8 +352,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- Elves settled under BOB, so the settle it carries says nothing about
   -- alice. Stealing it does not hand her a mana source this turn.
   Spec.it s "CR 302.6 a stolen Llanowar Elves is not a mana source for the thief" $ do
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
-    controlMagic <- Registry.printing registry "Control Magic"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let (elfId, g0) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
         settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
         (aura, withAura) = S.addCreature controlMagic S.alice settled
@@ -373,9 +373,9 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- to end through cast and resolution, so the haste is really granted rather
   -- than stipulated.
   Spec.it s "CR 702.10c a hasted stolen Llanowar Elves IS a mana source for the thief" $ do
-    mountain <- Registry.printing registry "Mountain"
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
-    actOfTreason <- Registry.printing registry "Act of Treason"
+    mountain <- S.printingOf s registry "Mountain"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
+    actOfTreason <- S.printingOf s registry "Act of Treason"
     let base0 = S.landsInPlay mountain 3
         (elfId, base1) = S.addCreature llanowarElves S.bob base0
         base = S.runPure S.identityAnswer base1 (Engine.settleAll S.bob)
@@ -392,8 +392,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- the Elf spends a creature that could otherwise block -- so the choice must
   -- be asked, and the answer must be honoured (#12).
   Spec.it s "CR 601.2g paying {G} with a Forest AND a Llanowar Elves asks which to tap" $ do
-    forest <- Registry.printing registry "Forest"
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
+    forest <- S.printingOf s registry "Forest"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let base0 = S.landsInPlay forest 1
         (elfId, base1) = S.addCreature llanowarElves S.alice base0
         gs = S.runPure S.identityAnswer base1 (Engine.settleAll S.alice)
@@ -411,7 +411,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- Three Forests DO ask. They are one card, but sameness of card is not
   -- sameness of object (#217), so the engine does not presume to skip it.
   Spec.it s "CR 601.2g one candidate asks nothing; more than one always asks" $ do
-    forest <- Registry.printing registry "Forest"
+    forest <- S.printingOf s registry "Forest"
     let green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         countingAnswer :: Prompt.Prompt r -> State.State Int r
         countingAnswer p = case p of
@@ -427,7 +427,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- must not be honoured. Beyond hygiene, tapForMana is a no-op on an unknown
   -- id, so obeying the answer would leave the state unchanged and loop forever.
   Spec.it s "CR 601.2g an answer outside the offered set is rejected, not obeyed" $ do
-    forest <- Registry.printing registry "Forest"
+    forest <- S.printingOf s registry "Forest"
     let green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         bogus = ObjectId.MkObjectId 9999
         liar p = case p of
@@ -439,7 +439,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertEqWith s "from a real Forest, not the invented id" (S.tappedCount S.alice after) 1
 
   Spec.it s "mana from a controlled permanent goes to its controller, not owner" $ do
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
         gs0 = S.giveControl oid S.alice base
         after = S.runPure S.identityAnswer gs0 (Mana.tapForMana oid)
@@ -482,13 +482,13 @@ tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.
 tappedFor answer oid gs = case Mana.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
 
-anyColorSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+anyColorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- CR 105.4: "If a player is asked to choose a color, they must choose one of
   -- the five colors. 'Multicolored' is not a color. Neither is 'colorless.'"
   -- So AnyColor offers exactly five options, and {C} is not among them.
   Spec.it s "CR 105.4 Birds of Paradise offers the five colors and not colorless" $ do
-    birds <- Registry.printing registry "Birds of Paradise"
+    birds <- S.printingOf s registry "Birds of Paradise"
     let (birdsId, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
@@ -500,8 +500,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- The gameplay-level proof (design.md section 4): a real card, cast end to
   -- end off a source that produces no black mana until its controller says so.
   Spec.it s "CR 605.3b Typhoid Rats is cast off a lone Birds of Paradise that taps for black" $ do
-    birds <- Registry.printing registry "Birds of Paradise"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let resolved = castOffBoard (prefersColor Color.Black) [birds] typhoidRats
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "the Birds and the Rats" (S.creaturesInPlay S.alice resolved) 2
@@ -510,8 +510,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- The discriminating half: identical board, identical spell, one different
   -- answer. If the engine picked the colour itself this would pass too.
   Spec.it s "the color is the player's: a Birds tapped for green does not pay {B}" $ do
-    birds <- Registry.printing registry "Birds of Paradise"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let resolved = castOffBoard (prefersColor Color.Green) [birds] typhoidRats
     Spec.assertEqWith s "the Rats never resolved" (S.creaturesInPlay S.alice resolved) 1
     -- CR 601.2h: partial payments are not allowed, so the failed payment is
@@ -523,15 +523,15 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- unaffordable. Only a matching over what each source COULD produce gets it
   -- right.
   Spec.it s "CR 118.3 a Forest and a Birds of Paradise can pay {G}{B}" $ do
-    forest <- Registry.printing registry "Forest"
-    birds <- Registry.printing registry "Birds of Paradise"
+    forest <- S.printingOf s registry "Forest"
+    birds <- S.printingOf s registry "Birds of Paradise"
     let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs) = S.addCreature birds S.alice g1
         cost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Black)]
     Spec.assertBool s (Mana.canPay S.alice cost gs) "affordable"
 
   Spec.it s "CR 118.3 two Birds of Paradise can pay {B}{B}, one cannot" $ do
-    birds <- Registry.printing registry "Birds of Paradise"
+    birds <- S.printingOf s registry "Birds of Paradise"
     let (_, one) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
         (_, two) = S.addCreature birds S.alice one
         black = ManaSymbol.OfType (ManaType.Colored Color.Black)
@@ -546,8 +546,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- serve it catches that one source cannot make two mana. Two demands, three
   -- sources, plenty of mana, still unpayable.
   Spec.it s "CR 118.3 a Birds and two Forests cannot pay {W}{W}" $ do
-    birds <- Registry.printing registry "Birds of Paradise"
-    forest <- Registry.printing registry "Forest"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    forest <- S.printingOf s registry "Forest"
     let (_, g1) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
         (_, g2) = S.addCreature forest S.alice g1
         (_, gs) = S.addCreature forest S.alice g2
@@ -559,8 +559,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- choice in this pool since Urborg landed, and tapForMana was silently
   -- taking the first. Both directions, so the answer is proven to decide.
   Spec.it s "CR 305.6/305.7 an Urborg'd Mountain's controller chooses red or black" $ do
-    mountain <- Registry.printing registry "Mountain"
-    urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+    mountain <- S.printingOf s registry "Mountain"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let base = Setup.emptyGame S.bothPlayers
         (mountainId, g1) = S.addCreature mountain S.alice base
         (_, gs) = S.addCreature urborg S.alice g1
@@ -570,8 +570,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- The elision side of the invariant: where the rules leave nothing to ask,
   -- do not ask. A Forest offers one yield, so no ChooseManaYield is raised.
   Spec.it s "CR 605 a single-yield source is not asked what to produce" $ do
-    forest <- Registry.printing registry "Forest"
-    birds <- Registry.printing registry "Birds of Paradise"
+    forest <- S.printingOf s registry "Forest"
+    birds <- S.printingOf s registry "Birds of Paradise"
     let countingAnswer :: Prompt.Prompt r -> State.State Int r
         countingAnswer p = case p of
           Prompt.ChooseManaYield {} -> do
@@ -612,11 +612,11 @@ floatedPools alices forest =
 --
 -- Upwelling ({3}{G} Enchantment, "Players don't lose unspent mana as steps and
 -- phases end.") is the card that stops it, and it stops it for EVERY player.
-upwellingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+upwellingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 upwellingSpec s registry = Spec.describe s "Upwelling" $ do
   -- The control. Same board, same float, no Upwelling: both pools go.
   Spec.it s "CR 500.5 without Upwelling both players lose their unspent mana" $ do
-    forest <- Registry.printing registry "Forest"
+    forest <- S.printingOf s registry "Forest"
     let (_, floated) = floatedPools [] forest
         ended = Mana.emptyManaPools floated
     Spec.assertEqWith s "alice floated one" (poolSize S.alice floated) 1
@@ -625,8 +625,8 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
     Spec.assertEqWith s "bob lost it" (poolSize S.bob ended) 0
 
   Spec.it s "CR 613.11 Upwelling keeps its controller's unspent mana" $ do
-    forest <- Registry.printing registry "Forest"
-    upwelling <- Registry.printing registry "Upwelling"
+    forest <- S.printingOf s registry "Forest"
+    upwelling <- S.printingOf s registry "Upwelling"
     let (_, floated) = floatedPools [upwelling] forest
     Spec.assertEqWith s "alice kept it" (poolSize S.alice (Mana.emptyManaPools floated)) 1
 
@@ -634,8 +634,8 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
   -- bob keeps his mana anyway -- that is what PlayerScope.EachPlayer means,
   -- and a You-scoped implementation passes the test above and fails this one.
   Spec.it s "CR 613.11 Upwelling is symmetric: an opponent's unspent mana is kept too" $ do
-    forest <- Registry.printing registry "Forest"
-    upwelling <- Registry.printing registry "Upwelling"
+    forest <- S.printingOf s registry "Forest"
+    upwelling <- S.printingOf s registry "Upwelling"
     let (_, floated) = floatedPools [upwelling] forest
     Spec.assertEqWith s "bob kept it, though alice controls the Upwelling" (poolSize S.bob (Mana.emptyManaPools floated)) 1
 
@@ -644,8 +644,8 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
   -- read LIVE at the moment the pools empty, so destroying the Upwelling in
   -- the same step restores the emptying with nothing to unwind.
   Spec.it s "CR 604.2 destroying Upwelling restores the emptying in the same step" $ do
-    forest <- Registry.printing registry "Forest"
-    upwelling <- Registry.printing registry "Upwelling"
+    forest <- S.printingOf s registry "Forest"
+    upwelling <- S.printingOf s registry "Upwelling"
     let (extras, floated) = floatedPools [upwelling] forest
     case extras of
       [] -> Spec.assertFailure s "fixture should have an Upwelling on the battlefield"
@@ -663,11 +663,11 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
   -- playing rather than by writing a pool into a fixture. Upwelling keeps it,
   -- and it pays for an Unsummon in the upkeep step that follows.
   Spec.it s "CR 500.5 whole card: mana Upwelling keeps across a step boundary pays for Unsummon" $ do
-    forest <- Registry.printing registry "Forest"
-    birds <- Registry.printing registry "Birds of Paradise"
-    upwelling <- Registry.printing registry "Upwelling"
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
-    unsummon <- Registry.printing registry "Unsummon"
+    forest <- S.printingOf s registry "Forest"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    upwelling <- S.printingOf s registry "Upwelling"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
+    unsummon <- S.printingOf s registry "Unsummon"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addCreature upwelling S.alice base
         (birdsId, g2) = S.addCreature birds S.alice g1
@@ -696,12 +696,12 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
 -- unit, and it is what separates "the types this source could produce" from "the
 -- mana this source produces when it is tapped" (#238).
-solRingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+solRingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- The unit fact. A mode holding two AddMana effects is ONE activation
   -- yielding two mana, not a choice between two singles.
   Spec.it s "CR 605 tapping Sol Ring adds two colorless mana, not one" $ do
-    solRing <- Registry.printing registry "Sol Ring"
+    solRing <- S.printingOf s registry "Sol Ring"
     let (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
@@ -713,7 +713,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- CR 118.3 counts an untapped source as the mana it could make, so one Sol
   -- Ring is two supplies and pays {2} by itself.
   Spec.it s "CR 118.3 a lone Sol Ring pays {2} by itself" $ do
-    solRing <- Registry.printing registry "Sol Ring"
+    solRing <- S.printingOf s registry "Sol Ring"
     let (_, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
     Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
@@ -723,8 +723,8 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- model that merely counted a source twice without keeping its types: that
   -- one passes the first assertion and fails the second.
   Spec.it s "CR 118.3 a Sol Ring and a Mountain pay {2}{R}, but not {R}{R}" $ do
-    solRing <- Registry.printing registry "Sol Ring"
-    mountain <- Registry.printing registry "Mountain"
+    solRing <- S.printingOf s registry "Sol Ring"
+    mountain <- S.printingOf s registry "Mountain"
     let (_, g1) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs) = S.addCreature mountain S.alice g1
         red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -734,8 +734,8 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- The gameplay-level proof (design.md section 4): a real spell cast end to
   -- end off a single permanent, which no one-mana-per-source engine can do.
   Spec.it s "CR 601.2g Sapphire Medallion is cast off a lone Sol Ring" $ do
-    solRing <- Registry.printing registry "Sol Ring"
-    sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
+    solRing <- S.printingOf s registry "Sol Ring"
+    sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
     let resolved = castOffBoard S.identityAnswer [solRing] sapphireMedallion
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "the Medallion resolved" (S.countOnBattlefieldByName (Text.pack "Sapphire Medallion") S.alice resolved) 1
@@ -748,7 +748,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- is not asked what to produce" above is the counterpart that keeps a real
   -- choice asked.
   Spec.it s "CR 605 Sol Ring is not asked what to produce" $ do
-    solRing <- Registry.printing registry "Sol Ring"
+    solRing <- S.printingOf s registry "Sol Ring"
     let countingAnswer :: Prompt.Prompt r -> State.State Int r
         countingAnswer p = case p of
           Prompt.ChooseManaYield {} -> do
@@ -758,7 +758,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
         (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (Mana.tapForMana solRingId)) 0) 0
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
   castabilitySpec s registry
@@ -788,12 +788,12 @@ redSymbol = ManaSymbol.OfType (ManaType.Colored Color.Red)
 -- CR 107.4e: "A hybrid symbol such as {W/U} can be paid with either white or blue
 -- mana." Its example is exactly this shape: "{G/W}{G/W} can be paid by spending
 -- {G}{G}, {G}{W}, or {W}{W}."
-hybridSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+hybridSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hybridSpec s registry = Spec.describe s "Hybrid" $ do
   Spec.it s "CR 107.4e one {R/G} is payable from either half, and from neither otherwise" $ do
-    mountain <- Registry.printing registry "Mountain"
-    forest <- Registry.printing registry "Forest"
-    island <- Registry.printing registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
     let cost = ManaCost.MkManaCost [redGreen]
     Spec.assertBool s (Mana.canPay S.alice cost (S.landsInPlay mountain 1)) "a Mountain pays it"
     Spec.assertBool s (Mana.canPay S.alice cost (mixedLands mountain forest 0 1)) "a Forest pays it"
@@ -805,8 +805,8 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
   -- Forest pay {R/G}{R} only if the hybrid takes the GREEN; handing it the
   -- red first strands the {R} with a Forest still untapped.
   Spec.it s "CR 107.4e {R/G}{R} off one Mountain and one Forest: the hybrid must take the GREEN" $ do
-    mountain <- Registry.printing registry "Mountain"
-    forest <- Registry.printing registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 1 1
     Spec.assertBool s (Mana.canPay S.alice cost gs) "canPay says yes"
@@ -818,8 +818,8 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
   -- The twin: the same cost with no red anywhere is unpayable, so the case
   -- above is not "hybrids always succeed".
   Spec.it s "CR 107.4e {R/G}{R} off two Forests is unpayable -- the {R} has no source" $ do
-    mountain <- Registry.printing registry "Mountain"
-    forest <- Registry.printing registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 0 2
     Spec.assertBool s (not (Mana.canPay S.alice cost gs)) "canPay says no"
@@ -827,9 +827,9 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     Spec.assertEqWith s "two {R/G} alone WOULD be payable from them" (Mana.canPay S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs) True
 
   Spec.it s "CR 107.4e whole card: Burning-Tree Emissary casts off RR, GG, or RG" $ do
-    mountain <- Registry.printing registry "Mountain"
-    forest <- Registry.printing registry "Forest"
-    burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
     let castOff reds greens =
           let (gs, spellId) = S.handOne burningTreeEmissary (mixedLands mountain forest reds greens)
               cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
@@ -840,7 +840,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     Spec.assertEqWith s "one land is not enough" (castOff 1 0) 0
 
   Spec.it s "CR 107.4e a hybrid symbol is ALL of its component colours" $ do
-    burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
+    burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
     let (oid, gs) = S.addCreature burningTreeEmissary S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
@@ -863,7 +863,7 @@ javelinCost = ManaCost.MkManaCost [twoOrRed, twoOrRed, twoOrRed]
 -- Flame Javelin ({2/R}{2/R}{2/R}) throughout, because the symbol only becomes
 -- interesting in bulk: one of them is barely distinguishable from {R}, three of
 -- them span {R}{R}{R} to {6}.
-monocoloredHybridSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+monocoloredHybridSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   let -- How many objects the stack holds after alice tries to cast the Javelin
       -- with `gs` already on the battlefield: 1 when the cost was paid, 0 when
@@ -873,8 +873,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
          in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))))
 
   Spec.it s "CR 107.4e one {2/R} takes one Mountain OR two Islands, and one Island is not enough" $ do
-    mountain <- Registry.printing registry "Mountain"
-    island <- Registry.printing registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
     let cost = ManaCost.MkManaCost [twoOrRed]
     Spec.assertBool s (Mana.canPay S.alice cost (S.landsInPlay mountain 1)) "one Mountain pays it"
     Spec.assertBool s (Mana.canPay S.alice cost (S.landsInPlay island 2)) "two Islands pay it"
@@ -888,8 +888,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- six Mountains would still be three taps, because payCost stops as
   -- soon as the cost is payable.
   Spec.it s "CR 107.4e whole card: Flame Javelin casts off three Mountains, {R} per symbol" $ do
-    mountain <- Registry.printing registry "Mountain"
-    flameJavelin <- Registry.printing registry "Flame Javelin"
+    mountain <- S.printingOf s registry "Mountain"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
     let gs = S.landsInPlay mountain 3
     Spec.assertBool s (Mana.canPay S.alice javelinCost gs) "canPay says yes"
     Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
@@ -900,8 +900,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
 
   -- The generic route, with no red mana anywhere on the board.
   Spec.it s "CR 107.4e whole card: Flame Javelin casts off six Islands, two generic per symbol" $ do
-    island <- Registry.printing registry "Island"
-    flameJavelin <- Registry.printing registry "Flame Javelin"
+    island <- S.printingOf s registry "Island"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
     let gs = S.landsInPlay island 6
     Spec.assertBool s (Mana.canPay S.alice javelinCost gs) "canPay says yes"
     Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
@@ -910,8 +910,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- all-generic route needs, and a payment path that charged one mana per
   -- {2/R} would call three of them sufficient, let alone five.
   Spec.it s "CR 107.4e five Islands cannot cast Flame Javelin -- {6} is one mana away" $ do
-    island <- Registry.printing registry "Island"
-    flameJavelin <- Registry.printing registry "Flame Javelin"
+    island <- S.printingOf s registry "Island"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
     let gs = S.landsInPlay island 5
     Spec.assertBool s (not (Mana.canPay S.alice javelinCost gs)) "canPay says no"
     Spec.assertEqWith s "and it does not cast" (castsOff flameJavelin gs) 0
@@ -922,9 +922,9 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- {4}{R}, or {6}." So the routes are chosen per symbol, and a search
   -- that picked one route for the whole cost would reject both of these.
   Spec.it s "CR 107.4e each symbol picks its own route: {R}{R}{2} and {R}{4}" $ do
-    mountain <- Registry.printing registry "Mountain"
-    island <- Registry.printing registry "Island"
-    flameJavelin <- Registry.printing registry "Flame Javelin"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
     let cost = javelinCost
     Spec.assertBool s (Mana.canPay S.alice cost (mixedLands mountain island 2 2)) "two Mountains and two Islands: {R}{R}{2}"
     Spec.assertBool s (Mana.canPay S.alice cost (mixedLands mountain island 1 4)) "one Mountain and four Islands: {R}{4}"
@@ -936,8 +936,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- The gameplay-level proof (design.md section 4): the whole card, cast
   -- and resolved off the all-generic route, doing what it says.
   Spec.it s "CR 107.4e Flame Javelin cast off six Islands resolves for 4 damage" $ do
-    island <- Registry.printing registry "Island"
-    flameJavelin <- Registry.printing registry "Flame Javelin"
+    island <- S.printingOf s registry "Island"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
     let (g, spellId) = S.handOne flameJavelin (S.landsInPlay island 6)
         cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -968,7 +968,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- is no colour, so only the named half counts. Flame Javelin is red
   -- even when six Islands paid for it.
   Spec.it s "CR 107.4e a monocolored hybrid symbol is its coloured half, and only that" $ do
-    flameJavelin <- Registry.printing registry "Flame Javelin"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
     let (oid, gs) = S.addCreature flameJavelin S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "red, not colourless" (Projection.colorsOf oid gs) (Set.singleton Color.Red)
 
@@ -1048,7 +1048,7 @@ aliceAt n =
 -- decides (#373); a case going through Cast.castSpell announces first, under CR
 -- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
 -- are the second path.
-phyrexianSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+phyrexianSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- The mana route. The life assertion is what makes this discriminating:
   -- both routes are open here, and paying life as WELL as the mana, or
@@ -1061,7 +1061,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- Cast.castSpell instead and asks -- see the CR 118.13a cases at the end of
   -- this group.
   Spec.it s "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
-    forest <- Registry.printing registry "Forest"
+    forest <- S.printingOf s registry "Forest"
     let gs = S.landsInPlay forest 1
     Spec.assertBool s (Mana.canPay S.alice phyrexianCost gs) "canPay says yes"
     let (paid, after) = S.runPureWith S.identityAnswer gs (Mana.payCost S.alice phyrexianCost)
@@ -1074,7 +1074,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- count is the discriminator: a payment path that tapped the Mountain
   -- first and then paid life would still leave alice at 18.
   Spec.it s "CR 107.4f one {G/P} is paid by 2 life when no green mana can be made" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
     Spec.assertBool s (Mana.canPay S.alice phyrexianCost gs) "canPay says yes"
     let (paid, after) = S.runPureWith S.identityAnswer gs (Mana.payCost S.alice phyrexianCost)
@@ -1102,9 +1102,9 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- card, cast off one Forest and resolved. Goblin Piker is 2/1, so +2/+2 is
   -- 4/3.
   Spec.it s "CR 107.4f whole card: Mutagenic Growth casts off one Forest for +2/+2" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
         cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
@@ -1118,8 +1118,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- The same card with NO lands anywhere. Castability has to see the life
   -- route or this never reaches the stack at all.
   Spec.it s "CR 107.4f whole card: Mutagenic Growth casts with no mana at all, for 2 life" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (pikerId, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
     Spec.assertBool s (Cast.castable S.alice spellId g) "castable with an empty battlefield but for the Piker"
@@ -1133,8 +1133,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- THE discriminating negative: neither route open. One life short, and no
   -- green mana on the board.
   Spec.it s "CR 119.4 Mutagenic Growth is uncastable at 1 life with no green mana" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let inHandAt n =
           let (_, withPiker) = S.addCreature piker S.alice (aliceAt n)
            in S.handOne mutagenicGrowth withPiker
@@ -1154,7 +1154,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- of the colors of those mana symbols, in addition to any other colors the
   -- object might be."
   Spec.it s "CR 107.4f/202.2d a Phyrexian mana symbol is a COLOURED mana symbol" $ do
-    mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (oid, gs) = S.addCreature mutagenicGrowth S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "green, not colourless" (Projection.colorsOf oid gs) (Set.singleton Color.Green)
 
@@ -1162,8 +1162,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- the reading that would call the card colourless is exactly the one a
   -- life-paid cast tempts.
   Spec.it s "CR 202.2d Mutagenic Growth is green on the stack even when 2 life paid for it" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
         cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
@@ -1183,10 +1183,10 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- {G} plus {2} works and costs nothing, and {2} plus 2 life works. The
   -- least is zero, and pawl must find it.
   Spec.it s "CR 107.4f the least-life route is found across symbols, not only within one" $ do
-    birds <- Registry.printing registry "Birds of Paradise"
-    island <- Registry.printing registry "Island"
-    mountain <- Registry.printing registry "Mountain"
-    forest <- Registry.printing registry "Forest"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
     let cost = ManaCost.MkManaCost [twoOrRed, ManaSymbol.Phyrexian Color.Green]
     Spec.assertEqWith
       s
@@ -1222,7 +1222,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- Mana.payCost's haddock takes towards a mis-tapped colour (#261). Reached
   -- only because this calls payCost directly, with nothing announced (#373).
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
-    birds <- Registry.printing registry "Birds of Paradise"
+    birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
         (paidBlue, afterBlue) = S.runPureWith (prefersColor Color.Blue) gs (Mana.payCost S.alice phyrexianCost)
     Spec.assertBool s paidBlue "the cost is still paid"
@@ -1245,10 +1245,10 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- {G/P}. The Elves' castability is the discriminator -- a life total alone
   -- could be produced by paying life on TOP of the mana.
   Spec.it s "CR 118.13a announcing 2 life keeps the Forest, so Llanowar Elves is still castable" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    growth <- Registry.printing registry "Mutagenic Growth"
-    elves <- Registry.printing registry "Llanowar Elves"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    growth <- S.printingOf s registry "Mutagenic Growth"
+    elves <- S.printingOf s registry "Llanowar Elves"
     let (growthId, elvesId, gs) = phyrexianBoard forest piker growth elves
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs growthId
     Spec.assertBool s (wasAskedHowToPayPhyrexian asked) "the engine asked rather than deciding"
@@ -1261,10 +1261,10 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- spends the Forest and the Elves are stranded. Both legs are needed --
   -- either alone would pass against an engine that ignored the answer.
   Spec.it s "CR 118.13a announcing coloured mana taps the Forest, and the Elves are stranded" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    growth <- Registry.printing registry "Mutagenic Growth"
-    elves <- Registry.printing registry "Llanowar Elves"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    growth <- S.printingOf s registry "Mutagenic Growth"
+    elves <- S.printingOf s registry "Llanowar Elves"
     let (growthId, elvesId, gs) = phyrexianBoard forest piker growth elves
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs growthId
     Spec.assertBool s (wasAskedHowToPayPhyrexian asked) "the engine asked here too"
@@ -1277,9 +1277,9 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- get it -- CR 601.2b's "previously made choices ... may restrict the
   -- player's options" arriving as a board that offers one option.
   Spec.it s "CR 118.13a no green source: the life route is taken and nothing is asked" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    growth <- Registry.printing registry "Mutagenic Growth"
-    elves <- Registry.printing registry "Llanowar Elves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    growth <- S.printingOf s registry "Mutagenic Growth"
+    elves <- S.printingOf s registry "Llanowar Elves"
     let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (withGrowth, growthId) = S.handOne growth withPiker
         (_, gs) = S.addHandCard elves S.alice withGrowth
@@ -1291,10 +1291,10 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- CR 119.4's floor closing the life route instead: one Forest, one life.
   -- The interpreter asks for life and must not be given it.
   Spec.it s "CR 119.4 at 1 life the life route is not offered, and nothing is asked" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    growth <- Registry.printing registry "Mutagenic Growth"
-    elves <- Registry.printing registry "Llanowar Elves"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    growth <- S.printingOf s registry "Mutagenic Growth"
+    elves <- S.printingOf s registry "Llanowar Elves"
     let (growthId, _, board) = phyrexianBoard forest piker growth elves
         gs = board {GameState.players = Map.adjust (\p -> p {Player.life = 1}) S.alice (GameState.players board)}
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs growthId
@@ -1338,7 +1338,7 @@ withPermanent land printing n = snd (S.addCreature printing S.alice (S.landsInPl
 --     own "the game returns to the moment before the casting of that spell was
 --     proposed" would also do -- but the answer was never a real option. Thalia
 --     and Mutagenic Growth, below.
-totalCostSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+totalCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 totalCostSpec s registry = Spec.describe s "TotalCost" $ do
   -- THE reduction case. Sapphire Medallion is "Blue spells you cast cost {1}
   -- less to cast", Spined Thopter is {2}{U/P}, and two Islands are exactly
@@ -1347,9 +1347,9 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
   -- cannot be paid with mana at all. So the coloured-mana route IS available
   -- and the player must be asked for it.
   Spec.it s "CR 601.2f a reduction opens the coloured-mana route, so the announcement is asked" $ do
-    island <- Registry.printing registry "Island"
-    medallion <- Registry.printing registry "Sapphire Medallion"
-    thopter <- Registry.printing registry "Spined Thopter"
+    island <- S.printingOf s registry "Island"
+    medallion <- S.printingOf s registry "Sapphire Medallion"
+    thopter <- S.printingOf s registry "Spined Thopter"
     let (gs, thopterId) = S.handOne thopter (withPermanent island medallion 2)
     Spec.assertBool s (Cast.castable S.alice thopterId gs) "castable"
     let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs thopterId
@@ -1364,9 +1364,9 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
   -- route leaves an Island up. Both legs are needed -- either alone would
   -- pass against an engine that ignored the answer.
   Spec.it s "CR 601.2f the same board's life route pays 2 and spares an Island" $ do
-    island <- Registry.printing registry "Island"
-    medallion <- Registry.printing registry "Sapphire Medallion"
-    thopter <- Registry.printing registry "Spined Thopter"
+    island <- S.printingOf s registry "Island"
+    medallion <- S.printingOf s registry "Sapphire Medallion"
+    thopter <- S.printingOf s registry "Spined Thopter"
     let (gs, thopterId) = S.handOne thopter (withPermanent island medallion 2)
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs thopterId
     Spec.assertBool s (wasAskedHowToPayPhyrexian asked) "asked here too"
@@ -1380,10 +1380,10 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
   -- {1}{G} off one Forest, so the coloured-mana route is NOT available and
   -- must not be offered. The interpreter asks for it and does not get it.
   Spec.it s "CR 601.2f an increase closes the coloured-mana route, so nothing is asked" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-    growth <- Registry.printing registry "Mutagenic Growth"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    growth <- S.printingOf s registry "Mutagenic Growth"
     -- The Piker goes down BEFORE Thalia, because S.identityAnswer's
     -- ChooseTargets takes the lowest object id and both are 2/1 creatures --
     -- so with Thalia first the Growth would pump HER and the assertion below
@@ -1408,10 +1408,10 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
   -- twice. Measured against the printed {1}{B/P}{B/P} the first symbol looks
   -- like a real choice, and taking its mana route strands the payment.
   Spec.it s "CR 601.2f Dismember under Thalia forces both symbols to life, and the cast survives" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-    dismember <- Registry.printing registry "Dismember"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    dismember <- S.printingOf s registry "Dismember"
     -- Piker before Thalia, for the reason the case above gives: both are 2/1
     -- creatures and identityAnswer targets the lowest object id.
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp 2)
@@ -1431,16 +1431,16 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
 -- in printed order, each asked knowing the answers before it, and an earlier
 -- answer narrowing a later one's offer -- CR 601.2b's last sentence, "previously
 -- made choices ... may restrict the player's options when making these choices."
-dismemberSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+dismemberSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 dismemberSpec s registry = Spec.describe s "Dismember" $ do
   -- Two Swamps: the first symbol is a real choice, and answering MANA leaves
   -- {1}{B} to pay off two Swamps -- which the second symbol's mana route
   -- would push to three. So the second symbol is forced to life and is not
   -- asked. One prompt, not two, and that count is the assertion.
   Spec.it s "CR 601.2b announcing mana for the first {B/P} forces the second to life" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    dismember <- Registry.printing registry "Dismember"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    dismember <- S.printingOf s registry "Dismember"
     let (gs, dismemberId) = dismemberBoard swamp piker dismember 2
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
     Spec.assertEqWith s "one symbol was a choice, the other was forced" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysMana]
@@ -1451,9 +1451,9 @@ dismemberSpec s registry = Spec.describe s "Dismember" $ do
   -- both Swamps available, so the SECOND symbol is a real choice too and is
   -- asked. Two prompts, and the answers are 2 life each.
   Spec.it s "CR 601.2b announcing life for the first {B/P} leaves the second a real choice" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    dismember <- Registry.printing registry "Dismember"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    dismember <- S.printingOf s registry "Dismember"
     let (gs, dismemberId) = dismemberBoard swamp piker dismember 2
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs dismemberId
     Spec.assertEqWith
@@ -1468,9 +1468,9 @@ dismemberSpec s registry = Spec.describe s "Dismember" $ do
   -- needed for the {1}. Nothing is asked at all, and CR 107.4f's example
   -- arithmetic for two symbols -- 4 life -- is what comes out.
   Spec.it s "CR 107.4f off one Swamp both symbols are forced to life, for 4" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    dismember <- Registry.printing registry "Dismember"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    dismember <- S.printingOf s registry "Dismember"
     let (gs, dismemberId) = dismemberBoard swamp piker dismember 1
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
     Spec.assertEqWith s "no choice existed either time" (phyrexianAnnouncements asked) []
@@ -1481,9 +1481,9 @@ dismemberSpec s registry = Spec.describe s "Dismember" $ do
   -- resolved. A Goblin Piker is 2/1, so -5/-5 is -3/-4 and CR 704.5f's
   -- state-based action puts it into its owner's graveyard.
   Spec.it s "CR 107.4f whole card: Dismember kills a Goblin Piker for 4 life" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    dismember <- Registry.printing registry "Dismember"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    dismember <- S.printingOf s registry "Dismember"
     let (gs, dismemberId) = dismemberBoard swamp piker dismember 1
         (_, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
         pikerId = pikerOn resolved
@@ -1524,15 +1524,15 @@ pikerOn gs =
 -- names "the activation cost of an activated ability" in its own words -- so the
 -- announcement happens at CR 601.2b's position for an activation too. Until this
 -- card there was nothing in the pool for Pawl.Engine.Activate's Cost.announce call to do.
-moltensteelSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+moltensteelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- The activation cost's symbol IS a choice off a Mountain, and answering
   -- mana taps it. CR 118.13b/c are not what governs this -- the cost is an
   -- activation cost, so CR 118.13a is, and the choice belongs at proposal
   -- rather than at payment (#373 is the other two clauses).
   Spec.it s "CR 118.13a/602.2b an activation cost's {R/P} is asked, and mana taps the Mountain" $ do
-    mountain <- Registry.printing registry "Mountain"
-    dragon <- Registry.printing registry "Moltensteel Dragon"
+    mountain <- S.printingOf s registry "Mountain"
+    dragon <- S.printingOf s registry "Moltensteel Dragon"
     let (dragonId, gs) = dragonBoard mountain dragon 1
         (asked, activated) = activateAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId (theAbility dragon)
     Spec.assertEqWith s "one symbol, one prompt" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysMana]
@@ -1544,8 +1544,8 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- The control, one answer different on the same board: 2 life instead, and
   -- the Mountain is still up for something else.
   Spec.it s "CR 118.13a the same activation's life route spares the Mountain" $ do
-    mountain <- Registry.printing registry "Mountain"
-    dragon <- Registry.printing registry "Moltensteel Dragon"
+    mountain <- S.printingOf s registry "Mountain"
+    dragon <- S.printingOf s registry "Moltensteel Dragon"
     let (dragonId, gs) = dragonBoard mountain dragon 1
         (asked, activated) = activateAndResolve (announces PhyrexianPayment.PaysLife) gs dragonId (theAbility dragon)
     Spec.assertEqWith s "asked here too" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysLife]
@@ -1557,8 +1557,8 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- nothing to ask and the life route is taken. The activation still happens,
   -- which is the half a payment-time reading would get right by accident.
   Spec.it s "CR 118.13a with no red source the activation's life route is forced" $ do
-    mountain <- Registry.printing registry "Mountain"
-    dragon <- Registry.printing registry "Moltensteel Dragon"
+    mountain <- S.printingOf s registry "Mountain"
+    dragon <- S.printingOf s registry "Moltensteel Dragon"
     let (dragonId, gs) = dragonBoard mountain dragon 0
         (asked, activated) = activateAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId (theAbility dragon)
     Spec.assertEqWith s "no choice existed, so none was asked" (phyrexianAnnouncements asked) []
@@ -1569,8 +1569,8 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- cost are both real choices: six Mountains pay {4}{R}{R} outright, so both
   -- announcements are asked and neither costs life.
   Spec.it s "CR 107.4f whole card: Moltensteel Dragon casts off six Mountains for no life" $ do
-    mountain <- Registry.printing registry "Mountain"
-    dragon <- Registry.printing registry "Moltensteel Dragon"
+    mountain <- S.printingOf s registry "Mountain"
+    dragon <- S.printingOf s registry "Moltensteel Dragon"
     let (gs, dragonId) = S.handOne dragon (S.landsInPlay mountain 6)
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId
     Spec.assertEqWith
@@ -1587,8 +1587,8 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- and CR 107.4f's arithmetic for two symbols is 4 -- the same card, one
   -- fewer land, and the whole announcement disappears.
   Spec.it s "CR 107.4f whole card: off four Mountains both symbols are forced, for 4 life" $ do
-    mountain <- Registry.printing registry "Mountain"
-    dragon <- Registry.printing registry "Moltensteel Dragon"
+    mountain <- S.printingOf s registry "Mountain"
+    dragon <- S.printingOf s registry "Moltensteel Dragon"
     let (gs, dragonId) = S.handOne dragon (S.landsInPlay mountain 4)
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId
     Spec.assertEqWith s "no choice existed either time" (phyrexianAnnouncements asked) []

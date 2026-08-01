@@ -70,12 +70,12 @@ import qualified Pawl.Types.Zone as Zone
 sicknessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Sickness.Sickness
 sicknessOf oid gs = fmap Object.sickness (Game.lookupObject oid gs)
 
-sicknessSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+sicknessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sicknessSpec s registry = Spec.describe s "Sickness" $ do
   Spec.it s "CR 302.6 a permanent entering the battlefield is summoning sick" $ do
     -- changeZone mints a new object, so the id to inspect is the new one.
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Battlefield)
     case Game.zoneMembers Zone.Battlefield S.alice after of
@@ -84,33 +84,33 @@ sicknessSpec s registry = Spec.describe s "Sickness" $ do
         [] -> Spec.assertFailure s "the new permanent should be Sick"
         _ -> pure ()
   Spec.it s "CR 302.6 the untap step settles the active player's permanents" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
         after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
     Spec.assertEqWith s "settled" (sicknessOf oid after) (Just (Sickness.Settled S.alice))
   Spec.it s "CR 302.6 settling does not touch the other player's permanents" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
         after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
     Spec.assertEqWith s "still sick" (sicknessOf oid after) (Just Sickness.Sick)
 
-castGameState :: Registry.Registry -> IO GameState.GameState
-castGameState registry = do
-  matchup <- S.redRed registry
+castGameState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+castGameState s registry = do
+  matchup <- S.redRed (S.printingOf s registry)
   pure (snd (Engine.runMatchPure S.castAnswer matchup))
 
-castEngineSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+castEngineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castEngineSpec s registry = Spec.describe s "CastEngine" $ do
   Spec.it s "a castable Piker is offered as a legal action" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 2 Phase.PrecombatMain
     Spec.assertBool s (elem (A.Cast oid) (Action.legalActions S.alice gs)) "offered"
   Spec.it s "an unaffordable Piker is not offered" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 1 Phase.PrecombatMain
     Spec.assertBool s (notElem (A.Cast oid) (Action.legalActions S.alice gs)) "not offered"
   -- M3a: the red deck now carries Lightning Bolt, so castAnswer casts removal
@@ -120,23 +120,23 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
   -- AND resolved (not merely discarded). Deck-robust where creature-presence
   -- was not.
   Spec.it s "casting actually happens in a full game" $ do
-    gs <- castGameState registry
+    gs <- castGameState s registry
     Spec.assertBool
       s
       (any (\pl -> Player.life pl < Setup.startingLife) (Map.elems (GameState.players gs)))
       "a spell resolved and dealt damage"
   Spec.it s "a casting game still terminates" $ do
-    gs <- castGameState registry
+    gs <- castGameState s registry
     Spec.assertBool s (Maybe.isJust (GameState.result gs)) "has result"
   Spec.it s "a casting game conserves objects" $ do
-    gs <- castGameState registry
+    gs <- castGameState s registry
     Spec.assertEqWith s "objects" (Game.objectCount gs) 120
   -- CR 500.5 is no longer unconditional: Upwelling keeps unspent mana across
   -- every step and phase end. It holds here because none of the hand-tuned
   -- decks in Pawl.Cards plays one, so a future deck that does must expect
   -- this assertion to change rather than treat it as a regression.
   Spec.it s "CR 500.5 no mana floats at the end of a game" $ do
-    gs <- castGameState registry
+    gs <- castGameState s registry
     Spec.assertEqWith s "pools empty" (GameState.manaPool gs) Map.empty
 
 -- A Piker cast and left on the stack, ready to resolve.
@@ -145,19 +145,19 @@ pikerOnStack mountain piker =
   let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
    in snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
 
-stackSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+stackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stackSpec s registry = Spec.describe s "Stack" $ do
   Spec.it s "CR 608.3 a resolving creature spell becomes a permanent" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let after = snd (Engine.runGamePure S.identityAnswer (pikerOnStack mountain piker) Stack.resolveTop)
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
     -- Four, not one: pikerInHand 3 leaves three Mountains in play.
     Spec.assertEqWith s "four permanents" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 4
     Spec.assertEqWith s "one of them a creature" (S.creaturesInPlay S.alice after) 1
   Spec.it s "CR 400.7 the permanent is a new object" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let after = snd (Engine.runGamePure S.identityAnswer (pikerOnStack mountain piker) Stack.resolveTop)
     case GameState.stack (pikerOnStack mountain piker) of
       [] -> Spec.assertFailure s "fixture should have a spell on the stack"
@@ -166,8 +166,8 @@ stackSpec s registry = Spec.describe s "Stack" $ do
     -- The object the spell resolved INTO, not just any permanent: the
     -- fixture already has three Mountains in play, and zoneMembers is
     -- ordered by id, so the front of that list is Mountain id 0.
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let before = Game.zoneMembers Zone.Battlefield S.alice (pikerOnStack mountain piker)
         after = snd (Engine.runGamePure S.identityAnswer (pikerOnStack mountain piker) Stack.resolveTop)
         isNew o = notElem o before
@@ -187,8 +187,8 @@ stackSpec s registry = Spec.describe s "Stack" $ do
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
             Source.OfInherentTrigger _ _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "resolving conserves objects" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     Spec.assertEqWith
       s
       "conserved"
@@ -198,9 +198,9 @@ stackSpec s registry = Spec.describe s "Stack" $ do
     let gs = Setup.emptyGame S.bothPlayers
      in Spec.assertEqWith s "unchanged" (snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop)) gs
   Spec.it s "CR 601.3: cast Panglacial during Evolving Wilds' search, then it resolves 9/5" $ do
-    evolvingWilds <- Registry.printing registry "Evolving Wilds"
-    forest <- Registry.printing registry "Forest"
-    panglacialWurm <- Registry.printing registry "Panglacial Wurm"
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    forest <- S.printingOf s registry "Forest"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let g0 = Setup.emptyGame S.bothPlayers
         (ewId, g1) = S.addCreature evolvingWilds S.alice g0
         g2 = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) g1 [1 .. (7 :: Int)]
@@ -219,9 +219,9 @@ stackSpec s registry = Spec.describe s "Stack" $ do
               Spec.assertEqWith s "seven Forests tapped for {5}{G}{G}" (S.tappedCount S.alice after) 7
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
   Spec.it s "declining the cast resolves the search normally, Panglacial stays" $ do
-    evolvingWilds <- Registry.printing registry "Evolving Wilds"
-    forest <- Registry.printing registry "Forest"
-    panglacialWurm <- Registry.printing registry "Panglacial Wurm"
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    forest <- S.printingOf s registry "Forest"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let g0 = Setup.emptyGame S.bothPlayers
         (ewId, g1) = S.addCreature evolvingWilds S.alice g0
         g2 = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) g1 [1 .. (7 :: Int)]
@@ -233,41 +233,41 @@ stackSpec s registry = Spec.describe s "Stack" $ do
          in Spec.assertEqWith s "Panglacial still in the library" (S.countByName (Text.pack "Panglacial Wurm") S.alice after) 1
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
 
-castSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do
   Spec.it s "a Piker is castable with two Mountains in a main phase" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 2 Phase.PrecombatMain
     Spec.assertBool s (Cast.castable S.alice oid gs) "castable"
   Spec.it s "a Piker is not castable with one Mountain" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 1 Phase.PrecombatMain
     Spec.assertBool s (not (Cast.castable S.alice oid gs)) "unaffordable"
   Spec.it s "CR 302.1 no creature spell in the upkeep" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 2 (Phase.Beginning BeginningStep.Upkeep)
     Spec.assertBool s (not (Cast.castable S.alice oid gs)) "wrong timing"
   Spec.it s "CR 302.1 no creature spell with a non-empty stack" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 2 Phase.PrecombatMain
         busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
     Spec.assertBool s (not (Cast.castable S.alice oid busy)) "stack not empty"
   Spec.it s "CR 302.1 a non-active player cannot cast at sorcery speed" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 2 Phase.PrecombatMain
         bobsTurn = gs {GameState.activePlayer = S.bob}
     Spec.assertBool s (not (Cast.castable S.alice oid bobsTurn)) "not active"
   Spec.it s "a Mountain in hand is not castable: lands have no mana cost" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (not (Cast.castable S.alice (ObjectId.MkObjectId 0) (S.oneMountainState mountain Phase.PrecombatMain))) "no cost"
   Spec.it s "CR 601 casting puts a NEW object on the stack and taps two lands" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
         after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
     Spec.assertEqWith s "stack depth" (length (GameState.stack after)) 1
@@ -277,8 +277,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
     -- CR 400.7: the card on the stack is a new object, not the old id.
     Spec.assertEqWith s "old id gone" (Game.lookupObject oid after) Nothing
   Spec.it s "the stack object is still a Piker on the stack" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
         after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
     case GameState.stack after of
@@ -296,32 +296,32 @@ castSpec s registry = Spec.describe s "Cast" $ do
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
             Source.OfInherentTrigger _ _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "CR 117.1a a Bolt is castable outside a main phase" $ do
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 (Phase.Beginning BeginningStep.Upkeep)
     Spec.assertBool s (Cast.castable S.alice oid gs) "instant speed"
   Spec.it s "CR 117.1a a Bolt is castable on the opponent's turn" $ do
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         bobsTurn = gs {GameState.activePlayer = S.bob}
     Spec.assertBool s (Cast.castable S.alice oid bobsTurn) "not my turn, still castable"
   Spec.it s "CR 117.1a a Bolt is castable with a non-empty stack" $ do
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
     Spec.assertBool s (Cast.castable S.alice oid busy) "in response"
   Spec.it s "a Bolt in the graveyard is not castable" $ do
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         buried = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
     Spec.assertEqWith s "nothing castable" (Cast.castableSpells S.alice buried) []
   Spec.it s "CR 601.2c casting a Bolt stamps the chosen target on the stack object" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (base, gs, _) = S.boltAtBobsPiker piker mountain lightningBolt
     case GameState.stack gs of
       [] -> Spec.assertFailure s "expected the Bolt on the stack"
@@ -335,8 +335,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
             (Binding.targetsOf (Object.bindings obj))
             (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToCreature (S.pikerOf base)))
   Spec.it s "casting a {X}{R} spell at X=3 stamps amount 3 and pays {3}{R}" $ do
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
         after = snd (Engine.runGamePure answerX3 gs0 (Cast.castSpell S.alice oid))
     case GameState.stack after of
@@ -347,8 +347,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
           Spec.assertEqWith s "amount bound" (Binding.amountOf Binding.variableX (Object.bindings obj)) (Just 3)
           Spec.assertEqWith s "four mana spent (paid {3}{R})" (S.tappedCount S.alice after) 4
   Spec.it s "an illegal target answer makes the cast a no-op" $ do
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         liar :: Prompt.Prompt r -> r
         liar p = case p of
@@ -359,20 +359,20 @@ castSpec s registry = Spec.describe s "Cast" $ do
     Spec.assertEqWith s "nothing on the stack" (length (GameState.stack after)) 0
     Spec.assertEqWith s "nothing paid" (S.tappedCount S.alice after) 0
   Spec.it s "Panglacial Wurm in the library is castable-while-searching with mana" $ do
-    forest <- Registry.printing registry "Forest"
-    panglacialWurm <- Registry.printing registry "Panglacial Wurm"
+    forest <- S.printingOf s registry "Forest"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let base = S.landsInPlay forest 7
         (_, gs) = S.addLibraryCard panglacialWurm S.alice base
     Spec.assertEqWith s "one castable-while-searching option" (length (Cast.castableWhileSearching S.alice gs)) 1
   Spec.it s "with too little mana, Panglacial is not castable-while-searching" $ do
-    forest <- Registry.printing registry "Forest"
-    panglacialWurm <- Registry.printing registry "Panglacial Wurm"
+    forest <- S.printingOf s registry "Forest"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let base = S.landsInPlay forest 3
         (_, gs) = S.addLibraryCard panglacialWurm S.alice base
     Spec.assertEqWith s "unaffordable, so no options" (length (Cast.castableWhileSearching S.alice gs)) 0
   Spec.it s "castWhileSearching casts Panglacial from the library onto the stack" $ do
-    forest <- Registry.printing registry "Forest"
-    panglacialWurm <- Registry.printing registry "Panglacial Wurm"
+    forest <- S.printingOf s registry "Forest"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let base = S.landsInPlay forest 7
         (_, gs) = S.addLibraryCard panglacialWurm S.alice base
         after = snd (Engine.runGamePure castFirstOption gs (Cast.castWhileSearching S.alice))
@@ -381,8 +381,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
     Spec.assertEqWith s "Panglacial left the library" (S.countByName (Text.pack "Panglacial Wurm") S.alice after) 0
     Spec.assertEqWith s "seven Forests tapped to pay {5}{G}{G}" (S.tappedCount S.alice after) 7
   Spec.it s "CR 601.2i casting a spell records a SpellCast event for the caster" $ do
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid)
         casts = Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events after))
@@ -391,8 +391,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
   Spec.it s "CR 601.2i a cast that is rejected records nothing" $ do
     -- A Bolt with no mana available: legalActions would never offer it, and
     -- castSpell's payment fails, so no event is recorded.
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 0 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid)
     Spec.assertEqWith s "no cast recorded" (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events after))) []
@@ -457,9 +457,9 @@ lastN :: Natural -> [a] -> [a]
 lastN n xs = reverse (List.genericTake n (reverse xs))
 
 -- Bob draws to eight, then discards at cleanup under discardLastAnswer.
-bobDiscardChoice :: Registry.Registry -> IO (GameState.GameState, [ObjectId.ObjectId])
-bobDiscardChoice registry = do
-  matchup <- S.redRed registry
+bobDiscardChoice :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, [ObjectId.ObjectId])
+bobDiscardChoice s registry = do
+  matchup <- S.redRed (S.printingOf s registry)
   let start = Setup.emptyGame S.bothPlayers
       steps = do
         Setup.newGame S.performer matchup
@@ -471,13 +471,13 @@ bobDiscardChoice registry = do
       (held, final) = Engine.runGamePure discardLastAnswer start steps
   pure (final, held)
 
-discardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+discardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 discardSpec s registry = Spec.describe s "Discard" $ do
   Spec.it s "CR 514.2 discard trims to hand size" $ do
-    (final, _held) <- bobDiscardChoice registry
+    (final, _held) <- bobDiscardChoice s registry
     Spec.assertEqWith s "hand" (S.handSize S.bob final) 7
   Spec.it s "CR 514.2 the prompted choice is honored" $ do
-    (final, held) <- bobDiscardChoice registry
+    (final, held) <- bobDiscardChoice s registry
     let kept = Game.zoneMembers Zone.Hand S.bob final
         -- discardLastAnswer pitched the last card, so the first seven of the
         -- pre-cleanup hand are exactly what survives. Ids are stable here:
@@ -521,16 +521,16 @@ hackAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
   _ -> S.identityAnswer p
 
-magicalHackSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+magicalHackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 magicalHackSpec s registry = Spec.describe s "MagicalHack" $ do
   Spec.it s "CR 612/305.6 a hacked basic Mountain taps for its new color" $ do
     -- alice: one Mountain to hack and one Island (blue for the {U}), plus a
     -- Magical Hack in hand. The Mountain is added FIRST so it has the lowest
     -- object id and identityAnswer's ChooseTargets (Set.lookupMin over the
     -- ToObject recipients) picks it, not the Island. Hack Mountain -> Island.
-    mountain <- Registry.printing registry "Mountain"
-    island <- Registry.printing registry "Island"
-    magicalHack <- Registry.printing registry "Magical Hack"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    magicalHack <- S.printingOf s registry "Magical Hack"
     let (mountainId, g0) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
         (islandId, g1) = S.addCreature island S.alice g0
         (gs, hackId) = handInPlay magicalHack g1
@@ -541,7 +541,7 @@ magicalHackSpec s registry = Spec.describe s "MagicalHack" $ do
     Spec.assertBool s (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf mountainId resolved)) "hacked Mountain taps blue"
     Spec.assertBool s (notElem (ManaType.Colored Color.Red) (Mana.manaTypesOf mountainId resolved)) "hacked Mountain no longer taps red"
   Spec.it s "CR 601.2c Magical Hack with no legal target is uncastable" $ do
-    magicalHack <- Registry.printing registry "Magical Hack"
+    magicalHack <- S.printingOf s registry "Magical Hack"
     let (gs, hackId) = handInPlay magicalHack (Setup.emptyGame S.bothPlayers)
     -- Empty battlefield and stack: SpellOrPermanentTarget has no legal
     -- recipient (and there is no mana either), so it is uncastable.
@@ -579,13 +579,13 @@ answerAboveBound p = case p of
 blazeInHand :: GameState.GameState -> Int
 blazeInHand gs = length (filter (nameOnStack (Text.pack "Blaze") gs) (Game.zoneMembers Zone.Hand S.alice gs))
 
-blazeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
   Spec.it s "Blaze at X=3 deals 3 to the opponent (CR 601.2b/f/h, 608.2)" $ do
     -- Falsifier: an engine that ignored the chosen value (treated X as 0, or
     -- as the {X} mana value) would leave bob at 20.
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
         after = snd (Engine.runGamePure answerX3 gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop))
     Spec.assertEqWith s "Bob at 17" (S.lifeOf S.bob after) (Just 17)
@@ -593,16 +593,16 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   Spec.it s "Blaze at X=0 is castable and deals nothing (the X=0 floor)" $ do
     -- Falsifier: a floor that required {X} > 0 would make Blaze uncastable off
     -- one Mountain, leaving it in hand.
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 1)
         after = snd (Engine.runGamePure answerX0 gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop))
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "one Mountain paid {R}" (S.tappedCount S.alice after) 1
     Spec.assertEqWith s "Blaze resolved out of hand" (blazeInHand after) 0
   Spec.it s "Blaze at an unaffordable X is a no-op (reject-not-repair)" $ do
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 1)
         after = snd (Engine.runGamePure answerX3 gs0 (Cast.castSpell S.alice oid))
     Spec.assertEqWith s "still in hand" (blazeInHand after) 1
@@ -614,8 +614,8 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   -- 601.2b's floor. No constant, and nothing read off the printed cost,
   -- satisfies all three (#417).
   Spec.it s "CR 601.2b the ChooseX bound is the greatest X the board can pay" $ do
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
     let boundsOff n =
           let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain n)
            in State.execState (Engine.runGame answerAtBound gs0 (Cast.castSpell S.alice oid)) []
@@ -626,8 +626,8 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   -- the spell, pays every Mountain, and resolves. An off-by-one bound would
   -- reverse the cast here instead (CR 601.2) and leave bob at 20.
   Spec.it s "CR 601.2b announcing X at the bound casts Blaze and resolves it" $ do
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
         after = snd (State.evalState (Engine.runGame answerAtBound gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop)) [])
     Spec.assertEqWith s "Bob at 17, so the bound of 3 was announced and paid" (S.lifeOf S.bob after) (Just 17)
@@ -639,8 +639,8 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   -- 601.2) exactly as any other unaffordable value does. A bound quietly
   -- turned into a clamp would deal 3 damage and tap four Mountains here.
   Spec.it s "CR 601.2b the bound does not clamp: X one above it is a no-op" $ do
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
         after = snd (Engine.runGamePure answerAboveBound gs0 (Cast.castSpell S.alice oid))
     Spec.assertEqWith s "still in hand" (blazeInHand after) 1
@@ -651,9 +651,9 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   -- controller pays it too) eats one of the four Mountains, and the board that
   -- admitted X=3 above admits only X=2.
   Spec.it s "CR 601.2f a cost increase lowers the ChooseX bound" $ do
-    blaze <- Registry.printing registry "Blaze"
-    mountain <- Registry.printing registry "Mountain"
-    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     let (gs0, oid) = S.handOne blaze (snd (S.addCreature thalia S.alice (S.landsInPlay mountain 4)))
         cast = do Cast.castSpell S.alice oid; Stack.resolveTop
         bounds = State.execState (Engine.runGame answerAtBound gs0 cast) []
@@ -667,18 +667,18 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
 -- Chaos Charm has three modes (destroy target Wall / damage target creature /
 -- give target creature haste); the falsifier is castability via the damage or
 -- haste mode with no Wall on the board at all.
-modalCastSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+modalCastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 modalCastSpec s registry = Spec.describe s "ModalCast" $ do
   Spec.it s "CR 700.2a Chaos Charm is castable off its non-Wall modes with no Wall in play" $ do
-    chaosCharm <- Registry.printing registry "Chaos Charm"
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    chaosCharm <- S.printingOf s registry "Chaos Charm"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
         (_, gs1) = S.addCreature piker S.alice gs0
     Spec.assertBool s (Cast.castable S.alice oid gs1) "castable via the damage/haste mode"
   Spec.it s "CR 700.2a Chaos Charm is not castable with no creature on the board at all" $ do
-    chaosCharm <- Registry.printing registry "Chaos Charm"
-    mountain <- Registry.printing registry "Mountain"
+    chaosCharm <- S.printingOf s registry "Chaos Charm"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
     Spec.assertBool s (not (Cast.castable S.alice oid gs0)) "no mode is fillable"
 
@@ -745,15 +745,15 @@ castAndResolve answer gs oid =
 
 -- CR 702.42: entwine, the first keyword that decides a modal spell's SELECTION
 -- while it is being cast rather than reading it off the card.
-entwineSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+entwineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- CR 702.42a's "you MAY choose all modes": declining is a real answer, and
   -- it leaves the printed ChooseExactly 1 alone.
   Spec.it s "CR 702.42a declining entwine chooses one mode: the Piker is tapped, the Wall stays tapped" $ do
-    island <- Registry.printing registry "Island"
-    dreamsGrip <- Registry.printing registry "Dream's Grip"
-    piker <- Registry.printing registry "Goblin Piker"
-    wallOfStone <- Registry.printing registry "Wall of Stone"
+    island <- S.printingOf s registry "Island"
+    dreamsGrip <- S.printingOf s registry "Dream's Grip"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (gs, spellId, pikerId, wallId) = entwineBoard island dreamsGrip piker wallOfStone 2
         (asked, after) = castAndResolve (grips EntwineDecision.Declines pikerId wallId) gs spellId
     Spec.assertEqWith s "the player was asked, and declined" (entwineAnnouncements asked) [EntwineDecision.Declines]
@@ -763,10 +763,10 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- CR 702.42a's "instead of just the number specified": paying widens the
   -- selection from the printed one to ALL of them.
   Spec.it s "CR 702.42a paying entwine chooses both modes: the Piker is tapped AND the Wall is untapped" $ do
-    island <- Registry.printing registry "Island"
-    dreamsGrip <- Registry.printing registry "Dream's Grip"
-    piker <- Registry.printing registry "Goblin Piker"
-    wallOfStone <- Registry.printing registry "Wall of Stone"
+    island <- S.printingOf s registry "Island"
+    dreamsGrip <- S.printingOf s registry "Dream's Grip"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (gs, spellId, pikerId, wallId) = entwineBoard island dreamsGrip piker wallOfStone 2
         (asked, after) = castAndResolve (grips EntwineDecision.Entwines pikerId wallId) gs spellId
     Spec.assertEqWith s "the player was asked, and entwined" (entwineAnnouncements asked) [EntwineDecision.Entwines]
@@ -778,10 +778,10 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- BOTH slots at one untapped permanent is what makes the order observable:
   -- tap-then-untap ends untapped, and untap-then-tap ends tapped.
   Spec.it s "CR 702.42b both modes aimed at one untapped Piker resolve tap-then-untap, leaving it untapped" $ do
-    island <- Registry.printing registry "Island"
-    dreamsGrip <- Registry.printing registry "Dream's Grip"
-    piker <- Registry.printing registry "Goblin Piker"
-    wallOfStone <- Registry.printing registry "Wall of Stone"
+    island <- S.printingOf s registry "Island"
+    dreamsGrip <- S.printingOf s registry "Dream's Grip"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (gs, spellId, pikerId, _) = entwineBoard island dreamsGrip piker wallOfStone 2
         (_, after) = castAndResolve (grips EntwineDecision.Entwines pikerId pikerId) gs spellId
     Spec.assertEqWith s "the untap mode ran last, as printed, so the Piker ends untapped" (tapStateOf pikerId after) (Just TapState.Untapped)
@@ -789,10 +789,10 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- there is {U} and nothing more, so entwining is not on offer at all -- and
   -- the ordinary modal cast still is.
   Spec.it s "CR 702.42a with only {U} available the entwine option is not offered, and the ordinary cast still is" $ do
-    island <- Registry.printing registry "Island"
-    dreamsGrip <- Registry.printing registry "Dream's Grip"
-    piker <- Registry.printing registry "Goblin Piker"
-    wallOfStone <- Registry.printing registry "Wall of Stone"
+    island <- S.printingOf s registry "Island"
+    dreamsGrip <- S.printingOf s registry "Dream's Grip"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (gs, spellId, pikerId, wallId) = entwineBoard island dreamsGrip piker wallOfStone 1
         -- An interpreter that WOULD entwine: it never gets the chance, which
         -- is what makes this discriminating rather than a restatement of the
@@ -805,10 +805,10 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- The gate itself, asked directly, so the two arms of "is entwining
   -- available" are pinned apart from the cast that consumes them.
   Spec.it s "CR 702.42a Cast.entwineOffer is the {1} with two Islands and Nothing with one" $ do
-    island <- Registry.printing registry "Island"
-    dreamsGrip <- Registry.printing registry "Dream's Grip"
-    piker <- Registry.printing registry "Goblin Piker"
-    wallOfStone <- Registry.printing registry "Wall of Stone"
+    island <- S.printingOf s registry "Island"
+    dreamsGrip <- S.printingOf s registry "Dream's Grip"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (rich, richSpell, _, _) = entwineBoard island dreamsGrip piker wallOfStone 2
         (poor, poorSpell, _, _) = entwineBoard island dreamsGrip piker wallOfStone 1
     Spec.assertEqWith
@@ -820,9 +820,9 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- A card with no entwine is never asked, which is the other half of "where
   -- the rules leave nothing to ask, don't prompt".
   Spec.it s "CR 702.42a a modal spell without entwine (Chaos Charm) is never offered one" $ do
-    mountain <- Registry.printing registry "Mountain"
-    chaosCharm <- Registry.printing registry "Chaos Charm"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    chaosCharm <- S.printingOf s registry "Chaos Charm"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
         (_, gs) = S.addCreature piker S.bob gs0
     Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer S.alice spellId gs) Nothing
@@ -834,12 +834,12 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
 -- teaches Target.fillableModes the extra slots a card declares outside its
 -- modes, so castability sees the enchant slot too -- without either function
 -- learning what an Aura is.
-auraTargetSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+auraTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
   Spec.it s "CR 303.4a: an Aura spell targets, so it prompts for the creature it enchants" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
@@ -854,8 +854,8 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
   -- cast at all. Reading only Mode.targetSpecs would call this castable and
   -- let it be countered on resolution instead.
   Spec.it s "CR 601.2c: an Aura with no creature on the battlefield is not castable" $ do
-    swamp <- Registry.printing registry "Swamp"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
+    swamp <- S.printingOf s registry "Swamp"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
         (gs, spellId) = S.handOne unholyStrength base
     Spec.assertBool s (not (Cast.castable S.alice spellId gs)) "not castable with an empty board"
@@ -892,15 +892,15 @@ theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
 -- afterward, whether it resolves, is countered, or leaves the stack in some
 -- other way." "The mana value of the spell is determined only by its mana cost,
 -- no matter what the total cost to cast the spell was."
-fireboltSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+fireboltSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fireboltSpec s registry = Spec.describe s "Firebolt" $ do
   -- The headline loop, end to end: hand -> stack -> graveyard -> stack ->
   -- EXILE. The exile is the discriminating assertion -- rule 702.34a's
   -- second static ability, and the half a bare alternative cost cannot
   -- reach.
   Spec.it s "CR 702.34a whole card: cast for {R}, then flash back for {4}{R} and be exiled" $ do
-    mountain <- Registry.printing registry "Mountain"
-    firebolt <- Registry.printing registry "Firebolt"
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
     let (fromHand, gs) = inHandWith mountain firebolt 6
         cast1 = S.runPure S.identityAnswer gs (Cast.castSpell S.alice fromHand)
         resolved1 = S.runPure S.identityAnswer cast1 Stack.resolveTop
@@ -919,8 +919,8 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
   -- using flashback will always be exiled afterward, whether it resolves, is
   -- countered, or leaves the stack in some other way."
   Spec.it s "CR 702.34a a countered flashback spell is exiled too" $ do
-    mountain <- Registry.printing registry "Mountain"
-    firebolt <- Registry.printing registry "Firebolt"
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
     let (inGraveyard, gs) = inGraveyardWith mountain firebolt 5
         cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice inGraveyard)
     case GameState.stack cast of
@@ -934,9 +934,9 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
   -- that heads for a graveyard while it sits there -- which is exactly what a
   -- destination-only pattern (Rest in Peace's shape) would do.
   Spec.it s "CR 702.34a the exile replacement is scoped to the spell itself" $ do
-    mountain <- Registry.printing registry "Mountain"
-    firebolt <- Registry.printing registry "Firebolt"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (inGraveyard, gs0) = inGraveyardWith mountain firebolt 5
         (bystander, gs1) = S.addCreature piker S.alice gs0
         cast = S.runPure S.identityAnswer gs1 (Cast.castSpell S.alice inGraveyard)
@@ -947,8 +947,8 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
   -- simply added to Card.alternativeCosts would make Firebolt castable from
   -- hand for {4}{R} as well, which rule 702.34a does not say.
   Spec.it s "CR 702.34a the flashback cost is offered only from the graveyard" $ do
-    mountain <- Registry.printing registry "Mountain"
-    firebolt <- Registry.printing registry "Firebolt"
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
     let (fromHand, handBoard) = inHandWith mountain firebolt 6
         (fromGraveyard, graveyardBoard) = inGraveyardWith mountain firebolt 6
         manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor oid gs)
@@ -972,8 +972,8 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
       (Card.Type.manaCost (Printing.card firebolt))
       (Just (ManaCost.MkManaCost [theRed]))
   Spec.it s "CR 118.3 four Mountains do not pay the flashback {4}{R}; five do" $ do
-    mountain <- Registry.printing registry "Mountain"
-    firebolt <- Registry.printing registry "Firebolt"
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
     let (four, fourLands) = inGraveyardWith mountain firebolt 4
         (five, fiveLands) = inGraveyardWith mountain firebolt 5
     Spec.assertBool s (not (Cast.castable S.alice four fourLands)) "not castable with four"
@@ -982,8 +982,8 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
   -- normally cast a sorcery." The permission is about the ZONE, not the
   -- timing.
   Spec.it s "CR 117.1a flashback does not lift the sorcery timing restriction" $ do
-    mountain <- Registry.printing registry "Mountain"
-    firebolt <- Registry.printing registry "Firebolt"
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
     let (inGraveyard, gs) = inGraveyardWith mountain firebolt 5
         upkeep = gs {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
     Spec.assertBool s (Cast.castable S.alice inGraveyard gs) "castable in her own main phase"
@@ -992,8 +992,8 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
   -- the graveyard stays uncastable. Lightning Bolt is affordable from six
   -- Mountains, so only the missing permission can be stopping it.
   Spec.it s "CR 601.3 a card without flashback is not castable from the graveyard" $ do
-    mountain <- Registry.printing registry "Mountain"
-    bolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
     let (inGraveyard, gs) = inGraveyardWith mountain bolt 6
         (inHand, handBoard) = inHandWith mountain bolt 6
     Spec.assertBool s (Cast.castable S.alice inHand handBoard) "castable from hand"
@@ -1014,7 +1014,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
 -- CREATURE. Mindslaver is a legendary ARTIFACT -- the case that fails if the
 -- check reads the supertype and forgets the card type. And Thalia under bob's
 -- control is the case that fails if the check forgets "that player controls".
-legendarySpellSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+legendarySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
   -- The control for every negative below: same board, same one Mountain,
   -- plus a legendary creature. Thalia taxes the sorcery {1} (her own
@@ -1022,9 +1022,9 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
   -- other cases, where nothing taxes it at all, are affordable a fortiori
   -- and only CR 205.4e can be stopping them.
   Spec.it s "CR 205.4e castable while its caster controls a legendary creature" $ do
-    mountain <- Registry.printing registry "Mountain"
-    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-    sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+    mountain <- S.printingOf s registry "Mountain"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature thalia S.alice gs)
     Spec.assertBool s (Cast.castable S.alice oid board) "castable"
@@ -1033,26 +1033,26 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
   -- Beleren is the pool's only one, and it is not a creature -- so this case
   -- fails for any reading that collapsed the rule onto the creature limb.
   Spec.it s "CR 205.4e castable while its caster controls a legendary planeswalker" $ do
-    mountain <- Registry.printing registry "Mountain"
-    jace <- Registry.printing registry "Jace Beleren"
-    sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+    mountain <- S.printingOf s registry "Mountain"
+    jace <- S.printingOf s registry "Jace Beleren"
+    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature jace S.alice gs)
     Spec.assertBool s (not (Card.isCreature (Printing.card jace))) "not a creature"
     Spec.assertBool s (Cast.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid) (Action.legalActions S.alice board)) "and offered as a legal action"
   Spec.it s "CR 205.4e not castable with no legendary permanent at all" $ do
-    mountain <- Registry.printing registry "Mountain"
-    sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+    mountain <- S.printingOf s registry "Mountain"
+    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
     Spec.assertBool s (not (Cast.castable S.alice oid gs)) "not castable"
     Spec.assertBool s (notElem (A.Cast oid) (Action.legalActions S.alice gs)) "and not offered"
   -- The supertype alone is not the condition: rule 205.4e names a legendary
   -- CREATURE (or planeswalker), and Mindslaver is a legendary artifact.
   Spec.it s "CR 205.4e a legendary artifact does not satisfy it" $ do
-    mountain <- Registry.printing registry "Mountain"
-    mindslaver <- Registry.printing registry "Mindslaver"
-    sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+    mountain <- S.printingOf s registry "Mountain"
+    mindslaver <- S.printingOf s registry "Mindslaver"
+    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature mindslaver S.alice gs)
     Spec.assertBool s (not (Cast.castable S.alice oid board)) "not castable"
@@ -1062,9 +1062,9 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
   -- so a second Mountain keeps the spell affordable and CR 205.4e the only
   -- thing left to fail.
   Spec.it s "CR 205.4e an opponent's legendary creature does not satisfy it" $ do
-    mountain <- Registry.printing registry "Mountain"
-    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-    sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+    mountain <- S.printingOf s registry "Mountain"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 2
         board = snd (S.addCreature thalia S.bob gs)
     Spec.assertBool s (not (Cast.castable S.alice oid board)) "not castable"
@@ -1073,17 +1073,17 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
   -- from an empty board exactly as before. A check that read only the
   -- supertype would make Thalia uncastable until a Thalia was already out.
   Spec.it s "CR 205.4e does not touch a legendary creature spell" $ do
-    plains <- Registry.printing registry "Plains"
-    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+    plains <- S.printingOf s registry "Plains"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     let (oid, gs) = inHandWith plains thalia 2
     Spec.assertBool s (Cast.castable S.alice oid gs) "castable"
     Spec.assertBool s (elem (A.Cast oid) (Action.legalActions S.alice gs)) "and offered as a legal action"
   -- Gameplay level, through the stack: the permitted cast resolves and its
   -- effect lands, so the gate is a gate and not a silent no-op.
   Spec.it s "CR 205.4e the permitted cast resolves" $ do
-    mountain <- Registry.printing registry "Mountain"
-    thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-    sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+    mountain <- S.printingOf s registry "Mountain"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature thalia S.alice gs)
         cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice oid)
@@ -1122,14 +1122,14 @@ rallyBoard piker plains rally =
         -- unreachable; a bogus id fails the assertions rather than the suite.
         [] -> (bobsRally, alicesRally, S.noSource, tapped)
 
-printedCastingRestrictionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
   -- Both clauses satisfied: bob is the defending player (CR 506.2), attackers
   -- have joined (CR 508.8), and the game is in the declare attackers step.
   Spec.it s "CR 601.3 castable once bob has been attacked in the declare attackers step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    plains <- Registry.printing registry "Plains"
-    rally <- Registry.printing registry "Rally the Troops"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (Cast.castable S.bob bobsRally attacked) "castable"
@@ -1137,9 +1137,9 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
   -- The "only if you've been attacked this step" clause, isolated: the step is
   -- right and nobody has attacked yet.
   Spec.it s "CR 601.3 not castable in the declare attackers step before attackers are declared" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    plains <- Registry.printing registry "Plains"
-    rally <- Registry.printing registry "Rally the Troops"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
     Spec.assertBool s (not (Cast.castable S.bob bobsRally board)) "not castable"
     Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob board)) "and not offered"
@@ -1147,9 +1147,9 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
   -- question about the step alone: Eightfold Maze's ruling is "To cast it, a
   -- creature needs to have attacked _you_", and nothing attacked alice.
   Spec.it s "CR 601.3 the ATTACKING player is not offered it in the same step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    plains <- Registry.printing registry "Plains"
-    rally <- Registry.printing registry "Rally the Troops"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
     let (_, alicesRally, _, board) = rallyBoard piker plains rally
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (not (Cast.castable S.alice alicesRally attacked)) "not castable"
@@ -1162,11 +1162,11 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
   -- Bolt is still offered, so what stops the Rally is the clause and not the
   -- step being closed to bob altogether.
   Spec.it s "CR 601.3 not castable in the declare blockers step, though bob was attacked" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    plains <- Registry.printing registry "Plains"
-    rally <- Registry.printing registry "Rally the Troops"
-    mountain <- Registry.printing registry "Mountain"
-    bolt <- Registry.printing registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
         (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
         attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
@@ -1180,11 +1180,11 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
   -- the negatives above would also pass on an engine that refused every cast
   -- in the declare attackers step.
   Spec.it s "CR 117.1a an unrestricted instant is castable in the same step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    plains <- Registry.printing registry "Plains"
-    rally <- Registry.printing registry "Rally the Troops"
-    mountain <- Registry.printing registry "Mountain"
-    bolt <- Registry.printing registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
     let (_, _, _, board) = rallyBoard piker plains rally
         (boltId, withBolt) = S.addHandCard bolt S.alice (snd (S.addCreature mountain S.alice board))
     Spec.assertBool s (Cast.castable S.alice boltId withBolt) "castable"
@@ -1192,9 +1192,9 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
   -- Gameplay level, through the stack: the permitted cast resolves and its
   -- effect lands, so the gate is a gate and not a silent no-op.
   Spec.it s "CR 601.3 the permitted cast resolves and untaps bob's creatures" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    plains <- Registry.printing registry "Plains"
-    rally <- Registry.printing registry "Rally the Troops"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
     let (bobsRally, _, bobsPiker, board) = rallyBoard piker plains rally
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
         cast = S.runPure S.identityAnswer attacked (Cast.castSpell S.bob bobsRally)
@@ -1211,7 +1211,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
   castEngineSpec s registry

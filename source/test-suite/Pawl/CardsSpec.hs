@@ -86,18 +86,19 @@ modeShapes m =
     (\mode -> (Mode.optionality mode, Foldable.toList (Mode.effects mode)))
     (Foldable.toList (Modal.modes m))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Cards" $ do
   Spec.it s "each committed file re-parses to its compiled card (P3)" $ do
-    ps <- S.allPrintings registry
-    mapM_ (checkFile s registry) ps
+    root <- Registry.defaultRoot
+    ps <- S.allPrintings s
+    mapM_ (checkFile s root) ps
   Spec.it s "clone.json loads as a 0/0 Shapeshifter with an EntryR AsCopy" $ do
-    c <- Registry.card registry "Clone"
+    c <- S.cardOf s registry "Clone"
     Spec.assertEqWith s "entry replacement" (CardT.replacementEffects c) [ReplacementEffect.EntryR EntryRewrite.AsCopy]
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Clone")
     Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 0)))
   Spec.it s "serum-powder.json loads as a {3} artifact with a CR 103.5b mulligan action" $ do
-    c <- Registry.card registry "Serum Powder"
+    c <- S.cardOf s registry "Serum Powder"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Serum Powder")
     Spec.assertEqWith s "the CR 103.5b action" (CardT.mulliganAction c) [Effect.ExileHandThenDraw]
     Spec.assertEqWith s "one activated ability, the {T}: Add {C} mana ability" (length (CardT.activatedAbilities c)) 1
@@ -107,7 +108,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- no Swamp anywhere, so a reader that took the land type from
   -- TypeLine.subtypes would find nothing to walk on.
   Spec.it s "bog-wraith.json loads as a {3}{B} 3/3 Wraith whose only keyword is swampwalk" $ do
-    c <- Registry.card registry "Bog Wraith"
+    c <- S.cardOf s registry "Bog Wraith"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Bog Wraith")
     Spec.assertEqWith
       s
@@ -126,7 +127,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- its own, and Pawl.Engine.Keyword derives all three of rule 702.34a's
   -- consequences from this one value.
   Spec.it s "firebolt.json loads as a {R} Sorcery whose only keyword is flashback {4}{R}" $ do
-    c <- Registry.card registry "Firebolt"
+    c <- S.cardOf s registry "Firebolt"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Firebolt")
     Spec.assertEqWith
       s
@@ -159,7 +160,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   --     -- so a shared name would fuse the two targets into one and make
   --     "tap one permanent and untap another" impossible to cast.
   Spec.it s "dreams-grip.json loads as a {U} Instant with entwine {1} over a tap mode and an untap mode" $ do
-    c <- Registry.card registry "Dream's Grip"
+    c <- S.cardOf s registry "Dream's Grip"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Dream's Grip")
     Spec.assertEqWith s "{U}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
     Spec.assertEqWith
@@ -200,7 +201,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- in the same file, which is what proves the key is per-mode rather than
   -- per-card.
   Spec.it s "renewed-faith.json loads with an Optional cycling trigger and a Mandatory spell" $ do
-    c <- Registry.card registry "Renewed Faith"
+    c <- S.cardOf s registry "Renewed Faith"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Renewed Faith")
     Spec.assertEqWith
       s
@@ -216,7 +217,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- than the battlefield (CR 113.6k). Its "may" reuses renewed-faith.json's
   -- per-mode optionality key rather than adding a second spelling.
   Spec.it s "narcomoeba.json loads as a {1}{U} flying Illusion with an Optional graveyard trigger" $ do
-    c <- Registry.card registry "Narcomoeba"
+    c <- S.cardOf s registry "Narcomoeba"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Narcomoeba")
     Spec.assertEqWith s "{1}{U}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
     Spec.assertEqWith
@@ -237,7 +238,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
       [[(Optionality.Optional, [Effect.MoveToZone Binding.triggerSource Zone.Battlefield])]]
   Spec.it s "hanweir-garrison.json loads as a {2}{R} 2/3 whose attack trigger makes two tapped attacking Humans" $ do
-    c <- Registry.card registry "Hanweir Garrison"
+    c <- S.cardOf s registry "Hanweir Garrison"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Hanweir Garrison")
     Spec.assertEqWith s "{2}{R}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
     Spec.assertEqWith
@@ -271,7 +272,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- graveyard pair (CR 603.6c through CR 700.4's "dies"), and the mirror of
   -- narcomoeba.json's library -> graveyard one above.
   Spec.it s "doomed-traveler.json loads as a {W} 1/1 whose dies trigger makes a flying white Spirit" $ do
-    c <- Registry.card registry "Doomed Traveler"
+    c <- S.cardOf s registry "Doomed Traveler"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Doomed Traveler")
     Spec.assertEqWith s "{W}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)]))
     Spec.assertEqWith
@@ -313,7 +314,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- different slot, which is precisely the distinction: that card's "self"
   -- IS the arriving graveyard card, and this one's is not.
   Spec.it s "endless-cockroaches.json loads as a {1}{B}{B} 1/1 whose dies trigger returns the card it became to hand" $ do
-    c <- Registry.card registry "Endless Cockroaches"
+    c <- S.cardOf s registry "Endless Cockroaches"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Endless Cockroaches")
     Spec.assertEqWith
       s
@@ -342,7 +343,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- against CR 608.2h last known information), and the first condition whose
   -- measured side is not a Count at all.
   Spec.it s "deathknell-berserker.json loads as a {1}{B} 2/2 whose dies trigger is gated on its own power" $ do
-    c <- Registry.card registry "Deathknell Berserker"
+    c <- S.cardOf s registry "Deathknell Berserker"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Deathknell Berserker")
     Spec.assertEqWith s "{1}{B}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)]))
     Spec.assertEqWith
@@ -386,7 +387,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- Skelemental survive its blocker: TriggerSpec's bystander group would
   -- then prove nothing.
   Spec.it s "lightning-skelemental.json loads as a {B}{R}{R} 6/1 trampler that makes the damaged player discard two" $ do
-    c <- Registry.card registry "Lightning Skelemental"
+    c <- S.cardOf s registry "Lightning Skelemental"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Lightning Skelemental")
     Spec.assertEqWith
       s
@@ -419,7 +420,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
         [(Optionality.Mandatory, [Effect.Sacrifice Binding.triggerSource])]
       ]
   Spec.it s "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
-    c <- Registry.card registry "Leyline of the Void"
+    c <- S.cardOf s registry "Leyline of the Void"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Leyline of the Void")
     Spec.assertEqWith
       s
@@ -438,7 +439,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- SKIP. Nothing about Eon Hub is a static ability -- the whole card is one
   -- replacement -- which is the correction this file's presence records.
   Spec.it s "eon-hub.json loads as a {5} artifact whose only ability is a PhaseR skip" $ do
-    c <- Registry.card registry "Eon Hub"
+    c <- S.cardOf s registry "Eon Hub"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Eon Hub")
     Spec.assertEqWith s "{5}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 5]))
     Spec.assertEqWith
@@ -460,7 +461,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- sorcery has no ability that exists on the battlefield -- which is the
   -- structural contrast with Eon Hub just above.
   Spec.it s "fatigue.json loads as a {1}{U} sorcery whose only effect is a SkipNextPhase" $ do
-    c <- Registry.card registry "Fatigue"
+    c <- S.cardOf s registry "Fatigue"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Fatigue")
     Spec.assertEqWith s "{1}{U}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
     Spec.assertEqWith
@@ -479,7 +480,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- a reference to it (see Pawl.Types.ExtraTurn). Contrast fatigue.json just
   -- above, whose SkipNextPhase names a player's NEXT occurrence instead.
   Spec.it s "savor-the-moment.json loads as a {1}{U}{U} sorcery whose TakeExtraTurn carries the untap skip" $ do
-    c <- Registry.card registry "Savor the Moment"
+    c <- S.cardOf s registry "Savor the Moment"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Savor the Moment")
     Spec.assertEqWith
       s
@@ -503,7 +504,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- a TARGET, which is what makes an opponent's extra turn expressible at
   -- all, and its skip set is empty.
   Spec.it s "time-warp.json loads as a {3}{U}{U} sorcery whose only effect is a TakeExtraTurn" $ do
-    c <- Registry.card registry "Time Warp"
+    c <- S.cardOf s registry "Time Warp"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Time Warp")
     Spec.assertEqWith
       s
@@ -526,7 +527,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- a land type that grants no intrinsic mana ability, so the "{T}: Add {C}"
   -- asserted here has to be PRINTED, and it is.
   Spec.it s "desert.json loads as a Land -- Desert whose ping is gated to the end of combat step" $ do
-    c <- Registry.card registry "Desert"
+    c <- S.cardOf s registry "Desert"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Desert")
     Spec.assertEqWith s "no mana cost" (CardT.manaCost c) Nothing
     Spec.assertEqWith
@@ -576,7 +577,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- printed text says "a creature", not "another creature", and an
   -- enchantment could not match a creature filter anyway.
   Spec.it s "aether-flash.json loads as a {2}{R}{R} enchantment dealing 2 to the creature that entered" $ do
-    c <- Registry.card registry "Aether Flash"
+    c <- S.cardOf s registry "Aether Flash"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Aether Flash")
     Spec.assertEqWith
       s
@@ -614,7 +615,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- and the Mountain subtype, "even if the text box doesn't actually contain
   -- that text." Printing it here would give the card two mana abilities.
   Spec.it s "snow-covered-mountain.json loads as a Basic Snow Land - Mountain with no printed ability" $ do
-    c <- Registry.card registry "Snow-Covered Mountain"
+    c <- S.cardOf s registry "Snow-Covered Mountain"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Snow-Covered Mountain")
     Spec.assertEqWith
       s
@@ -634,7 +635,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- supertype and by CR 109.5's controller -- the same shape nightmare.json
   -- uses for Swamps, with HasSupertype where that has HasSubtype.
   Spec.it s "skred.json loads as a {R} Instant dealing damage equal to the snow permanents you control" $ do
-    c <- Registry.card registry "Skred"
+    c <- S.cardOf s registry "Skred"
     let target = SlotName.MkSlotName (Text.pack "target")
         snowPermanentsYouControl =
           Count.MkCount
@@ -665,7 +666,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- "tribal" type were errata'd, so the Oracle text this file transcribes
   -- is already kindred.
   Spec.it s "bitterblossom.json loads as a {1}{B} Kindred Enchantment - Faerie whose upkeep trigger costs 1 life and makes a Faerie Rogue" $ do
-    c <- Registry.card registry "Bitterblossom"
+    c <- S.cardOf s registry "Bitterblossom"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Bitterblossom")
     Spec.assertEqWith s "{1}{B}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)]))
     Spec.assertEqWith
@@ -721,7 +722,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- (Pawl.Engine.Activate.loyaltyOk). A file claiming SorcerySpeed here would
   -- be card data teaching the engine a rule it already has.
   Spec.it s "jace-beleren.json loads as a {1}{U}{U} Legendary Planeswalker - Jace with loyalty 3 and three loyalty abilities" $ do
-    c <- Registry.card registry "Jace Beleren"
+    c <- S.cardOf s registry "Jace Beleren"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Jace Beleren")
     Spec.assertEqWith
       s
@@ -766,7 +767,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- second exclusion mechanism -- and the effect reads CR 702.70a's existing
   -- "that player" slot rather than adding a spelling of its own.
   Spec.it s "megrim.json loads as a {2}{B} enchantment triggering on an opponent's discard" $ do
-    c <- Registry.card registry "Megrim"
+    c <- S.cardOf s registry "Megrim"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Megrim")
     Spec.assertEqWith
       s
@@ -806,7 +807,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- two halves as Pool.Creatures plus a filter, because a TargetSpec has a
   -- pool.
   Spec.it s "trumpet-blast.json loads as a {2}{R} instant pumping every attacking creature" $ do
-    c <- Registry.card registry "Trumpet Blast"
+    c <- S.cardOf s registry "Trumpet Blast"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Trumpet Blast")
     Spec.assertEqWith s "{2}{R}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
     Spec.assertEqWith
@@ -840,7 +841,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- enchantments", with no "you don't control" and no "other", and the Thief
   -- itself is in a graveyard by the time the trigger resolves.
   Spec.it s "aura-thief.json loads as a {3}{U} 2/2 flying Illusion whose dies trigger takes every enchantment" $ do
-    c <- Registry.card registry "Aura Thief"
+    c <- S.cardOf s registry "Aura Thief"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Aura Thief")
     Spec.assertEqWith s "{3}{U}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
     Spec.assertEqWith
@@ -869,7 +870,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- payload: PhaseSelector.CombatPhase, which no Pawl.Types.Phase value can
   -- spell, next to Fatigue's PhaseSelector.Step just above.
   Spec.it s "stonehorn-dignitary.json loads as a {3}{W} 1/4 whose enters trigger skips a whole combat phase" $ do
-    c <- Registry.card registry "Stonehorn Dignitary"
+    c <- S.cardOf s registry "Stonehorn Dignitary"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Stonehorn Dignitary")
     Spec.assertEqWith s "{3}{W}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.White)]))
     Spec.assertEqWith
@@ -907,7 +908,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- The slot is a DEFINITION rather than a target spec, which is why the mode
   -- declares none: CR 115.10a, the word "target" is nowhere on the card.
   Spec.it s "bane-of-progress.json loads as a {4}{G}{G} Elemental whose sweep binds a count its rider reads" $ do
-    c <- Registry.card registry "Bane of Progress"
+    c <- S.cardOf s registry "Bane of Progress"
     let destroyed = SlotName.MkSlotName (Text.pack "destroyed")
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Bane of Progress")
     Spec.assertEqWith
@@ -951,11 +952,11 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       [[Map.empty]]
     Spec.assertEqWith s "nothing of it is a static or a replacement" (CardT.staticAbilities c, CardT.replacementEffects c) ([], [])
 
-checkFile :: Spec.Spec IO n -> Registry.Registry -> Printing.Printing -> IO ()
-checkFile s registry p = do
+checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
+checkFile s root p = do
   let slug = slugOf p
-  let path = Registry.root registry <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
-  -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
+  let path = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
+  -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Corpus.loadOne:
   -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
   -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".
   bytes <- ByteString.readFile path

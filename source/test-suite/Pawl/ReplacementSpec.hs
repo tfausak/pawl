@@ -234,7 +234,7 @@ leylineShape src ts =
 -- Sarcomancy is placed straight onto the battlefield, so its enters-trigger
 -- never resolves and no Zombie token exists: CR 603.4's intervening "if" holds
 -- and the upkeep ability really would fire.
-stepSkipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+stepSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stepSkipSpec s registry = Spec.describe s "Skip" $ do
   let untap = Phase.Beginning BeginningStep.Untap
       upkeep = Phase.Beginning BeginningStep.Upkeep
@@ -260,7 +260,7 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
   -- The control. Without Eon Hub the upkeep step begins normally, so the
   -- trigger fires and resolves.
   Spec.it s "CR 500.6 without a skip the upkeep step begins and its trigger fires" $ do
-    sarcomancy <- Registry.printing registry "Sarcomancy"
+    sarcomancy <- S.printingOf s registry "Sarcomancy"
     let after = runTwo (atUntap [sarcomancy])
     Spec.assertBool s (began untap after) "the untap step began"
     Spec.assertBool s (began upkeep after) "the upkeep step began"
@@ -270,8 +270,8 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
   -- skip THEIR upkeep steps" is symmetric, so the effect is not scoped to
   -- its controller.
   Spec.it s "CR 614.1b Eon Hub replaces the upkeep step with nothing" $ do
-    sarcomancy <- Registry.printing registry "Sarcomancy"
-    eonHub <- Registry.printing registry "Eon Hub"
+    sarcomancy <- S.printingOf s registry "Sarcomancy"
+    eonHub <- S.printingOf s registry "Eon Hub"
     let base = atUntap [sarcomancy]
         armed = snd (S.addCreature eonHub S.bob base)
         after = runTwo armed
@@ -310,7 +310,7 @@ aimPlayer pid p = case p of
 -- skipped step cannot be confused with a step that happened and drew nothing:
 -- the CR 603.2b StepBegan record (CR 614.6, "if an event is replaced, it never
 -- happens"), and alice's library, which a real draw step empties by one.
-fatigueSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+fatigueSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fatigueSpec s registry = Spec.describe s "Fatigue" $ do
   let drawStep = Phase.Beginning BeginningStep.DrawStep
       -- alice's turn, positioned at her draw step with the precombat main phase
@@ -348,9 +348,9 @@ fatigueSpec s registry = Spec.describe s "Fatigue" $ do
   -- alice's draw step begins and draws, which is what every case below is
   -- measured against.
   Spec.it s "CR 500.6 without a skip alice's draw step begins and draws" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    fatigue <- Registry.printing registry "Fatigue"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fatigue <- S.printingOf s registry "Fatigue"
     let (gs, _) = board island piker fatigue 1
         after = runDraw gs
     Spec.assertEqWith s "the draw step began" (begun after) 1
@@ -360,9 +360,9 @@ fatigueSpec s registry = Spec.describe s "Fatigue" $ do
   -- Hub, whose skip is re-derived from the battlefield every time and so
   -- never runs out.
   Spec.it s "CR 614.10a one Fatigue skips one draw step, and the next one draws" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    fatigue <- Registry.printing registry "Fatigue"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fatigue <- S.printingOf s registry "Fatigue"
     let (gs, held) = board island piker fatigue 1
         cast = castEach (aimPlayer S.alice) gs held
     Spec.assertEqWith s "the resolution armed one floating skip" (armed cast) 1
@@ -383,9 +383,9 @@ fatigueSpec s registry = Spec.describe s "Fatigue" $ do
   -- flag, or a single Maybe -- all of which coalesce the two into one and
   -- let the second draw step happen.
   Spec.it s "CR 614.10a two Fatigues skip two draw steps, not one" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    fatigue <- Registry.printing registry "Fatigue"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fatigue <- S.printingOf s registry "Fatigue"
     let (gs, held) = board island piker fatigue 2
         cast = castEach (aimPlayer S.alice) gs held
     Spec.assertEqWith s "two resolutions armed two floating skips" (armed cast) 2
@@ -411,9 +411,9 @@ fatigueSpec s registry = Spec.describe s "Fatigue" $ do
   -- which is what every skip in the pool did before this card -- would
   -- take alice's step here and spend itself doing it.
   Spec.it s "CR 614.1b a Fatigue aimed at bob leaves alice's draw step alone" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    fatigue <- Registry.printing registry "Fatigue"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fatigue <- S.printingOf s registry "Fatigue"
     let (gs, held) = board island piker fatigue 1
         cast = castEach (aimPlayer S.bob) gs held
         after = runDraw cast
@@ -491,7 +491,7 @@ castingSkirmishAnswer victim p = case p of
 -- Everything Fatigue proved about a skip's LIFETIME rides along unchanged: the
 -- skip is created by an effect, scoped to the player its resolution named, and
 -- consumed by one occurrence (CR 614.10a).
-stonehornSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+stonehornSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
   let -- alice in her precombat main phase on turn 2, holding Stonehorn Dignitary
       -- with four untapped Plains (exactly {3}{W}); bob has one Settled Goblin
@@ -521,9 +521,9 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
   -- phase runs all five of CR 506.1's steps and his Piker takes two off
   -- alice, which is what every case below is measured against.
   Spec.it s "CR 506.1 without a skip bob's combat phase runs and his Piker connects" $ do
-    plains <- Registry.printing registry "Plains"
-    stonehorn <- Registry.printing registry "Stonehorn Dignitary"
-    piker <- Registry.printing registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _) = board plains stonehorn piker
         bobsTurn = nextTurn (skirmishAnswer S.bob) gs
         mid = atPostcombatMain (skirmishAnswer S.bob) bobsTurn
@@ -535,9 +535,9 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
   -- pattern that named one step would leave the other four running, and
   -- bob's Piker would still be declared.
   Spec.it s "CR 500.11 the named opponent's whole combat phase is skipped, every step of it" $ do
-    plains <- Registry.printing registry "Plains"
-    stonehorn <- Registry.printing registry "Stonehorn Dignitary"
-    piker <- Registry.printing registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _) = board plains stonehorn piker
         bobsTurn = nextTurn (castingSkirmishAnswer S.bob) gs
         mid = atPostcombatMain (castingSkirmishAnswer S.bob) bobsTurn
@@ -553,9 +553,9 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
   -- waits for the first occurrence that isn't skipped" -- ONE occurrence,
   -- so bob's following combat phase is his own again.
   Spec.it s "CR 614.10a one Stonehorn skips one combat phase, and the next one happens" $ do
-    plains <- Registry.printing registry "Plains"
-    stonehorn <- Registry.printing registry "Stonehorn Dignitary"
-    piker <- Registry.printing registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
+    piker <- S.printingOf s registry "Goblin Piker"
     let answer = castingSkirmishAnswer S.bob
         (gs, _) = board plains stonehorn piker
         bobsTurn = nextTurn answer gs
@@ -571,9 +571,9 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
   -- PhasePattern.whosePhase would eat alice's combat immediately, and
   -- spend itself doing it.
   Spec.it s "CR 614.1b a Stonehorn aimed at bob leaves alice's own combat phase alone" $ do
-    plains <- Registry.printing registry "Plains"
-    stonehorn <- Registry.printing registry "Stonehorn Dignitary"
-    piker <- Registry.printing registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
+    piker <- S.printingOf s registry "Goblin Piker"
     let answer = castingSkirmishAnswer S.bob
         (gs, _) = board plains stonehorn piker
         mid = atPostcombatMain answer gs
@@ -591,15 +591,15 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
 -- would only risk becoming a CI flake. The timeout is not applied here --
 -- Pawl.Spec cannot express one -- but where this spec is wired into the tasty
 -- runner.
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- P9: a pattern's permanent match runs through the lower Pawl.Engine.Filter over
   -- the PROJECTED view, the same evaluator Pawl.Engine.Cost narrows sacrifices with
   -- (#111 retired). CR 205.2b/300.2/613.1d: creature-ness is projected; the
   -- trivial filter And [] matches every permanent (what AnyPermanent was).
   Spec.it s "CR 614.1 matchesPermanent narrows a permanent through Filter.matches" $ do
-    swamp <- Registry.printing registry "Swamp"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
         (piker, g1) = S.addCreature pikerPrinting S.alice base
         land = case Set.toList (GameState.battlefield base) of
@@ -621,8 +621,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- cannot re-fire. See "CR 614.5 the applied set ..." below for the real
   -- 614.5 coverage.
   Spec.it s "CR 614.1a a redirect that no longer matches its own pattern cannot re-fire" $ do
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (_, g1) = S.addCreature restInPeace S.alice g0
         (piker, g2) = S.addCreature pikerPrinting S.bob g1
@@ -630,8 +630,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "not in a graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
     Spec.assertEqWith s "exactly one object in exile" (Set.size (GameState.exile after)) 1
   Spec.it s "CR 616.1 value-equal candidates elide the prompt (nothing to choose)" $ do
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (_, g1) = S.addCreature restInPeace S.alice g0
         (piker, g2) = S.addCreature pikerPrinting S.bob g1
@@ -651,9 +651,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- is buried first and an implementation that re-collected the Piker's
   -- candidates from the live board would find it gone.
   Spec.it s "CR 704.3 a Rest in Peace buried by an SBA pass still exiles that pass's other victim" $ do
-    opalescence <- Registry.printing registry "Opalescence"
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    opalescence <- S.printingOf s registry "Opalescence"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
         (rip, g1) = S.addCreature restInPeace S.alice g0
         (piker, g2) = S.addCreature pikerPrinting S.bob g1
@@ -677,9 +677,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- marked damage instead, so it is lethally damaged rather than
   -- zero-toughness and CR 704.5g claims it.
   Spec.it s "CR 704.3 a Rest in Peace the pass buries still exiles what the pass DESTROYS" $ do
-    opalescence <- Registry.printing registry "Opalescence"
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    opalescence <- S.printingOf s registry "Opalescence"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
         (rip, g1) = S.addCreature restInPeace S.alice g0
         (piker, g2) = S.addCreature pikerPrinting S.bob g1
@@ -715,11 +715,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- the pool -- Drudge Skeletons and Uthden Troll -- name themselves. No Aura
   -- prints one, so there is no gameplay route to a shield on this Aura.
   Spec.it s "CR 614.7 an Aura the same pass buries is never offered to a regeneration shield" $ do
-    island <- Registry.printing registry "Island"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    coating <- Registry.printing registry "Liquimetal Coating"
-    animator <- Registry.printing registry "Skilled Animator"
+    island <- S.printingOf s registry "Island"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    coating <- S.printingOf s registry "Liquimetal Coating"
+    animator <- S.printingOf s registry "Skilled Animator"
     let base = S.landsInPlay island 3 -- {2}{U} for the Animator
         (creature, g1) = S.addCreature pikerPrinting S.alice base
         (aura, g2) = S.addCreature unholyStrength S.alice g1
@@ -747,8 +747,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "in its owner's graveyard, not regenerated" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "and the shield was never spent on a destruction that did not happen" (length (GameState.replacements after)) 1
   Spec.it s "CR 614.1a a move whose destination the pattern misses is untouched" $ do
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (piker, g1) = S.addCreature pikerPrinting S.bob g0
         -- Rest in Peace watches graveyard-bound moves only; a bounce to hand
@@ -757,9 +757,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "in bob's hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 1
     Spec.assertEqWith s "nothing was exiled" (Set.size (GameState.exile after)) 0
   Spec.it s "CR 615.10 Fog prevents both attackers' damage in one batch" $ do
-    forest <- Registry.printing registry "Forest"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
-    fog <- Registry.printing registry "Fog"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    fog <- S.printingOf s registry "Fog"
     let base = S.landsInPlay forest 1
         (victimA, g1) = S.addCreature pikerPrinting S.bob base
         (victimB, g2) = S.addCreature pikerPrinting S.bob g1
@@ -778,8 +778,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "and so was the second's, independently" (S.damageOf victimB after) (Just 0)
     Spec.assertEqWith s "no damage event was recorded at all" (S.damageEventsOf after) []
   Spec.it s "CR 701.19a Uses=Once: the first destruction is replaced, the second is not" $ do
-    swamp <- Registry.printing registry "Swamp"
-    drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+    swamp <- S.printingOf s registry "Swamp"
+    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
     let base = S.landsInPlay swamp 1
         (skel, g1) = S.addCreature drudgeSkeletons S.alice base
         -- Activate {B}: regenerate this creature, and resolve it.
@@ -802,8 +802,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- being cast; rather, they cause regeneration shields to not be applied."
   -- So the shield still exists -- it simply does not fire.
   Spec.it s "CR 701.19c a shield does not save a creature from a destruction that forbids regeneration" $ do
-    swamp <- Registry.printing registry "Swamp"
-    drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+    swamp <- S.printingOf s registry "Swamp"
+    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
     let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
         shielded = S.addRegenShield skel g1
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.CantBeRegenerated [skel])
@@ -816,8 +816,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- fails if the gate is ignored, and equally if it is applied to every
   -- destruction.
   Spec.it s "CR 701.19a the same shield DOES save it from an ordinary destruction" $ do
-    swamp <- Registry.printing registry "Swamp"
-    drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+    swamp <- S.printingOf s registry "Swamp"
+    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
     let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
         shielded = S.addRegenShield skel g1
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [skel])
@@ -827,10 +827,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- resolved. Uthden Troll rather than Drudge Skeletons because Terror
   -- cannot target a black creature -- the Troll is red.
   Spec.it s "CR 701.19c whole cards: Terror kills an Uthden Troll that just regenerated" $ do
-    mountain <- Registry.printing registry "Mountain"
-    swamp <- Registry.printing registry "Swamp"
-    uthdenTroll <- Registry.printing registry "Uthden Troll"
-    terror <- Registry.printing registry "Terror"
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    uthdenTroll <- S.printingOf s registry "Uthden Troll"
+    terror <- S.printingOf s registry "Terror"
     let base = foldl (\gs p -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
         (troll, g1) = S.addCreature uthdenTroll S.alice base
         -- {R}: Regenerate this creature -- the shield is really activated.
@@ -844,8 +844,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- destroyed by the CR 704.5g state-based action instead, which carries no
   -- such clause. Regeneration is exactly what it is for.
   Spec.it s "CR 701.19a an Uthden Troll's shield still saves it from lethal damage" $ do
-    mountain <- Registry.printing registry "Mountain"
-    uthdenTroll <- Registry.printing registry "Uthden Troll"
+    mountain <- S.printingOf s registry "Mountain"
+    uthdenTroll <- S.printingOf s registry "Uthden Troll"
     let base = S.landsInPlay mountain 1
         (troll, g1) = S.addCreature uthdenTroll S.alice base
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
@@ -854,9 +854,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         settled = S.settleSba hurt
     Spec.assertBool s (Set.member troll (GameState.battlefield settled)) "the shield saved it"
   Spec.it s "CR 614.8 regeneration replaces the destruction, so Rest in Peace never sees it" $ do
-    swamp <- Registry.printing registry "Swamp"
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+    swamp <- S.printingOf s registry "Swamp"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
     let base = S.landsInPlay swamp 1
         (_, g1) = S.addCreature restInPeace S.bob base
         (skel, g2) = S.addCreature drudgeSkeletons S.alice g1
@@ -866,7 +866,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "nothing was exiled -- the put-into-graveyard never happened" (Set.size (GameState.exile after)) 0
     Spec.assertEqWith s "and nothing reached a graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
   Spec.it s "CR 614.7 an event that never happens does not consume a shield" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let base = Setup.emptyGame S.bothPlayers
         (myr, g1) = S.addCreature darksteelMyr S.alice base
         shielded = S.addRegenShield myr g1
@@ -874,11 +874,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertBool s (Set.member myr (GameState.battlefield after)) "the indestructible creature survives"
     Spec.assertEqWith s "the shield is intact" (length (GameState.replacements after)) 1
   Spec.it s "CR 616.1 Scales first, then Corpsejack: 1 -> 2 -> 4" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    hardenedScales <- Registry.printing registry "Hardened Scales"
-    corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    hardenedScales <- S.printingOf s registry "Hardened Scales"
+    corpsejackMenace <- S.printingOf s registry "Corpsejack Menace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [hardenedScales, corpsejackMenace, pikerPrinting] []
     case mine of
       scales : _ : piker : _ ->
@@ -886,11 +886,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
          in Spec.assertEqWith s "(1 + 1) * 2" (countersOn CounterKind.PlusOnePlusOne piker after) 4
       _ -> Spec.assertFailure s "fixture did not build three permanents"
   Spec.it s "CR 616.1 Corpsejack first, then Scales: 1 -> 2 -> 3 (same input, different board)" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    hardenedScales <- Registry.printing registry "Hardened Scales"
-    corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    hardenedScales <- S.printingOf s registry "Hardened Scales"
+    corpsejackMenace <- S.printingOf s registry "Corpsejack Menace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [hardenedScales, corpsejackMenace, pikerPrinting] []
     case mine of
       _ : corpsejack : piker : _ ->
@@ -905,12 +905,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- is still a creature (CR 305.7 removes no card types), so it is still a
   -- legal target for "target creature".
   Spec.it s "CR 305.7 an Ashaya-animated, Blood Moon'd Corpsejack Menace doubles nothing" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
-    ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
-    bloodMoon <- Registry.printing registry "Blood Moon"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    corpsejackMenace <- S.printingOf s registry "Corpsejack Menace"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [corpsejackMenace, ashaya, bloodMoon, pikerPrinting] []
     case mine of
       corpsejack : _ : _ : piker : _ ->
@@ -918,11 +918,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
          in Spec.assertEqWith s "one counter, not two" (countersOn CounterKind.PlusOnePlusOne piker after) 1
       _ -> Spec.assertFailure s "fixture did not build four permanents"
   Spec.it s "CR 616.1 the engine ASKS -- it does not proceed on list order" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    hardenedScales <- Registry.printing registry "Hardened Scales"
-    corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    hardenedScales <- S.printingOf s registry "Hardened Scales"
+    corpsejackMenace <- S.printingOf s registry "Corpsejack Menace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [hardenedScales, corpsejackMenace, pikerPrinting] []
     case mine of
       scales : _ : piker : _ ->
@@ -930,10 +930,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
          in Spec.assertBool s (wasAskedToReplace asked) "a ChooseReplacement was raised"
       _ -> Spec.assertFailure s "fixture did not build three permanents"
   Spec.it s "CR 616.1 one Hardened Scales alone is not asked about (nothing to choose)" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    hardenedScales <- Registry.printing registry "Hardened Scales"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    hardenedScales <- S.printingOf s registry "Hardened Scales"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [hardenedScales, pikerPrinting] []
     case mine of
       scales : piker : _ ->
@@ -944,10 +944,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
       _ -> Spec.assertFailure s "fixture did not build two permanents"
   Spec.it s "CR 614.5 two Hardened Scales are two instances: 1 -> 2 -> 3, unprompted" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    hardenedScales <- Registry.printing registry "Hardened Scales"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    hardenedScales <- S.printingOf s registry "Hardened Scales"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [hardenedScales, hardenedScales, pikerPrinting] []
     case mine of
       scales : _ : piker : _ ->
@@ -958,10 +958,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               Spec.assertBool s (not (wasAskedToReplace asked)) "value-equal candidates elide the prompt"
       _ -> Spec.assertFailure s "fixture did not build three permanents"
   Spec.it s "CR 614.1 Hardened Scales ignores a -1/-1 counter (whichKind)" $ do
-    swamp <- Registry.printing registry "Swamp"
-    hardenedScales <- Registry.printing registry "Hardened Scales"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
-    instillInfection <- Registry.printing registry "Instill Infection"
+    swamp <- S.printingOf s registry "Swamp"
+    hardenedScales <- S.printingOf s registry "Hardened Scales"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    instillInfection <- S.printingOf s registry "Instill Infection"
     let base = S.landsInPlay swamp 4
         (scales, g1) = S.addCreature hardenedScales S.alice base
         (piker, g2) = S.addCreature pikerPrinting S.alice g1
@@ -969,10 +969,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         after = castAndResolve (raceAnswer scales piker) g3 spellId
     Spec.assertEqWith s "one -1/-1 counter, unscaled" (countersOn CounterKind.MinusOneMinusOne piker after) 1
   Spec.it s "CR 109.5 Corpsejack Menace does not double an opponent's counters" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    corpsejackMenace <- S.printingOf s registry "Corpsejack Menace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, theirs) = counterBoard forest battlegrowth [corpsejackMenace] [pikerPrinting]
     case (mine, theirs) of
       (corpsejack : _, piker : _) ->
@@ -980,9 +980,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
          in Spec.assertEqWith s "not doubled -- ControllerRelation is Yours" (countersOn CounterKind.PlusOnePlusOne piker after) 1
       _ -> Spec.assertFailure s "fixture did not build both sides"
   Spec.it s "CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f)" $ do
-    island <- Registry.printing registry "Island"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
-    clone <- Registry.printing registry "Clone"
+    island <- S.printingOf s registry "Island"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
     let base = S.landsInPlay island 4
         (_, withPiker) = S.addCreature pikerPrinting S.alice base
         (gs, cloneId) = S.handOne clone withPiker
@@ -991,9 +991,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
     Spec.assertEqWith s "the 0/0 Clone is gone" named []
   Spec.it s "CR 614.12a the copy choice is locked in BEFORE the enters event exists" $ do
-    island <- Registry.printing registry "Island"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
-    clonePrinting <- Registry.printing registry "Clone"
+    island <- S.printingOf s registry "Island"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    clonePrinting <- S.printingOf s registry "Clone"
     let base = S.landsInPlay island 4
         (piker, withPiker) = S.addCreature pikerPrinting S.alice base
         (gs, cloneId) = S.handOne clonePrinting withPiker
@@ -1004,8 +1004,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
       [] -> Spec.assertFailure s "Clone did not reach the battlefield"
       clone : _ -> Spec.assertEqWith s "already a 2/1, with no settle run" (Projection.powerOf clone resolved) (Just 2)
   Spec.it s "CR 208.2b Primal Plasma enters as the 2/2 with flying its controller picked" $ do
-    island <- Registry.printing registry "Island"
-    primalPlasma <- Registry.printing registry "Primal Plasma"
+    island <- S.printingOf s registry "Island"
+    primalPlasma <- S.printingOf s registry "Primal Plasma"
     let (gs, held) = blueBoard island 4 [primalPlasma]
     case held of
       plasmaCard : _ ->
@@ -1022,9 +1022,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     -- determined by its enters-the-battlefield replacement effect, but its
     -- power and toughness are determined by the copy's own
     -- enters-the-battlefield replacement effect."
-    island <- Registry.printing registry "Island"
-    primalPlasma <- Registry.printing registry "Primal Plasma"
-    clonePrinting <- Registry.printing registry "Clone"
+    island <- S.printingOf s registry "Island"
+    primalPlasma <- S.printingOf s registry "Primal Plasma"
+    clonePrinting <- S.printingOf s registry "Clone"
     let (gs, held) = blueBoard island 8 [primalPlasma, clonePrinting]
     case held of
       plasmaCard : cloneCard : _ ->
@@ -1039,9 +1039,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
                 Spec.assertBool s (Projection.hasKeyword Keyword.Defender clone after) "defender came from the CHOICE"
       _ -> Spec.assertFailure s "fixture did not deal two cards"
   Spec.it s "CR 616.2 the same Clone picking 3/3 is a 3/3 with flying" $ do
-    island <- Registry.printing registry "Island"
-    primalPlasma <- Registry.printing registry "Primal Plasma"
-    clonePrinting <- Registry.printing registry "Clone"
+    island <- S.printingOf s registry "Island"
+    primalPlasma <- S.printingOf s registry "Primal Plasma"
+    clonePrinting <- S.printingOf s registry "Clone"
     let (gs, held) = blueBoard island 8 [primalPlasma, clonePrinting]
     case held of
       plasmaCard : cloneCard : _ ->
@@ -1056,9 +1056,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
                 Spec.assertBool s (not (Projection.hasKeyword Keyword.Defender clone after)) "no defender"
       _ -> Spec.assertFailure s "fixture did not deal two cards"
   Spec.it s "CR 707.2 a Clone of that Clone copies 1/6-flying-defender and then chooses again" $ do
-    island <- Registry.printing registry "Island"
-    primalPlasma <- Registry.printing registry "Primal Plasma"
-    clonePrinting <- Registry.printing registry "Clone"
+    island <- S.printingOf s registry "Island"
+    primalPlasma <- S.printingOf s registry "Primal Plasma"
+    clonePrinting <- S.printingOf s registry "Clone"
     let (gs, held) = blueBoard island 12 [primalPlasma, clonePrinting, clonePrinting]
     case held of
       plasmaCard : cloneA : cloneB : _ ->
@@ -1087,7 +1087,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     -- Leyline of the Void's shape without the Leyline: a floating redirect
     -- whose source alice controls. Bob's card is exiled on the way to his
     -- graveyard; alice's own reaches hers untouched.
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (src, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
         (mine, g2) = S.addCreature pikerPrinting S.alice g1
         (theirs, g3) = S.addCreature pikerPrinting S.bob g2
@@ -1100,7 +1100,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     -- A card alice OWNS but bob CONTROLS still dies to alice's graveyard
     -- (CR 400.3), so alice's own redirect must not exile it. A
     -- controller-based test would, which is the case this pins.
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let slot = SlotName.MkSlotName (Text.pack "target")
         (src, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
         (oid, g2) = S.addCreature pikerPrinting S.alice g1
@@ -1113,7 +1113,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "it reaches its OWNER's graveyard, unexiled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
   Spec.it s "CR 208.2b a single-option ChoiceOf is not a choice and must not prompt" $ do
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (piker, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
         (ts, g2) = Game.freshTimestamp g1
         onlyOption = EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}
@@ -1131,18 +1131,18 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertBool s (not (wasAskedForEntryOption asked)) "no ChooseEntryOption was raised"
     Spec.assertEqWith s "the sole option applied anyway" (Projection.powerOf piker after) (Just 3)
   Spec.it s "CR 614.16 Doubling Season turns Dragon Fodder's two Goblins into four" $ do
-    mountain <- Registry.printing registry "Mountain"
-    doublingSeason <- Registry.printing registry "Doubling Season"
-    dragonFodder <- Registry.printing registry "Dragon Fodder"
+    mountain <- S.printingOf s registry "Mountain"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let base = S.landsInPlay mountain 2
         (_, g1) = S.addCreature doublingSeason S.alice base
         (g2, spellId) = S.handOne dragonFodder g1
         after = castAndResolve S.identityAnswer g2 spellId
     Spec.assertEqWith s "twice that many" (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after) 4
   Spec.it s "CR 614.5 two Doubling Seasons are two instances: eight Goblins" $ do
-    mountain <- Registry.printing registry "Mountain"
-    doublingSeason <- Registry.printing registry "Doubling Season"
-    dragonFodder <- Registry.printing registry "Dragon Fodder"
+    mountain <- S.printingOf s registry "Mountain"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let base = S.landsInPlay mountain 2
         (_, g1) = S.addCreature doublingSeason S.alice base
         (_, g2) = S.addCreature doublingSeason S.alice g1
@@ -1150,10 +1150,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         after = castAndResolve S.identityAnswer g3 spellId
     Spec.assertEqWith s "2 -> 4 -> 8" (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after) 8
   Spec.it s "CR 614.1 Doubling Season's OTHER clause doubles counters, not tokens" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    doublingSeason <- Registry.printing registry "Doubling Season"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [doublingSeason, pikerPrinting] []
     case mine of
       season : piker : _ ->
@@ -1161,11 +1161,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
          in Spec.assertEqWith s "1 * 2" (countersOn CounterKind.PlusOnePlusOne piker after) 2
       _ -> Spec.assertFailure s "fixture did not build two permanents"
   Spec.it s "CR 616.1 Doubling Season racing Hardened Scales: 4 or 3, by the prompt" $ do
-    forest <- Registry.printing registry "Forest"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    doublingSeason <- Registry.printing registry "Doubling Season"
-    hardenedScales <- Registry.printing registry "Hardened Scales"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    hardenedScales <- S.printingOf s registry "Hardened Scales"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [doublingSeason, hardenedScales, pikerPrinting] []
     case mine of
       season : scales : piker : _ ->
@@ -1180,15 +1180,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- put into the graveyard; collapsing it to a predicate is what made a
   -- redirecting DestructionRewrite silently unimplementable.
   Spec.it s "CR 701.8 an unreplaced destruction settles on the object itself" $ do
-    swamp <- Registry.printing registry "Swamp"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
         (piker, g1) = S.addCreature pikerPrinting S.alice base
         (settled, _) = S.runPureWith S.identityAnswer g1 (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)
     Spec.assertEqWith s "the object it was asked about" settled (Just piker)
   Spec.it s "CR 701.19a a regenerated destruction settles on nothing" $ do
-    swamp <- Registry.printing registry "Swamp"
-    pikerPrinting <- Registry.printing registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
         (piker, g1) = S.addCreature pikerPrinting S.alice base
         (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)

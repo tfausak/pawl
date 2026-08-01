@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
+import qualified Control.Exception as Exception
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -17,6 +18,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
@@ -231,12 +233,22 @@ fighting deck n =
 
 -- The redDeck recipe (name -> count), loaded from the registry -- the proof
 -- that files -> parse -> a real game works end-to-end.
-loadRedDeck :: Registry.Registry -> IO Deck.Deck
+-- The benchmark is at IO and has no spec record, so an unloadable card is an
+-- exception -- the same posture Pawl.Support.orThrow takes for the property
+-- tests.
+fetchOrThrow :: Registry.Registry IO -> String -> IO Printing.Printing
+fetchOrThrow registry name = do
+  result <- Registry.named registry name
+  case result of
+    Left err -> Exception.throwIO (userError (show err))
+    Right card -> pure (Printing.MkPrinting card)
+
+loadRedDeck :: Registry.Registry IO -> IO Deck.Deck
 loadRedDeck registry = do
-  mountain <- Registry.printing registry "Mountain"
-  piker <- Registry.printing registry "Goblin Piker"
-  maiden <- Registry.printing registry "Bird Maiden"
-  bolt <- Registry.printing registry "Lightning Bolt"
+  mountain <- fetchOrThrow registry "Mountain"
+  piker <- fetchOrThrow registry "Goblin Piker"
+  maiden <- fetchOrThrow registry "Bird Maiden"
+  bolt <- fetchOrThrow registry "Lightning Bolt"
   pure (Deck.MkDeck (Map.fromList [(mountain, 36), (piker, 12), (maiden, 8), (bolt, 4)]))
 
 -- A deck that reliably attaches several Auras to a populated battlefield, so
@@ -270,11 +282,11 @@ loadRedDeck registry = do
 -- damage cycle on essentially every one of those 108 turns -- nothing ever
 -- dies, so combat never tapers off the way it does against the red mirror's
 -- 1/2 Bird Maidens, which gang-block and kill the lead attacker.
-loadControlDeck :: Registry.Registry -> IO Deck.Deck
+loadControlDeck :: Registry.Registry IO -> IO Deck.Deck
 loadControlDeck registry = do
-  island <- Registry.printing registry "Island"
-  myr <- Registry.printing registry "Darksteel Myr"
-  control <- Registry.printing registry "Control Magic"
+  island <- fetchOrThrow registry "Island"
+  myr <- fetchOrThrow registry "Darksteel Myr"
+  control <- fetchOrThrow registry "Control Magic"
   pure (Deck.MkDeck (Map.fromList [(island, 53), (myr, 4), (control, 3)]))
 
 -- loadControlDeck's PAIRED CONTROL: the same 60 cards and the same 4 Darksteel
@@ -300,16 +312,16 @@ loadControlDeck registry = do
 -- same way: 4 and 4 at the end here, 5 and 3 there, because each Control Magic
 -- that resolves steals one. That drift is the Aura's own doing and is part of
 -- what the pair measures, not a flaw in the control.
-loadNoAuraDeck :: Registry.Registry -> IO Deck.Deck
+loadNoAuraDeck :: Registry.Registry IO -> IO Deck.Deck
 loadNoAuraDeck registry = do
-  island <- Registry.printing registry "Island"
-  myr <- Registry.printing registry "Darksteel Myr"
+  island <- fetchOrThrow registry "Island"
+  myr <- fetchOrThrow registry "Darksteel Myr"
   pure (Deck.MkDeck (Map.fromList [(island, 56), (myr, 4)]))
 
 main :: IO ()
 main = do
   root <- Registry.defaultRoot
-  registry <- Registry.new root
+  registry <- Registry.fileRegistry root
   deck <- loadRedDeck registry
   controlDeck <- loadControlDeck registry
   noAuraDeck <- loadNoAuraDeck registry

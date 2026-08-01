@@ -146,7 +146,7 @@ castWave tidalWave island =
    in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid)))
 
 -- CR 608.2i: the log records; it is never emptied by a reader.
-logSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+logSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 logSpec s registry =
   Spec.describe s "EventLog" $ do
     -- CR 400.7 / 603.2g: a zone change appends a Moved event carrying the
@@ -158,7 +158,7 @@ logSpec s registry =
     -- LEFT. Re-deriving from the printed card would be wrong for an animated
     -- land and impossible for a token (CR 111.1).
     Spec.it s "CR 608.2h a Moved event snapshots the object it moved" $ do
-      pikerPrinting <- Registry.printing registry "Goblin Piker"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
       let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           expected = Projection.project piker gs
           after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
@@ -168,16 +168,16 @@ logSpec s registry =
     -- CR 704.5h's window is "since the last SBA check": the check CONSUMES by
     -- bumping a watermark, and the record survives.
     Spec.it s "CR 704 the SBA check advances the damage watermark but keeps the record" $ do
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
-      ogreSentry <- Registry.printing registry "Ogre Sentry"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
+      ogreSentry <- S.printingOf s registry "Ogre Sentry"
       let (gs, _, _) = S.combatBoardOf [typhoidRats] [ogreSentry]
           fought = S.fightWith S.aggressiveAnswer gs
           after = S.settleSba fought
       Spec.assertEqWith s "nothing left unscanned for damage" (Event.unscannedDamage after) []
       Spec.assertBool s (not (null (S.damageEventsOf after))) "the damage events are still recorded"
     Spec.it s "CR 117.5 the trigger scan advances its watermark but keeps the record" $ do
-      restInPeace <- Registry.printing registry "Rest in Peace"
-      piker <- Registry.printing registry "Goblin Piker"
+      restInPeace <- S.printingOf s registry "Rest in Peace"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, gs) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           (pikerId, gs1) = S.addCreature piker S.bob gs
           moved = S.runPure S.identityAnswer gs1 (Event.changeZone pikerId Zone.Hand)
@@ -187,7 +187,7 @@ logSpec s registry =
     -- The turn is the log's scope (CR 608.2i). Clearing at cleanup would be
     -- wrong: cleanup is still part of THIS turn.
     Spec.it s "the log and both watermarks are cleared at turn handoff" $ do
-      pikerPrinting <- Registry.printing registry "Goblin Piker"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
       let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           moved = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
           after = snd (Engine.runGamePure S.identityAnswer moved Engine.handoffTurn)
@@ -197,7 +197,7 @@ logSpec s registry =
     -- CR 514.3 (partial): an event emitted by the cleanup step must be scanned
     -- BEFORE handoffTurn clears the log, or its trigger is lost outright.
     Spec.it s "advance settles before handing off, so no unscanned event is discarded" $ do
-      restInPeace <- Registry.printing registry "Rest in Peace"
+      restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
@@ -212,7 +212,7 @@ logSpec s registry =
       Spec.assertEqWith s "the log was cleared afterwards" (GameState.events after) Seq.empty
 
 -- CR 603.2b / 603.6a: a step begins, and EVERY permanent is checked.
-scanSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+scanSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 scanSpec s registry =
   Spec.describe s "Scan" $ do
     Spec.it s "CR 603.2b running a step records that it began, on the active player's turn" $ do
@@ -239,15 +239,15 @@ scanSpec s registry =
     -- so SelfEnters must ask whether the event is about THIS permanent. Rest in
     -- Peace is on the battlefield and a DIFFERENT object entered.
     Spec.it s "CR 603.6a a SelfEnters trigger does not fire on another object's entry" $ do
-      restInPeace <- Registry.printing registry "Rest in Peace"
-      piker <- Registry.printing registry "Goblin Piker"
+      restInPeace <- S.printingOf s registry "Rest in Peace"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           (pikerId, gs1) = S.addCreature piker S.bob gs0
           entered = ZoneChange.MkZoneChange pikerId pikerId Zone.Stack Zone.Battlefield
           gs2 = S.withEvents [GameEvent.Moved entered (Projection.project pikerId gs1)] gs1
       Spec.assertEqWith s "no trigger" (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))) 0
     Spec.it s "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
-      restInPeace <- Registry.printing registry "Rest in Peace"
+      restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
@@ -257,7 +257,7 @@ scanSpec s registry =
           Spec.assertEqWith s "controller is alice" (PendingTrigger.controller pt) S.alice
         other -> Spec.assertFailure s ("expected exactly one pending trigger, got " <> show (length other))
     Spec.it s "a graveyard-bound event yields no enters trigger" $ do
-      restInPeace <- Registry.printing registry "Rest in Peace"
+      restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           toGrave = ZoneChange.MkZoneChange ripId ripId Zone.Battlefield Zone.Graveyard
           gs1 = S.withEvents [GameEvent.Moved toGrave (Projection.project ripId gs0)] gs0
@@ -294,7 +294,7 @@ scanSpec s registry =
     -- were assigned; the resulting PendingTrigger.source list must follow
     -- that same ascending order.
     Spec.it s "CR 603.6a two SelfEnters triggers emit in ascending ObjectId order" $ do
-      restInPeace <- Registry.printing registry "Rest in Peace"
+      restInPeace <- S.printingOf s registry "Rest in Peace"
       let (rip1, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           (rip2, gs1) = S.addCreature restInPeace S.alice gs0
           entered1 = ZoneChange.MkZoneChange rip1 rip1 Zone.Stack Zone.Battlefield
@@ -318,7 +318,7 @@ scanSpec s registry =
     -- battlefield, one end-step event -- the PendingTrigger.source list must
     -- come out in ascending ObjectId order.
     Spec.it s "CR 603.2b two StepBegins triggers from one event emit in ascending ObjectId order" $ do
-      khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+      khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (ghoul1, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           (ghoul2, gs1) = S.addCreature khabalGhoul S.alice gs0
           event = GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
@@ -337,10 +337,10 @@ scanSpec s registry =
     -- bob holds TWO cards, so "discarded once" is distinguishable from
     -- "discarded twice"; the companion test below is the no-double-fire half.
     Spec.it s "CR 603.10 whole cards: under Night of Souls' Betrayal, Ravenous Rats dies as it enters and STILL makes bob discard" $ do
-      swamp <- Registry.printing registry "Swamp"
-      piker <- Registry.printing registry "Goblin Piker"
-      ravenousRats <- Registry.printing registry "Ravenous Rats"
-      night <- Registry.printing registry "Night of Souls' Betrayal"
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      ravenousRats <- S.printingOf s registry "Ravenous Rats"
+      night <- S.printingOf s registry "Night of Souls' Betrayal"
       let (_, base1) = S.addCreature night S.alice (S.landsInPlay swamp 2)
           (_, base2) = S.addHandCard piker S.bob base1
           (_, base3) = S.addHandCard piker S.bob base2
@@ -356,9 +356,9 @@ scanSpec s registry =
     -- entry event -- the two candidate sources the scan draws from. A count,
     -- not a boolean: a Rats counted twice discards two of bob's two cards.
     Spec.it s "CR 603.6a whole cards: a Ravenous Rats that survives its entry triggers exactly once" $ do
-      swamp <- Registry.printing registry "Swamp"
-      piker <- Registry.printing registry "Goblin Piker"
-      ravenousRats <- Registry.printing registry "Ravenous Rats"
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      ravenousRats <- S.printingOf s registry "Ravenous Rats"
       let (_, base1) = S.addHandCard piker S.bob (S.landsInPlay swamp 2)
           (_, base2) = S.addHandCard piker S.bob base1
           (gs, spellId) = S.handOne ravenousRats base2
@@ -370,11 +370,11 @@ scanSpec s registry =
       Spec.assertEqWith s "bob discarded exactly one" (S.handSize S.bob settled) (bobBefore - 1)
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
-sacrificeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+sacrificeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sacrificeSpec s registry =
   Spec.describe s "Sacrifice" $ do
     Spec.it s "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $ do
-      pikerPrinting <- Registry.printing registry "Goblin Piker"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
       let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
       Spec.assertEqWith s "off the battlefield" (S.creaturesInPlay S.bob after) 0
@@ -385,7 +385,7 @@ sacrificeSpec s registry =
     -- and alice controls (S.giveControl installs the layer-2 SetController
     -- effect), so the result must land in bob's graveyard, not alice's.
     Spec.it s "CR 701.21a a sacrifice lands in the OWNER's graveyard even when a different player controls it" $ do
-      pikerPrinting <- Registry.printing registry "Goblin Piker"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
       let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           gs = S.giveControl piker S.alice gs0
           -- ALICE is the sacrificing player, because she controls it (CR
@@ -398,19 +398,19 @@ sacrificeSpec s registry =
     -- CR 701.21a: "sacrificing a permanent doesn't destroy it", so neither CR
     -- 702.12b's indestructible gate nor CR 701.19a's shield applies.
     Spec.it s "CR 701.21a an indestructible permanent can still be sacrificed" $ do
-      darksteelMyr <- Registry.printing registry "Darksteel Myr"
+      darksteelMyr <- S.printingOf s registry "Darksteel Myr"
       let (myr, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob myr)
       Spec.assertEqWith s "gone from the battlefield" (S.creaturesInPlay S.bob after) 0
     Spec.it s "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $ do
-      pikerPrinting <- Registry.printing registry "Goblin Piker"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
       let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           gs = S.addRegenShield piker gs0
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
       Spec.assertEqWith s "still sacrificed" (S.creaturesInPlay S.bob after) 0
       Spec.assertEqWith s "the shield's source is untouched" (fmap ActiveReplacement.source (GameState.replacements after)) [piker]
     Spec.it s "only a battlefield permanent can be sacrificed (CR 701.21a)" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (card, gs) = S.addLibraryCard piker S.bob (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob card)
       Spec.assertEqWith s "the library card is untouched" after gs
@@ -418,7 +418,7 @@ sacrificeSpec s registry =
     -- can't sacrifice ... a permanent they don't control." Bob controls it;
     -- alice asking is refused outright rather than quietly honoured.
     Spec.it s "CR 701.21a a player cannot sacrifice a permanent they do not control" $ do
-      pikerPrinting <- Registry.printing registry "Goblin Piker"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
       let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           byAlice = S.runPure S.identityAnswer gs (Event.sacrifice S.alice piker)
           byBob = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
@@ -428,7 +428,7 @@ sacrificeSpec s registry =
       Spec.assertEqWith s "bob's own sacrifice goes through" (S.creaturesInPlay S.bob byBob) 0
     -- CR 113.7: "this creature" is a slot read, filled at placement.
     Spec.it s "CR 113.7 a placed trigger binds its source into the reserved self slot" $ do
-      restInPeace <- Registry.printing registry "Rest in Peace"
+      restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
@@ -441,7 +441,7 @@ sacrificeSpec s registry =
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
 -- shape ("a player controlling no permanents of a particular card type"), chosen
 -- by the rulebook to illustrate the rule.
-stateTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+stateTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stateTriggerSpec s registry =
   let triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
       isTriggerObject gs oid = case Game.lookupObject oid gs of
@@ -468,26 +468,26 @@ stateTriggerSpec s registry =
         -- ability (a bug that would wrongly suppress a second source, not
         -- flood -- so it fails this same 0/1 shape rather than hanging).
         Spec.it s "CR 603.8 a true state condition puts EXACTLY ONE instance on the stack" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-          swamp <- Registry.printing registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
           let (_, gs) = outcastBoard barbarianOutcast swamp 0
               settled = settle gs
           Spec.assertEqWith s "one trigger, not one per boundary" (length (triggerIds settled)) 1
         Spec.it s "CR 603.8 re-settling while the instance is on the stack adds no second copy" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-          swamp <- Registry.printing registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
           let (_, gs) = outcastBoard barbarianOutcast swamp 0
               twice = settle (settle gs)
           Spec.assertEqWith s "still exactly one" (length (triggerIds twice)) 1
         Spec.it s "CR 603.8 the condition being FALSE means no trigger at all" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-          swamp <- Registry.printing registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
           let (_, gs) = outcastBoard barbarianOutcast swamp 1
               settled = settle gs
           Spec.assertEqWith s "no trigger while a Swamp is out" (length (triggerIds settled)) 0
         Spec.it s "CR 603.8 losing the last Swamp makes the condition true and fires it" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-          swamp <- Registry.printing registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
           let (_, gs) = outcastBoard barbarianOutcast swamp 1
               quiet = settle gs
               swampOid = case Game.zoneMembers Zone.Battlefield S.alice quiet of
@@ -500,8 +500,8 @@ stateTriggerSpec s registry =
         -- been countered, or has otherwise left the stack" -- all three are
         -- "no longer on the stack", which is why armedness is derived.
         Spec.it s "CR 603.8 an instance leaving the stack re-arms the trigger" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-          swamp <- Registry.printing registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
           let (_, gs) = outcastBoard barbarianOutcast swamp 0
               settled = settle gs
               removed = case triggerIds settled of
@@ -522,8 +522,8 @@ stateTriggerSpec s registry =
         -- under an ability-only comparison it is (wrongly) suppressed by the
         -- first's presence on the stack.
         Spec.it s "CR 603.8 a second identical source still triggers -- suppression is per-source, not per-ability" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-          swamp <- Registry.printing registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
           let (_, gs0) = outcastBoard barbarianOutcast swamp 0
               settledFirst = settle gs0
               (_, gs1) = S.addCreature barbarianOutcast S.alice settledFirst
@@ -535,8 +535,8 @@ stateTriggerSpec s registry =
         -- adding an AddLandSubtype Swamp modification (the Urborg shape) to
         -- that same Mountain must turn the trigger off.
         Spec.it s "CR 613 layer 4: an added Swamp subtype (no real Swamp card) suppresses the trigger" $ do
-          mountain <- Registry.printing registry "Mountain"
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+          mountain <- S.printingOf s registry "Mountain"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
           let gs0 = S.landsInPlay mountain 1
               mountainId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
                 i : _ -> i
@@ -553,8 +553,8 @@ stateTriggerSpec s registry =
         -- layer-2 SetController effect, S.giveControl) must turn it off even
         -- though bob still OWNS that Swamp.
         Spec.it s "CR 110.2/613 layer 2: gaining control of the opponent's Swamp suppresses the trigger" $ do
-          swamp <- Registry.printing registry "Swamp"
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
           let gs0 = Setup.emptyGame S.bothPlayers
               (swampId, gs1) = S.addCreature swamp S.bob gs0
               (_, gs2) = S.addCreature barbarianOutcast S.alice gs1
@@ -566,8 +566,8 @@ stateTriggerSpec s registry =
         -- The whole card, at gameplay level: the trigger resolves and the
         -- Outcast sacrifices itself (CR 701.21a, through Event.sacrifice).
         Spec.it s "CR 701.21 the resolved trigger sacrifices the Outcast into its owner's graveyard" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
-          swamp <- Registry.printing registry "Swamp"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+          swamp <- S.printingOf s registry "Swamp"
           let (outcast, gs) = outcastBoard barbarianOutcast swamp 0
               settled = settle gs
               resolved = snd (Engine.runGamePure S.identityAnswer settled Stack.resolveTop)
@@ -579,7 +579,7 @@ stateTriggerSpec s registry =
 -- Scryfall's only ruling on the card is the design in one sentence: the count
 -- "includes creature tokens ... as well as creatures put into a graveyard before
 -- Khabál Ghoul entered the battlefield."
-historySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+historySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 historySpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs =
@@ -591,8 +591,8 @@ historySpec s registry =
         -- The drained-queue falsifier: the deaths are SCANNED past before the end
         -- step's trigger ever exists, and must still be counted.
         Spec.it s "CR 608.2i deaths the trigger scan already passed are still counted" $ do
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               (p1, gs1) = S.addCreature piker S.bob gs0
               (p2, gs2) = S.addCreature piker S.bob gs1
@@ -605,16 +605,16 @@ historySpec s registry =
         -- that re-derived card types from print instead of from the event's
         -- snapshot would read zero here.
         Spec.it s "CR 111.1 a token creature that died counts, though it has no printed card" $ do
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               (tok, gs1) = S.addToken (Printing.card piker) S.bob gs0
               dead = S.settleSba (S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable [tok]))
               atEnd = resolveAll (settle (beginEndStep dead))
           Spec.assertEqWith s "the token is counted" (countersOn ghoul atEnd) 1
         Spec.it s "a creature that left the battlefield for HAND did not die (CR 700.4)" $ do
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               (p1, gs1) = S.addCreature piker S.bob gs0
               bounced = S.runPure S.identityAnswer gs1 (Event.changeZone p1 Zone.Hand)
@@ -630,8 +630,8 @@ historySpec s registry =
         -- a regression gate on the ruling, pinned ahead of that signature
         -- ever gaining one.
         Spec.it s "CR 608.2i a creature that died before the Ghoul entered is still counted" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           let (p1, gs0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
               dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [p1])
               (ghoul, gs1) = S.addCreature khabalGhoul S.alice (settle dead)
@@ -639,8 +639,8 @@ historySpec s registry =
           Spec.assertEqWith s "one +1/+1 counter" (countersOn ghoul atEnd) 1
         -- CR 608.2i: the history's scope is ONE turn.
         Spec.it s "the count resets at turn handoff, not at the trigger scan" $ do
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               (p1, gs1) = S.addCreature piker S.bob gs0
               dead = S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable [p1])
@@ -650,7 +650,7 @@ historySpec s registry =
         -- CR 603.2b: the step trigger belongs to a permanent with nothing to do
         -- with the event -- Task 2's widened scan, at gameplay level.
         Spec.it s "CR 603.2b the end step's beginning is what fires it" $ do
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           let (_, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               quiet = settle gs0
               fired = settle (beginEndStep quiet)
@@ -665,7 +665,7 @@ historySpec s registry =
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
 -- delayed ability -- "it" must survive the resolution that armed it.
-delayedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+delayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 delayedSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -707,8 +707,8 @@ delayedSpec s registry =
           []
    in Spec.describe s "DelayedTrigger" $ do
         Spec.it s "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let after = castWave tidalWave island
           case walls after of
             [wall] -> do
@@ -719,8 +719,8 @@ delayedSpec s registry =
             other -> Spec.assertFailure s ("expected exactly one Wall token, got " <> show (length other))
         -- CR 603.7b: "only once, the next time its trigger event occurs".
         Spec.it s "CR 603.7 the token is sacrificed at the beginning of the next end step" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let after = resolveAll (settle (beginEndStep (castWave tidalWave island)))
           Spec.assertEqWith s "no Wall left" (walls after) []
           Spec.assertEqWith s "the store is empty" (Seq.length (GameState.delayedTriggers after)) 0
@@ -729,8 +729,8 @@ delayedSpec s registry =
         -- it, so the mechanism is tested without inventing a card; Full
         -- Throttle is the card that actually prints one.
         Spec.it s "CR 603.7b a stated-duration delayed ability stays armed after firing" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let armed = castWave tidalWave island
               stated = withExpiry (Just Expiry.Type.AtCleanup) armed
               began = [GameEvent.StepBegan endStep S.alice]
@@ -740,8 +740,8 @@ delayedSpec s registry =
           Spec.assertEqWith s "and stayed armed" (Seq.length survivors) 1
           Spec.assertEqWith s "so the next end step fires it again" (length firedAgain) 1
         Spec.it s "CR 603.7b without a stated duration firing still spends it" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let armed = castWave tidalWave island
               (fired, survivors) = Event.delayedPending [GameEvent.StepBegan endStep S.alice] armed
           Spec.assertEqWith s "it fired" (length fired) 1
@@ -750,8 +750,8 @@ delayedSpec s registry =
         -- during the cleanup step -- which is what ends the stated duration,
         -- and the reason an armed entry cannot outlive the turn that made it.
         Spec.it s "CR 514.2 cleanup drops a stated-duration delayed ability" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let armed = castWave tidalWave island
               swept expiry = GameState.delayedTriggers (Expiry.dropAtCleanup (withExpiry expiry armed))
           Spec.assertEqWith s "an 'this turn' entry is gone" (Seq.length (swept (Just Expiry.Type.AtCleanup))) 0
@@ -760,16 +760,16 @@ delayedSpec s registry =
           -- on no duration at all must survive every sweep.
           Spec.assertEqWith s "and a one-shot entry stays" (Seq.length (swept Nothing)) 1
         Spec.it s "CR 603.7b a second end step does not re-fire it" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let once = resolveAll (settle (beginEndStep (castWave tidalWave island)))
               again = settle (beginEndStep once)
           Spec.assertEqWith s "nothing on the stack" (GameState.stack again) []
         -- CR 603.7a: a delayed ability does not trigger on an event that
         -- happened BEFORE it was created. Falls out of the watermark for free.
         Spec.it s "CR 603.7a armed during an end step, it waits for the NEXT one" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let (gs0, oid) = S.handOne tidalWave (S.landsInPlay island 3)
               inEndStep = settle (beginEndStep gs0)
               cast = resolveAll (snd (Engine.runGamePure S.identityAnswer inEndStep (Cast.castSpell S.alice oid)))
@@ -780,8 +780,8 @@ delayedSpec s registry =
         -- CR 603.7c: the ability still triggers and is still consumed even when
         -- the object it remembers is gone.
         Spec.it s "CR 603.7c with the token already gone the ability does nothing and is consumed" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let armed = castWave tidalWave island
               killed = case walls armed of
                 wall : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [wall]))
@@ -844,8 +844,8 @@ delayedSpec s registry =
         -- Three seats, because at two the departure ends the game before an end
         -- step can arrive.
         Spec.it s "CR 800.4d a departed player's delayed ability triggers, is consumed, and is not put on the stack" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let (_, l1) = S.addCreature island S.bob S.threePlayerGame
               (_, l2) = S.addCreature island S.bob l1
               (_, l3) = S.addCreature island S.bob l2
@@ -879,9 +879,9 @@ delayedSpec s registry =
         -- unfixed engine bound the first, so the wrong Wall would be the one
         -- that died and the surviving assertion would fail too.
         Spec.it s "CR 614.16/603.7c a doubled Create asks which minted token \"it\" names" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
-          doublingSeason <- Registry.printing registry "Doubling Season"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
+          doublingSeason <- S.printingOf s registry "Doubling Season"
           let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
               (gs, waveId) = S.handOne tidalWave base
               ((_, armed), asked) = castUnderChoice gs waveId
@@ -897,8 +897,8 @@ delayedSpec s registry =
         -- possible referent and there is nothing to ask. Where the rules leave
         -- nothing to ask, don't prompt.
         Spec.it s "CR 603.7c one minted token is no choice, so nothing is asked" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
           let (gs, waveId) = S.handOne tidalWave (S.landsInPlay island 3)
               ((_, armed), asked) = castUnderChoice gs waveId
               after = resolveAll (settle (beginEndStep armed))
@@ -911,9 +911,9 @@ delayedSpec s registry =
         -- ability would sacrifice neither Wall. The slot is bound either way,
         -- deterministically to the first token.
         Spec.it s "CR 603.7c an answer naming an unminted object falls back to the first token" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
-          doublingSeason <- Registry.printing registry "Doubling Season"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
+          doublingSeason <- S.printingOf s registry "Doubling Season"
           let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
               (gs, waveId) = S.handOne tidalWave base
               cast = S.runPure chooseUnmintedToken gs (Cast.castSpell S.alice waveId)
@@ -928,7 +928,7 @@ delayedSpec s registry =
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an
 -- order that changes the answer.
-orderingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+orderingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 orderingSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -966,9 +966,9 @@ orderingSpec s registry =
         _ -> pure (S.identityAnswer p)
    in Spec.describe s "TriggerOrdering" $ do
         Spec.it s "CR 603.3b two triggers under one controller ask for an order, exactly once" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           let (_, gs) = boardOf tidalWave khabalGhoul island
               (_, asked) = State.runState (Engine.runGame countingAnswer gs Engine.settleForPriority) 0
           Spec.assertEqWith s "asked once" asked 1
@@ -982,9 +982,9 @@ orderingSpec s registry =
         -- the sacrifice to resolve first, the OTHER (non-Ghoul) trigger is the one
         -- named -- not the Ghoul itself.
         Spec.it s "CR 608.2h sacrificing first makes the Ghoul count the token" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           let (ghoul, gs) = boardOf tidalWave khabalGhoul island
               after = snd (Engine.runGamePure (orderLast (otherThan ghoul gs)) gs Engine.priorityLoop)
           Spec.assertEqWith s "the token was counted" (countersOn ghoul after) 1
@@ -992,9 +992,9 @@ orderingSpec s registry =
         -- counted. Same board, same cards, opposite answer -- which is what makes
         -- the ordering a genuine choice rather than a formality.
         Spec.it s "CR 608.2h counting first means the token is still alive and is not counted" $ do
-          tidalWave <- Registry.printing registry "Tidal Wave"
-          island <- Registry.printing registry "Island"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           let (ghoul, gs) = boardOf tidalWave khabalGhoul island
               after = snd (Engine.runGamePure (orderLast (TriggerSource.OfObject ghoul)) gs Engine.priorityLoop)
           Spec.assertEqWith s "nothing counted" (countersOn ghoul after) 0
@@ -1021,7 +1021,7 @@ orderingSpec s registry =
         -- controllers with one trigger apiece -- fewer than two each, so no
         -- ordering prompt is asked and the test isolates the cross-controller walk.
         Spec.it s "CR 101.4/603.3b the active player's trigger is placed first (bottom of stack)" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
           let gs0 = Setup.emptyGame S.bothPlayers
               (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
               (_, gs2) = S.addCreature barbarianOutcast S.bob gs1
@@ -1049,7 +1049,7 @@ orderingSpec s registry =
         -- assertion on his Outcast below is what keeps this case honest about
         -- which rule did what.
         Spec.it s "CR 101.4/603.3b APNAP orders the two remaining players' triggers starting at the active player, and a departed seat's permanent is gone with it" $ do
-          barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+          barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
           let gs0 = Setup.emptyGame S.threePlayers
               (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
               (bobsOutcast, gs2) = S.addCreature barbarianOutcast S.bob gs1
@@ -1072,7 +1072,7 @@ orderingSpec s registry =
 -- collision is reachable from the pool: Palace Jailer crowns its controller, and
 -- Khabál Ghoul triggers "at the beginning of each end step", so one player's end
 -- step fires her Ghoul's trigger and the monarch's inherent draw in one batch.
-monarchOrderingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+monarchOrderingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchOrderingSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -1120,9 +1120,9 @@ monarchOrderingSpec s registry =
    in Spec.describe s "MonarchTriggerOrdering" $ do
         -- The collision itself: both triggers reach ONE CR 603.3b choice.
         Spec.it s "CR 603.3b/725.2 the inherent end-step draw is offered in the same ordering choice as the Ghoul's trigger" $ do
-          palaceJailer <- Registry.printing registry "Palace Jailer"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          palaceJailer <- S.printingOf s registry "Palace Jailer"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
@@ -1132,9 +1132,9 @@ monarchOrderingSpec s registry =
         -- could not reach: the inherent draw goes on the stack first, so it sits
         -- at the BOTTOM and resolves last.
         Spec.it s "CR 603.3b/725.2 putting the inherent draw on the stack first leaves it at the bottom, resolving last" $ do
-          palaceJailer <- Registry.printing registry "Palace Jailer"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          palaceJailer <- S.printingOf s registry "Palace Jailer"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               placed = settleWith sourcelessFirst gs
@@ -1147,9 +1147,9 @@ monarchOrderingSpec s registry =
         -- last, so it is on top and resolves first. This is what the old engine
         -- forced unconditionally; here it is a choice.
         Spec.it s "CR 603.3b/725.2 putting the inherent draw on the stack last leaves it on top, resolving first" $ do
-          palaceJailer <- Registry.printing registry "Palace Jailer"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          palaceJailer <- S.printingOf s registry "Palace Jailer"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               placed = settleWith S.identityAnswer gs
@@ -1161,9 +1161,9 @@ monarchOrderingSpec s registry =
         -- Both still resolve, whichever order was chosen: the merge must not
         -- lose the inherent trigger's placement, only relocate it.
         Spec.it s "CR 725.2 the monarch still draws when her own trigger is ordered last" $ do
-          palaceJailer <- Registry.printing registry "Palace Jailer"
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
-          piker <- Registry.printing registry "Goblin Piker"
+          palaceJailer <- S.printingOf s registry "Palace Jailer"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (_, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               after = snd (Engine.runGamePure sourcelessFirst gs Engine.priorityLoop)
@@ -1172,8 +1172,8 @@ monarchOrderingSpec s registry =
         -- there is nothing to order, and where the rules leave nothing to ask,
         -- don't prompt.
         Spec.it s "CR 603.3b the inherent draw alone is one trigger, so nothing is asked" $ do
-          palaceJailer <- Registry.printing registry "Palace Jailer"
-          piker <- Registry.printing registry "Goblin Piker"
+          palaceJailer <- S.printingOf s registry "Palace Jailer"
+          piker <- S.printingOf s registry "Goblin Piker"
           let gs = crownAndEndStep palaceJailer piker (Setup.emptyGame S.bothPlayers)
               (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
               after = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
@@ -1183,7 +1183,7 @@ monarchOrderingSpec s registry =
         -- And the mirror: the Ghoul's trigger alone, with no monarch at all, is
         -- also one trigger and also asks nothing.
         Spec.it s "CR 603.3b the Ghoul's trigger alone, with no monarch, asks nothing" $ do
-          khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           let (_, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = beginEndStep base
               (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
@@ -1193,7 +1193,7 @@ monarchOrderingSpec s registry =
 -- Sarcomancy {B} Enchantment: "When this enchantment enters, create a 2/2 black
 -- Zombie creature token. At the beginning of your upkeep, if there are no Zombies
 -- on the battlefield, this enchantment deals 1 damage to you."
-interveningSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+interveningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 interveningSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
@@ -1208,7 +1208,7 @@ interveningSpec s registry =
          in (sarcId, resolveAll (settle gs1))
    in Spec.describe s "InterveningIf" $ do
         Spec.it s "CR 603.6a the enters trigger makes a 2/2 black Zombie token" $ do
-          sarcomancy <- Registry.printing registry "Sarcomancy"
+          sarcomancy <- S.printingOf s registry "Sarcomancy"
           let (_, after) = withZombie sarcomancy
           case zombies after of
             [tok] -> do
@@ -1218,13 +1218,13 @@ interveningSpec s registry =
         -- CR 603.4: with the condition FALSE, the ability does not trigger AT ALL
         -- -- nothing reaches the stack.
         Spec.it s "CR 603.4 with a Zombie out, the upkeep ability does not trigger" $ do
-          sarcomancy <- Registry.printing registry "Sarcomancy"
+          sarcomancy <- S.printingOf s registry "Sarcomancy"
           let (_, board) = withZombie sarcomancy
               atUpkeep = settle (beginUpkeep board)
           Spec.assertEqWith s "nothing on the stack" (GameState.stack atUpkeep) []
           Spec.assertEqWith s "no life lost" (S.lifeOf S.alice atUpkeep) (Just 20)
         Spec.it s "CR 603.4 with no Zombie, it triggers and deals 1 to its controller" $ do
-          sarcomancy <- Registry.printing registry "Sarcomancy"
+          sarcomancy <- S.printingOf s registry "Sarcomancy"
           let (_, board) = withZombie sarcomancy
               killed = case zombies board of
                 tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [tok]))
@@ -1235,8 +1235,8 @@ interveningSpec s registry =
         -- condition. The ability triggered legitimately; a Zombie appearing in
         -- RESPONSE makes it do nothing on resolution.
         Spec.it s "CR 608.2a a Zombie made in response makes the trigger resolve doing nothing" $ do
-          sarcomancy <- Registry.printing registry "Sarcomancy"
-          piker <- Registry.printing registry "Goblin Piker"
+          sarcomancy <- S.printingOf s registry "Sarcomancy"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (_, board) = withZombie sarcomancy
               killed = case zombies board of
                 tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [tok]))
@@ -1266,7 +1266,7 @@ zombieTokenOf sarcomancy pikerFallback =
 -- ability, so it is minted by Pawl.Engine.Keyword and gathered by the same
 -- Pawl.Engine.Event.eventTriggers scan a printed trigger goes through, with the damaged
 -- player carried across in the reserved Binding.triggerPlayer slot.
-poisonousSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+poisonousSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 poisonousSpec s registry =
   let -- Hang `n` Auras off `host`, each owned by alice. Attached directly rather
       -- than cast: the cast path is proved once, by the whole-card test below.
@@ -1307,8 +1307,8 @@ poisonousSpec s registry =
         -- the Piker's two damage AND gets three poison -- poisonous is not
         -- infect (CR 702.90b), so the life still goes.
         Spec.it s "CR 702.70a Snake Cult Initiation gives the damaged player three poison" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          initiation <- Registry.printing registry "Snake Cult Initiation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          initiation <- S.printingOf s registry "Snake Cult Initiation"
           case board piker initiation 1 [] of
             Nothing -> Spec.assertFailure s "fixture should have an attacker"
             Just (gs, attacker, _) -> do
@@ -1322,8 +1322,8 @@ poisonousSpec s registry =
         -- damage is dealt. `fightWith` deals combat damage without ever reaching
         -- a priority boundary, so nothing has been gathered yet.
         Spec.it s "CR 702.70a the poison rides the stack, not the damage" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          initiation <- Registry.printing registry "Snake Cult Initiation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          initiation <- S.printingOf s registry "Snake Cult Initiation"
           case board piker initiation 1 [] of
             Nothing -> Spec.assertFailure s "fixture should have an attacker"
             Just (gs, _, _) -> do
@@ -1335,8 +1335,8 @@ poisonousSpec s registry =
         -- projection that keeps keywords in a set -- the second grant collapses
         -- into the first and bob takes three.
         Spec.it s "CR 702.70b two Snake Cult Initiations trigger separately for six poison" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          initiation <- Registry.printing registry "Snake Cult Initiation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          initiation <- S.printingOf s registry "Snake Cult Initiation"
           case board piker initiation 2 [] of
             Nothing -> Spec.assertFailure s "fixture should have an attacker"
             Just (gs, _, _) -> do
@@ -1346,8 +1346,8 @@ poisonousSpec s registry =
         -- creature deals its damage to the blocker, so the ability never
         -- triggers and the blocker (not being a player) gets nothing either.
         Spec.it s "CR 702.70a a blocked creature poisons nobody" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          initiation <- Registry.printing registry "Snake Cult Initiation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          initiation <- S.printingOf s registry "Snake Cult Initiation"
           case board piker initiation 1 [piker] of
             Nothing -> Spec.assertFailure s "fixture should have an attacker"
             Just (gs, _, _) -> do
@@ -1360,9 +1360,9 @@ poisonousSpec s registry =
         -- The falsifier is a mint that reads the PRINTED keywords or the Aura's
         -- own static ability instead of the projection.
         Spec.it s "CR 613 Humility strips poisonous along with everything else" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          initiation <- Registry.printing registry "Snake Cult Initiation"
-          humility <- Registry.printing registry "Humility"
+          piker <- S.printingOf s registry "Goblin Piker"
+          initiation <- S.printingOf s registry "Snake Cult Initiation"
+          humility <- S.printingOf s registry "Humility"
           case board piker initiation 1 [] of
             Nothing -> Spec.assertFailure s "fixture should have an attacker"
             Just (gs0, attacker, _) -> do
@@ -1379,8 +1379,8 @@ poisonousSpec s registry =
         -- Prompt.ChooseDefender, so a "give it to the opponent" implementation
         -- cannot pass both.
         Spec.it s "CR 702.70a the poison follows whichever opponent was attacked" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          initiation <- Registry.printing registry "Snake Cult Initiation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          initiation <- S.printingOf s registry "Snake Cult Initiation"
           case S.threePlayerCombat [piker] [] [] of
             (_, [], _, _) -> Spec.assertFailure s "fixture should have an attacker"
             (base, attacker : _, _, _) -> do
@@ -1395,9 +1395,9 @@ poisonousSpec s registry =
         -- {3}{B}, target the Piker, let the Aura enter attached (CR 303.4), then
         -- attack. Everything above hangs the Aura on by fiat.
         Spec.it s "CR 702.70 whole card: cast Snake Cult Initiation, attack, and bob is poisoned" $ do
-          piker <- Registry.printing registry "Goblin Piker"
-          swamp <- Registry.printing registry "Swamp"
-          initiation <- Registry.printing registry "Snake Cult Initiation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          initiation <- S.printingOf s registry "Snake Cult Initiation"
           case S.combatBoardOf [piker] [] of
             (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
             (gs0, attacker : _, _) -> do
@@ -1418,15 +1418,15 @@ poisonousSpec s registry =
 -- "When you cycle this card, target creature gains flying until end of turn".
 -- The trigger is mandatory and its effect is Serpent's Gift's exact shape, so
 -- the only new thing any test below can be passing on is the trigger itself.
-cyclingTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+cyclingTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclingTriggerSpec s registry =
   Spec.describe s "CyclingTrigger" $ do
     -- The whole card: cycle the Aven for {U}, its trigger targets the Piker as
     -- it is placed (CR 603.3d), and the Piker is flying once it resolves.
     Spec.it s "CR 702.29c whole card: cycling Windcaller Aven grants flying" $ do
-      aven <- Registry.printing registry "Windcaller Aven"
-      island <- Registry.printing registry "Island"
-      piker <- Registry.printing registry "Goblin Piker"
+      aven <- S.printingOf s registry "Windcaller Aven"
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (creature, g0) = S.addCreature piker S.alice (S.landsInPlay island 1)
           (g1, avenId) = S.handOne aven g0
           gs = g1 {GameState.priority = Just S.alice}
@@ -1449,9 +1449,9 @@ cyclingTriggerSpec s registry =
     -- neither of the two places it looked before this rule -- the battlefield,
     -- and a permanent that just left it.
     Spec.it s "CR 702.29c the trigger fires from the graveyard, off a new incarnation" $ do
-      aven <- Registry.printing registry "Windcaller Aven"
-      island <- Registry.printing registry "Island"
-      piker <- Registry.printing registry "Goblin Piker"
+      aven <- S.printingOf s registry "Windcaller Aven"
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, g0) = S.addCreature piker S.alice (S.landsInPlay island 1)
           (g1, avenId) = S.handOne aven g0
           gs = g1 {GameState.priority = Just S.alice}
@@ -1467,9 +1467,9 @@ cyclingTriggerSpec s registry =
     -- ORDINARY discard of the same card, through the same CR 400.7 funnel, is
     -- not cycling and fires nothing.
     Spec.it s "CR 702.29c discarding the Aven without cycling fires nothing" $ do
-      aven <- Registry.printing registry "Windcaller Aven"
-      island <- Registry.printing registry "Island"
-      piker <- Registry.printing registry "Goblin Piker"
+      aven <- S.printingOf s registry "Windcaller Aven"
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (creature, g0) = S.addCreature piker S.alice (S.landsInPlay island 1)
           (g1, _) = S.handOne aven g0
           gs = g1 {GameState.priority = Just S.alice}
@@ -1483,9 +1483,9 @@ cyclingTriggerSpec s registry =
     -- The other control: cycling a card that has no cycling trigger fires
     -- nothing, so the trigger is the Aven's and not the act of cycling.
     Spec.it s "CR 702.29c cycling a card with no such trigger fires nothing" $ do
-      mauler <- Registry.printing registry "Barkhide Mauler"
-      forest <- Registry.printing registry "Forest"
-      piker <- Registry.printing registry "Goblin Piker"
+      mauler <- S.printingOf s registry "Barkhide Mauler"
+      forest <- S.printingOf s registry "Forest"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, g0) = S.addCreature piker S.alice (S.landsInPlay forest 2)
           (g1, maulerId) = S.handOne mauler g0
           gs = g1 {GameState.priority = Just S.alice}
@@ -1514,17 +1514,17 @@ cyclingTriggerSpec s registry =
 --
 -- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
 -- every "an opponent" below is alice.
-discardTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+discardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 discardTriggerSpec s registry =
   Spec.describe s "DiscardTrigger" $ do
     -- CR 601.2f's "costs may include ... discarding cards", and CR 701.9a is
     -- per CARD: Cathartic Reunion's additional cost discards two, so the one
     -- Megrim triggers twice and alice takes 4.
     Spec.it s "CR 701.9a whole cards: Cathartic Reunion's two discards fire bob's Megrim twice" $ do
-      mountain <- Registry.printing registry "Mountain"
-      piker <- Registry.printing registry "Goblin Piker"
-      reunion <- Registry.printing registry "Cathartic Reunion"
-      megrim <- Registry.printing registry "Megrim"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      reunion <- S.printingOf s registry "Cathartic Reunion"
+      megrim <- S.printingOf s registry "Megrim"
       let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 2))
           (reunionId, g1) = S.addHandCard reunion S.alice base
           -- Exactly two other cards, so CR 701.9b has nothing to ask and the
@@ -1548,10 +1548,10 @@ discardTriggerSpec s registry =
     -- cycled." Barkhide Mauler's whole text is "Cycling {2}", so nothing on it
     -- can contribute a second trigger and the count is the discard's alone.
     Spec.it s "CR 702.29d cycling a card fires the discard trigger exactly once" $ do
-      forest <- Registry.printing registry "Forest"
-      piker <- Registry.printing registry "Goblin Piker"
-      mauler <- Registry.printing registry "Barkhide Mauler"
-      megrim <- Registry.printing registry "Megrim"
+      forest <- S.printingOf s registry "Forest"
+      piker <- S.printingOf s registry "Goblin Piker"
+      mauler <- S.printingOf s registry "Barkhide Mauler"
+      megrim <- S.printingOf s registry "Megrim"
       let base = snd (S.addCreature megrim S.bob (S.landsInPlay forest 2))
           (_, withLibrary) = S.addLibraryCard piker S.alice base
           (gs, maulerId) = S.handOne mauler withLibrary
@@ -1569,9 +1569,9 @@ discardTriggerSpec s registry =
     -- implementation from one that ignores the player entirely. The same
     -- board, the same component, one discarder apart.
     Spec.it s "CR 102.2 'an opponent': bob discarding to his own Megrim fires nothing" $ do
-      mountain <- Registry.printing registry "Mountain"
-      piker <- Registry.printing registry "Goblin Piker"
-      megrim <- Registry.printing registry "Megrim"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      megrim <- S.printingOf s registry "Megrim"
       let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 1))
           (_, withAlicesCard) = S.addHandCard piker S.alice base
           (_, gs0) = S.addHandCard piker S.bob withAlicesCard
@@ -1611,7 +1611,7 @@ discardTriggerSpec s registry =
 --
 -- Baral's reflexive "if you do" is one Optional mode over both instructions
 -- (#487), so `Exercises` below draws AND discards.
-counterTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+counterTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterTriggerSpec s registry =
   let -- bob: a Baral, three Islands, one card in his library and a Cancel in
       -- hand. alice: `victim` on the stack. bob's library and hand each hold
@@ -1631,11 +1631,11 @@ counterTriggerSpec s registry =
         _ -> S.identityAnswer p
    in Spec.describe s "CounterTrigger" $ do
         Spec.it s "CR 701.6a whole cards: bob's Cancel counters alice's spell, and Baral draws then discards" $ do
-          island <- Registry.printing registry "Island"
-          cancel <- Registry.printing registry "Cancel"
-          baral <- Registry.printing registry "Baral, Chief of Compliance"
-          piker <- Registry.printing registry "Goblin Piker"
-          mountain <- Registry.printing registry "Mountain"
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          baral <- S.printingOf s registry "Baral, Chief of Compliance"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
           let (victimId, cancelId, gs) = board piker island cancel baral mountain
               answer :: Prompt.Prompt r -> r
               answer = answerWith victimId
@@ -1666,11 +1666,11 @@ counterTriggerSpec s registry =
         -- not be modelled faithfully. Both cards reach this gate the same way
         -- -- through Card.counterability, read off the spell on the stack.
         Spec.it s "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
-          island <- Registry.printing registry "Island"
-          cancel <- Registry.printing registry "Cancel"
-          baral <- Registry.printing registry "Baral, Chief of Compliance"
-          rendingVolley <- Registry.printing registry "Rending Volley"
-          mountain <- Registry.printing registry "Mountain"
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          baral <- S.printingOf s registry "Baral, Chief of Compliance"
+          rendingVolley <- S.printingOf s registry "Rending Volley"
+          mountain <- S.printingOf s registry "Mountain"
           let (victimId, cancelId, gs) = board rendingVolley island cancel baral mountain
               answer :: Prompt.Prompt r -> r
               answer = answerWith victimId
@@ -1689,9 +1689,9 @@ counterTriggerSpec s registry =
         -- that matched the zone pair rather than the recorded countering would
         -- fire here too.
         Spec.it s "CR 608.2n bob's own Bolt resolving into that same graveyard fires nothing" $ do
-          mountain <- Registry.printing registry "Mountain"
-          baral <- Registry.printing registry "Baral, Chief of Compliance"
-          bolt <- Registry.printing registry "Lightning Bolt"
+          mountain <- S.printingOf s registry "Mountain"
+          baral <- S.printingOf s registry "Baral, Chief of Compliance"
+          bolt <- S.printingOf s registry "Lightning Bolt"
           let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
               withLand = snd (S.addCreature mountain S.bob withBaral)
               (_, withLibrary) = S.addLibraryCard mountain S.bob withLand
@@ -1718,11 +1718,11 @@ counterTriggerSpec s registry =
         -- Also the other half of Baral's static: alice pays Cancel's full
         -- {1}{U}{U}, since "spells YOU cast" is scoped to bob.
         Spec.it s "CR 109.5 'you control': alice's Cancel countering bob's spell does not fire bob's Baral" $ do
-          island <- Registry.printing registry "Island"
-          cancel <- Registry.printing registry "Cancel"
-          baral <- Registry.printing registry "Baral, Chief of Compliance"
-          piker <- Registry.printing registry "Goblin Piker"
-          mountain <- Registry.printing registry "Mountain"
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          baral <- S.printingOf s registry "Baral, Chief of Compliance"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
           let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
               withLands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withBaral [1 .. (3 :: Int)]
               (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
@@ -1746,11 +1746,11 @@ counterTriggerSpec s registry =
         -- cast" (CR 601.2f's cost reductions) turns Cancel's {1}{U}{U} into
         -- {U}{U}, so one Island is still untapped once it is paid for.
         Spec.it s "CR 601.2f Baral's reduction leaves an Island untapped after Cancel is cast" $ do
-          island <- Registry.printing registry "Island"
-          cancel <- Registry.printing registry "Cancel"
-          baral <- Registry.printing registry "Baral, Chief of Compliance"
-          piker <- Registry.printing registry "Goblin Piker"
-          mountain <- Registry.printing registry "Mountain"
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          baral <- S.printingOf s registry "Baral, Chief of Compliance"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
           let (victimId, cancelId, gs) = board piker island cancel baral mountain
               answer :: Prompt.Prompt r -> r
               answer = answerWith victimId
@@ -1772,7 +1772,7 @@ counterTriggerSpec s registry =
 -- about the entering creature, so these cases isolate the trigger CONDITION;
 -- its "another" is Filter.Not Filter.IsSource inside the condition's own
 -- Filter, never a second exclusion mechanism (#163).
-permanentEntersSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+permanentEntersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 permanentEntersSpec s registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
@@ -1785,8 +1785,8 @@ permanentEntersSpec s registry =
         -- newcomer is checked against its own entry (the case below proves
         -- the scan does check it) and its own Filter is what declines.
         Spec.it s "CR 603.6a whole cards: a second Soul Warden entering gains alice exactly 1 life" $ do
-          plains <- Registry.printing registry "Plains"
-          soulWarden <- Registry.printing registry "Soul Warden"
+          plains <- S.printingOf s registry "Plains"
+          soulWarden <- S.printingOf s registry "Soul Warden"
           let (_, base) = S.addCreature soulWarden S.alice (S.landsInPlay plains 1)
               (gs, spellId) = S.handOne soulWarden base
               cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
@@ -1801,7 +1801,7 @@ permanentEntersSpec s registry =
         -- "another" turns it away. This is why the constructor is not called
         -- OtherEnters.
         Spec.it s "CR 603.6a including the newcomers: a permanent is checked against its own entry" $ do
-          soulWarden <- Registry.printing registry "Soul Warden"
+          soulWarden <- S.printingOf s registry "Soul Warden"
           let (oid, gs) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
           Spec.assertBool s (Event.matchesTrigger gs oid S.alice (TriggerCondition.PermanentEnters anyCreature) (enters oid)) "\"a creature enters\" admits the newcomer itself"
           Spec.assertBool s (not (Event.matchesTrigger gs oid S.alice (TriggerCondition.PermanentEnters anotherCreature) (enters oid))) "\"another creature enters\" does not"
@@ -1815,8 +1815,8 @@ permanentEntersSpec s registry =
         -- The Piker is a Creature only in the live projection, so a matcher
         -- reading the snapshot fires nothing here.
         Spec.it s "CR 603.6b/603.10 the entrant is read live, not from the Moved event's snapshot" $ do
-          soulWarden <- Registry.printing registry "Soul Warden"
-          piker <- Registry.printing registry "Goblin Piker"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (pikerId, gs1) = S.addCreature piker S.bob gs0
           Spec.assertEqWith s "no card types in the snapshot" (PC.cardTypes S.emptyCharacteristics) Set.empty
@@ -1828,8 +1828,8 @@ permanentEntersSpec s registry =
         -- the object. Same fallback eventTriggers' own `bystanders` takes for
         -- the bearer side.
         Spec.it s "CR 608.2h a creature that enters and leaves again still fires the trigger" $ do
-          soulWarden <- Registry.printing registry "Soul Warden"
-          piker <- Registry.printing registry "Goblin Piker"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (handCard, gs1) = S.addHandCard piker S.bob gs0
               entered = S.runPure S.identityAnswer gs1 (Event.changeZone handCard Zone.Battlefield)
@@ -1844,8 +1844,8 @@ permanentEntersSpec s registry =
         -- entering. Plains has no ability of its own, so nothing else can
         -- stand in for the silence.
         Spec.it s "CR 603.6a a noncreature permanent entering fires nothing" $ do
-          soulWarden <- Registry.printing registry "Soul Warden"
-          plains <- Registry.printing registry "Plains"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          plains <- S.printingOf s registry "Plains"
           let (_, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (landId, gs1) = S.addCreature plains S.alice gs0
               gs2 = S.withEvents [GameEvent.Moved (ZoneChange.MkZoneChange landId landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1)] gs1
@@ -1853,8 +1853,8 @@ permanentEntersSpec s registry =
         -- The destination half: CR 603.6a is an ENTERS-THE-BATTLEFIELD
         -- ability, so a creature card moving to a graveyard is not it.
         Spec.it s "CR 603.6a only a battlefield destination fires it" $ do
-          soulWarden <- Registry.printing registry "Soul Warden"
-          piker <- Registry.printing registry "Goblin Piker"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (pikerId, gs1) = S.addCreature piker S.bob gs0
               toGrave = GameEvent.Moved (ZoneChange.MkZoneChange pikerId pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
@@ -1864,8 +1864,8 @@ permanentEntersSpec s registry =
         -- count, not a boolean, so "fires once per entrant" is distinguishable
         -- from "fires once per batch".
         Spec.it s "CR 603.6a one Soul Warden fires once per entering creature" $ do
-          soulWarden <- Registry.printing registry "Soul Warden"
-          piker <- Registry.printing registry "Goblin Piker"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (first, gs1) = S.addCreature piker S.bob gs0
               (second, gs2) = S.addCreature piker S.bob gs1
@@ -1887,7 +1887,7 @@ permanentEntersSpec s registry =
 -- Narcomoeba; Soul Warden rides along in the same graveyard as the control,
 -- because its CR 603.6a trigger functions ONLY on the battlefield and so must
 -- stay silent even when a creature enters right in front of it.
-graveyardTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+graveyardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graveyardTriggerSpec s registry =
   let -- alice: one Island in play (Tome Scour's {U}), Tome Scour in hand, and a
       -- three-card library of Narcomoeba, Soul Warden and a Goblin Piker. Five
@@ -1895,11 +1895,11 @@ graveyardTriggerSpec s registry =
       -- lands in the graveyard in one event batch and the scan has to pick the
       -- one card whose ability functions there.
       milledBoard = do
-        island <- Registry.printing registry "Island"
-        tomeScour <- Registry.printing registry "Tome Scour"
-        narcomoeba <- Registry.printing registry "Narcomoeba"
-        soulWarden <- Registry.printing registry "Soul Warden"
-        piker <- Registry.printing registry "Goblin Piker"
+        island <- S.printingOf s registry "Island"
+        tomeScour <- S.printingOf s registry "Tome Scour"
+        narcomoeba <- S.printingOf s registry "Narcomoeba"
+        soulWarden <- S.printingOf s registry "Soul Warden"
+        piker <- S.printingOf s registry "Goblin Piker"
         let base = S.landsInPlay island 1
             (_, g1) = S.addLibraryCard narcomoeba S.alice base
             (_, g2) = S.addLibraryCard soulWarden S.alice g1
@@ -1948,7 +1948,7 @@ graveyardTriggerSpec s registry =
         -- "from your library" doing real work, half one: the same card moved
         -- out of a HAND reaches the same graveyard and must not trigger.
         Spec.it s "CR 113.6k Narcomoeba put into the graveyard from the HAND does not trigger" $ do
-          narcomoeba <- Registry.printing registry "Narcomoeba"
+          narcomoeba <- S.printingOf s registry "Narcomoeba"
           let (handCard, gs) = S.addHandCard narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
               buried = S.runPure S.identityAnswer gs (Event.changeZone handCard Zone.Graveyard)
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents buried) buried))) []
@@ -1956,7 +1956,7 @@ graveyardTriggerSpec s registry =
         -- "from your library" doing real work, half two: dying is a move to
         -- the same graveyard from the battlefield, and is not this trigger.
         Spec.it s "CR 113.6k Narcomoeba dying from the BATTLEFIELD does not trigger" $ do
-          narcomoeba <- Registry.printing registry "Narcomoeba"
+          narcomoeba <- S.printingOf s registry "Narcomoeba"
           let (creature, gs) = S.addCreature narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
               died = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Graveyard)
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents died) died))) []
@@ -1965,8 +1965,8 @@ graveyardTriggerSpec s registry =
         -- trigger functions on the battlefield (CR 113.6's default) is not
         -- scanned into firing by an event it would have seen from play.
         Spec.it s "CR 113.6 a battlefield-only trigger in a graveyard is not scanned" $ do
-          soulWarden <- Registry.printing registry "Soul Warden"
-          piker <- Registry.printing registry "Goblin Piker"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (wardenCard, gs0) = S.addLibraryCard soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               buried = S.runPure S.identityAnswer gs0 (Event.changeZone wardenCard Zone.Graveyard)
               (pikerCard, gs1) = S.addHandCard piker S.alice buried
@@ -1987,16 +1987,16 @@ graveyardTriggerSpec s registry =
 -- the time the scan runs, the Traveler is a card in a graveyard with a fresh id
 -- (CR 400.7) and nothing is on the battlefield to find -- which is what makes
 -- the token appearing at all the discriminating assertion here.
-diesTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+diesTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 diesTriggerSpec s registry =
   let -- alice: one Mountain (Lightning Bolt's {R}), a Doomed Traveler in play,
       -- and the Bolt in hand. S.identityAnswer targets the least Recipient, and
       -- Recipient.ToCreature sorts before Recipient.ToPlayer, so the one
       -- creature on the board is the target without a bespoke interpreter.
       boltBoard = do
-        mountain <- Registry.printing registry "Mountain"
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
-        doomedTraveler <- Registry.printing registry "Doomed Traveler"
+        mountain <- S.printingOf s registry "Mountain"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
+        doomedTraveler <- S.printingOf s registry "Doomed Traveler"
         let (_, withTraveler) = S.addCreature doomedTraveler S.alice (S.landsInPlay mountain 1)
         pure (S.handOne lightningBolt withTraveler)
       -- Cast the Bolt, resolve it (3 damage marked on a 1/1), settle -- CR
@@ -2042,7 +2042,7 @@ diesTriggerSpec s registry =
         -- leaves-the-battlefield. The same permanent moved from the
         -- battlefield to EXILE has left the battlefield and has not died.
         Spec.it s "CR 700.4 a Traveler exiled from the battlefield does not trigger" $ do
-          doomedTraveler <- Registry.printing registry "Doomed Traveler"
+          doomedTraveler <- S.printingOf s registry "Doomed Traveler"
           let (traveler, gs) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               exiled = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Exile)
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents exiled) exiled))) []
@@ -2050,15 +2050,15 @@ diesTriggerSpec s registry =
         -- The other half of "from the battlefield": the same card discarded
         -- reaches the same graveyard and has not died (CR 700.4).
         Spec.it s "CR 700.4 a Traveler discarded from the HAND does not trigger" $ do
-          doomedTraveler <- Registry.printing registry "Doomed Traveler"
+          doomedTraveler <- S.printingOf s registry "Doomed Traveler"
           let (traveler, gs) = S.addHandCard doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               discarded = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Graveyard)
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents discarded) discarded))) []
         -- Self-scoped: SOME OTHER creature dying is not this Traveler's
         -- death, even though the Traveler is right there to see it.
         Spec.it s "CR 603.6c another creature dying does not fire the Traveler's trigger" $ do
-          doomedTraveler <- Registry.printing registry "Doomed Traveler"
-          piker <- Registry.printing registry "Goblin Piker"
+          doomedTraveler <- S.printingOf s registry "Doomed Traveler"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (_, withTraveler) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               (pikerId, gs) = S.addCreature piker S.alice withTraveler
               died = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Graveyard)
@@ -2069,8 +2069,8 @@ diesTriggerSpec s registry =
         -- alice has stolen with Control Magic hands ALICE the Spirit. Reading
         -- the graveyard card's owner instead would answer bob.
         Spec.it s "CR 603.3a the trigger is controlled by whoever controlled the Traveler as it died" $ do
-          doomedTraveler <- Registry.printing registry "Doomed Traveler"
-          controlMagic <- Registry.printing registry "Control Magic"
+          doomedTraveler <- S.printingOf s registry "Doomed Traveler"
+          controlMagic <- S.printingOf s registry "Control Magic"
           let (traveler, withTraveler) = S.addCreature doomedTraveler S.bob (Setup.emptyGame S.bothPlayers)
               (aura, withAura) = S.addCreature controlMagic S.alice withTraveler
               stolen = S.attach aura traveler withAura
@@ -2156,16 +2156,16 @@ everyTriggerCondition =
 -- arriving card, because SelfPutIntoGraveyardFromLibrary matches on the
 -- ARRIVING incarnation; here it is not, because CR 603.10a makes this condition
 -- match on the DEPARTING one. That contrast is why there are two slots.
-becameSlotSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+becameSlotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 becameSlotSpec s registry =
   let -- alice: one Mountain (Lightning Bolt's {R}), the Cockroaches in play, and
       -- the Bolt in hand. S.identityAnswer targets the least Recipient, and
       -- Recipient.ToCreature sorts before Recipient.ToPlayer, so the one
       -- creature on the board is the target without a bespoke interpreter.
       roachBoard = do
-        mountain <- Registry.printing registry "Mountain"
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
-        cockroaches <- Registry.printing registry "Endless Cockroaches"
+        mountain <- S.printingOf s registry "Mountain"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
+        cockroaches <- S.printingOf s registry "Endless Cockroaches"
         let (roachId, withRoaches) = S.addCreature cockroaches S.alice (S.landsInPlay mountain 1)
         pure (roachId, S.handOne lightningBolt withRoaches)
       -- Cast the Bolt, resolve it (3 damage marked on a 1/1), settle -- CR
@@ -2262,13 +2262,13 @@ becameSlotSpec s registry =
 -- Bad Moon supplies the third power, and it does so through the LAYERS
 -- (CR 613.4c, layer 7c), which is what makes the graveyard card's printed value
 -- visibly the wrong answer rather than merely a different route to the same one.
-lookBackInterveningSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+lookBackInterveningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lookBackInterveningSpec s registry =
   let berserkerBoard withBadMoon = do
-        mountain <- Registry.printing registry "Mountain"
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
-        berserker <- Registry.printing registry "Deathknell Berserker"
-        badMoon <- Registry.printing registry "Bad Moon"
+        mountain <- S.printingOf s registry "Mountain"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
+        berserker <- S.printingOf s registry "Deathknell Berserker"
+        badMoon <- S.printingOf s registry "Bad Moon"
         let lands = S.landsInPlay mountain 1
             moonAdded = if withBadMoon then snd (S.addCreature badMoon S.alice lands) else lands
             (berserkerId, withBerserker) = S.addCreature berserker S.alice moonAdded
@@ -2327,7 +2327,7 @@ lookBackInterveningSpec s registry =
 -- settle. CR 603.6a checks every battlefield permanent against the event, and it
 -- reads each one's PROJECTION -- so a Blood Moon that has already made the
 -- Fountain a Mountain leaves nothing there to trigger.
-strippedTriggerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+strippedTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 strippedTriggerSpec s registry =
   let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
@@ -2336,14 +2336,14 @@ strippedTriggerSpec s registry =
          in resolveAll (settle (S.withEvents [GameEvent.Moved moved (Projection.project oid gs)] gs))
    in Spec.describe s "CR 305.7 strips a triggered ability" $ do
         Spec.it s "CR 603.6a Radiant Fountain's entry trigger gains its controller 2 life" $ do
-          radiantFountain <- Registry.printing registry "Radiant Fountain"
+          radiantFountain <- S.printingOf s registry "Radiant Fountain"
           let (fountainId, gs) = S.addCreature radiantFountain S.alice (Setup.emptyGame S.bothPlayers)
               after = entering fountainId gs
           Spec.assertEqWith s "20 + 2" (S.lifeOf S.alice after) (Just 22)
           Spec.assertBool s (ManaType.Colorless `elem` Mana.manaTypesOf fountainId after) "and it taps for colorless"
         Spec.it s "CR 305.7 under Blood Moon the same entry triggers nothing" $ do
-          radiantFountain <- Registry.printing registry "Radiant Fountain"
-          bloodMoon <- Registry.printing registry "Blood Moon"
+          radiantFountain <- S.printingOf s registry "Radiant Fountain"
+          bloodMoon <- S.printingOf s registry "Blood Moon"
           let (_, withMoon) = S.addCreature bloodMoon S.alice (Setup.emptyGame S.bothPlayers)
               (fountainId, gs) = S.addCreature radiantFountain S.alice withMoon
               after = entering fountainId gs
@@ -2387,15 +2387,15 @@ tramplingAnswer p = case p of
 -- put the trigger's event and the bearer's death in ONE batch: the excess
 -- reaches bob while the blocker's damage kills the Skelemental at the very next
 -- CR 704.5g check, before any player gets priority.
-bystanderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+bystanderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bystanderSpec s registry =
   Spec.describe s "Bystander" $ do
     -- The proving test. bob holds THREE cards, so "discarded once" (one left)
     -- is distinguishable from "discarded twice" (none) and from "not at all"
     -- (three).
     Spec.it s "CR 603.10 whole cards: Lightning Skelemental dies to its blocker and STILL makes bob discard two" $ do
-      skelemental <- Registry.printing registry "Lightning Skelemental"
-      piker <- Registry.printing registry "Goblin Piker"
+      skelemental <- S.printingOf s registry "Lightning Skelemental"
+      piker <- S.printingOf s registry "Goblin Piker"
       case S.combatBoardOf [skelemental] [piker] of
         (base, [attacker], [blocker]) -> do
           let gs = List.foldl' (\g _ -> snd (S.addHandCard piker S.bob g)) base [(), (), ()]
@@ -2413,8 +2413,8 @@ bystanderSpec s registry =
     -- ordinary candidate source. It is what makes the card data and the
     -- reserved "that player" slot innocent when the leg above fails.
     Spec.it s "CR 510.1b control: an UNBLOCKED Skelemental survives and makes bob discard two the ordinary way" $ do
-      skelemental <- Registry.printing registry "Lightning Skelemental"
-      piker <- Registry.printing registry "Goblin Piker"
+      skelemental <- S.printingOf s registry "Lightning Skelemental"
+      piker <- S.printingOf s registry "Goblin Piker"
       case S.combatBoardOf [skelemental] [] of
         (base, [attacker], []) -> do
           let gs = List.foldl' (\g _ -> snd (S.addHandCard piker S.bob g)) base [(), (), ()]
@@ -2431,7 +2431,7 @@ bystanderSpec s registry =
     -- events in one unscanned batch, and the step event comes FIRST, so
     -- nothing about the Ghoul's own departure event can be what recovers it.
     Spec.it s "CR 603.10 a StepBegins bearer that dies later in the same batch still triggers" $ do
-      khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+      khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
           dead = S.runPure S.identityAnswer began (Event.destroy Regenerability.Regenerable [ghoul])
@@ -2443,7 +2443,7 @@ bystanderSpec s registry =
     -- step began did not exist immediately after that event, and gets nothing.
     -- Same board, same two events, opposite order.
     Spec.it s "CR 603.10 a bearer that had already left before the event does NOT trigger" $ do
-      khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+      khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [ghoul])
           began = S.runPure S.identityAnswer dead (State.modify' (Event.recordEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)))
@@ -2476,15 +2476,15 @@ bystanderSpec s registry =
 -- Creature -- Ogre Warrior 3/3, defender) are the pair: identical costs and
 -- colors, so two Mountains cast either, and the ONLY difference the test can be
 -- reading is the toughness the 2 damage is measured against.
-aetherFlashSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+aetherFlashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 aetherFlashSpec s registry =
   let -- alice: Aether Flash already on the battlefield and two Mountains, with
       -- one creature card in hand. Casting it is the only thing on offer, so
       -- S.identityAnswer needs no bespoke interpreter.
       flashBoard creature = do
-        mountain <- Registry.printing registry "Mountain"
-        aetherFlash <- Registry.printing registry "Aether Flash"
-        entrant <- Registry.printing registry creature
+        mountain <- S.printingOf s registry "Mountain"
+        aetherFlash <- S.printingOf s registry "Aether Flash"
+        entrant <- S.printingOf s registry creature
         let (flashId, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
         pure (flashId, S.handOne entrant withFlash)
       castIt (gs, spellId) =
@@ -2555,9 +2555,9 @@ aetherFlashSpec s registry =
         -- CR 704.5d then removes the dead tokens from the graveyard, so the
         -- damage's proof is the DamageDealt log, not a graveyard census.
         Spec.it s "CR 603.6a two tokens enter together and each trigger names its own" $ do
-          mountain <- Registry.printing registry "Mountain"
-          aetherFlash <- Registry.printing registry "Aether Flash"
-          dragonFodder <- Registry.printing registry "Dragon Fodder"
+          mountain <- S.printingOf s registry "Mountain"
+          aetherFlash <- S.printingOf s registry "Aether Flash"
+          dragonFodder <- S.printingOf s registry "Dragon Fodder"
           let (_, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
               (gs, spellId) = S.handOne dragonFodder withFlash
               after = castIt (gs, spellId)
@@ -2574,9 +2574,9 @@ aetherFlashSpec s registry =
         -- on. CR 400.7 minted a fresh id for the graveyard card, so the effect
         -- does not follow it there.
         Spec.it s "CR 608.2h a second Aether Flash resolves with the entrant already dead, and deals nothing" $ do
-          mountain <- Registry.printing registry "Mountain"
-          aetherFlash <- Registry.printing registry "Aether Flash"
-          piker <- Registry.printing registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
+          aetherFlash <- S.printingOf s registry "Aether Flash"
+          piker <- S.printingOf s registry "Goblin Piker"
           let (_, oneFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
               (_, twoFlashes) = S.addCreature aetherFlash S.alice oneFlash
               (gs, spellId) = S.handOne piker twoFlashes
@@ -2602,7 +2602,7 @@ aetherFlashSpec s registry =
 -- upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token
 -- with flying." The pool's first KINDRED card (CR 308), and so the first object
 -- of any kind that carries a creature type without being a creature.
-kindredSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+kindredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kindredSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
@@ -2633,7 +2633,7 @@ kindredSpec s registry =
         -- pools, which is what keeps the enchantment's absence from the
         -- creature pool from being a fixture that simply produced nothing.
         Spec.it s "CR 308.2 a Kindred Enchantment is a legal \"target Faerie permanent\", and CR 110.4 keeps it out of \"target Faerie creature\"" $ do
-          bitterblossom <- Registry.printing registry "Bitterblossom"
+          bitterblossom <- S.printingOf s registry "Bitterblossom"
           let (blossomId, _, after) = board bitterblossom
               permanents = faeriesIn Pool.Permanents after
               creatures = faeriesIn Pool.Creatures after
@@ -2650,7 +2650,7 @@ kindredSpec s registry =
         -- ability controller's, CR 109.5), the life payment, and CR 111.1's
         -- token -- through the ordinary priority loop.
         Spec.it s "CR 603.3a Bitterblossom's upkeep trigger costs its controller 1 life and mints a 1/1 flying black Faerie Rogue" $ do
-          bitterblossom <- Registry.printing registry "Bitterblossom"
+          bitterblossom <- S.printingOf s registry "Bitterblossom"
           let (blossomId, onStack, after) = board bitterblossom
           Spec.assertBool s (not (null (GameState.stack onStack))) "the upkeep trigger really reached the stack"
           Spec.assertEqWith s "no life was lost before it resolved" (S.lifeOf S.alice onStack) (Just 20)
@@ -2666,7 +2666,7 @@ kindredSpec s registry =
               Spec.assertBool s (Projection.isCreatureOf token after) "and it, unlike its maker, IS a creature"
             other -> Spec.assertFailure s ("expected exactly one token beside Bitterblossom, got " <> show (length other) <> " other permanents")
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
   scanSpec s registry

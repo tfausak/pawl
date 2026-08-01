@@ -33,29 +33,29 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone
 
-deckSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+deckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 deckSpec s registry = Spec.describe s "Deck" $ do
   Spec.it s "the red deck is 60 cards" $ do
-    deck <- Cards.redDeck registry
+    deck <- Cards.redDeck (S.printingOf s registry)
     Spec.assertEqWith s "size" (Setup.deckSize deck) 60
 
   Spec.it s "the green deck is 60 cards" $ do
-    deck <- Cards.greenDeck registry
+    deck <- Cards.greenDeck (S.printingOf s registry)
     Spec.assertEqWith s "size" (Setup.deckSize deck) 60
 
   Spec.it s "the black deck is 60 cards" $ do
-    deck <- Cards.blackDeck registry
+    deck <- Cards.blackDeck (S.printingOf s registry)
     Spec.assertEqWith s "size" (Setup.deckSize deck) 60
 
   Spec.it s "red deck composition" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    bolt <- Registry.printing registry "Lightning Bolt"
-    blaze <- Registry.printing registry "Blaze"
-    dragonFodder <- Registry.printing registry "Dragon Fodder"
-    chaosCharm <- Registry.printing registry "Chaos Charm"
-    deck <- Cards.redDeck registry
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    blaze <- S.printingOf s registry "Blaze"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
+    chaosCharm <- S.printingOf s registry "Chaos Charm"
+    deck <- Cards.redDeck (S.printingOf s registry)
     let Deck.MkDeck m = deck
     Spec.assertEqWith s "mountains" (Map.lookup mountain m) (Just 36)
     Spec.assertEqWith s "pikers" (Map.lookup piker m) (Just 4)
@@ -66,13 +66,13 @@ deckSpec s registry = Spec.describe s "Deck" $ do
     Spec.assertEqWith s "chaos charms" (Map.lookup chaosCharm m) (Just 4)
 
   Spec.it s "green deck composition" $ do
-    forest <- Registry.printing registry "Forest"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    fog <- Registry.printing registry "Fog"
-    giantGrowth <- Registry.printing registry "Giant Growth"
-    serpentsGift <- Registry.printing registry "Serpent's Gift"
-    battlegrowth <- Registry.printing registry "Battlegrowth"
-    deck <- Cards.greenDeck registry
+    forest <- S.printingOf s registry "Forest"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    fog <- S.printingOf s registry "Fog"
+    giantGrowth <- S.printingOf s registry "Giant Growth"
+    serpentsGift <- S.printingOf s registry "Serpent's Gift"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    deck <- Cards.greenDeck (S.printingOf s registry)
     let Deck.MkDeck m = deck
     Spec.assertEqWith s "forests" (Map.lookup forest m) (Just 36)
     Spec.assertEqWith s "mammoths" (Map.lookup warMammoth m) (Just 8)
@@ -82,13 +82,13 @@ deckSpec s registry = Spec.describe s "Deck" $ do
     Spec.assertEqWith s "battlegrowths" (Map.lookup battlegrowth m) (Just 4)
 
   Spec.it s "black deck composition" $ do
-    swamp <- Registry.printing registry "Swamp"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
-    drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
-    murder <- Registry.printing registry "Murder"
-    mindRot <- Registry.printing registry "Mind Rot"
-    instillInfection <- Registry.printing registry "Instill Infection"
-    deck <- Cards.blackDeck registry
+    swamp <- S.printingOf s registry "Swamp"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
+    murder <- S.printingOf s registry "Murder"
+    mindRot <- S.printingOf s registry "Mind Rot"
+    instillInfection <- S.printingOf s registry "Instill Infection"
+    deck <- Cards.blackDeck (S.printingOf s registry)
     let Deck.MkDeck m = deck
     Spec.assertEqWith s "swamps" (Map.lookup swamp m) (Just 36)
     Spec.assertEqWith s "rats" (Map.lookup typhoidRats m) (Just 8)
@@ -98,58 +98,58 @@ deckSpec s registry = Spec.describe s "Deck" $ do
     Spec.assertEqWith s "instill infections" (Map.lookup instillInfection m) (Just 4)
 
   Spec.it s "36 Mountains per player after a red-red setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "mountains" (S.countByName (Text.pack "Mountain") S.alice gs) 36
 
   Spec.it s "4 Bird Maidens per player after a red-red setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "maidens" (S.countByName (Text.pack "Bird Maiden") S.alice gs) 4
 
   Spec.it s "4 Pikers per player after a red-red setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "pikers" (S.countByName (Text.pack "Goblin Piker") S.bob gs) 4
 
   Spec.it s "4 Lightning Bolts per player after a red-red setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "bolts" (S.countByName (Text.pack "Lightning Bolt") S.alice gs) 4
 
   Spec.it s "4 Blazes per player after a red-red setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "blazes" (S.countByName (Text.pack "Blaze") S.alice gs) 4
 
   Spec.it s "4 Dragon Fodders per player after a red-red setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "dragon fodders" (S.countByName (Text.pack "Dragon Fodder") S.alice gs) 4
 
   Spec.it s "4 Chaos Charms per player after a red-red setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "chaos charms" (S.countByName (Text.pack "Chaos Charm") S.alice gs) 4
 
-setupState :: Registry.Registry -> IO GameState.GameState
-setupState registry = do
-  matchup <- S.redRed registry
+setupState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+setupState s registry = do
+  matchup <- S.redRed (S.printingOf s registry)
   pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
-setupSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+setupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 setupSpec s registry = Spec.describe s "Setup" $ do
   Spec.it s "120 objects after setup" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "count" (Game.objectCount gs) 120
 
   Spec.it s "each library has 53 after opening draws" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "library" (length (Game.zoneMembers Zone.Library S.alice gs)) 53
 
   Spec.it s "each hand has 7" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "hand" (length (Game.zoneMembers Zone.Hand S.bob gs)) 7
 
   Spec.it s "active player is first in turn order" $ do
-    gs <- setupState registry
+    gs <- setupState s registry
     Spec.assertEqWith s "active" (GameState.activePlayer gs) S.alice
 
   Spec.it s "runMatch derives the players from the matchup (#24)" $ do
-    matchup <- S.redRed registry
+    matchup <- S.redRed (S.printingOf s registry)
     let (result, final) = Engine.runMatchPure S.identityAnswer matchup
     Spec.assertBool s (Maybe.isJust (GameState.result final)) "has a result"
     Spec.assertEqWith s "both players have a life total" (Map.size (GameState.players final)) 2
@@ -175,23 +175,23 @@ setupSpec s registry = Spec.describe s "Setup" $ do
   Spec.it s "CR 800.1 a three-player game has three players still in it at the start" $
     Spec.assertEqWith s "all three playing" (Game.stillPlaying S.threePlayerGame) [S.alice, S.bob, S.carol]
 
-greenBlackSetup :: Registry.Registry -> IO GameState.GameState
-greenBlackSetup registry = do
-  matchup <- S.greenBlack registry
+greenBlackSetup :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+greenBlackSetup s registry = do
+  matchup <- S.greenBlack (S.printingOf s registry)
   pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
-greenBlackSetupSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+greenBlackSetupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 greenBlackSetupSpec s registry = Spec.describe s "GreenBlackSetup" $ do
   Spec.it s "alice's green deck deals 36 Forests" $ do
-    gs <- greenBlackSetup registry
+    gs <- greenBlackSetup s registry
     Spec.assertEqWith s "forests" (S.countByName (Text.pack "Forest") S.alice gs) 36
 
   Spec.it s "bob's black deck deals 36 Swamps" $ do
-    gs <- greenBlackSetup registry
+    gs <- greenBlackSetup s registry
     Spec.assertEqWith s "swamps" (S.countByName (Text.pack "Swamp") S.bob gs) 36
 
   Spec.it s "green-black setup conserves 120 objects" $ do
-    gs <- greenBlackSetup registry
+    gs <- greenBlackSetup s registry
     Spec.assertEqWith s "count" (Game.objectCount gs) 120
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
@@ -200,13 +200,13 @@ addMany :: Printing.Printing -> Int -> PlayerId -> GameState.GameState -> GameSt
 addMany mountain n pid gs =
   List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
 
-restartSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+restartSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
   Spec.it s "startGameFromCards: libraries are rebuilt from the existing owned cards, hands drawn" $ do
     -- alice and bob each own 8 cards, all currently on the battlefield. After
     -- startGameFromCards each has a 7-card hand and a 1-card library, the
     -- battlefield is empty, and ownership is unchanged (CR 727.2 / 103.5).
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = addMany mountain 8 S.alice g0
         g2 = addMany mountain 8 S.bob g1
@@ -222,7 +222,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
   Spec.it s "CR 727.1a: the starting player is the restart's controller, at the head of the turn order" $ do
     -- Two restarts of the same board, controlled by different players: the
     -- active player and the head of the turn order follow the controller.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
         byBob = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.bob))
         byAlice = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.alice))
@@ -239,7 +239,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- Assert on per-owner counts: after the restart every owned card is in that
     -- owner's library or hand, none on the battlefield or in a graveyard, and
     -- bob's graveyard card is proven to return by his count staying 8.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         (_aId, g1) = S.addCreature mountain S.alice g0
         (bId, g2) = S.addCreature mountain S.bob g1
@@ -262,7 +262,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- load-bearing -- Setup.emptyGame already starts players at 20 life with
     -- no counters, so without this mutation the assertions would pass even
     -- if resetPlayer did nothing.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
         g1 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g0
         g2 = g1 {GameState.players = Map.adjust (\p -> p {Player.life = 5}) S.bob (GameState.players g1)}
@@ -281,7 +281,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- library, flagging drewFromEmpty, so the existing SBA path makes bob lose
     -- and alice win. (In live play this fires at the first upkeep, CR 727.3;
     -- here it is asserted at the next explicit SBA check.)
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 3 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
         afterRestart = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.alice))
         afterSba = snd (Engine.runGamePure S.identityAnswer afterRestart Engine.checkSba)
@@ -320,7 +320,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- game." Bob left first, so the new game has two seats. Today he keeps
     -- his seat in the rebuilt turn order, and startGameFromCards therefore
     -- gives him a library, a shuffle and a 7-card opening hand.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 8 S.carol (addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.threePlayers)))
         g1 = Departure.depart Departure.Type.Conceded S.bob g0
         after = snd (Engine.runGamePure S.identityAnswer g1 (Setup.restartGame S.performer S.alice))
@@ -354,12 +354,12 @@ poolToLibrary pid gs =
           GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
         }
 
-subgameSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+subgameSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 729.2: subgameStateFrom takes ONLY library cards; battlefield/hand do not enter" $ do
     -- alice owns 5 cards: 2 relocated to her library, 3 left on the battlefield.
     -- The subgame state's object pool must be exactly the 2 library cards.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = addMany mountain 5 S.alice g0
         -- relocate exactly 2 of alice's cards to her library, leave 3 on the battlefield
@@ -390,7 +390,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     -- Event.drawCard's changeZone mints fresh object ids above the parent's
     -- supply for every card actually drawn (CR 400.7), the way a real
     -- subgame would.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 5 S.bob (addMany mountain 5 S.alice g0)))
         -- move 3 of each back onto the battlefield so the parent has survivors
@@ -432,7 +432,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   -- second sentence keeps the two games separate populations, and nothing in
   -- the CR removes a card from a player's deck for losing a subgame.
   Spec.it s "CR 729.5/800.4a a player who departs inside a MULTIPLAYER subgame still gets their library back" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.threePlayers
         g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
         sub0 = Setup.subgameStateFrom S.alice g1
@@ -456,7 +456,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   -- genuinely destroyed earlier. funnelBack's guard must not depend on
   -- `finalSub`'s turnOrder at all for this reason.
   Spec.it s "CR 729.5/800.4a a restart INSIDE the subgame, after the departure, does not un-recover the departed player's library" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.threePlayers
         g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
         sub0 = Setup.subgameStateFrom S.alice g1
@@ -483,7 +483,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "carol goes first" (GameState.activePlayer sub) S.carol
     Spec.assertEqWith s "CR 800.1: a two-seat subgame is not a multiplayer game, so no free mulligan" (Mulligan.freeMulligans sub) 0
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Setup" $ do
   setupSpec s registry
   greenBlackSetupSpec s registry

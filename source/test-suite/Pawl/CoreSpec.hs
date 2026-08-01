@@ -90,7 +90,7 @@ noView _ = Nothing
 noContext :: Filter.Context
 noContext = Filter.MkContext Nothing Nothing
 
-quantitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+quantitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
   Spec.it s "a literal evaluates to itself" $ do
     Spec.assertEq s (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal 2)) $ Just 2
@@ -99,12 +99,12 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
     Spec.assertEq s (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal (-1))) $ Just (-1)
 
   Spec.it s "evaluate reads X from the object's binding environment" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (oid, gs) = withBoundAmount mountain (Just 5)
     Spec.assertEq s (Quantity.evaluate noView noContext gs oid Quantity.Type.X) $ Just 5
 
   Spec.it s "evaluate X is Nothing when no amount was bound" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (oid, gs) = withBoundAmount mountain Nothing
     Spec.assertEq s (Quantity.evaluate noView noContext gs oid Quantity.Type.X) Nothing
 
@@ -159,15 +159,15 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
       Nothing
 
   Spec.it s "Count CardsInYourHand counts that player's hand" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _) = S.handOne piker (Setup.emptyGame S.bothPlayers)
         viewOf = Projection.fullView gs
     Spec.assertEq s (Quantity.evaluate viewOf (Filter.MkContext (Just S.alice) Nothing) gs (ObjectId.MkObjectId 0) (Quantity.Type.Count cardsInYourHand)) $ Just 1
 
   Spec.it s "Count CardTypesInAllGraveyards counts DISTINCT card types, not cards" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, one) = S.addGraveyardCard piker S.alice gs0
         (_, two) = S.addGraveyardCard warMammoth S.bob one
@@ -185,7 +185,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
       (Quantity.evaluate viewOfThree noContext three (ObjectId.MkObjectId 0) (Quantity.Type.Count cardTypesInAllGraveyards))
       $ Just 2
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   programSpec s
   quantitySpec s registry

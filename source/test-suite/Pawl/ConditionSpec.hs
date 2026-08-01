@@ -57,37 +57,37 @@ check swamp n comparison threshold =
         (ObjectId.MkObjectId 0)
         (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   Spec.describe s "Exactly" $ do
     Spec.it s "CR 603.8 holds when the count equals the threshold" $ do
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       Spec.assertBool s (check swamp 0 Comparison.Exactly 0) "0 == 0"
 
     Spec.it s "CR 603.8 fails when the count differs" $ do
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       Spec.assertBool s (not (check swamp 1 Comparison.Exactly 0)) "1 /= 0"
 
   Spec.describe s "AtLeast" $ do
     Spec.it s "holds at the threshold" $ do
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       Spec.assertBool s (check swamp 3 Comparison.AtLeast 3) "3 >= 3"
 
     Spec.it s "fails below the threshold" $ do
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       Spec.assertBool s (not (check swamp 2 Comparison.AtLeast 3)) "2 < 3"
 
   Spec.describe s "AtMost" $ do
     Spec.it s "holds below the threshold" $ do
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       Spec.assertBool s (check swamp 0 Comparison.AtMost 1) "0 <= 1"
 
     Spec.it s "holds at the threshold" $ do
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       Spec.assertBool s (check swamp 1 Comparison.AtMost 1) "1 <= 1"
 
     Spec.it s "fails above the threshold" $ do
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       Spec.assertBool s (not (check swamp 2 Comparison.AtMost 1)) "2 > 1"
 
   Spec.describe s "an undeterminable side is false, never true" $ do
@@ -95,7 +95,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
       -- Relative with no perspective: Count.evaluate is Nothing, and a
       -- total holds must collapse that to False (CR 611.2b's conservative
       -- reading), not to a vacuous True.
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       let (viewOf, gs) = boardOf swamp 0
           count =
             Count.Type.MkCount
@@ -116,7 +116,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
 
     Spec.it s "when the THRESHOLD side cannot be evaluated" $ do
       -- Quantity.X with no binding on the object: same collapse.
-      swamp <- Registry.printing registry "Swamp"
+      swamp <- S.printingOf s registry "Swamp"
       let (viewOf, gs) = boardOf swamp 0
       Spec.assertBool
         s
