@@ -23,3 +23,8 @@ toInt = Bits.toIntegralSized
 -- will return 'maxBound'.
 toIntSaturating :: Natural.Natural -> Int
 toIntSaturating = Maybe.fromMaybe maxBound . toInt
+
+-- | Subtracts the second 'Natural.Natural' from the first. Unlike @(-)@, which
+-- throws when the result would be negative, this returns @0@.
+minusSaturating :: Natural.Natural -> Natural.Natural -> Natural.Natural
+minusSaturating x y = if x >= y then x - y else 0

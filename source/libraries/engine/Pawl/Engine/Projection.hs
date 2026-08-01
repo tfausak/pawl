@@ -1928,6 +1928,16 @@ isCreatureOf = isCreatureGiven Map.empty
 isCreatureGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
 isCreatureGiven pcs oid gs = Set.member CardType.Creature (cardTypesGiven pcs oid gs)
 
+-- CR 613.1d again, for the card type CR 115.4's "any target" pool and CR 120.3c's
+-- loyalty removal both ask about. Projected for the same reason isCreatureOf is:
+-- CR 613.1d puts card types in layer 4, so an effect that adds or removes the
+-- type changes the answer, and the printed type line is the wrong place to ask.
+isPlaneswalkerOf :: ObjectId -> GameState -> Bool
+isPlaneswalkerOf = isPlaneswalkerGiven Map.empty
+
+isPlaneswalkerGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
+isPlaneswalkerGiven pcs oid gs = Set.member CardType.Planeswalker (cardTypesGiven pcs oid gs)
+
 -- The same question against a PRECOMPUTED candidate list rather than a
 -- pre-projected board -- projectFrom's posture instead of projectGiven's. For a
 -- caller that asks about a HANDFUL of objects out of a whole battlefield

@@ -1019,6 +1019,16 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         -- A NONZERO toxic value, so the CR 702.164b rider is round-tripped
         -- rather than defaulted past.
         (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 3 DamageKind.Combat))
+    -- CR 120.3c's recipient tag is a different arm of Recipient from the one
+    -- above, and a CR 608.2i record the codec cannot write is one no replay can
+    -- read back.
+    Spec.it s "GameEvent.DamageDealt to a planeswalker round-trips" $
+      roundTrip
+        s
+        "damage"
+        gameEventToJson
+        jsonToGameEvent
+        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2)) 3 False False 0 DamageKind.Noncombat))
     Spec.it s "GameEvent.StepBegan round-trips" $
       roundTrip s "step" gameEventToJson jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
     Spec.it s "GameEvent.SpellCast round-trips" $

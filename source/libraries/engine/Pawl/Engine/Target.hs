@@ -29,9 +29,9 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 115: a target slot's legal recipients are its Pool's base candidate set
--- (CR 115.4's "any target" is creatures on the battlefield plus players still in
--- the game; the planeswalkers and battles that rule also names are not admitted,
--- #494 and #302) narrowed by its Filter (a
+-- (CR 115.4's "any target" is creatures and planeswalkers on the battlefield plus
+-- players still in the game; the battles that rule also names are not admitted,
+-- #302) narrowed by its Filter (a
 -- bare "target creature" carries Nothing and narrows nothing). No restriction
 -- (protection, hexproof, shroud) exists in the pool -- this function is where
 -- they will all land.
@@ -90,6 +90,7 @@ legalRecipients perspective source spec gs =
         -- control" cannot accidentally admit a player.
         Recipient.ToPlayer pid -> against (Filter.playerView pid)
         Recipient.ToCreature oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
+        Recipient.ToPlaneswalker oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToObject oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
       against view = case restriction of
         Nothing -> True
@@ -106,7 +107,12 @@ basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Pool.Pool -> GameSt
 basePoolGiven pcs pool gs = case pool of
   Pool.Creatures -> creatureRecipientsGiven pcs gs
   Pool.Players -> playerRecipients gs
-  Pool.AnyTarget -> Set.union (creatureRecipientsGiven pcs gs) (playerRecipients gs)
+  Pool.AnyTarget ->
+    Set.unions
+      [ creatureRecipientsGiven pcs gs,
+        planeswalkerRecipientsGiven pcs gs,
+        playerRecipients gs
+      ]
   Pool.Permanents -> permanentRecipients gs
   Pool.Spells -> spellRecipients gs
   Pool.SpellsAndPermanents -> Set.union (spellRecipients gs) (permanentRecipients gs)
@@ -124,6 +130,29 @@ creatureRecipientsGiven pcs gs =
         . fmap Recipient.ToCreature
         $ concatMap
           (filter isCreatureId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
+          (Game.stillPlaying gs)
+
+-- CR 115.4: planeswalkers on the battlefield, per playing player's zone, tagged
+-- ToPlaneswalker. The same walk creatureRecipientsGiven makes and shares its
+-- projection with, asking Projection.isPlaneswalkerGiven instead -- so a
+-- permanent the layer system made a planeswalker counts and one that lost the
+-- type does not.
+--
+-- The tag is what CR 120.3c needs and CR 120.3e must not get, which is why this
+-- is a pool of its own rather than a widened creatureRecipients: the two answers
+-- to "what does damage to this do" are picked here, once, and carried on the
+-- recipient. A permanent with BOTH card types would therefore appear under both
+-- tags, which is one target choice too many (#503).
+planeswalkerRecipients :: GameState -> Set Recipient
+planeswalkerRecipients gs = planeswalkerRecipientsGiven (Projection.projectAll gs) gs
+
+planeswalkerRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> GameState -> Set Recipient
+planeswalkerRecipientsGiven pcs gs =
+  let isPlaneswalkerId oid = Projection.isPlaneswalkerGiven pcs oid gs
+   in Set.fromList
+        . fmap Recipient.ToPlaneswalker
+        $ concatMap
+          (filter isPlaneswalkerId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
           (Game.stillPlaying gs)
 
 -- CR 115: players still in the game, tagged ToPlayer.

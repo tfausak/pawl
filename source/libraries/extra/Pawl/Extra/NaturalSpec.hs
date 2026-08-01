@@ -34,3 +34,13 @@ spec s = Spec.describe s "Pawl.Extra.Natural" $ do
 
     Spec.it s "clamps to the max bound" $ do
       Spec.assertEq s (Natural.toIntSaturating 9223372036854775808) 9223372036854775807
+
+  Spec.describe s "minusSaturating" $ do
+    Spec.it s "subtracts when the result is not negative" $ do
+      Spec.assertEq s (Natural.minusSaturating 3 2) 1
+
+    Spec.it s "works when the result is zero" $ do
+      Spec.assertEq s (Natural.minusSaturating 2 2) 0
+
+    Spec.it s "clamps to zero" $ do
+      Spec.assertEq s (Natural.minusSaturating 2 3) 0

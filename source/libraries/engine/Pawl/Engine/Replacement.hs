@@ -561,6 +561,7 @@ chooserOf gs event = case event of
   ProposedEvent.WouldDealDamage de -> case DamageEvent.target de of
     Recipient.ToPlayer pid -> Just pid
     Recipient.ToCreature oid -> Projection.controllerOf oid gs
+    Recipient.ToPlaneswalker oid -> Projection.controllerOf oid gs
     Recipient.ToObject oid -> Projection.controllerOf oid gs
   ProposedEvent.WouldBeDestroyed oid _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldPutCounters oid _ _ -> Projection.controllerOf oid gs

@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Extra.Integer as Integer
+import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AttackTarget (AttackTarget)
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
@@ -71,6 +72,11 @@ legalAssignment thresholds power answer =
       isDefender r = case r of
         Recipient.ToPlayer _ -> True
         Recipient.ToCreature _ -> False
+        -- CR 702.19b's excess goes to "the player or planeswalker it's
+        -- attacking", so an attacked planeswalker WOULD be a defender here --
+        -- but nothing declares an attack on one yet (#493), so no threshold map
+        -- can hold this tag and answering False is not a claim about trample.
+        Recipient.ToPlaneswalker _ -> False
         Recipient.ToObject _ -> False
       defenderAmount = sum (Map.elems (Map.filterWithKey (\r _ -> isDefender r) answer))
       blockerThresholds = Map.filterWithKey (\r _ -> not (isDefender r)) thresholds
@@ -261,25 +267,32 @@ gatherCombatDamage assigns = do
 -- proposed, so nothing downstream -- CR 616's replacement loop, CR 704.5h's
 -- deathtouch scan, CR 608.2i's turn log -- sees an event that never happened.
 --
--- ToCreature and ToPlayer pass through untouched. Both are produced by combat
--- (CR 510.1b-d, which name the blocking creature or the attacked player
--- outright) and by a CR 601.2c target chosen out of a typed Pool, so what they
--- name was already classified when the recipient was built; re-asking here
--- would be a second, later reading of the same question, which is what CR
--- 608.2b's target re-validation is for and this is not.
+-- ToCreature, ToPlaneswalker and ToPlayer pass through untouched. Each is
+-- produced either by combat (CR 510.1b-d, which name the blocking creature or
+-- the attacked player outright -- so ToCreature and ToPlayer only) or by a CR
+-- 601.2c target chosen out of a typed Pool, so what any of them names was
+-- already classified when the recipient was built; re-asking here would be a
+-- second, later reading of the same question, which is what CR 608.2b's target
+-- re-validation is for and this is not.
 --
--- Battles and planeswalkers are missing from the classification. A battle has no
--- card type yet (#302); a planeswalker does (Jace Beleren), and CR 120.3c --
--- damage to it removes that many loyalty counters -- is unimplemented (#494),
--- which is why a ToObject naming one is dropped here rather than reclassified.
+-- Only battles are missing from the classification, and only because no card type
+-- for one exists yet (#302); CR 120.3h is what it would need.
+--
+-- The creature test comes first, and for a permanent that is both a creature and
+-- a planeswalker that is the wrong answer -- CR 120.3 says damage "may have one
+-- or more of the following results", so CR 120.3c and CR 120.3e both apply and
+-- one Recipient cannot carry both (#503). Unreachable today: nothing in the pool
+-- prints both card types, and no effect in it adds a creature type to a
+-- planeswalker.
 damageRecipient :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
 damageRecipient gs recipient = case recipient of
   Recipient.ToPlayer _ -> Just recipient
   Recipient.ToCreature _ -> Just recipient
-  Recipient.ToObject oid ->
-    if Projection.isCreatureOf oid gs
-      then Just (Recipient.ToCreature oid)
-      else Nothing
+  Recipient.ToPlaneswalker _ -> Just recipient
+  Recipient.ToObject oid
+    | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
+    | Projection.isPlaneswalkerOf oid gs -> Just (Recipient.ToPlaneswalker oid)
+    | otherwise -> Nothing
 
 -- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
 -- record each event into GameState.events. The change-and-emit funnel for
@@ -320,6 +333,28 @@ applyDamage events = do
             else
               let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
                in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
+        -- CR 306.8 / CR 120.3c: "Damage dealt to a planeswalker results in that
+        -- many loyalty counters being removed from it." Removed DIRECTLY, for
+        -- the reason the infect arm above gives: this is a result of a damage
+        -- event that has already run its CR 616.1 loop, so a "would remove
+        -- counters" sub-replacement is out of scope (#122) -- and CR 614.16
+        -- scales counters an effect PUTS on, never removal.
+        --
+        -- Floored at 0 rather than wrapped, because Object.counters is Natural:
+        -- CR 306.5c makes loyalty the COUNT of loyalty counters, and a
+        -- planeswalker cannot have fewer than none. CR 704.5i then reads the 0
+        -- and buries it; nothing here destroys anything (CR 120.5).
+        Recipient.ToPlaneswalker oid ->
+          let have obj = Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj)
+              strip obj =
+                obj
+                  { Object.counters =
+                      Map.insert
+                        CounterKind.Loyalty
+                        (Natural.minusSaturating (have obj) (DamageEvent.amount ev))
+                        (Object.counters obj)
+                  }
+           in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
         Recipient.ToPlayer pid ->
           -- The two poison diversions are different shapes and BOTH apply. CR
           -- 120.3b / 702.90b: infect REPLACES the damage's result with poison
@@ -349,9 +384,9 @@ applyDamage events = do
         -- name a creature or a player), and the one producer that can --
         -- Resolve's DealDamage arm, reading a slot that names a permanent
         -- generically -- runs it through damageRecipient above first, which
-        -- turns it into ToCreature or into no event at all. Marking damage here
-        -- would be the wrong answer if anything did reach it: nothing has said
-        -- the object is a creature.
+        -- turns it into ToCreature or ToPlaneswalker, or into no event at all.
+        -- Doing anything here would be the wrong answer if anything did reach
+        -- it: nothing has said which of CR 120.3's results applies.
         Recipient.ToObject _ -> g
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
