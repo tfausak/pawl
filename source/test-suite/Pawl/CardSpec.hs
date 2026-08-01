@@ -1657,9 +1657,11 @@ sourceOnBattlefield =
 -- what lets an Equipment become a creature while it still equips one (CR 704.5p);
 -- Liquimetal Coating makes any permanent an artifact, which is the only way to
 -- feed an AURA to the Animator and so the only route to CR 303.4d's second clause
--- -- every printed enchantment animator excludes Auras by name; and March of the
+-- -- every printed enchantment animator excludes Auras by name; March of the
 -- Machines animates every noncreature artifact at once, which is the card CR
--- 613.6 exists for (#233).
+-- 613.6 exists for (#233); and Titania's Song is March with a layer-6 ability
+-- removal bolted on, which is what makes CR 613.6's LOWEST layer observable
+-- (#326).
 animatorCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 animatorCardSpec s registry = Spec.describe s "Animators" $ do
   -- The CR 613.6 gate card (#233), and the pin that matters is the SHAPE: one
@@ -1711,6 +1713,43 @@ animatorCardSpec s registry = Spec.describe s "Animators" $ do
       "CR 613.1d + CR 613.4b: becomes a creature, base P/T its mana value"
       (partsOf opalescence)
       [[Modification.AddCardType CardType.Creature, Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue]]
+  -- March of the Machines' set, plus the layer-6 removal March does not have --
+  -- and the pin that matters is that the four parts are ONE ability. That is what
+  -- makes layer 4 the whole effect's CR 613.6 decision point and so the layer its
+  -- affected set is fixed at, which is the card #326 exists for. Split into two
+  -- abilities the removal would decide its own set at layer 6, by which time this
+  -- card's own layer-4 part has animated the artifact out of "each noncreature
+  -- artifact".
+  --
+  -- The printed second sentence ("If this enchantment leaves the battlefield,
+  -- this effect continues until end of turn") is not modelled (#511).
+  Spec.it s "Titania's Song is a {3}{G} enchantment: ONE ability, four parts, layers 4, 6 and 7b" $ do
+    p <- S.printingOf s registry "Titania's Song"
+    let c = Printing.card p
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        noncreatureArtifact =
+          Affected.Matching
+            ( Filter.Type.And
+                [ Filter.Type.HasCardType CardType.Artifact,
+                  Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
+                ]
+            )
+    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Titania's Song")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, green])
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith
+      s
+      "\"loses all abilities and becomes an artifact creature with power and toughness each equal to its mana value\""
+      (Card.Type.staticAbilities c)
+      [ StaticAbility.MkStaticAbility
+          noncreatureArtifact
+          ( Modification.LoseAllAbilities
+              NonEmpty.:| [ Modification.AddCardType CardType.Artifact,
+                            Modification.AddCardType CardType.Creature,
+                            Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue
+                          ]
+          )
+      ]
   Spec.it s "Liquimetal Coating is a {2} artifact whose {T} ability makes any permanent an artifact" $ do
     p <- S.printingOf s registry "Liquimetal Coating"
     let c = Printing.card p
