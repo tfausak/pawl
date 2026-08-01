@@ -37,6 +37,8 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Expiry as Expiry
@@ -1494,7 +1496,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.blockers = Map.empty,
                       Combat.Type.struckFirst = Nothing,
                       Combat.Type.joinedUnder = Map.singleton oid S.alice,
-                      Combat.Type.attackersJoined = True,
+                      Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.defender = Just S.bob
                     }
               }
@@ -2298,6 +2300,184 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     -- The 2/3 Garrison plus two 1/1 tokens, all unblocked, against bob's 20.
     Spec.assertEqWith s "bob takes 2 + 1 + 1" (S.lifeOf S.bob after) (Just 16)
 
+-- CR 306.6 / CR 508.1b: attacking a planeswalker, through the one planeswalker in
+-- the pool.
+--
+-- Jace Beleren is the whole board on bob's side: {1}{U}{U} Legendary
+-- Planeswalker -- Jace, with printed loyalty 3, which is what makes every
+-- assertion here arithmetic rather than a threshold nobody can miss -- a 2/1
+-- Goblin Piker takes two of the three (CR 306.8), and two of them take all three
+-- and reach CR 704.5i.
+--
+-- PlaneswalkerSpec covers the card itself, including CR 306.5b's entry
+-- replacement; the counters here are placed as a state fixture, because a
+-- combat board cannot reach the sorcery-speed cast that would place them.
+jaceBoard :: Printing.Printing -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId)
+jaceBoard jace mine =
+  let (gs, ours, theirs) = S.combatBoardOf mine [jace]
+   in case theirs of
+        [jaceId] -> (S.addCounter CounterKind.Loyalty 3 jaceId gs, ours, jaceId)
+        -- Unreachable (combatBoardOf returns one id per printing), and total
+        -- rather than an `error`: S.noSource names no object, so a fixture that
+        -- somehow got here fails the first assertion instead of the suite.
+        _ -> (gs, ours, S.noSource)
+
+isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
+isPlaneswalkerTarget target = case target of
+  AttackTarget.OfPlaneswalker _ -> True
+  AttackTarget.OfPlayer _ -> False
+
+-- Announce every attack at the first planeswalker offered, and answer everything
+-- else aggressively. The counterpart of S.aggressiveAnswer, which takes the head
+-- of the same list and so always attacks the defending player: the pair is what
+-- makes CR 508.1b's announcement a REAL choice here rather than a prompt whose
+-- answer the engine could have supplied itself.
+--
+-- Falls back to the head when no planeswalker is offered, which keeps it total
+-- and makes it the same interpreter as S.aggressiveAnswer on a board without one.
+attackThePlaneswalker :: Prompt.Prompt r -> r
+attackThePlaneswalker p = case p of
+  Prompt.ChooseAttackTarget _ _ _ options -> case filter isPlaneswalkerTarget (NonEmpty.toList options) of
+    target : _ -> target
+    [] -> NonEmpty.head options
+  _ -> S.aggressiveAnswer p
+
+-- Record every CR 508.1b announcement the engine asks for -- the creature and the
+-- options it was offered -- and answer it with the planeswalker. The prompt is
+-- elided at one candidate, so an empty log is the assertion that nothing was
+-- asked.
+announcementLog :: Prompt.Prompt r -> State.State [(ObjectId.ObjectId, [AttackTarget.AttackTarget])] r
+announcementLog p = case p of
+  Prompt.ChooseAttackTarget _ _ oid options -> do
+    State.modify' (\seen -> seen <> [(oid, NonEmpty.toList options)])
+    pure (attackThePlaneswalker p)
+  _ -> pure (attackThePlaneswalker p)
+
+-- Declare attackers under the recording interpreter, keeping the log.
+announcementsFor :: GameState.GameState -> [(ObjectId.ObjectId, [AttackTarget.AttackTarget])]
+announcementsFor gs = State.execState (Engine.runGame announcementLog gs (Combat.declareAttackers S.alice)) []
+
+planeswalkerAttackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+planeswalkerAttackSpec s registry = Spec.describe s "AttackingAPlaneswalker" $ do
+  Spec.it s "CR 508.1b a creature is declared attacking the planeswalker, not its controller" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, jaceId) = jaceBoard jace [piker]
+        atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker gs
+    case mine of
+      [attacker] ->
+        Spec.assertEqWith
+          s
+          "the record names the planeswalker (CR 508.1b)"
+          (Map.lookup attacker (Combat.Type.attackers (GameState.combat atBlockers)))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+  Spec.it s "CR 306.8 whole cards: a 2/1 attacking Jace takes two loyalty counters and bob takes nothing" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [piker]
+        after = S.runCombat attackThePlaneswalker gs
+    Spec.assertEqWith s "CR 306.8: 3 - 2" (S.counterOf CounterKind.Loyalty jaceId after) 1
+    Spec.assertEqWith s "CR 510.1b: the damage did not reach its controller" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "CR 704.5i does not apply at loyalty 1"
+  -- The pair that makes the announcement a choice: ONE board, two interpreters,
+  -- two different games. An engine that answered CR 508.1b for the player could
+  -- not produce both lines.
+  Spec.it s "CR 508.1b both answers are reachable: the same board, attacked the other way" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [piker]
+        atJace = S.runCombat attackThePlaneswalker gs
+        atBob = S.runCombat S.aggressiveAnswer gs
+    Spec.assertEqWith s "attacking Jace: bob is untouched" (S.lifeOf S.bob atJace) (Just 20)
+    Spec.assertEqWith s "attacking Jace: two counters gone" (S.counterOf CounterKind.Loyalty jaceId atJace) 1
+    Spec.assertEqWith s "attacking bob: he takes two" (S.lifeOf S.bob atBob) (Just 18)
+    Spec.assertEqWith s "attacking bob: Jace keeps all three" (S.counterOf CounterKind.Loyalty jaceId atBob) 3
+  Spec.it s "CR 704.5i two attackers take all three loyalty counters and Jace is buried" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [piker, piker]
+        after = S.runCombat attackThePlaneswalker gs
+    Spec.assertEqWith s "loyalty 0 (Natural, not wrapped past zero)" (S.counterOf CounterKind.Loyalty jaceId after) 0
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "CR 704.5i: off the battlefield"
+    Spec.assertEqWith s "CR 704.5i: in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and none of the 4 damage splashed onto bob" (S.lifeOf S.bob after) (Just 20)
+  -- CR 508.1b's announcement is asked PER CREATURE, and the answers are
+  -- independent: two Pikers, one at Jace and one at bob.
+  Spec.it s "CR 508.1b the announcement is per creature, and the two may differ" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, jaceId) = jaceBoard jace [piker, piker]
+        splitting :: Prompt.Prompt r -> r
+        splitting p = case p of
+          -- The first Piker (the lower id) is sent at Jace and the second at bob.
+          Prompt.ChooseAttackTarget _ _ oid options ->
+            if Just oid == Maybe.listToMaybe mine
+              then attackThePlaneswalker p
+              else NonEmpty.head options
+          _ -> S.aggressiveAnswer p
+        after = S.runCombat splitting gs
+    Spec.assertEqWith s "one Piker's 2 went to Jace" (S.counterOf CounterKind.Loyalty jaceId after) 1
+    Spec.assertEqWith s "and the other's 2 went to bob" (S.lifeOf S.bob after) (Just 18)
+  Spec.it s "CR 508.1b the prompt is asked once per attacker, over the defending player and their planeswalker" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, jaceId) = jaceBoard jace [piker, piker]
+    Spec.assertEqWith
+      s
+      "two attackers, two announcements, each offering both targets"
+      (announcementsFor gs)
+      (fmap (\oid -> (oid, [AttackTarget.OfPlayer S.bob, AttackTarget.OfPlaneswalker jaceId])) mine)
+  -- The regression guard, and the elision: CR 508.1b calls for no announcement
+  -- when the defending player controls no planeswalker, so the engine must not
+  -- ask -- and the board must play exactly as it did before the prompt existed.
+  Spec.it s "CR 508.1b with no planeswalker the announcement is not asked at all" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = S.combatBoardOf [piker, piker] []
+    Spec.assertEqWith s "nothing was asked" (announcementsFor gs) []
+    Spec.assertEqWith s "and the two Pikers still connect for 4" (S.lifeOf S.bob (S.runCombat attackThePlaneswalker gs)) (Just 16)
+  -- CR 506.4 / CR 506.4c / CR 510.1b, at gameplay level and without an
+  -- instant: two first strikers kill Jace in the FIRST combat damage step
+  -- (CR 510.4), and the Piker attacking the same planeswalker then has nothing
+  -- to assign in the second -- "If it isn't currently attacking anything (if,
+  -- for example, it was attacking a planeswalker that has left the
+  -- battlefield), it assigns no combat damage."
+  --
+  -- The control is the same board attacked the other way: 2 + 2 + 2 is bob at
+  -- 14, so the missing 2 here is the rule and not a board that never dealt it.
+  Spec.it s "CR 510.1b whole cards: a planeswalker killed by first strike leaves its attacker assigning nothing" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    tiger <- S.printingOf s registry "Sabretooth Tiger"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, jaceId) = jaceBoard jace [tiger, tiger, piker]
+        atFirstStrike = runToStep (Phase.Combat CombatStep.CombatDamage) attackThePlaneswalker gs
+        atSecond = snd (Engine.runGamePure attackThePlaneswalker atFirstStrike Engine.runStep)
+        after = S.runCombat attackThePlaneswalker gs
+        control = S.runCombat S.aggressiveAnswer gs
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield atSecond))) "the two 2/1 first strikers buried Jace (CR 704.5i)"
+    case reverse mine of
+      thePiker : _ -> do
+        -- CR 506.4c: the Piker is still an attacking creature, though it is
+        -- attacking nothing. Removing it from combat instead is the bug this
+        -- pins.
+        Spec.assertBool
+          s
+          (Map.member thePiker (Combat.Type.attackers (GameState.combat atSecond)))
+          "CR 506.4c: the Piker remains an attacking creature"
+        -- "It assigns no combat damage" is a claim about ASSIGNMENT, so it is
+        -- asserted on the CR 608.2i damage log and not only on bob's life total:
+        -- the planeswalker's id still names an object in the graveyard, so an
+        -- engine that skipped CR 506.4 would deal the Piker's 2 to a permanent
+        -- that is not there and leave every life total looking right.
+        Spec.assertEqWith
+          s
+          "the Piker assigned no combat damage (CR 510.1b)"
+          (filter (\ev -> DamageEvent.source ev == thePiker) (S.damageEventsOf after))
+          []
+      _ -> Spec.assertFailure s "fixture should have three attackers"
+    Spec.assertEqWith s "so bob is untouched" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "the same board attacked at bob is 2 + 2 + 2" (S.lifeOf S.bob control) (Just 14)
+
 -- CR 508.4 / CR 508.3a / CR 508.8, through the one card in the pool that puts a
 -- creature onto the battlefield attacking WITHOUT anything having been declared.
 --
@@ -2380,6 +2560,38 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
     (gs, _) <- boardOf
     let afterCombat = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
     Spec.assertEqWith s "a 5/9 connected" (S.lifeOf S.bob afterCombat) (Just 15)
+  -- CR 508.4's CHOICE, which this card is the pool's only producer of: the
+  -- Towershell returns attacking on a turn nothing is declared, and its
+  -- controller says what it is attacking as it enters. Its own ruling is the
+  -- one being obeyed -- "you choose which opponent or opposing planeswalker
+  -- it's attacking. It doesn't have to attack the same opponent ... that it was
+  -- when it was exiled."
+  --
+  -- Both answers are asserted on ONE board, which is what makes this a choice
+  -- and not a default: aimed at Jace, its 5 damage buries a 3-loyalty
+  -- planeswalker (CR 306.8, CR 704.5i) and bob keeps his 20; aimed at bob, he
+  -- takes 5 and Jace keeps all three counters.
+  Spec.it s "CR 508.4 whole card: the returned Towershell chooses the planeswalker" $ do
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (base, _) = towershellBoard towershell island [jace]
+        jaceId = case filter (\oid -> Projection.isPlaneswalkerOf oid base) (Set.toList (GameState.battlefield base)) of
+          oid : _ -> oid
+          [] -> S.noSource
+        gs = S.addCounter CounterKind.Loyalty 3 jaceId base
+        atReturn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker gs
+        after = runToTurnStep 3 Phase.PostcombatMain attackThePlaneswalker gs
+        control = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
+    Spec.assertEqWith
+      s
+      "it entered attacking the planeswalker (CR 508.4)"
+      (Map.elems (Combat.Type.attackers (GameState.combat atReturn)))
+      [AttackTarget.OfPlaneswalker jaceId]
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "a 5/9 buried a 3-loyalty Jace"
+    Spec.assertEqWith s "and bob took none of it" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "aimed at bob instead, he takes 5" (S.lifeOf S.bob control) (Just 15)
+    Spec.assertEqWith s "and Jace keeps all three counters" (S.counterOf CounterKind.Loyalty jaceId control) 3
   Spec.it s "CR 702.14c whole card: islandwalk keeps the returned Towershell unblockable" $ do
     -- The pool's first ISLANDwalk (Bog Wraith, #500's card, prints swampwalk),
     -- and the only window in which this card's own evasion can be read: on the
@@ -2460,3 +2672,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   effectRemovalSpec s registry
   putOntoBattlefieldAttackingSpec s registry
   towershellSpec s registry
+  planeswalkerAttackSpec s registry

@@ -45,7 +45,7 @@ emptyCombat =
       Combat.blockers = Map.empty,
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
-      Combat.attackersJoined = False,
+      Combat.attacked = Set.empty,
       Combat.defender = Nothing
     }
 
@@ -65,14 +65,14 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 -- CR 508.8: "If no creatures are declared as attackers or put onto the
 -- battlefield attacking, skip the declare blockers and combat damage steps."
 --
--- BOTH of that rule's clauses are the same question of Combat.attackersJoined,
--- because both things that can make one true write that flag: declareAttackers
+-- BOTH of that rule's clauses are the same question of Combat.attacked, because
+-- both things that can make one true write that set: declareAttackers
 -- below, and putOntoBattlefieldAttacking. Engine.runStepThatBegan asks it as the
 -- declare attackers step ENDS -- after the priority round in which an attack
 -- trigger resolves -- rather than the moment the turn-based action finishes,
 -- which is what made the second clause unrepresentable before.
 --
--- The flag and NOT Map.null on Combat.attackers, which is the same question only
+-- That set and NOT Map.null on Combat.attackers, which is the same question only
 -- while nothing leaves combat. CR 508.8 asks whether a creature WAS declared or
 -- put onto the battlefield attacking, and CR 508.1k makes that a different
 -- question from whether one is attacking now: a declared creature "remains an
@@ -98,7 +98,7 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 -- clause with no card in the way, and both are kept.
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
-  if not (Combat.attackersJoined (GameState.combat gs))
+  if Set.null (Combat.attacked (GameState.combat gs))
     then gs {GameState.remaining = Turn.dropSkippedCombatSteps (GameState.phase gs) (GameState.remaining gs)}
     else gs
 
@@ -122,6 +122,78 @@ skipEmptyCombat gs =
 -- what an interpreter that takes the head should get.
 attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayingInOrder gs)
+
+-- CR 508.1b: what the active player may announce a chosen creature is attacking
+-- -- "which player, planeswalker, or battle". CR 506.2's second sentence is the
+-- same list scoped to a two-player game: "that player, planeswalkers they
+-- control, and battles they protect may be attacked."
+--
+-- The defending player is FIRST, which is not cosmetic: it is the candidate that
+-- exists on every board, so an interpreter that takes the head gets the answer
+-- every attack in a battle-less, planeswalker-less pool used to get, and
+-- Replay.defaultAnswer's fallback is the same one for the same reason.
+--
+-- Battles are absent because there is no battle card type (#302). CR 802's
+-- attack-multiple-players option would put a SECOND player on this list, and
+-- pawl has no options concept to read it from (#175) -- the defending player is
+-- the argument, so this function needs no change when it arrives, only a longer
+-- caller.
+--
+-- Read at DECLARATION and again at damage assignment (stillAttacked below), and
+-- both readings are derived rather than stored on purpose: every clause of CR
+-- 506.4 that stops a planeswalker being attacked -- it leaves the battlefield,
+-- its controller changes, it stops being a planeswalker -- is a change to
+-- exactly what this filter asks about, so re-asking IS performing the removal.
+attackTargets :: PlayerId -> GameState -> NonEmpty.NonEmpty AttackTarget.AttackTarget
+attackTargets defender gs =
+  AttackTarget.OfPlayer defender
+    NonEmpty.:| fmap AttackTarget.OfPlaneswalker (attackablePlaneswalkers defender gs)
+
+-- CR 306.6 / CR 508.1b: the planeswalkers a defending player controls, in
+-- ascending id order (Projection.controls walks the battlefield, which is a Set).
+--
+-- Battlefield-scoped by construction, since that is where Projection.controls
+-- looks, and PROJECTED rather than printed for isPlaneswalkerOf's own reason:
+-- CR 613.1d puts card types in layer 4.
+attackablePlaneswalkers :: PlayerId -> GameState -> [ObjectId]
+attackablePlaneswalkers defender gs =
+  filter (\oid -> Projection.isPlaneswalkerOf oid gs) (Projection.controls defender gs)
+
+-- CR 506.4: is this planeswalker still one that is being attacked -- or has it
+-- been removed from combat since the declaration?
+--
+-- Asked where the answer is USED (Damage.combatRecipient) rather than sampled
+-- into the combat record by Engine.settleForPriority the way removeChanged
+-- samples its two clauses, and the difference is invisible: an attack target is
+-- read in exactly two places, and both re-ask.
+--
+--   * Damage.combatRecipient, at CR 510.1's assignment -- whose own rule
+--     (CR 510.1b) is phrased for precisely this case: "If it isn't currently
+--     attacking anything (if, for example, it was attacking a planeswalker that
+--     has left the battlefield), it assigns no combat damage."
+--   * landwalkAllowsGiven, for CR 508.5's "defending player", which reads the
+--     planeswalker's controller and never whether it is still attacked.
+--
+-- Every other reader of Combat.attackers takes its KEYS (Projection's
+-- Filter.IsAttacking, blockCeiling, declareBlockers, Damage.dealCombatDamage),
+-- and CR 506.4c is emphatic that the keys must NOT change here: "removing that
+-- planeswalker or battle from combat doesn't remove that creature from combat.
+-- It continues to be an attacking creature, although it is not attacking any
+-- player, planeswalker, or battle. It may be blocked."
+--
+-- So the state pawl stores -- an attacker whose recorded target is no longer
+-- attackable -- and the state the rules describe -- an attacking creature
+-- attacking nothing -- are observationally the same board, and stay so until
+-- something asks a question that separates them. The candidate for that is a
+-- card whose text reads WHAT a creature is attacking (CR 508.3b's "whenever
+-- [a planeswalker] is attacked", CR 702.19c's trample over planeswalkers); none
+-- is in the pool (#537).
+stillAttacked :: ObjectId -> GameState -> Bool
+stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
+  -- No defending player is no attack (see Pawl.Types.Combat's defender field), so
+  -- nothing of theirs is being attacked either.
+  Nothing -> False
+  Just defender -> List.elem oid (attackablePlaneswalkers defender gs)
 
 isCreatureObject :: ObjectId -> GameState -> Bool
 isCreatureObject = isCreatureObjectGiven Map.empty
@@ -400,13 +472,27 @@ landwalkAllowsGiven grants pcs attacker gs =
         Keyword.Landwalk subtype -> Just subtype
         _ -> Nothing
       walked = Maybe.mapMaybe landTypeOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
-      -- CR 506.2/CR 508.1b: which player this creature is attacking. Read off the
-      -- attack itself rather than off the blocker's controller, because CR 702.14c
-      -- names the DEFENDING PLAYER -- the one CR 509.1a's blocker is defending --
-      -- and those two coincide only while there is exactly one of them (CR 802,
-      -- #175). Nothing means the object is not attacking, so no landwalk of its
-      -- can restrict anything.
-      defendingPlayer = fmap (\(AttackTarget.OfPlayer pid) -> pid) (Map.lookup attacker (Combat.attackers (GameState.combat gs)))
+      -- CR 508.5: "If an ability of an attacking creature refers to a defending
+      -- player ... the defending player it's referring to is the player that
+      -- creature is attacking, the controller of the planeswalker that creature
+      -- is attacking, or the protector of the battle that creature is attacking."
+      -- Landwalk is exactly such an ability, so this is that rule's own case
+      -- split, read off the attack itself rather than off the blocker's
+      -- controller -- those two coincide only while there is exactly one
+      -- defending player (CR 802, #175). Nothing means the object is not
+      -- attacking, so no landwalk of its can restrict anything.
+      --
+      -- CR 508.5's second sentence -- the planeswalker's controller "before it
+      -- was removed from combat", once the creature is no longer attacking -- is
+      -- last known information, and this reads the controller LIVE instead.
+      -- Unreachable in the pool, which has no card that can remove an attacked
+      -- planeswalker from combat and change who controlled it (#537), and
+      -- unobservable besides: no attacker in the pool has both landwalk and a
+      -- reason to attack a planeswalker.
+      defenderOf target = case target of
+        AttackTarget.OfPlayer pid -> Just pid
+        AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
+      defendingPlayer = defenderOf =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
       -- CR 702.14c's "at least one land with the specified land type" -- both
       -- halves of that phrase, because the rule states both. CR 205.3d ("an
       -- object can't gain a subtype that doesn't correspond to one of that
@@ -656,13 +742,15 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- blocked with nothing blocking it (Set.delete inside a surviving key) --
 -- CR 509.1h's last sentence, argued in full at that function.
 --
--- The types clause reads the creature card type ALONE, and that is exact today
--- rather than a simplification of CR 506.4d/e: those two subrules are about a
--- permanent that is also an ATTACKED planeswalker or battle, and nothing can be
--- one -- a planeswalker cannot be attacked (#493) and there is no battle card
--- type (#302) -- so nothing in pawl's combat record is anything but a creature.
--- CR 506.4's "becomes a battle" clause is unreachable for the same reason, and
--- "phases out" for phasing's (#154).
+-- Creatures only, which is what `combatants` gathers: an ATTACKED planeswalker
+-- is not in that set, and CR 506.4's clauses about one are answered where its
+-- target is read instead (stillAttacked, whose own haddock argues why the two
+-- are the same board). CR 506.4d/e are about a permanent that is both an
+-- attacked planeswalker and a blocking creature, or both a planeswalker and a
+-- battle, and nothing can be either: nothing in the pool prints two of those card
+-- types (#503) and there is no battle card type (#302). CR 506.4's "becomes a
+-- battle" clause is unreachable for that same reason, and "phases out" for
+-- phasing's (#154).
 --
 -- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
 -- clause, because there is nothing to compare it against and this only ever
@@ -759,6 +847,35 @@ chooseDefender = do
         State.modify' $ \g ->
           g {GameState.combat = (GameState.combat g) {Combat.defender = Just chosen}}
 
+-- CR 508.1b's announcement for ONE creature, and CR 508.4's choice for one
+-- creature put onto the battlefield attacking -- the same question, so the same
+-- function and the same prompt (Prompt.ChooseAttackTarget says why one and not
+-- two).
+--
+-- Not prompted with one candidate, which is CR 508.1b's own condition: the rule
+-- calls for an announcement only "if the defending player controls any
+-- planeswalkers, is the protector of any battles, or the game allows the active
+-- player to attack multiple other players", and attackTargets returns a lone
+-- defending player exactly when none of those holds. Where the rules leave
+-- nothing to ask, don't prompt.
+--
+-- An answer outside the candidate list is a broken interpreter, not a game
+-- state, and degrades to the first candidate -- the defending player, always a
+-- legal thing to attack and the least eventful answer. chooseDefender's posture
+-- and Replay.defaultAnswer's value for this prompt, which must agree with it for
+-- chooseDefender's reason: neither path can observe the other.
+announceAttackTarget :: PlayerId -> ObjectId -> NonEmpty.NonEmpty AttackTarget.AttackTarget -> Game AttackTarget.AttackTarget
+announceAttackTarget pid oid options = case options of
+  only NonEmpty.:| [] -> pure only
+  _ -> do
+    gs <- State.get
+    let decider = Decide.deciderFor pid gs
+    answer <- Trans.lift (Program.prompt (Prompt.ChooseAttackTarget decider pid oid options))
+    pure $
+      if List.elem answer (NonEmpty.toList options)
+        then answer
+        else NonEmpty.head options
+
 -- CR 508.1: the active player chooses which creatures attack (CR 508.1a), the
 -- declaration is judged against CR 508.1c's restrictions and CR 508.1d's
 -- requirements, and then they become tapped and attacking (CR 508.1f).
@@ -769,10 +886,9 @@ chooseDefender = do
 -- minted from the candidate list, so with no candidate there is nothing to
 -- require.
 --
--- The steps run here are CR 508.1a, 508.1c, 508.1d, 508.1f and 508.1k, in the
--- rule's own order, plus the event CR 508.1m's triggers watch. CR 508.1b's
--- announcement (#59) and CR 508.1g-508.1j's costs to attack (#460) are not
--- implemented.
+-- The steps run here are CR 508.1a, 508.1b, 508.1c, 508.1d, 508.1f and 508.1k, in
+-- the rule's own order, plus the event CR 508.1m's triggers watch. CR
+-- 508.1g-508.1j's costs to attack (#460) are not implemented.
 declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
@@ -785,16 +901,6 @@ declareAttackers pid = do
     -- the head-of-list behaviour this replaced.
     Nothing -> pure ()
     Just defender ->
-      -- CR 508.1b asks for a per-creature announcement only if the defending
-      -- player controls a planeswalker, protects a battle, or the game lets the
-      -- active player attack multiple other players. Every chosen creature
-      -- attacks the one defending player and no second prompt is issued (#59).
-      --
-      -- The planeswalker limb is no longer vacuous: a defending player CAN
-      -- control one now (Jace Beleren). What is missing is the other half of CR
-      -- 306.6 -- AttackTarget has no OfPlaneswalker arm to announce (#493) -- so
-      -- the prompt is elided because there is nothing to offer, not because the
-      -- rules leave nothing to ask.
       Monad.unless (null candidates) $ do
         let decider = Decide.deciderFor pid gs
         chosen <- Trans.lift (Program.prompt (Prompt.DeclareAttackers decider pid candidates))
@@ -844,20 +950,30 @@ declareAttackers pid = do
               if Projection.hasKeyword Keyword.Vigilance oid g
                 then g
                 else g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
-            recorded = Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer defender)) attacking)
             -- CR 506.4's comparand, taken here because here is where the creature
             -- joins combat. `pid` and not a fresh Projection.controllerOf call:
             -- canAttack has already required controllerOf == Just pid of every
             -- creature in `attacking` (CR 508.1a), so the two are the same value
             -- and this one cannot disagree with the legality check.
             joined = Map.fromList (fmap (\oid -> (oid, pid)) attacking)
-            -- UNIONED into the record, not written over it. Nothing in the pool
-            -- can have joined combat before this runs -- putOntoBattlefieldAttacking
-            -- is reachable only from a resolution, and the earliest one is the
-            -- priority round after this action -- but "the record is mine alone"
-            -- is exactly the assumption CR 508.8's second clause breaks, and
-            -- replacing the map would silently remove such a creature from combat.
-            attach g =
+            -- CR 508.1b's candidates, taken ONCE for the whole declaration and
+            -- from the state it is judged against: a pure `Prompt r -> r` cannot
+            -- change the board between two announcements, so per-creature
+            -- derivation would be the same battlefield walk for the same answer.
+            targets = attackTargets defender gs
+        -- CR 508.1b: the announcement, one question per chosen creature. Taken
+        -- here rather than beside the CR 508.1a prompt because that is the rule's
+        -- own order, and asked of `attacking` rather than of `chosen` so that a
+        -- creature the CR 508.1d degradation dropped is never announced -- on
+        -- every path but a broken interpreter's the two lists are equal anyway.
+        recorded <- fmap Map.fromList (Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid targets)) attacking)
+        -- UNIONED into the record, not written over it. Nothing in the pool
+        -- can have joined combat before this runs -- putOntoBattlefieldAttacking
+        -- is reachable only from a resolution, and the earliest one is the
+        -- priority round after this action -- but "the record is mine alone"
+        -- is exactly the assumption CR 508.8's second clause breaks, and
+        -- replacing the map would silently remove such a creature from combat.
+        let attach g =
               g
                 { GameState.combat =
                     (GameState.combat g)
@@ -866,9 +982,11 @@ declareAttackers pid = do
                         -- CR 508.8's first clause, recorded here because here is
                         -- where the declaration happens. Never cleared, so a
                         -- CR 506.4 removal later in the step cannot un-declare
-                        -- these creatures.
-                        Combat.attackersJoined =
-                          Combat.attackersJoined (GameState.combat g) || not (null attacking)
+                        -- these creatures, and never narrowed to the targets still
+                        -- being attacked -- Pawl.Types.Combat's `attacked` field
+                        -- says why both readers want the historical answer.
+                        Combat.attacked =
+                          Set.union (Set.fromList (Map.elems recorded)) (Combat.attacked (GameState.combat g))
                       }
                 }
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
@@ -878,6 +996,10 @@ declareAttackers pid = do
         -- the battlefield attacking. Recorded after the record is written, so the
         -- board a trigger's intervening-if clause reads (CR 603.4) already has
         -- these creatures attacking.
+        --
+        -- The event names the creature and not what it was announced as
+        -- attacking, so CR 508.3a's "attacks [a player, planeswalker, or
+        -- battle]", CR 508.3b and CR 508.3e are unavailable (#538).
         State.modify' (\g -> List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid) h) g attacking)
 
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
@@ -916,17 +1038,22 @@ declareAttackers pid = do
 -- player at all (see Pawl.Types.Combat's defender field), so there is nobody for
 -- the creature to be attacking.
 --
--- CR 508.4's CHOICE is not prompted, because there is exactly one candidate: one
--- defending player (CR 506.2 at two seats; CR 802's attack-multiple-players
--- option is unavailable, #175), no ATTACKABLE planeswalkers (the card type
--- exists, but CR 306.6 does not, #493) and no battles (#302).
--- Two rulings make the choice real once any of those lands -- Hanweir Garrison's
--- ("You choose which player, planeswalker, or battle each token is attacking as
--- you create the tokens ... the tokens don't both have to attack the same one")
--- and Meandering Towershell's ("you choose which opponent or opposing
--- planeswalker it's attacking. It doesn't have to attack the same opponent ...
--- that it was when it was exiled") -- so this becomes a per-permanent prompt
--- then (#367).
+-- CR 508.4's CHOICE is prompted per permanent, over the same candidates CR
+-- 508.1b's declaration offers, and two rulings say it must be: Hanweir
+-- Garrison's ("You choose which player, planeswalker, or battle each token is
+-- attacking as you create the tokens ... the tokens don't both have to attack
+-- the same one") and Meandering Towershell's ("you choose which opponent or
+-- opposing planeswalker it's attacking. It doesn't have to attack the same
+-- opponent ... that it was when it was exiled"). It is elided at one candidate,
+-- which is every board with no planeswalker on the defending player's side --
+-- so a pool without one behaves exactly as it did before the prompt existed.
+--
+-- CR 508.4a's remaining clauses -- a planeswalker "no longer on the battlefield,
+-- ... no longer a planeswalker or battle, [or] a planeswalker that is no longer
+-- controlled by a defending player" -- need no check of their own: attackTargets
+-- derives the offer from the board AT THIS MOMENT, so a candidate it lists
+-- satisfies all three, and the degradation for an out-of-list answer is the
+-- defending player, whom the guard below has already checked is in the game.
 --
 -- CR 508.4d ("a creature that's put onto the battlefield attacking during the
 -- declare blockers step, combat damage step, or end of combat step enters the
@@ -944,22 +1071,26 @@ putOntoBattlefieldAttacking oid = do
         -- CR 506.3b / CR 506.2: the attacking player is the active player
         controller == GameState.activePlayer gs,
         -- CR 506.3c / CR 508.4a
-        List.elem defender (Game.stillPlaying gs) ->
+        List.elem defender (Game.stillPlaying gs) -> do
+          -- CR 508.4: "its controller chooses", and by the guard above that
+          -- controller is the attacking player -- so the chooser is the same
+          -- player CR 508.1b asks, which is what lets the two share one prompt.
+          target <- announceAttackTarget controller oid (attackTargets defender gs)
           State.put
             gs
               { GameState.combat =
                   c
-                    { Combat.attackers = Map.insert oid (AttackTarget.OfPlayer defender) (Combat.attackers c),
+                    { Combat.attackers = Map.insert oid target (Combat.attackers c),
                       -- CR 506.4's comparand, for the same reason declareAttackers
                       -- takes one: this is where the creature joins combat.
                       Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c),
                       -- CR 508.8's SECOND clause -- "or put onto the battlefield
-                      -- attacking". Set inside the guards, and so here rather
+                      -- attacking". Written inside the guards, and so here rather
                       -- than in Resolve's Create arm: CR 506.3a-c and CR 508.4a
                       -- each let the permanent enter while it is "never
                       -- considered to be an attacking creature", and one that
                       -- never became an attacker cannot answer this rule.
-                      Combat.attackersJoined = True
+                      Combat.attacked = Set.insert target (Combat.attacked c)
                     }
               }
     _ -> pure ()

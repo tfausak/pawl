@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
@@ -310,22 +311,25 @@ restrictionMet pid gs restriction = case restriction of
 --
 -- CR 506.2: "During the combat phase of a two-player game, the nonactive player
 -- is the defending player; that player, planeswalkers they control, and battles
--- they protect may be attacked." Combat.defender is that player, so being
--- attacked at all requires being them. CR 508.8's Combat.attackersJoined is the
--- other half -- whether "creatures [have been] declared as attackers or put onto
--- the battlefield attacking" -- and it is the HISTORICAL flag rather than
--- Combat.attackers, because CR 506.4 removing the lone attacker from combat does
--- not un-attack anybody.
+-- they protect may be attacked." So the question is whether any creature was
+-- declared attacking -- or put onto the battlefield attacking (CR 508.8) -- THIS
+-- PLAYER, rather than a planeswalker of theirs, which is exactly membership in
+-- Combat.attacked.
 --
 -- Eightfold Maze's ruling is the reading pinned here, both sentences of it: "If
 -- all the attacking creatures attack your planeswalkers, you can't cast Eightfold
--- Maze. To cast it, a creature needs to have attacked _you_." pawl has no
--- way to attack a planeswalker (CR 306.6, #493) and one defending player (CR
--- 802's attack-multiple-players option is unavailable, #175), so every attack in
--- this pool is aimed at that player and the two conjuncts are the whole question.
+-- Maze. To cast it, a creature needs to have attacked _you_." That second
+-- sentence is why this cannot be emptiness of the record, and CR 306.6 is what
+-- made it observable: a creature really can attack a planeswalker instead.
+--
+-- Membership in the HISTORICAL set rather than a search of Combat.attackers,
+-- because CR 506.4 removing the lone attacker from combat does not un-attack
+-- anybody -- see Pawl.Types.Combat's `attacked` field. No separate
+-- Combat.defender test either: only a defending player can be attacked, so an
+-- OfPlayer entry naming this player IS that conjunct.
 --
 -- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
--- combat PHASE. The two spans coincide for every card in the pool -- the flag is
+-- combat PHASE. The two spans coincide for every card in the pool -- the set is
 -- written only by Pawl.Engine.Combat.declareAttackers (CR 508.1, the declare attackers
 -- step's turn-based action) and by putOntoBattlefieldAttacking, whose every
 -- producer resolves in a declare attackers step (a CR 508.3a attack trigger,
@@ -335,8 +339,7 @@ restrictionMet pid gs restriction = case restriction of
 -- part them, and none is built (#368).
 attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
-  let combat = GameState.combat gs
-   in Combat.defender combat == Just pid && Combat.attackersJoined combat
+  Set.member (AttackTarget.OfPlayer pid) (Combat.attacked (GameState.combat gs))
 
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least

@@ -257,6 +257,11 @@ identityAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  -- CR 508.1b: the defending player, which Combat.attackTargets puts first --
+  -- the answer every attack in a planeswalker-less pool gets anyway. A test that
+  -- wants a planeswalker attacked says so with its own interpreter, which is what
+  -- makes that answer discriminating.
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter isCreatureRecipient (Map.keys thresholds) of
@@ -309,6 +314,7 @@ castAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter isCreatureRecipient (Map.keys thresholds) of
@@ -372,6 +378,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
     a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
@@ -435,6 +442,7 @@ playLandAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter isCreatureRecipient (Map.keys thresholds) of
@@ -528,6 +536,15 @@ randomAnswer p = case p of
     let (keep, g') = Random.uniformR (0, length ids) g
     State.put g'
     pure (take keep ids)
+  -- CR 508.1b: a random target, so a random game with a planeswalker on the
+  -- defending side explores attacking it as well as its controller (the
+  -- ChooseDefender posture).
+  Prompt.ChooseAttackTarget _ _ _ options -> do
+    g <- State.get
+    let targets = NonEmpty.toList options
+        (i, g') = Random.uniformR (0, length targets - 1) g
+    State.put g'
+    pure (pickFrom options i)
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> pure Map.empty
     a : _ -> do
