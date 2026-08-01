@@ -4,7 +4,7 @@ module Pawl.Codec.CounterKind where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
+import qualified Pawl.Codec.Keyword as Keyword
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.CounterKind as CounterKind
 
@@ -15,7 +15,7 @@ counterKindToJson :: CounterKind.CounterKind -> Value
 counterKindToJson k = case k of
   CounterKind.PlusOnePlusOne -> Json.nullary (Text.pack "PlusOnePlusOne")
   CounterKind.MinusOneMinusOne -> Json.nullary (Text.pack "MinusOneMinusOne")
-  CounterKind.Keyword kw -> Json.tagged (Text.pack "Keyword") (Just (keywordToJson kw))
+  CounterKind.Keyword kw -> Json.tagged (Text.pack "Keyword") (Just (Keyword.toJson kw))
   CounterKind.Loyalty -> Json.nullary (Text.pack "Loyalty")
 
 jsonToCounterKind :: Value -> Either Text CounterKind.CounterKind
@@ -24,6 +24,6 @@ jsonToCounterKind value = do
   case (Text.unpack t, mv) of
     ("PlusOnePlusOne", _) -> Right CounterKind.PlusOnePlusOne
     ("MinusOneMinusOne", _) -> Right CounterKind.MinusOneMinusOne
-    ("Keyword", Just v) -> CounterKind.Keyword <$> jsonToKeyword v
+    ("Keyword", Just v) -> CounterKind.Keyword <$> Keyword.fromJson v
     ("Loyalty", _) -> Right CounterKind.Loyalty
     _ -> Left (Text.pack "unknown CounterKind: " <> t)

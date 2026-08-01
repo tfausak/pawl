@@ -20,6 +20,7 @@ import qualified Pawl.Codec.ColorSpec
 import qualified Pawl.Codec.CombatStepSpec
 import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
+import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostSpec
@@ -37,6 +38,7 @@ import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FilterSpec
+import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaProductionSpec
@@ -58,7 +60,9 @@ import qualified Pawl.Codec.PlayerIdSpec
 import qualified Pawl.Codec.PlayerRefSpec
 import qualified Pawl.Codec.PlayerRelationSpec
 import qualified Pawl.Codec.PlayerScopeSpec
+import qualified Pawl.Codec.PlayerStaticAbilitySpec
 import qualified Pawl.Codec.PoolSpec
+import qualified Pawl.Codec.PowerSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
@@ -71,6 +75,7 @@ import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetSpecSpec
 import qualified Pawl.Codec.TokenPatternSpec
+import qualified Pawl.Codec.ToughnessSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TurnScopeSpec
 import qualified Pawl.Codec.TypeLineSpec
@@ -191,6 +196,7 @@ spec s registry = do
   Pawl.Codec.CombatStepSpec.spec s
   Pawl.Codec.CommonSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
+  Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostSpec.spec s
@@ -208,6 +214,7 @@ spec s registry = do
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FilterSpec.spec s
+  Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaProductionSpec.spec s
@@ -229,7 +236,9 @@ spec s registry = do
   Pawl.Codec.PlayerRefSpec.spec s
   Pawl.Codec.PlayerRelationSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s
+  Pawl.Codec.PlayerStaticAbilitySpec.spec s
   Pawl.Codec.PoolSpec.spec s
+  Pawl.Codec.PowerSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
@@ -242,6 +251,7 @@ spec s registry = do
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TargetSpecSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
+  Pawl.Codec.ToughnessSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s

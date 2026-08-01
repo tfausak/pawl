@@ -5,7 +5,7 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
-import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.TriggerCondition (jsonToTriggerCondition, triggerConditionToJson)
@@ -21,7 +21,7 @@ triggeredAbilityToJson codec ta =
       ]
         <> ( case TriggeredAbility.intervening ta of
                Nothing -> []
-               Just c -> [(Text.pack "intervening", conditionToJson c)]
+               Just c -> [(Text.pack "intervening", Condition.toJson c)]
            )
     )
 
@@ -30,7 +30,7 @@ jsonToTriggeredAbility decode value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "condition") ps >>= jsonToTriggerCondition
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal decode
-  i <- Json.maybeFrom jsonToCondition (Json.getOpt (Text.pack "intervening") ps)
+  i <- Json.maybeFrom Condition.fromJson (Json.getOpt (Text.pack "intervening") ps)
   pure
     TriggeredAbility.MkTriggeredAbility
       { TriggeredAbility.condition = c,

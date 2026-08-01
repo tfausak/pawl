@@ -11,7 +11,7 @@ import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Affected as Affected
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
-import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
+import qualified Pawl.Codec.Condition as Condition
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
@@ -20,14 +20,11 @@ import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.Mode (jsonToMode, modeToJson)
 import qualified Pawl.Codec.ModeSelection as ModeSelection
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import qualified Pawl.Codec.Optionality as Optionality
-import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
-import Pawl.Codec.Power (jsonToPower, powerToJson)
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
 import qualified Pawl.Codec.Quantity as Quantity
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
@@ -87,7 +84,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
-import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -110,7 +106,6 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
-import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
@@ -155,72 +150,10 @@ optionalityKey value = case J.asObject value of
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Codec" $ do
+  -- Keyword's own per-constructor coverage, including the payload-bearing
+  -- Landwalk/Cycling/Flashback/Entwine/Poisonous/Toxic arms, lives in
+  -- Pawl.Codec.KeywordSpec now.
   Spec.describe s "leaf enums" $ do
-    Spec.it s "Keyword" $
-      roundTrip s "kw" keywordToJson jsonToKeyword Keyword.Trample
-    Spec.it s "Keyword.Infect" $
-      roundTrip s "infect" keywordToJson jsonToKeyword Keyword.Infect
-    -- CR 702.18a's shroud is nullary, so what this pins is the TAG: a Blurred
-    -- Mongoose that decoded as anything else would be a legal Doom Blade target.
-    Spec.it s "Keyword.Shroud" $ do
-      roundTrip s "shroud" keywordToJson jsonToKeyword Keyword.Shroud
-      Spec.assertBool s (keywordToJson Keyword.Shroud /= keywordToJson Keyword.Trample) "shroud is not trample"
-    -- CR 702.164a's N rides the constructor, so this is the first keyword
-    -- that is not a bare tag.
-    Spec.it s "Keyword.Toxic carries its N" $ do
-      roundTrip s "toxic 1" keywordToJson jsonToKeyword (Keyword.Toxic 1)
-      roundTrip s "toxic 2" keywordToJson jsonToKeyword (Keyword.Toxic 2)
-      Spec.assertBool s (keywordToJson (Keyword.Toxic 1) /= keywordToJson (Keyword.Toxic 2)) "toxic 1 and toxic 2 encode differently"
-    -- CR 702.70a's N rides the constructor the same way. The two payloaded
-    -- keywords must not share a tag, or Snake Cult Initiation would decode
-    -- as toxic 3.
-    Spec.it s "Keyword.Poisonous carries its N" $ do
-      roundTrip s "poisonous 1" keywordToJson jsonToKeyword (Keyword.Poisonous 1)
-      roundTrip s "poisonous 3" keywordToJson jsonToKeyword (Keyword.Poisonous 3)
-      Spec.assertBool s (keywordToJson (Keyword.Poisonous 3) /= keywordToJson (Keyword.Toxic 3)) "poisonous 3 is not toxic 3"
-    -- CR 702.34a's payload is a whole Cost, not a number -- the first
-    -- keyword whose parameter is itself a composite.
-    Spec.it s "Keyword.Flashback carries its cost" $ do
-      let flashback n =
-            Keyword.Flashback
-              Cost.Type.MkCost
-                { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic n]),
-                  Cost.Type.components = []
-                }
-      roundTrip s "flashback {1}" keywordToJson jsonToKeyword (flashback 1)
-      roundTrip s "flashback {4}" keywordToJson jsonToKeyword (flashback 4)
-      Spec.assertBool s (keywordToJson (flashback 1) /= keywordToJson (flashback 4)) "the cost is part of the encoding"
-    -- CR 702.42a's payload is a whole Cost too, and it must not share
-    -- Flashback's tag: Dream's Grip may not decode as a card castable from
-    -- a graveyard.
-    Spec.it s "Keyword.Entwine carries its cost, and is not Flashback" $ do
-      let entwine n =
-            Keyword.Entwine
-              Cost.Type.MkCost
-                { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic n]),
-                  Cost.Type.components = []
-                }
-          flashbackOf n =
-            Keyword.Flashback
-              Cost.Type.MkCost
-                { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic n]),
-                  Cost.Type.components = []
-                }
-      roundTrip s "entwine {1}" keywordToJson jsonToKeyword (entwine 1)
-      roundTrip s "entwine {3}" keywordToJson jsonToKeyword (entwine 3)
-      Spec.assertBool s (keywordToJson (entwine 1) /= keywordToJson (entwine 3)) "the cost is part of the encoding"
-      Spec.assertBool s (keywordToJson (entwine 1) /= keywordToJson (flashbackOf 1)) "entwine {1} is not flashback {1}"
-    -- CR 702.14a's "[type]" rides the constructor, so swampwalk and
-    -- islandwalk are DIFFERENT keywords and must encode differently -- a
-    -- Bog Wraith that decoded as an islandwalker would be blockable
-    -- exactly when it should not be.
-    Spec.it s "Keyword.Landwalk carries its land type" $ do
-      roundTrip s "swampwalk" keywordToJson jsonToKeyword (Keyword.Landwalk Subtype.Swamp)
-      roundTrip s "islandwalk" keywordToJson jsonToKeyword (Keyword.Landwalk Subtype.Island)
-      Spec.assertBool
-        s
-        (keywordToJson (Keyword.Landwalk Subtype.Swamp) /= keywordToJson (Keyword.Landwalk Subtype.Island))
-        "swampwalk and islandwalk encode differently"
     Spec.it s "CounterKind" $ do
       Spec.assertEqWith s "plus" (jsonToCounterKind (counterKindToJson CounterKind.PlusOnePlusOne)) (Right CounterKind.PlusOnePlusOne)
       Spec.assertEqWith s "minus" (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne)) (Right CounterKind.MinusOneMinusOne)
@@ -228,9 +161,9 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       Spec.assertEqWith s "loyalty" (jsonToCounterKind (counterKindToJson CounterKind.Loyalty)) (Right CounterKind.Loyalty)
   -- Quantity's own per-constructor coverage (including the tagged-object shape
   -- and the InSlot-nested-under-Plus payload check) lives in
-  -- Pawl.Codec.QuantitySpec now; ManaCost's lives in Pawl.Codec.ManaCostSpec.
-  Spec.describe s "mana + quantity (tagged-sum trap)" . Spec.it s "Power round-trips" $
-    roundTrip s "pow" powerToJson jsonToPower (Power.MkPower (Quantity.Literal 2))
+  -- Pawl.Codec.QuantitySpec now; ManaCost's lives in Pawl.Codec.ManaCostSpec;
+  -- Power's (and Toughness's) delegating codec lives in Pawl.Codec.PowerSpec
+  -- and Pawl.Codec.ToughnessSpec.
   Spec.describe s "modification + affected" $ do
     Spec.it s "GainKeyword" $
       roundTrip s "m1" modificationToJson jsonToModification (Modification.GainKeyword Keyword.Deathtouch)
@@ -394,8 +327,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   Spec.describe s "duration + condition" $ do
     Spec.it s "Duration.UntilYourNextTurn round-trips" $
       Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson Duration.UntilYourNextTurn)) (Right Duration.UntilYourNextTurn)
-    Spec.it s "S.youControlSource round-trips as a Condition" $
-      Spec.assertEqWith s "preserved" (jsonToCondition (conditionToJson S.youControlSource)) (Right S.youControlSource)
+    -- Condition's own per-constructor coverage lives in Pawl.Codec.ConditionSpec
+    -- now.
     Spec.it s "Duration.ForAsLongAs round-trips with its condition" $
       let d = Duration.ForAsLongAs S.youControlSource
        in Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson d)) (Right d)
@@ -434,13 +367,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
             Affected.Attached
             (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
         )
-    Spec.it s "PlayerStaticAbility round-trips" $
-      roundTrip
-        s
-        "ability"
-        playerStaticAbilityToJson
-        jsonToPlayerStaticAbility
-        (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1))
+    -- PlayerStaticAbility's own per-constructor coverage lives in
+    -- Pawl.Codec.PlayerStaticAbilitySpec now.
     Spec.it s "a Card carrying player abilities round-trips" $ do
       bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
@@ -749,13 +677,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "ev" gameEventToJson jsonToGameEvent (GameEvent.SpellCast S.alice)
     Spec.it s "GameEvent.BecameMonarch" $
       roundTrip s "bm" gameEventToJson jsonToGameEvent (GameEvent.BecameMonarch S.alice)
-    -- CR 702.29c's event, carrying the incarnation the cycled card became.
-    -- CR 702.29e: the typecycling filter rides the same keyword arm, absent
-    -- for plain cycling -- so both spellings have to survive the trip.
-    Spec.it s "Keyword.Cycling round-trips with and without a typecycling filter" $ do
-      let cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
-      roundTrip s "cyc" keywordToJson jsonToKeyword (Keyword.Cycling cost Nothing)
-      roundTrip s "typecyc" keywordToJson jsonToKeyword (Keyword.Cycling cost (Just (Filter.Type.HasCardType CardType.Land)))
+    -- Keyword.Cycling's own round trip, with and without a typecycling
+    -- filter, lives in Pawl.Codec.KeywordSpec now.
     -- CR 701.9a's event, carrying the incarnation the discarded card
     -- became. Both causes, because the cause is what tells a cycle from an
     -- ordinary discard (CR 702.29c) and a trip that flattened it would
@@ -852,7 +775,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn)
     Spec.it s "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $
       mapM_
-        (roundTrip s "condition" conditionToJson jsonToCondition)
+        (roundTrip s "condition" Condition.toJson Condition.fromJson)
         [S.youControlNoSwamps, noZombiesOnBattlefield]
     Spec.it s "TriggerCondition.StateIs round-trips" $
       roundTrip
@@ -953,18 +876,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
        in roundTrip s "ta" (triggeredAbilityToJson cardToJson) (jsonToTriggeredAbility jsonToCard) ability
   -- Count's own per-constructor coverage (in a zone, over the event history,
   -- and scoped to a slot) lives in Pawl.Codec.CountSpec now; Quantity's Count
-  -- arm and its nested-Greatest recursion live in Pawl.Codec.QuantitySpec.
-  Spec.describe s "count + condition (M5.5 T2)" . Spec.it s "Condition round-trips at every comparison" $
-    mapM_
-      (roundTrip s "condition" conditionToJson jsonToCondition)
-      [ Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.Exactly (Quantity.Literal 0),
-        Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtLeast (Quantity.Literal 3),
-        Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtMost (Quantity.Literal 1),
-        -- Both sides non-Count, which the Count-on-the-left shape could
-        -- not say at all: Deathknell Berserker's "if its power was 3 or
-        -- greater" (CR 603.4).
-        Condition.Type.MkCondition Quantity.Power Comparison.AtLeast (Quantity.Literal 3)
-      ]
+  -- arm and its nested-Greatest recursion live in Pawl.Codec.QuantitySpec;
+  -- Condition's own every-comparison coverage (including both sides
+  -- non-Count, which the Count-on-the-left shape this type replaced could not
+  -- say at all -- Deathknell Berserker's "if its power was 3 or greater", CR
+  -- 603.4) lives in Pawl.Codec.ConditionSpec.
   -- Pawl.Types.Effect is parametric in `card` so that Pawl.Types stays an
   -- acyclic module graph, and the codec mirrors that: the encoder reaches
   -- its card payload ONLY through the codec it is handed. Proving it at two
@@ -982,14 +898,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
 -- any Value at all, so long as both instantiations are given the same one.
 sentinel :: Value.Value
 sentinel = J.jText (Text.pack "SENTINEL")
-
--- A count with every axis non-default, so a codec that drops one is caught.
-zeroSwamps :: Count.Type.Count Quantity.Quantity
-zeroSwamps =
-  Count.Type.MkCount
-    (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
-    (Filter.Type.HasSubtype Subtype.Swamp)
-    Aggregation.Objects
 
 -- Sarcomancy's migrated intervening "if" (retired
 -- StateCondition.NoPermanentsOfSubtype Zombie -- CR 603.4): ANY player's

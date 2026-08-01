@@ -3,7 +3,7 @@ module Pawl.Types.PlayerStaticAbility where
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import Pawl.Types.PlayerScope (PlayerScope)
 
--- A card's printed player/rules-modifying static ability (CR 604.1/604.2: a
+-- | A card's printed player/rules-modifying static ability (CR 604.1/604.2: a
 -- static ability creates a continuous effect active while its permanent is on
 -- the battlefield). The player-axis sibling of Pawl.Types.StaticAbility, whose
 -- Affected/Modification pair this mirrors with a PlayerScope/PlayerEffect pair.

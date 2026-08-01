@@ -3,7 +3,7 @@ module Pawl.Types.Condition where
 import Pawl.Types.Comparison (Comparison)
 import Pawl.Types.Quantity (Quantity)
 
--- A predicate over game STATE rather than over an event, with three customers
+-- | A predicate over game STATE rather than over an event, with three customers
 -- and one vocabulary: a state trigger's condition (CR 603.8, checked at every
 -- CR 117.5 boundary), an intervening "if" (CR 603.4 when the trigger event
 -- occurs, CR 608.2a again on resolution), and a "for as long as" duration

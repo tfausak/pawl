@@ -8,7 +8,7 @@ import Pawl.Codec.Card (cardToJson, jsonToCard)
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.Quantity as Quantity
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
@@ -24,7 +24,7 @@ projectedCharacteristicsToJson pc =
   Json.jObject
     [ (Text.pack "name", Json.jText (PC.name pc)),
       (Text.pack "supertypes", Json.setTo Supertype.toJson (PC.supertypes pc)),
-      (Text.pack "keywords", Json.multisetTo keywordToJson (PC.keywords pc)),
+      (Text.pack "keywords", Json.multisetTo Keyword.toJson (PC.keywords pc)),
       (Text.pack "colors", Json.setTo Color.toJson (PC.colors pc)),
       (Text.pack "power", Json.maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", Json.maybeTo Json.jInt (PC.toughness pc)),
@@ -42,7 +42,7 @@ jsonToProjectedCharacteristics value = do
   ps <- Json.asObject value
   nm <- Json.field (Text.pack "name") ps >>= Json.asText
   sups <- Json.field (Text.pack "supertypes") ps >>= Json.setFrom Supertype.fromJson
-  kws <- Json.field (Text.pack "keywords") ps >>= Json.multisetFrom jsonToKeyword
+  kws <- Json.field (Text.pack "keywords") ps >>= Json.multisetFrom Keyword.fromJson
   cols <- Json.field (Text.pack "colors") ps >>= Json.setFrom Color.fromJson
   -- power/toughness/characteristicPT are encoded as required keys (Json.maybeTo
   -- writes JSON null for Nothing, never omits the key), so decoding them is

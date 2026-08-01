@@ -6,7 +6,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.Subtype as Subtype
@@ -16,7 +16,7 @@ import qualified Pawl.Types.Modification as Modification
 
 modificationToJson :: Modification.Modification -> Value
 modificationToJson m = case m of
-  Modification.GainKeyword k -> Json.tagged (Text.pack "GainKeyword") (Just (keywordToJson k))
+  Modification.GainKeyword k -> Json.tagged (Text.pack "GainKeyword") (Just (Keyword.toJson k))
   Modification.LoseAllAbilities -> Json.nullary (Text.pack "LoseAllAbilities")
   Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array (MkArray [Quantity.toJson p, Quantity.toJson t])))
   Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array (MkArray [Quantity.toJson p, Quantity.toJson t])))
@@ -36,7 +36,7 @@ jsonToModification value = do
         Just (Array (MkArray [x, y])) -> Right (x, y)
         _ -> Left (Text.pack "expected a two-element array")
   case Text.unpack t of
-    "GainKeyword" -> Json.withValue mv (fmap Modification.GainKeyword . jsonToKeyword)
+    "GainKeyword" -> Json.withValue mv (fmap Modification.GainKeyword . Keyword.fromJson)
     "LoseAllAbilities" -> Right Modification.LoseAllAbilities
     "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
     "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y

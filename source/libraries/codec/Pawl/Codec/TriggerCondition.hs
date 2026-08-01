@@ -3,7 +3,7 @@ module Pawl.Codec.TriggerCondition where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Phase as Phase
@@ -19,7 +19,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> Json.nullary (Text.pack "SelfEnters")
   TriggerCondition.PermanentEnters f -> Json.tagged (Text.pack "PermanentEnters") (Just (Filter.toJson f))
   TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array (MkArray [Phase.toJson p, TurnScope.toJson s])))
-  TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
+  TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (Condition.toJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Json.nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> Json.nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
   TriggerCondition.SelfAttacks f -> Json.tagged (Text.pack "SelfAttacks") (Just (TriggerFrequency.toJson f))
@@ -37,7 +37,7 @@ jsonToTriggerCondition value = do
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> Filter.fromJson v
     ("StepBegins", Just (Array (MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Phase.fromJson p <*> TurnScope.fromJson s
-    ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
+    ("StateIs", Just v) -> TriggerCondition.StateIs <$> Condition.fromJson v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> TriggerFrequency.fromJson v

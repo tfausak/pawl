@@ -1,13 +1,12 @@
--- | The @Power ⇆ Json@ codec (#481).
 module Pawl.Codec.Power where
 
-import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Quantity as Quantity
-import Pawl.Json.Value (Value)
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Power as Power
 
-powerToJson :: Power.Power -> Value
-powerToJson (Power.MkPower q) = Quantity.toJson q
+toJson :: Power.Power -> Value.Value
+toJson = Quantity.toJson . Power.unwrap
 
-jsonToPower :: Value -> Either Text Power.Power
-jsonToPower value = Power.MkPower <$> Quantity.fromJson value
+fromJson :: Value.Value -> Either Text.Text Power.Power
+fromJson = fmap Power.MkPower . Quantity.fromJson

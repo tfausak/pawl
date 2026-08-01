@@ -5,7 +5,7 @@ import Pawl.Types.Cost (Cost)
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.Subtype (Subtype)
 
--- CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
+-- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
 --
 -- Casing on this is NOT a violation of the closed/open invariant. That invariant
@@ -43,7 +43,7 @@ data Keyword
   | Flying -- 702.9
   | Haste -- 702.10
   | Indestructible -- 702.12
-  | -- 702.14a: "Landwalk is a generic term that appears within an object's rules
+  | -- | 702.14a: "Landwalk is a generic term that appears within an object's rules
     -- text as '[type]walk,' where [type] is usually a land type, but it can also
     -- be the card type land plus any combination of land types, card types,
     -- and/or supertypes."
@@ -62,7 +62,7 @@ data Keyword
     -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
     Landwalk Subtype
   | Reach -- 702.17
-  | -- 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
+  | -- | 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
     -- player can't be the target of spells or abilities.'"
     --
     -- The pool's first TARGETING RESTRICTION, and so far the only keyword the CR
@@ -77,7 +77,7 @@ data Keyword
     Shroud
   | Trample -- 702.19
   | Vigilance -- 702.20
-  | -- 702.29a: "Cycling is an activated ability that functions only while the
+  | -- | 702.29a: "Cycling is an activated ability that functions only while the
     -- card with cycling is in a player's hand. 'Cycling [cost]' means '[Cost],
     -- Discard this card: Draw a card.'"
     --
@@ -107,7 +107,7 @@ data Keyword
     -- type, subtype, supertype, or combination thereof (as in 'basic
     -- landcycling')" -- which is a Filter's whole job.
     Cycling Cost (Maybe Filter)
-  | -- 702.34a: "Flashback appears on some instants and sorceries. It represents
+  | -- | 702.34a: "Flashback appears on some instants and sorceries. It represents
     -- two static abilities: one that functions while the card is in a player's
     -- graveyard and another that functions while the card is on the stack.
     -- 'Flashback [cost]' means 'You may cast this card from your graveyard if
@@ -127,7 +127,7 @@ data Keyword
     -- (Keyword.flashbackExile).
     Flashback Cost
   | Fear -- 702.36
-  | -- 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
+  | -- | 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
     -- that functions while the spell is on the stack. 'Entwine [cost]' means
     -- 'You may choose all modes of this spell instead of just the number
     -- specified. If you do, you pay an additional [cost].' Using the entwine
@@ -146,7 +146,7 @@ data Keyword
     -- the payload's own mode count (Modal.modeCount) rather than a number
     -- restated here, and Pawl.Types.ModeSelection stays what the card PRINTS.
     Entwine Cost
-  | -- 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
+  | -- | 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
     -- this creature deals combat damage to a player, that player gets N poison
     -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the
     -- N values are NOT summed: CR 702.70b says each instance triggers
@@ -156,7 +156,7 @@ data Keyword
     Poisonous Natural
   | Infect -- 702.90
   | Devoid -- 702.114
-  | -- 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
+  | -- | 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
     -- a number." N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over
     -- every toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --

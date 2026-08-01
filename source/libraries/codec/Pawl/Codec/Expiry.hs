@@ -3,7 +3,7 @@ module Pawl.Codec.Expiry where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.PlayerId as PlayerId
 import Pawl.Json.Array (Array (MkArray))
@@ -18,7 +18,7 @@ expiryToJson :: Expiry.Expiry -> Value
 expiryToJson e = case e of
   Expiry.AtCleanup -> Json.nullary (Text.pack "AtCleanup")
   Expiry.Never -> Json.nullary (Text.pack "Never")
-  Expiry.While p c -> Json.tagged (Text.pack "While") (Just (Array (MkArray [PlayerId.toJson p, conditionToJson c])))
+  Expiry.While p c -> Json.tagged (Text.pack "While") (Just (Array (MkArray [PlayerId.toJson p, Condition.toJson c])))
   Expiry.AtTurnOf p -> Json.tagged (Text.pack "AtTurnOf") (Just (PlayerId.toJson p))
 
 jsonToExpiry :: Value -> Either Text Expiry.Expiry
@@ -27,6 +27,6 @@ jsonToExpiry value = do
   case (Text.unpack t, mv) of
     ("AtCleanup", _) -> Right Expiry.AtCleanup
     ("Never", _) -> Right Expiry.Never
-    ("While", Just (Array (MkArray [p, c]))) -> Expiry.While <$> PlayerId.fromJson p <*> jsonToCondition c
+    ("While", Just (Array (MkArray [p, c]))) -> Expiry.While <$> PlayerId.fromJson p <*> Condition.fromJson c
     ("AtTurnOf", Just v) -> Expiry.AtTurnOf <$> PlayerId.fromJson v
     _ -> Left (Text.pack "unknown Expiry: " <> t)

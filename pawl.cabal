@@ -96,6 +96,7 @@ library codec
     Pawl.Codec.Comparison
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
+    Pawl.Codec.ConditionSpec
     Pawl.Codec.ControllerRelation
     Pawl.Codec.ControllerRelationSpec
     Pawl.Codec.Cost
@@ -141,6 +142,7 @@ library codec
     Pawl.Codec.GameEvent
     Pawl.Codec.Json
     Pawl.Codec.Keyword
+    Pawl.Codec.KeywordSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
@@ -187,9 +189,11 @@ library codec
     Pawl.Codec.PlayerScope
     Pawl.Codec.PlayerScopeSpec
     Pawl.Codec.PlayerStaticAbility
+    Pawl.Codec.PlayerStaticAbilitySpec
     Pawl.Codec.Pool
     Pawl.Codec.PoolSpec
     Pawl.Codec.Power
+    Pawl.Codec.PowerSpec
     Pawl.Codec.Printing
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.Quantity
@@ -219,6 +223,7 @@ library codec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
     Pawl.Codec.Toughness
+    Pawl.Codec.ToughnessSpec
     Pawl.Codec.TriggerCondition
     Pawl.Codec.TriggeredAbility
     Pawl.Codec.TriggerFrequency
