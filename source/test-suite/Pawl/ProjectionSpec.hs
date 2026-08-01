@@ -567,8 +567,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Turn to Frog {1}{U}: "Until end of turn, target creature loses all
   -- abilities and becomes a blue Frog with base power and toughness 1/1."
   -- Four layers at once -- 4 (Frog), 5 (blue), 6 (loses all abilities) and 7b
-  -- (base 1/1) -- and the pool's only producer of the layer-4 arm that SETS a
+  -- (base 1/1) -- and the pool's first producer of the layer-4 arm that SETS a
   -- creature type.
+  --
+  -- Jade Statue is the other, and the degenerate one: "becomes a 3/6 Golem
+  -- artifact creature" sets a creature type over a permanent that prints none,
+  -- so the arm's filter runs over an empty set and the only thing left for CR
+  -- 205.1b to say is that the ARTIFACT card type is retained. Pawl.ExpirySpec
+  -- proves that one end to end; the case with a creature type standing is here.
   Spec.it s "CR 205.1b Turn to Frog replaces Bog Wraith's creature type: a Frog, and no longer a Wraith" $ do
     island <- S.printingOf s registry "Island"
     bogWraith <- S.printingOf s registry "Bog Wraith"
