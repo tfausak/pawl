@@ -10,6 +10,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Pawl.Codec.EntryRiders (defaultEntryRiders)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Subtype (subtypeToJson)
 import qualified Pawl.Engine.Binding as Binding
@@ -45,6 +46,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Cost as Cost.Type
@@ -379,7 +381,7 @@ effectCounts effect = case effect of
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone _ _ -> []
+  Effect.MoveToZone {} -> []
   Effect.Draw _ quantity -> quantityCounts quantity
   Effect.Mill _ quantity -> quantityCounts quantity
   Effect.Discard _ quantity -> quantityCounts quantity
@@ -397,7 +399,7 @@ effectCounts effect = case effect of
   Effect.Untap _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
-  Effect.ArmDelayedTrigger _ _ -> []
+  Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers duration _ _ -> durationCounts duration
   Effect.CreateEmblem card -> cardCounts card
   Effect.BecomeMonarch _ -> []
@@ -520,6 +522,34 @@ triggeredAbilityOffends ability =
           ]
       wanted = Set.unions (fmap Resolve.slotsOf effects)
    in not (Set.isSubsetOf wanted available)
+
+-- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
+-- whose condition is not scoped to its controller's turn?
+--
+-- Pawl.Types.Onset.FromYourNextTurn enforces only the NEXT half of that phrase:
+-- Resolve turns it into a turn NUMBER (DelayedTrigger.notBefore) and
+-- Event.delayedPending compares the live turn number against it, so the entry
+-- cannot fire on the turn that created it. A number cannot say WHOSE turn it is.
+-- The YOUR half is delivered by the delayed ability's own
+-- TriggerCondition.StepBegins carrying TurnScope.ControllersTurn.
+--
+-- The two collaborate and neither is redundant -- the scope alone admits the
+-- arming turn itself (an extra combat phase would fire the ability early), and
+-- the onset alone admits an intervening opponent's turn -- so a card that arms
+-- with the onset but scopes with EachTurn has a delayed ability whose printed
+-- "your" is a lie. That is what this rejects.
+--
+-- A dangling name (an onset naming an ability the card does not declare) is
+-- ALSO an offence here, and deliberately not silently accepted: the neighbouring
+-- "every armed delayed ability is declared" lint is what reports it precisely,
+-- and answering False for it here would let a card that offends both pass this
+-- one.
+onsetOffends :: Card.Type.Card -> Bool
+onsetOffends card =
+  let scoped name = case Map.lookup name (Card.Type.delayedAbilities card) of
+        Nothing -> False
+        Just ability -> Event.controllerTurnScoped (TriggeredAbility.condition ability)
+   in not (all scoped (Set.toList (Resolve.onsetGatedAbilities (cardResolutionEffects card))))
 
 -- A one-mode, targetless triggered ability running one effect under one
 -- condition -- the fixture the lint's own self-test misauthors on purpose. Kept
@@ -808,34 +838,73 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- TEST, never a trigger that silently never fires. Equality, not subset: a
   -- declared ability nothing arms is dead card text.
   --
-  -- SCOPE, same posture as Pawl.Engine.Binding's D4-lint-scope comment: this and the
-  -- multi-token-binding lint below both walk `Card.allEffects`, which is
-  -- `Modal.allEffects (Card.spell card)` -- a card's SPELL modes ONLY, never
-  -- an activated or triggered ability's effects. An ArmDelayedTrigger placed
-  -- inside an activated/triggered ability is therefore invisible to THIS
-  -- lint's "every armed name is declared" half; if the card also declares no
-  -- matching entry, the dangling arm passes silently. The reverse direction --
-  -- a declared entry nothing arms, because the arm lives in an ability the
-  -- lint can't see -- still fails loudly, which is the safe way round. No card
-  -- in this pool arms from inside an ability today (only Tidal Wave arms
-  -- anything, and it arms from its spell mode); widening the lint to
-  -- non-spell modes is a separate, deliberately out-of-scope change.
+  -- SCOPE: `cardResolutionEffects`, every carrier a card can execute an effect
+  -- from -- its spell modes AND its activated, triggered and delayed abilities'
+  -- -- and not `Card.allEffects`, which is the spell modes alone. Meandering
+  -- Towershell is what makes the difference load-bearing: it arms from a
+  -- TRIGGERED ability, so the narrower view saw a declared entry that nothing
+  -- appeared to arm and failed the equality outright.
+  --
+  -- The multi-token-binding lint below takes the same wide view, for the same
+  -- reason: nothing about CR 603.7c's one-of-several question is peculiar to a
+  -- spell mode. It sweeps nothing new today -- no ability in this pool creates
+  -- tokens and binds one -- so the widening is a hole closed, not a claim.
   Spec.it s "every armed delayed ability is declared, and every declared one is armed" $ do
     ps <- S.allPrintings s
     let cardOffends card =
-          Resolve.armedAbilities (Card.allEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
+          Resolve.armedAbilities (cardResolutionEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
         offenders = filter (cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (Card.Type.name . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
-  -- the reserved trigger-source slot, or a token bound by a Create.
+  -- the reserved trigger-source slot, a token bound by a Create, or the
+  -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
+  -- exiled card). The available side is `cardResolutionEffects` for the reason
+  -- the lint above takes it: the binding effect can live in the ability that
+  -- arms, not only in a spell mode.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
     let cardOffends card =
-          let available = Set.insert Binding.triggerSource (Resolve.definedSlots (Card.allEffects card))
+          let available = Set.insert Binding.triggerSource (Resolve.definedSlots (cardResolutionEffects card))
               wanted = Set.unions (fmap Resolve.slotsOf (Card.delayedEffects card))
            in not (Set.isSubsetOf wanted available)
         offenders = filter (cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
+  -- alone. See onsetOffends for why the onset and the condition's TurnScope
+  -- are two halves of one printed "your next turn", and what goes wrong when a
+  -- card supplies only one of them.
+  Spec.it s "every delayed ability armed for YOUR next turn is controller-scoped" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (onsetOffends . Printing.card) ps
+    Spec.assertEqWith s "no onset over a condition that admits another player's turn" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The sweep above is NOT vacuous -- Meandering Towershell is a real card with
+  -- an onset, so the accepting direction is exercised by the pool -- but nothing
+  -- committed offends it, so the REJECTING direction is proven here instead,
+  -- against that same card misauthored on purpose. Never a card file: a card
+  -- that offends a lint must not be loadable.
+  Spec.it s "the lint itself catches an onset over an EachTurn condition" $ do
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    let card = Printing.card towershell
+        -- The Towershell's own condition with CR 603.2b's OTHER turn scope: "at
+        -- the beginning of EACH declare attackers step", which an opponent's
+        -- turn satisfies. Built rather than pattern-matched, so this fixture
+        -- states the offence outright.
+        eachTurn ability =
+          ability
+            { TriggeredAbility.condition =
+                TriggerCondition.StepBegins (Phase.Combat CombatStep.DeclareAttackers) TurnScope.EachTurn
+            }
+        widened = card {Card.Type.delayedAbilities = fmap eachTurn (Card.Type.delayedAbilities card)}
+        -- The other way a card can reach this: an onset naming an ability the
+        -- card does not declare at all.
+        dangling = card {Card.Type.delayedAbilities = Map.empty}
+    Spec.assertBool s (not (onsetOffends card)) "the real card, ControllersTurn, is accepted"
+    Spec.assertBool s (onsetOffends widened) "EachTurn under an onset is rejected"
+    Spec.assertBool s (onsetOffends dangling) "and so is an onset naming no declared ability"
+    -- Not a check that fires for every card: one with no onset at all has
+    -- nothing for this to reject, whatever its delayed abilities are scoped to.
+    tidalWave <- S.printingOf s registry "Tidal Wave"
+    Spec.assertBool s (not (onsetOffends (Printing.card tidalWave))) "a card with no onset is not swept up"
   -- The same subset shape over a card's TRIGGERED abilities, which is where
   -- the condition-specific reserved slots live -- CR 400.7e's `became` and
   -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
@@ -857,7 +926,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a reserved event slot the condition never binds" $ do
     roaches <- S.printingOf s registry "Endless Cockroaches"
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
-        returnIt = Effect.MoveToZone Binding.became Zone.Hand
+        returnIt = Effect.MoveToZone Binding.became Zone.Hand defaultEntryRiders Nothing
         -- Rule 702.70a's shape, as a targetless read of "that player".
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
     Spec.assertBool
@@ -886,7 +955,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders =
           filter
-            (Resolve.bindsSeveralTokens . Card.allEffects . Printing.card)
+            (Resolve.bindsSeveralTokens . cardResolutionEffects . Printing.card)
             ps
     Spec.assertEqWith s "no multi-token binding" (fmap (Card.Type.name . Printing.card) offenders) []
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
@@ -1162,7 +1231,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     let c = Printing.card unsummon
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [blue]))
-    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand]
+    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand defaultEntryRiders Nothing]
   -- Three modifications on ONE target, in printed order. Spelled out rather
   -- than spot-checked because the toxic 1 grant is what makes this card the
   -- CR 702.164b proof in DamageSpec: a card that granted toxic 2 by mistake
@@ -1189,7 +1258,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     let c = Printing.card angelicEdict
     Spec.assertBool s (not (Card.isInstant c)) "not an instant"
-    Spec.assertEqWith s "effect exiles" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile]
+    Spec.assertEqWith s "effect exiles" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile defaultEntryRiders Nothing]
     Spec.assertEqWith s "creature-or-enchantment slot" (Card.allTargetSpecs c) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment]))))
   Spec.it s "Divination is a {2}{U} Sorcery that draws two cards with no target" $ do
     divination <- S.printingOf s registry "Divination"

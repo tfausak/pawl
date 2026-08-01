@@ -104,7 +104,8 @@ data Card = MkCard
     -- payloads an Effect.ArmDelayedTrigger in this card's own text arms. Card
     -- DATA, not an opcode payload: Effect is first-order and non-recursive
     -- (design.md section 1), and Effect -> TriggeredAbility -> Modal -> Mode ->
-    -- Effect is a genuine module cycle. Empty for all but Tidal Wave.
+    -- Effect is a genuine module cycle. Empty for all but Tidal Wave, Full
+    -- Throttle and Meandering Towershell.
     --
     -- Read straight from the card, never through the projection: a delayed
     -- ability is not ON the source object -- CR 603.7d gives it no source

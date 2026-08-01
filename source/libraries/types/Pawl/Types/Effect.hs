@@ -4,12 +4,14 @@ import Data.Set (Set)
 import Pawl.Types.AbilityName (AbilityName)
 import Pawl.Types.CounterKind (CounterKind)
 import Pawl.Types.Duration (Duration)
+import Pawl.Types.EntryRiders (EntryRiders)
 import Pawl.Types.ExtraPhase (ExtraPhase)
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.ManaProduction (ManaProduction)
 import Pawl.Types.Modification (Modification)
 import Pawl.Types.MonarchTarget (MonarchTarget)
 import Pawl.Types.ObjectRef (ObjectRef)
+import Pawl.Types.Onset (Onset)
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Types.PlayerEffect (PlayerEffect)
@@ -20,7 +22,6 @@ import Pawl.Types.Regenerability (Regenerability)
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import Pawl.Types.SearchDestination (SearchDestination)
 import Pawl.Types.SlotName (SlotName)
-import Pawl.Types.TokenEntry (TokenEntry)
 import Pawl.Types.Uses (Uses)
 import Pawl.Types.Zone (Zone)
 
@@ -200,7 +201,23 @@ data Effect card
     -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is
     -- data; one opcode for every targeted single-object move. Distinct from
     -- Destroy (unconditional move, no indestructible check).
-    MoveToZone SlotName Zone
+    --
+    -- The EntryRiders are what the effect says about the object AS IT ENTERS the
+    -- battlefield, beyond its own text -- Meandering Towershell's "return it to
+    -- the battlefield tapped and attacking" -- and are shared with Create for
+    -- the reason that type's own comment gives (CR 109.3: neither is a
+    -- characteristic). They mean nothing for any other destination, and Resolve
+    -- applies neither rider there. Resolve reads them; it never cases on them.
+    --
+    -- The Maybe SlotName BINDS the incarnation CR 400.7 mints at the
+    -- DESTINATION into the resolving object's live bindings, exactly as Create's
+    -- minted-token slot does and for the same rule: a delayed ability this same
+    -- resolution arms (CR 603.7c's "it") must be able to name the object, and
+    -- after a zone change the id it was named by is gone. Meandering Towershell
+    -- is the producer -- "exile it. Return IT to the battlefield ..." -- where
+    -- the two "it"s are two incarnations of one card. A DEFINITION, not a read:
+    -- it is not a target and never appears in targetSpecs.
+    MoveToZone SlotName Zone EntryRiders (Maybe SlotName)
   | -- CR 121.1: the players the PlayerRef names each draw this many cards, one
     -- at a time (CR 121.2). Divination is `Relative You`; Ancestral Recall's
     -- "target player draws three cards" is `InSlot`, reading a slot that
@@ -264,7 +281,7 @@ data Effect card
     -- Resolve.applyEffect via Event.createTokens. NOT a copy-token (CR 707) and NOT a
     -- predefined token (CR 111.10): given, not derived.
     --
-    -- The TokenEntry is what the effect says about the tokens beyond their text
+    -- The EntryRiders is what the effect says about the tokens beyond their text
     -- -- Hanweir Garrison's "that are tapped and attacking" -- and is not part of
     -- the embedded card for the reason that type's own comment gives (CR 109.3:
     -- neither is a characteristic). Resolve reads it; it never cases on it.
@@ -279,7 +296,7 @@ data Effect card
     -- is not a target and never appears in targetSpecs. Defined only for a
     -- single-token create; a Create that binds a slot while making several tokens
     -- is rejected by the Pawl.CardSpec lint family rather than guessed at (#53).
-    Create Quantity card TokenEntry (Maybe SlotName)
+    Create Quantity card EntryRiders (Maybe SlotName)
   | -- CR 614.3 / 615.3: install a floating replacement effect for a duration, with
     -- a use count. Fog is
     -- `Replace UntilEndOfTurn Unlimited (DamageR (MkDamagePattern (Just Combat)) PreventAll)`;
@@ -439,7 +456,13 @@ data Effect card
     -- that rule's default, "only once, the next time its trigger event occurs"
     -- (Tidal Wave), and it is Nothing rather than a Duration arm meaning "once"
     -- because the rule words once-ness as the ABSENCE of a duration.
-    ArmDelayedTrigger AbilityName (Maybe Duration)
+    --
+    -- The Onset is the same envelope's other end -- when the ability becomes
+    -- armed rather than when it stops being. Immediately for everything but
+    -- Meandering Towershell's "on your next turn"; see Pawl.Types.Onset for why
+    -- a total field rather than a second Maybe, and why the gate cannot live in
+    -- the ability's own trigger condition.
+    ArmDelayedTrigger AbilityName Onset (Maybe Duration)
   | -- CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
     -- effect on a class of players for a duration. Silence is
     -- `AffectPlayers UntilEndOfTurn Opponents CantCastSpells`.

@@ -1,6 +1,7 @@
 module Pawl.Types.DelayedTrigger where
 
 import Data.Map.Strict (Map)
+import Numeric.Natural (Natural)
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
 import Pawl.Types.Expiry (Expiry)
@@ -39,6 +40,30 @@ data DelayedTrigger = MkDelayedTrigger
     source :: ObjectId,
     controller :: PlayerId,
     bindings :: Map SlotName Binding,
+    -- Pawl.Types.Onset as the game remembers it: the earliest
+    -- GameState.turnNumber at which this entry may fire. Nothing is the ordinary
+    -- case -- an ability watches for its event from the moment it is created,
+    -- which is CR 603.7a's floor and all those abilities ask. Just n is
+    -- Onset.FromYourNextTurn resolved against the board: the turn AFTER the one
+    -- the arming resolution happened on, which
+    -- Pawl.Engine.Event.delayedPending compares the live turn number against.
+    --
+    -- A turn NUMBER and not a latch cleared at the handoff, because the number is
+    -- already kept (GameState.turnNumber, bumped in Engine.beginTurnOf for every
+    -- turn that begins, extra turns included) and a comparison cannot go stale.
+    --
+    -- A number carries no player, and that is a real limit rather than a
+    -- shorthand: this field answers only "not the turn it was armed on", and
+    -- WHOSE turn the entry may fire on is the ability's own condition's question
+    -- (TurnScope.ControllersTurn). The two are only jointly "your next turn",
+    -- which is why the pairing is lint-enforced rather than assumed -- see
+    -- Pawl.Types.Onset.FromYourNextTurn.
+    --
+    -- Not implemented: a turn whose declare attackers step is skipped
+    -- (Stonehorn Dignitary) leaves the entry armed for a LATER turn, where the
+    -- printed "your next turn" named one particular turn and the event can never
+    -- occur again (#507).
+    notBefore :: Maybe Natural,
     expiry :: Maybe Expiry
   }
   deriving (Eq, Show)

@@ -1,0 +1,164 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "delayedAbilities": [
+    {
+      "ability": {
+        "condition": {
+          "type": "StepBegins",
+          "value": [
+            {
+              "type": "Combat",
+              "value": {
+                "type": "DeclareAttackers"
+              }
+            },
+            {
+              "type": "ControllersTurn"
+            }
+          ]
+        },
+        "modal": {
+          "modes": [
+            {
+              "effects": [
+                {
+                  "type": "MoveToZone",
+                  "value": [
+                    "exiled",
+                    {
+                      "type": "Battlefield"
+                    },
+                    {
+                      "attacking": true,
+                      "tapped": {
+                        "type": "Tapped"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "targetSpecs": []
+            }
+          ],
+          "selection": {
+            "type": "ChooseExactly",
+            "value": 1
+          }
+        }
+      },
+      "name": "return it"
+    }
+  ],
+  "keywords": [
+    {
+      "type": "Landwalk",
+      "value": {
+        "type": "Island"
+      }
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Meandering Towershell",
+  "power": {
+    "type": "Literal",
+    "value": 5
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 9
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfAttacks",
+        "value": {
+          "type": "EveryTime"
+        }
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "MoveToZone",
+                "value": [
+                  "self",
+                  {
+                    "type": "Exile"
+                  },
+                  "exiled"
+                ]
+              },
+              {
+                "type": "ArmDelayedTrigger",
+                "value": [
+                  "return it",
+                  {
+                    "type": "FromYourNextTurn"
+                  },
+                  null
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Turtle"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

@@ -100,3 +100,7 @@ isLandType subtype = case subtype of
   -- artifact too -- CR 205.3g's artifact types are Equipment and the rest, and
   -- Golem is not one of them. Not a land type either way.
   Subtype.Golem -> False
+  -- CR 205.3m: a creature type (Meandering Towershell's). Not a land type --
+  -- worth saying out loud for the same reason Wraith is: the Towershell prints
+  -- ISLANDWALK, and the land type its keyword names is Island rather than this.
+  Subtype.Turtle -> False

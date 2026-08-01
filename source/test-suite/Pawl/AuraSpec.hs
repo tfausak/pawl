@@ -68,6 +68,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
         run =
           Resolve.applyEffect
             equip
+            equip
             S.alice
             Map.empty
             (Map.singleton slot True)
@@ -103,6 +104,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         run =
           Resolve.applyEffect
+            equip
             equip
             S.alice
             Map.empty
@@ -163,6 +165,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
         attachTo t g =
           S.runPure S.identityAnswer g $
             Resolve.applyEffect
+              equip
               equip
               S.alice
               Map.empty
@@ -603,6 +606,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
           S.runPure (destination second) gs $
             Resolve.applyEffect
               crownObj
+              crownObj
               S.alice
               Map.empty
               (Map.singleton slot True)
@@ -629,6 +633,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         after =
           S.runPure S.identityAnswer gs $
             Resolve.applyEffect
+              crownObj
               crownObj
               S.alice
               Map.empty
@@ -668,6 +673,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         after =
           S.runPure (destination land) gs $
             Resolve.applyEffect
+              crownObj
               crownObj
               S.alice
               Map.empty

@@ -108,4 +108,6 @@ data Subtype
     Wraith
   | -- CR 205.3m (a creature type; Icehide Golem's).
     Golem
+  | -- CR 205.3m (a creature type; Meandering Towershell's).
+    Turtle
   deriving (Eq, Ord, Show)

@@ -334,11 +334,13 @@ skipSpec s registry = Spec.describe s "Skip" $ do
     Spec.assertEqWith s "the attacker really left combat" (Map.keys (Combat.Type.attackers (GameState.combat after))) []
     Spec.assertEqWith s "declare blockers still next" (GameState.phase after) (Phase.Combat CombatStep.DeclareBlockers)
   Spec.it s "CR 508.8 a creature put onto the battlefield attacking keeps the two steps" $ do
-    -- The rule's SECOND clause on its own, with nothing declared. Direct
-    -- call, because no card in the pool can put a creature onto the
-    -- battlefield attacking without first attacking with something (#370);
-    -- this is the strongest statement of the clause available, and it is
-    -- what stops the fix above from being narrowed to the declaration.
+    -- The rule's SECOND clause on its own, with nothing declared. A DIRECT
+    -- call, so the clause is stated with no card in the way: it is what
+    -- stops the fix above from being narrowed to the declaration.
+    -- Pawl.CombatSpec's MeanderingTowershell group reaches the same clause
+    -- through a card, and the two are kept because they fail for different
+    -- reasons -- this one for a flag dropped from putOntoBattlefieldAttacking,
+    -- that one for anything between the attack and the return going wrong.
     piker <- S.printingOf s registry "Goblin Piker"
     let (base, ours, _) = S.combatBoardOf [piker] []
         joined = S.runPure S.identityAnswer base (Foldable.traverse_ Combat.putOntoBattlefieldAttacking ours)
@@ -904,7 +906,7 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
           S.runPure
             S.identityAnswer
             gs
-            (Resolve.applyEffect source S.bob Map.empty Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer Set.empty))
+            (Resolve.applyEffect source source S.bob Map.empty Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer Set.empty))
     Spec.assertEqWith s "added in APNAP order, so taken in reverse" (takersOf after) [S.alice, S.bob]
 
 -- alice in her precombat main phase with priority, eight untapped Islands

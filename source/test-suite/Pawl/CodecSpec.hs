@@ -25,6 +25,7 @@ import Pawl.Codec.DiscardCause (discardCauseToJson, jsonToDiscardCause)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
+import Pawl.Codec.EntryRiders (defaultEntryRiders)
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
@@ -111,6 +112,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -130,6 +132,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -159,7 +162,6 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
-import qualified Pawl.Types.TokenEntry as TokenEntry
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -637,7 +639,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "a Card carrying a CR 103.6 opening-hand action round-trips" $ do
       bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
-          c = base {CardT.openingHandAction = [Effect.MoveToZone Binding.triggerSource Zone.Battlefield]}
+          c = base {CardT.openingHandAction = [Effect.MoveToZone Binding.triggerSource Zone.Battlefield defaultEntryRiders Nothing]}
       roundTrip s "card" cardToJson jsonToCard c
     Spec.it s "an empty openingHandAction list is omitted from the JSON" $ do
       bloodMoon <- S.printingOf s registry "Blood Moon"
@@ -1097,16 +1099,16 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "TriggerCondition.SpellOrAbilityCounters round-trips both relations" $ do
       roundTrip s "socy" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SpellOrAbilityCounters PlayerRelation.You)
       roundTrip s "soco" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SpellOrAbilityCounters PlayerRelation.Opponent)
-    -- Create's TokenEntry is ELIDED when it is the CR 110.5b default, so
+    -- Create's EntryRiders is ELIDED when it is the CR 110.5b default, so
     -- the round trip has to hold for all four shapes the encoder emits --
     -- and the two three-element ones (a slot, or an entry) are told apart
     -- by JSON type alone, which is the part that could silently confuse
     -- them.
-    Spec.it s "Effect.Create round-trips with and without a TokenEntry and a slot" $ do
+    Spec.it s "Effect.Create round-trips with and without a EntryRiders and a slot" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let card = Printing.card piker
-          attacking = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Tapped, TokenEntry.attacking = True}
-          plain = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Untapped, TokenEntry.attacking = False}
+          attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}
+          plain = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False}
           slot = SlotName.MkSlotName (Text.pack "token")
       roundTrip s "plain" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.Create (Quantity.Literal 2) card plain Nothing)
       roundTrip s "plain+slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.Create (Quantity.Literal 1) card plain (Just slot))
@@ -1117,7 +1119,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       -- this one byte-identical.
       Spec.assertEqWith
         s
-        "a default TokenEntry is not written"
+        "a default EntryRiders is not written"
         (J.tagged (Text.pack "Create") (Just (J.jArray [quantityToJson (Quantity.Literal 2), cardToJson card])))
         (effectToJson cardToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
     -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
@@ -1166,11 +1168,41 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "AbilityName round-trips" $
       roundTrip s "name" abilityNameToJson jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it"))
     Spec.it s "ArmDelayedTrigger round-trips" $
-      roundTrip s "arm" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it")) Nothing)
+      roundTrip s "arm" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it")) Onset.Immediately Nothing)
     -- CR 603.7b's stated duration takes the two-element form; the absent
     -- one above must keep the bare shape, so both have to survive.
     Spec.it s "ArmDelayedTrigger round-trips a stated duration" $
-      roundTrip s "arm1" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "each combat")) (Just Duration.UntilEndOfTurn))
+      roundTrip s "arm1" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "each combat")) Onset.Immediately (Just Duration.UntilEndOfTurn))
+    -- CR 603.7a's onset takes the THREE-element form, whose last element is a
+    -- duration or null -- the two forms an onset can pair with. Length, not
+    -- JSON type, is what tells this apart from the two-element form, since an
+    -- Onset and a Duration are both tagged objects.
+    Spec.it s "ArmDelayedTrigger round-trips a stated onset, with and without a duration" $ do
+      let named = AbilityName.MkAbilityName (Text.pack "return it")
+      roundTrip s "arm2" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ArmDelayedTrigger named Onset.FromYourNextTurn Nothing)
+      roundTrip s "arm3" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ArmDelayedTrigger named Onset.FromYourNextTurn (Just Duration.UntilEndOfTurn))
+      -- The elision: a default onset adds nothing, which is what keeps every
+      -- card file written before onsets existed byte-identical.
+      Spec.assertEqWith
+        s
+        "a default Onset is not written"
+        (J.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson named)))
+        (effectToJson cardToJson (Effect.ArmDelayedTrigger named Onset.Immediately Nothing))
+    -- MoveToZone's two riders elide exactly as Create's do, and its
+    -- three-element form is the same pair of shapes told apart by JSON type.
+    Spec.it s "Effect.MoveToZone round-trips with and without EntryRiders and a bound slot" $ do
+      let slot = SlotName.MkSlotName (Text.pack "target")
+          bound = SlotName.MkSlotName (Text.pack "exiled")
+          attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}
+      roundTrip s "move" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone slot Zone.Hand defaultEntryRiders Nothing)
+      roundTrip s "move+slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone slot Zone.Exile defaultEntryRiders (Just bound))
+      roundTrip s "move+entry" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone bound Zone.Battlefield attacking Nothing)
+      roundTrip s "move+entry+slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone bound Zone.Battlefield attacking (Just bound))
+      Spec.assertEqWith
+        s
+        "default riders and no bound slot are not written"
+        (J.tagged (Text.pack "MoveToZone") (Just (J.jArray [slotNameToJson slot, zoneToJson Zone.Hand])))
+        (effectToJson cardToJson (Effect.MoveToZone slot Zone.Hand defaultEntryRiders Nothing))
     -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
     -- only a Binding's `target` field via Binding.toObject. The codec is
     -- meant to be total over every Binding field -- subtypes, amount, modes,
@@ -1202,14 +1234,17 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
                 DelayedTrigger.source = ObjectId.MkObjectId 4,
                 DelayedTrigger.controller = S.alice,
                 DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9)),
+                DelayedTrigger.notBefore = Nothing,
                 DelayedTrigger.expiry = Nothing
               }
        in do
             -- CR 603.7b's default and its stated-duration exception both
             -- have to survive: the absent expiry is elided to null, and a
-            -- present one must come back as itself.
+            -- present one must come back as itself. CR 603.7a's arming gate is
+            -- the same pair of cases on the other end of the envelope.
             roundTrip s "delayed" delayedTriggerToJson jsonToDelayedTrigger entry
             roundTrip s "delayed1" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
+            roundTrip s "delayed2" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.notBefore = Just 7}
     Spec.it s "a TriggeredAbility with an intervening if round-trips" $
       let ability =
             TriggeredAbility.MkTriggeredAbility

@@ -7,6 +7,7 @@ import qualified Data.Text as Text
 import Pawl.Codec.AbilityName (abilityNameToJson, jsonToAbilityName)
 import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
+import Pawl.Codec.EntryRiders (defaultEntryRiders, entryRidersToJson, jsonToEntryRiders)
 import Pawl.Codec.ExtraPhase (extraPhaseToJson, jsonToExtraPhase)
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
@@ -14,6 +15,7 @@ import Pawl.Codec.ManaProduction (jsonToManaProduction, manaProductionToJson)
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import Pawl.Codec.MonarchTarget (jsonToMonarchTarget, monarchTargetToJson)
 import Pawl.Codec.ObjectRef (jsonToObjectRef, objectRefToJson)
+import Pawl.Codec.Onset (jsonToOnset, onsetToJson)
 import Pawl.Codec.PhaseSelector (jsonToPhaseSelector, phaseSelectorToJson)
 import Pawl.Codec.PlayerCounterKind (jsonToPlayerCounterKind, playerCounterKindToJson)
 import Pawl.Codec.PlayerEffect (jsonToPlayerEffect, playerEffectToJson)
@@ -24,12 +26,12 @@ import Pawl.Codec.Regenerability (jsonToRegenerability, regenerabilityToJson)
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import Pawl.Codec.SearchDestination (jsonToSearchDestination, searchDestinationToJson)
 import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
-import Pawl.Codec.TokenEntry (defaultTokenEntry, jsonToTokenEntry, tokenEntryToJson)
 import Pawl.Codec.Uses (jsonToUses, usesToJson)
 import Pawl.Codec.Zone (jsonToZone, zoneToJson)
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array, Object))
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Onset as Onset
 
 effectToJson :: (card -> Value) -> Effect.Effect card -> Value
 effectToJson codec e = case e of
@@ -44,8 +46,8 @@ effectToJson codec e = case e of
   Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [slotNameToJson slot, filterToJson f, quantityToJson q])))
   Effect.RestartGame -> Json.nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
-  -- The bound-count slot is ELIDED when absent, the posture Create's TokenEntry
-  -- and ArmDelayedTrigger's duration take, so every card that says nothing about
+  -- The bound-count slot is ELIDED when absent, the posture Create's EntryRiders
+  -- and ArmDelayedTrigger's duration both take, so every card that says nothing about
   -- counting its sweep stays byte-for-byte as it was written.
   Effect.Destroy s r ms ->
     Json.tagged (Text.pack "Destroy") . Just . Array . MkArray $
@@ -53,23 +55,33 @@ effectToJson codec e = case e of
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
-  Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array (MkArray [slotNameToJson s, zoneToJson z])))
+  -- MoveToZone's payload is positional and takes Create's shape, for the same
+  -- reason and with the same two elisions: the EntryRiders are dropped when they
+  -- are the CR 110.5b default and the bound slot when there is none, so every
+  -- card file written before either existed stays byte-for-byte as it was. The
+  -- three-element form is two shapes, told apart on decode by JSON TYPE -- a
+  -- slot name is a string, riders are an object.
+  Effect.MoveToZone s z riders ms ->
+    Json.tagged (Text.pack "MoveToZone") . Just . Array . MkArray $
+      [slotNameToJson s, zoneToJson z]
+        <> (if riders == defaultEntryRiders then [] else [entryRidersToJson riders])
+        <> fmap slotNameToJson (Maybe.maybeToList ms)
   Effect.Draw r q -> Json.tagged (Text.pack "Draw") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
   Effect.LoseLife r q -> Json.tagged (Text.pack "LoseLife") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
   Effect.GainLife r q -> Json.tagged (Text.pack "GainLife") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
-  -- Create's payload is positional, and the TokenEntry is ELIDED when it is the
-  -- CR 110.5b default (defaultTokenEntry) -- the same posture `counterability`
-  -- takes, so a card file that says nothing about how its tokens enter stays
-  -- exactly as it was written. The three-element form is therefore two shapes,
-  -- told apart on decode by JSON TYPE rather than by position: a slot name is a
-  -- string (slotNameToJson) and a TokenEntry is an object, so the two can never
-  -- be confused.
+  -- Create's payload is positional, and the EntryRiders are ELIDED when they are
+  -- the CR 110.5b default (defaultEntryRiders) -- the same posture
+  -- `counterability` takes, so a card file that says nothing about how its
+  -- tokens enter stays exactly as it was written. The three-element form is
+  -- therefore two shapes, told apart on decode by JSON TYPE rather than by
+  -- position: a slot name is a string (slotNameToJson) and riders are an object,
+  -- so the two can never be confused.
   Effect.Create q c te ms ->
     Json.tagged (Text.pack "Create") . Just . Array . MkArray $
       [quantityToJson q, codec c]
-        <> (if te == defaultTokenEntry then [] else [tokenEntryToJson te])
+        <> (if te == defaultEntryRiders then [] else [entryRidersToJson te])
         <> fmap slotNameToJson (Maybe.maybeToList ms)
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [durationToJson d, usesToJson u, replacementEffectToJson re])))
   Effect.SkipNextPhase r sel -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [playerRefToJson r, phaseSelectorToJson sel])))
@@ -81,11 +93,16 @@ effectToJson codec e = case e of
   Effect.GainControl d r -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, objectRefToJson r])))
   -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
   -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
-  -- states a duration writes the two-element form.
-  Effect.ArmDelayedTrigger n md ->
-    Json.tagged (Text.pack "ArmDelayedTrigger") . Just $ case md of
-      Nothing -> abilityNameToJson n
-      Just d -> Array (MkArray [abilityNameToJson n, durationToJson d])
+  -- states a duration writes the two-element form. The ONSET is elided when it is CR 603.7a's default (the ability is armed the
+  -- moment it is created), so Tidal Wave's bare name and Full Throttle's
+  -- two-element form both stay exactly as they were written. A stated onset
+  -- takes the THREE-element form, whose last element is the duration or null --
+  -- and LENGTH, not JSON type, is what tells the forms apart, because an onset
+  -- and a duration are both tagged objects.
+  Effect.ArmDelayedTrigger n o md -> Json.tagged (Text.pack "ArmDelayedTrigger") . Just $ case (o, md) of
+    (Onset.Immediately, Nothing) -> abilityNameToJson n
+    (Onset.Immediately, Just d) -> Array (MkArray [abilityNameToJson n, durationToJson d])
+    _ -> Array (MkArray [abilityNameToJson n, onsetToJson o, Json.maybeTo durationToJson md])
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array (MkArray [durationToJson d, playerScopeToJson s, playerEffectToJson pe])))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (codec c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
@@ -125,9 +142,15 @@ jsonToEffect decode value = do
     "Sacrifice" -> Json.withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
     "RemoveFromCombat" -> Json.withValue mv (fmap Effect.RemoveFromCombat . jsonToSlotName)
     "Counter" -> Json.withValue mv (fmap Effect.Counter . jsonToSlotName)
+    -- The four shapes the encoder above can emit, read exactly as Create's are:
+    -- an Object in third position is the EntryRiders, anything else is the bound
+    -- slot name (a string).
     "MoveToZone" -> case mv of
-      Just (Array (MkArray [s, z])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z
-      _ -> Left (Text.pack "MoveToZone expects [slot, zone]")
+      Just (Array (MkArray [s, z])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> pure defaultEntryRiders <*> pure Nothing
+      Just (Array (MkArray [s, z, e@(Object _)])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> jsonToEntryRiders e <*> pure Nothing
+      Just (Array (MkArray [s, z, b])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> pure defaultEntryRiders <*> (Just <$> jsonToSlotName b)
+      Just (Array (MkArray [s, z, e, b])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> jsonToEntryRiders e <*> (Just <$> jsonToSlotName b)
+      _ -> Left (Text.pack "MoveToZone expects [slot, zone], optionally with EntryRiders and/or a slot")
     "Draw" -> case mv of
       Just (Array (MkArray [r, q])) -> Effect.Draw <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "Draw expects [playerRef, quantity]")
@@ -144,18 +167,22 @@ jsonToEffect decode value = do
       Just (Array (MkArray [r, q])) -> Effect.GainLife <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "GainLife expects [playerRef, quantity]")
     -- The four shapes the encoder above can emit. The three-element one is read
-    -- by JSON type: an Object is the TokenEntry, anything else is the slot name
+    -- by JSON type: an Object is the EntryRiders, anything else is the slot name
     -- (a string), which is what lets the entry be elided when it is the default
     -- without a hole in the array.
     "Create" -> case mv of
-      Just (Array (MkArray [q, c])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> pure defaultTokenEntry <*> pure Nothing
-      Just (Array (MkArray [q, c, e@(Object _)])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> jsonToTokenEntry e <*> pure Nothing
-      Just (Array (MkArray [q, c, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> pure defaultTokenEntry <*> (Just <$> jsonToSlotName s)
-      Just (Array (MkArray [q, c, e, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> jsonToTokenEntry e <*> (Just <$> jsonToSlotName s)
-      _ -> Left (Text.pack "Create expects [Quantity, Card], optionally with a TokenEntry and/or a slot")
+      Just (Array (MkArray [q, c])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> pure defaultEntryRiders <*> pure Nothing
+      Just (Array (MkArray [q, c, e@(Object _)])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> jsonToEntryRiders e <*> pure Nothing
+      Just (Array (MkArray [q, c, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> pure defaultEntryRiders <*> (Just <$> jsonToSlotName s)
+      Just (Array (MkArray [q, c, e, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> jsonToEntryRiders e <*> (Just <$> jsonToSlotName s)
+      _ -> Left (Text.pack "Create expects [Quantity, Card], optionally with EntryRiders and/or a slot")
+    -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
-      Just (Array (MkArray [n, d])) -> Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> fmap Just (jsonToDuration d)
-      _ -> Json.withValue mv (fmap (`Effect.ArmDelayedTrigger` Nothing) . jsonToAbilityName)
+      Just (Array (MkArray [n, o, d])) ->
+        Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> jsonToOnset o <*> Json.maybeFrom jsonToDuration d
+      Just (Array (MkArray [n, d])) ->
+        Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> pure Onset.Immediately <*> fmap Just (jsonToDuration d)
+      _ -> Json.withValue mv (fmap (\n -> Effect.ArmDelayedTrigger n Onset.Immediately Nothing) . jsonToAbilityName)
     "Replace" -> case mv of
       Just (Array (MkArray [d, u, re])) -> do
         duration <- jsonToDuration d
