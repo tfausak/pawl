@@ -5,6 +5,7 @@ module Pawl.Engine.Engine where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1128,16 +1129,44 @@ runStepThatBegan phase = do
       -- signal and plays the new game from its first step.
       RestartSignal.Restarted -> pure ()
       RestartSignal.Playing -> do
-        -- CR 500.5: as a step or phase ends, any unspent mana left in a player's
-        -- mana pool empties -- a turn-based action that does not use the stack
-        -- (CR 703.4q). This line says only WHEN; WHOSE mana empties is the action
-        -- itself, and Mana.emptyManaPools decides it per player (Upwelling).
+        -- CR 500.5, whole and in its own order: "As a step or phase ends, if
+        -- there are effects that last until the end of that step or phase, those
+        -- effects expire. Then any unspent mana left in a player's mana pool
+        -- empties."
         --
-        -- CR 500.5's first clause -- "if there are effects that last until the end
-        -- of that step or phase, those effects expire", and only THEN the mana --
-        -- has nothing to run before this line, because no Duration and no Expiry
-        -- can name an end-of-step or end-of-phase moment (#353). The ordering is
-        -- satisfied vacuously, and this is where the sweep goes when it exists.
+        -- TWO windows end here, not one, and CR 500.5a is why the difference
+        -- matters: "effects that last 'until end of combat' expire at the end of
+        -- the combat phase, not at the beginning of the end of combat step" (CR
+        -- 511.2 again). So the step that just ran is swept, and then -- only if
+        -- it was the phase's last step -- the phase is, which is the question
+        -- Turn.phaseEndingAt answers. An "until end of combat" animation is
+        -- therefore live for the whole of the end of combat step, including the
+        -- priority round CR 511.1 grants there, and gone as that step's end
+        -- carries the phase's with it.
+        --
+        -- The step is swept before the phase because CR 500.1 nests the one
+        -- inside the other and the inner window ends first -- the reverse of the
+        -- order runStep asks the two SKIP questions in, where the phase is
+        -- offered before the step it contains. Nothing observes the order in
+        -- either case: the two sweeps match disjoint sets of stored effects
+        -- (equality on the selector), and no state-based action, trigger or
+        -- priority round runs between them.
+        State.modify' (Expiry.dropAtEndOf (PhaseSelector.Step phase))
+        Foldable.traverse_ (State.modify' . Expiry.dropAtEndOf) (Turn.phaseEndingAt phase)
+        -- CR 703.4q: emptying the pool is a turn-based action that does not use
+        -- the stack, and CR 500.5's "Then" puts it AFTER the expiries above. This
+        -- line says only WHEN; WHOSE mana empties is the action itself, and
+        -- Mana.emptyManaPools decides it per player (Upwelling).
+        --
+        -- The ordering is observable, and Pawl.ExpirySpec's "CR 500.5 an
+        -- end-of-combat retention effect expires BEFORE the pool empties" is
+        -- what proves it: PlayerEffect.DontLoseUnspentMana is read live by
+        -- Mana.emptyManaPools, so a retention effect that expires here keeps
+        -- nothing, while one swept afterwards would keep the pool across a
+        -- boundary it no longer covers. No CARD in the pool prints that
+        -- combination (CR
+        -- 702.189a firebending is the shape that would); the test installs the
+        -- stored effect directly.
         State.modify' Mana.emptyManaPools
         -- CR 511.3: "as soon as the end of combat step ends, all creatures,
         -- battles, and planeswalkers are removed from combat" -- so it belongs
@@ -1150,9 +1179,18 @@ runStepThatBegan phase = do
         -- including the priority round CR 511.1 grants, where an instant may
         -- still read them (Kill Shot).
         --
-        -- The two orderings of these two lines are indistinguishable -- nothing
-        -- reads a mana pool through the combat record or the reverse -- and
-        -- neither raises a state-based action, so checkSba below is unaffected.
+        -- The two orderings of this line and the mana emptying above it are
+        -- indistinguishable -- nothing reads a mana pool through the combat
+        -- record or the reverse -- and neither raises a state-based action, so
+        -- checkSba below is unaffected.
+        --
+        -- Order against CR 500.5's expiry sweeps is free for a subtler reason,
+        -- and it is worth stating because this is the one step where both fire:
+        -- an "until end of combat" animation expiring first makes its source
+        -- stop being a creature, which CR 506.4 would remove from combat -- but
+        -- this line empties the whole record a moment later regardless, and no
+        -- priority round, trigger or state-based-action check sits between the
+        -- two for anything to observe the difference in.
         Monad.when (phase == Phase.Combat CombatStep.EndOfCombat) (State.modify' Combat.clearCombat)
         -- CR 508.8: drop the two combat steps that have nothing to do if nobody
         -- attacked. Asked as the declare attackers step ENDS, not when its
@@ -1166,9 +1204,11 @@ runStepThatBegan phase = do
         -- NOT guarded by hasActive: a turn with no active player declares no
         -- attackers, which is precisely CR 508.8's condition.
         --
-        -- Order against the two lines above is free -- neither the mana emptying
-        -- nor CR 511.3's removal happens in this step -- and it is before
-        -- `advance`, which is what CR 500.11's "as though it didn't exist" needs.
+        -- Order against the lines above is free -- neither the mana emptying nor
+        -- CR 511.3's removal happens in this step, and CR 500.5's expiry sweeps
+        -- touch only the four expiry carriers while this touches only
+        -- GameState.remaining -- and it is before `advance`, which is what CR
+        -- 500.11's "as though it didn't exist" needs.
         Monad.when (phase == Phase.Combat CombatStep.DeclareAttackers) (State.modify' Combat.skipEmptyCombat)
         checkSba
         stillFinished <- State.gets (Maybe.isJust . GameState.result)

@@ -36,6 +36,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -95,6 +96,7 @@ singleModeAbility effects specs =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationTimingSpec s registry
+  printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
@@ -902,6 +904,80 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
         after = S.runCombat S.aggressiveAnswer board
     Spec.assertEqWith s "the Piker still connected" (S.lifeOf S.bob after) (Just 18)
     Spec.assertBool s (Set.member attackerId (GameState.battlefield after)) "and is still on the battlefield"
+
+-- alice controls a Jade Statue and two Mountains, and holds priority. The {2} is
+-- payable exactly once, which is all any of these tests needs.
+statueBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+statueBoard statue mountain =
+  let (statueId, gs1) = S.addCreature statue S.alice (Setup.emptyGame S.bothPlayers)
+      (_, gs2) = S.addCreature mountain S.alice gs1
+      (_, gs3) = S.addCreature mountain S.alice gs2
+   in (statueId, gs3 {GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+
+-- CR 307.5's rider naming a phase that HAS steps, which no Pawl.Types.Phase value
+-- can say: Jade Statue (Arabian Nights) prints "{2}: This artifact becomes a 3/6
+-- Golem artifact creature until end of combat. Activate only during combat."
+--
+-- The third axis of the arm, after Desert's step and Llanowar Augur's turn. CR
+-- 500.1 -- "The beginning, combat, and ending phases are further broken down
+-- into steps, which proceed in order" -- and CR 506.1 lists combat's five, so
+-- "during combat" is one window over five schedule entries. Pawl.Types.PhaseSelector
+-- is what says it, and Pawl.Engine.Turn.inWindow is the containment test that
+-- reads it.
+--
+-- Desert's group above is the other half of the pair: it names ONE of these five
+-- steps, and its tests must go on refusing the other four. Between them they
+-- prove the reader did not simply become permissive.
+printedActivationWholePhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationWholePhaseSpec s registry = Spec.describe s "PrintedActivationWholePhase" $ do
+  -- Every one of CR 506.1's five steps, in one assertion: a rider naming the
+  -- combat phase is live in all of them. An arm that could only name a step
+  -- would have to pick one, and would fail four of these five.
+  Spec.it s "CR 500.1/506.1 the Statue's animation is offered in EVERY combat step" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    let (statueId, board) = statueBoard statue mountain
+        offeredIn step = length (activationsOf statueId (Action.legalActions S.alice (board {GameState.phase = Phase.Combat step})))
+    Spec.assertEqWith
+      s
+      "one activation in each of the five"
+      (fmap offeredIn [CombatStep.BeginningOfCombat, CombatStep.DeclareAttackers, CombatStep.DeclareBlockers, CombatStep.CombatDamage, CombatStep.EndOfCombat])
+      [1, 1, 1, 1, 1]
+
+  -- The discriminating half. CR 505.1 makes the two main phases their own
+  -- phases, so "during combat" excludes both -- and the postcombat main phase is
+  -- the sharp one, since it is adjacent to the window and shares its turn.
+  --
+  -- Carries its own control in the same test, on the same board and for the same
+  -- player: alice's Prodigal Sorcerer ("{T}: This creature deals 1 damage to any
+  -- target", CR 602.2 and no rider) IS offered, so what withholds the Statue is
+  -- the rider and not the phase being closed to alice altogether.
+  Spec.it s "CR 505.1 the Statue's animation is NOT offered in either main phase" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (statueId, board) = statueBoard statue mountain
+        (sorcererId, withSorcerer) = S.addCreature prodigalSorcerer S.alice board
+        offeredIn phase = activationsOf statueId (Action.legalActions S.alice (withSorcerer {GameState.phase = phase}))
+    Spec.assertEqWith s "not before combat" (offeredIn Phase.PrecombatMain) []
+    Spec.assertEqWith s "not after it" (offeredIn Phase.PostcombatMain) []
+    Spec.assertEqWith s "not in the upkeep either" (offeredIn (Phase.Beginning BeginningStep.Upkeep)) []
+    Spec.assertEqWith s "and not in the end step" (offeredIn (Phase.Ending EndingStep.EndStep)) []
+    Spec.assertBool
+      s
+      (not (null (activationsOf sorcererId (Action.legalActions S.alice (withSorcerer {GameState.phase = Phase.PostcombatMain})))))
+      "but alice's unrestricted ability is offered in the same phase"
+
+  -- CR 102.1's axis, unchanged by the widening: Jade Statue prints no "your", so
+  -- its TurnScope is EachTurn and bob's combat phase is a window for it too.
+  -- Asked of alice, who controls it -- CR 602.2 restricts activation to the
+  -- controller -- on a turn that is not hers.
+  Spec.it s "CR 102.1 the window is EachTurn, so an opponent's combat phase qualifies" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    let (statueId, board) = statueBoard statue mountain
+        bobsCombat = board {GameState.activePlayer = S.bob, GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
+    Spec.assertEqWith s "still offered on bob's turn" (length (activationsOf statueId (Action.legalActions S.alice bobsCombat))) 1
 
 -- CR 307.5's rider narrowed by TURN as well as by step: Llanowar Augur
 -- (Future Sight) prints "Sacrifice this creature: Target creature gets +3/+3 and

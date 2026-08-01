@@ -322,6 +322,7 @@ durationCounts duration = case duration of
   Duration.Indefinite -> []
   Duration.UntilYourNextTurn -> []
   Duration.ForAsLongAs condition -> conditionCounts condition
+  Duration.UntilEndOfCombat -> []
 
 -- Every Count reachable from a Modification: only its P/T quantities
 -- (layers 7b/7c) carry one.
