@@ -189,6 +189,7 @@ basePoolGiven pcs pool gs = case pool of
       ]
   Pool.Permanents -> permanentRecipients gs
   Pool.Spells -> spellRecipients gs
+  Pool.Abilities -> abilityRecipients gs
   Pool.SpellsAndPermanents -> Set.union (spellRecipients gs) (permanentRecipients gs)
 
 -- CR 115.1a: creatures on the battlefield, per playing player's zone, tagged
@@ -241,6 +242,26 @@ permanentRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (Game
 -- and permanents are excluded by Game.isSpell.
 spellRecipients :: GameState -> Set Recipient
 spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
+
+-- CR 113.9: only activated and triggered abilities (Source.OfAbility /
+-- OfTrigger / OfInherentTrigger) on the stack, tagged ToObject; spells and
+-- permanents are excluded by Game.isAbility. Stifle's "target activated or
+-- triggered ability".
+--
+-- The same walk spellRecipients makes over the same list, and DISJOINT from it
+-- by construction, which is rule 113.9's first two sentences: "activated and
+-- triggered abilities on the stack aren't spells, and therefore can't be
+-- countered by anything that counters only spells. Activated and triggered
+-- abilities on the stack can be countered by effects that specifically counter
+-- abilities."
+--
+-- Nothing filters out a MANA ability, and nothing needs to: CR 605.3b and CR
+-- 605.4a keep one off the stack entirely ("doesn't go on the stack, so it can't
+-- be targeted, countered, or otherwise responded to"), so this walk can never
+-- see one. Stifle's "(Mana abilities can't be targeted.)" is reminder text for
+-- those rules -- see Pawl.Types.Pool.Abilities.
+abilityRecipients :: GameState -> Set Recipient
+abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game.isAbility oid gs) (GameState.stack gs)))
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

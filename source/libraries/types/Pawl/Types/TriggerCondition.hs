@@ -215,7 +215,11 @@ data TriggerCondition
     --
     -- Only a countered SPELL fires this, which is the printed word rather than
     -- an omission: rule 701.6a's subject is "a spell or ability", and Baral's
-    -- own object is "counters a spell". No effect in this pool can target an
-    -- ability on the stack, so nothing can counter one either (#486).
+    -- own object is "counters a spell". Stifle counters an ABILITY, and Baral
+    -- stays silent for it -- CR 113.9 says an ability on the stack is not a
+    -- spell, so Pawl.Engine.Event.counter ceases it (CR 608.2n) and records no
+    -- event for this condition to match. The countered-ability sibling of that
+    -- record does not exist, and no card in the pool wants one (#541); it would
+    -- be a new event and a new condition, never a widening of these two.
     SpellOrAbilityCounters PlayerRelation
   deriving (Eq, Ord, Show)

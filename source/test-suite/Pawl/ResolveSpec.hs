@@ -6,6 +6,7 @@
 module Pawl.ResolveSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -1445,6 +1446,159 @@ counterSpec s registry = Spec.describe s "Counter" $ do
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the countered spell is not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
     Spec.assertEqWith s "the countered spell is exiled" (length (Game.zoneMembers Zone.Exile S.bob resolved)) 1
+
+-- The one activated ability of a printing that declares exactly one -- Prodigal
+-- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
+-- printing, so a card that grew a second ability fails the case that names it
+-- rather than silently picking whichever came first (Pawl.TargetSpec's
+-- soleTargetSpec is the same shape for the same reason).
+soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleActivatedAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+  [only] -> Just only
+  _ -> Nothing
+
+-- bob has a settled Prodigal Sorcerer ("{T}: This creature deals 1 damage to any
+-- target"); alice has `lands` Islands and `stifles` Stifles in hand. bob
+-- activates the Sorcerer at ALICE, so the ability's effect is observable as her
+-- life total, and the returned state is the one where the ability is on the
+-- stack, waiting.
+stifleBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> Maybe ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+stifleBoard island stifle sorcerer lands stifles = case soleActivatedAbility sorcerer of
+  Nothing -> Nothing
+  Just ability ->
+    let (srcId, withSorcerer) = S.addCreature sorcerer S.bob (Setup.emptyGame S.bothPlayers)
+        -- CR 302.6: the Sorcerer must have settled under bob before its {T} may
+        -- be activated at all.
+        settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.bob)
+        withLands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) settled [1 .. lands]
+        (stifleIds, withStifles) =
+          List.foldl'
+            (\(ids, g) _ -> let (i, g') = S.addHandCard stifle S.alice g in (ids <> [i], g'))
+            ([], withLands)
+            [1 .. stifles]
+        atAlice :: Prompt.Prompt r -> r
+        atAlice p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+          _ -> S.identityAnswer p
+        activated = S.runPure atAlice (withStifles {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob srcId ability)
+     in Just (stifleIds, srcId, activated)
+
+-- CR 701.6a covers "a spell or ability", and Stifle ({U} Instant, "Counter
+-- target activated or triggered ability. (Mana abilities can't be targeted.)")
+-- is the first card in the pool that reaches the second half. Cancel proved the
+-- spell half above; these cases are the ability half, and what makes them a
+-- different test rather than the same one twice is rule 701.6a's LAST sentence:
+-- "a countered spell is put into its owner's graveyard." Only a spell. CR 608.2n
+-- says how an ability leaves instead -- "the ability is removed from the stack
+-- and ceases to exist" -- so the graveyard assertions here are the load-bearing
+-- ones, and they are stated as counts of what did NOT arrive.
+--
+-- CR 113.9 is why one card cannot do both: "activated and triggered abilities on
+-- the stack aren't spells, and therefore can't be countered by anything that
+-- counters only spells. Activated and triggered abilities on the stack can be
+-- countered by effects that specifically counter abilities." Pawl.TargetSpec
+-- holds that half, as the two disjoint pools.
+--
+-- Stifle's parenthetical needs nothing implemented and is not tested for: CR
+-- 605.3b ("an activated mana ability doesn't go on the stack, so it can't be
+-- targeted, countered, or otherwise responded to") and CR 605.4a keep a mana
+-- ability off the stack in the first place, so it is never a candidate. See
+-- Pawl.Types.Pool.Abilities.
+stifleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stifleSpec s registry = Spec.describe s "Stifle" $ do
+  -- The ACTIVATED half (CR 113.3b). The discriminating assertions are alice's
+  -- untouched life -- rule 701.6a's "it doesn't resolve and none of its effects
+  -- occur" -- and bob's EMPTY graveyard, which is what tells a cease (CR 608.2n)
+  -- apart from the graveyard move Cancel makes.
+  Spec.it s "CR 701.6a whole cards: Stifle counters Prodigal Sorcerer's activated ability, which ceases (CR 608.2n)" $ do
+    island <- S.printingOf s registry "Island"
+    stifle <- S.printingOf s registry "Stifle"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case stifleBoard island stifle sorcerer 1 1 of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (stifleIds, srcId, activated) -> do
+        let abilIds = GameState.stack activated
+            cast = List.foldl' (\g oid -> S.runPure S.identityAnswer g (Cast.castSpell S.alice oid)) activated stifleIds
+            countered = S.runPure S.identityAnswer cast Stack.resolveTop
+        Spec.assertEqWith s "the activation put exactly one ability on the stack" (length abilIds) 1
+        Spec.assertEqWith s "and both it and the Stifle are gone from the stack" (GameState.stack countered) []
+        -- CR 701.6a: "it doesn't resolve and none of its effects occur."
+        Spec.assertEqWith s "alice took no damage: the ability never resolved" (S.lifeOf S.alice countered) (Just 20)
+        -- CR 608.2n: the ability ceased. It is not in a graveyard -- an ability
+        -- is not a card and has no owner's graveyard to be put into -- and it is
+        -- not an object at all any more.
+        Spec.assertEqWith s "nothing arrived in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob countered)) 0
+        Spec.assertEqWith s "alice's graveyard holds the spent Stifle and nothing else" (length (Game.zoneMembers Zone.Graveyard S.alice countered)) 1
+        Spec.assertEqWith s "the ability object ceased to exist" (fmap (\oid -> Game.lookupObject oid countered) abilIds) [Nothing]
+        -- CR 113.7a: the ability was its own object, so countering it leaves the
+        -- SOURCE alone -- and CR 701.6b gives no refund, so the Sorcerer stays
+        -- tapped for a {T} that bought nothing.
+        Spec.assertBool s (Set.member srcId (GameState.battlefield countered)) "the Prodigal Sorcerer is untouched on the battlefield"
+        Spec.assertEqWith s "still tapped: CR 701.6b refunds no cost" (fmap Object.tapped (Game.lookupObject srcId countered)) (Just TapState.Tapped)
+  -- The TRIGGERED half (CR 113.3c), and a different observation: Aether Flash's
+  -- trigger is what kills a Goblin Piker in Pawl.TriggerSpec's own case, so the
+  -- Piker being ALIVE with no damage marked is the same effect not occurring.
+  Spec.it s "CR 701.6a whole cards: Stifle counters Aether Flash's triggered ability, so the Piker lives" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    aetherFlash <- S.printingOf s registry "Aether Flash"
+    piker <- S.printingOf s registry "Goblin Piker"
+    stifle <- S.printingOf s registry "Stifle"
+    let (flashId, withFlash) = S.addCreature aetherFlash S.alice (Setup.emptyGame S.bothPlayers)
+        withMountains = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) withFlash [1 .. (2 :: Int)]
+        (_, withIsland) = S.addCreature island S.bob withMountains
+        (stifleId, withStifle) = S.addHandCard stifle S.bob withIsland
+        (pikerId, gs) = S.addHandCard piker S.alice withStifle
+        cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice pikerId)
+        -- The Piker resolves and enters; CR 603.3 then puts Aether Flash's
+        -- trigger on the stack the next time a player would receive priority.
+        entered = S.runPure S.identityAnswer cast Stack.resolveTop
+        placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+        stifled = S.runPure S.identityAnswer placed (Cast.castSpell S.bob stifleId)
+        countered = S.runPure S.identityAnswer stifled Stack.resolveTop
+        after = S.runPure S.identityAnswer countered Engine.settleForPriority
+        entrantId = case filter (\oid -> fmap Card.Type.name (Game.cardOf oid after) == Just (Text.pack "Goblin Piker")) (Set.toList (GameState.battlefield after)) of
+          [only] -> Just only
+          _ -> Nothing
+    Spec.assertEqWith s "the trigger is the only thing on the stack before the Stifle" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "the stack is empty afterwards" (GameState.stack after) []
+    -- The falsifier is Pawl.TriggerSpec's aetherFlashSpec, where the same
+    -- Aether Flash's 2 damage kills the same 2/1 (CR 704.5g): a Piker alive with
+    -- NO damage marked is rule 701.6a's "none of its effects occur".
+    Spec.assertEqWith s "the Piker survived" (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "with no damage marked on it at all" (fmap (\oid -> fmap Object.damage (Game.lookupObject oid after)) entrantId) (Just (Just 0))
+    Spec.assertEqWith s "no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events after)))) []
+    -- CR 608.2n again: the countered trigger went nowhere. alice's graveyard is
+    -- empty (no Piker corpse, and no residue of the trigger), and bob's holds
+    -- only the Stifle that did the countering.
+    Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "bob's holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertBool s (Set.member flashId (GameState.battlefield after)) "and Aether Flash itself is untouched"
+  -- CR 608.2b, for a target that CEASED rather than moved: "a target that's no
+  -- longer in the zone it was in when it was targeted is illegal ... If all its
+  -- targets ... are now illegal, the spell or ability doesn't resolve. It's
+  -- removed from the stack and, IF IT'S A SPELL, put into its owner's
+  -- graveyard." Stifle is a spell, so the fizzled one is buried; the ability it
+  -- was aimed at left by ceasing, which is not a zone change at all.
+  --
+  -- The twin of the racing Cancels above, one card over.
+  Spec.it s "CR 608.2b a Stifle whose ability already ceased fizzles" $ do
+    island <- S.printingOf s registry "Island"
+    stifle <- S.printingOf s registry "Stifle"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case stifleBoard island stifle sorcerer 2 2 of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (stifleIds, _, activated) -> do
+        let castAll g oid = S.runPure S.identityAnswer g (Cast.castSpell S.alice oid)
+            bothCast = List.foldl' castAll activated stifleIds
+            first' = S.runPure S.identityAnswer bothCast Stack.resolveTop
+            second' = S.runPure S.identityAnswer first' Stack.resolveTop
+        Spec.assertEqWith s "two Stifles were cast onto the ability" (length (GameState.stack bothCast)) 3
+        Spec.assertEqWith s "the first counters the ability" (length (GameState.stack first')) 1
+        Spec.assertEqWith s "and the second fizzles off the stack" (GameState.stack second') []
+        Spec.assertEqWith s "both Stifles are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice second')) 2
+        Spec.assertEqWith s "bob's graveyard stayed empty throughout" (length (Game.zoneMembers Zone.Graveyard S.bob second')) 0
+        Spec.assertEqWith s "and alice never took the damage" (S.lifeOf S.alice second') (Just 20)
 
 fizzleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
@@ -3518,6 +3672,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   loseLifeSpec s registry
   greatestSpec s registry
   counterSpec s registry
+  stifleSpec s registry
   countersSpec s registry
   untapSpec s registry
   gainControlSpec s registry

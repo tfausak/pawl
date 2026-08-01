@@ -13,6 +13,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -229,3 +230,41 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         shrouded = S.withEffect pikerId (Modification.GainKeyword Keyword.Shroud) attached
     Spec.assertBool s (Set.member auraId (GameState.battlefield (S.settleSba attached))) "the Aura stays put with no shroud around"
     Spec.assertBool s (Set.member auraId (GameState.battlefield (S.settleSba shrouded))) "and stays put once its host has shroud"
+
+  -- CR 113.9, the whole rule, as two DISJOINT pools: "activated and triggered
+  -- abilities on the stack aren't spells, and therefore can't be countered by
+  -- anything that counters only spells. Activated and triggered abilities on
+  -- the stack can be countered by effects that specifically counter abilities."
+  --
+  -- One board with one of each on the stack -- alice's Goblin Piker spell, and
+  -- her Prodigal Sorcerer's activated ability above it -- so neither exclusion
+  -- can pass by the pool simply being empty. Cancel ("counter target spell",
+  -- Pool.Spells) and Stifle ("counter target activated or triggered ability",
+  -- Pool.Abilities) are read off their committed printings, so this is the
+  -- printed text and not a hand-built spec.
+  --
+  -- CR 115.2 is what admits either at all: "only permanents are legal targets
+  -- ... unless a spell or ability ... (b) targets an object that can't exist on
+  -- the battlefield, such as a spell or ability."
+  Spec.it s "CR 113.9 Stifle's pool holds only the ability and Cancel's only the spell" $ do
+    cancel <- S.printingOf s registry "Cancel"
+    stifle <- S.printingOf s registry "Stifle"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case Card.Type.activatedAbilities (Printing.card sorcerer) of
+      [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      ability : _ -> do
+        let (srcId, withSorcerer) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
+            -- CR 302.6: the Sorcerer has to have settled before its {T} is legal.
+            settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
+            (spellId, onStack) = S.spellOnStack piker S.alice settled
+            gs = S.runPure S.identityAnswer (onStack {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
+            abilIds = filter (/= spellId) (GameState.stack gs)
+            -- soleTargetSpec, not S.spellTargetSpec: neither card calls its slot
+            -- "target" -- Cancel's is "spell" and Stifle's is "ability".
+            legalFor printing = fmap (\theSpec -> Target.legalRecipients (Just S.bob) S.noSource theSpec gs) (soleTargetSpec (Card.Type.spell (Printing.card printing)))
+        case (abilIds, legalFor cancel, legalFor stifle) of
+          ([abilId], Just cancelLegal, Just stifleLegal) -> do
+            Spec.assertEqWith s "Cancel sees the spell and only the spell" cancelLegal (Set.singleton (Recipient.ToObject spellId))
+            Spec.assertEqWith s "Stifle sees the ability and only the ability" stifleLegal (Set.singleton (Recipient.ToObject abilId))
+          _ -> Spec.assertFailure s "the fixture should put one ability and one spell on the stack, and both cards should declare a target slot"

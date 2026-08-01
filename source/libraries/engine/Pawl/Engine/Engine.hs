@@ -513,7 +513,7 @@ placeBorne srcId pending = do
   if Natural.length legal < count
     then -- CR 603.3c: fewer legal modes than the selection demands -- for
     -- ChooseExactly 1, no legal mode at all -- removes the ability.
-      State.modify' (Resolve.cease abilId)
+      State.modify' (Game.cease abilId)
     else do
       -- CR 700.2b: forced when there is nothing to choose (as many legal modes
       -- as the selection demands), prompted otherwise.

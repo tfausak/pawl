@@ -338,11 +338,20 @@ data Effect card
     -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
     -- "target player", but nothing here demands it.
     SkipNextPhase PlayerRef PhaseSelector
-  | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
-    -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
-    -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way
-    -- Destroy is (M4b): Counter is a keyword action on rule 701's list, and this is
-    -- the future home of "can't be countered" and a distinct "was countered" event.
+  | -- CR 701.6: counter the slot's target -- "cancel it, removing it from the
+    -- stack. It doesn't resolve and none of its effects occur" (CR 701.6a) --
+    -- via the Event.counter funnel. ONE opcode for both of rule 701.6a's
+    -- subjects: Cancel's slot is a Pool.Spells one and Stifle's a
+    -- Pool.Abilities one, and which ending the countering has (the owner's
+    -- graveyard for a spell, CR 608.2n's cease for an ability) is the funnel's
+    -- own classification of the object it is handed, not a second opcode. CR
+    -- 113.9 keeps the two apart where it belongs, in the target pool: an effect
+    -- that counters only spells cannot reach an ability.
+    --
+    -- Distinct from MoveToZone slot Graveyard the way Destroy is (M4b): Counter
+    -- is a keyword action on rule 701's list, it carries the CR 113.6g "can't be
+    -- countered" gate, and countering a SPELL records a distinct "was countered"
+    -- event that the zone change alone could not be told apart from.
     Counter SlotName
   | -- CR 122.6: put this many counters of this kind on the slot's target permanent.
     -- Battlegrowth = PutCounters PlusOnePlusOne (Literal 1) slot; Instill Infection

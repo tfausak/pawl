@@ -101,7 +101,7 @@ resolveTopWith runSubgame = do
           case TriggeredAbility.intervening ability of
             Just cond
               | not (Condition.holds (Projection.viewWithLastKnown srcId gs) (Filter.MkContext (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
-                  State.modify' (Resolve.cease oid)
+                  State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
                   modal = TriggeredAbility.modal ability

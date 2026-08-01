@@ -443,7 +443,7 @@ fullView gs oid = Just (viewOfObject oid gs)
 --
 -- Nothing when the source is gone AND nothing was recorded for it -- an object
 -- that ceased without a zone change ever running over it, which is what
--- Resolve.cease does to an ability and what Departure.objectsLeaveWith does to a
+-- Game.cease does to an ability and what Departure.objectsLeaveWith does to a
 -- departing player's objects. Honest Nothing rather than a zero, and it lands on
 -- the no-op every caller already gives an unevaluable quantity.
 --

@@ -993,6 +993,28 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         "target spec"
         (Card.allTargetSpecs card)
         (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing))
+    -- Stifle beside it, and the pair is the point: ONE Counter opcode, TWO
+    -- pools. CR 113.9 -- "activated and triggered abilities on the stack aren't
+    -- spells, and therefore can't be countered by anything that counters only
+    -- spells" -- is carried entirely by which Pool the slot names, so a card
+    -- file that reached for Pool.Spells here would let Stifle counter a spell.
+    --
+    -- Stifle's parenthetical is reminder text and decodes to nothing: CR 605.3b
+    -- and CR 605.4a keep a mana ability off the stack, so there is no filter for
+    -- it to become (hence the Nothing beside Pool.Abilities).
+    Spec.it s "CR 113.9 Stifle loads as the same Counter effect over Pool.Abilities" $ do
+      stifle <- S.printingOf s registry "Stifle"
+      let card = Printing.card stifle
+      Spec.assertEqWith
+        s
+        "effects"
+        (Card.allEffects card)
+        [Effect.Counter (SlotName.MkSlotName (Text.pack "ability"))]
+      Spec.assertEqWith
+        s
+        "target spec"
+        (Card.allTargetSpecs card)
+        (Map.singleton (SlotName.MkSlotName (Text.pack "ability")) (TargetSpec.MkTargetSpec Pool.Abilities Nothing))
     -- The key is omitted when Counterable, so this pins BOTH directions of
     -- that default: the one card that prints the clause decodes as
     -- CantBeCountered, and a card that says nothing decodes as Counterable

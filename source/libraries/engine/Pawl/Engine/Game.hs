@@ -138,6 +138,29 @@ insertIntoZone zone pid oid gs = case zone of
   Zone.Command -> gs {GameState.command = Set.insert oid (GameState.command gs)}
   Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
 
+-- CR 608.2n: an ability leaves the stack and CEASES TO EXIST -- "as the final
+-- part of an ability's resolution, the ability is removed from the stack and
+-- ceases to exist". No graveyard: an ability is not a card, so there is no
+-- owner's graveyard for it to go to, and the removal is therefore NOT a zone
+-- change and never goes through Pawl.Engine.Event.changeZone (nothing arrives,
+-- so CR 400.7 mints no new incarnation and CR 614 has no destination to
+-- replace).
+--
+-- The one way an ability object leaves the stack, and it lives HERE rather than
+-- with the resolution machinery because rule 608.2n's ending is not the only one
+-- that needs it. CR 603.3c: "if no mode is chosen, the ability is removed from
+-- the stack" (Pawl.Engine.Engine.placeBorne). CR 608.2a, an intervening "if"
+-- that is no longer true: "the ability is removed from the stack and does
+-- nothing" (Pawl.Engine.Stack). And CR 701.6a's countering of an ability ends
+-- the same way (Pawl.Engine.Event.counter) -- which is what moved this out of
+-- Pawl.Engine.Resolve, since Event cannot import that module.
+cease :: ObjectId -> GameState -> GameState
+cease abilId gs =
+  gs
+    { GameState.stack = filter (/= abilId) (GameState.stack gs),
+      GameState.objects = Map.delete abilId (GameState.objects gs)
+    }
+
 -- The card an object is a copy of. Nothing when the id is unknown.
 cardOf :: ObjectId -> GameState -> Maybe Card
 cardOf oid gs = cardOfSource (fmap Object.source (lookupObject oid gs))
@@ -194,6 +217,38 @@ isSpell oid gs = case lookupObject oid gs of
       Source.OfTrigger _ _ -> False
       Source.OfEmblem _ -> False
       Source.OfInherentTrigger _ _ -> False
+
+-- CR 113.9: is this object an activated or triggered ability on the stack?
+-- "Activated and triggered abilities on the stack aren't spells" -- so this is
+-- the SIBLING of isSpell just above and never its complement, and it asks the
+-- same two things in the same way: the object's zone, and its KIND (its Source),
+-- never the card's identity.
+--
+-- The two together are what CR 113.9's rule about countering needs: an effect
+-- that counters only spells must not reach an ability, and one that specifically
+-- counters abilities must not reach a spell. Pawl.Types.Pool.Spells and
+-- Pawl.Types.Pool.Abilities are those two answers as target pools, and
+-- Pawl.Engine.Event.counter branches on this one to choose between rule 701.6a's
+-- graveyard and CR 608.2n's cease.
+--
+-- CR 725.2's inherent monarch triggers count: "there are two inherent triggered
+-- abilities associated with being the monarch. These triggered abilities have no
+-- source", and they are triggered abilities all the same, so a Stifle may
+-- counter one. An emblem goes into the command zone and stays there (CR 114.1 /
+-- 114.4), and a token on the stack would be a spell copy (CR 112.1a) rather than
+-- an ability, so both answer False on their own, whatever zone they are found
+-- in.
+isAbility :: ObjectId -> GameState -> Bool
+isAbility oid gs = case lookupObject oid gs of
+  Nothing -> False
+  Just obj ->
+    Object.zone obj == Zone.Stack && case Object.source obj of
+      Source.OfCard _ -> False
+      Source.OfToken _ -> False
+      Source.OfAbility _ _ -> True
+      Source.OfTrigger _ _ -> True
+      Source.OfEmblem _ -> False
+      Source.OfInherentTrigger _ _ -> True
 
 -- CR 111.1 / 111.6: is this object a token rather than a card? Asks the object's
 -- KIND (its Source), a classification in the same standing as isSpell just above,
