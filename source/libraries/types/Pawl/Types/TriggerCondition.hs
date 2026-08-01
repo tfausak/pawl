@@ -133,7 +133,8 @@ data TriggerCondition
     -- and NOT the whole of CR 603.6c, whose first clause is "a permanent moves
     -- from the battlefield to another zone", any zone at all. A card that says
     -- "leaves the battlefield" must not be conflated with one that says "dies",
-    -- so the wider condition is a separate one that does not exist yet (#384).
+    -- so the wider condition is SelfLeavesTheBattlefield just below rather than
+    -- a widening of this one.
     --
     -- Self-scoped like SelfEnters and SelfCycled: the scan visits every
     -- candidate source, so the bearer being the permanent that died is part of
@@ -163,6 +164,38 @@ data TriggerCondition
     -- battlefield), and reads the ARRIVING incarnation; this one is battlefield
     -- to graveyard, functions on the battlefield, and reads the DEPARTING one.
     SelfDies
+  | -- CR 603.6c's FIRST written form -- "When [this object] leaves the
+    -- battlefield, . . ." -- which is the rule's own first clause taken whole:
+    -- "Leaves-the-battlefield abilities trigger when a permanent moves from the
+    -- battlefield to another zone". ANY other zone, so an exile, a bounce to a
+    -- hand and a shuffle into a library all fire it. Thragtusk's.
+    --
+    -- SIBLING of SelfDies above, never its superset in code even though it is
+    -- one in the rules. The two written forms are different printed sentences,
+    -- and CR 700.4 narrows the second to a graveyard, so a Doomed Traveler must
+    -- stay silent for exactly the bounce that fires a Thragtusk. Expressing
+    -- SelfDies as "this condition, plus a destination test" would put the two
+    -- cards' fates in one arm, which is the conflation the separation exists to
+    -- prevent.
+    --
+    -- Self-scoped, and a LOOK-BACK, for the same reasons as SelfDies: CR 603.10a
+    -- names leaves-the-battlefield abilities as the exception in the first
+    -- place, so the bearer is ZoneChange.departed -- the permanent as it was
+    -- immediately before it left -- and CR 603.3a's controller is whoever
+    -- controlled it then.
+    --
+    -- Where it DIVERGES from SelfDies is CR 400.7e. That rule's rescue of the
+    -- arriving object -- "can find the new object that it became in the zone it
+    -- moved to when the ability triggered, if that zone is a public zone" --
+    -- carries a proviso SelfDies satisfies by construction, since CR 400.2 makes
+    -- a graveyard public. This condition's destination may be a hand or a
+    -- library, which that same rule makes hidden, so the proviso is a real test
+    -- here: Pawl.Engine.Event.eventBindings binds Pawl.Engine.Binding.became only
+    -- for a public destination, and binds nothing at all for a hidden one.
+    --
+    -- CR 603.6c's SECOND trigger event -- "or when a phased-in permanent leaves
+    -- the game because its owner leaves the game" -- is not matched (#385).
+    SelfLeavesTheBattlefield
   | -- CR 701.6a: "whenever a spell or ability you control counters a spell" --
     -- Baral, Chief of Compliance's. Matched against GameEvent.SpellCountered,
     -- whose Countering carries the controller of the spell or ability that DID

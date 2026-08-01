@@ -146,6 +146,7 @@ playersFor context gs ref =
           case recipient of
             Recipient.ToPlayer pid -> Just [pid]
             Recipient.ToCreature _ -> Nothing
+            Recipient.ToPlaneswalker _ -> Nothing
             Recipient.ToObject _ -> Nothing
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event

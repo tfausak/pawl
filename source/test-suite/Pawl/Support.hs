@@ -244,6 +244,7 @@ threeWayMirror fetch = do
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
+  Recipient.ToPlaneswalker _ -> False
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
 

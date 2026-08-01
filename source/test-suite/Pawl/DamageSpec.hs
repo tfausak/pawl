@@ -1444,12 +1444,24 @@ m2cPropertySpec s registry =
 -- says nothing about the entrant's card types -- gets classified before an
 -- effect can build a damage event out of it.
 --
--- Aether Flash exercises the two answers this function gives in a real game
--- (TriggerSpec's aetherFlashSpec): a creature entrant becomes ToCreature, and
--- an entrant already dead by the time the ability resolves (CR 608.2h) becomes
--- Nothing. The third, a permanent that exists and is not a creature, no card in
--- the pool can produce -- every DealDamage on a generically named slot belongs
--- to a condition whose Filter admits only creatures -- so it is pinned here.
+-- All three clauses of that rule are now live: the creature one has been since
+-- M3a, and CR 306.8's loyalty removal made the planeswalker one so (#494). Only
+-- "battle" is still aspirational, for want of the card type (#302).
+--
+-- So the function has three answers for a generically named permanent --
+-- ToCreature, ToPlaneswalker, or Nothing -- plus the pass-through for a
+-- recipient that arrives already classified.
+--
+-- Aether Flash exercises two of them in a real game (TriggerSpec's
+-- aetherFlashSpec): a creature entrant becomes ToCreature, and an entrant
+-- already dead by the time the ability resolves (CR 608.2h) becomes Nothing.
+-- The other two are pinned here and nowhere else, because no card in the pool
+-- can produce them. Every DealDamage in data/cards/ takes its slot from an
+-- AnyTarget, Creatures or Players pool -- none of which tags a candidate
+-- ToObject -- or from a bound slot, and the one bound slot that names a
+-- permanent is Aether Flash's `became`, whose trigger condition Filter admits
+-- only creatures. A planeswalker or a land therefore reaches this function's
+-- ToObject arm only from a direct call like these.
 damageRecipientSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageRecipientSpec s registry =
   Spec.describe s "CR 120.1a which recipients damage can be dealt to" $ do
@@ -1462,11 +1474,37 @@ damageRecipientSpec s registry =
         (Damage.damageRecipient gs (Recipient.ToObject oid))
         (Just (Recipient.ToCreature oid))
 
-    Spec.it s "a generically named NONcreature permanent can be dealt no damage" $ do
+    -- CR 306.8's arm is what makes the wording here matter. "Noncreature
+    -- permanent" is NOT the condition for taking nothing -- a planeswalker is
+    -- one and takes damage (the case below) -- so what CR 120.1a rejects is a
+    -- permanent that is none of its three card types. A land is the case the
+    -- pool can build today; a battle would be the other side of it (#302).
+    Spec.it s "a generically named permanent that is neither a creature nor a planeswalker can be dealt no damage" $ do
       plains <- S.printingOf s registry "Plains"
       let (oid, gs) = S.addCreature plains S.alice (Setup.emptyGame S.bothPlayers)
       Spec.assertBool s (Set.member oid (GameState.battlefield gs)) "the land is really there"
       Spec.assertEqWith s "and takes nothing" (Damage.damageRecipient gs (Recipient.ToObject oid)) Nothing
+
+    -- CR 120.1a's planeswalker clause, and the retag CR 120.3c needs: the
+    -- ToPlaneswalker tag is what tells Damage.applyDamage to remove loyalty
+    -- counters instead of marking damage, so classifying a generically named
+    -- planeswalker as ToCreature here would silently give it the wrong one of
+    -- CR 120.3's results.
+    --
+    -- No card drives this: see the group's header. It is the same footing the
+    -- Plains case above stands on -- a direct call, pinning an answer the pool
+    -- cannot yet ask for. PlaneswalkerSpec's Lightning Bolt case is what proves
+    -- the loyalty removal itself in a real game, through AnyTarget's own
+    -- ToPlaneswalker tag rather than through this arm.
+    Spec.it s "a generically named planeswalker becomes CR 120.3c's planeswalker recipient" $ do
+      jace <- S.printingOf s registry "Jace Beleren"
+      let (oid, gs) = S.addCreature jace S.alice (Setup.emptyGame S.bothPlayers)
+      Spec.assertBool s (Set.member oid (GameState.battlefield gs)) "the planeswalker is really there"
+      Spec.assertEqWith
+        s
+        "retagged, not rejected"
+        (Damage.damageRecipient gs (Recipient.ToObject oid))
+        (Just (Recipient.ToPlaneswalker oid))
 
     Spec.it s "an object that no longer exists takes nothing either (CR 608.2h)" $
       Spec.assertEqWith
@@ -1478,10 +1516,13 @@ damageRecipientSpec s registry =
     -- The pass-through half. A combat recipient (CR 510.1b-d) and a chosen
     -- target out of a typed Pool were classified when they were built, so this
     -- function is not a second, later reading of the same question.
-    Spec.it s "a creature or player recipient is unchanged" $ do
+    Spec.it s "a creature, planeswalker or player recipient is unchanged" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      jace <- S.printingOf s registry "Jace Beleren"
+      let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+          (jaceId, gs) = S.addCreature jace S.alice gs0
       Spec.assertEqWith s "creature" (Damage.damageRecipient gs (Recipient.ToCreature oid)) (Just (Recipient.ToCreature oid))
+      Spec.assertEqWith s "planeswalker" (Damage.damageRecipient gs (Recipient.ToPlaneswalker jaceId)) (Just (Recipient.ToPlaneswalker jaceId))
       Spec.assertEqWith s "player" (Damage.damageRecipient gs (Recipient.ToPlayer S.bob)) (Just (Recipient.ToPlayer S.bob))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

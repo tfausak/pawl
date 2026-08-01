@@ -20,7 +20,8 @@
 -- look-back trigger, the card it became in the first zone it went to, with
 -- Endless Cockroaches -- `becameSlotSpec`, which also pins
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
--- against the keys eventBindings actually stamps. CR 603.4's intervening "if"
+-- against the keys eventBindings actually stamps, over every event each
+-- condition admits. CR 603.4's intervening "if"
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
 -- -- `lookBackInterveningSpec`. CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
@@ -30,11 +31,13 @@
 -- Flash -- `aetherFlashSpec`. CR 308's kindred card type, whose one observable
 -- consequence (CR 308.2: a noncreature card carrying creature types) is read
 -- through the ordinary Pool + Filter target machinery, with Bitterblossom --
--- `kindredSpec`.
--- Flash -- `aetherFlashSpec`. CR 701.9a's discard trigger, and CR 702.29d's
+-- `kindredSpec`. CR 701.9a's discard trigger, and CR 702.29d's
 -- "only once when a card is cycled", with Megrim -- `discardTriggerSpec`.
 -- CR 701.6a's countering trigger, and the CR 113.6g gate that keeps it silent,
--- with Baral, Chief of Compliance -- `counterTriggerSpec`.
+-- with Baral, Chief of Compliance -- `counterTriggerSpec`. CR 603.6c's OTHER
+-- written form, "leaves the battlefield" for any destination, and the CR 400.7e
+-- public-zone proviso a hidden destination makes real, with Thragtusk bounced by
+-- Unsummon -- `leavesBattlefieldSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -2079,40 +2082,234 @@ diesTriggerSpec s registry =
           Spec.assertEqWith s "alice controlled it as it died" (Projection.controllerOf traveler stolen) (Just S.alice)
           Spec.assertEqWith s "so the trigger is hers, not its owner's" (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedEvents died) died))) [S.alice]
 
--- One event per trigger condition, chosen to be an event that GENUINELY fires
--- that condition (Event.matchesTrigger's own arms are the spec), so
--- eventBindings is exercised through its matching arm rather than through its
--- `_ -> Map.empty` fallthrough. A pair that did not match would pin nothing:
--- both sides would read empty for every condition.
+-- CR 603.6c's FIRST written form, and the whole of its first clause:
+-- "Leaves-the-battlefield abilities trigger when a permanent moves from the
+-- battlefield to another zone ... written as, but aren't limited to, 'When
+-- [this object] leaves the battlefield, . . . .'" ANY other zone -- which is the
+-- whole of what separates it from the SECOND written form, the one CR 700.4
+-- abbreviates as "dies" and diesTriggerSpec above covers.
+--
+-- Thragtusk, {4}{G} Creature -- Beast 5/3: "When this creature enters, you gain
+-- 5 life. When this creature leaves the battlefield, create a 3/3 green Beast
+-- creature token." The two halves of the same card are here because the enters
+-- trigger is what proves the leaves trigger is not merely firing on every zone
+-- change the permanent is party to.
+--
+-- Unsummon is what makes CR 400.7e's public-zone proviso a real test rather
+-- than one satisfied by construction, which is all it could be while SelfDies
+-- was the only look-back condition: a bounced Thragtusk HAS left the
+-- battlefield, so the ability triggers, but it went to a hand, which CR 400.2
+-- makes a hidden zone -- so "can find the new object that it became in the zone
+-- it moved to when the ability triggered, IF THAT ZONE IS A PUBLIC ZONE"
+-- withholds Pawl.Engine.Binding.became.
+--
+-- Doomed Traveler bounced is the regression guard on the other side: the two
+-- conditions must not be conflated, so the card that prints "dies" must stay
+-- silent for exactly the event that fires the card that prints "leaves the
+-- battlefield".
+leavesBattlefieldSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+leavesBattlefieldSpec s registry =
+  let -- alice: one Mountain (Lightning Bolt's {R}), a Thragtusk in play, and the
+      -- Bolt in hand. S.identityAnswer targets the least Recipient, and
+      -- Recipient.ToCreature sorts before Recipient.ToPlayer, so the one
+      -- creature on the board is the target without a bespoke interpreter.
+      -- Three damage is lethal to a 5/3 (CR 704.5g).
+      boltBoard = do
+        mountain <- S.printingOf s registry "Mountain"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
+        thragtusk <- S.printingOf s registry "Thragtusk"
+        let (tusk, withTusk) = S.addCreature thragtusk S.alice (S.landsInPlay mountain 1)
+        pure (tusk, S.handOne lightningBolt withTusk)
+      -- The same board with a bounce spell instead of a burn spell, for the
+      -- creature the caller names. One Island pays Unsummon's {U}.
+      bounceBoard printing = do
+        island <- S.printingOf s registry "Island"
+        unsummon <- S.printingOf s registry "Unsummon"
+        victim <- S.printingOf s registry printing
+        let (oid, withVictim) = S.addCreature victim S.alice (S.landsInPlay island 1)
+        pure (oid, S.handOne unsummon withVictim)
+      -- Cast the one spell in hand, resolve it, then settle -- CR 117.5's
+      -- boundary is where state-based actions run and the trigger scan sees the
+      -- departure -- and hand back both the settled state (the trigger on the
+      -- stack) and the state after the trigger itself resolves.
+      castIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+            resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      beastsOf pid gs =
+        filter
+          -- CR 111.4: Thragtusk does not specify the token's name, so the name
+          -- is its subtype plus the word "Token".
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Beast Token"))
+          (Game.zoneMembers Zone.Battlefield pid gs)
+      assertOneBeast after =
+        case beastsOf S.alice after of
+          [beast] -> do
+            Spec.assertEqWith s "3/3" (Projection.powerOf beast after, Projection.toughnessOf beast after) (Just 3, Just 3)
+            -- CR 202.2b/202.2e: a token has no mana cost, so the colour
+            -- indicator is the only thing making it green.
+            Spec.assertEqWith s "green" (Projection.colorsOf beast after) (Set.singleton Color.Green)
+            Spec.assertEqWith s "Beast" (Projection.subtypesOf beast after) (Set.singleton Subtype.Beast)
+          other -> Spec.assertFailure s ("expected exactly one Beast token, got " <> show (length other))
+      tuskName = Text.pack "Thragtusk"
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+      -- Every slot stamped on every object currently on the stack, which for
+      -- these boards is the one placed trigger.
+      stackSlots gs =
+        concatMap (Map.toList . Binding.targetsOf . maybe Map.empty Object.bindings . flip Game.lookupObject gs) (GameState.stack gs)
+   in Spec.describe s "LeavesTheBattlefield" $ do
+        -- The destination this condition SHARES with "dies", so the wider
+        -- condition is not merely the narrower one's complement: a Thragtusk
+        -- that dies has also left the battlefield.
+        Spec.it s "CR 603.6c whole card: Lightning Bolt kills Thragtusk and its leaves-the-battlefield trigger makes a 3/3 Beast" $ do
+          (_, board) <- boltBoard
+          let (settled, after) = castIt board
+          Spec.assertEqWith s "the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
+          Spec.assertBool s (Set.member tuskName (namesIn Zone.Graveyard S.alice settled)) "the Thragtusk is in the graveyard by then"
+          assertOneBeast after
+        -- The destination "dies" does NOT reach, and the reason this condition
+        -- has to exist at all (CR 700.4 is a graveyard, CR 603.6c is any zone).
+        -- The hand is also a HIDDEN zone (CR 400.2), which is what makes the
+        -- next case a real branch rather than a proviso.
+        Spec.it s "CR 603.6c whole card: Unsummon bounces Thragtusk and the leaves-the-battlefield trigger still makes a 3/3 Beast" $ do
+          (_, board) <- bounceBoard "Thragtusk"
+          let (settled, after) = castIt board
+          Spec.assertEqWith s "the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
+          Spec.assertBool s (Set.member tuskName (namesIn Zone.Hand S.alice settled)) "the Thragtusk is in its owner's hand, not a graveyard"
+          Spec.assertBool s (not (Set.member tuskName (namesIn Zone.Graveyard S.alice settled))) "and nowhere near a graveyard"
+          assertOneBeast after
+        -- CR 400.7e's proviso, which is the new plumbing this condition needed:
+        -- "can find the new object that it became in the zone it moved to when
+        -- the ability triggered, IF THAT ZONE IS A PUBLIC ZONE." A hand is not
+        -- one (CR 400.2), so the slot must be ABSENT -- naming the card in hand
+        -- would hand the ability an object the rule does not let it find.
+        --
+        -- CR 113.7a's source slot is still stamped, and is asserted here so
+        -- that the absence above is read as a decision about `became` rather
+        -- than as a trigger that was placed with no bindings at all.
+        Spec.it s "CR 400.7e a bounce to a HIDDEN zone binds no became slot, though the source slot is still stamped" $ do
+          (tusk, board) <- bounceBoard "Thragtusk"
+          let (settled, _) = castIt board
+              slots = stackSlots settled
+          Spec.assertEqWith s "the departed permanent is CR 113.7a's source" (lookup Binding.triggerSource slots) (Just (Recipient.ToObject tusk))
+          Spec.assertEqWith s "and CR 400.7e's became is absent for a hidden destination" (lookup Binding.became slots) Nothing
+        -- The public destination, side by side with the hidden one: the same
+        -- condition, the same card, and the slot IS bound -- so its absence
+        -- above is CR 400.7e's proviso doing work rather than the condition
+        -- simply never binding anything.
+        Spec.it s "CR 400.7e a death to a PUBLIC zone does bind became, for the same condition" $ do
+          (tusk, board) <- boltBoard
+          let (settled, _) = castIt board
+              slots = stackSlots settled
+          Spec.assertEqWith s "the departed permanent is still CR 113.7a's source" (lookup Binding.triggerSource slots) (Just (Recipient.ToObject tusk))
+          case lookup Binding.became slots of
+            Just (Recipient.ToObject graveyardId) -> do
+              Spec.assertBool s (graveyardId /= tusk) "became is the CR 400.7 incarnation, a different id"
+              Spec.assertEqWith s "and it is the graveyard card" (fmap Card.Type.name (Game.cardOf graveyardId settled)) (Just tuskName)
+            other -> Spec.assertFailure s ("expected became to name an object, got " <> show other)
+        -- THE REGRESSION GUARD. Doomed Traveler prints "dies", not "leaves the
+        -- battlefield", and CR 700.4 makes that a graveyard and nothing else. A
+        -- bounce is the event that fires Thragtusk two cases up, so conflating
+        -- the two conditions would show up here as a Spirit that should not
+        -- exist.
+        Spec.it s "CR 700.4 a Doomed Traveler bounced by Unsummon does NOT fire its dies trigger" $ do
+          (_, board) <- bounceBoard "Doomed Traveler"
+          let (settled, _) = castIt board
+          Spec.assertBool s (Set.member (Text.pack "Doomed Traveler") (namesIn Zone.Hand S.alice settled)) "the Traveler left the battlefield for a hand"
+          Spec.assertEqWith s "and nothing triggered" (length (GameState.stack settled)) 0
+          Spec.assertEqWith s "so no Spirit was made" (S.countOnBattlefieldByName (Text.pack "Spirit Token") S.alice settled) 0
+        -- CR 400.7e's proviso in isolation, one case per zone CR 400.2
+        -- classifies, so the branch is pinned to the RULE rather than to the two
+        -- destinations the boards above happen to reach. "Graveyard,
+        -- battlefield, stack, exile, ante, and command are public zones ...
+        -- Library and hand are hidden zones."
+        Spec.it s "CR 400.2 eventBindings binds became for every PUBLIC destination and for no hidden one" $ do
+          let departed = ObjectId.MkObjectId 1
+              arrived = ObjectId.MkObjectId 2
+              leftFor to = Event.eventBindings TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics)
+              bound = Map.singleton Binding.became (Binding.toObject arrived)
+          Spec.assertEqWith s "a graveyard is public" (leftFor Zone.Graveyard) bound
+          Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
+          Spec.assertEqWith s "the stack is public" (leftFor Zone.Stack) bound
+          Spec.assertEqWith s "the command zone is public" (leftFor Zone.Command) bound
+          Spec.assertEqWith s "a hand is hidden" (leftFor Zone.Hand) Map.empty
+          Spec.assertEqWith s "a library is hidden" (leftFor Zone.Library) Map.empty
+        -- CR 603.6c's "to ANOTHER zone", which is the one destination this
+        -- condition rejects. Pawl.Engine.Event.recordTokenEntry files a
+        -- battlefield-to-battlefield pseudo-move whose departed id is the new
+        -- token's own, so a token bearing this ability would fire on its own
+        -- creation if the guard were dropped -- and no card in the pool makes
+        -- such a token, which is exactly why the guard needs a test of its own.
+        Spec.it s "CR 603.6c a battlefield-to-battlefield pseudo-move is not a departure" $ do
+          let token = ObjectId.MkObjectId 1
+              entry = GameEvent.Moved (ZoneChange.MkZoneChange token token Zone.Battlefield Zone.Battlefield) S.emptyCharacteristics
+              gone = GameEvent.Moved (ZoneChange.MkZoneChange token (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Exile) S.emptyCharacteristics
+              matches = Event.matchesTrigger (Setup.emptyGame S.bothPlayers) token S.alice TriggerCondition.SelfLeavesTheBattlefield
+          Spec.assertBool s (not (matches entry)) "a token's own entry is not a departure"
+          Spec.assertBool s (matches gone) "but the same token being exiled is"
+        -- The card's other half, and the proof that the leaves trigger is
+        -- scoped to DEPARTURES: Thragtusk arriving on the battlefield is a zone
+        -- change involving the same permanent, and only the enters trigger may
+        -- see it.
+        Spec.it s "CR 603.6a whole card: casting Thragtusk gains 5 life, and its leaves trigger stays silent on the way in" $ do
+          forest <- S.printingOf s registry "Forest"
+          thragtusk <- S.printingOf s registry "Thragtusk"
+          let (settled, after) = castIt (S.handOne thragtusk (S.landsInPlay forest 5))
+          Spec.assertEqWith s "exactly one trigger, the enters one" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "alice is still at 20 until it resolves" (S.lifeOf S.alice settled) (Just 20)
+          Spec.assertEqWith s "and at 25 once it does" (S.lifeOf S.alice after) (Just 25)
+          Spec.assertEqWith s "with no Beast token anywhere" (length (beastsOf S.alice after)) 0
+
+-- The events a trigger condition GENUINELY fires on (Event.matchesTrigger's own
+-- arms are the spec), so eventBindings is exercised through its matching arm
+-- rather than through its `_ -> Map.empty` fallthrough. A pair that did not
+-- match would pin nothing: both sides would read empty for every condition.
+--
+-- A NON-EMPTY LIST rather than one event, because Event.eventBindingSlots
+-- answers the guaranteed FLOOR -- the slots bound for every event a condition
+-- admits -- and a condition that binds a slot for some of its events and not
+-- others cannot be pinned by any single one of them. Every condition but one is
+-- represented by a one-element list, for which the floor is that event's exact
+-- keyset. SelfLeavesTheBattlefield is the exception, and the two
+-- destinations below are why: CR 400.7e binds `became` for the public one and
+-- withholds it for the hidden one (CR 400.2).
 --
 -- Exhaustive with no wildcard, which is half of what keeps the pin honest -- a
 -- new TriggerCondition fails to compile here. The other half, the list below, is
 -- hand-kept and cannot be forced; add the new constructor there too.
-representativeEvent :: TriggerCondition.TriggerCondition -> GameEvent.GameEvent
-representativeEvent cond =
+representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty GameEvent.GameEvent
+representativeEvents cond =
   let departed = ObjectId.MkObjectId 1
       arrived = ObjectId.MkObjectId 2
       moved from to = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics
       combatDamage =
         GameEvent.DamageDealt
           (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
+      one e = e NonEmpty.:| []
    in case cond of
-        TriggerCondition.SelfEnters -> moved Zone.Stack Zone.Battlefield
-        TriggerCondition.PermanentEnters _ -> moved Zone.Stack Zone.Battlefield
-        TriggerCondition.StepBegins phase _ -> GameEvent.StepBegan phase S.alice
+        TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
+        TriggerCondition.PermanentEnters _ -> one (moved Zone.Stack Zone.Battlefield)
+        TriggerCondition.StepBegins phase _ -> one (GameEvent.StepBegan phase S.alice)
         -- CR 603.8: a state trigger matches a game STATE, so no log entry fires
         -- it at all (Event.matchesTrigger's StateIs arm answers False for every
         -- event). Any event is therefore as representative as any other.
-        TriggerCondition.StateIs _ -> GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
-        TriggerCondition.SelfDealsCombatDamageToPlayer -> combatDamage
-        TriggerCondition.CreatureDealtCombatDamageToMonarch -> combatDamage
-        TriggerCondition.SelfCycled -> GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost
-        TriggerCondition.PlayerDiscards _ -> GameEvent.Discarded S.alice departed DiscardCause.Ordinary
-        TriggerCondition.SelfAttacks _ -> GameEvent.AttackerDeclared departed
-        TriggerCondition.SelfPutIntoGraveyardFromLibrary -> moved Zone.Library Zone.Graveyard
-        TriggerCondition.SelfDies -> moved Zone.Battlefield Zone.Graveyard
+        TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
+        TriggerCondition.SelfDealsCombatDamageToPlayer -> one combatDamage
+        TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
+        TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
+        TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
+        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed)
+        TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
+        TriggerCondition.SelfDies -> one (moved Zone.Battlefield Zone.Graveyard)
+        -- CR 603.6c admits every destination, and CR 400.2 splits them into
+        -- public and hidden, so both sides of CR 400.7e's proviso have to be
+        -- here for the floor to be the honest answer.
+        TriggerCondition.SelfLeavesTheBattlefield ->
+          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand]
         TriggerCondition.SpellOrAbilityCounters _ ->
-          GameEvent.SpellCountered (Countering.MkCountering departed arrived S.alice)
+          one (GameEvent.SpellCountered (Countering.MkCountering departed arrived S.alice))
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -2130,6 +2327,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfDies,
+    TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You
   ]
 
@@ -2240,10 +2438,18 @@ becameSlotSpec s registry =
         -- silently un-lint the new slot. Comparing the keys eventBindings
         -- actually produces against what the classification claims is what
         -- makes the drift a failing test.
-        Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps" $ do
+        --
+        -- The INTERSECTION over the events a condition admits, because the
+        -- classification answers the guaranteed floor rather than the union: a
+        -- slot the lint says is available must be bound for every event that
+        -- could have placed the trigger. For every condition but
+        -- SelfLeavesTheBattlefield that list has one element, so the
+        -- intersection is exactly that event's keyset.
+        Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for EVERY event a condition admits" $ do
           mapM_
             ( \cond ->
-                Spec.assertEqWith s ("the slots bound for " <> show cond) (Event.eventBindingSlots cond) (Map.keysSet (Event.eventBindings cond (representativeEvent cond)))
+                let stamped = fmap (Map.keysSet . Event.eventBindings cond) (representativeEvents cond)
+                 in Spec.assertEqWith s ("the slots bound for " <> show cond) (Event.eventBindingSlots cond) (foldr Set.intersection (NonEmpty.head stamped) (NonEmpty.tail stamped))
             )
             everyTriggerCondition
 
@@ -2781,6 +2987,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   diesTriggerSpec s registry
+  leavesBattlefieldSpec s registry
   becameSlotSpec s registry
   lookBackInterveningSpec s registry
   strippedTriggerSpec s registry

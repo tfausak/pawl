@@ -1569,6 +1569,7 @@ isPlayerRecipient :: Recipient.Recipient -> Bool
 isPlayerRecipient r = case r of
   Recipient.ToPlayer _ -> True
   Recipient.ToCreature _ -> False
+  Recipient.ToPlaneswalker _ -> False
   Recipient.ToObject _ -> False
 
 pickPlayerRecipient :: Set.Set Recipient.Recipient -> Maybe Recipient.Recipient
