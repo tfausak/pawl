@@ -7,9 +7,9 @@ import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.Card (Card)
 import Pawl.Types.GameState (GameState)
@@ -21,8 +21,7 @@ import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import Pawl.Types.Recipient (Recipient)
@@ -241,7 +240,7 @@ basePoolGiven pcs context pool gs = case pool of
   Pool.Spells -> spellRecipients gs
   Pool.Abilities -> abilityRecipients gs
   Pool.SpellsAndPermanents -> Set.union (spellRecipients gs) (permanentRecipients gs)
-  Pool.CardsInGraveyard relation -> graveyardRecipients context relation gs
+  Pool.CardsInGraveyard scope -> graveyardRecipients context scope gs
 
 -- CR 115.1a: creatures on the battlefield, per playing player's zone, tagged
 -- ToCreature. Reads Projection.isCreatureOf so a permanent made a creature by the
@@ -314,34 +313,36 @@ spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game
 abilityRecipients :: GameState -> Set Recipient
 abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game.isAbility oid gs) (GameState.stack gs)))
 
--- CR 404.1: the cards in the graveyards the relation names, tagged ToObject --
--- Raise Dead's "target creature card in your graveyard". CR 115.2's clause (a),
--- "a spell or ability ... specifies that it can target an object in another
--- zone" -- its OTHER-ZONE half, since playerRecipients above is already the "or a
--- player" one -- and so the first pool that leaves the battlefield and the stack
--- behind.
+-- CR 404.1: the cards in the graveyards the scope names, tagged ToObject -- Raise
+-- Dead's "target creature card in your graveyard", and Withered Wretch's "exile
+-- target card from a graveyard", which names no player at all. CR 115.2's
+-- clause (a), "a spell or ability ... specifies that it can target an object in
+-- another zone" -- its OTHER-ZONE half, since playerRecipients above is already
+-- the "or a player" one -- and so the only pool that leaves the battlefield and
+-- the stack behind.
 --
 -- ToObject, like permanentRecipients and unlike creatureRecipients, because the
 -- candidates are CARDS: CR 109.2's battlefield default is switched off by the
 -- card's own word "card", so "creature" is a Filter over an untagged card here.
 -- Game.zoneMembers Zone.Graveyard is per-OWNER (CR 400.3 sends every card to its
 -- owner's graveyard, so a graveyard holds nothing else), which is what makes the
--- relation answerable at all -- CR 108.4 gives a card in a graveyard no
--- controller to ask about.
+-- scope answerable at all -- CR 108.4 gives a card in a graveyard no controller
+-- to ask about.
 --
--- Whose graveyard is Count.playersFor's answer rather than a second reading of
--- CR 109.5 written here: that function is where PlayerRelation.Opponent's CR
--- 806.1 free-for-all argument lives, and its own haddock warns that two readings
--- of the same relation must not disagree. Wrapped in PlayerRef.Relative, which is
--- the arm it answers for; the pool's axis is deliberately narrower than a full
--- PlayerRef (#548).
+-- Whose graveyard is PlayerEffect.playersInScope's answer rather than a second
+-- reading of CR 109.5 written here: that function folds the one membership test
+-- (PlayerEffect.inScope), which is where PlayerScope.Opponents' CR 806.1
+-- free-for-all argument lives. NOT Count.playersFor, which answers for a
+-- PlayerRef, whose InSlot arm names a slot CR 601.2c has not filled at the moment
+-- this pool is read -- see Pawl.Types.Pool.CardsInGraveyard.
 --
--- Nothing -> empty, which is Count.playersFor's report of an absent perspective
--- (CR 109.5's "you" with nobody to be) -- the vacuous posture every
--- player-referencing Filter atom already takes.
-graveyardRecipients :: Filter.Context -> PlayerRelation.PlayerRelation -> GameState -> Set Recipient
-graveyardRecipients context relation gs =
-  case Count.playersFor context gs (PlayerRef.Relative relation) of
+-- Nothing -> empty, playersInScope's report of an absent perspective (CR 109.5's
+-- "you" with nobody to be) -- the vacuous posture every player-referencing Filter
+-- atom already takes. PlayerScope.EachPlayer never reaches it: "a graveyard"
+-- names the whole table with no perspective to lack.
+graveyardRecipients :: Filter.Context -> PlayerScope.PlayerScope -> GameState -> Set Recipient
+graveyardRecipients context scope gs =
+  case PlayerEffect.playersInScope (Filter.perspective context) gs scope of
     Nothing -> Set.empty
     Just pids ->
       Set.fromList
