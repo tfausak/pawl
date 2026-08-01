@@ -798,7 +798,8 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
     -- CR 205.1b: "these effects also allow the object to retain all of its prior
     -- card types and subtypes other than creature types" -- so the printed type
-    -- line stays a bare Artifact and the Creature card type arrives in layer 4.
+    -- line stays a bare Artifact, and both the Creature card type and the Golem
+    -- creature type arrive in layer 4.
     Spec.assertEqWith
       s
       "Artifact"
@@ -824,20 +825,27 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "{2} is the whole cost"
       (fmap (\ab -> (Cost.mana (ActivatedAbility.cost ab), Cost.components (ActivatedAbility.cost ab))) (CardT.activatedAbilities c))
       [(Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]), [])]
-    -- Two ModifyTarget effects on the reserved "self" slot rather than one:
+    -- Three ModifyTarget effects on the reserved "self" slot rather than one:
     -- Pawl.Types.Modification is one modification per effect, and CR 613.1d's
-    -- layer 4 (the card type) and CR 613.4b's layer 7b (the base P/T) are
-    -- different layers in any case. Both carry Duration.UntilEndOfCombat.
+    -- layer 4 (the card type and the Golem) and CR 613.4b's layer 7b (the base
+    -- P/T) are different layers in any case. All three carry
+    -- Duration.UntilEndOfCombat.
     --
-    -- The GOLEM creature type is absent, and deliberately: no layer-4
-    -- Modification sets or adds a creature subtype (#512). Nothing in the pool
-    -- reads Golem, so no game can tell.
+    -- The Golem is a SET and not an add, and it is CR 205.1b's last sentence
+    -- that says so, in Jade Statue's own words: "Some effects state that an
+    -- object becomes a '[creature type or types] artifact creature'; these
+    -- effects also allow the object to retain all of its prior card types and
+    -- subtypes other than creature types, but replace any existing creature
+    -- types." The Statue is the DEGENERATE case of that arm -- it prints no
+    -- creature type for the set to replace -- where turn-to-frog.json is the
+    -- case with one. CR 205.3m lists Golem among the creature types.
     Spec.assertEqWith
       s
-      "becomes an artifact creature with base 3/6, until end of combat"
+      "becomes an artifact creature -- Golem with base 3/6, until end of combat"
       (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
       [ [ ( Optionality.Mandatory,
             [ Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.AddCardType CardType.Creature) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))),
+              Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.SetCreatureSubtype Subtype.Golem) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))),
               Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.SetBasePowerToughness (Quantity.Literal 3) (Quantity.Literal 6)) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")))
             ]
           )

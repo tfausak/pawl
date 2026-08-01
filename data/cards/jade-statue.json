@@ -36,6 +36,21 @@
                     "type": "UntilEndOfCombat"
                   },
                   {
+                    "type": "SetCreatureSubtype",
+                    "value": {
+                      "type": "Golem"
+                    }
+                  },
+                  "self"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfCombat"
+                  },
+                  {
                     "type": "SetBasePowerToughness",
                     "value": [
                       {
