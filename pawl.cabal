@@ -109,6 +109,7 @@ library codec
     Pawl.Codec.Countering
     Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
+    Pawl.Codec.CounterKindSpec
     Pawl.Codec.CounterPattern
     Pawl.Codec.CountSpec
     Pawl.Codec.DamageEvent
@@ -125,16 +126,19 @@ library codec
     Pawl.Codec.DiscardCause
     Pawl.Codec.DiscardCauseSpec
     Pawl.Codec.Duration
+    Pawl.Codec.DurationSpec
     Pawl.Codec.Effect
     Pawl.Codec.EndingStep
     Pawl.Codec.EndingStepSpec
     Pawl.Codec.EntryOption
+    Pawl.Codec.EntryOptionSpec
     Pawl.Codec.EntryRewrite
     Pawl.Codec.EntryRiders
     Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EventShape
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.Expiry
+    Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
     Pawl.Codec.ExtraPhaseSpec
     Pawl.Codec.Filter
@@ -160,6 +164,7 @@ library codec
     Pawl.Codec.ModeSelection
     Pawl.Codec.ModeSelectionSpec
     Pawl.Codec.Modification
+    Pawl.Codec.ModificationSpec
     Pawl.Codec.MonarchTarget
     Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.ObjectId
@@ -225,6 +230,7 @@ library codec
     Pawl.Codec.Toughness
     Pawl.Codec.ToughnessSpec
     Pawl.Codec.TriggerCondition
+    Pawl.Codec.TriggerConditionSpec
     Pawl.Codec.TriggeredAbility
     Pawl.Codec.TriggerFrequency
     Pawl.Codec.TriggerFrequencySpec

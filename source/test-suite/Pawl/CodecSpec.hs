@@ -12,9 +12,7 @@ import qualified Pawl.Codec.Affected as Affected
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
 import qualified Pawl.Codec.Condition as Condition
-import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
 import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
-import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -23,14 +21,12 @@ import qualified Pawl.Codec.Json as J
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
 import Pawl.Codec.Mode (jsonToMode, modeToJson)
 import qualified Pawl.Codec.ModeSelection as ModeSelection
-import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import qualified Pawl.Codec.Optionality as Optionality
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
 import qualified Pawl.Codec.Quantity as Quantity
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
-import Pawl.Codec.TriggerCondition (jsonToTriggerCondition, triggerConditionToJson)
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Engine.Binding as Binding
@@ -122,7 +118,6 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
@@ -152,27 +147,14 @@ spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Codec" $ do
   -- Keyword's own per-constructor coverage, including the payload-bearing
   -- Landwalk/Cycling/Flashback/Entwine/Poisonous/Toxic arms, lives in
-  -- Pawl.Codec.KeywordSpec now.
-  Spec.describe s "leaf enums" $ do
-    Spec.it s "CounterKind" $ do
-      Spec.assertEqWith s "plus" (jsonToCounterKind (counterKindToJson CounterKind.PlusOnePlusOne)) (Right CounterKind.PlusOnePlusOne)
-      Spec.assertEqWith s "minus" (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne)) (Right CounterKind.MinusOneMinusOne)
-      -- CR 122.1e, the first kind that modifies no characteristic.
-      Spec.assertEqWith s "loyalty" (jsonToCounterKind (counterKindToJson CounterKind.Loyalty)) (Right CounterKind.Loyalty)
+  -- Pawl.Codec.KeywordSpec now. CounterKind's own per-constructor coverage,
+  -- including the keyword-carrying arm, lives in Pawl.Codec.CounterKindSpec.
   -- Quantity's own per-constructor coverage (including the tagged-object shape
   -- and the InSlot-nested-under-Plus payload check) lives in
   -- Pawl.Codec.QuantitySpec now; ManaCost's lives in Pawl.Codec.ManaCostSpec;
   -- Power's (and Toughness's) delegating codec lives in Pawl.Codec.PowerSpec
-  -- and Pawl.Codec.ToughnessSpec.
-  Spec.describe s "modification + affected" $ do
-    Spec.it s "GainKeyword" $
-      roundTrip s "m1" modificationToJson jsonToModification (Modification.GainKeyword Keyword.Deathtouch)
-    Spec.it s "SetBasePowerToughness" $
-      roundTrip s "m2" modificationToJson jsonToModification (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
-    Spec.it s "ChangeSubtypeWord" $
-      roundTrip s "m3" modificationToJson jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)
-    Spec.it s "SetControllerToSource" $
-      roundTrip s "m4" modificationToJson jsonToModification Modification.SetControllerToSource
+  -- and Pawl.Codec.ToughnessSpec. Modification's own per-constructor coverage
+  -- lives in Pawl.Codec.ModificationSpec now.
   Spec.describe s "effect" $ do
     Spec.it s "DealDamage" $
       roundTrip s "e1" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3))
@@ -324,14 +306,9 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "PlaySubgame round-trips" $
       let e = Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser"))
        in Spec.assertEqWith s "PlaySubgame round-trips" (jsonToEffect jsonToCard (effectToJson cardToJson e)) (Right e)
-  Spec.describe s "duration + condition" $ do
-    Spec.it s "Duration.UntilYourNextTurn round-trips" $
-      Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson Duration.UntilYourNextTurn)) (Right Duration.UntilYourNextTurn)
-    -- Condition's own per-constructor coverage lives in Pawl.Codec.ConditionSpec
-    -- now.
-    Spec.it s "Duration.ForAsLongAs round-trips with its condition" $
-      let d = Duration.ForAsLongAs S.youControlSource
-       in Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson d)) (Right d)
+  -- Duration's own per-constructor coverage lives in Pawl.Codec.DurationSpec
+  -- now; Condition's own per-constructor coverage lives in
+  -- Pawl.Codec.ConditionSpec.
   -- PlayerEffect's own per-constructor coverage, including the Edgewalker
   -- typed-mana ReduceSpellCost, lives in Pawl.Codec.PlayerEffectSpec now.
   Spec.describe s "player effects (P7)" $ do
@@ -694,16 +671,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       typhoidRats <- S.printingOf s registry "Typhoid Rats"
       let (ratId, gs) = S.addLibraryCard typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
       roundTrip s "revealed" gameEventToJson jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs))
-    Spec.it s "TriggerCondition.SelfCycled round-trips" $
-      roundTrip s "sc" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfCycled
-    -- Both relations, since the PlayerRelation is the whole content of
-    -- Megrim's "an OPPONENT discards a card".
-    Spec.it s "TriggerCondition.PlayerDiscards round-trips both relations" $ do
-      roundTrip s "pdo" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.PlayerDiscards PlayerRelation.Opponent)
-      roundTrip s "pdy" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.PlayerDiscards PlayerRelation.You)
-    Spec.it s "TriggerCondition.SelfAttacks round-trips both frequencies" $ do
-      roundTrip s "sa" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime)
-      roundTrip s "sa1" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn)
+    -- TriggerCondition's own per-constructor coverage lives in
+    -- Pawl.Codec.TriggerConditionSpec now.
     Spec.it s "GameEvent.AttackerDeclared round-trips" $
       roundTrip s "ad" gameEventToJson jsonToGameEvent (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3))
     -- CR 701.6a's event. Three DISTINCT payload values, two of them
@@ -716,12 +685,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         gameEventToJson
         jsonToGameEvent
         (GameEvent.SpellCountered (Countering.MkCountering (ObjectId.MkObjectId 4) (ObjectId.MkObjectId 5) S.bob))
-    -- Both relations, for the reason the discard condition's case gives:
-    -- the PlayerRelation is the whole content of Baral, Chief of
-    -- Compliance's "a spell or ability YOU CONTROL counters a spell".
-    Spec.it s "TriggerCondition.SpellOrAbilityCounters round-trips both relations" $ do
-      roundTrip s "socy" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SpellOrAbilityCounters PlayerRelation.You)
-      roundTrip s "soco" triggerConditionToJson jsonToTriggerCondition (TriggerCondition.SpellOrAbilityCounters PlayerRelation.Opponent)
     -- Create's EntryRiders is ELIDED when it is the CR 110.5b default, so
     -- the round trip has to hold for all four shapes the encoder emits --
     -- and the two three-element ones (a slot, or an entry) are told apart
@@ -745,47 +708,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         "a default EntryRiders is not written"
         (J.tagged (Text.pack "Create") (Just (J.jArray [Quantity.toJson (Quantity.Literal 2), cardToJson card])))
         (effectToJson cardToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
-    -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
-    -- pair rather than the battlefield.
-    Spec.it s "TriggerCondition.SelfPutIntoGraveyardFromLibrary round-trips" $
-      roundTrip s "spigfl" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfPutIntoGraveyardFromLibrary
-    -- CR 603.6c's condition (Doomed Traveler's), the other zone pair.
-    Spec.it s "TriggerCondition.SelfDies round-trips" $
-      roundTrip s "dies" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfDies
-    -- The same rule's wider written form (Thragtusk's), which is a separate tag
-    -- rather than a payload on the one above: the two must never decode to each
-    -- other.
-    Spec.it s "TriggerCondition.SelfLeavesTheBattlefield round-trips" $
-      roundTrip s "ltb" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfLeavesTheBattlefield
-    -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that
-    -- spells Soul Warden's "another creature" has to survive the trip.
-    Spec.it s "TriggerCondition.PermanentEnters round-trips with its Filter" $
-      roundTrip
-        s
-        "pe"
-        triggerConditionToJson
-        jsonToTriggerCondition
-        (TriggerCondition.PermanentEnters (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsSource]))
-    Spec.it s "TriggerCondition.StepBegins round-trips" $
-      roundTrip
-        s
-        "cond"
-        triggerConditionToJson
-        jsonToTriggerCondition
-        (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn)
     Spec.it s "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $
       mapM_
         (roundTrip s "condition" Condition.toJson Condition.fromJson)
         [S.youControlNoSwamps, noZombiesOnBattlefield]
-    Spec.it s "TriggerCondition.StateIs round-trips" $
-      roundTrip
-        s
-        "cond"
-        triggerConditionToJson
-        jsonToTriggerCondition
-        (TriggerCondition.StateIs S.youControlNoSwamps)
-    Spec.it s "CreatureDealtCombatDamageToMonarch" $
-      roundTrip s "cd" triggerConditionToJson jsonToTriggerCondition TriggerCondition.CreatureDealtCombatDamageToMonarch
     Spec.it s "AbilityName round-trips" $
       roundTrip s "name" AbilityName.toJson AbilityName.fromJson (AbilityName.MkAbilityName (Text.pack "sacrifice it"))
     Spec.it s "ArmDelayedTrigger round-trips" $

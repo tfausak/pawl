@@ -3,7 +3,7 @@ module Pawl.Types.EntryOption where
 import Data.Set (Set)
 import Pawl.Types.Keyword (Keyword)
 
--- CR 208.2b / 614.1c: one of the shapes an "as this creature enters, it becomes
+-- | CR 208.2b / 614.1c: one of the shapes an "as this creature enters, it becomes
 -- your choice of ..." ability offers. Primal Plasma's three are (3,3,{}),
 -- (2,2,{Flying}) and (1,6,{Defender}).
 --

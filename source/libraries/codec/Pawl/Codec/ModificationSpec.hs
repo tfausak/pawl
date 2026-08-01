@@ -1,0 +1,100 @@
+module Pawl.Codec.ModificationSpec where
+
+import qualified Data.Set as Set
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Modification as Modification
+import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Subtype as Subtype
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.Modification" $ do
+  -- layer 6 (Serpent's Gift).
+  Spec.it s "GainKeyword" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.GainKeyword Keyword.Deathtouch)
+      "{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Deathtouch\"}}"
+  -- layer 6 (Humility).
+  Spec.it s "LoseAllAbilities" $
+    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.LoseAllAbilities "{\"type\":\"LoseAllAbilities\"}"
+  -- layer 7b (Humility 1/1; Opalescence mana value).
+  Spec.it s "SetBasePowerToughness" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+      "{\"type\":\"SetBasePowerToughness\",\"value\":[{\"type\":\"Literal\",\"value\":1},{\"type\":\"Literal\",\"value\":1}]}"
+  -- layer 7c (Giant Growth +3/+3).
+  Spec.it s "ModifyPowerToughness" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))
+      "{\"type\":\"ModifyPowerToughness\",\"value\":[{\"type\":\"Literal\",\"value\":3},{\"type\":\"Literal\",\"value\":3}]}"
+  -- layer 4, CR 305.7 set (Blood Moon -> Mountain).
+  Spec.it s "SetLandSubtype" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.SetLandSubtype Subtype.Mountain)
+      "{\"type\":\"SetLandSubtype\",\"value\":{\"type\":\"Mountain\"}}"
+  -- layer 4, CR 305.7 add (Urborg -> Swamp).
+  Spec.it s "AddLandSubtype" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.AddLandSubtype Subtype.Swamp)
+      "{\"type\":\"AddLandSubtype\",\"value\":{\"type\":\"Swamp\"}}"
+  -- layer 4 (Opalescence -> Creature).
+  Spec.it s "AddCardType" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.AddCardType CardType.Creature)
+      "{\"type\":\"AddCardType\",\"value\":{\"type\":\"Creature\"}}"
+  -- layer 3, CR 612 (Magical Hack: from -> to).
+  Spec.it s "ChangeSubtypeWord" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)
+      "{\"type\":\"ChangeSubtypeWord\",\"value\":[{\"type\":\"Mountain\"},{\"type\":\"Island\"}]}"
+  -- layer 2, CR 613.1b: the PlayerId is BAKED at effect creation, unlike
+  -- SetControllerToSource below.
+  Spec.it s "SetController carries its baked PlayerId" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.SetController (PlayerId.MkPlayerId 0))
+      "{\"type\":\"SetController\",\"value\":0}"
+  -- layer 2, CR 613.1b: the only shape a printed static ability can grant
+  -- control with, since the controller is DERIVED at projection time rather
+  -- than baked. Payload-free, and must not decode as SetController.
+  Spec.it s "SetControllerToSource" $
+    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.SetControllerToSource "{\"type\":\"SetControllerToSource\"}"
+  -- layer 5, CR 613.1e / 105.3: a SET, not an add.
+  Spec.it s "SetColor carries its colour set" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.SetColor (Set.singleton Color.Blue))
+      "{\"type\":\"SetColor\",\"value\":[{\"type\":\"Blue\"}]}"
+  -- layer 7d, CR 613.4d: switches power and toughness. Payload-free.
+  Spec.it s "SwitchPowerToughness" $
+    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.SwitchPowerToughness "{\"type\":\"SwitchPowerToughness\"}"

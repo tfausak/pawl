@@ -5,7 +5,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Binding (bindingsToJson, jsonToBindings)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
-import Pawl.Codec.Expiry (expiryToJson, jsonToExpiry)
+import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
@@ -25,7 +25,7 @@ delayedTriggerToJson d =
       (Text.pack "notBefore", Json.maybeTo Json.natTo (DelayedTrigger.notBefore d)),
       -- CR 603.7b: absent for an ability with no stated duration, which is the
       -- rule's default and every entry in the pool but Full Throttle's.
-      (Text.pack "expiry", Json.maybeTo expiryToJson (DelayedTrigger.expiry d))
+      (Text.pack "expiry", Json.maybeTo Expiry.toJson (DelayedTrigger.expiry d))
     ]
 
 jsonToDelayedTrigger :: Value -> Either Text DelayedTrigger.DelayedTrigger
@@ -36,7 +36,7 @@ jsonToDelayedTrigger value = do
   c <- Json.field (Text.pack "controller") ps >>= PlayerId.fromJson
   b <- Json.field (Text.pack "bindings") ps >>= jsonToBindings
   n <- Json.maybeFrom Json.natFrom (Json.getOpt (Text.pack "notBefore") ps)
-  e <- Json.maybeFrom jsonToExpiry (Json.getOpt (Text.pack "expiry") ps)
+  e <- Json.maybeFrom Expiry.fromJson (Json.getOpt (Text.pack "expiry") ps)
   pure
     DelayedTrigger.MkDelayedTrigger
       { DelayedTrigger.ability = a,

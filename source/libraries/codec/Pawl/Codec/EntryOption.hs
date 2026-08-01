@@ -1,27 +1,25 @@
--- | The @EntryOption ⇆ Json@ codec (#481).
 module Pawl.Codec.EntryOption where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Keyword as Keyword
-import Pawl.Json.Value (Value)
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.EntryOption as EntryOption
 
-entryOptionToJson :: EntryOption.EntryOption -> Value
-entryOptionToJson o =
-  Json.jObject
-    [ (Text.pack "power", Json.jInt (EntryOption.power o)),
-      (Text.pack "toughness", Json.jInt (EntryOption.toughness o)),
-      (Text.pack "keywords", Json.setTo Keyword.toJson (EntryOption.keywords o))
+toJson :: EntryOption.EntryOption -> Value.Value
+toJson o =
+  Common.object
+    [ Common.pair "power" . Common.integer $ EntryOption.power o,
+      Common.pair "toughness" . Common.integer $ EntryOption.toughness o,
+      Common.pair "keywords" . Common.encodeSet Keyword.toJson $ EntryOption.keywords o
     ]
 
-jsonToEntryOption :: Value -> Either Text EntryOption.EntryOption
-jsonToEntryOption value = do
-  ps <- Json.asObject value
-  p <- Json.field (Text.pack "power") ps >>= Json.asInteger
-  t <- Json.field (Text.pack "toughness") ps >>= Json.asInteger
-  ks <- Json.field (Text.pack "keywords") ps >>= Json.setFrom Keyword.fromJson
+fromJson :: Value.Value -> Either Text.Text EntryOption.EntryOption
+fromJson value = do
+  ps <- Common.asObject value
+  p <- Common.field "power" ps >>= Common.asInteger
+  t <- Common.field "toughness" ps >>= Common.asInteger
+  ks <- Common.field "keywords" ps >>= Common.decodeSet Keyword.fromJson
   pure
     EntryOption.MkEntryOption
       { EntryOption.power = p,

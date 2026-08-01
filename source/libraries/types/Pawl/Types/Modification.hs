@@ -8,7 +8,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.Quantity (Quantity)
 import Pawl.Types.Subtype (Subtype)
 
--- The open-half continuous-effect vocabulary -- its own leaf family (design.md's
+-- | The open-half continuous-effect vocabulary -- its own leaf family (design.md's
 -- M3g note: "continuous-effect specifications, classified by layer"), distinct
 -- from Effect. The ONLY module that may case on a constructor is Pawl.Engine.Projection
 -- (Projection.layer classifies it; Projection.applyModification applies it) --
@@ -26,7 +26,7 @@ data Modification
   | AddLandSubtype Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
   | AddCardType CardType -- layer 4 (Opalescence -> Creature)
   | ChangeSubtypeWord Subtype Subtype -- layer 3, CR 612 (Magical Hack: from -> to)
-  | -- layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
+  | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is
     -- the effect's source's controller, never chosen. Applied only by
     -- Projection.controllerOf.
@@ -36,7 +36,7 @@ data Modification
     -- Effect.ModifyTarget. Baking a PlayerId into static card text is
     -- meaningless, so Pawl.CardSpec lints the pool against it (#199).
     SetController PlayerId
-  | -- layer 2, CR 613.1b: this object's controller becomes the controller of THIS
+  | -- | layer 2, CR 613.1b: this object's controller becomes the controller of THIS
     -- effect's SOURCE. Payload-free because the player is DERIVED at projection
     -- time, not baked -- the contrast with SetController above, whose PlayerId is
     -- fixed at resolution by CR 611.2c because a resolution effect's answer is
@@ -51,13 +51,13 @@ data Modification
     -- gaining control of the creature does not gain control of the Aura, and
     -- gaining control of the Aura DOES move the creature.
     SetControllerToSource
-  | -- layer 5, CR 613.1e / 105.3: this object becomes exactly these colours. A
+  | -- | layer 5, CR 613.1e / 105.3: this object becomes exactly these colours. A
     -- SET, not an add: CR 105.3 says a new colour REPLACES all previous colours
     -- unless the effect says "in addition" -- and no card in the pool does, so
     -- there is deliberately no AddColor constructor. SetColor with an empty set
     -- is "becomes colourless" (CR 105.2c).
     SetColor (Set Color)
-  | -- layer 7d, CR 613.4d: switch this object's power and toughness. Takes the
+  | -- | layer 7d, CR 613.4d: switch this object's power and toughness. Takes the
     -- value of power and applies it to toughness, and vice versa -- so it acts on
     -- whatever 7a, 7b and 7c already produced, not on the printed box. Carries no
     -- payload: two applications return the object to normal for free.

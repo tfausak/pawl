@@ -5,14 +5,14 @@ import qualified Data.Maybe as Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
-import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
-import Pawl.Codec.Duration (durationToJson, jsonToDuration)
+import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.ManaProduction as ManaProduction
-import Pawl.Codec.Modification (jsonToModification, modificationToJson)
+import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Onset as Onset
@@ -36,7 +36,7 @@ import qualified Pawl.Types.Onset as Onset
 effectToJson :: (card -> Value) -> Effect.Effect card -> Value
 effectToJson codec e = case e of
   Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [SlotName.toJson s, Quantity.toJson q])))
-  Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, ObjectRef.toJson r])))
+  Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [Duration.toJson d, Modification.toJson m, ObjectRef.toJson r])))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (SlotName.toJson s))
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (ManaProduction.toJson production))
   Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [Filter.toJson f, SearchDestination.toJson d])))
@@ -83,14 +83,14 @@ effectToJson codec e = case e of
       [Quantity.toJson q, codec c]
         <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
-  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [durationToJson d, Uses.toJson u, replacementEffectToJson re])))
+  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [Duration.toJson d, Uses.toJson u, replacementEffectToJson re])))
   Effect.SkipNextPhase r sel -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [PlayerRef.toJson r, PhaseSelector.toJson sel])))
-  Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [counterKindToJson k, Quantity.toJson q, SlotName.toJson s])))
+  Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s])))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q])))
   Effect.Tap r -> Json.tagged (Text.pack "Tap") (Just (ObjectRef.toJson r))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (ObjectRef.toJson r))
   Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (MkArray (fmap ExtraPhase.toJson ps))))
-  Effect.GainControl d r -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, ObjectRef.toJson r])))
+  Effect.GainControl d r -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [Duration.toJson d, ObjectRef.toJson r])))
   -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
   -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
   -- states a duration writes the two-element form. The ONSET is elided when it is CR 603.7a's default (the ability is armed the
@@ -101,9 +101,9 @@ effectToJson codec e = case e of
   -- and a duration are both tagged objects.
   Effect.ArmDelayedTrigger n o md -> Json.tagged (Text.pack "ArmDelayedTrigger") . Just $ case (o, md) of
     (Onset.Immediately, Nothing) -> AbilityName.toJson n
-    (Onset.Immediately, Just d) -> Array (MkArray [AbilityName.toJson n, durationToJson d])
-    _ -> Array (MkArray [AbilityName.toJson n, Onset.toJson o, Json.maybeTo durationToJson md])
-  Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array (MkArray [durationToJson d, PlayerScope.toJson s, PlayerEffect.toJson pe])))
+    (Onset.Immediately, Just d) -> Array (MkArray [AbilityName.toJson n, Duration.toJson d])
+    _ -> Array (MkArray [AbilityName.toJson n, Onset.toJson o, Json.maybeTo Duration.toJson md])
+  Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array (MkArray [Duration.toJson d, PlayerScope.toJson s, PlayerEffect.toJson pe])))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (codec c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (MonarchTarget.toJson t))
   Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (SlotName.toJson s))
@@ -120,7 +120,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [s, q])) -> Effect.DealDamage <$> SlotName.fromJson s <*> Quantity.fromJson q
       _ -> Left (Text.pack "DealDamage expects [slot, quantity]")
     "ModifyTarget" -> case mv of
-      Just (Array (MkArray [d, m, r])) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> ObjectRef.fromJson r
+      Just (Array (MkArray [d, m, r])) -> Effect.ModifyTarget <$> Duration.fromJson d <*> Modification.fromJson m <*> ObjectRef.fromJson r
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, objectRef]")
     "ChangeText" -> Json.withValue mv (fmap Effect.ChangeText . SlotName.fromJson)
     "AddMana" -> Json.withValue mv (fmap Effect.AddMana . ManaProduction.fromJson)
@@ -179,13 +179,13 @@ jsonToEffect decode value = do
     -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
       Just (Array (MkArray [n, o, d])) ->
-        Effect.ArmDelayedTrigger <$> AbilityName.fromJson n <*> Onset.fromJson o <*> Json.maybeFrom jsonToDuration d
+        Effect.ArmDelayedTrigger <$> AbilityName.fromJson n <*> Onset.fromJson o <*> Json.maybeFrom Duration.fromJson d
       Just (Array (MkArray [n, d])) ->
-        Effect.ArmDelayedTrigger <$> AbilityName.fromJson n <*> pure Onset.Immediately <*> fmap Just (jsonToDuration d)
+        Effect.ArmDelayedTrigger <$> AbilityName.fromJson n <*> pure Onset.Immediately <*> fmap Just (Duration.fromJson d)
       _ -> Json.withValue mv (fmap (\n -> Effect.ArmDelayedTrigger n Onset.Immediately Nothing) . AbilityName.fromJson)
     "Replace" -> case mv of
       Just (Array (MkArray [d, u, re])) -> do
-        duration <- jsonToDuration d
+        duration <- Duration.fromJson d
         uses <- Uses.fromJson u
         effect <- jsonToReplacementEffect re
         pure (Effect.Replace duration uses effect)
@@ -194,7 +194,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [r, sel])) -> Effect.SkipNextPhase <$> PlayerRef.fromJson r <*> PhaseSelector.fromJson sel
       _ -> Left (Text.pack "SkipNextPhase expects [playerRef, phaseSelector]")
     "PutCounters" -> case mv of
-      Just (Array (MkArray [k, q, s])) -> Effect.PutCounters <$> jsonToCounterKind k <*> Quantity.fromJson q <*> SlotName.fromJson s
+      Just (Array (MkArray [k, q, s])) -> Effect.PutCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
     "GainPlayerCounters" -> case mv of
       Just (Array (MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> PlayerRef.fromJson r <*> PlayerCounterKind.fromJson k <*> Quantity.fromJson q
@@ -205,10 +205,10 @@ jsonToEffect decode value = do
       Just (Array (MkArray ps)) -> Effect.AddPhases <$> traverse ExtraPhase.fromJson ps
       _ -> Left (Text.pack "AddPhases expects [ExtraPhase]")
     "GainControl" -> case mv of
-      Just (Array (MkArray [d, r])) -> Effect.GainControl <$> jsonToDuration d <*> ObjectRef.fromJson r
+      Just (Array (MkArray [d, r])) -> Effect.GainControl <$> Duration.fromJson d <*> ObjectRef.fromJson r
       _ -> Left (Text.pack "GainControl expects [duration, objectRef]")
     "AffectPlayers" -> case mv of
-      Just (Array (MkArray [d, s, pe])) -> Effect.AffectPlayers <$> jsonToDuration d <*> PlayerScope.fromJson s <*> PlayerEffect.fromJson pe
+      Just (Array (MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Duration.fromJson d <*> PlayerScope.fromJson s <*> PlayerEffect.fromJson pe
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")
     "CreateEmblem" -> Json.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Json.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)

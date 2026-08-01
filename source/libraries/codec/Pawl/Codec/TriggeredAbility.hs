@@ -8,7 +8,7 @@ import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Modal (jsonToModal, modalToJson)
-import Pawl.Codec.TriggerCondition (jsonToTriggerCondition, triggerConditionToJson)
+import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -16,7 +16,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 triggeredAbilityToJson :: (card -> Value) -> TriggeredAbility.TriggeredAbility card -> Value
 triggeredAbilityToJson codec ta =
   Json.jObject
-    ( [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
+    ( [ (Text.pack "condition", TriggerCondition.toJson (TriggeredAbility.condition ta)),
         (Text.pack "modal", modalToJson codec (TriggeredAbility.modal ta))
       ]
         <> ( case TriggeredAbility.intervening ta of
@@ -28,7 +28,7 @@ triggeredAbilityToJson codec ta =
 jsonToTriggeredAbility :: (Value -> Either Text card) -> Value -> Either Text (TriggeredAbility.TriggeredAbility card)
 jsonToTriggeredAbility decode value = do
   ps <- Json.asObject value
-  c <- Json.field (Text.pack "condition") ps >>= jsonToTriggerCondition
+  c <- Json.field (Text.pack "condition") ps >>= TriggerCondition.fromJson
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal decode
   i <- Json.maybeFrom Condition.fromJson (Json.getOpt (Text.pack "intervening") ps)
   pure

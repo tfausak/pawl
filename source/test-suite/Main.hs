@@ -25,6 +25,7 @@ import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostSpec
 import qualified Pawl.Codec.CountSpec
+import qualified Pawl.Codec.CounterKindSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.DamageEventSpec
@@ -33,9 +34,12 @@ import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
+import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.EndingStepSpec
+import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
+import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.KeywordSpec
@@ -46,6 +50,7 @@ import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
+import qualified Pawl.Codec.ModificationSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
@@ -76,6 +81,7 @@ import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetSpecSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.ToughnessSpec
+import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TurnScopeSpec
 import qualified Pawl.Codec.TypeLineSpec
@@ -200,6 +206,7 @@ spec s registry = do
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostSpec.spec s
+  Pawl.Codec.CounterKindSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CountSpec.spec s
@@ -209,9 +216,12 @@ spec s registry = do
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
+  Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
+  Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
+  Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.KeywordSpec.spec s
@@ -222,6 +232,7 @@ spec s registry = do
   Pawl.Codec.ManaTypeSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s
+  Pawl.Codec.ModificationSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.ObjectRefSpec.spec s
@@ -252,6 +263,7 @@ spec s registry = do
   Pawl.Codec.TargetSpecSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.ToughnessSpec.spec s
+  Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
