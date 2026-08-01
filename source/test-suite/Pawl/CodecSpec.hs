@@ -571,6 +571,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "PlaySubgame round-trips" $
       let e = Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser"))
        in Spec.assertEqWith s "PlaySubgame round-trips" (jsonToEffect jsonToCard (effectToJson cardToJson e)) (Right e)
+    -- CR 701.24: a bare slot name on the wire, like Counter and Sacrifice --
+    -- whose library is derived from the object, so there is no second field.
+    Spec.it s "ShuffleIntoLibrary round-trips" $
+      roundTrip s "shuffle" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.ShuffleIntoLibrary (SlotName.MkSlotName (Text.pack "target")))
   Spec.describe s "duration + condition" $ do
     Spec.it s "Duration.UntilYourNextTurn round-trips" $
       Spec.assertEqWith s "preserved" (jsonToDuration (durationToJson Duration.UntilYourNextTurn)) (Right Duration.UntilYourNextTurn)
@@ -743,6 +747,14 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
              in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
         )
         [PlayerScope.You, PlayerScope.Opponents, PlayerScope.EachPlayer]
+    -- The exile pool, which is NULLARY where the graveyard one is tagged: CR
+    -- 400.1's "the other zones are shared by all players" leaves it no per-player
+    -- axis to carry. Unfiltered too, since Riftsweeper's "target face-up exiled
+    -- card" names no card type -- so a Nothing narrowing has to survive the trip
+    -- as well, which the filtered cases above never ask.
+    Spec.it s "CR 115.2 clause (a) TargetSpec over exile round-trips, scopeless and unfiltered" $
+      let spec' = TargetSpec.MkTargetSpec Pool.CardsInExile Nothing
+       in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
   Spec.describe s "records" $ do
     Spec.it s "TypeLine" $
       roundTrip
