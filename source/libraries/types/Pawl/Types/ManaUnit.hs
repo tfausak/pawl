@@ -1,6 +1,8 @@
 module Pawl.Types.ManaUnit where
 
+import Data.Set (Set)
 import Pawl.Types.ManaType (ManaType)
+import Pawl.Types.ProductionTag (ProductionTag)
 
 -- One unit of mana in a pool.
 --
@@ -19,15 +21,18 @@ import Pawl.Types.ManaType (ManaType)
 --
 -- Both are sets/lists, never fixed fields: a unit can carry several at once.
 --
--- Neither collection exists yet: snow is #305 and the spending restrictions are
--- #252.
+-- The first of the two is here (Pawl.Types.ProductionTag); the spending
+-- restrictions are still #252.
 --
 -- Deliberately no source ObjectId. Snow cares about a PROPERTY of the source,
 -- not its identity, and a reference would dangle by construction: mana outlives
 -- its source (tap a land, the land is destroyed in response, the mana remains)
 -- and CR 400.7 mints a fresh id on every zone change. Properties are captured at
--- production time. Becomes a `data` when the first collection lands.
-newtype ManaUnit = MkManaUnit
-  { manaType :: ManaType
+-- production time -- Pawl.Engine.Mana.manaYieldsOfGiven is the one place that
+-- stamps them, because it is the one place that knows both the source and the
+-- mana.
+data ManaUnit = MkManaUnit
+  { manaType :: ManaType,
+    tags :: Set ProductionTag
   }
   deriving (Eq, Ord, Show)

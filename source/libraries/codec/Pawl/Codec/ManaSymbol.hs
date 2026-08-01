@@ -18,6 +18,9 @@ manaSymbolToJson ms = case ms of
   ManaSymbol.MonocoloredHybrid mt -> Json.tagged (Text.pack "MonocoloredHybrid") (Just (manaTypeToJson mt))
   -- A Color, not a ManaType: CR 107.4f's five Phyrexian symbols are all coloured.
   ManaSymbol.Phyrexian c -> Json.tagged (Text.pack "Phyrexian") (Just (colorToJson c))
+  -- Nullary: CR 107.4h's {S} names no mana type and no colour, so there is
+  -- nothing for it to carry.
+  ManaSymbol.Snow -> Json.nullary (Text.pack "Snow")
   ManaSymbol.Variable -> Json.nullary (Text.pack "Variable")
 
 jsonToManaSymbol :: Value -> Either Text ManaSymbol.ManaSymbol
@@ -29,5 +32,6 @@ jsonToManaSymbol value = do
     ("Hybrid", Just (Array (MkArray [av, bv]))) -> ManaSymbol.Hybrid <$> jsonToManaType av <*> jsonToManaType bv
     ("MonocoloredHybrid", Just v) -> ManaSymbol.MonocoloredHybrid <$> jsonToManaType v
     ("Phyrexian", Just v) -> ManaSymbol.Phyrexian <$> jsonToColor v
+    ("Snow", _) -> Right ManaSymbol.Snow
     ("Variable", _) -> Right ManaSymbol.Variable
     _ -> Left (Text.pack "unknown ManaSymbol: " <> t)

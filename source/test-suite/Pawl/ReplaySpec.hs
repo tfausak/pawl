@@ -50,9 +50,10 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- The one-unit yield of a single-colour mana ability, which is what a
--- ChooseManaYield candidate looks like for every source but Sol Ring.
+-- ChooseManaYield candidate looks like for every source but Sol Ring. No
+-- production tag: every source these replays tap is a nonsnow one (CR 205.4g).
 oneMana :: Color.Color -> Mana.Mana
-oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color}]
+oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}]
 
 combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 combatReplaySpec s =

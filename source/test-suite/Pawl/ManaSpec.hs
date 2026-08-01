@@ -56,6 +56,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -185,7 +186,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           s
           "pool"
           (Mana.poolOf S.alice after)
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}])
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}])
 
   Spec.it s "two Mountains can pay {1}{R}" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -460,7 +461,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    let yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted}]
+    let yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty}]
      in if elem yield (NonEmpty.toList candidates)
           then yield
           else NonEmpty.head candidates
@@ -771,6 +772,126 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   dismemberSpec s registry
   moltensteelSpec s registry
   upwellingSpec s registry
+  snowSpec s registry
+
+-- Icehide Golem's whole printed cost. Restated rather than read off the card,
+-- for the reason javelinCost gives; Pawl.CardsSpec pins it against
+-- data/cards/icehide-golem.json.
+snowCost :: ManaCost.ManaCost
+snowCost = ManaCost.MkManaCost [ManaSymbol.Snow]
+
+-- The units of Alice's pool, so a test can look at a mana's TAGS and not only at
+-- its type -- which is the whole of what CR 107.4h reads.
+poolUnits :: GameState.GameState -> [ManaUnit.ManaUnit]
+poolUnits gs = case Mana.poolOf S.alice gs of
+  Mana.Type.MkMana units -> units
+
+-- One red mana, produced by a snow source and by a nonsnow one. These are what
+-- tapping a Snow-Covered Mountain and a Mountain really put in a pool, which is
+-- itself one of the assertions below; the payment tests then build a pool out of
+-- them directly, because `Mana.spend` is a pure function of one.
+snowRed :: ManaUnit.ManaUnit
+snowRed =
+  ManaUnit.MkManaUnit
+    { ManaUnit.manaType = ManaType.Colored Color.Red,
+      ManaUnit.tags = Set.singleton ProductionTag.Snow
+    }
+
+plainRed :: ManaUnit.ManaUnit
+plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}
+
+-- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
+-- that can be paid with one mana of any type produced by a snow source (see rule
+-- 106.3). Effects that reduce the amount of generic mana you pay don't affect
+-- {S} costs. ... Snow is neither a color nor a type of mana."
+--
+-- Icehide Golem's entire content is that cost -- its oracle text is nothing but
+-- the reminder text for it -- so every test here is about the symbol. The pair
+-- that carries the rule is the first two: the same card cast off the same
+-- {R}-producing Mountain, differing only in CR 205.4g's supertype.
+snowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+snowSpec s registry = Spec.describe s "Snow" $ do
+  Spec.it s "CR 107.4h a Snow-Covered Mountain's mana pays {S}, and Icehide Golem resolves" $ do
+    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    icehideGolem <- S.printingOf s registry "Icehide Golem"
+    let after = resolvedCreature snowMountain icehideGolem 1
+    Spec.assertEqWith s "the Golem is on the battlefield" (S.countOnBattlefieldByName (Text.pack "Icehide Golem") S.alice after) 1
+    Spec.assertEqWith s "the Snow-Covered Mountain paid for it" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
+
+  -- The negative half, and it must fail for the RIGHT reason: the board is a
+  -- mana source, it is untapped, and it produces exactly the red mana the snow
+  -- one does. CR 205.4g's supertype is the only difference, and CR 107.4h asks
+  -- for nothing else.
+  Spec.it s "CR 107.4h an ordinary Mountain's mana does not pay {S}" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    icehideGolem <- S.printingOf s registry "Icehide Golem"
+    let board = S.landsInPlay mountain 1
+        (g, spellId) = S.handOne icehideGolem board
+    Spec.assertBool s (not (null (Mana.manaSources S.alice board))) "the Mountain IS a mana source"
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [redSymbol]) board) "and it pays {R}"
+    Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "but it does not pay {S}"
+    Spec.assertBool s (not (Cast.castable S.alice spellId g)) "so the Golem cannot be cast"
+
+  -- CR 107.4h's second sentence, from the other end: "Effects that reduce the
+  -- amount of generic mana you pay don't affect {S} costs." An {S} that were
+  -- Generic 1 would be paid by any one mana, so a board that pays {1} six times
+  -- over and still cannot pay {S} is what says the two are different symbols.
+  Spec.it s "CR 107.4h {S} is not generic: no number of nonsnow Mountains pays it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let board = S.landsInPlay mountain 6
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 6]) board) "six Mountains pay {6}"
+    Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "and none of them pays {S}"
+
+  -- The tag narrows nothing ELSE. CR 107.4h's last sentence -- "Snow is neither
+  -- a color nor a type of mana" -- cuts both ways: a Snow-Covered Mountain's
+  -- mana is red mana, so Skred's {R} is paid by it exactly as a Mountain's is.
+  Spec.it s "CR 107.4h a snow source's mana is still its own type, and pays {R}" $ do
+    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    Spec.assertBool
+      s
+      (Mana.canPay S.alice (ManaCost.MkManaCost [redSymbol]) (S.landsInPlay snowMountain 1))
+      "a Snow-Covered Mountain pays {R}"
+
+  -- CR 106.3: "If mana is produced by an ability, the source of that mana is the
+  -- source of that ability." The tag is on the MANA, put there when it was
+  -- produced -- which is why this is asked of the pool and not of the land.
+  Spec.it s "CR 106.3 the mana a Snow-Covered Mountain adds is tagged snow; a Mountain's is not" $ do
+    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    mountain <- S.printingOf s registry "Mountain"
+    let tapFirst land =
+          let board = S.landsInPlay land 1
+           in case Game.zoneMembers Zone.Battlefield S.alice board of
+                [] -> []
+                oid : _ -> poolUnits (S.runPure S.identityAnswer board (Mana.tapForMana oid))
+    Spec.assertEqWith s "the snow one" (tapFirst snowMountain) [snowRed]
+    Spec.assertEqWith s "the plain one" (tapFirst mountain) [plainRed]
+
+  -- The assignment, not merely the count. Both units are red and only one is
+  -- snow, so a payment that took the head of the pool would be right half the
+  -- time -- hence both orders.
+  Spec.it s "CR 107.4h payment spends the snow mana out of a mixed pool, whichever end it is at" $ do
+    Spec.assertEqWith
+      s
+      "snow first"
+      (Mana.spend 0 snowCost (Mana.Type.MkMana [snowRed, plainRed]))
+      (Just (Mana.Type.MkMana [plainRed], 0))
+    Spec.assertEqWith
+      s
+      "snow last"
+      (Mana.spend 0 snowCost (Mana.Type.MkMana [plainRed, snowRed]))
+      (Just (Mana.Type.MkMana [plainRed], 0))
+
+  -- CR 202.2d's colour-granting list names the hybrid and Phyrexian symbols and
+  -- not this one, because of CR 107.4h's last sentence: "Snow is neither a color
+  -- nor a type of mana." So a card whose whole mana cost is {S} is colorless (CR
+  -- 202.2b) -- the sibling of monocoloredHybridSpec's "CR 107.4e a monocolored
+  -- hybrid symbol is its coloured half, and only that", which is the same read
+  -- taken of a symbol that DOES grant one.
+  Spec.it s "CR 202.2b Icehide Golem is colorless: its {S} grants no colour" $ do
+    icehideGolem <- S.printingOf s registry "Icehide Golem"
+    let (oid, gs) = S.addCreature icehideGolem S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "colorless" (Projection.colorsOf oid gs) Set.empty
 
 -- alice controls `n` copies of `first` and `m` copies of `second`, and nothing
 -- else. Both are lands in every caller, but nothing here requires it.
@@ -955,8 +1076,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- makes it: it spends the fewest units. CR 601.2b puts that choice with
   -- the player, at announcement (#261).
   Spec.it s "CR 601.2b the engine takes a {2/R}'s one-mana half when both halves are payable (#261)" $
-    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless}
+    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
      in Spec.assertEqWith
           s
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"

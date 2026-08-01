@@ -1248,6 +1248,14 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
   Spec.it s "Flame Javelin's three monocolored hybrid symbols make mana value 6, not 3" $ do
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     Spec.assertEqWith s "six" (Quantity.manaValueOf (Printing.card flameJavelin)) 6
+  -- CR 202.3 with no subrule of its own to lean on: "a number equal to the total
+  -- amount of mana in its mana cost, regardless of color", and CR 107.4h makes
+  -- {S} "a cost that can be paid with one mana of any type produced by a snow
+  -- source" -- one mana, so 1. Not 0, which is what a symbol mistaken for a
+  -- colour marker rather than a mana would give.
+  Spec.it s "CR 202.3 Icehide Golem's snow mana symbol makes mana value 1" $ do
+    icehideGolem <- S.printingOf s registry "Icehide Golem"
+    Spec.assertEqWith s "one" (Quantity.manaValueOf (Printing.card icehideGolem)) 1
 
 m45p6CardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m45p6CardSpec s registry = Spec.describe s "M45p6Cards" $ do
