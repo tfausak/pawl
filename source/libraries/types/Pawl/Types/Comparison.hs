@@ -1,6 +1,6 @@
 module Pawl.Types.Comparison where
 
--- How a Pawl.Types.Condition relates its count to its threshold. A sum type
+-- | How a Pawl.Types.Condition relates its count to its threshold. A sum type
 -- rather than a bare Bool-shaped "is zero": the pool's cards are all Exactly 0
 -- today, and AtLeast/AtMost are what a threshold card needs.
 --

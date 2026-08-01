@@ -3,8 +3,8 @@ module Pawl.Codec.Filter where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.CardType (cardTypeToJson, jsonToCardType)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
+import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
 import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
@@ -25,9 +25,9 @@ optionalFilter value = case value of
 -- delegates to the leaf-enum codec for the characteristic it cases on.
 filterToJson :: Filter.Filter -> Value
 filterToJson filter_ = case filter_ of
-  Filter.HasCardType t -> Json.tagged (Text.pack "HasCardType") (Just (cardTypeToJson t))
+  Filter.HasCardType t -> Json.tagged (Text.pack "HasCardType") (Just (CardType.toJson t))
   Filter.HasSupertype s -> Json.tagged (Text.pack "HasSupertype") (Just (supertypeToJson s))
-  Filter.HasColor c -> Json.tagged (Text.pack "HasColor") (Just (colorToJson c))
+  Filter.HasColor c -> Json.tagged (Text.pack "HasColor") (Just (Color.toJson c))
   Filter.HasSubtype s -> Json.tagged (Text.pack "HasSubtype") (Just (subtypeToJson s))
   Filter.PowerAtLeast n -> Json.tagged (Text.pack "PowerAtLeast") (Just (Json.jInt n))
   Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (playerRelationToJson r))
@@ -48,9 +48,9 @@ jsonToFilter :: Value -> Either Text Filter.Filter
 jsonToFilter value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("HasCardType", Just v) -> Filter.HasCardType <$> jsonToCardType v
+    ("HasCardType", Just v) -> Filter.HasCardType <$> CardType.fromJson v
     ("HasSupertype", Just v) -> Filter.HasSupertype <$> jsonToSupertype v
-    ("HasColor", Just v) -> Filter.HasColor <$> jsonToColor v
+    ("HasColor", Just v) -> Filter.HasColor <$> Color.fromJson v
     ("HasSubtype", Just v) -> Filter.HasSubtype <$> jsonToSubtype v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Json.asInteger v
     ("ControlledBy", Just v) -> Filter.ControlledBy <$> jsonToPlayerRelation v

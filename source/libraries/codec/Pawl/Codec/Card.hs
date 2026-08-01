@@ -16,12 +16,12 @@ import qualified Data.Text as Text
 import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbility)
 import Pawl.Codec.AttackRequirement (attackRequirementToJson, jsonToAttackRequirement)
 import Pawl.Codec.BlockRequirement (blockRequirementToJson, jsonToBlockRequirement)
-import Pawl.Codec.CastingPermission (castingPermissionToJson, jsonToCastingPermission)
+import qualified Pawl.Codec.CastingPermission as CastingPermission
 import Pawl.Codec.CastingRestriction (castingRestrictionToJson, jsonToCastingRestriction)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
+import qualified Pawl.Codec.Color as Color
 import Pawl.Codec.Cost (costToJson, jsonToCost)
 import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
-import Pawl.Codec.Counterability (counterabilityToJson, jsonToCounterabilityDefault)
+import qualified Pawl.Codec.Counterability as Counterability
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
@@ -55,7 +55,7 @@ cardToJson c =
         (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (CardT.activatedAbilities c)),
         (Text.pack "replacementEffects", Json.listTo replacementEffectToJson (CardT.replacementEffects c)),
         (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (CardT.triggeredAbilities c)),
-        (Text.pack "castingPermissions", Json.listTo castingPermissionToJson (CardT.castingPermissions c))
+        (Text.pack "castingPermissions", Json.listTo CastingPermission.toJson (CardT.castingPermissions c))
       ]
         -- CR 306.5: omitted for every card that is not a planeswalker, the
         -- counterability posture below rather than the power/toughness one. Those
@@ -68,7 +68,7 @@ cardToJson c =
            )
         <> ( if Set.null (CardT.colorIndicator c)
                then []
-               else [(Text.pack "colorIndicator", Json.setTo colorToJson (CardT.colorIndicator c))]
+               else [(Text.pack "colorIndicator", Json.setTo Color.toJson (CardT.colorIndicator c))]
            )
         <> ( case CardT.characteristicPT c of
                Nothing -> []
@@ -104,7 +104,7 @@ cardToJson c =
         -- nothing.
         <> ( case CardT.counterability c of
                Counterability.Counterable -> []
-               Counterability.CantBeCountered -> [(Text.pack "counterability", counterabilityToJson (CardT.counterability c))]
+               Counterability.CantBeCountered -> [(Text.pack "counterability", Counterability.toJson (CardT.counterability c))]
            )
         <> ( if null (CardT.mulliganAction c)
                then []
@@ -143,9 +143,9 @@ jsonToCard value = do
   activated <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
-  permissions <- Json.field (Text.pack "castingPermissions") ps >>= Json.listFrom jsonToCastingPermission
+  permissions <- Json.field (Text.pack "castingPermissions") ps >>= Json.listFrom CastingPermission.fromJson
   restrictions <- Json.listFromDefault jsonToCastingRestriction (Json.getOpt (Text.pack "castingRestrictions") ps)
-  colorIndicator <- Json.setFromDefault jsonToColor (Json.getOpt (Text.pack "colorIndicator") ps)
+  colorIndicator <- Json.setFromDefault Color.fromJson (Json.getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- Json.maybeFrom jsonToQuantity (Json.getOpt (Text.pack "characteristicPT") ps)
   delayed <- Json.mapFromDefault (jsonToDelayedAbilities jsonToCard) (Json.getOpt (Text.pack "delayedAbilities") ps)
   playerAbilities <- Json.listFromDefault jsonToPlayerStaticAbility (Json.getOpt (Text.pack "playerAbilities") ps)
@@ -156,7 +156,7 @@ jsonToCard value = do
   mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
   openingHandAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)
   enchant <- Json.maybeFrom jsonToTargetSpec (Json.getOpt (Text.pack "enchant") ps)
-  counterability <- jsonToCounterabilityDefault (Json.getOpt (Text.pack "counterability") ps)
+  counterability <- Counterability.fromJsonDefault (Json.getOpt (Text.pack "counterability") ps)
   pure
     CardT.MkCard
       { CardT.name = name,

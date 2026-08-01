@@ -3,7 +3,7 @@ module Pawl.Codec.ManaSymbol where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Color (colorToJson, jsonToColor)
+import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.ManaType (jsonToManaType, manaTypeToJson)
 import Pawl.Json.Array (Array (MkArray))
@@ -17,7 +17,7 @@ manaSymbolToJson ms = case ms of
   ManaSymbol.Hybrid a b -> Json.tagged (Text.pack "Hybrid") (Just (Array (MkArray [manaTypeToJson a, manaTypeToJson b])))
   ManaSymbol.MonocoloredHybrid mt -> Json.tagged (Text.pack "MonocoloredHybrid") (Just (manaTypeToJson mt))
   -- A Color, not a ManaType: CR 107.4f's five Phyrexian symbols are all coloured.
-  ManaSymbol.Phyrexian c -> Json.tagged (Text.pack "Phyrexian") (Just (colorToJson c))
+  ManaSymbol.Phyrexian c -> Json.tagged (Text.pack "Phyrexian") (Just (Color.toJson c))
   -- Nullary: CR 107.4h's {S} names no mana type and no colour, so there is
   -- nothing for it to carry.
   ManaSymbol.Snow -> Json.nullary (Text.pack "Snow")
@@ -31,7 +31,7 @@ jsonToManaSymbol value = do
     ("OfType", Just v) -> ManaSymbol.OfType <$> jsonToManaType v
     ("Hybrid", Just (Array (MkArray [av, bv]))) -> ManaSymbol.Hybrid <$> jsonToManaType av <*> jsonToManaType bv
     ("MonocoloredHybrid", Just v) -> ManaSymbol.MonocoloredHybrid <$> jsonToManaType v
-    ("Phyrexian", Just v) -> ManaSymbol.Phyrexian <$> jsonToColor v
+    ("Phyrexian", Just v) -> ManaSymbol.Phyrexian <$> Color.fromJson v
     ("Snow", _) -> Right ManaSymbol.Snow
     ("Variable", _) -> Right ManaSymbol.Variable
     _ -> Left (Text.pack "unknown ManaSymbol: " <> t)

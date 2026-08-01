@@ -70,25 +70,34 @@ library codec
     Pawl.Codec.ActivationTiming
     Pawl.Codec.Affected
     Pawl.Codec.Aggregation
+    Pawl.Codec.AggregationSpec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.BeginningStep
+    Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
     Pawl.Codec.BlockRequirement
     Pawl.Codec.Card
     Pawl.Codec.CardType
+    Pawl.Codec.CardTypeSpec
     Pawl.Codec.CastingPermission
+    Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
     Pawl.Codec.Color
+    Pawl.Codec.ColorSpec
     Pawl.Codec.CombatStep
+    Pawl.Codec.CombatStepSpec
     Pawl.Codec.Common
     Pawl.Codec.CommonSpec
     Pawl.Codec.Comparison
+    Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
     Pawl.Codec.ControllerRelation
+    Pawl.Codec.ControllerRelationSpec
     Pawl.Codec.Cost
     Pawl.Codec.CostComponent
     Pawl.Codec.Count
     Pawl.Codec.Counterability
+    Pawl.Codec.CounterabilitySpec
     Pawl.Codec.Countering
     Pawl.Codec.CounterKind
     Pawl.Codec.CounterPattern

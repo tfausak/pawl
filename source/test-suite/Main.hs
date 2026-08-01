@@ -7,7 +7,16 @@ import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.Codec.AbilityNameSpec
+import qualified Pawl.Codec.AggregationSpec
+import qualified Pawl.Codec.BeginningStepSpec
+import qualified Pawl.Codec.CardTypeSpec
+import qualified Pawl.Codec.CastingPermissionSpec
+import qualified Pawl.Codec.ColorSpec
+import qualified Pawl.Codec.CombatStepSpec
 import qualified Pawl.Codec.CommonSpec
+import qualified Pawl.Codec.ComparisonSpec
+import qualified Pawl.Codec.ControllerRelationSpec
+import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.CodecSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
@@ -107,7 +116,16 @@ spec s registry = do
   Pawl.CardsSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
+  Pawl.Codec.AggregationSpec.spec s
+  Pawl.Codec.BeginningStepSpec.spec s
+  Pawl.Codec.CardTypeSpec.spec s
+  Pawl.Codec.CastingPermissionSpec.spec s
+  Pawl.Codec.ColorSpec.spec s
+  Pawl.Codec.CombatStepSpec.spec s
   Pawl.Codec.CommonSpec.spec s
+  Pawl.Codec.ComparisonSpec.spec s
+  Pawl.Codec.ControllerRelationSpec.spec s
+  Pawl.Codec.CounterabilitySpec.spec s
   Pawl.CodecSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry

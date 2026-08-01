@@ -1,28 +1,25 @@
--- | The @Aggregation ⇆ Json@ codec (#481).
 module Pawl.Codec.Aggregation where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Aggregation as Aggregation
 
--- No longer wholly nullary, and so no longer Json.decodeNullary's shape:
--- Greatest carries the per-member quantity it reads. Parametric in that
--- quantity, exactly as Pawl.Types.Aggregation is, so the codec reaches the
--- payload only through `codec` -- which is what lets this module sit below
--- Pawl.Codec.Quantity rather than in a cycle with it (#481).
-aggregationToJson :: (q -> Value) -> Aggregation.Aggregation q -> Value
-aggregationToJson codec a = case a of
-  Aggregation.Objects -> Json.nullary (Text.pack "Objects")
-  Aggregation.DistinctCardTypes -> Json.nullary (Text.pack "DistinctCardTypes")
-  Aggregation.Greatest q -> Json.tagged (Text.pack "Greatest") (Just (codec q))
+-- | No longer wholly nullary: Greatest carries the per-member quantity it
+-- reads. Parametric in that quantity, exactly as 'Aggregation.Aggregation' is,
+-- so the codec reaches the payload only through @codec@ -- which is what lets
+-- this module sit below @Pawl.Codec.Quantity@ rather than in a cycle with it.
+toJson :: (q -> Value.Value) -> Aggregation.Aggregation q -> Value.Value
+toJson codec a = case a of
+  Aggregation.Objects -> Common.nullary "Objects"
+  Aggregation.DistinctCardTypes -> Common.nullary "DistinctCardTypes"
+  Aggregation.Greatest q -> Common.tagged "Greatest" . Just $ codec q
 
-jsonToAggregation :: (Value -> Either Text q) -> Value -> Either Text (Aggregation.Aggregation q)
-jsonToAggregation decode value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
+fromJson :: (Value.Value -> Either Text.Text q) -> Value.Value -> Either Text.Text (Aggregation.Aggregation q)
+fromJson decode value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
     ("Objects", Nothing) -> Right Aggregation.Objects
     ("DistinctCardTypes", Nothing) -> Right Aggregation.DistinctCardTypes
     ("Greatest", Just v) -> Aggregation.Greatest <$> decode v
-    _ -> Left (Text.pack "unknown Aggregation: " <> t)
+    _ -> Left . Text.pack $ "unknown Aggregation: " <> t

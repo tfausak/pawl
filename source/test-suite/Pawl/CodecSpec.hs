@@ -12,9 +12,7 @@ import Pawl.Codec.ActivationTiming (activationTimingToJson, jsonToActivationTimi
 import Pawl.Codec.Affected (affectedToJson, jsonToAffected)
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
-import Pawl.Codec.CastingPermission (castingPermissionToJson, jsonToCastingPermission)
 import Pawl.Codec.CastingRestriction (castingRestrictionToJson, jsonToCastingRestriction)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
 import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
 import Pawl.Codec.Cost (costToJson, jsonToCost)
 import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
@@ -86,7 +84,6 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -202,8 +199,6 @@ optionalityKey value = case J.asObject value of
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Codec" $ do
   Spec.describe s "leaf enums" $ do
-    Spec.it s "Color" $
-      mapM_ (roundTrip s "color" colorToJson jsonToColor) [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
     Spec.it s "Keyword" $
       roundTrip s "kw" keywordToJson jsonToKeyword Keyword.Trample
     Spec.it s "Keyword.Infect" $
@@ -269,9 +264,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         s
         (keywordToJson (Keyword.Landwalk Subtype.Swamp) /= keywordToJson (Keyword.Landwalk Subtype.Island))
         "swampwalk and islandwalk encode differently"
-    Spec.it s "CastingPermission" $ do
-      roundTrip s "library" castingPermissionToJson jsonToCastingPermission CastingPermission.CastFromLibraryWhileSearching
-      roundTrip s "graveyard" castingPermissionToJson jsonToCastingPermission CastingPermission.CastFromGraveyard
     Spec.it s "CastingRestriction" $ do
       let declareAttackers = CastingRestriction.DuringPhase (Phase.Combat CombatStep.DeclareAttackers)
           upkeep = CastingRestriction.DuringPhase (Phase.Beginning BeginningStep.Upkeep)
@@ -294,8 +286,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "zone" zoneToJson jsonToZone Zone.Graveyard
     Spec.it s "Zone.Command" $
       roundTrip s "command" zoneToJson jsonToZone Zone.Command
-    Spec.it s "unknown tag fails" $
-      Spec.assertBool s (either (const True) (const False) (jsonToColor (J.jObject []))) "left"
   Spec.describe s "newtypes" $ do
     Spec.it s "SlotName" $
       roundTrip s "slot" slotNameToJson jsonToSlotName (SlotName.MkSlotName (Text.pack "x"))

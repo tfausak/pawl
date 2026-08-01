@@ -3,7 +3,7 @@ module Pawl.Codec.Count where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Aggregation (aggregationToJson, jsonToAggregation)
+import qualified Pawl.Codec.Aggregation as Aggregation
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Scope (jsonToScope, scopeToJson)
@@ -13,11 +13,11 @@ import qualified Pawl.Types.Count as Count.Type
 
 countToJson :: (q -> Value) -> Count.Type.Count q -> Value
 countToJson codec (Count.Type.MkCount s f a) =
-  Json.tagged (Text.pack "Count") (Just (Array (MkArray [scopeToJson s, filterToJson f, aggregationToJson codec a])))
+  Json.tagged (Text.pack "Count") (Just (Array (MkArray [scopeToJson s, filterToJson f, Aggregation.toJson codec a])))
 
 jsonToCount :: (Value -> Either Text q) -> Value -> Either Text (Count.Type.Count q)
 jsonToCount decode value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("Count", Just (Array (MkArray [s, f, a]))) -> Count.Type.MkCount <$> jsonToScope s <*> jsonToFilter f <*> jsonToAggregation decode a
+    ("Count", Just (Array (MkArray [s, f, a]))) -> Count.Type.MkCount <$> jsonToScope s <*> jsonToFilter f <*> Aggregation.fromJson decode a
     _ -> Left (Text.pack "unknown Count: " <> t)

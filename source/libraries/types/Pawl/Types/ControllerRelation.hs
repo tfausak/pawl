@@ -1,6 +1,6 @@
 module Pawl.Types.ControllerRelation where
 
--- CR 614.1 / 109.5: whose object a replacement's pattern admits, relative to the
+-- | CR 614.1 / 109.5: whose object a replacement's pattern admits, relative to the
 -- controller of the effect's SOURCE (that is what "you" means on a permanent's
 -- static ability). Hardened Scales says "a creature you control" (Yours); Rest in
 -- Peace's redirect has no controller clause at all (Anyones).
@@ -10,7 +10,7 @@ module Pawl.Types.ControllerRelation where
 data ControllerRelation
   = Yours
   | Anyones
-  | -- CR 102.1: "an opponent" -- any other player. Leyline of the Void's "an
+  | -- | CR 102.1: "an opponent" -- any other player. Leyline of the Void's "an
     -- opponent's graveyard". Read against the effect SOURCE's controller, like
     -- its siblings, but see Pawl.Engine.Replacement: for a ZONE CHANGE the subject is
     -- the object's OWNER (CR 400.3), because the destination zone is theirs.

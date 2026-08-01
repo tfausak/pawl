@@ -5,8 +5,8 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbility)
 import Pawl.Codec.Card (cardToJson, jsonToCard)
-import Pawl.Codec.CardType (cardTypeToJson, jsonToCardType)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
+import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
@@ -25,12 +25,12 @@ projectedCharacteristicsToJson pc =
     [ (Text.pack "name", Json.jText (PC.name pc)),
       (Text.pack "supertypes", Json.setTo supertypeToJson (PC.supertypes pc)),
       (Text.pack "keywords", Json.multisetTo keywordToJson (PC.keywords pc)),
-      (Text.pack "colors", Json.setTo colorToJson (PC.colors pc)),
+      (Text.pack "colors", Json.setTo Color.toJson (PC.colors pc)),
       (Text.pack "power", Json.maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", Json.maybeTo Json.jInt (PC.toughness pc)),
       (Text.pack "loyalty", Json.maybeTo loyaltyToJson (PC.loyalty pc)),
       (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [quantityToJson p, quantityToJson t])) (PC.characteristicPT pc)),
-      (Text.pack "cardTypes", Json.setTo cardTypeToJson (PC.cardTypes pc)),
+      (Text.pack "cardTypes", Json.setTo CardType.toJson (PC.cardTypes pc)),
       (Text.pack "subtypes", Json.setTo subtypeToJson (PC.subtypes pc)),
       (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (PC.activatedAbilities pc)),
       (Text.pack "replacementEffects", Json.listTo replacementEffectToJson (PC.replacementEffects pc)),
@@ -43,7 +43,7 @@ jsonToProjectedCharacteristics value = do
   nm <- Json.field (Text.pack "name") ps >>= Json.asText
   sups <- Json.field (Text.pack "supertypes") ps >>= Json.setFrom jsonToSupertype
   kws <- Json.field (Text.pack "keywords") ps >>= Json.multisetFrom jsonToKeyword
-  cols <- Json.field (Text.pack "colors") ps >>= Json.setFrom jsonToColor
+  cols <- Json.field (Text.pack "colors") ps >>= Json.setFrom Color.fromJson
   -- power/toughness/characteristicPT are encoded as required keys (Json.maybeTo
   -- writes JSON null for Nothing, never omits the key), so decoding them is
   -- Json.field (required) >>= Json.maybeFrom (Null -> Nothing), exactly like every
@@ -52,7 +52,7 @@ jsonToProjectedCharacteristics value = do
   tou <- Json.field (Text.pack "toughness") ps >>= Json.maybeFrom Json.asInteger
   loy <- Json.field (Text.pack "loyalty") ps >>= Json.maybeFrom jsonToLoyalty
   cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom jsonToQuantityPair
-  cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom jsonToCardType
+  cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom CardType.fromJson
   subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom jsonToSubtype
   acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
   reps <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect

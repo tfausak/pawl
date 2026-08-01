@@ -3,7 +3,7 @@ module Pawl.Codec.Condition where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Comparison (comparisonToJson, jsonToComparison)
+import qualified Pawl.Codec.Comparison as Comparison
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
 import Pawl.Json.Array (Array (MkArray))
@@ -18,11 +18,11 @@ import qualified Pawl.Types.Condition as Condition.Type
 -- untouched.
 conditionToJson :: Condition.Type.Condition -> Value
 conditionToJson (Condition.Type.MkCondition m cmp q) =
-  Json.tagged (Text.pack "Condition") (Just (Array (MkArray [quantityToJson m, comparisonToJson cmp, quantityToJson q])))
+  Json.tagged (Text.pack "Condition") (Just (Array (MkArray [quantityToJson m, Comparison.toJson cmp, quantityToJson q])))
 
 jsonToCondition :: Value -> Either Text Condition.Type.Condition
 jsonToCondition value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("Condition", Just (Array (MkArray [m, cmp, q]))) -> Condition.Type.MkCondition <$> jsonToQuantity m <*> jsonToComparison cmp <*> jsonToQuantity q
+    ("Condition", Just (Array (MkArray [m, cmp, q]))) -> Condition.Type.MkCondition <$> jsonToQuantity m <*> Comparison.fromJson cmp <*> jsonToQuantity q
     _ -> Left (Text.pack "unknown Condition: " <> t)

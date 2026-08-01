@@ -3,8 +3,8 @@ module Pawl.Codec.Modification where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.CardType (cardTypeToJson, jsonToCardType)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
+import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
 import Pawl.Codec.PlayerId (jsonToPlayerId, playerIdToJson)
@@ -22,11 +22,11 @@ modificationToJson m = case m of
   Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
   Modification.SetLandSubtype s -> Json.tagged (Text.pack "SetLandSubtype") (Just (subtypeToJson s))
   Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (subtypeToJson s))
-  Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (cardTypeToJson c))
+  Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (CardType.toJson c))
   Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array (MkArray [subtypeToJson a, subtypeToJson b])))
   Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))
   Modification.SetControllerToSource -> Json.nullary (Text.pack "SetControllerToSource")
-  Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (Json.setTo colorToJson cs))
+  Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (Json.setTo Color.toJson cs))
   Modification.SwitchPowerToughness -> Json.nullary (Text.pack "SwitchPowerToughness")
 
 jsonToModification :: Value -> Either Text Modification.Modification
@@ -42,10 +42,10 @@ jsonToModification value = do
     "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
     "SetLandSubtype" -> Json.withValue mv (fmap Modification.SetLandSubtype . jsonToSubtype)
     "AddLandSubtype" -> Json.withValue mv (fmap Modification.AddLandSubtype . jsonToSubtype)
-    "AddCardType" -> Json.withValue mv (fmap Modification.AddCardType . jsonToCardType)
+    "AddCardType" -> Json.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
     "SetController" -> Json.withValue mv (fmap Modification.SetController . jsonToPlayerId)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
-    "SetColor" -> Json.withValue mv (fmap Modification.SetColor . Json.setFrom jsonToColor)
+    "SetColor" -> Json.withValue mv (fmap Modification.SetColor . Json.setFrom Color.fromJson)
     "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness
     _ -> Left (Text.pack "unknown Modification: " <> t)
