@@ -661,7 +661,7 @@ resolveModes stackId srcId modes = do
             Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
-            State.modify' (cease stackId)
+            State.modify' (Game.cease stackId)
 
 -- CR 603.5 / 608.2d: does this mode's instruction list happen at all? A
 -- mandatory mode always does. An OPTIONAL one -- a printed "may" -- is its
@@ -702,14 +702,6 @@ resolveAbility abilId srcId ability = do
     Just obj ->
       let chosen = Binding.modesOf (Object.bindings obj)
        in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
-
--- CR 608.2n: an ability leaves the stack and ceases to exist (no graveyard).
-cease :: ObjectId -> GameState -> GameState
-cease abilId gs =
-  gs
-    { GameState.stack = filter (/= abilId) (GameState.stack gs),
-      GameState.objects = Map.delete abilId (GameState.objects gs)
-    }
 
 -- One effect, applied. The case on the constructor is THIS module's charter.
 -- `controller` is the controller of the resolving spell/ability -- who searches
@@ -1828,8 +1820,10 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
       _ -> pure ()
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      -- CR 701.6a: the slot's target is a spell on the stack; counter it through
-      -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
+      -- CR 701.6a: the slot's target is a spell or an ability on the stack;
+      -- counter it through the single funnel, which picks that rule's ending
+      -- from the object's own kind (the graveyard for a spell, CR 608.2n's cease
+      -- for an ability). A player recipient / illegal slot (CR 608.2b): no-op.
       --
       -- The funnel is handed THIS effect's source and controller, which is what
       -- Baral, Chief of Compliance's "whenever a spell or ability you control

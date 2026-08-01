@@ -470,13 +470,33 @@ destroyIn asOf regenerability oids = do
         changeZoneInBatch gs target Zone.Graveyard
         pure (Just target)
 
--- The single spell-countering funnel (CR 701.6 -- not to be confused with
--- Pawl.Engine.Replacement.putCounters, CR 122.6's placement of counter
--- markers). A countered
--- spell is removed from the stack and put into its owner's graveyard (CR
--- 701.6a) through the changeZone funnel -- so Rest in Peace's redirect
--- (graveyard->exile) and CR 400.7's new incarnation still compose, exactly as
--- they do for destroy.
+-- The single countering funnel (CR 701.6 -- not to be confused with
+-- Pawl.Engine.Replacement.putCounters, CR 122.6's placement of counter markers).
+-- CR 701.6a: "to counter a spell or ability means to cancel it, removing it from
+-- the stack. It doesn't resolve and none of its effects occur. A countered spell
+-- is put into its owner's graveyard."
+--
+-- TWO endings, because that rule's last sentence is about a SPELL and its first
+-- two are about "a spell or ability". Which one applies is decided by
+-- Game.isAbility -- a classification of the object's kind, exactly like the
+-- isSpell beside it, and never a question about the countering effect:
+--
+--   * a SPELL is removed from the stack and put into its owner's graveyard,
+--     through the changeZone funnel -- so Rest in Peace's redirect
+--     (graveyard->exile) and CR 400.7's new incarnation still compose, exactly
+--     as they do for destroy.
+--   * an ABILITY CEASES (Game.cease), which is CR 608.2n's ending -- "the
+--     ability is removed from the stack and ceases to exist". It is NOT a zone
+--     change: an ability is not a card, so it has no owner's graveyard to go to,
+--     nothing arrives anywhere, and there is no destination for CR 614 to
+--     replace. A Rest in Peace exiles a countered spell and cannot touch a
+--     countered ability, because nothing was ever headed for a graveyard.
+--
+-- The ability branch records NO event, so no trigger can watch it (#541).
+-- Widening GameEvent.SpellCountered instead would be the wrong direction: its
+-- one reader is Baral, Chief of Compliance's "whenever a spell or ability you
+-- control counters A SPELL", which must stay silent here.
+--
 -- Gated on CR 113.6g's "can't be countered", which functions on the stack and so
 -- is read off the spell's own card (Card.counterability) rather than through the
 -- projection -- there is no battlefield projection of a spell. CR 101.2 is what
@@ -489,14 +509,14 @@ destroyIn asOf regenerability oids = do
 -- indestructible gate already has, and for the same CR 614.7 reason: an event
 -- that never happens offers nothing for a replacement to intercept.
 --
--- Records a GameEvent.SpellCountered of its own, ALONGSIDE the Moved event the
--- zone change files -- never instead of it. The two say different things: the
--- Moved event is the CR 400.7 zone change, and this one is what the change WAS.
--- Keeping them apart is what makes a countered spell distinguishable from one
--- that RESOLVED into the same graveyard by CR 608.2n, and from a discarded or
--- milled card; it is also what survives Rest in Peace redirecting the
--- destination (CR 614), after which no zone pair reads stack-to-graveyard at
--- all.
+-- On the SPELL branch, records a GameEvent.SpellCountered of its own, ALONGSIDE
+-- the Moved event the zone change files -- never instead of it. The two say
+-- different things: the Moved event is the CR 400.7 zone change, and this one is
+-- what the change WAS. Keeping them apart is what makes a countered spell
+-- distinguishable from one that RESOLVED into the same graveyard by CR 608.2n,
+-- and from a discarded or milled card; it is also what survives Rest in Peace
+-- redirecting the destination (CR 614), after which no zone pair reads
+-- stack-to-graveyard at all.
 --
 -- Nothing at all is recorded on any of the three paths that DO NOT counter, and
 -- CR 603.2g is what makes that mandatory rather than tidy: "an event that's
@@ -511,6 +531,10 @@ destroyIn asOf regenerability oids = do
 --     countering did not happen. The posture `discard` below takes, and with no
 --     producer today: no card in the pool cancels a zone change outright.
 --
+-- The ability branch is NOT one of those three, and must not be read as a
+-- fourth: that countering really happened, and the silence is the missing record
+-- of #541 rather than a statement that nothing occurred.
+--
 -- The `source` and `controller` are the countering spell or ability and the
 -- player who controlled it (CR 405.4) -- what Baral, Chief of Compliance's
 -- "whenever a spell or ability YOU CONTROL counters a spell" reads against CR
@@ -524,6 +548,13 @@ counter source controller oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
+    -- CR 608.2n, reached before the CR 113.6g gate below because that gate is a
+    -- question about a spell's own card and an ability has none: Game.cardOf
+    -- answers Nothing for an ability object (its card belongs to its SOURCE), so
+    -- asking first would fall through to the graveyard move by accident rather
+    -- than by decision. An ability of a source that says "can't be countered" is
+    -- not covered either way -- that clause is about the spell (#542).
+    Just _ | Game.isAbility oid gs -> State.modify' (Game.cease oid)
     Just _ -> case fmap Card.counterability (Game.cardOf oid gs) of
       Just Counterability.CantBeCountered -> pure ()
       _ -> do
@@ -813,7 +844,7 @@ matchesTrigger gs bearer you cond event = case cond of
           -- pays nothing, and eventTriggers' `projected` hoist is untouched.
           --
           -- Nothing is an entrant that is gone AND filed no last known
-          -- information -- Resolve.cease and Departure.objectsLeaveWith remove an
+          -- information -- Game.cease and Departure.objectsLeaveWith remove an
           -- object without a zone change running over it. Nothing is known about
           -- what entered, so no Filter can honestly admit it.
           let entrant = ZoneChange.object zc
@@ -1443,7 +1474,7 @@ eventTriggers events gs =
       -- value in this one: eventBindings binds it under Binding.became.
       --
       -- Empty for a permanent that ceased without a zone change ever running
-      -- over it (Resolve.cease, Departure.objectsLeaveWith), which files no last
+      -- over it (Game.cease, Departure.objectsLeaveWith), which files no last
       -- known information. That hole is `bystanders`' too, since it is built out
       -- of this: such a permanent is recoverable for no event at all.
       leftBattlefield event = case event of
@@ -1770,7 +1801,7 @@ stateTriggers gs =
               -- Engine.settleForPriority fixpoint, so a lost suppression
               -- (failing open) loops forever -- a hang, not a wrong answer --
               -- while failing closed costs at most one settle pass' worth of
-              -- a legitimate new instance. Unreachable today: Resolve.cease
+              -- a legitimate new instance. Unreachable today: Game.cease
               -- removes the stack entry and its object together, so a stack
               -- id is never left dangling.
               Nothing -> True
