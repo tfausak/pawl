@@ -781,7 +781,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "a DamageR replacement round-trips (pattern and rewrite are data)" $
       let re =
             ReplacementEffect.DamageR
-              DamagePattern.MkDamagePattern {DamagePattern.unwrap = Just DamageKind.Combat}
+              DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat}
               DamageRewrite.PreventAll
        in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
     Spec.it s "a DestructionR replacement round-trips" $

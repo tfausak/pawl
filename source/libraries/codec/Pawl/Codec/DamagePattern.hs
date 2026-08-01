@@ -7,10 +7,10 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.DamagePattern as DamagePattern
 
 toJson :: DamagePattern.DamagePattern -> Value.Value
-toJson p = Common.object [Common.pair "whichKind" . Common.encodeMaybe DamageKind.toJson $ DamagePattern.unwrap p]
+toJson p = Common.object [Common.pair "whichKind" . Common.encodeMaybe DamageKind.toJson $ DamagePattern.whichKind p]
 
 fromJson :: Value.Value -> Either Text.Text DamagePattern.DamagePattern
 fromJson value = do
   ps <- Common.asObject value
   k <- Common.field "whichKind" ps >>= Common.decodeMaybe DamageKind.fromJson
-  pure DamagePattern.MkDamagePattern {DamagePattern.unwrap = k}
+  pure DamagePattern.MkDamagePattern {DamagePattern.whichKind = k}

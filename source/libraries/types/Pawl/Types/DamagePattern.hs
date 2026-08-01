@@ -6,6 +6,6 @@ import Pawl.Types.DamageKind (DamageKind)
 -- Nothing means any kind. CR 615's shields that name a SOURCE, an AMOUNT, or a
 -- RECIPIENT are P9's to add; this carries the minimum Fog needs.
 newtype DamagePattern = MkDamagePattern
-  { unwrap :: Maybe DamageKind
+  { whichKind :: Maybe DamageKind
   }
   deriving (Eq, Ord, Show)

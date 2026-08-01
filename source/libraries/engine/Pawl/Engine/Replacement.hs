@@ -311,7 +311,7 @@ applies gs event candidate =
             && matchesZoneSubject src (ZoneChangePattern.whichObject pat) (ZoneChange.object zc)
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
         (ReplacementEffect.DamageR pat _, ProposedEvent.WouldDealDamage de) ->
-          case DamagePattern.unwrap pat of
+          case DamagePattern.whichKind pat of
             -- CR 615.1: no kind named means every damage event.
             Nothing -> True
             Just kind -> DamageEvent.kind de == kind
