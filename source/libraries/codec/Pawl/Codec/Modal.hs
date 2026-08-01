@@ -1,28 +1,26 @@
--- | The @Modal ⇆ Json@ codec (#481).
 module Pawl.Codec.Modal where
 
 import qualified Data.Sequence as Seq
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Mode (jsonToMode, modeToJson)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Mode as Mode
 import qualified Pawl.Codec.ModeSelection as ModeSelection
-import Pawl.Json.Value (Value)
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Modal as Modal
 
-modalToJson :: (card -> Value) -> Modal.Modal card -> Value
-modalToJson codec m =
-  Json.jObject
-    [ (Text.pack "modes", Json.seqTo (modeToJson codec) (Modal.modes m)),
-      (Text.pack "selection", ModeSelection.toJson (Modal.selection m))
+toJson :: (card -> Value.Value) -> Modal.Modal card -> Value.Value
+toJson codec m =
+  Common.object
+    [ Common.pair "modes" (Common.encodeSeq (Mode.toJson codec) (Modal.modes m)),
+      Common.pair "selection" (ModeSelection.toJson (Modal.selection m))
     ]
 
-jsonToModal :: (Value -> Either Text card) -> Value -> Either Text (Modal.Modal card)
-jsonToModal decode value = do
-  ps <- Json.asObject value
-  ms <- Json.field (Text.pack "modes") ps >>= Json.seqFrom (jsonToMode decode)
+fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Modal.Modal card)
+fromJson decode value = do
+  ps <- Common.asObject value
+  ms <- Common.field "modes" ps >>= Common.decodeSeq (Mode.fromJson decode)
   if Seq.null ms
     then Left (Text.pack "modal has no modes")
     else do
-      sel <- Json.field (Text.pack "selection") ps >>= ModeSelection.fromJson
+      sel <- Common.field "selection" ps >>= ModeSelection.fromJson
       pure (Modal.MkModal ms sel)

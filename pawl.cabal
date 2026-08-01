@@ -67,6 +67,7 @@ library codec
     Pawl.Codec.AbilityName
     Pawl.Codec.AbilityNameSpec
     Pawl.Codec.ActivatedAbility
+    Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivationTiming
     Pawl.Codec.ActivationTimingSpec
     Pawl.Codec.Affected
@@ -161,11 +162,13 @@ library codec
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec
     Pawl.Codec.Modal
+    Pawl.Codec.ModalSpec
     Pawl.Codec.Mode
     Pawl.Codec.ModeIndex
     Pawl.Codec.ModeIndexSpec
     Pawl.Codec.ModeSelection
     Pawl.Codec.ModeSelectionSpec
+    Pawl.Codec.ModeSpec
     Pawl.Codec.Modification
     Pawl.Codec.ModificationSpec
     Pawl.Codec.MonarchTarget
@@ -237,6 +240,7 @@ library codec
     Pawl.Codec.TriggerCondition
     Pawl.Codec.TriggerConditionSpec
     Pawl.Codec.TriggeredAbility
+    Pawl.Codec.TriggeredAbilitySpec
     Pawl.Codec.TriggerFrequency
     Pawl.Codec.TriggerFrequencySpec
     Pawl.Codec.TurnScope

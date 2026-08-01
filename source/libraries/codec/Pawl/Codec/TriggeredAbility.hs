@@ -1,36 +1,34 @@
--- | The @TriggeredAbility ⇆ Json@ codec (#481).
 module Pawl.Codec.TriggeredAbility where
 
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Modal (jsonToModal, modalToJson)
+import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
-import Pawl.Json.Value (Value)
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
-triggeredAbilityToJson :: (card -> Value) -> TriggeredAbility.TriggeredAbility card -> Value
-triggeredAbilityToJson codec ta =
-  Json.jObject
-    ( [ (Text.pack "condition", TriggerCondition.toJson (TriggeredAbility.condition ta)),
-        (Text.pack "modal", modalToJson codec (TriggeredAbility.modal ta))
+toJson :: (card -> Value.Value) -> TriggeredAbility.TriggeredAbility card -> Value.Value
+toJson codec ta =
+  Common.object
+    ( [ Common.pair "condition" (TriggerCondition.toJson (TriggeredAbility.condition ta)),
+        Common.pair "modal" (Modal.toJson codec (TriggeredAbility.modal ta))
       ]
         <> ( case TriggeredAbility.intervening ta of
                Nothing -> []
-               Just c -> [(Text.pack "intervening", Condition.toJson c)]
+               Just c -> [Common.pair "intervening" (Condition.toJson c)]
            )
     )
 
-jsonToTriggeredAbility :: (Value -> Either Text card) -> Value -> Either Text (TriggeredAbility.TriggeredAbility card)
-jsonToTriggeredAbility decode value = do
-  ps <- Json.asObject value
-  c <- Json.field (Text.pack "condition") ps >>= TriggerCondition.fromJson
-  m <- Json.field (Text.pack "modal") ps >>= jsonToModal decode
-  i <- Json.maybeFrom Condition.fromJson (Json.getOpt (Text.pack "intervening") ps)
+fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility card)
+fromJson decode value = do
+  ps <- Common.asObject value
+  c <- Common.field "condition" ps >>= TriggerCondition.fromJson
+  m <- Common.field "modal" ps >>= Modal.fromJson decode
+  i <- Common.decodeMaybe Condition.fromJson (Common.nullableField "intervening" ps)
   pure
     TriggeredAbility.MkTriggeredAbility
       { TriggeredAbility.condition = c,
@@ -38,19 +36,19 @@ jsonToTriggeredAbility decode value = do
         TriggeredAbility.intervening = i
       }
 
--- The targetSpecsToJson shape: a name-keyed map as a sorted array of entries, so
--- the render is deterministic and the file byte-stable.
-delayedAbilitiesToJson :: (card -> Value) -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card) -> Value
-delayedAbilitiesToJson codec m =
-  Json.listTo
-    (\(k, v) -> Json.jObject [(Text.pack "name", AbilityName.toJson k), (Text.pack "ability", triggeredAbilityToJson codec v)])
+-- A name-keyed map as a sorted array of entries, so the render is deterministic
+-- and the file byte-stable.
+toJsonDelayed :: (card -> Value.Value) -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card) -> Value.Value
+toJsonDelayed codec m =
+  Common.encodeList
+    (\(k, v) -> Common.object [Common.pair "name" (AbilityName.toJson k), Common.pair "ability" (toJson codec v)])
     (Map.toAscList m)
 
-jsonToDelayedAbilities :: (Value -> Either Text card) -> Value -> Either Text (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card))
-jsonToDelayedAbilities decode value =
+fromJsonDelayed :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card))
+fromJsonDelayed decode value =
   let decodeEntry v = do
-        ps <- Json.asObject v
-        k <- Json.field (Text.pack "name") ps >>= AbilityName.fromJson
-        a <- Json.field (Text.pack "ability") ps >>= jsonToTriggeredAbility decode
+        ps <- Common.asObject v
+        k <- Common.field "name" ps >>= AbilityName.fromJson
+        a <- Common.field "ability" ps >>= fromJson decode
         pure (k, a)
-   in Map.fromList <$> Json.listFrom decodeEntry value
+   in Map.fromList <$> Common.decodeList decodeEntry value

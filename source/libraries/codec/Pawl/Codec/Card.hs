@@ -13,7 +13,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbility)
+import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
 import qualified Pawl.Codec.CastingPermission as CastingPermission
@@ -27,7 +27,7 @@ import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.ManaCost as ManaCost
-import Pawl.Codec.Modal (jsonToModal, modalToJson)
+import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.Power as Power
 import qualified Pawl.Codec.Quantity as Quantity
@@ -35,7 +35,7 @@ import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.TargetSpec as TargetSpec
 import qualified Pawl.Codec.Toughness as Toughness
-import Pawl.Codec.TriggeredAbility (delayedAbilitiesToJson, jsonToDelayedAbilities, jsonToTriggeredAbility, triggeredAbilityToJson)
+import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TypeLine as TypeLine
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.Card as CardT
@@ -51,10 +51,10 @@ cardToJson c =
         (Text.pack "toughness", Json.maybeTo Toughness.toJson (CardT.toughness c)),
         (Text.pack "keywords", Json.setTo Keyword.toJson (CardT.keywords c)),
         (Text.pack "staticAbilities", Json.listTo StaticAbility.toJson (CardT.staticAbilities c)),
-        (Text.pack "spell", modalToJson cardToJson (CardT.spell c)),
-        (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (CardT.activatedAbilities c)),
+        (Text.pack "spell", Modal.toJson cardToJson (CardT.spell c)),
+        (Text.pack "activatedAbilities", Json.listTo (ActivatedAbility.toJson cardToJson) (CardT.activatedAbilities c)),
         (Text.pack "replacementEffects", Json.listTo ReplacementEffect.toJson (CardT.replacementEffects c)),
-        (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (CardT.triggeredAbilities c)),
+        (Text.pack "triggeredAbilities", Json.listTo (TriggeredAbility.toJson cardToJson) (CardT.triggeredAbilities c)),
         (Text.pack "castingPermissions", Json.listTo CastingPermission.toJson (CardT.castingPermissions c))
       ]
         -- CR 306.5: omitted for every card that is not a planeswalker, the
@@ -76,7 +76,7 @@ cardToJson c =
            )
         <> ( if Map.null (CardT.delayedAbilities c)
                then []
-               else [(Text.pack "delayedAbilities", delayedAbilitiesToJson cardToJson (CardT.delayedAbilities c))]
+               else [(Text.pack "delayedAbilities", TriggeredAbility.toJsonDelayed cardToJson (CardT.delayedAbilities c))]
            )
         <> ( if null (CardT.playerAbilities c)
                then []
@@ -139,15 +139,15 @@ jsonToCard value = do
   loyalty <- Json.maybeFrom Loyalty.fromJson (Json.getOpt (Text.pack "loyalty") ps)
   keywords <- Json.field (Text.pack "keywords") ps >>= Json.setFrom Keyword.fromJson
   statics <- Json.field (Text.pack "staticAbilities") ps >>= Json.listFrom StaticAbility.fromJson
-  spell <- Json.field (Text.pack "spell") ps >>= jsonToModal jsonToCard
-  activated <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
+  spell <- Json.field (Text.pack "spell") ps >>= Modal.fromJson jsonToCard
+  activated <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (ActivatedAbility.fromJson jsonToCard)
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom ReplacementEffect.fromJson
-  triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
+  triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (TriggeredAbility.fromJson jsonToCard)
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= Json.listFrom CastingPermission.fromJson
   restrictions <- Json.listFromDefault CastingRestriction.fromJson (Json.getOpt (Text.pack "castingRestrictions") ps)
   colorIndicator <- Json.setFromDefault Color.fromJson (Json.getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- Json.maybeFrom Quantity.fromJson (Json.getOpt (Text.pack "characteristicPT") ps)
-  delayed <- Json.mapFromDefault (jsonToDelayedAbilities jsonToCard) (Json.getOpt (Text.pack "delayedAbilities") ps)
+  delayed <- Json.mapFromDefault (TriggeredAbility.fromJsonDelayed jsonToCard) (Json.getOpt (Text.pack "delayedAbilities") ps)
   playerAbilities <- Json.listFromDefault PlayerStaticAbility.fromJson (Json.getOpt (Text.pack "playerAbilities") ps)
   blockRequirements <- Json.listFromDefault BlockRequirement.fromJson (Json.getOpt (Text.pack "blockRequirements") ps)
   attackRequirements <- Json.listFromDefault AttackRequirement.fromJson (Json.getOpt (Text.pack "attackRequirements") ps)

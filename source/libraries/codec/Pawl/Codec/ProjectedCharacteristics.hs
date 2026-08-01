@@ -3,7 +3,7 @@ module Pawl.Codec.ProjectedCharacteristics where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbility)
+import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import Pawl.Codec.Card (cardToJson, jsonToCard)
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
@@ -14,7 +14,7 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
-import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
+import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -32,9 +32,9 @@ projectedCharacteristicsToJson pc =
       (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc)),
       (Text.pack "cardTypes", Json.setTo CardType.toJson (PC.cardTypes pc)),
       (Text.pack "subtypes", Json.setTo Subtype.toJson (PC.subtypes pc)),
-      (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (PC.activatedAbilities pc)),
+      (Text.pack "activatedAbilities", Json.listTo (ActivatedAbility.toJson cardToJson) (PC.activatedAbilities pc)),
       (Text.pack "replacementEffects", Json.listTo ReplacementEffect.toJson (PC.replacementEffects pc)),
-      (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (PC.triggeredAbilities pc))
+      (Text.pack "triggeredAbilities", Json.listTo (TriggeredAbility.toJson cardToJson) (PC.triggeredAbilities pc))
     ]
 
 jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristics
@@ -54,9 +54,9 @@ jsonToProjectedCharacteristics value = do
   cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom Quantity.fromJsonPair
   cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom CardType.fromJson
   subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom Subtype.fromJson
-  acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
+  acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (ActivatedAbility.fromJson jsonToCard)
   reps <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom ReplacementEffect.fromJson
-  trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
+  trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (TriggeredAbility.fromJson jsonToCard)
   pure
     PC.MkProjectedCharacteristics
       { PC.name = nm,

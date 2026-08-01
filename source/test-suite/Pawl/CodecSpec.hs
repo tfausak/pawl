@@ -14,12 +14,7 @@ import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
-import Pawl.Codec.Modal (jsonToModal, modalToJson)
-import Pawl.Codec.Mode (jsonToMode, modeToJson)
-import qualified Pawl.Codec.ModeSelection as ModeSelection
-import qualified Pawl.Codec.Optionality as Optionality
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
-import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
@@ -85,13 +80,6 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 
 roundTrip :: (Applicative m, Eq a, Show a) => Spec.Spec m n -> String -> (a -> Value.Value) -> (Value.Value -> Either Text a) -> a -> m ()
 roundTrip s label enc dec x = Spec.assertEqWith s label (dec (enc x)) (Right x)
-
--- The `optionality` key of an encoded Mode, or Nothing when it was omitted (CR
--- 603.5's Mandatory default).
-optionalityKey :: Value.Value -> Maybe Value.Value
-optionalityKey value = case J.asObject value of
-  Right ps -> J.optField (Text.pack "optionality") ps
-  Left _ -> Nothing
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Codec" $ do
@@ -210,49 +198,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   -- "pattern and scaling/rewrite are data" shapes, the CounterR explicit
   -- JSON null, and the PhaseR whosePhase axis -- lives in
   -- Pawl.Codec.ReplacementEffectSpec now.
-  Spec.describe s "modal" $ do
-    Spec.it s "Modal round-trips" $
-      roundTrip
-        s
-        "modal"
-        (modalToJson cardToJson)
-        (jsonToModal jsonToCard)
-        ( Modal.MkModal
-            ( Seq.fromList
-                [ Mode.MkMode
-                    (Seq.fromList [Effect.DealDamage (SlotName.MkSlotName (Text.pack "creature")) (Quantity.Literal 1)])
-                    (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
-                    Optionality.Mandatory
-                ]
-            )
-            (ModeSelection.ChooseExactly 1)
-        )
-    -- CR 603.5: an Optional mode is what a printed "may" encodes to, and
-    -- the key is emitted only for that value.
-    Spec.it s "an Optional mode round-trips, and says so in the JSON" $ do
-      let m = Mode.MkMode Seq.empty Map.empty Optionality.Optional
-      roundTrip s "optional mode" (modeToJson cardToJson) (jsonToMode jsonToCard) m
-      Spec.assertEqWith
-        s
-        "the optionality key is present"
-        (optionalityKey (modeToJson cardToJson m))
-        (Just (Optionality.toJson Optionality.Optional))
-    -- The byte-identity guarantee for every card file that prints no
-    -- "may": a Mandatory mode emits no key, and a mode with no key decodes
-    -- back to Mandatory. The counterability precedent.
-    Spec.it s "a Mandatory mode omits the key, and an omitted key decodes to Mandatory" $ do
-      let m = Mode.MkMode Seq.empty Map.empty Optionality.Mandatory
-      Spec.assertEqWith s "no optionality key" (optionalityKey (modeToJson cardToJson m)) Nothing
-      Spec.assertEqWith s "decodes to Mandatory" (jsonToMode jsonToCard (modeToJson cardToJson m)) (Right m)
-    Spec.it s "empty modal is a decode error" $
-      Spec.assertBool
-        s
-        ( either
-            (const True)
-            (const False)
-            (jsonToModal jsonToCard (J.jObject [(Text.pack "modes", J.jArray []), (Text.pack "selection", ModeSelection.toJson (ModeSelection.ChooseExactly 1))]))
-        )
-        "left"
+  -- Mode's own per-constructor coverage, including the CR 603.5 optionality
+  -- elision in both directions, lives in Pawl.Codec.ModeSpec now; Modal's own
+  -- coverage, including the empty-modes decode failure, lives in
+  -- Pawl.Codec.ModalSpec.
   Spec.describe s "honesty round-trip over allPrintings" $ do
     Spec.it s "P1: jsonToPrinting . printingToJson == Right" $ do
       ps <- S.allPrintings s
@@ -422,14 +371,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
             roundTrip s "delayed" delayedTriggerToJson jsonToDelayedTrigger entry
             roundTrip s "delayed1" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
             roundTrip s "delayed2" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.notBefore = Just 7}
-    Spec.it s "a TriggeredAbility with an intervening if round-trips" $
-      let ability =
-            TriggeredAbility.MkTriggeredAbility
-              { TriggeredAbility.condition = TriggerCondition.SelfEnters,
-                TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
-                TriggeredAbility.intervening = Just noZombiesOnBattlefield
-              }
-       in roundTrip s "ta" (triggeredAbilityToJson cardToJson) (jsonToTriggeredAbility jsonToCard) ability
+
+-- TriggeredAbility's own per-constructor coverage, including both states of
+-- the CR 603.4 intervening "if" and the CR 603.7 toJsonDelayed/fromJsonDelayed
+-- sort order, lives in Pawl.Codec.TriggeredAbilitySpec now.
 
 -- Count's own per-constructor coverage (in a zone, over the event history,
 -- and scoped to a slot) lives in Pawl.Codec.CountSpec now; Quantity's Count

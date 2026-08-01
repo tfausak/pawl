@@ -7,6 +7,7 @@ import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.Codec.AbilityNameSpec
+import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationTimingSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
@@ -51,8 +52,10 @@ import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
+import qualified Pawl.Codec.ModalSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
+import qualified Pawl.Codec.ModeSpec
 import qualified Pawl.Codec.ModificationSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.ObjectIdSpec
@@ -88,6 +91,7 @@ import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.ToughnessSpec
 import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
+import qualified Pawl.Codec.TriggeredAbilitySpec
 import qualified Pawl.Codec.TurnScopeSpec
 import qualified Pawl.Codec.TypeLineSpec
 import qualified Pawl.Codec.UsesSpec
@@ -194,6 +198,7 @@ spec s registry = do
   Pawl.CardsSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
+  Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationTimingSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
@@ -238,8 +243,10 @@ spec s registry = do
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
+  Pawl.Codec.ModalSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s
+  Pawl.Codec.ModeSpec.spec s
   Pawl.Codec.ModificationSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
@@ -275,6 +282,7 @@ spec s registry = do
   Pawl.Codec.ToughnessSpec.spec s
   Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
+  Pawl.Codec.TriggeredAbilitySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
   Pawl.Codec.UsesSpec.spec s
