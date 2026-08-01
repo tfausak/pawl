@@ -1,8 +1,11 @@
 -- Covers Pawl.Engine.Target: CR 115 target legality, and the rule-702 TARGETING
 -- RESTRICTIONS that narrow it. Shroud (CR 702.18) is the pool's first, and
--- Blurred Mongoose is the card that prints it. The last case covers the other
--- side of that split -- Pawl.Engine.Sba's CR 303.4c re-check, which asks what an
--- enchant spec ADMITS and must not ask a targeting question.
+-- Blurred Mongoose is the card that prints it. One case covers the other side of
+-- that split -- Pawl.Engine.Sba's CR 303.4c re-check, which asks what an enchant
+-- spec ADMITS and must not ask a targeting question -- and the last four cover
+-- CR 115.2's two escape hatches from "only permanents are legal targets": its
+-- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead. (Those letters
+-- are prose inside rule 115.2, not subrule numbers; there is no CR 115.2a.)
 --
 -- Gameplay-level: every spec under test is read out of a committed card rather
 -- than hand-built, and the cases that turn on an effect cast and resolve through
@@ -16,6 +19,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 -- The logic module, alongside Pawl.Types.Modal below: unambiguous under one alias
 -- because the two export disjoint names (CardSpec's precedent).
@@ -268,3 +272,91 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
             Spec.assertEqWith s "Cancel sees the spell and only the spell" cancelLegal (Set.singleton (Recipient.ToObject spellId))
             Spec.assertEqWith s "Stifle sees the ability and only the ability" stifleLegal (Set.singleton (Recipient.ToObject abilId))
           _ -> Spec.assertFailure s "the fixture should put one ability and one spell on the stack, and both cards should declare a target slot"
+
+  -- CR 115.2's OTHER escape hatch, the one Pool.Spells and Pool.Abilities are
+  -- not: "only permanents are legal targets for spells and abilities, unless a
+  -- spell or ability (a) SPECIFIES THAT IT CAN TARGET AN OBJECT IN ANOTHER ZONE
+  -- or a player". Raise Dead's "target creature card in your graveyard" is that
+  -- clause, and its pool is Pool.CardsInGraveyard.
+  --
+  -- Three ways it could go wrong, on ONE board, because each is a different
+  -- mistake and any of them alone would pass against a pool that stayed empty:
+  --
+  --   * CR 400.1's per-player zone -- "each player has their own library, hand,
+  --     and graveyard" -- is why the pool carries a PlayerRelation at all, and
+  --     bob's copy of the very same card is what proves the axis is real rather
+  --     than decorative. It cannot be a Filter: CR 108.4 says "a card doesn't
+  --     have a controller unless that card represents a permanent or spell", so
+  --     ControlledBy is vacuously False for every card in every graveyard.
+  --   * the Filter still narrows, so alice's Lightning Bolt is out.
+  --   * the pool is DISJOINT from Pool.Creatures, the way Pool.Abilities is from
+  --     Pool.Spells: the Piker on the battlefield is offered under neither tag.
+  --     CR 109.2's battlefield default does not reach this card, because its text
+  --     says the word "card" outright.
+  Spec.it s "CR 115.2 clause (a) Raise Dead reaches the creature card in your graveyard and nothing else" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    raiseDead <- S.printingOf s registry "Raise Dead"
+    let (inPlayId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (mineId, g2) = S.addGraveyardCard piker S.alice g1
+        (myBoltId, g3) = S.addGraveyardCard bolt S.alice g2
+        (theirsId, gs) = S.addGraveyardCard piker S.bob g3
+    case S.spellTargetSpec raiseDead of
+      Nothing -> Spec.assertFailure s "Raise Dead should declare a target slot"
+      Just theSpec -> do
+        let legal = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+        Spec.assertBool s (Set.member (Recipient.ToObject mineId) legal) "the creature card in alice's own graveyard is legal"
+        Spec.assertBool s (not (Set.member (Recipient.ToObject theirsId) legal)) "the identical card in bob's graveyard is not (CR 400.1)"
+        Spec.assertBool s (not (Set.member (Recipient.ToObject myBoltId) legal)) "nor is the instant card beside it (the Filter narrows)"
+        Spec.assertBool s (not (Set.member (Recipient.ToObject inPlayId) legal)) "nor the Piker on the battlefield, under ToObject"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature inPlayId) legal)) "nor under ToCreature (disjoint from Pool.Creatures)"
+        Spec.assertEqWith s "and nothing else at all" legal (Set.singleton (Recipient.ToObject mineId))
+
+  -- The move itself, cast and resolved through the stack: CR 400.7 mints a NEW
+  -- object in the hand ("an object that moves from one zone to another becomes a
+  -- new object"), so the card is asserted by name in the hand and by the absence
+  -- of the id it was targeted under from the graveyard. Raise Dead's own trip to
+  -- the graveyard is CR 404.1's "as is any instant or sorcery spell that's
+  -- finished resolving".
+  Spec.it s "CR 115.2 clause (a) whole card: Raise Dead returns the targeted creature card to alice's hand" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    raiseDead <- S.printingOf s registry "Raise Dead"
+    let (mineId, board) = S.addGraveyardCard piker S.alice (S.landsInPlay swamp 1)
+        (gs, rdId) = S.handOne raiseDead board
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice rdId))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "Raise Dead went on the stack" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "the Piker card is in alice's hand" (S.countByName (Text.pack "Goblin Piker") S.alice resolved) 1
+    Spec.assertBool
+      s
+      (notElem mineId (Game.zoneMembers Zone.Graveyard S.alice resolved))
+      "and the object it was targeted under is gone from the graveyard (CR 400.7)"
+    Spec.assertEqWith s "that graveyard holds one card, the spent Raise Dead (CR 404.1)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+    Spec.assertEqWith s "and alice's hand holds one card, the Piker and not the spell" (S.handSize S.alice resolved) 1
+
+  -- CR 608.2b: "A target that's no longer in the zone it was in when it was
+  -- targeted is illegal. ... If all its targets ... are now illegal, the spell or
+  -- ability doesn't resolve. It's removed from the stack and, if it's a spell,
+  -- put into its owner's graveyard."
+  --
+  -- The response is Event.changeZone rather than a card, because no card in this
+  -- pool can be cast in response to a sorcery AND move a card out of a graveyard:
+  -- Rest in Peace is the only one that empties a graveyard, and it does it from
+  -- an enchantment's enters trigger -- CR 303.1 lets an enchantment be cast only
+  -- "during a main phase of their turn when the stack is empty", which is exactly
+  -- when Raise Dead is not on it. Both halves run off one board and one cast, so
+  -- the fizzle cannot be a Raise Dead that never worked.
+  Spec.it s "CR 608.2b Raise Dead fizzles when its target leaves the graveyard in response" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    raiseDead <- S.printingOf s registry "Raise Dead"
+    let (mineId, board) = S.addGraveyardCard piker S.alice (S.landsInPlay swamp 1)
+        (gs, rdId) = S.handOne raiseDead board
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice rdId))
+        resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
+        returned = resolve cast
+        fizzled = resolve (S.runPure S.identityAnswer cast (Event.changeZone mineId Zone.Exile))
+    Spec.assertEqWith s "untouched, the Piker card comes back" (S.countByName (Text.pack "Goblin Piker") S.alice returned) 1
+    Spec.assertEqWith s "exiled in response, nothing comes back" (S.countByName (Text.pack "Goblin Piker") S.alice fizzled) 0
+    Spec.assertEqWith s "and Raise Dead is in alice's graveyard either way" (length (Game.zoneMembers Zone.Graveyard S.alice fizzled)) 1

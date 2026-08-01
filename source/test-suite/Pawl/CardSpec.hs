@@ -1236,6 +1236,25 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [blue]))
     Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand defaultEntryRiders Nothing]
+  -- Unsummon's effect exactly, over a different pool: the same MoveToZone to the
+  -- hand, so the whole card is its target spec. CR 115.2's clause (a) admits it
+  -- ("specifies that it can target an object in another zone"), CR 400.1 is why
+  -- the pool carries a relation, and CR 109.2's default is switched off by the
+  -- printed word "card" -- which is why the creature-ness is a Filter over a
+  -- ToObject candidate rather than a Pool.Creatures slot.
+  Spec.it s "Raise Dead is a {B} Sorcery returning a creature card from your graveyard to your hand" $ do
+    raiseDead <- S.printingOf s registry "Raise Dead"
+    let c = Printing.card raiseDead
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [black]))
+    Spec.assertBool s (Card.isSorcery c) "a sorcery"
+    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone target Zone.Hand defaultEntryRiders Nothing]
+    Spec.assertEqWith
+      s
+      "one creature-card-in-your-graveyard slot"
+      (Card.allTargetSpecs c)
+      (Map.singleton target (TargetSpec.MkTargetSpec (Pool.CardsInGraveyard PlayerRelation.You) (Just (Filter.Type.HasCardType CardType.Creature))))
   -- Three modifications on ONE target, in printed order. Spelled out rather
   -- than spot-checked because the toxic 1 grant is what makes this card the
   -- CR 702.164b proof in DamageSpec: a card that granted toxic 2 by mistake
