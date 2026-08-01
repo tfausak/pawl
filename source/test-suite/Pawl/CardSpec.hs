@@ -97,7 +97,7 @@ import qualified System.Directory as Directory
 costOf :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
 costOf symbols = Just (ManaCost.MkManaCost symbols)
 
-m2aCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m2aCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m2aCardSpec s registry = Spec.describe s "M2aCards" $ do
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       green = ManaSymbol.OfType (ManaType.Colored Color.Green)
@@ -185,7 +185,7 @@ m2aCardSpec s registry = Spec.describe s "M2aCards" $ do
       )
       S.m2aKeywords
 
-cardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+cardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cardSpec s registry = Spec.describe s "Card" $ do
   Spec.it s "Mountain printing is named Mountain" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -965,7 +965,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offenders = filter (offends . Printing.card) ps
     Spec.assertEqWith s "the enchant slot is never hand-declared" (fmap (Card.Type.name . Printing.card) offenders) []
 
-m2bCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m2bCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m2bCardSpec s registry = Spec.describe s "M2bCards" $ do
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       gs0 = Setup.emptyGame S.bothPlayers
@@ -1005,7 +1005,7 @@ m2bCardSpec s registry = Spec.describe s "M2bCards" $ do
     Spec.assertEqWith s "tiger body" (bodyOf sabretoothTiger) (bodyOf piker)
     Spec.assertEqWith s "raptor body" (bodyOf ridgetopRaptor) (bodyOf piker)
 
-m2cCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m2cCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m2cCardSpec s registry = Spec.describe s "M2cCards" $ do
   Spec.it s "Typhoid Rats is a {B} 1/1 Rat with deathtouch" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
@@ -1022,7 +1022,7 @@ m2cCardSpec s registry = Spec.describe s "M2cCards" $ do
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
     Spec.assertEqWith s "keywords" (Card.Type.keywords c) (Set.singleton Keyword.Trample)
 
-basicLandSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+basicLandSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 basicLandSpec s registry = Spec.describe s "BasicLand" $ do
   Spec.it s "CR 305.6 a Swamp's intrinsic ability is black mana" $
     Spec.assertEqWith
@@ -1053,7 +1053,7 @@ basicLandSpec s registry = Spec.describe s "BasicLand" $ do
       (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
       "forest subtype"
 
-m3cCardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+m3cCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 m3cCardSpec s registry = Spec.describe s "M3cCards" $ do
   Spec.it s "Blood Moon is a {2}{R} enchantment with one SetLandSubtype static ability" $ do
     bloodMoon <- S.printingOf s registry "Blood Moon"
@@ -1061,7 +1061,7 @@ m3cCardSpec s registry = Spec.describe s "M3cCards" $ do
     Spec.assertEqWith s "one static ability" (length (Card.Type.staticAbilities card)) 1
     Spec.assertBool s (Map.null (Card.allTargetSpecs card)) "not a permanent target"
 
-m3eCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m3eCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m3eCardSpec s registry = Spec.describe s "M3eCards" $ do
   Spec.it s "Prodigal Sorcerer has one non-mana activated ability" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -1074,7 +1074,7 @@ m3eCardSpec s registry = Spec.describe s "M3eCards" $ do
       [ab] -> Spec.assertBool s (Mana.isManaAbility ab) "mana ability"
       _ -> Spec.assertFailure s "expected exactly one ability"
 
-m4bCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m4bCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
   Spec.it s "Darksteel Myr is a {3} 0/1 Artifact Creature with indestructible" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
@@ -1249,7 +1249,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     Spec.assertEqWith s "six" (Quantity.manaValueOf (Printing.card flameJavelin)) 6
 
-m45p6CardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m45p6CardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m45p6CardSpec s registry = Spec.describe s "M45p6Cards" $ do
   Spec.it s "Master Thief is a {2}{U}{U} 2/2 Human Rogue whose ETB steals an artifact" $ do
     masterThief <- S.printingOf s registry "Master Thief"
@@ -1312,7 +1312,7 @@ m45p6CardSpec s registry = Spec.describe s "M45p6Cards" $ do
           _ -> Spec.assertFailure s "expected exactly one mode"
       _ -> Spec.assertFailure s "expected exactly one triggered ability"
 
-m45p7CardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m45p7CardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
   Spec.it s "Rule of Law is a {2}{W} enchantment with one EachPlayer CantCastMoreThan 1 player ability" $ do
     ruleOfLaw <- S.printingOf s registry "Rule of Law"
@@ -1434,7 +1434,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
       [Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells]
     Spec.assertEqWith s "no target slots" (Card.allTargetSpecs c) Map.empty
 
-m45p11CardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+m45p11CardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 m45p11CardSpec s registry = Spec.describe s "M4.5 P11" $ do
   Spec.it s "Palace Jailer is a {2}{W}{W} 2/2 Human Soldier with two ETB triggers" $ do
     palaceJailer <- S.printingOf s registry "Palace Jailer"
@@ -1449,7 +1449,7 @@ m45p11CardSpec s registry = Spec.describe s "M4.5 P11" $ do
 -- fails here rather than surfacing as a behavioural oddity somewhere downstream.
 -- Master Thief's ForAsLongAs is pinned this way in m45p6CardSpec; this is
 -- Barbarian Outcast's StateIs, which had only behavioural coverage (#165).
-m55CardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+m55CardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m55CardSpec s registry = Spec.describe s "M5.5" $ do
   Spec.it s "Barbarian Outcast's state trigger is a Count of exactly 0 Swamps you control (CR 603.8)" $ do
     barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
@@ -1500,7 +1500,7 @@ m55CardSpec s registry = Spec.describe s "M5.5" $ do
 
 -- The Auras phase (a) gate card: CR 303.4m's Attached affected-set, proven by a
 -- real Aura on a real creature rather than a synthetic fixture.
-auraCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+auraCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraCardSpec s registry = Spec.describe s "Auras" $ do
   Spec.it s "Unholy Strength is a {B} Aura enchanting a creature for +2/+1" $ do
     p <- S.printingOf s registry "Unholy Strength"
@@ -1659,7 +1659,7 @@ sourceOnBattlefield =
 -- -- every printed enchantment animator excludes Auras by name; and March of the
 -- Machines animates every noncreature artifact at once, which is the card CR
 -- 613.6 exists for (#233).
-animatorCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+animatorCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 animatorCardSpec s registry = Spec.describe s "Animators" $ do
   -- The CR 613.6 gate card (#233), and the pin that matters is the SHAPE: one
   -- static ability with three parts, not three abilities. Its affected set
@@ -1781,7 +1781,7 @@ animatorCardSpec s registry = Spec.describe s "Animators" $ do
 -- CR 702.29: the pool's first cycling card. Barkhide Mauler is a vanilla 4/4
 -- whose only text is the keyword, so nothing else about it can stand in for the
 -- keyword when a cycling test passes.
-cyclingCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+cyclingCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclingCardSpec s registry = Spec.describe s "Cycling" $ do
   Spec.it s "Windcaller Aven is a {4}{U}{U} 4/3 with flying, Cycling {U} and a cycling trigger" $ do
     p <- S.printingOf s registry "Windcaller Aven"
@@ -1843,7 +1843,7 @@ cyclingCardSpec s registry = Spec.describe s "Cycling" $ do
 -- and it is the SUPERTYPE on the type line that earns them their place: CR
 -- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Engine.Sba.worldVictims),
 -- and nothing else in the corpus carries it.
-worldCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+worldCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 worldCardSpec s registry = Spec.describe s "WorldEnchantments" $ do
   Spec.it s "Concordant Crossroads is a {G} world enchantment giving all creatures haste" $ do
     p <- S.printingOf s registry "Concordant Crossroads"
@@ -1886,7 +1886,7 @@ worldCardSpec s registry = Spec.describe s "WorldEnchantments" $ do
 
 -- CR 701.20: the cards that say "reveal" in their own text, as opposed to
 -- inheriting it from a keyword the way Ash Barrens' typecycling does.
-revealCardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+revealCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 revealCardSpec s registry = Spec.describe s "Reveal" $ do
   Spec.it s "Braidwood Sextant is a {1} Artifact whose {2}, {T}, Sacrifice fetches a revealed basic land" $ do
     p <- S.printingOf s registry "Braidwood Sextant"
@@ -1919,7 +1919,7 @@ revealCardSpec s registry = Spec.describe s "Reveal" $ do
 -- ability triggers on a permanent OTHER than itself entering, and its effect
 -- names nothing about the newcomer, so the card is a clean witness for the
 -- trigger condition alone.
-entersCardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+entersCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 entersCardSpec s registry = Spec.describe s "Enters" $ do
   Spec.it s "Soul Warden is a {W} 1/1 Human Cleric whose trigger reads \"whenever ANOTHER creature enters\"" $ do
     p <- S.printingOf s registry "Soul Warden"
@@ -1954,7 +1954,7 @@ entersCardSpec s registry = Spec.describe s "Enters" $ do
           modes -> Spec.assertFailure s ("expected one mode, got " <> show (length modes))
       abilities -> Spec.assertFailure s ("expected one triggered ability, got " <> show (length abilities))
 
-unspentManaCardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+unspentManaCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 unspentManaCardSpec s registry = Spec.describe s "Unspent mana" $ do
   -- The modern Oracle wording is "don't LOSE unspent mana", CR 106.4's verb,
   -- not "mana pools don't empty" -- and it is symmetric, which is why the
@@ -1973,7 +1973,7 @@ unspentManaCardSpec s registry = Spec.describe s "Unspent mana" $ do
       (Card.Type.playerAbilities c)
       [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer PlayerEffect.DontLoseUnspentMana]
 
-phyrexianCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+phyrexianCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phyrexianCardSpec s registry = Spec.describe s "Phyrexian" $ do
   Spec.it s "Mutagenic Growth is a {G/P} Instant giving target creature +2/+2" $ do
     p <- S.printingOf s registry "Mutagenic Growth"
@@ -2000,7 +2000,7 @@ phyrexianCardSpec s registry = Spec.describe s "Phyrexian" $ do
 -- "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking creature from
 -- combat." (Murders at Karlov Manor Commander; oracle text checked against
 -- Scryfall.) The gameplay proof is Pawl.CombatSpec's EffectRemoval group.
-removeFromCombatCardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+removeFromCombatCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 removeFromCombatCardSpec s registry = Spec.describe s "RemoveFromCombat" $ do
   Spec.it s "Labyrinth of Skophos is a Land with a {T} colorless mana ability and a {4}, {T} removal ability" $ do
     labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
@@ -2038,7 +2038,7 @@ removeFromCombatCardSpec s registry = Spec.describe s "RemoveFromCombat" $ do
 -- point next to Lure's, above: the same field, the other Affected. The gameplay
 -- proof, including CR 604.2's layer-6 strip, is Pawl.CombatSpec's
 -- BlockRequirements group.
-blockRequirementCardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+blockRequirementCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 blockRequirementCardSpec s registry = Spec.describe s "BlockRequirements" $ do
   Spec.it s "Prized Unicorn is a {3}{G} 2/2 Unicorn whose only ability is a requirement naming ITSELF" $ do
     p <- S.printingOf s registry "Prized Unicorn"
@@ -2071,7 +2071,7 @@ blockRequirementCardSpec s registry = Spec.describe s "BlockRequirements" $ do
 -- Aura reaching the same set through the same Affected, carried on a field the
 -- CR 613 layer system never reads. The gameplay proof is Pawl.CombatSpec's
 -- AttackRequirements group.
-attackRequirementCardSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
+attackRequirementCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackRequirementCardSpec s registry = Spec.describe s "AttackRequirements" $ do
   Spec.it s "Curse of the Nightly Hunt is a {2}{R} Aura Curse whose only ability is a CR 508.1d attacking requirement" $ do
     p <- S.printingOf s registry "Curse of the Nightly Hunt"

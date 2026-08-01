@@ -171,7 +171,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
-roundTrip :: (Eq a, Show a) => Spec.Spec IO n -> String -> (a -> Value.Value) -> (Value.Value -> Either Text a) -> a -> IO ()
+roundTrip :: (Applicative m, Eq a, Show a) => Spec.Spec m n -> String -> (a -> Value.Value) -> (Value.Value -> Either Text a) -> a -> m ()
 roundTrip s label enc dec x = Spec.assertEqWith s label (dec (enc x)) (Right x)
 
 -- The first element of an encoded effect's positional payload -- for Destroy,
