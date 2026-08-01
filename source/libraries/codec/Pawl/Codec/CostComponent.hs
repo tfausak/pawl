@@ -3,7 +3,7 @@ module Pawl.Codec.CostComponent where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
+import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
@@ -18,7 +18,7 @@ costComponentToJson c = case c of
   CostComponent.UntapThis -> Json.nullary (Text.pack "UntapThis")
   CostComponent.SacrificeThis -> Json.nullary (Text.pack "SacrificeThis")
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (Json.natTo n))
-  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array (MkArray [Json.natTo n, filterToJson c_])))
+  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array (MkArray [Json.natTo n, Filter.toJson c_])))
   CostComponent.DiscardCards n -> Json.tagged (Text.pack "DiscardCards") (Just (Json.natTo n))
   CostComponent.DiscardThis -> Json.nullary (Text.pack "DiscardThis")
   CostComponent.PayEnergy n -> Json.tagged (Text.pack "PayEnergy") (Just (Json.natTo n))
@@ -35,7 +35,7 @@ jsonToCostComponent value = do
     ("PayLife", Just v) -> fmap CostComponent.PayLife (Json.natFrom v)
     ("Sacrifice", Just (Array (MkArray [n, c_]))) -> do
       count <- Json.natFrom n
-      filter_ <- jsonToFilter c_
+      filter_ <- Filter.fromJson c_
       pure (CostComponent.Sacrifice count filter_)
     ("DiscardCards", Just v) -> fmap CostComponent.DiscardCards (Json.natFrom v)
     ("DiscardThis", _) -> Right CostComponent.DiscardThis

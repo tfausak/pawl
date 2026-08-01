@@ -2,7 +2,7 @@ module Pawl.Types.EntryRiders where
 
 import Pawl.Types.TapState (TapState)
 
--- What an effect says about a permanent AS IT ENTERS the battlefield, beyond the
+-- | What an effect says about a permanent AS IT ENTERS the battlefield, beyond the
 -- permanent's own text -- Hanweir Garrison's "that are tapped and attacking",
 -- and Meandering Towershell's "return it to the battlefield tapped and
 -- attacking".

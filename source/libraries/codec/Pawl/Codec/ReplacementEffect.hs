@@ -4,7 +4,7 @@ module Pawl.Codec.ReplacementEffect where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.CounterPattern (counterPatternToJson, jsonToCounterPattern)
-import Pawl.Codec.DamagePattern (damagePatternToJson, jsonToDamagePattern)
+import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
@@ -25,7 +25,7 @@ replacementEffectToJson re = case re of
   ReplacementEffect.EntryR r ->
     Json.tagged (Text.pack "EntryR") (Just (entryRewriteToJson r))
   ReplacementEffect.DamageR p r ->
-    Json.tagged (Text.pack "DamageR") (Just (Array (MkArray [damagePatternToJson p, DamageRewrite.toJson r])))
+    Json.tagged (Text.pack "DamageR") (Just (Array (MkArray [DamagePattern.toJson p, DamageRewrite.toJson r])))
   ReplacementEffect.DestructionR r ->
     Json.tagged (Text.pack "DestructionR") (Just (DestructionRewrite.toJson r))
   ReplacementEffect.CounterR p s ->
@@ -45,7 +45,7 @@ jsonToReplacementEffect value = do
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
     ("EntryR", Just v) -> fmap ReplacementEffect.EntryR (jsonToEntryRewrite v)
     ("DamageR", Just (Array (MkArray [p, r]))) -> do
-      pattern_ <- jsonToDamagePattern p
+      pattern_ <- DamagePattern.fromJson p
       rewrite <- DamageRewrite.fromJson r
       pure (ReplacementEffect.DamageR pattern_ rewrite)
     ("DestructionR", Just v) -> fmap ReplacementEffect.DestructionR (DestructionRewrite.fromJson v)

@@ -17,19 +17,26 @@ import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CounterabilitySpec
+import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.DamageKindSpec
+import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.EndingStepSpec
+import qualified Pawl.Codec.EntryRidersSpec
+import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExtraPhaseSpec
+import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.LoyaltySpec
+import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
+import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerIdSpec
 import qualified Pawl.Codec.PlayerRelationSpec
@@ -156,19 +163,26 @@ spec s registry = do
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
+  Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
+  Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
+  Pawl.Codec.EntryRidersSpec.spec s
+  Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
+  Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
+  Pawl.Codec.ManaTypeSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
+  Pawl.Codec.PhaseSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerIdSpec.spec s
   Pawl.Codec.PlayerRelationSpec.spec s

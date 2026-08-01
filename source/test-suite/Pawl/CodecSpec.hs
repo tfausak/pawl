@@ -22,8 +22,8 @@ import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
 import Pawl.Codec.Duration (durationToJson, jsonToDuration)
 import Pawl.Codec.Effect (effectToJson, jsonToEffect)
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
-import Pawl.Codec.EntryRiders (defaultEntryRiders)
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
+import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.Filter as Filter
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
 import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
@@ -34,7 +34,6 @@ import Pawl.Codec.Mode (jsonToMode, modeToJson)
 import qualified Pawl.Codec.ModeSelection as ModeSelection
 import Pawl.Codec.Modification (jsonToModification, modificationToJson)
 import qualified Pawl.Codec.Optionality as Optionality
-import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
 import Pawl.Codec.PlayerEffect (jsonToPlayerEffect, playerEffectToJson)
 import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
 import Pawl.Codec.Power (jsonToPower, powerToJson)
@@ -391,7 +390,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         s
         "and a set is the Filter object"
         (payloadHead (effectToJson cardToJson swept))
-        (filterToJson (Filter.Type.HasCardType CardType.Creature))
+        (Filter.toJson (Filter.Type.HasCardType CardType.Creature))
     -- Bane of Progress' "destroyed this way": the third element is the slot
     -- the sweep binds its count into, and it is ELIDED when absent -- so
     -- every Destroy already on disk keeps its two-element payload.
@@ -601,7 +600,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "a Card carrying a CR 103.6 opening-hand action round-trips" $ do
       bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
-          c = base {CardT.openingHandAction = [Effect.MoveToZone Binding.triggerSource Zone.Battlefield defaultEntryRiders Nothing]}
+          c = base {CardT.openingHandAction = [Effect.MoveToZone Binding.triggerSource Zone.Battlefield EntryRiders.defaultValue Nothing]}
       roundTrip s "card" cardToJson jsonToCard c
     Spec.it s "an empty openingHandAction list is omitted from the JSON" $ do
       bloodMoon <- S.printingOf s registry "Blood Moon"
@@ -610,27 +609,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       case J.asObject (cardToJson base) of
         Left err -> Spec.assertFailure s (Text.unpack err)
         Right pairs -> Spec.assertBool s (notElem (Text.pack "openingHandAction") (fmap fst pairs)) "key absent"
-  Spec.describe s "filter (P9)" $ do
-    Spec.it s "Filter round-trips including nested And/Or/Not" $
-      let doomBlade = Filter.Type.Not (Filter.Type.HasColor Color.Black)
-          terror = Filter.Type.And [Filter.Type.Not (Filter.Type.HasColor Color.Black), Filter.Type.Not (Filter.Type.HasCardType CardType.Artifact)]
-          reprisal = Filter.Type.PowerAtLeast 4
-          basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
-          angelicEdict = Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment]
-          controlled = Filter.Type.ControlledBy PlayerRelation.Opponent
-          bySubtype = Filter.Type.HasSubtype Subtype.Wall
-          isSource = Filter.Type.IsSource
-          ravenousRats = Filter.Type.IsPlayer PlayerRelation.Opponent
-          killShot = Filter.Type.IsAttacking
-          relentlessAssault = Filter.Type.AttackedThisTurn
-          crownOfTheAges = Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]
-          labyrinthOfSkophos = Filter.Type.Or [Filter.Type.IsAttacking, Filter.Type.IsBlocking]
-          auraGraftTarget = Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToPermanent]
-          auraGraftDestination = Filter.Type.CanHostSubject
-       in mapM_
-            (roundTrip s "filter" filterToJson jsonToFilter)
-            [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, relentlessAssault, crownOfTheAges, labyrinthOfSkophos, auraGraftTarget, auraGraftDestination]
-  -- Sits beside "filter (P9)": a TargetSpec is Pool + Maybe Filter, so these
+  -- Filter's own per-constructor and nested-And/Or/Not coverage lives in
+  -- Pawl.Codec.FilterSpec now; a TargetSpec is Pool + Maybe Filter, so these
   -- exercise the Filter arm above in its embedded position. Covers a bare
   -- pool (Nothing filter, omitted key), a filtered pool, and the Not
   -- IsSource conjunct that carries CR 601.2c's "another" (#163).
@@ -801,7 +781,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "a DamageR replacement round-trips (pattern and rewrite are data)" $
       let re =
             ReplacementEffect.DamageR
-              DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat}
+              DamagePattern.MkDamagePattern {DamagePattern.unwrap = Just DamageKind.Combat}
               DamageRewrite.PreventAll
        in Spec.assertEqWith s "preserved" (jsonToReplacementEffect (replacementEffectToJson re)) (Right re)
     Spec.it s "a DestructionR replacement round-trips" $
@@ -924,15 +904,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         (CardT.counterability (Printing.card cancel))
         Counterability.Counterable
   Spec.describe s "P4 runtime types" $ do
-    Spec.it s "Phase round-trips" $
-      mapM_
-        (roundTrip s "phase" phaseToJson jsonToPhase)
-        [ Phase.Beginning BeginningStep.Upkeep,
-          Phase.PrecombatMain,
-          Phase.Combat CombatStep.DeclareBlockers,
-          Phase.PostcombatMain,
-          Phase.Ending EndingStep.EndStep
-        ]
     -- A real permanent, not a projection of a nonexistent object: Typhoid
     -- Rats (1/1 deathtouch) populates keywords, colors, power, toughness,
     -- cardTypes and subtypes all at once, so a swapped field or a wrong
@@ -1126,15 +1097,15 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       let slot = SlotName.MkSlotName (Text.pack "target")
           bound = SlotName.MkSlotName (Text.pack "exiled")
           attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}
-      roundTrip s "move" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone slot Zone.Hand defaultEntryRiders Nothing)
-      roundTrip s "move+slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone slot Zone.Exile defaultEntryRiders (Just bound))
+      roundTrip s "move" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing)
+      roundTrip s "move+slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone slot Zone.Exile EntryRiders.defaultValue (Just bound))
       roundTrip s "move+entry" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone bound Zone.Battlefield attacking Nothing)
       roundTrip s "move+entry+slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.MoveToZone bound Zone.Battlefield attacking (Just bound))
       Spec.assertEqWith
         s
         "default riders and no bound slot are not written"
         (J.tagged (Text.pack "MoveToZone") (Just (J.jArray [SlotName.toJson slot, Zone.toJson Zone.Hand])))
-        (effectToJson cardToJson (Effect.MoveToZone slot Zone.Hand defaultEntryRiders Nothing))
+        (effectToJson cardToJson (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing))
     -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
     -- only a Binding's `target` field via Binding.toObject. The codec is
     -- meant to be total over every Binding field -- subtypes, amount, modes,

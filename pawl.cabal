@@ -99,12 +99,14 @@ library codec
     Pawl.Codec.Counterability
     Pawl.Codec.CounterabilitySpec
     Pawl.Codec.Countering
+    Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
     Pawl.Codec.CounterPattern
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageKind
     Pawl.Codec.DamageKindSpec
     Pawl.Codec.DamagePattern
+    Pawl.Codec.DamagePatternSpec
     Pawl.Codec.DamageRewrite
     Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.DelayedTrigger
@@ -119,11 +121,14 @@ library codec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryRewrite
     Pawl.Codec.EntryRiders
+    Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EventShape
+    Pawl.Codec.EventShapeSpec
     Pawl.Codec.Expiry
     Pawl.Codec.ExtraPhase
     Pawl.Codec.ExtraPhaseSpec
     Pawl.Codec.Filter
+    Pawl.Codec.FilterSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.Json
     Pawl.Codec.Keyword
@@ -133,6 +138,7 @@ library codec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaSymbol
     Pawl.Codec.ManaType
+    Pawl.Codec.ManaTypeSpec
     Pawl.Codec.Modal
     Pawl.Codec.Mode
     Pawl.Codec.ModeIndex
@@ -152,6 +158,7 @@ library codec
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
     Pawl.Codec.PhaseSelector
+    Pawl.Codec.PhaseSpec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerEffect

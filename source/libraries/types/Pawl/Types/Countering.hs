@@ -3,7 +3,7 @@ module Pawl.Types.Countering where
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 
--- CR 701.6a: one act of COUNTERING a spell -- "to counter a spell or ability
+-- | CR 701.6a: one act of COUNTERING a spell -- "to counter a spell or ability
 -- means to cancel it, removing it from the stack. It doesn't resolve and none of
 -- its effects occur." Recorded by Pawl.Engine.Event.counter, the one funnel every
 -- countering in the engine goes through.
@@ -19,14 +19,14 @@ import Pawl.Types.PlayerId (PlayerId)
 -- only spells", and Pawl.Types.Pool has no constructor admitting one as a target
 -- either -- so a countered ability records nothing today (#486).
 data Countering = MkCountering
-  { -- CR 701.6a: the spell that was countered, as it was on the stack. The id is
+  { -- | CR 701.6a: the spell that was countered, as it was on the stack. The id is
     -- already dead by the time any reader sees this: countering removes it from
     -- the stack through Pawl.Engine.Event.changeZone, and CR 400.7 mints a fresh
     -- incarnation in the graveyard. Carried anyway, because it is WHAT HAPPENED
     -- -- the event otherwise says only that somebody countered something, and
     -- two counters in one batch would be indistinguishable entries.
     spell :: ObjectId,
-    -- The spell or ability that did the countering, which is what Baral, Chief
+    -- | The spell or ability that did the countering, which is what Baral, Chief
     -- of Compliance's "a spell or ability YOU CONTROL counters a spell" names.
     -- Whichever object Pawl.Engine.Resolve calls the effect's source: the
     -- resolving spell itself for a spell, and CR 113.7's SOURCE PERMANENT -- not
@@ -37,7 +37,7 @@ data Countering = MkCountering
     -- THIS creature counters a spell") is the one thing `controller` below could
     -- not answer.
     source :: ObjectId,
-    -- CR 405.4: who controlled `source` AT THE MOMENT IT COUNTERED -- "the
+    -- | CR 405.4: who controlled `source` AT THE MOMENT IT COUNTERED -- "the
     -- controller of a spell is the player who cast it", and for an ability the
     -- player who activated it or who controlled its source when it triggered.
     -- The player a "a spell or ability YOU CONTROL" condition compares against

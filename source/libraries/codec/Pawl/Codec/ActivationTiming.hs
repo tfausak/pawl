@@ -4,7 +4,7 @@ module Pawl.Codec.ActivationTiming where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
+import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.TurnScope as TurnScope
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
@@ -23,7 +23,7 @@ activationTimingToJson :: ActivationTiming.ActivationTiming -> Value
 activationTimingToJson t = case t of
   ActivationTiming.AnyTime -> Json.nullary (Text.pack "AnyTime")
   ActivationTiming.SorcerySpeed -> Json.nullary (Text.pack "SorcerySpeed")
-  ActivationTiming.DuringPhase p sc -> Json.tagged (Text.pack "DuringPhase") (Just (Array (MkArray [phaseToJson p, TurnScope.toJson sc])))
+  ActivationTiming.DuringPhase p sc -> Json.tagged (Text.pack "DuringPhase") (Just (Array (MkArray [Phase.toJson p, TurnScope.toJson sc])))
 
 jsonToActivationTiming :: Value -> Either Text ActivationTiming.ActivationTiming
 jsonToActivationTiming value = do
@@ -31,5 +31,5 @@ jsonToActivationTiming value = do
   case (Text.unpack t, mv) of
     ("AnyTime", _) -> Right ActivationTiming.AnyTime
     ("SorcerySpeed", _) -> Right ActivationTiming.SorcerySpeed
-    ("DuringPhase", Just (Array (MkArray [p, sc]))) -> ActivationTiming.DuringPhase <$> jsonToPhase p <*> TurnScope.fromJson sc
+    ("DuringPhase", Just (Array (MkArray [p, sc]))) -> ActivationTiming.DuringPhase <$> Phase.fromJson p <*> TurnScope.fromJson sc
     _ -> Left (Text.pack "unknown ActivationTiming: " <> t)

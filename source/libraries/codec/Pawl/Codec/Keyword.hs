@@ -4,7 +4,7 @@ module Pawl.Codec.Keyword where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Cost (costToJson, jsonToCost)
-import Pawl.Codec.Filter (filterToJson, optionalFilter)
+import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Subtype as Subtype
 import Pawl.Json.Array (Array (MkArray))
@@ -28,7 +28,7 @@ keywordToJson k = case k of
   Keyword.Shroud -> Json.nullary (Text.pack "Shroud")
   Keyword.Trample -> Json.nullary (Text.pack "Trample")
   Keyword.Vigilance -> Json.nullary (Text.pack "Vigilance")
-  Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array (MkArray [costToJson cost, maybe Json.jNull filterToJson searchFor])))
+  Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array (MkArray [costToJson cost, maybe Json.jNull Filter.toJson searchFor])))
   Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (costToJson cost))
   Keyword.Fear -> Json.nullary (Text.pack "Fear")
   Keyword.Entwine cost -> Json.tagged (Text.pack "Entwine") (Just (costToJson cost))
@@ -53,7 +53,7 @@ jsonToKeyword value = do
     ("Shroud", _) -> Right Keyword.Shroud
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
-    ("Cycling", Just (Array (MkArray [c, f]))) -> Keyword.Cycling <$> jsonToCost c <*> optionalFilter f
+    ("Cycling", Just (Array (MkArray [c, f]))) -> Keyword.Cycling <$> jsonToCost c <*> Filter.optional f
     ("Flashback", Just v) -> Keyword.Flashback <$> jsonToCost v
     ("Fear", _) -> Right Keyword.Fear
     ("Entwine", Just v) -> Keyword.Entwine <$> jsonToCost v

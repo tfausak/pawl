@@ -1,21 +1,19 @@
--- | The @EventShape ⇆ Json@ codec (#481).
 module Pawl.Codec.EventShape where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Zone as Zone
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.EventShape as EventShape
 
-eventShapeToJson :: EventShape.EventShape -> Value
-eventShapeToJson s = case s of
-  EventShape.MovedBetween from to -> Json.tagged (Text.pack "MovedBetween") (Just (Array (MkArray [Zone.toJson from, Zone.toJson to])))
+toJson :: EventShape.EventShape -> Value.Value
+toJson s = case s of
+  EventShape.MovedBetween from to -> Common.tagged "MovedBetween" . Just . Common.array $ [Zone.toJson from, Zone.toJson to]
 
-jsonToEventShape :: Value -> Either Text EventShape.EventShape
-jsonToEventShape value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("MovedBetween", Just (Array (MkArray [f, u]))) -> EventShape.MovedBetween <$> Zone.fromJson f <*> Zone.fromJson u
-    _ -> Left (Text.pack "unknown EventShape: " <> t)
+fromJson :: Value.Value -> Either Text.Text EventShape.EventShape
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
+    ("MovedBetween", Just (Value.Array (Array.MkArray [f, u]))) -> EventShape.MovedBetween <$> Zone.fromJson f <*> Zone.fromJson u
+    _ -> Left . Text.pack $ "unknown EventShape: " <> t

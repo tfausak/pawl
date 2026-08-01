@@ -4,9 +4,9 @@ module Pawl.Codec.TriggerCondition where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Condition (conditionToJson, jsonToCondition)
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
+import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
+import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Codec.TurnScope as TurnScope
@@ -17,8 +17,8 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
 triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> Json.nullary (Text.pack "SelfEnters")
-  TriggerCondition.PermanentEnters f -> Json.tagged (Text.pack "PermanentEnters") (Just (filterToJson f))
-  TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array (MkArray [phaseToJson p, TurnScope.toJson s])))
+  TriggerCondition.PermanentEnters f -> Json.tagged (Text.pack "PermanentEnters") (Just (Filter.toJson f))
+  TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array (MkArray [Phase.toJson p, TurnScope.toJson s])))
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Json.nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> Json.nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
@@ -35,8 +35,8 @@ jsonToTriggerCondition value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
-    ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> jsonToFilter v
-    ("StepBegins", Just (Array (MkArray [p, s]))) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> TurnScope.fromJson s
+    ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> Filter.fromJson v
+    ("StepBegins", Just (Array (MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Phase.fromJson p <*> TurnScope.fromJson s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch

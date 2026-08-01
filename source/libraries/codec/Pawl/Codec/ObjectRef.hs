@@ -2,7 +2,7 @@
 module Pawl.Codec.ObjectRef where
 
 import Data.Text (Text)
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
+import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Json.Value (Value (Object))
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -15,9 +15,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 objectRefToJson :: ObjectRef.ObjectRef -> Value
 objectRefToJson r = case r of
   ObjectRef.InSlot n -> SlotName.toJson n
-  ObjectRef.EachMatching f -> filterToJson f
+  ObjectRef.EachMatching f -> Filter.toJson f
 
 jsonToObjectRef :: Value -> Either Text ObjectRef.ObjectRef
 jsonToObjectRef value = case value of
-  Object _ -> ObjectRef.EachMatching <$> jsonToFilter value
+  Object _ -> ObjectRef.EachMatching <$> Filter.fromJson value
   _ -> ObjectRef.InSlot <$> SlotName.fromJson value

@@ -4,7 +4,7 @@ module Pawl.Codec.TargetSpec where
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
+import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.Codec.SlotName as SlotName
@@ -21,7 +21,7 @@ targetSpecToJson (TargetSpec.MkTargetSpec pool restriction) =
   let base = [(Text.pack "pool", Pool.toJson pool)]
       withFilter = case restriction of
         Nothing -> base
-        Just f -> base <> [(Text.pack "filter", filterToJson f)]
+        Just f -> base <> [(Text.pack "filter", Filter.toJson f)]
    in Json.jObject withFilter
 
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
@@ -30,7 +30,7 @@ jsonToTargetSpec value = do
   pool <- Json.field (Text.pack "pool") ps >>= Pool.fromJson
   restriction <- case Json.optField (Text.pack "filter") ps of
     Nothing -> Right Nothing
-    Just v -> Just <$> jsonToFilter v
+    Just v -> Just <$> Filter.fromJson v
   pure (TargetSpec.MkTargetSpec pool restriction)
 
 targetSpecsToJson :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value

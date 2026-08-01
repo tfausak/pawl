@@ -6,7 +6,7 @@ import Pawl.Types.PlayerRelation (PlayerRelation)
 import Pawl.Types.Subtype (Subtype)
 import Pawl.Types.Supertype (Supertype)
 
--- A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
+-- | A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
 -- predicate over one candidate -- an object, or (CR 115.1) a player, since a
 -- target may be either -- expressed as data and evaluated by one generic
 -- matcher (Pawl.Engine.Filter.matches) that never learns which effect produced it. Its
@@ -37,7 +37,7 @@ data Filter
   | HasSubtype Subtype -- CR 205.3: the object's subtypes include this one.
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
   | ControlledBy PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
-  | -- The candidate IS the evaluation's source object. Context-relative in the
+  | -- | The candidate IS the evaluation's source object. Context-relative in the
     -- same way ControlledBy is: the Filter value carries no object id, and the
     -- answer comes from the Context the caller supplies. `Not IsSource` is how
     -- CR 601.2c's "another" (a target slot) and a continuous effect's own
@@ -45,7 +45,7 @@ data Filter
     -- number) are both written -- one relation, one spelling, rather than a
     -- parallel Exclusion field on each (#163).
     IsSource
-  | -- CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
+  | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative in exactly the way ControlledBy is: it
     -- carries no player id, and the answer comes from the Context the caller
     -- supplies.
@@ -57,7 +57,7 @@ data Filter
     -- representing a permanent or spell -- so the two are never both answerable
     -- for one candidate.
     IsPlayer PlayerRelation
-  | -- CR 508.1k: the candidate is an ATTACKING creature -- a creature declared
+  | -- | CR 508.1k: the candidate is an ATTACKING creature -- a creature declared
     -- as an attacker this combat phase and not since removed from combat
     -- (CR 506.4). "Target attacking creature" (Kill Shot) is the card text this
     -- exists for.
@@ -71,7 +71,7 @@ data Filter
     -- type. What the invariant forbids is casing on an EFFECT's identity, which
     -- this arm still does not do.
     IsAttacking
-  | -- CR 509.1g: the candidate is a BLOCKING creature -- one declared as a
+  | -- | CR 509.1g: the candidate is a BLOCKING creature -- one declared as a
     -- blocker this combat phase ("it remains a blocking creature until it's
     -- removed from combat or the combat phase ends, whichever comes first") and
     -- not since removed under CR 506.4. Labyrinth of Skophos' "target attacking
@@ -96,7 +96,7 @@ data Filter
     -- all the creatures blocking it are removed from combat" -- so an attacker
     -- can be blocked at a moment when nothing answers True here.
     IsBlocking
-  | -- CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
+  | -- | CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
     -- read of the turn-scoped GameEvent log, which is what CR 608.2i sanctions:
     -- "Some effects look back in time and require information about previous
@@ -122,7 +122,7 @@ data Filter
     -- EFFECT's identity is still what the invariant forbids and still not what
     -- this does.
     AttackedThisTurn
-  | -- CR 303.4b / 701.3a: the candidate is ATTACHED to a creature -- "the object
+  | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to a creature -- "the object
     -- or player an Aura is attached to is called enchanted" -- which is what
     -- Crown of the Ages' "target Aura attached to a creature" narrows by.
     --
@@ -138,7 +138,7 @@ data Filter
     -- that would compose with the rest of this type: the narrowest atom the one
     -- card in the pool needs. The generalization is #356.
     IsAttachedToCreature
-  | -- CR 303.4 / 701.3a: the candidate is attached to a PERMANENT -- Aura Graft's
+  | -- | CR 303.4 / 701.3a: the candidate is attached to a PERMANENT -- Aura Graft's
     -- "target Aura that's attached to a permanent". Strictly wider than
     -- IsAttachedToCreature above and strictly narrower than "attached to
     -- anything": CR 303.4 attaches an Aura to "an object or player", and only one
@@ -155,7 +155,7 @@ data Filter
     -- ATTACHMENT, not about the host's characteristics, so it reads no second
     -- projection at all.
     IsAttachedToPermanent
-  | -- CR 701.3a's last sentence: "An Aura, Equipment, or Fortification can't be
+  | -- | CR 701.3a's last sentence: "An Aura, Equipment, or Fortification can't be
     -- attached to an object or player it couldn't enchant, equip, or fortify,
     -- respectively." The candidate is one the SUBJECT of the surrounding attach --
     -- the permanent being moved -- could legally be attached to. Aura Graft's
@@ -183,7 +183,7 @@ data Filter
     -- CR 303.4's "other effects can limit what a permanent can be enchanted by"
     -- (#472).
     CanHostSubject
-  | -- CR 111.6: "A token isn't a card." Ashaya, Soul of the Wild's "nontoken
+  | -- | CR 111.6: "A token isn't a card." Ashaya, Soul of the Wild's "nontoken
     -- creatures you control" is the card text this exists for, and it is spelled
     -- `Not IsToken` -- one relation, one spelling, the way CR 601.2c's "another"
     -- is spelled `Not IsSource` (#163) rather than given a second arm.
