@@ -90,12 +90,12 @@ singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpe
 singleModeAbility effects specs =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationTimingSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         g1 = g0 {GameState.priority = Just S.alice}
         after = snd (Engine.runGamePure S.identityAnswer g1 (Activate.activateAbility S.alice srcId (theAbility prodigalSorcerer)))
@@ -103,7 +103,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertEqWith s "source tapped" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Tapped)
 
   Spec.it s "CR 602.5/302.6 a summoning-sick creature's {T} ability is not offered" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) srcId (GameState.objects g0), GameState.priority = Just S.alice}
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice sick))) "no Activate offered"
@@ -112,8 +112,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   -- Sorcerer has settled under bob, and alice's Control Magic does not
   -- inherit that settle along with the creature (#198).
   Spec.it s "CR 302.6 a stolen creature's {T} ability is not offered to the thief" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-    controlMagic <- Registry.printing registry "Control Magic"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.bob (Setup.emptyGame S.bothPlayers)
         settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
         (aura, withAura) = S.addCreature controlMagic S.alice settled
@@ -126,9 +126,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   -- and says it narrowly: "the player must have priority, it must be during
   -- the main phase of their turn, and the stack must be empty."
   Spec.it s "CR 307.5 equip is offered in your own main phase with an empty stack" $ do
-    mountain <- Registry.printing registry "Mountain"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
     -- Lands, so the {1} equip cost is payable and the ONLY thing under test
     -- is the timing rider.
     let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
@@ -137,9 +137,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertBool s (any isActivate (Action.legalActions S.alice gs)) "equip offered"
 
   Spec.it s "CR 307.5 equip is NOT offered outside a main phase" $ do
-    mountain <- Registry.printing registry "Mountain"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
     -- Lands, so the {1} equip cost is payable and the ONLY thing under test
     -- is the timing rider.
     let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
@@ -148,9 +148,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no equip during combat"
 
   Spec.it s "CR 307.5 equip is NOT offered on an opponent's turn" $ do
-    mountain <- Registry.printing registry "Mountain"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
     -- Lands, so the {1} equip cost is payable and the ONLY thing under test
     -- is the timing rider.
     let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
@@ -159,9 +159,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "not on bob's turn"
 
   Spec.it s "CR 307.5 equip is NOT offered while the stack is not empty" $ do
-    mountain <- Registry.printing registry "Mountain"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
     -- Lands, so the {1} equip cost is payable and the ONLY thing under test
     -- is the timing rider.
     let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
@@ -174,20 +174,20 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   -- The control: an UNRESTRICTED ability is unaffected by all three, so the
   -- gate cannot pass by refusing everything outside a main phase.
   Spec.it s "CR 602.2 an ability with no timing rider is still offered during combat" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (_, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.alice)
         gs = settled {GameState.priority = Just S.alice, GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
     Spec.assertBool s (any isActivate (Action.legalActions S.alice gs)) "Prodigal Sorcerer still offered"
 
   Spec.it s "CR 602 a settled Prodigal Sorcerer's ability IS offered" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (_, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         g1 = g0 {GameState.priority = Just S.alice}
     Spec.assertBool s (any isActivate (Action.legalActions S.alice g1)) "Activate offered"
 
   Spec.it s "CR 602 activating then resolving deals 1 damage and the ability ceases" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         g1 = g0 {GameState.priority = Just S.alice}
         -- identityAnswer's ChooseTargets picks the lowest recipient; with no
@@ -197,15 +197,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertEqWith s "stack empty after resolution" (GameState.stack resolved) []
 
   Spec.it s "CR 605.3b a mana ability is not offered as a stack activation" $ do
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (_, g0) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
         g1 = g0 {GameState.priority = Just S.alice}
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice g1))) "no Activate for the mana ability"
 
   Spec.it s "CR 701.21/701.23 Evolving Wilds sacrifices itself and fetches a basic land tapped" $ do
     -- The fetched land gets a NEW id (CR 400.7); assert by count/tapped-count.
-    evolvingWilds <- Registry.printing registry "Evolving Wilds"
-    forest <- Registry.printing registry "Forest"
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    forest <- S.printingOf s registry "Forest"
     let base = Setup.emptyGame S.bothPlayers
         (wildsId, g1) = S.addCreature evolvingWilds S.alice base
         (_, g2) = S.addLibraryCard forest S.alice g1
@@ -219,7 +219,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertEqWith s "the fetched land is tapped" (S.tappedCount S.alice resolved) 1
 
   Spec.it s "CR 302.6 a freshly-added land can tap+sac immediately (no summoning sickness)" $ do
-    evolvingWilds <- Registry.printing registry "Evolving Wilds"
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
     let base = Setup.emptyGame S.bothPlayers
         (wildsId, g1) = S.addCreature evolvingWilds S.alice base
         -- Force it Sick: a land ignores sickness, so the ability is still offered.
@@ -227,15 +227,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertBool s (any isActivate (Action.legalActions S.alice g2)) "land ability offered despite sickness"
 
   Spec.it s "CR 613/602 a Humility'd Prodigal Sorcerer's ability is not offered" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-    humility <- Registry.printing registry "Humility"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    humility <- S.printingOf s registry "Humility"
     let (_, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         gs = (S.withHumility humility g0) {GameState.priority = Just S.alice}
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no Activate under Humility"
 
   Spec.it s "CR 602.1b: an activation with a mana cost needs the mana" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs = S.landsInPlay mountain 1
         (srcId, gs1) = S.addCreature piker S.alice gs
         costlyAbility =
@@ -251,8 +251,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertBool s (not (Activate.activatable S.alice srcId costlyAbility gs1)) "one Mountain cannot pay {2}"
 
   Spec.it s "CR 701.19a Drudge Skeletons regenerates: activate, survive Murder, die to the next" $ do
-    swamp <- Registry.printing registry "Swamp"
-    drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+    swamp <- S.printingOf s registry "Swamp"
+    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
     let base = S.landsInPlay swamp 1
         (skel, gs0) = S.addCreature drudgeSkeletons S.alice base
         ability = theAbility drudgeSkeletons -- the local ActivateSpec helper
@@ -286,9 +286,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   -- Pawl.ExpirySpec's masterThiefSpec, but on the ACTIVATED path -- which
   -- is what retired the synthetic ability these two tests used to carry.
   Spec.it s "CR 113.8 an activated ability resolves under whoever activated it, not a later controller" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    mountain <- Registry.printing registry "Mountain"
-    aladdin <- Registry.printing registry "Aladdin"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    mountain <- S.printingOf s registry "Mountain"
+    aladdin <- S.printingOf s registry "Aladdin"
     let base = S.landsInPlay mountain 3
         -- The Myr is ALICE's own artifact (not bob's): if control ever
         -- moved to bob it would be a genuine change, not a fixture
@@ -327,9 +327,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   -- pair is what covers CR 113.8, not either case alone -- do not "fix" this
   -- one into a second copy of the first.
   Spec.it s "CR 113.8 a stolen creature's ability, activated by the new controller, resolves under them" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
-    mountain <- Registry.printing registry "Mountain"
-    aladdin <- Registry.printing registry "Aladdin"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    mountain <- S.printingOf s registry "Mountain"
+    aladdin <- S.printingOf s registry "Aladdin"
     -- bob pays for it, so the Mountains are HIS. S.giveControl also settles
     -- the stolen Aladdin under bob, which CR 302.6 requires before he can
     -- pay its {T} (#198 -- a thief does not inherit the previous
@@ -377,10 +377,10 @@ aimAt who p = case p of
 -- the stack, "otherwise, it will check that information when it resolves. In both
 -- instances, if the source is no longer in the zone it's expected to be in, its
 -- last known information is used."
-lastKnownSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+lastKnownSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
   Spec.it s "CR 113.7a whole card: a sacrificed Ghitu Fire-Eater still deals damage equal to its power" $ do
-    ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+    ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
     let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
         g1 = g0 {GameState.priority = Just S.alice}
         activated = snd (Engine.runGamePure (aimAt S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility ghituFireEater)))
@@ -393,7 +393,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
     -- The discriminator between reading last known information and reading
     -- the printed card. Both answer 2 for a vanilla Fire-Eater; only last
     -- known information answers 5 for one that was pumped before it left.
-    ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+    ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
     let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
         pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
         g1 = pumped {GameState.priority = Just S.alice}
@@ -406,7 +406,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
     -- The substrate, on its own. CR 400.7 mints a fresh id for the graveyard
     -- incarnation, so the id an ability on the stack still holds is the one
     -- this map has to be keyed by.
-    ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+    ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
     let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
         pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
     Spec.assertEqWith s "nothing filed before it moves" (Map.lookup srcId (GameState.lastKnown pumped)) Nothing
@@ -429,7 +429,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
     -- Discriminating against a viewWithLastKnown that always consults the
     -- map: a Fire-Eater that has not moved must read its current projection,
     -- and the map has nothing filed for it at all.
-    ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+    ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
     let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
         pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
     Spec.assertEqWith
@@ -453,29 +453,29 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
 -- Alice holds it, two Forests pay the {2}, and her library has a card to draw --
 -- otherwise CR 704.5b would end the game around the assertion rather than the
 -- draw being observable.
-cyclingBoard :: Registry.Registry -> IO (ObjectId.ObjectId, GameState.GameState)
-cyclingBoard registry = do
-  mauler <- Registry.printing registry "Barkhide Mauler"
-  forest <- Registry.printing registry "Forest"
-  piker <- Registry.printing registry "Goblin Piker"
+cyclingBoard :: Spec.Spec IO n -> Registry.Registry IO -> IO (ObjectId.ObjectId, GameState.GameState)
+cyclingBoard s registry = do
+  mauler <- S.printingOf s registry "Barkhide Mauler"
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
   let (_, g0) = S.addLibraryCard piker S.alice (S.landsInPlay forest 2)
       (g1, oid) = S.handOne mauler g0
   pure (oid, g1 {GameState.priority = Just S.alice})
 
-cyclingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+cyclingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- CR 702.29a: "Cycling is an activated ability that functions only while
   -- the card with cycling is in a player's hand."
   Spec.it s "CR 702.29a cycling is offered from the hand" $ do
-    (_, gs) <- cyclingBoard registry
+    (_, gs) <- cyclingBoard s registry
     Spec.assertBool s (any isActivate (Action.legalActions S.alice gs)) "an Activate is offered"
 
   -- The ability rule 702.29a MEANS, rather than any the card prints: Barkhide
   -- Mauler's own activatedAbilities list is empty, and what is offered is
   -- minted from the keyword -- printed cost plus the rule's discard.
   Spec.it s "CR 702.29a the minted ability is '{2}, Discard this card: Draw a card'" $ do
-    mauler <- Registry.printing registry "Barkhide Mauler"
-    (oid, gs) <- cyclingBoard registry
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    (oid, gs) <- cyclingBoard s registry
     Spec.assertEqWith s "the card itself prints no activated ability" (Card.Type.activatedAbilities (Printing.card mauler)) []
     case Activate.abilitiesFor oid gs of
       [ability] -> do
@@ -491,7 +491,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- BEFORE the draw resolves, which is rule 702.29a putting the discard in
   -- the cost rather than in the effect.
   Spec.it s "CR 702.29a whole card: cycling discards the Mauler and draws" $ do
-    (oid, gs) <- cyclingBoard registry
+    (oid, gs) <- cyclingBoard s registry
     case Activate.abilitiesFor oid gs of
       [ability] -> do
         let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
@@ -511,8 +511,8 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- this is not the ability being absent -- it is not being activatable
   -- there. A Mauler that resolved as a creature cannot be cycled.
   Spec.it s "CR 702.29a cycling is NOT offered from the battlefield" $ do
-    mauler <- Registry.printing registry "Barkhide Mauler"
-    forest <- Registry.printing registry "Forest"
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    forest <- S.printingOf s registry "Forest"
     let (_, g0) = S.addCreature mauler S.alice (S.landsInPlay forest 2)
         gs = g0 {GameState.priority = Just S.alice}
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no Activate offered"
@@ -522,13 +522,13 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- written against control would have offered it to nobody -- or, read
   -- loosely, to anybody.
   Spec.it s "CR 702.29a the other player cannot cycle a card in your hand" $ do
-    (_, gs) <- cyclingBoard registry
+    (_, gs) <- cyclingBoard s registry
     Spec.assertBool s (not (any isActivate (Action.legalActions S.bob gs {GameState.priority = Just S.bob}))) "not offered to bob"
 
   -- CR 118.3: the cost still has to be payable. One Forest is not {2}.
   Spec.it s "CR 118.3 cycling is not offered without the mana" $ do
-    mauler <- Registry.printing registry "Barkhide Mauler"
-    forest <- Registry.printing registry "Forest"
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    forest <- S.printingOf s registry "Forest"
     let (g0, _) = S.handOne mauler (S.landsInPlay forest 1)
         gs = g0 {GameState.priority = Just S.alice}
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "one Forest cannot pay {2}"
@@ -538,9 +538,9 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- it in HAND -- not onto the battlefield, which is the destination Evolving
   -- Wilds' search has and the one this rule does not.
   Spec.it s "CR 702.29e whole card: basic landcycling Ash Barrens fetches a Forest to hand" $ do
-    barrens <- Registry.printing registry "Ash Barrens"
-    forest <- Registry.printing registry "Forest"
-    island <- Registry.printing registry "Island"
+    barrens <- S.printingOf s registry "Ash Barrens"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
     let (_, g0) = S.addLibraryCard forest S.alice (S.landsInPlay island 1)
         (g1, oid) = S.handOne barrens g0
         gs = g1 {GameState.priority = Just S.alice}
@@ -558,9 +558,9 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- with no basic land in it finds nothing, and the cycler is still discarded
   -- (CR 701.23b -- a player "isn't required to find" a card, and here cannot).
   Spec.it s "CR 702.29e basic landcycling finds nothing in a library of nonbasics" $ do
-    barrens <- Registry.printing registry "Ash Barrens"
-    piker <- Registry.printing registry "Goblin Piker"
-    island <- Registry.printing registry "Island"
+    barrens <- S.printingOf s registry "Ash Barrens"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
     let (_, g0) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
         (g1, oid) = S.handOne barrens g0
         gs = g1 {GameState.priority = Just S.alice}
@@ -585,9 +585,9 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- The log, not a per-player view: pawl has no such view yet (#322), and
   -- this is the record one would read.
   Spec.it s "CR 701.20a basic landcycling reveals the Forest it fetches" $ do
-    barrens <- Registry.printing registry "Ash Barrens"
-    forest <- Registry.printing registry "Forest"
-    island <- Registry.printing registry "Island"
+    barrens <- S.printingOf s registry "Ash Barrens"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
     let (_, g0) = S.addLibraryCard forest S.alice (S.landsInPlay island 1)
         (g1, oid) = S.handOne barrens g0
         gs = g1 {GameState.priority = Just S.alice}
@@ -614,9 +614,9 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- announcement reveal is unaffected -- it already happened, and whether
   -- the search finds anything cannot reach back and unshow the cycler.
   Spec.it s "CR 701.20a a search that finds nothing reveals nothing" $ do
-    barrens <- Registry.printing registry "Ash Barrens"
-    piker <- Registry.printing registry "Goblin Piker"
-    island <- Registry.printing registry "Island"
+    barrens <- S.printingOf s registry "Ash Barrens"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
     let (_, g0) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
         (g1, oid) = S.handOne barrens g0
         gs = g1 {GameState.priority = Just S.alice}
@@ -632,9 +632,9 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- from one keyword arm -- the discard is in the cost either way, and the
   -- only difference is what resolves.
   Spec.it s "CR 702.29f a typecycling ability is a cycling ability" $ do
-    barrens <- Registry.printing registry "Ash Barrens"
-    mauler <- Registry.printing registry "Barkhide Mauler"
-    island <- Registry.printing registry "Island"
+    barrens <- S.printingOf s registry "Ash Barrens"
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    island <- S.printingOf s registry "Island"
     let (g0, barrensId) = S.handOne barrens (S.landsInPlay island 2)
         (g1, maulerId) = S.handOne mauler g0
         gs = g1 {GameState.priority = Just S.alice}
@@ -655,9 +655,9 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- this is the half that proves the reveal belongs to the CARD's sentence
   -- (CR 701.23e) rather than to the keyword that happened to arrive first.
   Spec.it s "CR 701.20a whole card: Braidwood Sextant fetches a Forest and reveals it" $ do
-    sextant <- Registry.printing registry "Braidwood Sextant"
-    forest <- Registry.printing registry "Forest"
-    island <- Registry.printing registry "Island"
+    sextant <- S.printingOf s registry "Braidwood Sextant"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
     let (sextantId, g0) = S.addCreature sextant S.alice (S.landsInPlay island 2)
         (_, g1) = S.addLibraryCard forest S.alice g0
         gs = g1 {GameState.priority = Just S.alice}
@@ -695,7 +695,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- then moving to the graveyard. Both halves are asserted: an engine that
   -- revealed at the wrong moment would still show the right card.
   Spec.it s "CR 602.2a cycling from hand reveals the Mauler as the ability is announced" $ do
-    (oid, gs) <- cyclingBoard registry
+    (oid, gs) <- cyclingBoard s registry
     case Activate.abilitiesFor oid gs of
       [ability] -> do
         let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
@@ -712,7 +712,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- where every player can already see the card. Prodigal Sorcerer's {T} is
   -- announced the same way and shows nobody anything.
   Spec.it s "CR 400.2 activating from the battlefield reveals nothing" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         gs = g0 {GameState.priority = Just S.alice}
         activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId (theAbility prodigalSorcerer))
@@ -729,8 +729,8 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- ability activatable from a hidden zone; the Mauler is a real card in a
   -- real hand, which is the part under test.
   Spec.it s "CR 602.2a a rejected activation reveals nothing" $ do
-    mauler <- Registry.printing registry "Barkhide Mauler"
-    forest <- Registry.printing registry "Forest"
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    forest <- S.printingOf s registry "Forest"
     let (g0, oid) = S.handOne mauler (S.landsInPlay forest 2)
         gs = g0 {GameState.priority = Just S.alice}
         -- Two fillable modes, choose one: more legal than the count, so
@@ -752,8 +752,8 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- The control: the gate cannot pass by offering every card in hand. A
   -- Piker has no cycling and nothing is minted for it.
   Spec.it s "CR 702.29a a card without cycling offers nothing from the hand" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    forest <- Registry.printing registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
     let (g0, oid) = S.handOne piker (S.landsInPlay forest 2)
         gs = g0 {GameState.priority = Just S.alice}
     Spec.assertEqWith s "no abilities minted" (Activate.abilitiesFor oid gs) []
@@ -812,7 +812,7 @@ pingAnswer p = case p of
     [] -> A.Pass
   _ -> S.aggressiveAnswer p
 
-printedActivationTimingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+printedActivationTimingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTiming" $ do
   -- The rider, isolated. bob is in the declare attackers step with an
   -- untapped Desert, a legal target (CR 508.1f has just tapped alice's
@@ -824,9 +824,9 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
   -- to any target", CR 602.2 and no rider) IS offered, so what stops the
   -- Desert is the rider and not the step being closed to bob altogether.
   Spec.it s "CR 307.5 the Desert's ping is NOT offered in the declare attackers step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    desert <- Registry.printing registry "Desert"
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    desert <- S.printingOf s registry "Desert"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (gs0, _, theirs) = S.combatBoardOf [piker] [prodigalSorcerer]
         (desertId, gs1) = S.addCreature desert S.bob gs0
         attacked = desertAttacked gs1
@@ -845,8 +845,8 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
   -- creature declared as an attacker is still attacking throughout this step
   -- and the ability still has something to target.
   Spec.it s "CR 307.5 the Desert's ping IS offered in the end of combat step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    desert <- Registry.printing registry "Desert"
+    piker <- S.printingOf s registry "Goblin Piker"
+    desert <- S.printingOf s registry "Desert"
     let (desertId, _, board) = desertBoard piker desert
         atEndOfCombat = (desertAttacked board) {GameState.phase = Phase.Combat CombatStep.EndOfCombat}
     Spec.assertEqWith s "exactly one activation, the ping" (length (activationsOf desertId (Action.legalActions S.bob atEndOfCombat))) 1
@@ -855,8 +855,8 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
   -- combat record still holds the attack -- asserted, so this cannot pass
   -- because the target pool emptied -- and the ability is gone all the same.
   Spec.it s "CR 307.5 the Desert's ping is NOT offered in the postcombat main phase" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    desert <- Registry.printing registry "Desert"
+    piker <- S.printingOf s registry "Goblin Piker"
+    desert <- S.printingOf s registry "Desert"
     let (desertId, _, board) = desertBoard piker desert
         attacked = desertAttacked board
         later = attacked {GameState.phase = Phase.PostcombatMain}
@@ -881,8 +881,8 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
   -- to its toughness, that creature has been dealt lethal damage and is
   -- destroyed." One damage on a 2/1.
   Spec.it s "CR 307.5 whole card: Desert pings the attacker dead in the end of combat step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    desert <- Registry.printing registry "Desert"
+    piker <- S.printingOf s registry "Goblin Piker"
+    desert <- S.printingOf s registry "Desert"
     let (desertId, attackerId, board) = desertBoard piker desert
         after = S.runCombat pingAnswer board
     Spec.assertEqWith s "the Piker connected first" (S.lifeOf S.bob after) (Just 18)
@@ -893,8 +893,8 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
   -- with an interpreter that never activates. The Piker survives, so what
   -- killed it above was the ability and not combat.
   Spec.it s "CR 307.5 whole card: the attacker survives a combat bob does not ping in" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    desert <- Registry.printing registry "Desert"
+    piker <- S.printingOf s registry "Goblin Piker"
+    desert <- S.printingOf s registry "Desert"
     let (_, attackerId, board) = desertBoard piker desert
         after = S.runCombat S.aggressiveAnswer board
     Spec.assertEqWith s "the Piker still connected" (S.lifeOf S.bob after) (Just 18)

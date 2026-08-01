@@ -134,13 +134,13 @@ universalInvariants matchup gs =
         QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players gs)))
     ]
 
-propertyTests :: Registry.Registry -> Tasty.TestTree
+propertyTests :: Registry.Registry IO -> Tasty.TestTree
 propertyTests registry =
   Tasty.localOption iterations
     . Tasty.testGroup "Properties"
     $ [ QC.testProperty "every matchup upholds every universal invariant" $
           \s -> QC.ioProperty $ do
-            ms <- S.matchups registry
+            ms <- S.matchups (S.orThrow registry)
             pure (QC.conjoin (fmap (\m -> universalInvariants m (S.runRandomGame m s)) ms)),
         -- Durable structural property: with a deck that can only ever deck out (60
         -- basic lands, no spells, no attackers), every seed's game ends AND ends by
@@ -148,7 +148,7 @@ propertyTests registry =
         -- loss condition. Stays true no matter what cards later exist.
         QC.testProperty "a lands-only mirror always ends by deck-out" $
           \s -> QC.ioProperty $ do
-            decks <- S.landsOnly registry
+            decks <- S.landsOnly (S.orThrow registry)
             let final = S.runRandomGame decks s
             pure $
               QC.property
@@ -169,7 +169,7 @@ propertyTests registry =
         -- implementation on the first deck-out.
         QC.testProperty "a three-seat lands-only mirror needs TWO deck-outs to find a winner" $
           \s -> QC.ioProperty $ do
-            decks <- S.threePlayerLandsOnly registry
+            decks <- S.threePlayerLandsOnly (S.orThrow registry)
             let final = S.runRandomGame decks s
                 decked = GameState.drewFromEmpty final
             pure $
@@ -187,5 +187,5 @@ propertyTests registry =
                 ]
       ]
 
-tests :: Registry.Registry -> Tasty.TestTree
+tests :: Registry.Registry IO -> Tasty.TestTree
 tests registry = Tasty.testGroup "Properties" [propertyTests registry]

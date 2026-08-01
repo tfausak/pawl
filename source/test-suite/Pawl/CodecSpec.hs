@@ -197,7 +197,7 @@ optionalityKey value = case J.asObject value of
   Right ps -> J.optField (Text.pack "optionality") ps
   Left _ -> Nothing
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Codec" $ do
   Spec.describe s "leaf enums" $ do
     Spec.it s "Color" $
@@ -511,7 +511,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "gain you" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
       roundTrip s "gain slot" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.GainLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
     Spec.it s "CreateEmblem" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       roundTrip s "emblem" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.CreateEmblem (Printing.card piker))
     Spec.it s "BecomeMonarch" $
       roundTrip s "e" (effectToJson cardToJson) (jsonToEffect jsonToCard) (Effect.BecomeMonarch MonarchTarget.TheController)
@@ -600,7 +600,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         jsonToPlayerStaticAbility
         (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1))
     Spec.it s "a Card carrying player abilities round-trips" $ do
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
           c = base {CardT.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.NoMaximumHandSize]}
       roundTrip s "card" cardToJson jsonToCard c
@@ -608,14 +608,14 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- or every committed card file changes. The same posture
     -- colorIndicator and delayedAbilities already take.
     Spec.it s "an empty playerAbilities list is omitted from the JSON" $ do
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
       Spec.assertEqWith s "the fixture really has none" (CardT.playerAbilities base) []
       case J.asObject (cardToJson base) of
         Left err -> Spec.assertFailure s (Text.unpack err)
         Right pairs -> Spec.assertBool s (notElem (Text.pack "playerAbilities") (fmap fst pairs)) "key absent"
     Spec.it s "a Card carrying a CR 103.5b mulligan action round-trips" $ do
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
           c = base {CardT.mulliganAction = [Effect.ExileHandThenDraw]}
       roundTrip s "card" cardToJson jsonToCard c
@@ -623,19 +623,19 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- or every committed card file changes. The same posture
     -- playerAbilities and additionalCosts already take.
     Spec.it s "an empty mulliganAction list is omitted from the JSON" $ do
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
       Spec.assertEqWith s "the fixture really has none" (CardT.mulliganAction base) []
       case J.asObject (cardToJson base) of
         Left err -> Spec.assertFailure s (Text.unpack err)
         Right pairs -> Spec.assertBool s (notElem (Text.pack "mulliganAction") (fmap fst pairs)) "key absent"
     Spec.it s "a Card carrying a CR 103.6 opening-hand action round-trips" $ do
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
           c = base {CardT.openingHandAction = [Effect.MoveToZone Binding.triggerSource Zone.Battlefield]}
       roundTrip s "card" cardToJson jsonToCard c
     Spec.it s "an empty openingHandAction list is omitted from the JSON" $ do
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = Printing.card bloodMoon
       Spec.assertEqWith s "the fixture really has none" (CardT.openingHandAction base) []
       case J.asObject (cardToJson base) of
@@ -768,7 +768,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
               (jsonToCost value)
               (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
       Spec.it s "a Card carrying an additional cost round-trips" $ do
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
         let base = Printing.card lightningBolt
             c = base {CardT.additionalCosts = [CostComponent.Sacrifice 1 (Filter.Type.HasCardType CardType.Creature)]}
         roundTrip s "card" cardToJson jsonToCard c
@@ -776,14 +776,14 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       -- or every committed card file changes. The posture colorIndicator,
       -- delayedAbilities and playerAbilities already take.
       Spec.it s "an empty additionalCosts list is omitted from the JSON" $ do
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
         let base = Printing.card lightningBolt
         Spec.assertEqWith s "the fixture really has none" (CardT.additionalCosts base) []
         case J.asObject (cardToJson base) of
           Left err -> Spec.assertFailure s (Text.unpack err)
           Right pairs -> Spec.assertBool s (notElem (Text.pack "additionalCosts") (fmap fst pairs)) "key absent"
       Spec.it s "a Card carrying an alternative cost round-trips" $ do
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
         let base = Printing.card lightningBolt
             alt =
               Cost.Type.MkCost
@@ -793,7 +793,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
             c = base {CardT.alternativeCosts = [alt]}
         roundTrip s "card" cardToJson jsonToCard c
       Spec.it s "an empty alternativeCosts list is omitted from the JSON" $ do
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        lightningBolt <- S.printingOf s registry "Lightning Bolt"
         let base = Printing.card lightningBolt
         Spec.assertEqWith s "the fixture really has none" (CardT.alternativeCosts base) []
         case J.asObject (cardToJson base) of
@@ -946,7 +946,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (J.parse (J.render (printingToJson p)) >>= jsonToPrinting) (Right p))
         ps
     Spec.it s "M4e Cancel loads as a single Counter effect targeting a spell" $ do
-      cancel <- Registry.printing registry "Cancel"
+      cancel <- S.printingOf s registry "Cancel"
       let card = Printing.card cancel
       Spec.assertEqWith
         s
@@ -963,8 +963,8 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- CantBeCountered, and a card that says nothing decodes as Counterable
     -- rather than as whatever a missing key might otherwise become.
     Spec.it s "CR 113.6g counterability decodes from the card, and defaults when the key is absent" $ do
-      rendingVolley <- Registry.printing registry "Rending Volley"
-      cancel <- Registry.printing registry "Cancel"
+      rendingVolley <- S.printingOf s registry "Rending Volley"
+      cancel <- S.printingOf s registry "Cancel"
       Spec.assertEqWith
         s
         "Rending Volley says it"
@@ -991,7 +991,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- JSON key would fail this round-trip instead of surviving it on an
     -- all-Nothing/all-empty value.
     Spec.it s "GameEvent.Moved round-trips with its snapshot" $ do
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
       let (ratId, gs) = S.addCreature typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
           zc = ZoneChange.MkZoneChange ratId ratId Zone.Battlefield Zone.Graveyard
           snapshot = Projection.project ratId gs
@@ -1003,7 +1003,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- the Stalker's total toxic value on replay, which is why the count is
     -- asserted here before the round-trip rather than left to Eq alone.
     Spec.it s "a doubled keyword survives the Moved snapshot round-trip" $ do
-      stalker <- Registry.printing registry "Branchblight Stalker"
+      stalker <- S.printingOf s registry "Branchblight Stalker"
       let (oid, gs0) = S.addCreature stalker S.alice (Setup.emptyGame S.bothPlayers)
           grant ts = S.withEffectAt oid (Timestamp.MkTimestamp ts) (Modification.GainKeyword (Keyword.Toxic 1))
           snapshot = Projection.project oid (grant 101 (grant 100 gs0))
@@ -1051,7 +1051,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- players were shown rather than merely mislabel it. Typhoid Rats for
     -- the reason the Moved case gives -- every snapshot field populated.
     Spec.it s "GameEvent.Revealed round-trips with its snapshot" $ do
-      typhoidRats <- Registry.printing registry "Typhoid Rats"
+      typhoidRats <- S.printingOf s registry "Typhoid Rats"
       let (ratId, gs) = S.addLibraryCard typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
       roundTrip s "revealed" gameEventToJson jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs))
     Spec.it s "TriggerCondition.SelfCycled round-trips" $
@@ -1088,7 +1088,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- by JSON type alone, which is the part that could silently confuse
     -- them.
     Spec.it s "Effect.Create round-trips with and without a TokenEntry and a slot" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let card = Printing.card piker
           attacking = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Tapped, TokenEntry.attacking = True}
           plain = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Untapped, TokenEntry.attacking = False}

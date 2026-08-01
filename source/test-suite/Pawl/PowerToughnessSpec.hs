@@ -27,13 +27,13 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   Spec.it s "CR 604.3 the seed carries the CDA as QUANTITIES, with the printed star substituted" $ do
     -- CR 707.2a: a copy acquires the ABILITY, so what the seed (and therefore
     -- the copiable value) holds must be unevaluated. Tarmogoyf's printed box is
     -- \*/1+*, so the pair is <count> and 1+<count>.
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
     let gs0 = Setup.emptyGame S.bothPlayers
         (goyfId, gs) = S.addCreature tarmogoyf S.alice gs0
         -- CR 208.2a: Tarmogoyf's shape -- distinct card types over every
@@ -52,14 +52,14 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
       (Just (count, Quantity.Type.Plus (Quantity.Type.Literal 1) count))
   Spec.it s "CR 613.4a no P/T value exists before layer 7a applies one" $ do
     -- The seed evaluates the printed Star, which is deliberately Nothing.
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
     let gs0 = Setup.emptyGame S.bothPlayers
         (goyfId, gs) = S.addCreature tarmogoyf S.alice gs0
         seeded = Projection.baseCharacteristics goyfId gs
     Spec.assertEqWith s "no seeded power" (PC.power seeded) Nothing
     Spec.assertEqWith s "no seeded toughness" (PC.toughness seeded) Nothing
   Spec.it s "an ordinary card has no CDA" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, gs) = S.addCreature piker S.alice gs0
     Spec.assertEqWith s "none" (PC.characteristicPT (Projection.baseCharacteristics pikerId gs)) Nothing
@@ -72,9 +72,9 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- Fog, NOT Lightning Bolt: Bolt targets, S.identityAnswer would aim it at
     -- the only creature on the board, and 3 damage would kill the 0/1 Goyf
     -- being measured. Fog has no target and no effect outside combat.
-    forest <- Registry.printing registry "Forest"
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
-    fog <- Registry.printing registry "Fog"
+    forest <- S.printingOf s registry "Forest"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    fog <- S.printingOf s registry "Fog"
     let base = S.landsInPlay forest 1
         (goyfId, board) = S.addCreature tarmogoyf S.alice base
         (gs, fogId) = S.handOne fog board
@@ -91,14 +91,14 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- itself." CR 604.3 says a CDA functions in all zones, and CR 208.2a
     -- repeats it for P/T. This is the assertion that a gather-based
     -- implementation cannot make: gather only walks the battlefield.
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
     let gs0 = Setup.emptyGame S.bothPlayers
         (goyfId, gs) = S.addGraveyardCard tarmogoyf S.alice gs0
     Spec.assertEqWith s "the Goyf in the graveyard is a creature card, so power 1" (Projection.powerOf goyfId gs) (Just 1)
     Spec.assertEqWith s "1+1 toughness" (Projection.toughnessOf goyfId gs) (Just 2)
   Spec.it s "CR 613.4a/613.4c layer 7a runs before 7c, so a counter adds to the CDA" $ do
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withCard) = S.addGraveyardCard lightningBolt S.alice gs0
         (goyfId, board) = S.addCreature tarmogoyf S.alice withCard
@@ -120,9 +120,9 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- 0/0), which does not exist yet; Soul Sculptor needs the same
     -- layer-4 REPLACEMENT; Dress Down needs Flash, a beginning-of-end-step
     -- trigger (P4) and Sacrifice. See the P3b spec, section 8.
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
-    humility <- Registry.printing registry "Humility"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    humility <- S.printingOf s registry "Humility"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
         (goyfId, board) = S.addCreature tarmogoyf S.alice withBolt
@@ -132,8 +132,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   Spec.it s "CR 604.3 LoseAllAbilities clears the CDA from the projected characteristics" $ do
     -- The clearing itself, asserted directly on the projection rather than
     -- through P/T -- the only channel through which it IS observable today.
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
-    humility <- Registry.printing registry "Humility"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    humility <- S.printingOf s registry "Humility"
     let gs0 = Setup.emptyGame S.bothPlayers
         (goyfId, board) = S.addCreature tarmogoyf S.alice gs0
         gs = S.withHumility humility board
@@ -143,10 +143,10 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- answer is determined only once, when the effect is applied. Alice
     -- resolves the pump with two cards left in hand (+2/+2), then casts one of
     -- them -- her hand is now one card, and the pump must NOT follow it down.
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    innerCalm <- Registry.printing registry "Inner Calm, Outer Strength"
-    giantGrowth <- Registry.printing registry "Giant Growth"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    innerCalm <- S.printingOf s registry "Inner Calm, Outer Strength"
+    giantGrowth <- S.printingOf s registry "Giant Growth"
     let base = S.landsInPlay forest 4
         (pikerId, board) = S.addCreature piker S.alice base
         -- handOne FIRST (it replaces the hand and sets up the phase), then
@@ -184,8 +184,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- excluding a source from its own static ability. 3/3 is still nowhere
     -- near the 5/5 a ManaValue-against-Opalescence leak would produce (4/4
     -- base + Bad Moon's own +1/+1), so the falsifier still distinguishes.
-    opalescence <- Registry.printing registry "Opalescence"
-    badMoon <- Registry.printing registry "Bad Moon"
+    opalescence <- S.printingOf s registry "Opalescence"
+    badMoon <- S.printingOf s registry "Bad Moon"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withOpal) = S.addCreature opalescence S.alice gs0
         (moonId, gs) = S.addCreature badMoon S.alice withOpal
@@ -196,10 +196,10 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- stored quantity against the AFFECTED object, so a player-scoped count
     -- would read the wrong player. Alice holds two cards after casting; bob
     -- holds none, and it is bob's creature being pumped.
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    innerCalm <- Registry.printing registry "Inner Calm, Outer Strength"
-    giantGrowth <- Registry.printing registry "Giant Growth"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    innerCalm <- S.printingOf s registry "Inner Calm, Outer Strength"
+    giantGrowth <- S.printingOf s registry "Giant Growth"
     let base = S.landsInPlay forest 4
         (bobsPiker, board) = S.addCreature piker S.bob base
         (h1, icId) = S.handOne innerCalm board
@@ -217,11 +217,11 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- order. Two card types in graveyards -> a 2/3 -> switched, a 3/2.
     -- Switching before 7a would switch Nothing/Nothing and the CDA would then
     -- write 2/3 straight back over it.
-    island <- Registry.printing registry "Island"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
-    piker <- Registry.printing registry "Goblin Piker"
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
-    twistedImage <- Registry.printing registry "Twisted Image"
+    island <- S.printingOf s registry "Island"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    twistedImage <- S.printingOf s registry "Twisted Image"
     let base = S.landsInPlay island 1
         (_, g1) = S.addGraveyardCard lightningBolt S.alice base
         (_, g2) = S.addGraveyardCard piker S.alice g1
@@ -240,12 +240,12 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- Giant Growth: Giant Growth is an Instant, the same type Lightning Bolt
     -- already contributed, so it would add no NEW type and this fixture would
     -- silently test nothing beyond the previous case.
-    island <- Registry.printing registry "Island"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
-    piker <- Registry.printing registry "Goblin Piker"
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
-    twistedImage <- Registry.printing registry "Twisted Image"
-    divination <- Registry.printing registry "Divination"
+    island <- S.printingOf s registry "Island"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    twistedImage <- S.printingOf s registry "Twisted Image"
+    divination <- S.printingOf s registry "Divination"
     let base = S.landsInPlay island 1
         (_, g1) = S.addGraveyardCard lightningBolt S.alice base
         (_, g2) = S.addGraveyardCard piker S.alice g1
@@ -271,7 +271,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     --
     -- Goblin Piker is 2/1. Correct: 7c gives 4/1, 7d switches to 1/4.
     -- Timestamp-ordered: switch gives 1/2, then the pump gives 3/2.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, board) = S.addCreature piker S.alice gs0
         switched = S.withEffect pikerId Modification.SwitchPowerToughness board
@@ -279,7 +279,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertEqWith s "power is the pumped toughness" (Projection.powerOf pikerId gs) (Just 1)
     Spec.assertEqWith s "toughness is the pumped power" (Projection.toughnessOf pikerId gs) (Just 4)
   Spec.it s "CR 613.4d 2021-03-19 two switches return the object to normal" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, board) = S.addCreature piker S.alice gs0
         once = S.withEffect pikerId Modification.SwitchPowerToughness board
@@ -297,12 +297,12 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     --
     -- A 2/3 Tarmogoyf with 2 damage marked survives. Switched to 3/2, the same
     -- 2 damage is lethal.
-    island <- Registry.printing registry "Island"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
-    piker <- Registry.printing registry "Goblin Piker"
-    tarmogoyf <- Registry.printing registry "Tarmogoyf"
-    forest <- Registry.printing registry "Forest"
-    twistedImage <- Registry.printing registry "Twisted Image"
+    island <- S.printingOf s registry "Island"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    forest <- S.printingOf s registry "Forest"
+    twistedImage <- S.printingOf s registry "Twisted Image"
     let base = S.landsInPlay island 1
         (_, g1) = S.addGraveyardCard lightningBolt S.alice base
         (_, g2) = S.addGraveyardCard piker S.alice g1
@@ -319,8 +319,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertBool s (Set.member goyfId (GameState.battlefield board)) "the 2/3 with 2 damage was alive"
     Spec.assertBool s (not (Set.member goyfId (GameState.battlefield after))) "the switched 3/2 with 2 damage is dead"
   Spec.it s "CR 208.2a Nightmare counts the Swamps you control" $ do
-    swamp <- Registry.printing registry "Swamp"
-    nightmare <- Registry.printing registry "Nightmare"
+    swamp <- S.printingOf s registry "Swamp"
+    nightmare <- S.printingOf s registry "Nightmare"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, gs1) = S.addCreature swamp S.alice gs0
         (_, gs2) = S.addCreature swamp S.alice gs1
@@ -331,10 +331,10 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   Spec.it s "CR 613.1d Urborg makes every land a Swamp, and Nightmare counts them" $ do
     -- THE FALSIFIER for a printed-type count. Nothing touches the Nightmare;
     -- its power moves because a layer-4 type-changer entered.
-    mountain <- Registry.printing registry "Mountain"
-    forest <- Registry.printing registry "Forest"
-    nightmare <- Registry.printing registry "Nightmare"
-    urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    nightmare <- S.printingOf s registry "Nightmare"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, gs1) = S.addCreature mountain S.alice gs0
         (_, gs2) = S.addCreature forest S.alice gs1
@@ -350,8 +350,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- new zone (CR 400.7) -- rather than by deleting it out of
     -- GameState.objects directly, a state the engine itself never
     -- produces.
-    nightmare <- Registry.printing registry "Nightmare"
-    swamp <- Registry.printing registry "Swamp"
+    nightmare <- S.printingOf s registry "Nightmare"
+    swamp <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (nightId, g1) = S.addCreature nightmare S.alice gs0
         (_, g2) = S.addCreature swamp S.alice g1
@@ -377,10 +377,10 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- suppresses every permanent's static abilities, would return 0 here
     -- exactly as a correct implementation returns for Urborg alone -- only
     -- a count that genuinely sees the basic Swamp reaches 1.
-    nightmare <- Registry.printing registry "Nightmare"
-    swamp <- Registry.printing registry "Swamp"
-    urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
-    bloodMoon <- Registry.printing registry "Blood Moon"
+    nightmare <- S.printingOf s registry "Nightmare"
+    swamp <- S.printingOf s registry "Swamp"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
     let gs0 = Setup.emptyGame S.bothPlayers
         (nightId, g1) = S.addCreature nightmare S.alice gs0
         (_, g2) = S.addCreature swamp S.alice g1
@@ -424,10 +424,10 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- alongside the other two permanents. It is immune to Blood Moon (which
     -- excludes basic lands), so it stays a Swamp and keeps the count off a
     -- vacuous 0.
-    nightmare <- Registry.printing registry "Nightmare"
-    swamp <- Registry.printing registry "Swamp"
-    bloodMoon <- Registry.printing registry "Blood Moon"
-    urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+    nightmare <- S.printingOf s registry "Nightmare"
+    swamp <- S.printingOf s registry "Swamp"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let gs0 = Setup.emptyGame S.bothPlayers
         (nightId, g1) = S.addCreature nightmare S.alice gs0
         (_, g2) = S.addCreature swamp S.alice g1
@@ -449,9 +449,9 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     -- layer 7b setting a P/T either way, no ordering between "cleared" and
     -- "never ran" is directly observable from this fixture -- only the
     -- clearing itself is, and that is all this test claims.
-    swamp <- Registry.printing registry "Swamp"
-    nightmare <- Registry.printing registry "Nightmare"
-    humility <- Registry.printing registry "Humility"
+    swamp <- S.printingOf s registry "Swamp"
+    nightmare <- S.printingOf s registry "Nightmare"
+    humility <- S.printingOf s registry "Humility"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addCreature swamp S.alice gs0
         (_, g2) = S.addCreature swamp S.alice g1
@@ -461,8 +461,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertEqWith s "1 power" (Projection.powerOf nightId gs) (Just 1)
     Spec.assertEqWith s "1 toughness" (Projection.toughnessOf nightId gs) (Just 1)
   Spec.it s "CR 303.4m: an attached Unholy Strength gives the enchanted creature +2/+1" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = Setup.emptyGame S.bothPlayers
         -- Goblin Piker is a 2/1.
         (creature, withCreature) = S.addCreature piker S.bob base

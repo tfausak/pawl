@@ -75,13 +75,13 @@ theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
 
-doorSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+doorSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 doorSpec s registry =
   Spec.describe s "Door" $ do
     -- CR 118.3's own second example: "a permanent that's already tapped can't
     -- be tapped to pay a cost" (CR 107.5 says the same for the {T} symbol).
     Spec.it s "CR 107.5 TapThis is payable only while the permanent is untapped" $ do
-      prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       let (oid, gs) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
           tapped = S.tapObject oid gs
       Spec.assertBool s (Cost.canPayComponent S.alice oid CostComponent.TapThis gs) "untapped pays"
@@ -89,7 +89,7 @@ doorSpec s registry =
     -- CR 701.21a: "A player can't sacrifice something that isn't a permanent,
     -- or something that's a permanent they don't control."
     Spec.it s "CR 701.21a SacrificeThis needs a permanent this player controls" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
       Spec.assertBool s (Cost.canPayComponent S.alice onField CostComponent.SacrificeThis gs1) "a controlled permanent pays"
@@ -104,7 +104,7 @@ doorSpec s registry =
     -- an activation passes -- this one and Activate.abilitiesFor's -- would
     -- otherwise cover for each other, and either alone would look correct.
     Spec.it s "CR 702.29a DiscardThis needs the card in this player's hand" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
       Spec.assertBool s (Cost.canPayComponent S.alice inHand CostComponent.DiscardThis gs1) "a card in hand pays"
@@ -114,7 +114,7 @@ doorSpec s registry =
     -- card lands in its owner's graveyard as a new incarnation, so the old id
     -- is gone rather than moved.
     Spec.it s "CR 701.9a paying DiscardThis puts that card in the graveyard" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (inHand, gs0) = S.addHandCard piker S.alice (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs0 (Cost.payComponent S.alice inHand CostComponent.DiscardThis)
       Spec.assertEqWith s "the hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
@@ -122,7 +122,7 @@ doorSpec s registry =
     -- CR 118.6 vs CR 118.5a: the distinction the Maybe carries. Nothing is an
     -- unpayable cost; an empty ManaCost is {0} and is payable.
     Spec.it s "CR 118.6 an unpayable cost can never be paid" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 5
       Spec.assertBool
         s
@@ -138,9 +138,9 @@ doorSpec s registry =
     -- additional cost is imposed, the cost is still unpayable." total maps over
     -- the Maybe, so there is no special case to get wrong.
     Spec.it s "CR 118.6a Thalia's increase leaves an unpayable cost unpayable" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let base = S.landsInPlay mountain 5
           (_, gs) = S.addCreature thalia S.alice base
           (bolt, withBolt) = S.addHandCard lightningBolt S.alice gs
@@ -151,8 +151,8 @@ doorSpec s registry =
         Nothing
     -- The classification Pawl.Engine.Activate reads instead of matching a constructor.
     Spec.it s "CR 302.6 requiresSicknessCheck classifies a cost, and Greed's counterpart proves it" $ do
-      llanowarElves <- Registry.printing registry "Llanowar Elves"
-      drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+      llanowarElves <- S.printingOf s registry "Llanowar Elves"
+      drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
       let elves = ActivatedAbility.cost (theAbility llanowarElves)
           skeletons = ActivatedAbility.cost (theAbility drudgeSkeletons)
       Spec.assertBool s (Cost.requiresSicknessCheck elves) "Llanowar Elves' {T} cost requires the tap symbol"
@@ -164,9 +164,9 @@ doorSpec s registry =
     -- must still afford Mindslaver's printed {4}; a fifth would be needed if
     -- the tax wrongly reached the activation (#90).
     Spec.it s "CR 613.11 Thalia does not tax a noncreature permanent's activated ability" $ do
-      mountain <- Registry.printing registry "Mountain"
-      mindslaver <- Registry.printing registry "Mindslaver"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+      mountain <- S.printingOf s registry "Mountain"
+      mindslaver <- S.printingOf s registry "Mindslaver"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       let base = S.landsInPlay mountain 4
           (slaver, gs1) = S.addCreature mindslaver S.alice base
           (_, gs2) = S.addCreature thalia S.alice gs1
@@ -176,14 +176,14 @@ doorSpec s registry =
         "four Mountains still pay {4}"
     -- Departure 2: an Unpaid payment is a complete no-op, never a partial one.
     Spec.it s "CR 118.6 paying an unpayable cost changes nothing" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 3
           (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay S.alice S.noSource (Cost.Type.MkCost Nothing []))
       Spec.assertEqWith s "Unpaid" outcome Payment.Unpaid
       Spec.assertEqWith s "no land tapped" (S.tappedCount S.alice after) 0
     -- CR 701.21a: enough controlled permanents matching the criterion.
     Spec.it s "CR 118.3 a Sacrifice component counts matching permanents this player controls" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 2
           two = CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
           three = CostComponent.Sacrifice 3 (Filter.Type.HasSubtype Subtype.Mountain)
@@ -197,7 +197,7 @@ doorSpec s registry =
     -- the player-counter substrate (P10 #37 GainPlayerCounters is the ADD
     -- direction).
     Spec.it s "CR 118.6 PayEnergy is unpayable below the count and payable at or above" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           two = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
           one = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice gs0
@@ -205,7 +205,7 @@ doorSpec s registry =
       Spec.assertBool s (not (Cost.canPayComponent S.alice oid (CostComponent.PayEnergy 2) one)) "one energy cannot"
     -- CR 107.14: paying energy removes exactly that many counters.
     Spec.it s "CR 107.14 paying PayEnergy removes that many energy counters" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
           after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent S.alice oid (CostComponent.PayEnergy 2)))
@@ -235,16 +235,16 @@ greedBoard swamp greed piker life =
           }
       )
 
-greedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+greedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 greedSpec s registry =
   Spec.describe s "Greed" $ do
     let isActivate a = case a of
           Action.Type.Activate _ _ -> True
           _ -> False
     Spec.it s "CR 119.4 activating draws a card and subtracts the life" $ do
-      swamp <- Registry.printing registry "Swamp"
-      greed <- Registry.printing registry "Greed"
-      piker <- Registry.printing registry "Goblin Piker"
+      swamp <- S.printingOf s registry "Swamp"
+      greed <- S.printingOf s registry "Greed"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (greedId, gs) = greedBoard swamp greed piker 20
           activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice greedId (theAbility greed))
           resolved = S.runPure S.identityAnswer activated Stack.resolveTop
@@ -256,9 +256,9 @@ greedSpec s registry =
     -- can't pay a cost of 2 life." THE discriminating test: a payability
     -- check that ignores the amount passes the case above and fails here.
     Spec.it s "CR 118.3 at 1 life the ability is not offered" $ do
-      swamp <- Registry.printing registry "Swamp"
-      greed <- Registry.printing registry "Greed"
-      piker <- Registry.printing registry "Goblin Piker"
+      swamp <- S.printingOf s registry "Swamp"
+      greed <- S.printingOf s registry "Greed"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (greedId, gs) = greedBoard swamp greed piker 1
       Spec.assertBool
         s
@@ -266,9 +266,9 @@ greedSpec s registry =
         "not activatable"
       Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no Activate action offered"
     Spec.it s "CR 119.4b at 2 life the ability IS offered" $ do
-      swamp <- Registry.printing registry "Swamp"
-      greed <- Registry.printing registry "Greed"
-      piker <- Registry.printing registry "Goblin Piker"
+      swamp <- S.printingOf s registry "Swamp"
+      greed <- S.printingOf s registry "Greed"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (greedId, gs) = greedBoard swamp greed piker 2
       Spec.assertBool
         s
@@ -278,9 +278,9 @@ greedSpec s registry =
     -- game." Paying life is a real life-total change, and a cost may
     -- legally kill its payer.
     Spec.it s "CR 704.5a paying the last 2 life is legal and loses the game" $ do
-      swamp <- Registry.printing registry "Swamp"
-      greed <- Registry.printing registry "Greed"
-      piker <- Registry.printing registry "Goblin Piker"
+      swamp <- S.printingOf s registry "Swamp"
+      greed <- S.printingOf s registry "Greed"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (greedId, gs) = greedBoard swamp greed piker 2
           activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice greedId (theAbility greed))
           settled = S.settleSba activated
@@ -293,7 +293,7 @@ greedSpec s registry =
     -- Greed has no {T} in its cost, so CR 302.6 never applies -- the
     -- counterpart to Llanowar Elves, whose cost is Just [] plus TapThis.
     Spec.it s "CR 302.6 Greed's cost requires no tap symbol" $ do
-      greed <- Registry.printing registry "Greed"
+      greed <- S.printingOf s registry "Greed"
       Spec.assertBool
         s
         (not (Cost.requiresSicknessCheck (ActivatedAbility.cost (theAbility greed))))
@@ -353,13 +353,13 @@ villageRitesBoard swamp piker villageRites n =
 -- Its one ruling: "You must sacrifice exactly one creature to cast this spell;
 -- you can't cast it without sacrificing a creature, and you can't sacrifice
 -- additional creatures."
-villageRitesSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+villageRitesSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 villageRitesSpec s registry =
   Spec.describe s "Village Rites" $ do
     Spec.it s "CR 118.8 the additional cost is paid and the spell resolves" $ do
-      swamp <- Registry.printing registry "Swamp"
-      piker <- Registry.printing registry "Goblin Piker"
-      villageRites <- Registry.printing registry "Village Rites"
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      villageRites <- S.printingOf s registry "Village Rites"
       let (rites, pikers, gs) = villageRitesBoard swamp piker villageRites 1
           cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice rites)
           resolved = S.runPure S.identityAnswer cast Stack.resolveTop
@@ -385,9 +385,9 @@ villageRitesSpec s registry =
     -- additional cost INSIDE the total cost: an implementation that pays
     -- additional costs after announcement offers this cast.
     Spec.it s "CR 601.2f with no creature to sacrifice the spell is not castable" $ do
-      swamp <- Registry.printing registry "Swamp"
-      piker <- Registry.printing registry "Goblin Piker"
-      villageRites <- Registry.printing registry "Village Rites"
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      villageRites <- S.printingOf s registry "Village Rites"
       let (rites, _, gs) = villageRitesBoard swamp piker villageRites 0
       Spec.assertBool s (not (Cast.castable S.alice rites gs)) "not castable"
       Spec.assertEqWith s "and not offered" (filter (isCastOf rites) (Action.legalActions S.alice gs)) []
@@ -396,10 +396,10 @@ villageRitesSpec s registry =
     -- above and fails this one. The settle/resolve shape is
     -- Pawl.TriggerSpec's historySpec, verbatim.
     Spec.it s "CR 608.2i Khabál Ghoul counts a creature sacrificed to pay a cost" $ do
-      swamp <- Registry.printing registry "Swamp"
-      piker <- Registry.printing registry "Goblin Piker"
-      villageRites <- Registry.printing registry "Village Rites"
-      khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      villageRites <- S.printingOf s registry "Village Rites"
+      khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (rites, _, gs0) = villageRitesBoard swamp piker villageRites 1
           (ghoul, gs1) = S.addCreature khabalGhoul S.alice gs0
           cast = S.runPure S.identityAnswer gs1 (Cast.castSpell S.alice rites)
@@ -414,9 +414,9 @@ villageRitesSpec s registry =
     -- two candidates is a real choice; one is not, and where the rules
     -- leave nothing to ask, don't prompt.
     Spec.it s "CR 701.21a two creatures raise ChooseSacrifices; one elides it" $ do
-      swamp <- Registry.printing registry "Swamp"
-      piker <- Registry.printing registry "Goblin Piker"
-      villageRites <- Registry.printing registry "Village Rites"
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      villageRites <- S.printingOf s registry "Village Rites"
       let (ritesTwo, _, twoPikers) = villageRitesBoard swamp piker villageRites 2
           (ritesOne, _, onePiker) = villageRitesBoard swamp piker villageRites 1
           askedTwo = answersFor S.identityAnswer twoPikers (Cast.castSpell S.alice ritesTwo)
@@ -426,9 +426,9 @@ villageRitesSpec s registry =
     -- CR 115.1 makes a target only what the word "target" names: a
     -- sacrifice choice is not one, so it must not travel as a target.
     Spec.it s "CR 115.1 the sacrifice choice is not a target choice" $ do
-      swamp <- Registry.printing registry "Swamp"
-      piker <- Registry.printing registry "Goblin Piker"
-      villageRites <- Registry.printing registry "Village Rites"
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      villageRites <- S.printingOf s registry "Village Rites"
       let (rites, _, gs) = villageRitesBoard swamp piker villageRites 2
           asked = answersFor S.identityAnswer gs (Cast.castSpell S.alice rites)
           isTargets r = case r of
@@ -463,15 +463,15 @@ fireblastBoard mountain fireblastPrinting n tap =
 -- this spell's mana cost. Fireblast deals 4 damage to any target."
 --
 -- Scryfall returned no rulings for this card.
-fireblastSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+fireblastSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 fireblastSpec s registry =
   Spec.describe s "Fireblast" $ do
     -- The headline test: the printed cost is unaffordable and the spell is
     -- castable anyway. Kills "castability is mana affordability" and "an
     -- alternative cost is a different ManaCost" at once.
     Spec.it s "CR 118.9 two TAPPED Mountains and an empty pool still cast it, and it deals 4" $ do
-      mountain <- Registry.printing registry "Mountain"
-      fireblastPrinting <- Registry.printing registry "Fireblast"
+      mountain <- S.printingOf s registry "Mountain"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 2 True
           cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice fireblast)
           resolved = S.runPure S.identityAnswer cast Stack.resolveTop
@@ -481,8 +481,8 @@ fireblastSpec s registry =
     -- CR 118.9b: an alternative cost is optional, so a player who can
     -- afford both is really choosing.
     Spec.it s "CR 118.9b both costs payable raises ChooseCost; one payable elides it" $ do
-      mountain <- Registry.printing registry "Mountain"
-      fireblastPrinting <- Registry.printing registry "Fireblast"
+      mountain <- S.printingOf s registry "Mountain"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (both, sixUntapped) = fireblastBoard mountain fireblastPrinting 6 False
           (onlyAlternative, twoTapped) = fireblastBoard mountain fireblastPrinting 2 True
           askedBoth = answersFor S.identityAnswer sixUntapped (Cast.castSpell S.alice both)
@@ -493,8 +493,8 @@ fireblastSpec s registry =
     -- as it's being cast" -- the list-of-candidates shape itself. The
     -- printed cost is offered FIRST.
     Spec.it s "CR 118.9a costsFor offers the printed cost first, then each alternative" $ do
-      mountain <- Registry.printing registry "Mountain"
-      fireblastPrinting <- Registry.printing registry "Fireblast"
+      mountain <- S.printingOf s registry "Mountain"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 2 True
           candidates = Cost.costsFor fireblast gs
           red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -506,8 +506,8 @@ fireblastSpec s registry =
         [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, red, red]), Just (ManaCost.MkManaCost [])]
     -- CR 701.21a again, on the alternative's own component.
     Spec.it s "CR 701.21a three Mountains raise ChooseSacrifices; exactly two elide it" $ do
-      mountain <- Registry.printing registry "Mountain"
-      fireblastPrinting <- Registry.printing registry "Fireblast"
+      mountain <- S.printingOf s registry "Mountain"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (three, threeMountains) = fireblastBoard mountain fireblastPrinting 3 True
           (two, twoMountains) = fireblastBoard mountain fireblastPrinting 2 True
           askedThree = answersFor S.identityAnswer threeMountains (Cast.castSpell S.alice three)
@@ -515,8 +515,8 @@ fireblastSpec s registry =
       Spec.assertBool s (wasAskedToSacrifice askedThree) "asked with three"
       Spec.assertBool s (not (wasAskedToSacrifice askedTwo)) "not asked with exactly two"
     Spec.it s "CR 118.3 one Mountain pays neither cost" $ do
-      mountain <- Registry.printing registry "Mountain"
-      fireblastPrinting <- Registry.printing registry "Fireblast"
+      mountain <- S.printingOf s registry "Mountain"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 1 True
       Spec.assertBool s (not (Cast.castable S.alice fireblast gs)) "not castable"
 
@@ -531,7 +531,7 @@ crossCheckWithPriority gs =
       GameState.priority = Just S.alice
     }
 
-crossCheckSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+crossCheckSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 crossCheckSpec s registry =
   Spec.describe s "CrossChecks" $ do
     -- Blood Moon: "Nonbasic lands are Mountains." Evolving Wilds is a
@@ -543,10 +543,10 @@ crossCheckSpec s registry =
     -- Blood Moon affects only NONBASIC lands, which is why the second
     -- permanent is Evolving Wilds and not an Island.
     Spec.it s "CR 613.1d PermanentOfSubtype reads the projection, not the printed type line" $ do
-      mountain <- Registry.printing registry "Mountain"
-      evolvingWilds <- Registry.printing registry "Evolving Wilds"
-      fireblastPrinting <- Registry.printing registry "Fireblast"
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      mountain <- S.printingOf s registry "Mountain"
+      evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = S.landsInPlay mountain 1
           (wilds, gs1) = S.addCreature evolvingWilds S.alice base
           (fireblast, gs2) = S.addHandCard fireblastPrinting S.alice gs1
@@ -567,9 +567,9 @@ crossCheckSpec s registry =
     -- alternative's ABSENT mana component is a real, taxable {0} raised to
     -- {1}. This is the test that requires Just [] rather than Nothing.
     Spec.it s "CR 118.9d Thalia raises the alternative cost's {0} to {1}" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      fireblastPrinting <- Registry.printing registry "Fireblast"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
       let tapAll gs = List.foldl' (flip S.tapObject) gs (Set.toList (GameState.battlefield gs))
           twoTapped = tapAll (S.landsInPlay mountain 2)
           (_, taxedTwo) = S.addCreature thalia S.alice twoTapped
@@ -599,16 +599,16 @@ crossCheckSpec s registry =
 -- feeds an energy-paid pump (CR 118 / 122.6). The ability is extracted via the
 -- file-local total `theAbility` (no partial functions); the card-characteristics
 -- case guards that the extraction sees a real ability.
-longtuskCubSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+longtuskCubSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 longtuskCubSpec s registry =
   Spec.describe s "LongtuskCub" $ do
     Spec.it s "Longtusk Cub is a {1}{G} 2/2 Cat with a pay-energy ability" $ do
-      longtuskCub <- Registry.printing registry "Longtusk Cub"
+      longtuskCub <- S.printingOf s registry "Longtusk Cub"
       Spec.assertEqWith s "name" (Card.Type.name (Printing.card longtuskCub)) (Text.pack "Longtusk Cub")
       Spec.assertEqWith s "power" (Card.Type.power (Printing.card longtuskCub)) (Just (Power.MkPower (Quantity.Type.Literal 2)))
       Spec.assertEqWith s "one activated ability" (length (Card.Type.activatedAbilities (Printing.card longtuskCub))) 1
     Spec.it s "CR 118.6 the pay-energy ability is payable at two energy, not at one, and grows the Cub" $ do
-      longtuskCub <- Registry.printing registry "Longtusk Cub"
+      longtuskCub <- S.printingOf s registry "Longtusk Cub"
       let (cubId, base) = S.addCreature longtuskCub S.alice (Setup.emptyGame S.bothPlayers)
           ability = theAbility longtuskCub
           withTwo = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice base
@@ -620,12 +620,12 @@ longtuskCubSpec s registry =
       Spec.assertEqWith s "energy spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice activated) 0
       Spec.assertEqWith s "Cub grew a +1/+1 counter" (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject cubId resolved)) (Just 1)
     Spec.it s "CR 603.2 Longtusk Cub gains two energy when it connects" $ do
-      longtuskCub <- Registry.printing registry "Longtusk Cub"
+      longtuskCub <- S.printingOf s registry "Longtusk Cub"
       let (gs, _, _) = S.combatBoardOf [longtuskCub] []
           after = S.runCombat S.aggressiveAnswer gs
       Spec.assertEqWith s "alice gained two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
   greedSpec s registry
@@ -655,12 +655,12 @@ sentryBoard plains safeholdSentry tapped =
 
 -- Safehold Sentry {1}{W} Creature -- Elf Warrior 2/2: "{2}{W}, {Q}: This creature
 -- gets +0/+2 until end of turn." The card CR 107.6's untap symbol was waiting for.
-safeholdSentrySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+safeholdSentrySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 safeholdSentrySpec s registry =
   Spec.describe s "Safehold Sentry" $ do
     Spec.it s "CR 107.6 whole card: a TAPPED Sentry untaps to pay {Q} and gets +0/+2" $ do
-      plains <- Registry.printing registry "Plains"
-      safeholdSentry <- Registry.printing registry "Safehold Sentry"
+      plains <- S.printingOf s registry "Plains"
+      safeholdSentry <- S.printingOf s registry "Safehold Sentry"
       let (sentry, gs) = sentryBoard plains safeholdSentry True
           activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice sentry (theAbility safeholdSentry))
           resolved = S.runPure S.identityAnswer activated Stack.resolveTop
@@ -671,8 +671,8 @@ safeholdSentrySpec s registry =
     -- CR 107.6's second sentence, and the exact inverse of TapThis: "A permanent
     -- that's already untapped can't be untapped again to pay the cost."
     Spec.it s "CR 107.6 an UNTAPPED Sentry cannot pay {Q}, so the ability is not offered" $ do
-      plains <- Registry.printing registry "Plains"
-      safeholdSentry <- Registry.printing registry "Safehold Sentry"
+      plains <- S.printingOf s registry "Plains"
+      safeholdSentry <- S.printingOf s registry "Safehold Sentry"
       let (sentry, gs) = sentryBoard plains safeholdSentry False
       Spec.assertBool s (not (Cost.canPay S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) gs)) "canPay says no"
       Spec.assertBool s (not (any isActivateAction (Action.legalActions S.alice gs))) "and no Activate is offered"
@@ -680,8 +680,8 @@ safeholdSentrySpec s registry =
     -- symbol, and only the first half had a producer. A summoning-sick Sentry
     -- must not be able to activate a {Q} ability.
     Spec.it s "CR 302.6 a summoning-sick Sentry's {Q} ability is not offered" $ do
-      plains <- Registry.printing registry "Plains"
-      safeholdSentry <- Registry.printing registry "Safehold Sentry"
+      plains <- S.printingOf s registry "Plains"
+      safeholdSentry <- S.printingOf s registry "Safehold Sentry"
       let (sentry, gs) = sentryBoard plains safeholdSentry True
           sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) sentry (GameState.objects gs)}
       Spec.assertBool s (Cost.canPay S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) sick) "the cost itself is still payable -- it is tapped"
@@ -722,13 +722,13 @@ noDiscardAnswer p = case p of
 -- Cathartic Reunion {1}{R} Sorcery: "As an additional cost to cast this spell,
 -- discard two cards. Draw three cards." The card CR 601.2f's "discarding cards"
 -- clause was waiting for.
-catharticReunionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+catharticReunionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 catharticReunionSpec s registry =
   Spec.describe s "Cathartic Reunion" $ do
     Spec.it s "CR 118.8 whole card: the two cards are discarded and three are drawn" $ do
-      mountain <- Registry.printing registry "Mountain"
-      piker <- Registry.printing registry "Goblin Piker"
-      catharticReunion <- Registry.printing registry "Cathartic Reunion"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      catharticReunion <- S.printingOf s registry "Cathartic Reunion"
       -- Exactly two other cards, so CR 701.9b has no choice to offer and the
       -- prompt is elided -- which noDiscardAnswer proves, since an answer of
       -- [] would discard nothing if the prompt were actually raised.
@@ -741,9 +741,9 @@ catharticReunionSpec s registry =
       -- CR 608.2n: the sorcery joins the two discards on resolution.
       Spec.assertEqWith s "and the spell itself is there too" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 3
     Spec.it s "CR 601.2f with only one other card in hand the spell is not castable" $ do
-      mountain <- Registry.printing registry "Mountain"
-      piker <- Registry.printing registry "Goblin Piker"
-      catharticReunion <- Registry.printing registry "Cathartic Reunion"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      catharticReunion <- S.printingOf s registry "Cathartic Reunion"
       let (reunion, gs) = catharticBoard mountain piker catharticReunion 1
           isCastOfReunion a = case a of
             Action.Type.Cast oid -> oid == reunion
@@ -758,9 +758,9 @@ catharticReunionSpec s registry =
       -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Engine.Cost.pay
       -- restores the entry state and nothing at all happened. Three other cards
       -- makes the prompt real (hand > count), unlike the forced case above.
-      mountain <- Registry.printing registry "Mountain"
-      piker <- Registry.printing registry "Goblin Piker"
-      catharticReunion <- Registry.printing registry "Cathartic Reunion"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      catharticReunion <- S.printingOf s registry "Cathartic Reunion"
       let (reunion, gs) = catharticBoard mountain piker catharticReunion 3
           cast = S.runPure noDiscardAnswer gs (Cast.castSpell S.alice reunion)
       Spec.assertEqWith s "nothing was discarded" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 0
@@ -774,9 +774,9 @@ catharticReunionSpec s registry =
     -- interpreter meaning [a,a,b] there builds {a,b} and the Sacrifice arm
     -- accepts it -- this keeps the two components answering alike.
     Spec.it s "CR 601.2h the answer is read as a set: [a,a,b] pays for two, [a,a] does not" $ do
-      mountain <- Registry.printing registry "Mountain"
-      piker <- Registry.printing registry "Goblin Piker"
-      catharticReunion <- Registry.printing registry "Cathartic Reunion"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      catharticReunion <- S.printingOf s registry "Cathartic Reunion"
       let (reunion, gs) = catharticBoard mountain piker catharticReunion 3
           -- Repeat the first offered card, then add a second distinct one.
           duplicateThenDistinct q = case q of

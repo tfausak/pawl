@@ -8,6 +8,7 @@
 -- group, not here.
 module Pawl.Support where
 
+import qualified Control.Exception as Exception
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -17,6 +18,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Data.Text.IO as TextIO
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Corpus as Corpus
@@ -101,6 +103,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
+import qualified System.Directory as Directory
 import qualified System.Random as Random
 
 alice, bob, carol, dave :: PlayerId.PlayerId
@@ -136,58 +139,106 @@ fourPlayers = alice NonEmpty.:| [bob, carol, dave]
 fourPlayerGame :: GameState.GameState
 fourPlayerGame = Setup.emptyGame fourPlayers
 
-redRed :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
-redRed registry = do
-  deck <- Cards.redDeck registry
+-- How a spec case fetches a card: a Left becomes an assertion failure naming the
+-- card, so a missing or unloadable card fails the case that wanted it rather
+-- than escaping as an exception. This is the adapter for everything inside a
+-- Spec.it, and the reason those modules need no IO.
+-- A throwaway directory holding `files` (name, contents), for the cases that
+-- need a corpus other than the committed one. The label keeps concurrently
+-- running cases in separate directories, since tasty runs them in parallel.
+withCorpusDir :: String -> [(FilePath, Text.Text)] -> (FilePath -> IO a) -> IO a
+withCorpusDir label files action = do
+  tmp <- Directory.getTemporaryDirectory
+  let dir = tmp <> "/pawl-corpus-" <> label
+  Exception.bracket_
+    ( do
+        Directory.createDirectoryIfMissing True dir
+        mapM_ (\(name, contents) -> TextIO.writeFile (dir <> "/" <> name) contents) files
+    )
+    (Directory.removeDirectoryRecursive dir)
+    (action dir)
+
+-- The committed Goblin Piker file, used as a known-good card in a throwaway
+-- corpus. Read rather than inlined so no spec becomes a second source of truth
+-- for a card's contents.
+pikerJson :: IO Text.Text
+pikerJson = do
+  root <- Registry.defaultRoot
+  TextIO.readFile (root <> "/goblin-piker.json")
+
+printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
+printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
+
+cardOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Card.Type.Card
+cardOf s registry name = do
+  result <- Registry.named registry name
+  case result of
+    Left err -> Spec.assertFailure s (show err)
+    Right card -> pure card
+
+-- How Pawl.PropertySpec fetches a card. It is tasty-based and QuickCheck-shaped,
+-- so it has no spec record to fold a failure into -- but it is also at m ~ IO,
+-- where an exception is the ordinary way to fail. That is why the deck loaders
+-- take a fetch function rather than a registry: one deck list, two adapters.
+orThrow :: Registry.Registry IO -> String -> IO Printing.Printing
+orThrow registry name = do
+  result <- Registry.named registry name
+  case result of
+    Left err -> Exception.throwIO (userError (show err))
+    Right card -> pure (Printing.MkPrinting card)
+
+redRed :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+redRed fetch = do
+  deck <- Cards.redDeck fetch
   pure (Setup.mirror deck bothPlayers)
 
-greenBlack :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
-greenBlack registry = do
-  green <- Cards.greenDeck registry
-  black <- Cards.blackDeck registry
+greenBlack :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+greenBlack fetch = do
+  green <- Cards.greenDeck fetch
+  black <- Cards.blackDeck fetch
   pure ((alice, green) NonEmpty.:| [(bob, black)])
 
-blueBlack :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
-blueBlack registry = do
-  blue <- Cards.blueDeck registry
-  black <- Cards.blackDeck registry
+blueBlack :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+blueBlack fetch = do
+  blue <- Cards.blueDeck fetch
+  black <- Cards.blackDeck fetch
   pure ((alice, blue) NonEmpty.:| [(bob, black)])
 
-matchups :: Registry.Registry -> IO [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
-matchups registry = do
-  rr <- redRed registry
-  gb <- greenBlack registry
-  bb <- blueBlack registry
+matchups :: (Monad m) => Cards.Fetch m -> m [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
+matchups fetch = do
+  rr <- redRed fetch
+  gb <- greenBlack fetch
+  bb <- blueBlack fetch
   -- CR 800.1: the three-seat matchup. Every invariant that holds at two seats
   -- must hold at three, and this is the cheapest possible broad falsifier for
   -- that -- one list entry buys a whole played-out three-player game per seed.
-  tw <- threeWayMirror registry
+  tw <- threeWayMirror fetch
   pure [rr, gb, bb, tw]
 
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable
 -- lands-only-decks property.
-landsOnly :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
-landsOnly registry = do
-  mountain <- Registry.printing registry "Mountain"
+landsOnly :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+landsOnly fetch = do
+  mountain <- fetch "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
 
 -- CR 800.1: the three-seat twin of landsOnly. 60 basic lands each, so the only
 -- reachable loss condition is CR 704.5b deck-out and the only reachable end is
 -- CR 104.2a's last player standing. The seat count is what makes it a falsifier:
 -- at two players the first deck-out ends the game, at three it must not.
-threePlayerLandsOnly :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
-threePlayerLandsOnly registry = do
-  mountain <- Registry.printing registry "Mountain"
+threePlayerLandsOnly :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threePlayerLandsOnly fetch = do
+  mountain <- fetch "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) threePlayers)
 
 -- CR 800.1: the three-seat twin of redRed -- one red deck each for alice, bob and
 -- carol. Setup.mirror is already NonEmpty-shaped, so the seat count is the only
 -- difference. The three-seat setup rules (CR 103.5c's free first mulligan, CR
 -- 103.8c's first draw) are what this exists to exercise.
-threeWayMirror :: Registry.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
-threeWayMirror registry = do
-  deck <- Cards.redDeck registry
+threeWayMirror :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threeWayMirror fetch = do
+  deck <- Cards.redDeck fetch
   pure (Setup.mirror deck threePlayers)
 
 isCreatureRecipient :: Recipient.Recipient -> Bool

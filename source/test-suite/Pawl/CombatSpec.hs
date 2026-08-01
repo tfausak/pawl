@@ -55,16 +55,16 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
-combatDamageSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+combatDamageSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.1b an unblocked attacker damages the defending player" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 0
         after = S.fightWith S.aggressiveAnswer gs
     -- A Piker is a 2/1, and bob starts at 20.
     Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 509 a blocked attacker does not damage the player" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 1
         after = S.fightWith S.aggressiveAnswer gs
     Spec.assertEqWith s "bob untouched" (S.lifeOf S.bob after) (Just 20)
@@ -74,7 +74,7 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
     -- power), so it is rejected and the blocker takes 0 -- and the assertion
     -- below fails. That is why this proves "unprompted" without an `error`,
     -- which the no-partial-functions rule forbids anyway.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = S.combatBoard piker 1 1
         noAssign :: Prompt.Prompt r -> r
         noAssign p = case p of
@@ -87,13 +87,13 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.2 a 2/1 trade kills BOTH creatures" $ do
     -- The simultaneity test. Sequential damage kills only one, because the
     -- blocker would be in the graveyard before it dealt its damage.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 1
         after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
     Spec.assertEqWith s "alice's is dead" (S.creaturesInPlay S.alice after) 0
     Spec.assertEqWith s "bob's is dead" (S.creaturesInPlay S.bob after) 0
   Spec.it s "CR 510.1c a free division of 2 across two blockers kills both" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = S.combatBoard piker 1 2
         split :: Prompt.Prompt r -> r
         split p = case p of
@@ -103,7 +103,7 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
     Spec.assertEqWith s "both blockers dead" (S.creaturesInPlay S.bob after) 0
     Spec.assertEqWith s "expected two blockers" (length theirs) 2
   Spec.it s "CR 510.1c the same 2 damage on one blocker kills only it" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 2
         dump :: Prompt.Prompt r -> r
         dump p = case p of
@@ -117,7 +117,7 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.1e an illegal division is rejected and deals nothing" $ do
     -- Not a reachable game state: this is the engine's defense against a
     -- broken interpreter. See the spec, section 3.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 2
         cheat :: Prompt.Prompt r -> r
         cheat p = case p of
@@ -128,7 +128,7 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   -- The deterministic successor to the retired "combat happens" property: an
   -- unblocked 2/1 attacker reduces the defender's life by its power.
   Spec.it s "combat deals damage to the defending player" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] []
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "defender took two" (S.lifeOf S.bob after) (Just 18)
@@ -136,16 +136,16 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
 declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
 
-declareSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+declareSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 declareSpec s registry = Spec.describe s "Declare" $ do
   Spec.it s "CR 508.1f declaring an attacker taps it" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 1
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "one attacker" (declaredAttackers after) mine
     Spec.assertEqWith s "tapped" (S.tappedCount S.alice after) 1
   Spec.it s "CR 508.1 attackers attack the defending player" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 1
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
     case mine of
@@ -158,7 +158,7 @@ declareSpec s registry = Spec.describe s "Declare" $ do
           (Just (AttackTarget.OfPlayer S.bob))
   Spec.it s "an illegal attacker in the answer is dropped" $ do
     -- The interpreter names bob's creature. It is not alice's to attack with.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = S.combatBoard piker 1 1
         liar :: Prompt.Prompt r -> r
         liar p = case p of
@@ -167,7 +167,7 @@ declareSpec s registry = Spec.describe s "Declare" $ do
         after = snd (Engine.runGamePure liar gs (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "nothing attacks" (declaredAttackers after) []
   Spec.it s "CR 509.1 a blocker is recorded against the attacker it blocks" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = S.combatBoard piker 1 1
         steps = do
           Combat.declareAttackers S.alice
@@ -178,7 +178,7 @@ declareSpec s registry = Spec.describe s "Declare" $ do
       attacker : _ ->
         Spec.assertEqWith s "blocked by bob's creature" (Combat.blockersOf attacker after) (Set.fromList theirs)
   Spec.it s "an unblocked attacker has no blockers" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 0
         steps = do
           Combat.declareAttackers S.alice
@@ -190,7 +190,7 @@ declareSpec s registry = Spec.describe s "Declare" $ do
   Spec.it s "no legal attackers means no prompt and no attacks" $ do
     -- combatBoard 0 1 gives alice nothing. A prompt here would be the engine
     -- asking a question with exactly one answer.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 0 1
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "nothing attacks" (declaredAttackers after) []
@@ -199,7 +199,7 @@ declareSpec s registry = Spec.describe s "Declare" $ do
   -- controller's untap step has settled it. The halves are tested in Tasks 1
   -- and 4; this proves they compose.
   Spec.it s "CR 302.6 a creature cannot attack the turn it arrives, and can after untapping" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 1
         arrived = justArrived gs
         sameTurn = snd (Engine.runGamePure S.aggressiveAnswer arrived (Combat.declareAttackers S.alice))
@@ -212,25 +212,25 @@ declareSpec s registry = Spec.describe s "Declare" $ do
     Spec.assertEqWith s "cannot attack the turn it arrives" (declaredAttackers sameTurn) []
     Spec.assertEqWith s "can attack after untapping" (length (declaredAttackers nextTurn)) 1
 
-defenderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+defenderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 defenderSpec s registry = Spec.describe s "Defender" $ do
   Spec.it s "CR 702.3b a creature with defender can't attack" $ do
-    ogreSentry <- Registry.printing registry "Ogre Sentry"
-    piker <- Registry.printing registry "Goblin Piker"
+    ogreSentry <- S.printingOf s registry "Ogre Sentry"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [ogreSentry] [piker]
     case mine of
       [] -> Spec.assertFailure s "fixture should have one creature"
       oid : _ -> Spec.assertBool s (not (Combat.canAttack S.alice oid gs)) "can't attack"
   Spec.it s "CR 702.3b a creature with defender is not offered as a legal attacker" $ do
-    ogreSentry <- Registry.printing registry "Ogre Sentry"
-    piker <- Registry.printing registry "Goblin Piker"
+    ogreSentry <- S.printingOf s registry "Ogre Sentry"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [ogreSentry] [piker]
     Spec.assertEqWith s "none" (Combat.legalAttackers S.alice gs) []
   Spec.it s "CR 702.3b defender does not stop it blocking" $ do
     -- 702.3b says "can't attack" and nothing else. A defender that could not
     -- block would be a Wall in the pre-2004 sense, and that is not the rule.
-    piker <- Registry.printing registry "Goblin Piker"
-    ogreSentry <- Registry.printing registry "Ogre Sentry"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ogreSentry <- S.printingOf s registry "Ogre Sentry"
     let (gs, _, theirs) = S.combatBoardOf [piker] [ogreSentry]
     case theirs of
       [] -> Spec.assertFailure s "fixture should have one blocker"
@@ -238,12 +238,12 @@ defenderSpec s registry = Spec.describe s "Defender" $ do
   Spec.it s "a creature without defender is still offered" $ do
     -- The control. If defender were implemented as "nothing may attack", the
     -- test above would pass and this one would fail.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
     Spec.assertEqWith s "one" (Combat.legalAttackers S.alice gs) mine
   Spec.it s "CR 702.3b a defender is skipped but its neighbor still attacks" $ do
-    ogreSentry <- Registry.printing registry "Ogre Sentry"
-    piker <- Registry.printing registry "Goblin Piker"
+    ogreSentry <- S.printingOf s registry "Ogre Sentry"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [ogreSentry, piker] [piker]
     case mine of
       [_, p] -> Spec.assertEqWith s "only the piker" (Combat.legalAttackers S.alice gs) [p]
@@ -298,7 +298,7 @@ runRecordingBlockers gs =
 
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderSpec, which is the Defender KEYWORD (CR 702.3b).
-defendingPlayerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+defendingPlayerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
   Spec.it s "CR 703.4h/507.1 the active player chooses which opponent is the defending player" $ do
     -- THREE seats: the whole point. Discriminating against the behaviour this
@@ -463,7 +463,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.carol}}
     Spec.assertEqWith s "cleared at end of combat" (Combat.Type.defender (GameState.combat (Combat.clearCombat busy))) Nothing
   Spec.it s "CR 508.1 every attacker attacks the CHOSEN defending player" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (board, mine, _, _) = S.threePlayerCombat [piker, piker] [piker] [piker]
         -- carol, deliberately not the first candidate.
         ready =
@@ -486,7 +486,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- behaviour wearing a different hat. The answerer is maximal (it attacks
     -- with everything offered), so an empty attacker map can only come from
     -- the prompt never being issued.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (board, mine, _, _) = S.threePlayerCombat [piker] [piker] [piker]
         ready = board {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
         after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)
@@ -497,7 +497,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- CR 509.1's first sentence names THE defending player, singular. CR 802.4
     -- is the rule that has several of them declare in APNAP order, and it needs
     -- an option pawl cannot express (#175).
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (board, mine, bobs, carols) = S.threePlayerCombat [piker] [piker] [piker]
         attackMap = case mine of
           oid : _ -> Map.singleton oid (AttackTarget.OfPlayer S.carol)
@@ -528,7 +528,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- Discriminating: run A is what the deleted head-of-list behaviour did
     -- whatever the answer, so run A alone proves nothing. Run B is
     -- unreachable under it, and the pair is the proof.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (board, _, _, _) = S.threePlayerCombat [piker] [] []
         crowned = S.withMonarch S.bob board
         hitBob = S.runCombat (S.attackTo S.bob) crowned
@@ -554,23 +554,23 @@ justArrived gs =
   let sicken o = if Object.owner o == S.alice then o {Object.sickness = Sickness.Sick} else o
    in gs {GameState.objects = fmap sicken (GameState.objects gs)}
 
-hasteSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+hasteSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 hasteSpec s registry = Spec.describe s "Haste" $ do
   Spec.it s "CR 702.10b a creature with haste attacks the turn it arrives" $ do
-    goblinChariot <- Registry.printing registry "Goblin Chariot"
-    piker <- Registry.printing registry "Goblin Piker"
+    goblinChariot <- S.printingOf s registry "Goblin Chariot"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [goblinChariot] [piker]
         after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "attacks" (length (declaredAttackers after)) 1
   Spec.it s "CR 302.6 the same creature without haste cannot" $ do
     -- The control. Goblin Chariot and Goblin Piker are both 2/2-ish Goblin
     -- Warriors; the ONLY difference the engine can see is the keyword.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] [piker]
         after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "cannot attack" (declaredAttackers after) []
   Spec.it s "CR 702.10b haste is not needed once the creature has settled" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "attacks" (declaredAttackers after) mine
@@ -579,8 +579,8 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
   -- the very Piker that could not attack in the control case above now can,
   -- and nothing about the Piker itself changed.
   Spec.it s "CR 702.10b Concordant Crossroads grants haste, so a summoning-sick Piker attacks" $ do
-    crossroads <- Registry.printing registry "Concordant Crossroads"
-    piker <- Registry.printing registry "Goblin Piker"
+    crossroads <- S.printingOf s registry "Concordant Crossroads"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
         (_, enchanted) = S.addCreature crossroads S.alice (justArrived gs)
         after = snd (Engine.runGamePure S.aggressiveAnswer enchanted (Combat.declareAttackers S.alice))
@@ -588,23 +588,23 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
   Spec.it s "CR 702.10b a hasty creature and a sick one, in the same declaration" $ do
     -- Both sick; only the Chariot may attack. A blanket "sickness ignored"
     -- bug would let both through.
-    goblinChariot <- Registry.printing registry "Goblin Chariot"
-    piker <- Registry.printing registry "Goblin Piker"
+    goblinChariot <- S.printingOf s registry "Goblin Chariot"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [goblinChariot, piker] [piker]
         after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
     case mine of
       [chariot, _] -> Spec.assertEqWith s "only the chariot" (declaredAttackers after) [chariot]
       _ -> Spec.assertFailure s "fixture should have two creatures"
 
-controlChangeSicknessSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+controlChangeSicknessSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $ do
   -- A live steal, with nothing forced: bob's Piker settles under bob at his
   -- untap step, then alice's Control Magic takes it. CR 302.6 asks whether
   -- ALICE has controlled it continuously since HER most recent turn began,
   -- and she has not -- the settle it carries is bob's, not hers.
   Spec.it s "CR 302.6 a creature that just changed control is summoning sick (no haste)" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.bob base
         settled = S.runPure S.identityAnswer withCreature (Engine.settleAll S.bob)
@@ -621,8 +621,8 @@ controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $
   -- Aura, so bob can only cast it on his own turn, and alice can only answer
   -- it on hers -- after her untap step has already passed.
   Spec.it s "CR 302.6 control that leaves and returns is not continuous" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.alice base
         settled = S.runPure S.identityAnswer withCreature (Engine.settleAll S.alice)
@@ -665,11 +665,11 @@ withFear oid gs =
 withLands :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
 withLands lands gs = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs lands
 
-evasionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+evasionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.9b a declaration in which a ground creature blocks a flier is illegal" $ do
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    piker <- Registry.printing registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = attacking [birdMaiden] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -678,8 +678,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.17b a reach creature may block a flier" $ do
     -- THE FALSIFIER. Fails against any implementation that asks "does the
     -- blocker have flying?"
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
     let (gs, mine, theirs) = attacking [birdMaiden] [nimbleBirdsticker]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -688,15 +688,15 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.9b a flier may block a ground creature" $ do
     -- The asymmetry: 702.9b's second sentence. Fails if flying is implemented
     -- as a symmetric predicate.
-    piker <- Registry.printing registry "Goblin Piker"
-    birdMaiden <- Registry.printing registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
     let (gs, mine, theirs) = attacking [piker] [birdMaiden]
     case (mine, theirs) of
       (a : _, b : _) ->
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.9b a flier may block a flier" $ do
-    birdMaiden <- Registry.printing registry "Bird Maiden"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
     let (gs, mine, theirs) = attacking [birdMaiden] [birdMaiden]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -705,8 +705,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $ do
     -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
     -- fails if evasion is wrongly implemented as a filter on the candidates.
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    piker <- Registry.printing registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = attacking [birdMaiden] [piker]
     Spec.assertEqWith s "still offered" (Combat.legalBlockers S.bob gs) theirs
   Spec.it s "CR 509.1b an illegal declaration is rejected WHOLE, not repaired" $ do
@@ -716,9 +716,9 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- let the Birdsticker's block stand -- which is what M1b does today, and
     -- is unsound: under menace, dropping one blocker from a pair manufactures
     -- an illegal single block.
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
-    piker <- Registry.printing registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [birdMaiden] [nimbleBirdsticker, piker]
         steps = do
           Combat.declareAttackers S.alice
@@ -730,8 +730,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 509.1b a wholly legal declaration is accepted" $ do
     -- The control for the test above: with only the reach creature, the same
     -- interpreter produces a legal declaration and the block stands.
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
     let (gs, _, theirs) = S.combatBoardOf [birdMaiden] [nimbleBirdsticker]
         steps = do
           Combat.declareAttackers S.alice
@@ -745,8 +745,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- is-it-a-creature, never which card it is. M1b (tests cards) "a land may not
     -- attack" but never that a land may not BLOCK, so this closes a real gap
     -- rather than restating one.
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    mountain <- Registry.printing registry "Mountain"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    mountain <- S.printingOf s registry "Mountain"
     let (gs, mine, _) = attacking [birdMaiden] []
         withLand = snd (S.addCreature mountain S.bob gs)
     case mine of
@@ -757,23 +757,23 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- flying: nothing may block, bob takes 1, and both creatures live.
     -- WITHOUT flying: the Piker blocks, bob takes 0, and the two TRADE (Bird
     -- Maiden is 1/2, Piker is 2/1). All three assertions distinguish them.
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    piker <- Registry.printing registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [birdMaiden] [piker]
         after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
     Spec.assertEqWith s "bob took 1" (S.lifeOf S.bob after) (Just 19)
     Spec.assertEqWith s "the flier lives" (S.creaturesInPlay S.alice after) 1
     Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
   Spec.it s "CR 702.36b a red creature may not block a creature with fear" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, mine, theirs) = attacking [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0))) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.36b a black creature may block a creature with fear" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    piker <- S.printingOf s registry "Goblin Piker"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let (gs0, mine, theirs) = attacking [piker] [typhoidRats]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -782,8 +782,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.36b an ARTIFACT creature may block a creature with fear" $ do
     -- THE FALSIFIER for reading 702.36b as a colour test alone: Darksteel Myr
     -- is a colourless artifact creature and blocks legally.
-    piker <- Registry.printing registry "Goblin Piker"
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
+    piker <- S.printingOf s registry "Goblin Piker"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let (gs0, mine, theirs) = attacking [piker] [darksteelMyr]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -795,8 +795,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- black), so it is not a legal blocker of a fear attacker. Fails against
     -- any implementation that reads the blocker's printed colour rather than
     -- its projected colour.
-    piker <- Registry.printing registry "Goblin Piker"
-    devoidDrone <- Registry.printing registry "Synthetic Devoid Drone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
     let (gs0, mine, theirs) = attacking [piker] [devoidDrone]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -805,7 +805,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.36b fear restricts being blocked, never blocking" $ do
     -- The 702.9b asymmetry, restated for fear: a fear creature blocking a
     -- plain attacker is legal.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, mine, theirs) = attacking [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -815,9 +815,9 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp" $ do
     -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so
     -- this asks about the keyword and no other text.
-    bogWraith <- Registry.printing registry "Bog Wraith"
-    piker <- Registry.printing registry "Goblin Piker"
-    swamp <- Registry.printing registry "Swamp"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
     let (gs0, mine, theirs) = attacking [bogWraith] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -828,9 +828,9 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- THE FALSIFIER, and the reason the case above cannot pass vacuously:
     -- the same board with the wrong land. The declaration is legal AND the
     -- block survives a real declare blockers step.
-    bogWraith <- Registry.printing registry "Bog Wraith"
-    piker <- Registry.printing registry "Goblin Piker"
-    island <- Registry.printing registry "Island"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
     let (gs0, mine, theirs) = attacking [bogWraith] [piker]
         gs = withLands [island] gs0
     case (mine, theirs) of
@@ -847,10 +847,10 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- AddLandSubtype over every land -- so bob's Island is a Swamp and the
     -- Wraith walks on it. Urborg is ALICE'S, so the only land bob controls
     -- printed no Swamp at all.
-    bogWraith <- Registry.printing registry "Bog Wraith"
-    piker <- Registry.printing registry "Goblin Piker"
-    island <- Registry.printing registry "Island"
-    urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let (gs0, mine, theirs) = attacking [bogWraith] [piker]
         gs = snd (S.addCreature urborg S.alice (withLands [island] gs0))
     case (mine, theirs) of
@@ -864,8 +864,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- block. Fails against any implementation that compares the attacker's
     -- landwalk with the blocker's -- which is how protection reads, and is
     -- the wrong shape here.
-    bogWraith <- Registry.printing registry "Bog Wraith"
-    swamp <- Registry.printing registry "Swamp"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    swamp <- S.printingOf s registry "Swamp"
     let (gs0, mine, theirs) = attacking [bogWraith] [bogWraith]
         gs = withLands [swamp] gs0
     case (mine, theirs) of
@@ -897,25 +897,25 @@ luring lure mine theirs =
 -- carrier, and the one CR 604.2's layer-6 strip needs: it is a CREATURE, so
 -- Humility's "each creature loses all abilities" reaches its requirement with no
 -- animator in between.
-blockRequirementSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+blockRequirementSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
   Spec.it s "CR 509.1c declining to block a Lured attacker is illegal" $ do
     -- THE FALSIFIER for a restrictions-only reading of CR 509.1: the empty
     -- declaration disobeys no restriction, which is exactly why 509.1c is a
     -- maximization and not a per-creature check.
-    lure <- Registry.printing registry "Lure"
-    piker <- Registry.printing registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = luring lure [piker] [piker]
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "no blocks is illegal"
   Spec.it s "CR 509.1 the same board WITHOUT the Lure lets the defender decline" $ do
     -- The control for the test above, and the reason it is not vacuous: the
     -- empty declaration is legal here, so the Lure is what changed the answer.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = attacking [piker] [piker]
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "no blocks is legal"
   Spec.it s "CR 509.1c blocking the Lured attacker is legal" $ do
-    lure <- Registry.printing registry "Lure"
-    piker <- Registry.printing registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = luring lure [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
@@ -927,17 +927,17 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- No requirement instance exists, the maximum is zero, and declining stays
     -- legal. Fails against an implementation that requires every creature to
     -- block regardless of the restrictions.
-    lure <- Registry.printing registry "Lure"
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    piker <- Registry.printing registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = luring lure [birdMaiden] [piker]
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "no blocks is legal"
   Spec.it s "CR 509.1a a TAPPED creature is not able to block, so a Lure does not require it" $ do
     -- The other half of "able": CR 509.1a's chosen creatures "must be
     -- untapped", so a tapped creature is never a candidate and carries no
     -- requirement.
-    lure <- Registry.printing registry "Lure"
-    piker <- Registry.printing registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = luring lure [piker] [piker]
     case theirs of
       b : _ -> Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty (S.tapObject b gs)) "no blocks is legal"
@@ -949,10 +949,10 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- restriction is ONE, and only the Birdsticker's block attains it: the
     -- empty declaration obeys zero and is illegal, and the Piker's block is
     -- illegal under CR 702.9b whatever it would obey.
-    lure <- Registry.printing registry "Lure"
-    birdMaiden <- Registry.printing registry "Bird Maiden"
-    piker <- Registry.printing registry "Goblin Piker"
-    nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
+    lure <- S.printingOf s registry "Lure"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
     let (gs, mine, theirs) = luring lure [birdMaiden] [piker, nimbleBirdsticker]
     case (mine, theirs) of
       (a : _, [ground, reacher]) -> do
@@ -964,8 +964,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- One Lure over two creatures is TWO requirements, not one -- CR 509.1c
     -- checks "each creature they control". A single block obeys one of two
     -- and is illegal; blocking with both attains the maximum.
-    lure <- Registry.printing registry "Lure"
-    piker <- Registry.printing registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = luring lure [piker] [piker, piker]
     case (mine, theirs) of
       (a : _, [first, second]) -> do
@@ -982,8 +982,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- two worlds. WITHOUT the requirement: nobody blocks, bob takes 2 and both
     -- Pikers live. WITH it: the Piker blocks, bob takes nothing, and the two
     -- 2/1s trade.
-    lure <- Registry.printing registry "Lure"
-    piker <- Registry.printing registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
         declining :: Prompt.Prompt r -> r
         declining p = case p of
@@ -1004,8 +1004,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- attacker's identity. No Aura and no animator anywhere -- the requirement
     -- rides on a creature card. Fails against an implementation that only ever
     -- resolves Affected.Attached.
-    prizedUnicorn <- Registry.printing registry "Prized Unicorn"
-    piker <- Registry.printing registry "Goblin Piker"
+    prizedUnicorn <- S.printingOf s registry "Prized Unicorn"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = attacking [prizedUnicorn] [piker]
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "no blocks is illegal"
     case (mine, theirs) of
@@ -1018,8 +1018,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- obeys nothing and the maximum is still attained only by blocking the
     -- Unicorn. Fails against an implementation that mints a requirement per
     -- attacker rather than per matching attacker.
-    prizedUnicorn <- Registry.printing registry "Prized Unicorn"
-    piker <- Registry.printing registry "Goblin Piker"
+    prizedUnicorn <- S.printingOf s registry "Prized Unicorn"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = attacking [prizedUnicorn, piker] [piker]
     case (mine, theirs) of
       ([unicorn, other], b : _) -> do
@@ -1039,9 +1039,9 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- combat is still live under Humility -- the Unicorn is still attacking and
     -- the (now 1/1) Piker is still able to block it -- so declining became legal
     -- because the requirement went away, not because there was nothing to block.
-    prizedUnicorn <- Registry.printing registry "Prized Unicorn"
-    piker <- Registry.printing registry "Goblin Piker"
-    humility <- Registry.printing registry "Humility"
+    prizedUnicorn <- S.printingOf s registry "Prized Unicorn"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humility <- S.printingOf s registry "Humility"
     let (gs, mine, theirs) = attacking [prizedUnicorn] [piker]
         underHumility = S.withHumility humility gs
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "without Humility, no blocks is illegal"
@@ -1055,8 +1055,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- attacker and mints no requirement. The Aura stays ON the battlefield
     -- throughout, so this is not a test that removing it works -- CR 704.5m
     -- would bury it, and no state-based-action pass is run here.
-    lure <- Registry.printing registry "Lure"
-    piker <- Registry.printing registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = attacking [piker] [piker]
         withAura = snd (S.addCreature lure S.alice gs)
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty withAura) "no blocks is legal"
@@ -1085,26 +1085,26 @@ cursing curse who mine theirs =
 -- Pawl.Engine.Combat.legalAttackers, so a creature that could not have attacked anyway
 -- carries no requirement and cannot make declining illegal. Half the group is
 -- that half.
-attackRequirementSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+attackRequirementSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
   Spec.it s "CR 508.1d declining to attack under a Curse of the Nightly Hunt is illegal" $ do
     -- THE FALSIFIER for a restrictions-only reading of CR 508.1: the empty
     -- declaration disobeys no restriction, which is exactly why 508.1d is a
     -- maximization and not a per-creature check.
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = cursing curse S.alice [piker] []
     Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "no attack is illegal"
   Spec.it s "CR 508.1 the same board WITHOUT the Curse lets the active player decline" $ do
     -- The control for the test above, and the reason it is not vacuous:
     -- attacking is optional by default (CR 508.1a chooses "which creatures,
     -- IF ANY"), so the Curse is what changed the answer.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] []
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "no attack is legal"
   Spec.it s "CR 508.1d attacking with the required creature is legal" $ do
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = cursing curse S.alice [piker] []
     case mine of
       a : _ -> Spec.assertBool s (Combat.legalAttackDeclaration S.alice [a] gs) "attacking is legal"
@@ -1115,23 +1115,23 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     -- set entirely and she may still decline. bob's own creatures are not a
     -- second requirement either -- CR 508.1a's candidates are the ACTIVE
     -- player's, so a nonactive player's creature is never "able" to attack.
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = cursing curse S.bob [piker] [piker]
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "no attack is legal"
   Spec.it s "CR 508.1a a TAPPED creature is not able to attack, so the Curse does not require it" $ do
     -- "If able" doing its work, on the clause CR 508.1a states first: the
     -- chosen creatures "must be untapped", so a tapped one is never a
     -- candidate and carries no requirement.
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = cursing curse S.alice [piker] []
     case mine of
       a : _ -> Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] (S.tapObject a gs)) "no attack is legal"
       _ -> Spec.assertFailure s "fixture should have a creature"
   Spec.it s "CR 302.6 a summoning sick creature is not able to attack, so the Curse does not require it" $ do
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = cursing curse S.alice [piker] []
     case mine of
       a : _ ->
@@ -1144,9 +1144,9 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     -- on ONE board, so a blanket "nothing is required" bug cannot pass: the
     -- Piker alone attains the maximum, and the Wall neither adds to it nor is
     -- allowed to attack.
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    wallOfStone <- Registry.printing registry "Wall of Stone"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = cursing curse S.alice [wallOfStone, piker] []
     case mine of
       [wall, p] -> do
@@ -1158,8 +1158,8 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     -- One Curse over two creatures is TWO requirements, not one -- CR 508.1d
     -- checks "each creature they control". Attacking with one obeys one of
     -- two and is illegal; attacking with both attains the maximum.
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = cursing curse S.alice [piker, piker] []
     case mine of
       [first, second] -> do
@@ -1171,8 +1171,8 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     -- player and mints no requirement. The Aura stays ON the battlefield
     -- throughout, so this is not a test that removing it works -- CR 704.5m
     -- would bury it, and no state-based-action pass is run here.
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] []
         withAura = snd (S.addCreature curse S.alice gs)
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] withAura) "no attack is legal"
@@ -1186,8 +1186,8 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     -- Precise rather than vacuous, and both worlds are asserted. WITHOUT the
     -- Curse the declining interpreter attacks with nothing and bob stays at
     -- 20; WITH it the Piker attacks, taps, and bob takes 2.
-    curse <- Registry.printing registry "Curse of the Nightly Hunt"
-    piker <- Registry.printing registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = cursing curse S.alice [piker] []
         (plain, _, _) = S.combatBoardOf [piker] []
         declining :: Prompt.Prompt r -> r
@@ -1206,13 +1206,13 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
         Spec.assertEqWith s "and tapped" (tapStateOf a after) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have a creature"
 
-vigilanceSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+vigilanceSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
   Spec.it s "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $ do
     -- Both creatures in ONE declaration, so a blanket "nothing taps" bug
     -- cannot pass: the Piker must still tap.
-    windseekerCentaur <- Registry.printing registry "Windseeker Centaur"
-    piker <- Registry.printing registry "Goblin Piker"
+    windseekerCentaur <- S.printingOf s registry "Windseeker Centaur"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [windseekerCentaur, piker] [piker]
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
     case mine of
@@ -1224,15 +1224,15 @@ vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
   Spec.it s "CR 702.20b vigilance still attacks" $ do
     -- Vigilance is not a legality question: the creature is declared as an
     -- attacker exactly as normal. It simply skips CR 508.1f's tap.
-    windseekerCentaur <- Registry.printing registry "Windseeker Centaur"
-    piker <- Registry.printing registry "Goblin Piker"
+    windseekerCentaur <- S.printingOf s registry "Windseeker Centaur"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [windseekerCentaur] [piker]
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "attacking" (declaredAttackers after) mine
   Spec.it s "CR 702.20b an untapped vigilant attacker can still be blocked" $ do
     -- It is attacking, so it is in the Combat record, tapped or not.
-    windseekerCentaur <- Registry.printing registry "Windseeker Centaur"
-    piker <- Registry.printing registry "Goblin Piker"
+    windseekerCentaur <- S.printingOf s registry "Windseeker Centaur"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = S.combatBoardOf [windseekerCentaur] [piker]
         steps = do
           Combat.declareAttackers S.alice
@@ -1242,16 +1242,16 @@ vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
       [] -> Spec.assertFailure s "fixture should have an attacker"
       attacker : _ -> Spec.assertEqWith s "blocked" (Combat.blockersOf attacker after) (Set.fromList theirs)
 
-combatLegalitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+combatLegalitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
   Spec.it s "a Settled untapped creature may attack" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 0
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
       oid : _ -> Spec.assertBool s (Combat.canAttack S.alice oid gs) "may attack"
   Spec.it s "CR 302.6 a summoning sick creature may not attack" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 0
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -1259,7 +1259,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
         let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
          in Spec.assertBool s (not (Combat.canAttack S.alice oid sick)) "may not attack"
   Spec.it s "CR 508.1a a tapped creature may not attack" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 0
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -1267,13 +1267,13 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
         let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
          in Spec.assertBool s (not (Combat.canAttack S.alice oid tapped)) "may not attack"
   Spec.it s "a land may not attack" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs = (S.landsInPlay mountain 1) {GameState.activePlayer = S.alice}
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
       oid : _ -> Spec.assertBool s (not (Combat.canAttack S.alice oid gs)) "may not attack"
   Spec.it s "you may not attack with a creature you do not control" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = S.combatBoard piker 1 1
     case theirs of
       [] -> Spec.assertFailure s "fixture should have a blocker"
@@ -1281,7 +1281,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
   -- CR 302.6 restricts attacking and tap abilities. It says NOTHING about
   -- blocking, and getting this wrong is the classic beginner bug.
   Spec.it s "CR 302.6 a summoning sick creature MAY block" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = S.combatBoard piker 1 1
     case theirs of
       [] -> Spec.assertFailure s "fixture should have a blocker"
@@ -1289,7 +1289,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
         let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
          in Spec.assertBool s (Combat.canBlock S.bob oid sick) "may block"
   Spec.it s "CR 509.1a a tapped creature may not block" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = S.combatBoard piker 1 1
     case theirs of
       [] -> Spec.assertFailure s "fixture should have a blocker"
@@ -1297,17 +1297,17 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
         let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
          in Spec.assertBool s (not (Combat.canBlock S.bob oid tapped)) "may not block"
   Spec.it s "legalAttackers lists exactly the active player's creatures" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 2 3
     Spec.assertEqWith s "two" (Combat.legalAttackers S.alice gs) mine
   Spec.it s "CR 508.1a a player can attack with a creature they control but do not own" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (oid, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         gs0 = S.giveControl oid S.alice base
     Spec.assertBool s (elem oid (Combat.legalAttackers S.alice gs0)) "alice may attack with it"
     Spec.assertBool s (notElem oid (Combat.legalAttackers S.bob gs0)) "bob may not (not the controller, not active)"
   Spec.it s "combat starts empty and clears" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 0
         busy = case mine of
           [] -> gs
@@ -1326,24 +1326,24 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
     Spec.assertEqWith s "starts empty" (Combat.Type.attackers (GameState.combat gs)) Map.empty
     Spec.assertEqWith s "clears" (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy))) Map.empty
 
-keywordSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+keywordSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 keywordSpec s registry = Spec.describe s "Keyword" $ do
   let gs0 = Setup.emptyGame S.bothPlayers
       -- Each M2a printing carries exactly its one keyword and no other.
       carriesOnly (name, keyword) =
         Spec.it s (name <> " carries exactly " <> show keyword) $ do
-          printing <- Registry.printing registry name
+          printing <- S.printingOf s registry name
           let (oid, gs) = S.addCreature printing S.alice gs0
           Spec.assertEqWith s "keywords" (Projection.keywordsOf oid gs) (Map.singleton keyword 1)
           Spec.assertBool s (Projection.hasKeyword keyword oid gs) "hasKeyword"
   mapM_ carriesOnly S.m2aKeywords
   Spec.it s "a Piker has no keywords" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (oid, gs) = S.addCreature piker S.alice gs0
     Spec.assertEqWith s "none" (Projection.keywordsOf oid gs) Map.empty
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying oid gs)) "no flying"
   Spec.it s "a Mountain has no keywords" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
@@ -1354,7 +1354,7 @@ keywordSpec s registry = Spec.describe s "Keyword" $ do
   -- passes while the reach case above also passes, the two keywords
   -- are genuinely distinct rather than one flag.
   Spec.it s "reach is not flying" $ do
-    nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
+    nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
     let (oid, gs) = S.addCreature nimbleBirdsticker S.alice gs0
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying oid gs)) "no flying"
 
@@ -1371,14 +1371,14 @@ runToFirstStrikeDone answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 24 gs0
 
-firstStrikeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+firstStrikeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
   Spec.it s "CR 702.7b a first striker kills a vanilla blocker and lives" $ do
     -- The tiger (2/1 first strike) kills the Piker (2/1) in the first-strike
     -- step; the SBA between steps buries it before it can deal, so the tiger
     -- survives at zero damage.
-    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
-    piker <- Registry.printing registry "Goblin Piker"
+    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [sabretoothTiger] [piker]
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "the blocker is dead" (S.creaturesInPlay S.bob after) 0
@@ -1386,33 +1386,33 @@ firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
   Spec.it s "CR 510.2 the control: two vanilla 2/1s trade" $ do
     -- With a Piker in the tiger's place there is one combat damage step and
     -- both die. So first strike is the sole cause above.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] [piker]
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "alice's is dead" (S.creaturesInPlay S.alice after) 0
     Spec.assertEqWith s "bob's is dead" (S.creaturesInPlay S.bob after) 0
   Spec.it s "CR 702.4b a double striker deals twice to an unblocked player" $ do
     -- The raptor (2/1 double strike) deals 2 in each step: bob loses 4.
-    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
+    ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
     let (gs, _, _) = S.combatBoardOf [ridgetopRaptor] []
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "bob took 4" (S.lifeOf S.bob after) (Just 16)
   Spec.it s "CR 702.7b the control: a first striker deals once to a player" $ do
-    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
+    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
     let (gs, _, _) = S.combatBoardOf [sabretoothTiger] []
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 510.1b the control: a vanilla creature deals once to a player" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] []
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 510.4 double strike kills a 3/3 across two steps; first strike does not" $ do
     -- The raptor deals 2 + 2 = 4 to the Ogre (3/3), killing it. A first
     -- striker deals 2 once, and the Ogre lives.
-    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
-    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
-    ogreSentry <- Registry.printing registry "Ogre Sentry"
+    ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
+    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
+    ogreSentry <- S.printingOf s registry "Ogre Sentry"
     let raptorVs = S.combatBoardOf [ridgetopRaptor] [ogreSentry]
         tigerVs = S.combatBoardOf [sabretoothTiger] [ogreSentry]
         afterRaptor = S.runCombat S.aggressiveAnswer (frst raptorVs)
@@ -1423,8 +1423,8 @@ firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
     -- Raptor (double strike) and tiger (first strike) each block-kill the
     -- other in the first step. Neither is "remaining" for the second step, so
     -- no second-wave damage; both are simply dead.
-    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
-    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
+    ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
+    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
     let (gs, _, _) = S.combatBoardOf [ridgetopRaptor] [sabretoothTiger]
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "attacker dead" (S.creaturesInPlay S.alice after) 0
@@ -1435,9 +1435,9 @@ firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
     -- step: raptor 2 + Piker 2 = 4. bob: 20 - 8 = 12. The naive "strikers in
     -- step one, everyone else in step two" drops the raptor's second hit and
     -- lands bob at 14.
-    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
-    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
-    piker <- Registry.printing registry "Goblin Piker"
+    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
+    ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [sabretoothTiger, ridgetopRaptor, piker] []
         mid = runToFirstStrikeDone S.aggressiveAnswer gs
         after = S.runCombat S.aggressiveAnswer gs
@@ -1495,21 +1495,21 @@ runToEndOfCombat = runToStep (Phase.Combat CombatStep.EndOfCombat)
 -- round (CR 511.1), where the active player may cast an instant. Kill Shot
 -- ("Destroy target attacking creature") is what makes the window observable: it
 -- has a legal target during the end of combat step and none after it.
-endOfCombatSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+endOfCombatSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 endOfCombatSpec s registry = Spec.describe s "EndOfCombat" $ do
   Spec.it s "CR 511.3 whole card: Kill Shot destroys an attacker during the end of combat step" $ do
-    plains <- Registry.printing registry "Plains"
-    piker <- Registry.printing registry "Goblin Piker"
-    killShot <- Registry.printing registry "Kill Shot"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    killShot <- S.printingOf s registry "Kill Shot"
     let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
         after = snd (Engine.runGamePure attackAndCast atEnd Engine.runStep)
     Spec.assertEqWith s "the step under test is the end of combat step" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
     Spec.assertBool s (not (Map.null (Combat.Type.attackers (GameState.combat atEnd)))) "the Piker is still attacking as the step begins"
     Spec.assertEqWith s "the attacker was destroyed" (S.creaturesInPlay S.alice after) 0
   Spec.it s "CR 511.3 the removal still happens, one step later: combat is empty once the step ends" $ do
-    plains <- Registry.printing registry "Plains"
-    piker <- Registry.printing registry "Goblin Piker"
-    killShot <- Registry.printing registry "Kill Shot"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    killShot <- S.printingOf s registry "Kill Shot"
     let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
         after = snd (Engine.runGamePure S.aggressiveAnswer atEnd Engine.runStep)
     Spec.assertEqWith s "the combat phase is over" (GameState.phase after) Phase.PostcombatMain
@@ -1521,9 +1521,9 @@ endOfCombatSpec s registry = Spec.describe s "EndOfCombat" $ do
     -- The discriminator for the case above. If IsAttacking simply read True
     -- for every creature, or if combat were never cleared at all, this would
     -- kill the Piker too.
-    plains <- Registry.printing registry "Plains"
-    piker <- Registry.printing registry "Goblin Piker"
-    killShot <- Registry.printing registry "Kill Shot"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    killShot <- S.printingOf s registry "Kill Shot"
     let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
         postcombat = snd (Engine.runGamePure S.aggressiveAnswer atEnd Engine.runStep)
         after = snd (Engine.runGamePure attackAndCast postcombat Engine.runStep)
@@ -1534,12 +1534,12 @@ endOfCombatSpec s registry = Spec.describe s "EndOfCombat" $ do
 frst :: (a, b, c) -> a
 frst (a, _, _) = a
 
-m2bExitSpec :: Spec.Spec IO n -> Registry.Registry -> n ()
+m2bExitSpec :: Spec.Spec IO n -> Registry.Registry IO -> n ()
 m2bExitSpec s registry = Spec.describe s "M2bExit" $ do
   Spec.it s "the milestone: first strike breaks the trade, double strike doubles the hit, no attacker no damage" $ do
-    sabretoothTiger <- Registry.printing registry "Sabretooth Tiger"
-    piker <- Registry.printing registry "Goblin Piker"
-    ridgetopRaptor <- Registry.printing registry "Ridgetop Raptor"
+    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
     let trade = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [sabretoothTiger] [piker]))
         doubled = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [ridgetopRaptor] []))
         quiet = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [] []))
@@ -1600,13 +1600,13 @@ snatch victim p = case p of
 -- test is the engine's own and the removal is observed where a player would see
 -- it: at the CR 117.5 settle that follows the spell resolving. Each leg stops at
 -- the end of combat step, where CR 511.3 says the record still reads live.
-controlChangeRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+controlChangeRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ do
   Spec.it s "CR 506.4 whole card: Ray of Command on an attacker removes THAT attacker from combat, and it deals no combat damage" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    rayOfCommand <- Registry.printing registry "Ray of Command"
-    killShot <- Registry.printing registry "Kill Shot"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rayOfCommand <- S.printingOf s registry "Ray of Command"
+    killShot <- S.printingOf s registry "Kill Shot"
     case (rayBoard island piker rayOfCommand, S.spellTargetSpec killShot) of
       ((gs, [stolen, other, homebody]), Just attackingSpec) -> do
         let atEnd = runToEndOfCombat (steal homebody stolen) gs
@@ -1630,9 +1630,9 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
     -- control really does change -- just not for a combatant. A sampler that
     -- cleared combat whenever it saw a control change, or whenever anything
     -- resolved, would take the attackers out here too.
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    rayOfCommand <- Registry.printing registry "Ray of Command"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rayOfCommand <- S.printingOf s registry "Ray of Command"
     case rayBoard island piker rayOfCommand of
       (gs, [one, two, homebody]) -> do
         let atEnd = runToEndOfCombat (steal homebody homebody) gs
@@ -1650,9 +1650,9 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
     -- The theft has to land after blocks are declared, so the declare
     -- attackers step is played under an answerer that does not cast and only
     -- the declare blockers step onwards sees `snatch`.
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    rayOfCommand <- Registry.printing registry "Ray of Command"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rayOfCommand <- S.printingOf s registry "Ray of Command"
     let (gs0, mine, theirs) = S.combatBoardOf [piker] [piker]
         addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature island S.alice g))
         gs = snd (S.addHandCard rayOfCommand S.alice (addLands 4 gs0))
@@ -1789,12 +1789,12 @@ stayHomeAnswer homebody p = case p of
 -- Removal is removal only. Nothing here puts a creature back into combat, which
 -- is what the rules say too -- the glossary's "removed from combat" entry has
 -- the permanent take "no further involvement in that combat phase".
-effectRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+effectRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
   Spec.it s "CR 506.4 whole card: Labyrinth of Skophos removes target ATTACKING creature, and it deals no combat damage" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
     case (removalAbility labyrinth, skophosBoard labyrinth island S.bob [piker] []) of
       (Just ability, (gs, [attacker], _, mazeId)) -> do
         let atEnd = runToEndOfCombatWith (mazeAnswer mazeId ability attacker) gs
@@ -1820,9 +1820,9 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
     -- removal has to land after blocks are declared: the declare attackers
     -- step is played under an answerer that never activates, and only the
     -- declare blockers step onwards sees `mazeAnswer`.
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
     case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker] [piker]) of
       (Just ability, (gs, [attacker], [blocker], mazeId)) -> do
         let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
@@ -1842,9 +1842,9 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
     -- Or [IsAttacking, IsBlocking], and both halves are load-bearing: with
     -- IsAttacking alone the blocker would be rejected, and with no filter at
     -- all the homebody would be admitted.
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
     case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker, piker] [piker]) of
       (Just ability, (gs, [attacker, homebody], [blocker], _)) -> do
         -- The combat damage step is the vantage point: blockers have been
@@ -1974,15 +1974,15 @@ unblock blocker victim p = case p of
 --
 -- Every leg runs whole steps through Engine.runStep and stops at the end of
 -- combat step, where CR 511.3 says the record still reads live.
-typeChangeRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+typeChangeRemovalSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
   Spec.it s "CR 506.4 whole cards: an attacking Forest that stops being a creature is removed from combat" $ do
-    forest <- Registry.printing registry "Forest"
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    opalescence <- Registry.printing registry "Opalescence"
-    livingPlane <- Registry.printing registry "Living Plane"
-    doomBlade <- Registry.printing registry "Doom Blade"
+    forest <- S.printingOf s registry "Forest"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    opalescence <- S.printingOf s registry "Opalescence"
+    livingPlane <- S.printingOf s registry "Living Plane"
+    doomBlade <- S.printingOf s registry "Doom Blade"
     case unmakeBoard opalescence livingPlane piker forest swamp doomBlade of
       (gs, [_, plane, _], land) -> do
         let atEnd = runToEndOfCombat (unmake land plane) gs
@@ -2004,12 +2004,12 @@ typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
     -- creature really does die -- just not the one the Forest's creature-ness
     -- hangs on. A sampler that cleared combat whenever anything died, or
     -- whenever anything resolved, would take the Forest out here too.
-    forest <- Registry.printing registry "Forest"
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    opalescence <- Registry.printing registry "Opalescence"
-    livingPlane <- Registry.printing registry "Living Plane"
-    doomBlade <- Registry.printing registry "Doom Blade"
+    forest <- S.printingOf s registry "Forest"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    opalescence <- S.printingOf s registry "Opalescence"
+    livingPlane <- S.printingOf s registry "Living Plane"
+    doomBlade <- S.printingOf s registry "Doom Blade"
     case unmakeBoard opalescence livingPlane piker forest swamp doomBlade of
       (gs, [_, plane, homebody], land) -> do
         let atEnd = runToEndOfCombat (unmake land homebody) gs
@@ -2035,12 +2035,12 @@ typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
     -- The kill has to land after blocks are declared, so the declare attackers
     -- step is played under an answerer that never casts and only the declare
     -- blockers step onwards sees `unblock`.
-    forest <- Registry.printing registry "Forest"
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    opalescence <- Registry.printing registry "Opalescence"
-    livingPlane <- Registry.printing registry "Living Plane"
-    doomBlade <- Registry.printing registry "Doom Blade"
+    forest <- S.printingOf s registry "Forest"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    opalescence <- S.printingOf s registry "Opalescence"
+    livingPlane <- S.printingOf s registry "Living Plane"
+    doomBlade <- S.printingOf s registry "Doom Blade"
     case unblockBoard opalescence livingPlane piker forest swamp doomBlade of
       (gs, [attacker], [_, plane], land) -> do
         let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackOnly attacker) gs
@@ -2069,10 +2069,10 @@ typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
 -- Hanweir Garrison is the pool's only source of one: "Whenever this creature
 -- attacks, create two 1/1 red Human creature tokens that are tapped and
 -- attacking."
-putOntoBattlefieldAttackingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+putOntoBattlefieldAttackingSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefieldAttacking" $ do
   Spec.it s "CR 508.4 whole card: Hanweir Garrison's two Humans enter tapped and attacking" $ do
-    garrison <- Registry.printing registry "Hanweir Garrison"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
     let (gs, mine, _) = S.combatBoardOf [garrison] []
         -- The vantage point is the declare blockers step: the trigger fired
         -- at the declaration (CR 508.2b) and resolved in the declare
@@ -2107,7 +2107,7 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     -- declaration really does record one entry per creature, which is what
     -- makes the tokens' absence a fact about the tokens rather than about
     -- the shape of the log.
-    garrison <- Registry.printing registry "Hanweir Garrison"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
     let (gs, mine, _) = S.combatBoardOf [garrison, garrison] []
         atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
         tokens = S.tokensOf atBlockers
@@ -2117,13 +2117,13 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     Spec.assertEqWith s "but only the two Garrisons were DECLARED" (S.attackerDeclarationsOf atBlockers) mine
     mapM_ (\oid -> Spec.assertBool s (notElem oid (S.attackerDeclarationsOf atBlockers)) "no token was declared") tokens
   Spec.it s "CR 510.1b the tokens deal combat damage like any attacker" $ do
-    garrison <- Registry.printing registry "Hanweir Garrison"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
     let (gs, _, _) = S.combatBoardOf [garrison] []
         after = S.runCombat S.aggressiveAnswer gs
     -- The 2/3 Garrison plus two 1/1 tokens, all unblocked, against bob's 20.
     Spec.assertEqWith s "bob takes 2 + 1 + 1" (S.lifeOf S.bob after) (Just 16)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
   declareSpec s registry

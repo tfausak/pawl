@@ -78,12 +78,12 @@ ruleOfLawAfterFirst plains ruleOfLaw =
       (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
    in (a, b, resolveAll (S.runPure S.identityAnswer board (Cast.castSpell S.alice a)))
 
-ruleOfLawSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+ruleOfLawSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 ruleOfLawSpec s registry =
   Spec.describe s "RuleOfLaw" $ do
     Spec.it s "before any spell is cast, both cards are castable" $ do
-      plains <- Registry.printing registry "Plains"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
+      plains <- S.printingOf s registry "Plains"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice board)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast a) (Action.legalActions S.alice board)) "a offered"
@@ -96,8 +96,8 @@ ruleOfLawSpec s registry =
     -- used up the allowance is Rule of Law itself, cast BEFORE the effect
     -- existed. Any per-effect watermark or counter fails here.
     Spec.it s "CR 601.3 casting Rule of Law itself uses up the turn's one spell" $ do
-      plains <- Registry.printing registry "Plains"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
+      plains <- S.printingOf s registry "Plains"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice afterFirst) "alice is now prohibited"
       Spec.assertEqWith
@@ -109,8 +109,8 @@ ruleOfLawSpec s registry =
     -- The limit is counted PER PLAYER: bob has cast nothing this turn, so
     -- EachPlayer does not prohibit him.
     Spec.it s "CR 109.5 the EachPlayer scope still counts each player's own casts" $ do
-      plains <- Registry.printing registry "Plains"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
+      plains <- S.printingOf s registry "Plains"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob afterFirst)) "bob is not prohibited"
 
@@ -120,8 +120,8 @@ ruleOfLawSpec s registry =
     -- says nothing about the log being cleared, so this is an
     -- implementation fact rather than a rules citation.
     Spec.it s "the restriction lifts on the next turn" $ do
-      plains <- Registry.printing registry "Plains"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
+      plains <- S.printingOf s registry "Plains"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, b, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
           handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
           nextOwnTurn =
@@ -136,8 +136,8 @@ ruleOfLawSpec s registry =
     -- Ruling: "If you cast a spell that was countered, you can't cast
     -- another spell during the same turn." The counted event is the CAST.
     Spec.it s "CR 601.2i a countered spell still counted" $ do
-      plains <- Registry.printing registry "Plains"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
+      plains <- S.printingOf s registry "Plains"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, x, _, plain) = ruleOfLawBoard plains ruleOfLaw
           onBoard = snd (S.addCreature ruleOfLaw S.alice plain)
           cast = S.runPure S.identityAnswer onBoard (Cast.castSpell S.alice x)
@@ -151,8 +151,8 @@ ruleOfLawSpec s registry =
     -- The effect is RE-DERIVED from the battlefield on every read, so there
     -- is no stored state to unwind when its source leaves.
     Spec.it s "CR 604.2 destroying Rule of Law lifts the restriction in the same turn" $ do
-      plains <- Registry.printing registry "Plains"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
+      plains <- S.printingOf s registry "Plains"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, z, plain) = ruleOfLawBoard plains ruleOfLaw
           (rol, onBoard) = S.addCreature ruleOfLaw S.alice plain
           castOne = S.withEvents [GameEvent.SpellCast S.alice] onBoard
@@ -166,9 +166,9 @@ ruleOfLawSpec s registry =
     -- (Cast.permitsCastWhileSearching) excepts only the timing half, not
     -- the prohibition half. Seven Forests pay the Wurm's {5}{G}{G}.
     Spec.it s "CR 601.3 Rule of Law also prohibits casting Panglacial Wurm from the library" $ do
-      forest <- Registry.printing registry "Forest"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
-      panglacialWurm <- Registry.printing registry "Panglacial Wurm"
+      forest <- S.printingOf s registry "Forest"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
+      panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
       let base = S.landsInPlay forest 7
           (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
           (_, gs) = S.addLibraryCard panglacialWurm S.alice withRuleOfLaw
@@ -345,14 +345,14 @@ thaliaUntaxed mountain lightningBolt n =
 
 -- Thalia, Guardian of Thraben {1}{W} Legendary Creature -- Human Soldier 2/1:
 -- "First strike / Noncreature spells cost {1} more to cast."
-thaliaSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+thaliaSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 thaliaSpec s registry =
   Spec.describe s "Thalia" $ do
     Spec.it s "CR 601.2f a noncreature spell's total cost is one more" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = thaliaBoard mountain thalia lightningBolt piker 3
       Spec.assertEqWith
         s
@@ -363,10 +363,10 @@ thaliaSpec s registry =
     -- Ruling: "Thalia's ability affects each spell that's not a creature
     -- spell, including your own." The Filter reads the PROJECTION.
     Spec.it s "a creature spell fails the effect's criterion, so it is unaffected" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, pikerId, gs) = thaliaBoard mountain thalia lightningBolt piker 3
       Spec.assertEqWith
         s
@@ -379,10 +379,10 @@ thaliaSpec s registry =
     -- cast that cannot be afforded, and there is no mid-announcement
     -- rewind (#56) -- that is a wedged game, not a rejected action.
     Spec.it s "CR 601.2f castability is measured against the total cost" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (boltOne, _, oneLand) = thaliaBoard mountain thalia lightningBolt piker 1
           (boltTwo, _, twoLands) = thaliaBoard mountain thalia lightningBolt piker 2
           (_, pikerTwo, twoLandsAgain) = thaliaBoard mountain thalia lightningBolt piker 2
@@ -391,10 +391,10 @@ thaliaSpec s registry =
       Spec.assertBool s (Cast.castable S.alice pikerTwo twoLandsAgain) "and an untaxed creature spell needs only its printed two"
 
     Spec.it s "CR 601.2f payment spends the total cost" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = thaliaBoard mountain thalia lightningBolt piker 3
           paid = S.runPure S.identityAnswer gs (Cast.castSpell S.alice bolt)
           (boltU, gsU) = thaliaUntaxed mountain lightningBolt 3
@@ -405,10 +405,10 @@ thaliaSpec s registry =
     -- The EachPlayer scope: Thalia's controller is taxed (every assertion
     -- above is alice's own spell) and so is her opponent.
     Spec.it s "CR 611.1 the opponent is taxed too" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, gs) = thaliaBoard mountain thalia lightningBolt piker 3
           (bobBolt, withBob) = S.addHandCard lightningBolt S.bob gs
       Spec.assertEqWith
@@ -430,10 +430,10 @@ thaliaSpec s registry =
     -- enough), so if the tax wrongly reached the Wurm, castableWhileSearching
     -- would offer nothing here.
     Spec.it s "CR 601.2f a library-cast creature spell is unaffected by Thalia's noncreature tax" $ do
-      forest <- Registry.printing registry "Forest"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      panglacialWurm <- Registry.printing registry "Panglacial Wurm"
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
+      forest <- S.printingOf s registry "Forest"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let green = ManaSymbol.OfType (ManaType.Colored Color.Green)
           base = S.landsInPlay forest 7
           (_, withThalia) = S.addCreature thalia S.alice base
@@ -492,7 +492,7 @@ medallionBothBoard island sapphireMedallion thalia unsummonPrinting =
       )
 
 -- Sapphire Medallion {2} Artifact: "Blue spells you cast cost {1} less to cast."
-medallionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+medallionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 medallionSpec s registry =
   Spec.describe s "SapphireMedallion" $ do
     -- Ruling: "The ability can't reduce the amount of colored mana you pay
@@ -500,11 +500,11 @@ medallionSpec s registry =
     -- cost." THE HEADLINE FALSIFIER: subtracting from the mana value would
     -- make this spell free.
     Spec.it s "CR 118.7a a {U} spell still costs {U}" $ do
-      island <- Registry.printing registry "Island"
-      sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-      unsummonPrinting <- Registry.printing registry "Unsummon"
-      divinationPrinting <- Registry.printing registry "Divination"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      unsummonPrinting <- S.printingOf s registry "Unsummon"
+      divinationPrinting <- S.printingOf s registry "Divination"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let (unsummon, _, _, gs) = medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt 2
       Spec.assertEqWith
         s
@@ -513,11 +513,11 @@ medallionSpec s registry =
         (Just (ManaCost.MkManaCost [blue]))
 
     Spec.it s "CR 118.7a a {2}{U} spell costs {1}{U}" $ do
-      island <- Registry.printing registry "Island"
-      sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-      unsummonPrinting <- Registry.printing registry "Unsummon"
-      divinationPrinting <- Registry.printing registry "Divination"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      unsummonPrinting <- S.printingOf s registry "Unsummon"
+      divinationPrinting <- S.printingOf s registry "Divination"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let (_, divination, _, gs) = medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt 2
       Spec.assertEqWith
         s
@@ -526,11 +526,11 @@ medallionSpec s registry =
         (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]))
 
     Spec.it s "a red spell fails the effect's colour criterion, so it is unaffected" $ do
-      island <- Registry.printing registry "Island"
-      sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-      unsummonPrinting <- Registry.printing registry "Unsummon"
-      divinationPrinting <- Registry.printing registry "Divination"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      unsummonPrinting <- S.printingOf s registry "Unsummon"
+      divinationPrinting <- S.printingOf s registry "Divination"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let (_, _, bolt, gs) = medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt 2
       Spec.assertEqWith
         s
@@ -541,11 +541,11 @@ medallionSpec s registry =
     -- Divination is {2}{U}: three mana printed, two after the discount. Two
     -- Islands is exactly the amount that tells the two apart.
     Spec.it s "CR 601.2f the discount is observable at the castability gate" $ do
-      island <- Registry.printing registry "Island"
-      sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-      unsummonPrinting <- Registry.printing registry "Unsummon"
-      divinationPrinting <- Registry.printing registry "Divination"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      unsummonPrinting <- S.printingOf s registry "Unsummon"
+      divinationPrinting <- S.printingOf s registry "Divination"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let (_, divination, _, withMedallion) = medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt 2
           bareBoard =
             let base = S.landsInPlay island 2
@@ -563,11 +563,11 @@ medallionSpec s registry =
 
     -- CR 611.1 / 109.5: the You scope is the effect's controller.
     Spec.it s "CR 109.5 the You scope does not discount an opponent's spell" $ do
-      island <- Registry.printing registry "Island"
-      sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-      unsummonPrinting <- Registry.printing registry "Unsummon"
-      divinationPrinting <- Registry.printing registry "Divination"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      unsummonPrinting <- S.printingOf s registry "Unsummon"
+      divinationPrinting <- S.printingOf s registry "Divination"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let (_, _, _, gs) = medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt 2
           (bobDivination, withBob) = S.addHandCard divinationPrinting S.bob gs
       Spec.assertEqWith
@@ -583,10 +583,10 @@ medallionSpec s registry =
     -- names a cost with NO generic component on purpose: the two orders
     -- agree wherever the CR 601.2f floor does not bind.
     Spec.it s "CR 601.2f Thalia then the Medallion leaves a {U} spell at exactly {U}" $ do
-      island <- Registry.printing registry "Island"
-      sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      unsummonPrinting <- Registry.printing registry "Unsummon"
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      unsummonPrinting <- S.printingOf s registry "Unsummon"
       let (unsummon, gs) = medallionBothBoard island sapphireMedallion thalia unsummonPrinting
       Spec.assertEqWith
         s
@@ -608,18 +608,18 @@ medallionSpec s registry =
 -- AFTER the seven layers have run, so one never starts to apply before layer 6
 -- and the cut is unconditional. Same shape as the layer-7-only static ability
 -- gatherStatic drops.
-humilitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+humilitySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 humilitySpec s registry =
   Spec.describe s "Humility" $ do
     -- THE PROVING CASE. Thalia is a creature, so Humility reaches her with no
     -- animator in the way, and her tax is the only thing standing between the
     -- Bolt and its printed cost.
     Spec.it s "CR 604.2 Humility takes Thalia's ability, so her tax stops applying" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
-      humility <- Registry.printing registry "Humility"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
+      humility <- S.printingOf s registry "Humility"
       let (bolt, _, taxed) = thaliaBoard mountain thalia lightningBolt piker 3
           humbled = S.withHumility humility taxed
       Spec.assertEqWith
@@ -637,11 +637,11 @@ humilitySpec s registry =
     -- with ONE Mountain -- the amount that tells the taxed and untaxed costs
     -- apart.
     Spec.it s "CR 601.2f castability and payment both drop the stripped tax" $ do
-      mountain <- Registry.printing registry "Mountain"
-      thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
-      humility <- Registry.printing registry "Humility"
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
+      humility <- S.printingOf s registry "Humility"
       let (bolt, _, oneLand) = thaliaBoard mountain thalia lightningBolt piker 1
           humbled = S.withHumility humility oneLand
           paid = S.runPure S.identityAnswer humbled (Cast.castSpell S.alice bolt)
@@ -653,12 +653,12 @@ humilitySpec s registry =
     -- Humility's affected set is "each creature", and Sapphire Medallion is an
     -- artifact -- nothing animates it here, so its discount is untouched.
     Spec.it s "CR 613.1f Humility reaches only creatures, so an artifact's ability stands" $ do
-      island <- Registry.printing registry "Island"
-      sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
-      unsummonPrinting <- Registry.printing registry "Unsummon"
-      divinationPrinting <- Registry.printing registry "Divination"
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      humility <- Registry.printing registry "Humility"
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      unsummonPrinting <- S.printingOf s registry "Unsummon"
+      divinationPrinting <- S.printingOf s registry "Divination"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      humility <- S.printingOf s registry "Humility"
       let (_, divination, _, gs) = medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt 2
           humbled = S.withHumility humility gs
       Spec.assertEqWith
@@ -674,9 +674,9 @@ humilitySpec s registry =
     -- animation already is. Opalescence itself is spared by its own "each
     -- other enchantment", so it keeps animating.
     Spec.it s "CR 613.1d Opalescence animates Rule of Law into Humility's set" $ do
-      ruleOfLaw <- Registry.printing registry "Rule of Law"
-      humility <- Registry.printing registry "Humility"
-      opalescence <- Registry.printing registry "Opalescence"
+      ruleOfLaw <- S.printingOf s registry "Rule of Law"
+      humility <- S.printingOf s registry "Humility"
+      opalescence <- S.printingOf s registry "Opalescence"
       let base = Setup.emptyGame S.bothPlayers
           (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
           withHumility = S.withHumility humility withRuleOfLaw
@@ -720,13 +720,13 @@ edgewalkerBoard plains edgewalker piker copies n =
 -- excess as dropped rather than spilled (#309). Edgewalker is itself a Cleric,
 -- so the spell it discounts is another copy of itself and the pool needs no
 -- second Cleric to make the point.
-edgewalkerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+edgewalkerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 edgewalkerSpec s registry =
   Spec.describe s "Edgewalker" $ do
     Spec.it s "CR 118.7 a Cleric spell loses one white and one black symbol" $ do
-      plains <- Registry.printing registry "Plains"
-      edgewalker <- Registry.printing registry "Edgewalker"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (spell, _, gs) = edgewalkerBoard plains edgewalker piker 1 3
       Spec.assertEqWith
         s
@@ -735,9 +735,9 @@ edgewalkerSpec s registry =
         (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
 
     Spec.it s "a spell with no Cleric subtype fails the effect's criterion, so it is unaffected" $ do
-      plains <- Registry.printing registry "Plains"
-      edgewalker <- Registry.printing registry "Edgewalker"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, pikerId, gs) = edgewalkerBoard plains edgewalker piker 1 3
       Spec.assertEqWith
         s
@@ -752,9 +752,9 @@ edgewalkerSpec s registry =
     -- go on to eat the {1} and leave the spell free, and Edgewalker's card
     -- text stops it (#309).
     Spec.it s "a second Edgewalker's stranded halves leave the generic component alone" $ do
-      plains <- Registry.printing registry "Plains"
-      edgewalker <- Registry.printing registry "Edgewalker"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (spell, _, gs) = edgewalkerBoard plains edgewalker piker 2 3
       Spec.assertEqWith
         s
@@ -767,18 +767,18 @@ edgewalkerSpec s registry =
     -- a {B}: what makes the discounted spell castable is that the reduction
     -- removed the black SYMBOL, not that it removed an amount.
     Spec.it s "CR 601.2f castability is measured against the total cost" $ do
-      plains <- Registry.printing registry "Plains"
-      edgewalker <- Registry.printing registry "Edgewalker"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (discounted, _, withEdgewalker) = edgewalkerBoard plains edgewalker piker 1 3
           (undiscounted, _, bare) = edgewalkerBoard plains edgewalker piker 0 3
       Spec.assertBool s (not (Cast.castable S.alice undiscounted bare)) "three Plains cannot pay a printed {1}{W}{B}"
       Spec.assertBool s (Cast.castable S.alice discounted withEdgewalker) "but they can pay the discounted {1}"
 
     Spec.it s "CR 601.2f payment spends the total cost" $ do
-      plains <- Registry.printing registry "Plains"
-      edgewalker <- Registry.printing registry "Edgewalker"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (spell, _, gs) = edgewalkerBoard plains edgewalker piker 1 3
           paid = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spell)
       Spec.assertEqWith s "one Plains tapped, not three" (S.tappedCount S.alice paid) 1
@@ -786,9 +786,9 @@ edgewalkerSpec s registry =
     -- CR 611.1 / 109.5: the You scope is the effect's controller, and bob
     -- controls no Edgewalker.
     Spec.it s "CR 109.5 the You scope does not discount an opponent's Cleric spell" $ do
-      plains <- Registry.printing registry "Plains"
-      edgewalker <- Registry.printing registry "Edgewalker"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, gs) = edgewalkerBoard plains edgewalker piker 1 3
           (bobEdgewalker, withBob) = S.addHandCard edgewalker S.bob gs
       Spec.assertEqWith
@@ -812,22 +812,22 @@ reliquaryCleanup :: GameState.GameState -> GameState.GameState
 reliquaryCleanup gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
 
 -- Reliquary Tower, a Land: "You have no maximum hand size. / {T}: Add {C}."
-reliquaryTowerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+reliquaryTowerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 reliquaryTowerSpec s registry =
   Spec.describe s "ReliquaryTower" $ do
     Spec.it s "CR 402.2 the maximum hand size is normally seven" $ do
-      plains <- Registry.printing registry "Plains"
+      plains <- S.printingOf s registry "Plains"
       Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [])) (Just 7)
 
     Spec.it s "CR 514.1 nine cards at cleanup discards down to seven" $ do
-      plains <- Registry.printing registry "Plains"
+      plains <- S.printingOf s registry "Plains"
       let after = reliquaryCleanup (reliquaryHandOfNine plains [])
       Spec.assertEqWith s "hand" (S.handSize S.alice after) 7
       Spec.assertEqWith s "two discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
 
     Spec.it s "CR 402.2 Reliquary Tower removes the maximum entirely" $ do
-      plains <- Registry.printing registry "Plains"
-      reliquaryTower <- Registry.printing registry "Reliquary Tower"
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
       Spec.assertEqWith
         s
         "no maximum"
@@ -835,16 +835,16 @@ reliquaryTowerSpec s registry =
         Nothing
 
     Spec.it s "CR 514.1 with Reliquary Tower nothing is discarded and nothing is asked" $ do
-      plains <- Registry.printing registry "Plains"
-      reliquaryTower <- Registry.printing registry "Reliquary Tower"
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
       let after = reliquaryCleanup (reliquaryHandOfNine plains [reliquaryTower])
       Spec.assertEqWith s "hand keeps nine" (S.handSize S.alice after) 9
       Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
 
     -- CR 109.5: the You scope. bob does not share alice's Tower.
     Spec.it s "CR 109.5 the opponent still has a maximum hand size" $ do
-      plains <- Registry.printing registry "Plains"
-      reliquaryTower <- Registry.printing registry "Reliquary Tower"
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
       Spec.assertEqWith
         s
         "seven"
@@ -856,9 +856,9 @@ reliquaryTowerSpec s registry =
     -- in the pool -- so this axis composes with the layer system without
     -- being part of it.
     Spec.it s "CR 305.7 Blood Moon strips the ability off the Tower" $ do
-      plains <- Registry.printing registry "Plains"
-      reliquaryTower <- Registry.printing registry "Reliquary Tower"
-      bloodMoon <- Registry.printing registry "Blood Moon"
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
       let board = reliquaryHandOfNine plains [reliquaryTower, bloodMoon]
       Spec.assertEqWith s "seven again" (PlayerEffect.maximumHandSize S.alice board) (Just 7)
 
@@ -907,7 +907,7 @@ storedConditional piker =
 -- The STORED carrier: a player effect that outlives the object that made it.
 -- Hand-built here, exactly as ExpirySpec hand-builds a ContinuousEffect, so the
 -- carrier and its sweeps are proven before an opcode can produce one.
-storedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+storedSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 storedSpec s registry =
   Spec.describe s "Stored" $ do
     let base = Setup.emptyGame S.bothPlayers
@@ -957,7 +957,7 @@ storedSpec s registry =
     -- Without this, "deletes on failure" is indistinguishable from
     -- "empties the list unconditionally".
     Spec.it s "CR 611.2b the conditional sweep keeps a player effect whose condition still holds" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, conditional) = storedConditional piker
           (changed, swept) = Engine.runGamePure S.identityAnswer conditional Expiry.sweepConditional
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob conditional) "still prohibited while the source stands"
@@ -966,7 +966,7 @@ storedSpec s registry =
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob swept) "still prohibited after a no-op sweep"
 
     Spec.it s "CR 611.2b the conditional sweep deletes a player effect whose condition has failed" $ do
-      piker <- Registry.printing registry "Goblin Piker"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (srcId, conditional) = storedConditional piker
           gone = S.runPure S.identityAnswer conditional (Event.destroy Regenerability.Regenerable [srcId])
           (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
@@ -1048,15 +1048,15 @@ isSilenceActivate action = case action of
   Action.Type.Pass -> False
 
 -- Silence {W} Instant: "Your opponents can't cast spells this turn."
-silenceSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+silenceSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 silenceSpec s registry =
   Spec.describe s "Silence" $ do
     Spec.it s "before Silence resolves, bob may cast his creature" $ do
-      plains <- Registry.printing registry "Plains"
-      silence <- Registry.printing registry "Silence"
-      mountain <- Registry.printing registry "Mountain"
-      prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      silence <- S.printingOf s registry "Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, pikerId, _, before, _) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertBool s (elem (Action.Type.Cast pikerId) (Action.legalActions S.bob before)) "offered"
 
@@ -1064,11 +1064,11 @@ silenceSpec s registry =
     -- resolves -- the stack holds only Silence itself. Freeze the affected
     -- set and this card does literally nothing.
     Spec.it s "CR 611.2c the effect reaches a spell that did not exist when it began" $ do
-      plains <- Registry.printing registry "Plains"
-      silence <- Registry.printing registry "Silence"
-      mountain <- Registry.printing registry "Mountain"
-      prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      silence <- S.printingOf s registry "Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects after)) 1
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob after) "bob is prohibited"
@@ -1081,11 +1081,11 @@ silenceSpec s registry =
     -- CR 109.5: "your opponents" is scoped off Silence's controller, which
     -- is baked into the stored effect because its source is in a graveyard.
     Spec.it s "CR 109.5 the Opponents scope spares the caster" $ do
-      plains <- Registry.printing registry "Plains"
-      silence <- Registry.printing registry "Silence"
-      mountain <- Registry.printing registry "Mountain"
-      prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      silence <- S.printingOf s registry "Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, silence2Id, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice after)) "alice is not prohibited"
       Spec.assertBool s (Cast.castable S.alice silence2Id after) "and may cast her second Silence"
@@ -1094,21 +1094,21 @@ silenceSpec s registry =
     -- opponents can still activate abilities ... they can still play lands,
     -- and so on."
     Spec.it s "CR 601.3 only casting is stopped" $ do
-      plains <- Registry.printing registry "Plains"
-      silence <- Registry.printing registry "Silence"
-      mountain <- Registry.printing registry "Mountain"
-      prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      silence <- S.printingOf s registry "Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, landId, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertBool s (elem (Action.Type.Play landId) (Action.legalActions S.bob after)) "bob may still play a land"
       Spec.assertBool s (any isSilenceActivate (Action.legalActions S.bob after)) "and still activate an ability"
 
     Spec.it s "CR 514.2 the prohibition ends at cleanup" $ do
-      plains <- Registry.printing registry "Plains"
-      silence <- Registry.printing registry "Silence"
-      mountain <- Registry.printing registry "Mountain"
-      prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      silence <- S.printingOf s registry "Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
           ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
       Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
@@ -1118,10 +1118,10 @@ silenceSpec s registry =
     -- card's your-opponents is EVERY other player, not the next seat. This is
     -- the first Silence fixture that can tell those apart.
     Spec.it s "CR 806.1 at three seats Silence stops BOTH opponents, and still spares the caster" $ do
-      plains <- Registry.printing registry "Plains"
-      silence <- Registry.printing registry "Silence"
-      mountain <- Registry.printing registry "Mountain"
-      piker <- Registry.printing registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      silence <- S.printingOf s registry "Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (silenceId, bobsPiker, carolsPiker, before) = threeSeatSilenceBoard plains silence mountain piker
           -- Goblin Piker is a creature, so CR 302.1's timing applies: it is
           -- offered only to the ACTIVE player (Cast.sorcerySpeed). `before` is
@@ -1168,36 +1168,36 @@ matchesSpellBoard lightningBolt piker =
 -- over the PROJECTED view (CR 613.1d layer 4 for a card type, CR 613.1e layer 5
 -- for a colour) rather than the retired SpellCriterion. A noncreature spell is
 -- Filter.Not (Filter.HasCardType Creature); a coloured spell is Filter.HasColor.
-matchesSpellSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+matchesSpellSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 matchesSpellSpec s registry =
   Spec.describe s "matchesSpell" $ do
     let noncreature = Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
 
     Spec.it s "CR 613.1d Thalia's noncreature criterion admits an instant" $ do
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
       Spec.assertBool s (PlayerEffect.matchesSpell noncreature bolt gs) "Lightning Bolt is a noncreature spell"
 
     Spec.it s "CR 613.1d a creature spell fails the noncreature criterion" $ do
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (_, pikerId, gs) = matchesSpellBoard lightningBolt piker
       Spec.assertBool s (not (PlayerEffect.matchesSpell noncreature pikerId gs)) "Goblin Piker is a creature spell"
 
     Spec.it s "CR 613.1e a colour criterion admits a matching-colour spell" $ do
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
       Spec.assertBool s (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
 
     Spec.it s "CR 613.1e a colour criterion rejects a non-matching colour" $ do
-      lightningBolt <- Registry.printing registry "Lightning Bolt"
-      piker <- Registry.printing registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
       Spec.assertBool s (not (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
   adjustmentSpec s

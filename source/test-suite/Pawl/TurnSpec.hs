@@ -177,7 +177,7 @@ turnDataSpec s = Spec.describe s "TurnData" $ do
               ]
           )
 
-skipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+skipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 skipSpec s registry = Spec.describe s "Skip" $ do
   Spec.it s "CR 511.3 thisPhase inside a combat phase ends at ITS end of combat" $
     -- Two whole combat phases back to back -- the arrangement CR 500.8
@@ -280,7 +280,7 @@ skipSpec s registry = Spec.describe s "Skip" $ do
   Spec.it s "CR 508.8 an attacker keeps the declare blockers step" $ do
     -- The control: with an attacker, the step after declare attackers is
     -- declare blockers, exactly as before. So the skip is not "always skip".
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] []
         after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
     Spec.assertEqWith s "declare blockers still next" (GameState.phase after) (Phase.Combat CombatStep.DeclareBlockers)
@@ -303,8 +303,8 @@ skipSpec s registry = Spec.describe s "Skip" $ do
     -- clause ("or put onto the battlefield attacking") can only come true in
     -- that step's priority round -- which is also the round this test's Bolt
     -- would be cast in.
-    mountain <- Registry.printing registry "Mountain"
-    bolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
     let (base, _) = S.boltInHand mountain bolt 1 (Phase.Combat CombatStep.DeclareAttackers)
         armed = base {GameState.activePlayer = S.bob}
         after = snd (Engine.runGamePure S.identityAnswer armed Engine.runStep)
@@ -323,9 +323,9 @@ skipSpec s registry = Spec.describe s "Skip" $ do
     -- rule that keeps the two apart -- a declared creature "remains an
     -- attacking creature until it's removed from combat", which ends its
     -- attacking, not its having been declared.
-    piker <- Registry.printing registry "Goblin Piker"
-    island <- Registry.printing registry "Island"
-    ray <- Registry.printing registry "Ray of Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
+    ray <- S.printingOf s registry "Ray of Command"
     let (base, _, _) = S.combatBoardOf [piker] []
         -- {3}{U}, so four.
         withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 :: Int .. 4]
@@ -339,7 +339,7 @@ skipSpec s registry = Spec.describe s "Skip" $ do
     -- battlefield attacking without first attacking with something (#370);
     -- this is the strongest statement of the clause available, and it is
     -- what stops the fix above from being narrowed to the declaration.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (base, ours, _) = S.combatBoardOf [piker] []
         joined = S.runPure S.identityAnswer base (Foldable.traverse_ Combat.putOntoBattlefieldAttacking ours)
         after = Combat.skipEmptyCombat joined
@@ -497,7 +497,7 @@ castAndResolveWith answer spell gs =
 -- main phase. Activate only as a sorcery.) and Relentless Assault ({2}{R}{R}:
 -- Untap all creatures that attacked this turn. After this main phase, there is
 -- an additional combat phase followed by an additional main phase.)
-extraPhaseSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+extraPhaseSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
   Spec.it s "CR 500.8 splicePhases from a MAIN phase goes at the head" $
     -- CR 505.2: a main phase has no steps, so nothing of it is left in the
@@ -543,9 +543,9 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
       (Turn.splicePhases Phase.PrecombatMain [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat] Seq.empty)
       (Turn.expandExtraPhase ExtraPhase.ExtraCombat <> Turn.expandExtraPhase ExtraPhase.ExtraCombat)
   Spec.it s "CR 500.8 whole card: Aggravated Assault untaps your creatures and adds a combat and a main phase" $ do
-    mountain <- Registry.printing registry "Mountain"
-    assault <- Registry.printing registry "Aggravated Assault"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    assault <- S.printingOf s registry "Aggravated Assault"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, enchantment, ours, theirs) = assaultBoard mountain assault piker piker
     case assaultAbility assault of
       Nothing -> Spec.assertFailure s "Aggravated Assault should print one activated ability"
@@ -579,9 +579,9 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     -- directly after the precombat main phase), nobody attacks in it, so CR
     -- 508.8 skips its declare blockers and combat damage steps -- and the
     -- turn's own combat phase, still ahead in the schedule, must keep both.
-    mountain <- Registry.printing registry "Mountain"
-    assault <- Registry.printing registry "Aggravated Assault"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    assault <- S.printingOf s registry "Aggravated Assault"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, enchantment, _, _) = assaultBoard mountain assault piker piker
     case assaultAbility assault of
       Nothing -> Spec.assertFailure s "Aggravated Assault should print one activated ability"
@@ -602,10 +602,10 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     -- vigilance (CR 702.20b: attacking does not tap it), so it is a legal
     -- attacker again in the second declare attackers step, and bob takes 2
     -- in each combat damage step.
-    mountain <- Registry.printing registry "Mountain"
-    assault <- Registry.printing registry "Aggravated Assault"
-    centaur <- Registry.printing registry "Windseeker Centaur"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    assault <- S.printingOf s registry "Aggravated Assault"
+    centaur <- S.printingOf s registry "Windseeker Centaur"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, enchantment, _, _) = assaultBoard mountain assault centaur piker
     case assaultAbility assault of
       Nothing -> Spec.assertFailure s "Aggravated Assault should print one activated ability"
@@ -637,9 +637,9 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     -- "creatures you control": both creatures are alice's and both are
     -- tapped by the time the spell resolves, and only the one that was
     -- DECLARED as an attacker (CR 508.3a) may untap.
-    mountain <- Registry.printing registry "Mountain"
-    assault <- Registry.printing registry "Relentless Assault"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    assault <- S.printingOf s registry "Relentless Assault"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, spell, attacker, bystander) = relentlessBoard mountain assault piker
         fought = S.runCombat (S.attackTo S.bob) gs
         after = castAndResolve spell fought
@@ -658,8 +658,8 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     -- combat phase's own declare blockers, combat damage and end of combat
     -- steps are all still in `remaining` -- so the head is INSIDE the phase
     -- the added one has to follow. CR 511.3 is what bounds it.
-    aurelia <- Registry.printing registry "Aurelia, the Warleader"
-    piker <- Registry.printing registry "Goblin Piker"
+    aurelia <- S.printingOf s registry "Aurelia, the Warleader"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, ours, _) = S.combatBoardOf [aurelia, piker] []
         after = snd (Engine.runGamePure (S.attackTo S.bob) gs Engine.runStep)
     -- Under a head-cons the added phase's beginning of combat step would be
@@ -683,8 +683,8 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
   Spec.it s "CR 500.8 Aurelia's second attack adds no third combat phase" $ do
     -- "For the first time each turn" is load-bearing: without it Aurelia
     -- attacks in the phase she added, adds another, and the turn never ends.
-    aurelia <- Registry.printing registry "Aurelia, the Warleader"
-    piker <- Registry.printing registry "Goblin Piker"
+    aurelia <- S.printingOf s registry "Aurelia, the Warleader"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [aurelia, piker] []
         (played, ran) = runTurn (S.attackTo S.bob) gs
     Spec.assertEqWith
@@ -710,9 +710,9 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     -- The one two-element payload in the pool, and the one that adds a
     -- combat phase directly after a combat phase. CR 500.8 fixes neither the
     -- number nor the kind, which is why the opcode carries a list.
-    mountain <- Registry.printing registry "Mountain"
-    throttle <- Registry.printing registry "Full Throttle"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    throttle <- S.printingOf s registry "Full Throttle"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, spell, _) = throttleBoard mountain throttle piker
         after = castAndResolve spell gs
     Spec.assertEqWith
@@ -731,9 +731,9 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     -- it added and the turn's own. Under the old store it would fire once,
     -- the Piker would stay tapped from its first attack (CR 508.1f), and bob
     -- would take 2 instead of 6.
-    mountain <- Registry.printing registry "Mountain"
-    throttle <- Registry.printing registry "Full Throttle"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    throttle <- S.printingOf s registry "Full Throttle"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, spell, _) = throttleBoard mountain throttle piker
         (played, ran) = runTurn (S.attackTo S.bob) (castAndResolve spell gs)
         combatPhase = Turn.expandExtraPhase ExtraPhase.ExtraCombat
@@ -757,9 +757,9 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     -- step has ended, so CR 511.3 has removed every creature from combat and
     -- Combat.Type.attackers is empty -- an IsAttacking-shaped implementation would
     -- untap nothing here and this test would fail.
-    mountain <- Registry.printing registry "Mountain"
-    assault <- Registry.printing registry "Relentless Assault"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    assault <- S.printingOf s registry "Relentless Assault"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, spell, attacker, _) = relentlessBoard mountain assault piker
         fought = S.runCombat (S.attackTo S.bob) gs
     Spec.assertEqWith s "combat really was cleared" (Map.keys (Combat.Type.attackers (GameState.combat fought))) []
@@ -815,12 +815,12 @@ turnTakers n gs =
 -- ANOTHER player: Time Warp ({3}{U}{U} Sorcery, "Target player takes an extra
 -- turn after this one."). Savor the Moment creates one too, and what it adds --
 -- a skip scoped to that turn -- is turnScopedSkipSpec below.
-extraTurnSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+extraTurnSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
   let boardOf n = do
-        island <- Registry.printing registry "Island"
-        warp <- Registry.printing registry "Time Warp"
-        piker <- Registry.printing registry "Goblin Piker"
+        island <- S.printingOf s registry "Island"
+        warp <- S.printingOf s registry "Time Warp"
+        piker <- S.printingOf s registry "Goblin Piker"
         pure (warpBoard island warp piker n)
   -- The control: without the spell the turn hands off down the seating
   -- order, which is what every case below is measured against.
@@ -897,7 +897,7 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
   -- ALICE's turn most recently created and therefore first. Fails
   -- against a push in seating order, which would answer [bob, alice].
   Spec.it s "CR 500.7 several extra turns from one effect are added in APNAP order" $ do
-    island <- Registry.printing registry "Island"
+    island <- S.printingOf s registry "Island"
     let gs = (S.landsInPlay island 1) {GameState.activePlayer = S.bob}
         source = ObjectId.MkObjectId 0
         after =
@@ -959,13 +959,13 @@ tapStateOf oid = fmap Object.tapped . Game.lookupObject oid
 -- created after this one and taken BEFORE it, and the printed card skips the
 -- untap step of the turn IT made, not of whichever turn comes next. Two cards
 -- already in the pool reach that divergence.
-turnScopedSkipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+turnScopedSkipSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
   let boardOf = do
-        island <- Registry.printing registry "Island"
-        savor <- Registry.printing registry "Savor the Moment"
-        warp <- Registry.printing registry "Time Warp"
-        piker <- Registry.printing registry "Goblin Piker"
+        island <- S.printingOf s registry "Island"
+        savor <- S.printingOf s registry "Savor the Moment"
+        warp <- S.printingOf s registry "Time Warp"
+        piker <- S.printingOf s registry "Goblin Piker"
         pure (savorBoard island savor warp piker)
       tapped = Just TapState.Tapped
       untapped = Just TapState.Untapped
@@ -1039,7 +1039,7 @@ turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
     Spec.assertEqWith s "Savor's is turn 3, and alice's" (GameState.turnNumber atSavorTurn, GameState.activePlayer atSavorTurn) (3, S.alice)
     Spec.assertEqWith s "but Savor's own turn did NOT untap" (tapStateOf piker afterSavorTurn) tapped
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   turnSpec s
   turnDataSpec s

@@ -84,16 +84,16 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
-objectFactSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+objectFactSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 objectFactSpec s registry = Spec.describe s "ObjectFacts" $ do
   Spec.it s "a Piker's power and toughness are 2 and 1" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 2)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 1)
 
   Spec.it s "CR 111.3 a token's characteristics are read through cardOf" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         goblinCard = Printing.card piker
         (tokId, gs) = S.addToken goblinCard S.alice base
@@ -101,7 +101,7 @@ objectFactSpec s registry = Spec.describe s "ObjectFacts" $ do
     Spec.assertEqWith s "the token is on the battlefield" (Set.member tokId (GameState.battlefield gs)) True
 
   Spec.it s "CR 112.1 isSpell is True for a spell on the stack, False off it" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         (spellId, gs1) = S.spellOnStack piker S.alice base
         (permId, gs2) = S.addCreature piker S.bob gs1
@@ -112,7 +112,7 @@ objectFactSpec s registry = Spec.describe s "ObjectFacts" $ do
     Spec.assertBool s (not (Game.isSpell tokId gs3)) "a token is not a spell"
 
   Spec.it s "a Mountain has no power or toughness" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
@@ -121,7 +121,7 @@ objectFactSpec s registry = Spec.describe s "ObjectFacts" $ do
         Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) Nothing
 
   Spec.it s "controllerOf is the owner while nothing can change control" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "controller" (Projection.controllerOf oid gs) (Just S.bob)
 
@@ -138,18 +138,18 @@ afterMountainMoved :: Printing.Printing -> GameState.GameState
 afterMountainMoved mountain =
   S.runPure S.identityAnswer (S.oneMountainState mountain Phase.PrecombatMain) (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
 
-gameSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+gameSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 gameSpec s registry = Spec.describe s "Game" $ do
   Spec.it s "changeZone preserves object count" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "count" (Game.objectCount (afterMountainMoved mountain)) 1
 
   Spec.it s "changeZone drops the old id" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "old gone" (Game.lookupObject (ObjectId.MkObjectId 0) (afterMountainMoved mountain)) Nothing
 
   Spec.it s "the moved object is on the battlefield, owner preserved" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith
       s
       "moved"
@@ -172,7 +172,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
       )
 
   Spec.it s "CR 400.7 changeZone forgets a spell's bindings" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let base = S.oneMountainState mountain Phase.PrecombatMain
         slot = SlotName.MkSlotName (Text.pack "target")
         stamped =
@@ -188,7 +188,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
     Spec.assertEqWith s "reset" (fmap Object.bindings landed) [Map.empty]
 
   Spec.it s "CR 400.7 changeZone resets a word-swap binding" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let base = S.oneMountainState mountain Phase.PrecombatMain
         slot = SlotName.MkSlotName (Text.pack "target")
         stamped =
@@ -204,8 +204,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
     Spec.assertEqWith s "reset to empty" (fmap Object.bindings newObj) (Just Map.empty)
 
   Spec.it s "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    mountain <- Registry.printing registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
     let (oid, gs) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
         before = GameState.nextTimestamp gs
         movedState = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
@@ -223,36 +223,36 @@ gameSpec s registry = Spec.describe s "Game" $ do
     Spec.assertEqWith s "empty" (GameState.continuousEffects (Setup.emptyGame S.bothPlayers)) []
 
   Spec.it s "a vanilla printing declares no static abilities" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     Spec.assertEqWith s "empty" (Card.Type.staticAbilities (Printing.card piker)) []
 
-actionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+actionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 actionSpec s registry = Spec.describe s "Action" $ do
   Spec.it s "a land in hand is playable in a main phase" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)) "play"
 
   Spec.it s "passing is always legal" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)) "pass"
 
   Spec.it s "no land play outside a main phase" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice (S.oneMountainState mountain (Phase.Beginning BeginningStep.Upkeep))) [A.Pass]
 
   Spec.it s "no second land after one is played" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs = (S.oneMountainState mountain Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice gs) [A.Pass]
 
-goldfishResult :: Registry.Registry -> IO (Result.Result, GameState.GameState)
-goldfishResult registry = do
-  matchup <- S.redRed registry
+goldfishResult :: Spec.Spec IO n -> Registry.Registry IO -> IO (Result.Result, GameState.GameState)
+goldfishResult s registry = do
+  matchup <- S.redRed (S.printingOf s registry)
   pure (Engine.runMatchPure S.identityAnswer matchup)
 
-landState :: Registry.Registry -> IO GameState.GameState
-landState registry = do
-  matchup <- S.redRed registry
+landState :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+landState s registry = do
+  matchup <- S.redRed (S.printingOf s registry)
   pure (snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom matchup)))
 
 -- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
@@ -262,26 +262,26 @@ turnsTaken pid gs =
   let total = GameState.turnNumber gs
    in if pid == S.alice then (total + 1) `div` 2 else total `div` 2
 
-engineSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+engineSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 engineSpec s registry = Spec.describe s "Engine" $ do
   Spec.it s "goldfish game ends with the starting player winning" $ do
-    (result, _) <- goldfishResult registry
+    (result, _) <- goldfishResult s registry
     Spec.assertEqWith s "winner" result (Result.Won S.alice)
 
   Spec.it s "card conservation holds at end" $ do
-    (_, gs) <- goldfishResult registry
+    (_, gs) <- goldfishResult s registry
     Spec.assertEqWith s "objects" (Game.objectCount gs) 120
 
   Spec.it s "playing lands fills the battlefield" $ do
-    gs <- landState registry
+    gs <- landState s registry
     Spec.assertBool s (not (null (Game.zoneMembers Zone.Battlefield S.alice gs))) "non-empty"
 
   Spec.it s "land play conserves cards" $ do
-    gs <- landState registry
+    gs <- landState s registry
     Spec.assertEqWith s "objects" (Game.objectCount gs) 120
 
   Spec.it s "CR 305.2 at most one land per turn" $ do
-    gs <- landState registry
+    gs <- landState s registry
     Spec.assertBool
       s
       ( Natural.length (Game.zoneMembers Zone.Battlefield S.alice gs) <= turnsTaken S.alice gs
@@ -290,31 +290,31 @@ engineSpec s registry = Spec.describe s "Engine" $ do
       "no double land plays"
 
 -- Run setup, then a scripted tweak, then whatever steps the scenario needs.
-scenario :: Registry.Registry -> Game.Type.Game () -> IO GameState.GameState
-scenario registry steps = do
-  matchup <- S.redRed registry
+scenario :: Spec.Spec IO n -> Registry.Registry IO -> Game.Type.Game () -> IO GameState.GameState
+scenario s registry steps = do
+  matchup <- S.redRed (S.printingOf s registry)
   pure . snd . Engine.runGamePure S.identityAnswer (Setup.emptyGame (fmap fst matchup)) $ do
     Setup.newGame S.performer matchup
     steps
 
 -- Alice starts, so her turn-1 draw is skipped.
-aliceFirstDraw :: Registry.Registry -> IO GameState.GameState
-aliceFirstDraw registry = scenario registry S.drawStep
+aliceFirstDraw :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+aliceFirstDraw s registry = scenario s registry S.drawStep
 
 -- Bob is not the starting player, so his draw happens normally.
-bobFirstDraw :: Registry.Registry -> IO GameState.GameState
-bobFirstDraw registry = scenario registry $ do
+bobFirstDraw :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+bobFirstDraw s registry = scenario s registry $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
 
-bobAfterCleanup :: Registry.Registry -> IO GameState.GameState
-bobAfterCleanup registry = scenario registry $ do
+bobAfterCleanup :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+bobAfterCleanup s registry = scenario s registry $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
   Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)
 
-deckedOut :: Registry.Registry -> IO GameState.GameState
-deckedOut registry = scenario registry $ do
+deckedOut :: Spec.Spec IO n -> Registry.Registry IO -> IO GameState.GameState
+deckedOut s registry = scenario s registry $ do
   State.modify' $ \gs ->
     gs
       { GameState.library = Map.insert S.alice Seq.empty (GameState.library gs),
@@ -390,14 +390,14 @@ askedPlayers mountain piker =
         (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
         []
 
-ruleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+ruleSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 ruleSpec s registry = Spec.describe s "Rules" $ do
   Spec.it s "CR 117.4 a full round of passes resolves the stack, not the step" $ do
     -- With a spell on the stack, everyone passing must RESOLVE it and keep
     -- the step alive. Under M0's rule the step would simply end with the
     -- spell still sitting on the stack.
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
         steps = do
           Cast.castSpell S.alice oid
@@ -410,17 +410,17 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- alice is asked, casts, and must be asked AGAIN before bob gets a turn.
     -- If priority wrongly advanced to the next player, this would be
     -- [alice, bob, ...] instead.
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     Spec.assertEqWith s "alice twice, then bob" (take 3 (askedPlayers mountain piker)) [S.alice, S.alice, S.bob]
 
   Spec.it s "CR 103.8a starting player skips first draw" $ do
-    gs <- aliceFirstDraw registry
+    gs <- aliceFirstDraw s registry
     Spec.assertEqWith s "hand" (S.handSize S.alice gs) 7
     Spec.assertEqWith s "library" (librarySize S.alice gs) 53
 
   Spec.it s "CR 103.8a only the starting player skips" $ do
-    gs <- bobFirstDraw registry
+    gs <- bobFirstDraw s registry
     Spec.assertEqWith s "hand" (S.handSize S.bob gs) 8
     Spec.assertEqWith s "library" (librarySize S.bob gs) 52
 
@@ -442,11 +442,11 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertBool s (not (Set.member S.alice (GameState.drewFromEmpty afterTwo))) "CR 103.8a: alice still skips at two seats"
 
   Spec.it s "CR 514.2 discard to hand size" $ do
-    gs <- bobAfterCleanup registry
+    gs <- bobAfterCleanup s registry
     Spec.assertEqWith s "hand" (S.handSize S.bob gs) 7
 
   Spec.it s "CR 704.5b deck-out loses" $ do
-    gs <- deckedOut registry
+    gs <- deckedOut s registry
     Spec.assertEqWith
       s
       "alice departed"
@@ -454,13 +454,13 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
       (Just (Status.Departed Departure.Type.Lost))
 
   Spec.it s "CR 704.5b the survivor wins" $ do
-    gs <- deckedOut registry
+    gs <- deckedOut s registry
     Spec.assertEqWith s "bob won" (GameState.result gs) (Just (Result.Won S.bob))
 
   Spec.it s "CR 723.3/723.5: alice decides for bob, but bob's resources move" $ do
     -- bob's main phase, controlled by alice, with a Mountain and a Bolt.
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let g0 = Setup.emptyGame S.bothPlayers
         (_mtnId, g1) = S.addCreature mountain S.bob g0
         (_boltId, g2) = handBobBolt lightningBolt g1
@@ -486,9 +486,9 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- Alice activates a REAL Mindslaver through the driver loop at bob, the
     -- engine promotes control on bob's turn, alice casts bob's Bolt at bob
     -- (bob's own resource), and control ends at the following turn boundary.
-    mindslaver <- Registry.printing registry "Mindslaver"
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mindslaver <- S.printingOf s registry "Mindslaver"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let g0 = Setup.emptyGame S.bothPlayers
         (_msId, g1) = S.addCreature mindslaver S.alice g0
         -- {4} for Mindslaver's activation: four untapped Mountains for alice.
@@ -540,7 +540,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- defending player because alice is active there (CR 506.2), so a board
     -- that makes bob active must name alice instead -- otherwise bob would be
     -- declared the defending player on his own turn.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (board, _mine, _bobsPikers) = S.combatBoardOf [] [piker]
         g0 =
           board
@@ -555,8 +555,8 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- bob (controlled by alice) and alice each have an untapped Mountain; bob
     -- has a Bolt. Alice-as-bob casts bob's Bolt, paid from BOB's Mountain.
     -- alice's Mountain and hand must be untouched.
-    mountain <- Registry.printing registry "Mountain"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let g0 = Setup.emptyGame S.bothPlayers
         (_bMtn, g1) = S.addCreature mountain S.bob g0
         (_aMtn, g2) = S.addCreature mountain S.alice g1
@@ -579,9 +579,9 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- alice owns 8. Both start with reduced life on a populated board. bob
     -- activates the artifact through the priority loop; it resolves, restarts
     -- the game, and the result is a valid new game with bob as starter.
-    syntheticRestart <- Registry.printing registry "Synthetic Restart"
-    piker <- Registry.printing registry "Goblin Piker"
-    mountain <- Registry.printing registry "Mountain"
+    syntheticRestart <- S.printingOf s registry "Synthetic Restart"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         (_restartId, g1) = S.addCreature syntheticRestart S.bob g0
         (_aPiker, g2) = S.addCreature piker S.alice g1
@@ -611,7 +611,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "the game did not end -- the new game is live" (GameState.result after) Nothing
 
   Spec.it s "CR 729.2/729.3/729.5: playSubgame runs a nested game, bob decks, cards funnel back" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         -- alice: 8 library cards; bob: 3 (fewer than seven -> loses, CR 729.3)
         g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
@@ -632,7 +632,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   -- exactly whoever the roll started. Flipping the answer flips the winner,
   -- which is what makes the determination observable rather than cosmetic.
   Spec.it s "CR 729.2: the subgame's first player comes from the roll; the answer decides who wins" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 7 S.bob (addManyG mountain 7 S.alice g0)))
         winnerWhenStarting starter = fst (Engine.runGamePure (firstPlayerAnswer starter) g1 Engine.playSubgame)
@@ -667,7 +667,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- resurrect a departed player's library. The full-roster span in
     -- Setup.subgameStateFrom and Setup.funnelBack still has to match; see the
     -- comments at both sites.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.threePlayers
         g1 = poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 7 S.carol (addManyG mountain 3 S.bob (addManyG mountain 7 S.alice g0)))))
         parent = Departure.depart Departure.Type.Conceded S.bob g1
@@ -684,8 +684,8 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- a 3-card library (decks in the subgame, CR 729.3). alice casts through
     -- the priority loop; the subgame resolves alice the winner; the follow-on
     -- DealDamage hits bob (the loser) for 3.
-    mountain <- Registry.printing registry "Mountain"
-    syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
+    mountain <- S.printingOf s registry "Mountain"
+    syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
         (spellId, g2) = S.addHandCard syntheticSubgame S.alice g1
@@ -711,8 +711,8 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- library pool built first, THEN the survivor is added to the battlefield --
     -- poolToLibraryG sweeps every object a player owns onto their library, so a
     -- survivor added before it would be swept in too and vanish from the board.
-    mountain <- Registry.printing registry "Mountain"
-    syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
+    mountain <- S.printingOf s registry "Mountain"
+    syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
         -- a survivor on the main battlefield that must remain after the subgame
@@ -772,8 +772,8 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- (2 setup + 2 funnel-back); this two-level gate contributes 8 (2 levels
     -- x (2 setup + 2 funnel-back)), so asserting the count is a genuine
     -- nesting regression test, not just a termination guard.
-    syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
-    mountain <- Registry.printing registry "Mountain"
+    syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         (_nestedId, g1) = libraryCard syntheticSubgame S.alice g0
         g2 = poolToLibraryG S.bob (addToLibraryG mountain 13 S.alice (addManyG mountain 7 S.bob g1))
@@ -797,8 +797,8 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- gate's fixture through record -> replay and comparing the final
     -- GameState (derives Eq) is the test that would fail if that design had
     -- been taken instead.
-    syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
-    mountain <- Registry.printing registry "Mountain"
+    syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
+    mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         (_nestedId, g1) = libraryCard syntheticSubgame S.alice g0
         g2 = poolToLibraryG S.bob (addToLibraryG mountain 13 S.alice (addManyG mountain 7 S.bob g1))
@@ -818,7 +818,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- bottomed, so every player keeps seven and nothing goes back to the
     -- library -- today each keeps six and bottoms one. CR 103.8c: the
     -- starting player does not skip the first draw -- today alice skips.
-    matchup <- S.threeWayMirror registry
+    matchup <- S.threeWayMirror (S.printingOf s registry)
     let g0 = Setup.emptyGame (fmap fst matchup)
         afterSetup = snd (Engine.runGamePure mulliganOnceAnswer g0 (Setup.newGame S.performer matchup))
         afterDraw = snd (Engine.runGamePure mulliganOnceAnswer afterSetup S.drawStep)
@@ -855,7 +855,7 @@ concedeOrderAnswer who p = case p of
     pure (if asked == who then Concession.Concedes else Concession.Continues)
   _ -> pure (S.identityAnswer p)
 
-concedeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+concedeSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
   Spec.it s "CR 104.3a/104.2a a concede ends the game immediately, opponent wins" $ do
     let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
@@ -879,7 +879,7 @@ concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
     -- Decide.deciderFor (activeControl stops being honoured) would make this
     -- record MkDecider bob instead, and the test would catch it even though
     -- the headline outcome (bob departs Conceded, alice wins) would still hold.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (mountainOid, gs) =
           S.addHandCard
             mountain
@@ -957,7 +957,7 @@ concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
   Spec.it s "CR 104.3a concede does not use the stack: a spell on it never resolves" $ do
     -- A Lightning Bolt is on the stack targeting nothing in particular. alice
     -- concedes at her priority; the game ends without the stack resolving.
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (spellId, base) = S.spellOnStack lightningBolt S.alice (Setup.emptyGame S.bothPlayers)
         gs =
           base
@@ -1017,7 +1017,7 @@ greedThenPassAnswer greedId ability p = case p of
     pure (if pid == S.alice && List.elem (A.Activate greedId ability) actions then A.Activate greedId ability else A.Pass)
   _ -> pure (S.identityAnswer p)
 
-turnOrderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+turnOrderSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
   Spec.it s "CR 800.4k a departed player's turn does not begin" $ do
     let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
@@ -1136,7 +1136,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- on the stack, alice (the active player) has left. Bob and carol pass,
     -- the Piker resolves, and priority is re-granted to BOB. Without
     -- priorityHolder the third ask would be alice's.
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (_, withSpell) = S.spellOnStack piker S.carol S.threePlayerGame
         gone = Departure.depart Departure.Type.Conceded S.alice (withSpell {GameState.phase = Phase.PrecombatMain})
         ((_, after), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.alice) gone Engine.priorityLoop) []
@@ -1169,7 +1169,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     Spec.assertEqWith s "a playing active player's land play IS cleared" (GameState.landPlayed control) Set.empty
 
   Spec.it s "CR 800.4j/703.4i a departed active player is not asked to declare attackers" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     -- The board sits at the declare attackers step, so CR 703.4h has already
     -- settled the defending player and it has to say who: alice is active, so
     -- bob is her first candidate (CR 506.2a). Without it Combat.defender is
@@ -1217,7 +1217,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- attack at all (no attack is possible), so deleting the guard would leave
     -- this case green for the wrong reason. alice is active, so bob defends
     -- (CR 506.2's second sentence).
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let seated =
           (Setup.emptyGame S.bothPlayers)
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
@@ -1269,8 +1269,8 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- departed alice again. With the guard it re-derives the holder via
     -- nextStillPlaying and asks bob, the next seat still in the game,
     -- instead.
-    swamp <- Registry.printing registry "Swamp"
-    greed <- Registry.printing registry "Greed"
+    swamp <- S.printingOf s registry "Swamp"
+    greed <- S.printingOf s registry "Greed"
     let (_, withSwamp) = S.addCreature swamp S.alice S.threePlayerGame
         (greedId, withGreed) = S.addCreature greed S.alice withSwamp
         gs =
@@ -1304,8 +1304,8 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- leaving the battlefield won't cause the exiled creature to return. The
     -- game will continue to watch for the next time an opponent becomes the
     -- monarch."
-    piker <- Registry.printing registry "Goblin Piker"
-    palaceJailer <- Registry.printing registry "Palace Jailer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceJailer <- S.printingOf s registry "Palace Jailer"
     let (victim, g1) = S.addCreature piker S.carol S.threePlayerGame
         (jailer, g2) = S.addCreature palaceJailer S.bob g1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
@@ -1387,13 +1387,13 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
 -- act on anything else. Every gate the enumeration applies -- the controller
 -- check, CR 302.6's tap-sickness gate, cost payability, CR 307.5 timing -- is
 -- only as strong as this.
-trustedActionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+trustedActionSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 trustedActionSpec s registry = Spec.describe s "TrustedActions" $ do
   -- CR 302.6: a summoning-sick creature's {T} ability cannot be activated.
   -- legalActions already refuses to offer it; this pins that NAMING it anyway
   -- does not work either.
   Spec.it s "#219 an activation that was never offered is refused" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         -- Summoning sick, so the ability is genuinely illegal to activate.
         sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) srcId (GameState.objects g0), GameState.priority = Just S.alice}
@@ -1408,7 +1408,7 @@ trustedActionSpec s registry = Spec.describe s "TrustedActions" $ do
   -- activation is legal and must go through. Without this, a guard that
   -- refused every activation would pass the test above.
   Spec.it s "#219 the same activation IS honoured once it is legal" $ do
-    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.alice)
         ready = settled {GameState.priority = Just S.alice}
@@ -1417,7 +1417,7 @@ trustedActionSpec s registry = Spec.describe s "TrustedActions" $ do
     Spec.assertBool s (elem (A.Activate srcId ability) (Action.legalActions S.alice ready)) "it is offered now"
     Spec.assertEqWith s "so the Sorcerer taps" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Tapped)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
   gameSpec s registry
   actionSpec s registry
@@ -1776,10 +1776,10 @@ runCountingActions gs act =
       ((_, gs1), n) = State.runState (Engine.runGame answer gs act) 0
    in (gs1, n)
 
-restartReentrySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+restartReentrySpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 restartReentrySpec s registry = Spec.describe s "restart re-entry (CR 727.4)" $ do
   Spec.it s "the step the restart fired in does not advance past turn 1's untap step" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (after, _) = runCountingActions (restartOnStack mountain) Engine.runStep
     Spec.assertEqWith s "still positioned at the untap step" (GameState.phase after) Turn.firstPhase
     Spec.assertEqWith s "the fresh turn schedule is intact, not popped" (GameState.remaining after) Turn.laterPhases
@@ -1790,12 +1790,12 @@ restartReentrySpec s registry = Spec.describe s "restart re-entry (CR 727.4)" $ 
     -- alice passes, bob passes, the ability resolves: two ChooseAction prompts
     -- and no more. A third means the priority loop kept running on a game that
     -- no longer exists.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (_, asked) = runCountingActions (restartOnStack mountain) Engine.runStep
     Spec.assertEqWith s "exactly the two passes that resolved the ability" asked 2
 
   Spec.it s "the next step runs the rebuilt turn 1's untap step" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (afterRestart, _) = runCountingActions (restartOnStack mountain) Engine.runStep
         (afterUntap, _) = runCountingActions afterRestart Engine.runStep
     Spec.assertEqWith s "the untap step ran and handed on to upkeep" (GameState.phase afterUntap) (Phase.Beginning BeginningStep.Upkeep)
@@ -1810,7 +1810,7 @@ restartReentrySpec s registry = Spec.describe s "restart re-entry (CR 727.4)" $ 
     -- wins, loses or draws the game that was restarted). Terminating: the
     -- restart is a hand-built stack object, not a card in any library, so it
     -- cannot fire again and the rebuilt game decks out like any other.
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let (result, _) = Engine.runGamePure S.identityAnswer (restartOnStack mountain) Engine.playGame
     Spec.assertBool s (case result of Result.Won _ -> True; Result.Drawn -> True) "the new game reached a result"
 
@@ -1844,11 +1844,11 @@ cleanupBoard filler n others =
 -- still on 20, bob active, turn 2. Under CR 514.3a it resolves inside alice's own
 -- cleanup step: alice on 18, alice still active, and a second cleanup step
 -- current.
-cleanupStepSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+cleanupStepSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ do
   Spec.it s "CR 514.3a a trigger waiting during cleanup resolves in that cleanup" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    megrim <- Registry.printing registry "Megrim"
+    piker <- S.printingOf s registry "Goblin Piker"
+    megrim <- S.printingOf s registry "Megrim"
     let after = S.runPure S.identityAnswer (cleanupBoard piker 8 [megrim]) Engine.runStep
     Spec.assertEqWith s "CR 514.1 trimmed alice to her maximum hand size" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
     Spec.assertEqWith s "Megrim's trigger RESOLVED, in this cleanup step" (S.lifeOf S.alice after) (Just 18)
@@ -1861,8 +1861,8 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
   -- two cleanup steps because CR 514.1 finds the hand already at its maximum
   -- the second time round and so has no discard to fire the Megrim with.
   Spec.it s "CR 514.3a the second cleanup step finds nothing waiting and ends the turn" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    megrim <- Registry.printing registry "Megrim"
+    piker <- S.printingOf s registry "Goblin Piker"
+    megrim <- S.printingOf s registry "Megrim"
     let after = S.runPure S.identityAnswer (cleanupBoard piker 8 [megrim]) Engine.runStep
         (again, asked) = runCountingActions after Engine.runStep
     Spec.assertEqWith s "nobody was asked to act in the second cleanup step" asked 0
@@ -1877,7 +1877,7 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
   -- board one card apart: without the Megrim nothing is waiting, and the
   -- exception must not fire.
   Spec.it s "CR 514.3 a cleanup step with nothing waiting grants no priority" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (after, asked) = runCountingActions (cleanupBoard piker 8 []) Engine.runStep
     Spec.assertEqWith s "nobody was asked to act" asked 0
     Spec.assertEqWith s "the turn handed off at once" (GameState.activePlayer after) S.bob
@@ -1887,8 +1887,8 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
   -- and a second empties the stack and ends the step (CR 514.3a's "once the
   -- stack is empty and all players pass in succession").
   Spec.it s "CR 514.3a the exception grants a real priority round" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    megrim <- Registry.printing registry "Megrim"
+    piker <- S.printingOf s registry "Goblin Piker"
+    megrim <- S.printingOf s registry "Megrim"
     let (_, asked) = runCountingActions (cleanupBoard piker 8 [megrim]) Engine.runStep
     Spec.assertEqWith s "two passes to resolve the trigger, two to end the step" asked 4
 
@@ -1907,10 +1907,10 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
   -- unlooped CR 704.3 check running ahead of it buries the Piker, and CR
   -- 514.3a then finds an already-settled board and grants nothing.
   Spec.it s "CR 514.3a a state-based action alone fires the exception" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    giantGrowth <- Registry.printing registry "Giant Growth"
-    curse <- Registry.printing registry "Curse of Death's Hold"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giantGrowth <- S.printingOf s registry "Giant Growth"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs0, ggId) = S.handOne giantGrowth withPiker
         cast = S.runPure S.identityAnswer gs0 (Cast.castSpell S.alice ggId)

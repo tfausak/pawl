@@ -53,14 +53,14 @@ import qualified Pawl.Types.Zone as Zone
 -- and CR 704.5n's detach-rather-than-bury state-based action (#193). The
 -- Reattach group below is the same keyword action aimed the other way, at a
 -- permanent the effect TARGETS rather than at its own source.
-equipmentSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+equipmentSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- CR 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
   -- creature you control." The Equipment is the ability's SOURCE; the slot is
   -- what it attaches to.
   Spec.it s "CR 702.6a equipping attaches the Equipment to the target creature" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.alice base
         (equip, gs) = S.addCreature bonesplitter S.alice withCreature
@@ -80,8 +80,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- 'equipped creature'." Affected.Attached already means exactly that, so
   -- Bonesplitter's +2/+0 rides the same path Unholy Strength does.
   Spec.it s "CR 301.5a the equipped creature gets the Equipment's bonus" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.alice base
         (equip, gs) = S.addCreature bonesplitter S.alice withCreature
@@ -92,9 +92,9 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- CR 701.3a: attaching a permanent that is already attached MOVES it --
   -- "take it from where it currently is and put it onto that object".
   Spec.it s "CR 701.3a equipping again moves the Equipment off the first creature" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
         (first, g1) = S.addCreature piker S.alice base
         (second, g2) = S.addCreature warMammoth S.alice g1
@@ -118,9 +118,9 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- it resolve, and see the creature actually hit harder. Everything above
   -- drives Effect.Attach directly; this drives the CARD.
   Spec.it s "CR 702.6 whole card: cast Bonesplitter, equip a Piker, and it swings for 4" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base0 = S.landsInPlay mountain 2 -- {1} to cast, {1} to equip
         (creature, base1) = S.addCreature piker S.alice base0
         (withSpell, spellId) = S.handOne bonesplitter base1
@@ -151,9 +151,9 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- CR 701.3b's second sentence is the other half: re-attaching to the object
   -- it is ALREADY attached to "does nothing", so no new timestamp there.
   Spec.it s "CR 701.3c attaching to a different creature restamps; re-attaching to the same one does not" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
         (first, g1) = S.addCreature piker S.alice base
         (second, g2) = S.addCreature warMammoth S.alice g1
@@ -179,8 +179,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- player. It REMAINS ON THE BATTLEFIELD." The shape difference from an
   -- Aura, which CR 704.5m buries instead (#193).
   Spec.it s "CR 704.5n an Equipment whose creature dies detaches and stays on the battlefield" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.alice base
         (equip, g2) = S.addCreature bonesplitter S.alice withCreature
@@ -193,8 +193,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- creature." An Equipment left on a noncreature permanent detaches too --
   -- the same SBA, a different way of becoming illegal.
   Spec.it s "CR 301.5 an Equipment attached to a noncreature permanent detaches" $ do
-    mountain <- Registry.printing registry "Mountain"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
         (land, withLand) = S.addCreature mountain S.alice base
         (equip, g2) = S.addCreature bonesplitter S.alice withLand
@@ -216,7 +216,7 @@ aimAt oid p = case p of
 -- CR 704.5p, the sibling of CR 704.5n above: 704.5n asks whether the HOST is
 -- still legal, and this asks whether the attached permanent may be attached to
 -- anything at all. Both detach and leave the permanent on the battlefield.
-unattachableSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+unattachableSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 unattachableSpec s registry = Spec.describe s "Unattachable" $ do
   -- CR 704.5p, first sentence: "If a battle or creature is attached to an
   -- object or player, it becomes unattached and remains on the battlefield."
@@ -235,10 +235,10 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
   -- CR 603.6a enters-the-battlefield trigger target the equipped
   -- Bonesplitter, and watch the equipped creature lose the bonus.
   Spec.it s "CR 704.5p whole card: animating an equipped Bonesplitter detaches it and the Piker loses the bonus" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    bonesplitter <- Registry.printing registry "Bonesplitter"
-    animator <- Registry.printing registry "Skilled Animator"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    animator <- S.printingOf s registry "Skilled Animator"
     let base = S.landsInPlay island 3 -- {2}{U}
         (creature, g1) = S.addCreature piker S.alice base
         (equip, g2) = S.addCreature bonesplitter S.alice g1
@@ -268,8 +268,8 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
   -- branch reads the permanent's own types and not its host's: the Piker here
   -- is a legal host for anything that may be attached at all.
   Spec.it s "CR 704.5p a land attached to a creature detaches and stays on the battlefield" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.alice base
         (land, g2) = S.addCreature mountain S.alice withCreature
@@ -294,11 +294,11 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
   -- an ARTIFACT first (Liquimetal Coating), which nothing excludes it from,
   -- and Skilled Animator then animates it as one.
   Spec.it s "CR 303.4d whole cards: an Aura made a creature unattaches, then is buried" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    coating <- Registry.printing registry "Liquimetal Coating"
-    animator <- Registry.printing registry "Skilled Animator"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    coating <- S.printingOf s registry "Liquimetal Coating"
+    animator <- S.printingOf s registry "Skilled Animator"
     let base = S.landsInPlay island 3 -- {2}{U} for the Animator
         (creature, g1) = S.addCreature piker S.alice base
         (aura, g2) = S.addCreature unholyStrength S.alice g1
@@ -344,7 +344,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
 -- BOTH halves of an enchant-player Aura: the Pool.Players enchant spec, which
 -- Card.enchant could already express, and a static ability whose affected set is
 -- reached THROUGH the enchanted player (Affected.AttachedPlayerControls).
-enchantPlayerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+enchantPlayerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- The gameplay proof design.md section 4 asks for: cast the real card at a
   -- real player, let it resolve, and see the creatures on the other side of
@@ -352,9 +352,9 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- to an object or player", so the attachment is asserted on the incarnation
   -- that entered, not written by a later step.
   Spec.it s "CR 702.5d whole card: Curse of Death's Hold enters attached to the player it targeted and shrinks that player's creatures" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    curse <- Registry.printing registry "Curse of Death's Hold"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
     let base = S.landsInPlay swamp 5
         (his, withHis) = S.addCreature piker S.bob base
         (hers, withBoth) = S.addCreature piker S.alice withHis
@@ -376,9 +376,9 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- enchanted player no longer controls is out of the set on the very next
   -- projection. Control Magic is the only control-changer in the pool.
   Spec.it s "CR 613.1b: a creature stolen from the enchanted player leaves the Curse's affected set" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    curse <- Registry.printing registry "Curse of Death's Hold"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.bob base
         (aura, withAura) = S.addCreature curse S.alice withCreature
@@ -393,7 +393,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- moment anyone leaves and no state-based action would ever be checked
   -- again.
   Spec.it s "CR 704.5m / 303.4c: a Curse attached to a player who has left the game is put into its owner's graveyard" $ do
-    curse <- Registry.printing registry "Curse of Death's Hold"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
     let (aura, withAura) = S.addCreature curse S.alice S.threePlayerGame
         attached = S.attachTo aura (Recipient.ToPlayer S.carol) withAura
         before = S.settleSba attached
@@ -409,10 +409,10 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- the OBJECT it names, which a player attachment does not name at all. So
   -- the Curse is not a legal target and there is nothing to refuse later.
   Spec.it s "CR 702.5d: a Curse attached to a player is not an Aura attached to a creature" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    curse <- Registry.printing registry "Curse of Death's Hold"
-    crown <- Registry.printing registry "Crown of the Ages"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
+    crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
         (creature, g1) = S.addCreature piker S.alice base
         (onCreature, g2) = S.addCreature unholyStrength S.alice g1
@@ -428,7 +428,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
           (Target.legalRecipients (Just S.alice) crownId theSpec gs)
           (Set.singleton (Recipient.ToObject onCreature))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraSpec s registry
   equipmentSpec s registry
@@ -498,18 +498,18 @@ crownTargetSpec printing = case Card.Type.activatedAbilities (Printing.card prin
 -- opcode that moves an Aura already on the battlefield, which the Auras unit left
 -- unbuilt. Crown of the Ages is the proving card -- "{4}, {T}: Attach target Aura
 -- attached to a creature to another creature".
-reattachSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+reattachSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- The gameplay-level proof design.md section 4 asks for: cast the Aura, cast
   -- the Crown, activate its printed ability through the real activation path,
   -- let it resolve, and see the bonus MOVE -- which is what "the Aura moved"
   -- means observably, not a field changing.
   Spec.it s "CR 701.3 whole card: Crown of the Ages moves Unholy Strength from the Piker to the Mammoth" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    crown <- Registry.printing registry "Crown of the Ages"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    crown <- S.printingOf s registry "Crown of the Ages"
     -- {B} for the Aura, {2} to cast the Crown, {4} to activate it.
     let base0 = S.landsInPlay swamp 7
         (first, base1) = S.addCreature piker S.alice base0
@@ -566,10 +566,10 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- Aura on the next state-based-action pass, so no sequence of card plays
   -- leaves one standing for a player to look at.
   Spec.it s "CR 303.4b Crown of the Ages offers an Aura on a creature and not one on a land" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    crown <- Registry.printing registry "Crown of the Ages"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
         (creature, g1) = S.addCreature piker S.alice base
         (land, g2) = S.addCreature mountain S.alice g1
@@ -588,10 +588,10 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- battlefield to a different object or player causes [it] to receive a new
   -- timestamp." Feeds CR 613.7's layer ordering, so it is not cosmetic.
   Spec.it s "CR 701.3c moving an Aura to a different creature restamps it" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    crown <- Registry.printing registry "Crown of the Ages"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
         (first, g1) = S.addCreature piker S.alice base
         (second, g2) = S.addCreature warMammoth S.alice g1
@@ -617,9 +617,9 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- as "ANOTHER creature", so with no other creature on the battlefield there
   -- is nothing to choose and nothing happens -- in particular no restamp.
   Spec.it s "CR 701.3b with only its own host available the Aura does not move and is not restamped" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    crown <- Registry.printing registry "Crown of the Ages"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
         (first, g1) = S.addCreature piker S.alice base
         (aura, g2) = S.addCreature unholyStrength S.alice g1
@@ -654,10 +654,10 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- rule's other case, a destination the Aura's own enchant restriction
   -- rejects, is the whole-cards test right below.
   Spec.it s "CR 303.4j attaching an Aura to something it cannot enchant leaves it where it was" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    crown <- Registry.printing registry "Crown of the Ages"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
         (first, g1) = S.addCreature piker S.alice base
         (land, g2) = S.addCreature mountain S.alice g1
@@ -704,11 +704,11 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- the machinery declining to move anything: aimed at alice's own Mammoth the
   -- very same ability moves the Aura.
   Spec.it s "CR 303.4j whole cards: Crown of the Ages cannot move Setessan Training onto an opponent's creature" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    setessanTraining <- Registry.printing registry "Setessan Training"
-    crown <- Registry.printing registry "Crown of the Ages"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    setessanTraining <- S.printingOf s registry "Setessan Training"
+    crown <- S.printingOf s registry "Crown of the Ages"
     -- {1}{G} for the Aura, {2} to cast the Crown, {4} to activate it.
     let base0 = S.landsInPlay forest 8
         (host, base1) = S.addCreature piker S.alice base0
@@ -766,7 +766,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
 -- which is the backstop for a card that does NOT say it: the Crown offers a
 -- creature its Aura may not enchant and the move then fails, where Aura Graft may
 -- not offer one at all. The pair of cards is what keeps the two apart.
-auraGraftSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+auraGraftSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- The gameplay-level proof design.md section 4 asks for, and the one the
   -- control clause exists for: CR 303.4e says an Aura's controller is separate
@@ -776,11 +776,11 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- alice takes the Aura, takes the Mammoth it lands on, and gets her own
   -- Piker back because the Aura left it.
   Spec.it s "CR 303.4e whole cards: Aura Graft takes bob's Control Magic and the creature it moves onto" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    controlMagic <- Registry.printing registry "Control Magic"
-    auraGraft <- Registry.printing registry "Aura Graft"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    auraGraft <- S.printingOf s registry "Aura Graft"
     -- {1}{U} for the Graft.
     let base0 = S.landsInPlay island 2
         (host, base1) = S.addCreature piker S.alice base0
@@ -829,12 +829,12 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- hand-builds one: CR 704.5m would bury it on the next state-based-action
   -- pass, so no sequence of card plays leaves one standing to be targeted.
   Spec.it s "CR 601.2c Aura Graft targets an Aura on any permanent, where Crown of the Ages needs one on a creature" $ do
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    curse <- Registry.printing registry "Curse of Death's Hold"
-    crown <- Registry.printing registry "Crown of the Ages"
-    auraGraft <- Registry.printing registry "Aura Graft"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
+    crown <- S.printingOf s registry "Crown of the Ages"
+    auraGraft <- S.printingOf s registry "Aura Graft"
     let base = Setup.emptyGame S.bothPlayers
         (creature, g1) = S.addCreature piker S.alice base
         (land, g2) = S.addCreature mountain S.alice g1
@@ -869,9 +869,9 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- Not reachable while a player holds priority, because CR 704.3 runs the
   -- pass first -- which is exactly why the state has to be built by hand here.
   Spec.it s "CR 110.1 an Aura whose host has left the battlefield is not attached to a permanent" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    auraGraft <- Registry.printing registry "Aura Graft"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    auraGraft <- S.printingOf s registry "Aura Graft"
     let base = Setup.emptyGame S.bothPlayers
         (creature, g1) = S.addCreature piker S.alice base
         (aura, g2) = S.addCreature unholyStrength S.alice g1
@@ -898,12 +898,12 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- it doesn't move" -- which is a sentence about LEGAL PLACES being what the
   -- card looks for.
   Spec.it s "the destination filter offers only a permanent the Aura can enchant, so a Mountain is never a destination" $ do
-    island <- Registry.printing registry "Island"
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
-    auraGraft <- Registry.printing registry "Aura Graft"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    auraGraft <- S.printingOf s registry "Aura Graft"
     -- Gatherer, 2007-07-15: "You can target an Aura you already control just to
     -- move that Aura to a new permanent."
     let base0 = S.landsInPlay island 2
@@ -929,11 +929,11 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- under each reading of the order, and they are different creatures. Run the
   -- attach first and the Aura lands on bob's Mammoth.
   Spec.it s "CR 608.2c the control change lands before the destination is chosen, so 'creature you control' means alice's" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    warMammoth <- Registry.printing registry "War Mammoth"
-    setessanTraining <- Registry.printing registry "Setessan Training"
-    auraGraft <- Registry.printing registry "Aura Graft"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    setessanTraining <- S.printingOf s registry "Setessan Training"
+    auraGraft <- S.printingOf s registry "Aura Graft"
     let base0 = S.landsInPlay island 2
         (host, base1) = S.addCreature piker S.bob base0
         (his, base2) = S.addCreature warMammoth S.bob base1
@@ -955,11 +955,11 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
   -- really are independent, which is the point of CR 303.4e's "an Aura's
   -- controller is separate".
   Spec.it s "with no permanent it can enchant the Aura does not move, and alice still gains it" $ do
-    island <- Registry.printing registry "Island"
-    mountain <- Registry.printing registry "Mountain"
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
-    auraGraft <- Registry.printing registry "Aura Graft"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    auraGraft <- S.printingOf s registry "Aura Graft"
     let base0 = S.landsInPlay island 2
         (host, base1) = S.addCreature piker S.alice base0
         (_, base2) = S.addCreature mountain S.alice base1
@@ -975,12 +975,12 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     Spec.assertEqWith s "but alice controls it" (Projection.controllerOf aura after) (Just S.alice)
     Spec.assertEqWith s "so the creature it holds is hers" (Projection.controllerOf host after) (Just S.alice)
 
-auraSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+auraSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 auraSpec s registry = Spec.describe s "Aura" $ do
   Spec.it s "CR 303.4: a resolving Aura spell enters the battlefield attached to its target" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
@@ -994,9 +994,9 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- can be countered on resolution. Before this task, Stack sent every
   -- permanent spell to the battlefield with no target check at all.
   Spec.it s "CR 608.2b: an Aura spell whose target left is countered on resolution" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
@@ -1012,9 +1012,9 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- point -- an implementation that dropped the Aura in pass one would be reading
   -- post-pass state, which is what CR 704.3's "simultaneously" forbids.
   Spec.it s "CR 704.5m: an Aura whose creature died falls off on the next SBA pass" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
-    unholyStrength <- Registry.printing registry "Unholy Strength"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
@@ -1034,7 +1034,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- and Setessan Training case below; nothing in the pool strips creature-ness
   -- from a permanent, so a CONTROL change is how that clause is reached.
   Spec.it s "CR 704.5m: an unattached Aura on the battlefield goes to the graveyard" $ do
-    unholyStrength <- Registry.printing registry "Unholy Strength"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = Setup.emptyGame S.bothPlayers
         (aura, gs) = S.addCreature unholyStrength S.alice base
         after = S.settleSba gs
@@ -1049,9 +1049,9 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- spell is being cast, so alice's creature is offered and bob's is withheld.
   -- The spec is read out of the committed card, never hand-built.
   Spec.it s "CR 702.5a whole card: Setessan Training enchants only its caster's creature, draws, and grants +1/+0 and trample" $ do
-    forest <- Registry.printing registry "Forest"
-    piker <- Registry.printing registry "Goblin Piker"
-    setessanTraining <- Registry.printing registry "Setessan Training"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    setessanTraining <- S.printingOf s registry "Setessan Training"
     let base0 = S.landsInPlay forest 2
         (mine, base1) = S.addCreature piker S.alice base0
         (theirs, base2) = S.addCreature piker S.bob base1
@@ -1092,11 +1092,11 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- is a bare "enchant creature", so it stays attached to the very creature
   -- Setessan Training just fell off.
   Spec.it s "CR 704.5m whole cards: Control Magic steals the enchanted creature, so Setessan Training is buried and Control Magic is not" $ do
-    forest <- Registry.printing registry "Forest"
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    setessanTraining <- Registry.printing registry "Setessan Training"
-    controlMagic <- Registry.printing registry "Control Magic"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    setessanTraining <- S.printingOf s registry "Setessan Training"
+    controlMagic <- S.printingOf s registry "Control Magic"
     -- {1}{G} for alice's Aura, {2}{U}{U} for bob's. S.landsInPlay seats
     -- alice's lands and nothing else, so bob's go in one at a time through
     -- S.addCreature -- which puts a printing onto the battlefield whatever its
@@ -1133,8 +1133,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- CR 613.1b / 303.4e: Control Magic's static ability moves control of the
   -- enchanted creature to the AURA's controller, and leaves the Aura itself alone.
   Spec.it s "CR 613.1b: Control Magic gives the Aura's controller the creature" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.bob base
         (aura, withAura) = S.addCreature controlMagic S.alice withCreature
@@ -1148,8 +1148,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- projection, because a static ability's effect exists only while its source is
   -- on the battlefield (CR 604.2).
   Spec.it s "CR 604.2: removing Control Magic reverts control" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.bob base
         (aura, withAura) = S.addCreature controlMagic S.alice withCreature
@@ -1159,9 +1159,9 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     Spec.assertEqWith s "bob controls it again" (Projection.controllerOf creature gone) (Just S.bob)
   -- The whole path: cast, target, enter attached, control moves.
   Spec.it s "CR 303.4: casting Control Magic takes the creature" $ do
-    island <- Registry.printing registry "Island"
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let base = S.landsInPlay island 4
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne controlMagic withCreature
@@ -1178,8 +1178,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- steal makes it sick again for alice, and only HER untap step settles it
   -- for her. The middle assertion is what #198 got wrong.
   Spec.it s "CR 302.6 (#62): a creature held under indefinite control settles at the thief's untap step" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    controlMagic <- Registry.printing registry "Control Magic"
+    piker <- S.printingOf s registry "Goblin Piker"
+    controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
         (creature, withCreature) = S.addCreature piker S.bob base
         settledForBob = S.runPure S.identityAnswer withCreature (Engine.settleAll S.bob)

@@ -47,12 +47,12 @@ swampsYouControl =
     (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
     Aggregation.Objects
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   Spec.it s "Objects counts the matching members of a zone" $ do
     -- Two Swamps Alice controls, one Bob controls; ControlledBy You keeps
     -- Alice's two.
-    swampPrinting <- Registry.printing registry "Swamp"
+    swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (a1, gs1) = S.addCreature swampPrinting S.alice gs0
         (a2, gs2) = S.addCreature swampPrinting S.alice gs1
@@ -70,8 +70,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   Spec.it s "CR 208.2a DistinctCardTypes counts the union, not the objects" $ do
     -- Three graveyard cards, two of them Creatures: the answer is 2 types,
     -- not 3 objects.
-    piker <- Registry.printing registry "Goblin Piker"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let gs0 = Setup.emptyGame S.bothPlayers
         (g1, gs1) = S.addGraveyardCard piker S.alice gs0
         (g2, gs2) = S.addGraveyardCard piker S.alice gs1
@@ -92,7 +92,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   Spec.it s "CR 102.2 Relative Opponent excludes the perspective" $ do
     -- The same board as the first case, read from Bob's perspective: his
     -- opponent Alice controls two Swamps.
-    swampPrinting <- Registry.printing registry "Swamp"
+    swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (a1, gs1) = S.addCreature swampPrinting S.alice gs0
         (b1, gs) = S.addCreature swampPrinting S.bob gs1
@@ -113,7 +113,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- every wrong reading gives a different number -- one opponent gives 1 or
     -- 2, and including the perspective gives 4. A two-seat board cannot
     -- separate those, which is why the sibling case above tops out at 1.
-    swampPrinting <- Registry.printing registry "Swamp"
+    swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.threePlayers
         (a1, gs1) = S.addCreature swampPrinting S.alice gs0
         (b1, gs2) = S.addCreature swampPrinting S.bob gs1
@@ -187,7 +187,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   Spec.it s "EachPlayer folds every player's copy" $ do
     -- The first case's board with the ControlledBy conjunct dropped: all
     -- three Swamps across both players count.
-    swampPrinting <- Registry.printing registry "Swamp"
+    swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (a1, gs1) = S.addCreature swampPrinting S.alice gs0
         (a2, gs2) = S.addCreature swampPrinting S.alice gs1
@@ -210,7 +210,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   Spec.it s "Relative You resolves against the perspective" $ do
     -- The first case's board, read from Bob's perspective: Bob's own one
     -- Swamp.
-    swampPrinting <- Registry.printing registry "Swamp"
+    swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (a1, gs1) = S.addCreature swampPrinting S.alice gs0
         (a2, gs2) = S.addCreature swampPrinting S.alice gs1
@@ -228,8 +228,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   Spec.it s "InSlot reads the bound player" $ do
     -- A source object binds Bob under the "target" slot (Sudden Impact's
     -- "that player's hand"); the count reads Bob's hand through the slot.
-    piker <- Registry.printing registry "Goblin Piker"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let gs0 = Setup.emptyGame S.bothPlayers
         (srcId, gs1) = S.addCreature piker S.alice gs0
         slot = SlotName.MkSlotName (Text.pack "target")
@@ -257,7 +257,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- a Saga with no chapter abilities). So the honest answer is the one
     -- this codebase propagates everywhere else. THE FALSIFIER for reaching
     -- for `maximum (0 : values)`.
-    swampPrinting <- Registry.printing registry "Swamp"
+    swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (b1, gs) = S.addCreature swampPrinting S.bob gs0
         land = Set.singleton CardType.Land
@@ -281,9 +281,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- Two +1/+1 counters on the Piker (CR 122.1a / 613.4c) make it a 4/3,
     -- and the answer moves to 4 -- which no reading of the printed boxes
     -- gives.
-    elves <- Registry.printing registry "Llanowar Elves"
-    piker <- Registry.printing registry "Goblin Piker"
-    mammoth <- Registry.printing registry "War Mammoth"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, gs1) = S.addCreature elves S.alice gs0
         (pikerId, gs2) = S.addCreature piker S.alice gs1
@@ -305,7 +305,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- Swamp (CR 208.3: a noncreature permanent has no power). Nothing
     -- propagates rather than the member being silently dropped, which would
     -- report the maximum of a set the card never named.
-    swampPrinting <- Registry.printing registry "Swamp"
+    swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (a1, gs) = S.addCreature swampPrinting S.alice gs0
         count =

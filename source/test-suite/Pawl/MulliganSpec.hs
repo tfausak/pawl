@@ -119,10 +119,10 @@ recordAlwaysMulligan p = case p of
 -- this test tracks instead. Bob's library is uniform Mountains; only alice
 -- mulligans in the accompanying test, so bob's composition never enters the
 -- assertion.
-distinctPrintings :: Registry.Registry -> IO [Printing.Printing]
-distinctPrintings registry =
+distinctPrintings :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m [Printing.Printing]
+distinctPrintings s registry =
   mapM
-    (Registry.printing registry)
+    (S.printingOf s registry)
     [ "Mountain",
       "Swamp",
       "Forest",
@@ -389,7 +389,7 @@ reversingShuffle p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> S.identityAnswer p
 
-trustedAnswerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+trustedAnswerSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 trustedAnswerSpec s registry =
   Spec.describe s "TrustedAnswers" $ do
     -- CR 103.5: after mulliganing twice, alice bottoms exactly two cards and
@@ -401,16 +401,16 @@ trustedAnswerSpec s registry =
     -- `take n` before the dedupe is ever consulted, and the test would pass
     -- against the bug it exists to catch.
     Spec.it s "#222 a bottoming answer that repeats a card still bottoms two" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run bottomDuplicatingFirst (libraryGame mountain 20)
       Spec.assertEqWith s "alice mulliganed twice, so she keeps five" (length (Game.zoneMembers Zone.Hand S.alice after)) 5
     Spec.it s "#222 a bottoming answer naming cards not in hand still bottoms from the hand" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run bottomInventing (libraryGame mountain 20)
       Spec.assertEqWith s "alice still ends on five" (length (Game.zoneMembers Zone.Hand S.alice after)) 5
       Spec.assertBool s (List.notElem (ObjectId.MkObjectId 9999) (Game.zoneMembers Zone.Library S.alice after)) "and no invented card reached her library"
     Spec.it s "#222 a shuffle answer that duplicates a card is refused" $ do
-      forest <- Registry.printing registry "Forest"
+      forest <- S.printingOf s registry "Forest"
       let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
           (b, gs) = S.addLibraryCard forest S.alice g1
           -- The interpreter returns one card twice: a library that would gain a
@@ -418,7 +418,7 @@ trustedAnswerSpec s registry =
           after = S.runPure (shuffleAnswering [a, a]) gs (Mulligan.shuffleLibrary S.alice)
       Spec.assertEqWith s "the library still holds both cards, once each" (List.sort (Game.zoneMembers Zone.Library S.alice after)) [a, b]
     Spec.it s "#222 a shuffle answer naming a card that was never there is refused" $ do
-      forest <- Registry.printing registry "Forest"
+      forest <- S.printingOf s registry "Forest"
       let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
           (b, gs) = S.addLibraryCard forest S.alice g1
           phantom = ObjectId.MkObjectId 9999
@@ -427,7 +427,7 @@ trustedAnswerSpec s registry =
     -- The control: an honest permutation IS honoured, so the guard cannot pass
     -- by ignoring every answer.
     Spec.it s "#222 an honest permutation is honoured" $ do
-      forest <- Registry.printing registry "Forest"
+      forest <- S.printingOf s registry "Forest"
       let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
           (b, gs) = S.addLibraryCard forest S.alice g1
           before = Game.zoneMembers Zone.Library S.alice gs
@@ -435,19 +435,19 @@ trustedAnswerSpec s registry =
       Spec.assertEqWith s "the fixture really has two cards" (List.sort before) [a, b]
       Spec.assertEqWith s "the order is the reversal the interpreter asked for" (Game.zoneMembers Zone.Library S.alice after) (reverse before)
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry =
   Spec.describe s "Pawl.Engine.Mulligan" $ do
     Spec.it s "CR 103.5b: a hand card granting an action is offered at the declaration" $ do
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = powderGame powder mountain 20
           ((_, _after), offered) = State.runState (Program.foldProgramM recordWindow (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
       Spec.assertEqWith s "exactly one offer -- alice's, in the one round she declares" (length offered) 1
       Spec.assertEqWith s "and it offered exactly her Powder" (fmap length offered) [1]
     Spec.it s "CR 103.5b: taking the action exiles the whole hand and redraws that many" $ do
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run usePowder (powderGame powder mountain 20)
       Spec.assertEqWith s "alice's hand is a full seven again" (S.handSize S.alice after) 7
       Spec.assertEqWith s "her first seven are exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 7
@@ -459,8 +459,8 @@ spec s registry =
       -- Binding.triggerSource, which is how "this card" is expressible with no
       -- self-variant opcode (Effect.Sacrifice's own comment). Proved here on a
       -- settled opening hand so it does not depend on CR 103.6 existing yet.
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let drawn = run keepAnswer (powderGame powder mountain 20)
       case Game.zoneMembers Zone.Hand S.alice drawn of
         [] -> Spec.assertFailure s "expected a drawn opening hand to act from"
@@ -472,8 +472,8 @@ spec s registry =
       -- alice takes the action and then mulligans ONCE. CR 103.5 bottoms a
       -- number equal to the mulligans she has taken, which is one -- so her
       -- opening hand is six. A five would mean the action had been counted.
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run powderThenMulliganOnce (powderGame powder mountain 20)
       Spec.assertEqWith s "one mulligan bottoms exactly one card" (S.handSize S.alice after) 6
     Spec.it s "CR 103.5b: the window is offered in a later round, not just the first" $ do
@@ -481,8 +481,8 @@ spec s registry =
       -- nothing; she mulligans, redraws into it, and round 2 offers it. The
       -- recorded value is how many declarations preceded the offer: 2 (hers
       -- and bob's, both in round 1).
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = powderUnder powder mountain 7
           ((_, _after), (_, offers)) = State.runState (Program.foldProgramM recordWindowRound (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) (0, [])
       Spec.assertEqWith s "exactly one offer, and it came after both first-round declarations" offers [2]
@@ -490,14 +490,14 @@ spec s registry =
       -- Using the first Powder draws the second; the loop offers again and
       -- ends only when the redrawn hand holds none. Fourteen cards exiled is
       -- two uses.
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run usePowder (chainGame powder mountain)
       Spec.assertEqWith s "two hands exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 14
       Spec.assertEqWith s "and the third hand is a full seven" (S.handSize S.alice after) 7
     Spec.it s "CR 103.5b: a hand with no granting card is not asked" $ do
       -- Where the rules leave nothing to ask, don't prompt.
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20
           ((_, _after), offered) = State.runState (Program.foldProgramM recordWindow (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
       Spec.assertEqWith s "no window prompt at all" offered []
@@ -505,14 +505,14 @@ spec s registry =
       -- alice keeps in round 1 and leaves the pool; bob keeps the loop alive
       -- for two more rounds. She declares once, so she is offered once --
       -- CR 103.5b's window exists only "at a time they would declare".
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = powderGame powder mountain 20
           ((_, _after), offers) = State.runState (Program.foldProgramM recordWindowPlayers (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
       Spec.assertEqWith s "offered in her one declaration round and never again" (length (filter (== S.alice) offers)) 1
     Spec.it s "CR 103.5b: a game with a mulligan action replays deterministically" $ do
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = powderGame powder mountain 20
           ((_, recorded), responses) = Replay.record usePowder gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
           ((_, replayed), desync) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
@@ -529,35 +529,35 @@ spec s registry =
       -- all seven and redraws from an empty library, which flags the failed
       -- draw and leaves her with nothing -- a forced keep under CR 103.5's
       -- final sentence, so she is not asked to declare.
-      powder <- Registry.printing registry "Serum Powder"
-      mountain <- Registry.printing registry "Mountain"
+      powder <- S.printingOf s registry "Serum Powder"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run usePowder (shortPowderGame powder mountain)
       Spec.assertEqWith s "her hand is empty" (S.handSize S.alice after) 0
       Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "and she drew from an empty library"
     Spec.it s "CR 103.5: all-Keep draws exactly seven, library shrinks by seven" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run keepAnswer (libraryGame mountain 20)
       Spec.assertEqWith s "alice hand" (S.handSize S.alice after) 7
       Spec.assertEqWith s "alice library" (libSize S.alice after) 13
     Spec.it s "CR 103.5: one mulligan bottoms one card (hand of six)" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run (mulliganUpTo 1) (libraryGame mountain 20)
       Spec.assertEqWith s "alice hand" (S.handSize S.alice after) 6
     Spec.it s "CR 103.5: two mulligans bottom two cards (hand of five)" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run (mulliganUpTo 2) (libraryGame mountain 20)
       Spec.assertEqWith s "alice hand" (S.handSize S.alice after) 5
     Spec.it s "CR 103.5 final sentence: mulligan floors at a zero-card hand" $ do
       -- A 7-card library: redraw is always 7, but the loop bottoms up to the
       -- growing count; the process deterministically terminates with alice's
       -- opening hand floored at zero cards (never negative).
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run (mulliganUpTo 100) (libraryGame mountain 7)
       Spec.assertEqWith s "opening hand floored at zero" (S.handSize S.alice after) 0
     Spec.it s "CR 103.5: bottomed cards are the ones NOT in the opening hand" $ do
       -- One mulligan: hand is 6, and the 1 bottomed card is at the library
       -- bottom, distinct (by id) from the six in hand.
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run (mulliganUpTo 1) (libraryGame mountain 20)
           handIds = Set.fromList (Game.zoneMembers Zone.Hand S.alice after)
           bottom1 = libBottom 1 S.alice after
@@ -571,10 +571,10 @@ spec s registry =
       -- indices 14..19,0, and bottoms count=2 reversed: [15,14] -- humility
       -- then giantGrowth, a genuinely non-identity order. Round 3 (taken=2)
       -- keeps, ending the process.
-      mountain <- Registry.printing registry "Mountain"
-      printings <- distinctPrintings registry
-      humility <- Registry.printing registry "Humility"
-      giantGrowth <- Registry.printing registry "Giant Growth"
+      mountain <- S.printingOf s registry "Mountain"
+      printings <- distinctPrintings s registry
+      humility <- S.printingOf s registry "Humility"
+      giantGrowth <- S.printingOf s registry "Giant Growth"
       let gs0 = orderedLibraryGame mountain printings
           after = run bottomReversedAnswer gs0
           bottomCards = fmap (\oid -> Game.cardOf oid after) (libBottom 2 S.alice after)
@@ -583,13 +583,13 @@ spec s registry =
           expectedCards = fmap (Just . Printing.card) [humility, giantGrowth]
       Spec.assertEqWith s "library bottom equals the chosen order exactly (humility, then giantGrowth)" bottomCards expectedCards
     Spec.it s "CR 103.5: keeping is terminal -- a kept player is not asked again" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20
           ((_, _after), asked) = State.runState (Program.foldProgramM recordAsks (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
       Spec.assertEqWith s "alice kept round 1, so was asked exactly once" (length (filter (== S.alice) asked)) 1
       Spec.assertBool s (length (filter (== S.bob) asked) > 1) "bob mulliganed twice then kept, so was asked more than once"
     Spec.it s "CR 103.5: a game with mulligans replays deterministically" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20
           ((_, recorded), responses) = Replay.record (mulliganUpTo 2) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
           ((_, replayed), desync) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
@@ -606,7 +606,7 @@ spec s registry =
       -- the failed draw. Driven by an actual mulligan (mulliganUpTo 1) so the
       -- flag is shown to SURVIVE the shuffle-back-and-redraw path, not merely
       -- the initial draw -- "regardless of any mulligans" (CR 727.3 / 729.3).
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let g0 = Setup.emptyGame S.bothPlayers
           addMany pid n g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
           gs0 = poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob 5 (addMany S.alice 20 g0)))
@@ -629,7 +629,7 @@ spec s registry =
       -- Two runs over the same three-seat board. Today both bottom one more
       -- card than they should: takeMulligan bottoms `count` unconditionally,
       -- so the first mulligan leaves a hand of 6 and the second a hand of 5.
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let once = run3 (mulliganUpTo 1) (libraryGame3 mountain 20)
           twice = run3 (mulliganUpTo 2) (libraryGame3 mountain 20)
       Spec.assertEqWith s "alice's free first mulligan keeps all seven" (S.handSize S.alice once) 7
@@ -644,7 +644,7 @@ spec s registry =
       -- Two seats: hands run 6,5,4,3,2,1,0 -- seven asks. Three seats: the
       -- first is free, so 7,6,5,4,3,2,1,0 -- eight asks. Today both give
       -- seven, because the free allowance does not exist.
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let asksIn owners gs0 = snd (State.runState (Program.foldProgramM recordAlwaysMulligan (State.runStateT (Mulligan.openingHands S.performer owners) gs0)) [])
           three = asksIn [S.alice, S.bob, S.carol] (libraryGame3 mountain 20)
           two = asksIn [S.alice, S.bob] (libraryGame mountain 20)
@@ -656,7 +656,7 @@ spec s registry =
       -- so alice's opening declaration offers (taken 0, bottom 0) where a
       -- two-player game offers (taken 0, bottom 1). An answerer holding only
       -- the raw count cannot tell those apart, which is what #176 was about.
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let offersIn owners gs0 = reverse (snd (State.runState (Program.foldProgramM recordOffers (State.runStateT (Mulligan.openingHands S.performer owners) gs0)) []))
       Spec.assertEqWith
         s
@@ -669,8 +669,8 @@ spec s registry =
         (offersIn [S.alice, S.bob] (libraryGame mountain 20))
         [(0, 1), (1, 2), (2, 3)]
     Spec.it s "CR 103.6: the window opens only once the mulligan process is complete" $ do
-      leyline <- Registry.printing registry "Leyline of the Void"
-      mountain <- Registry.printing registry "Mountain"
+      leyline <- S.printingOf s registry "Leyline of the Void"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = leylineGame leyline mountain 20
           (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
       Spec.assertEqWith
@@ -679,38 +679,38 @@ spec s registry =
         (reverse tags)
         [(Text.pack "declare", S.alice), (Text.pack "declare", S.bob), (Text.pack "opening", S.alice)]
     Spec.it s "CR 103.6a: taking the action puts the card onto the battlefield" $ do
-      leyline <- Registry.printing registry "Leyline of the Void"
-      mountain <- Registry.printing registry "Mountain"
+      leyline <- S.printingOf s registry "Leyline of the Void"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run useOpeningAction (leylineGame leyline mountain 20)
       Spec.assertEqWith s "alice's hand is one smaller" (S.handSize S.alice after) 6
       Spec.assertEqWith s "and the Leyline is on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
     Spec.it s "CR 103.6: declining leaves the card in hand" $ do
-      leyline <- Registry.printing registry "Leyline of the Void"
-      mountain <- Registry.printing registry "Mountain"
+      leyline <- S.printingOf s registry "Leyline of the Void"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run declineOpeningAction (leylineGame leyline mountain 20)
       Spec.assertEqWith s "a full opening hand" (S.handSize S.alice after) 7
       Spec.assertEqWith s "and nothing on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 0
     Spec.it s "CR 103.6: the starting player's window comes before the other player's" $ do
-      leyline <- Registry.printing registry "Leyline of the Void"
-      mountain <- Registry.printing registry "Mountain"
+      leyline <- S.printingOf s registry "Leyline of the Void"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = leylineBothGame leyline mountain 20
           (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
           openings = reverse (fmap snd (filter (\(tag, _) -> tag == Text.pack "opening") tags))
       Spec.assertEqWith s "alice first, then bob" openings [S.alice, S.bob]
     Spec.it s "CR 103.6: 'any such actions in any order' -- the window re-offers until declined" $ do
-      leyline <- Registry.printing registry "Leyline of the Void"
-      mountain <- Registry.printing registry "Mountain"
+      leyline <- S.printingOf s registry "Leyline of the Void"
+      mountain <- S.printingOf s registry "Mountain"
       let after = run useOpeningAction (twoLeylineGame leyline mountain 20)
       Spec.assertEqWith s "both Leylines are on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 2
       Spec.assertEqWith s "and the hand is two smaller" (S.handSize S.alice after) 5
     Spec.it s "CR 103.6: no granting card means no prompt" $ do
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20
           (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
       Spec.assertEqWith s "no opening-hand prompt at all" (filter (\(tag, _) -> tag == Text.pack "opening") tags) []
     Spec.it s "CR 103.6: a game with an opening-hand action replays deterministically" $ do
-      leyline <- Registry.printing registry "Leyline of the Void"
-      mountain <- Registry.printing registry "Mountain"
+      leyline <- S.printingOf s registry "Leyline of the Void"
+      mountain <- S.printingOf s registry "Mountain"
       let gs0 = leylineGame leyline mountain 20
           ((_, recorded), responses) = Replay.record useOpeningAction gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
           ((_, replayed), desync) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
@@ -722,7 +722,7 @@ spec s registry =
       -- seven cards has exactly one legal answer. Today the free mulligan is
       -- not free, so each of the three players is asked to bottom one card and
       -- three Response.PutOnBottom entries are recorded.
-      mountain <- Registry.printing registry "Mountain"
+      mountain <- S.printingOf s registry "Mountain"
       let bottomsIn owners gs0 =
             let (_, log_) = Replay.record (mulliganUpTo 1) gs0 (Mulligan.openingHands S.performer owners)
                 isBottom r = case r of

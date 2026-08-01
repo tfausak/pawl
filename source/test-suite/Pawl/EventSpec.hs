@@ -44,11 +44,11 @@ counteringsOf gs =
         _ -> Nothing
    in Maybe.mapMaybe counteringOf (Foldable.toList (GameState.events gs))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614: with Rest in Peace out, a creature sent to the graveyard is exiled" $ do
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    piker <- Registry.printing registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (theCreature, g1) = S.addCreature piker S.bob g0
         after = S.runPure S.identityAnswer g1 (Event.changeZone theCreature Zone.Graveyard)
@@ -58,8 +58,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "one object in exile" inExile 1
 
   Spec.it s "CR 603.2g: the emitted event records the RESOLVED destination (exile)" $ do
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    piker <- Registry.printing registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (theCreature, g1) = S.addCreature piker S.bob g0
         after = S.runPure S.identityAnswer g1 (Event.changeZone theCreature Zone.Graveyard)
@@ -68,14 +68,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
       [] -> Spec.assertFailure s "expected an emitted zone change"
 
   Spec.it s "without Rest in Peace, a creature goes to the graveyard" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (theCreature, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer g1 (Event.changeZone theCreature Zone.Graveyard)
     Spec.assertEq s (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
 
   Spec.it s "CR 608.2n: a resolving spell is exiled from the stack under Rest in Peace" $ do
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (bolt, g1) = S.addLibraryCard lightningBolt S.bob g0
         onStack = g1 {GameState.stack = bolt : GameState.stack g1, GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Stack}) bolt (GameState.objects g1)}
@@ -83,7 +83,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "spell exiled, graveyard empty" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
 
   Spec.it s "CR 701.6a Event.counter puts a countered spell into its owner's graveyard" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (spellId, onStack) = S.spellOnStack piker S.bob (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
     Spec.assertEqWith s "off the stack" (GameState.stack after) []
@@ -105,7 +105,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   -- through, and the gate is there rather than in the Counter opcode so that
   -- every future counterer inherits it.
   Spec.it s "CR 113.6g Event.counter is a no-op on a spell that can't be countered" $ do
-    rendingVolley <- Registry.printing registry "Rending Volley"
+    rendingVolley <- S.printingOf s registry "Rending Volley"
     let (spellId, onStack) = S.spellOnStack rendingVolley S.bob (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
     Spec.assertEqWith s "still on the stack, under its original id" (GameState.stack after) [spellId]
@@ -117,8 +117,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "and no countering event was recorded" (counteringsOf after) []
 
   Spec.it s "CR 614 a countered spell is exiled under Rest in Peace" $ do
-    restInPeace <- Registry.printing registry "Rest in Peace"
-    piker <- Registry.printing registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (spellId, onStack) = S.spellOnStack piker S.bob g0
         after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
@@ -126,9 +126,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "exiled instead" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
 
   Spec.it s "CR 603/614 whole card: cast Rest in Peace, ETB exiles graveyards, then deaths are exiled" $ do
-    plains <- Registry.printing registry "Plains"
-    piker <- Registry.printing registry "Goblin Piker"
-    restInPeace <- Registry.printing registry "Rest in Peace"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
     let base = S.landsInPlay plains 2
         (deadId, withDead) = S.addLibraryCard piker S.alice base
         g0 = S.runPure S.identityAnswer withDead (Event.changeZone deadId Zone.Graveyard) -- a card already in the graveyard
@@ -149,7 +149,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   -- Three seats, because CR 800.1 gates the departure machinery on a game
   -- that began with more than two players.
   Spec.it s "CR 800.4b no token is created under the control of a player who has left the game" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let goblinCard = Printing.card piker
         gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
@@ -161,7 +161,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   -- The other half of the guard: a player still in the game is unaffected, so
   -- this cannot pass by refusing every token.
   Spec.it s "CR 800.4b a player still in the game still gets their tokens" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let goblinCard = Printing.card piker
         gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
@@ -170,7 +170,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "both on the battlefield" (Set.size (GameState.battlefield after)) 2
 
   Spec.it s "CR 111.2 createTokens puts a token on the battlefield and emits an enters event" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         goblinCard = Printing.card piker
         before = Game.objectCount base
@@ -193,8 +193,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
       _ -> Spec.assertFailure s "expected exactly one token"
 
   Spec.it s "CR 614 + 704.5d a token dies under Rest in Peace: exiled, then ceases" $ do
-    piker <- Registry.printing registry "Goblin Piker"
-    restInPeace <- Registry.printing registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
     let base = Setup.emptyGame S.bothPlayers
         goblinCard = Printing.card piker
         (_, withRip) = S.addCreature restInPeace S.bob base
@@ -207,14 +207,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "after the SBA it has ceased to exist (gone from exile)" (length (Game.zoneMembers Zone.Exile S.alice settled)) 0
 
   Spec.it s "CR 701.19a / 514.2 a regeneration shield is dropped at cleanup (this turn)" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         (oid, gs0) = S.addCreature piker S.alice base
         cleared = Expiry.dropAtCleanup (S.addRegenShield oid gs0)
     Spec.assertEqWith s "no shields remain" (GameState.replacements cleared) []
 
   Spec.it s "CR 701.19a Event.destroy consumes a shield and regenerates instead" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         (oid, gs0) = S.addCreature piker S.alice base
         damaged = S.markDamage oid 1 gs0
@@ -229,7 +229,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
       Nothing -> Spec.assertFailure s "the creature vanished"
 
   Spec.it s "CR 701.19a a second destroy with no shield left kills it" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         (oid, gs0) = S.addCreature piker S.alice base
         once = S.runPure S.identityAnswer (S.addRegenShield oid gs0) (Event.destroy Regenerability.Regenerable [oid]) -- regenerated
@@ -237,15 +237,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "gone from the battlefield" (Set.member oid (GameState.battlefield twice)) False
 
   Spec.it s "CR 700.4 Event.destroy no-ops on an indestructible permanent" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let base = Setup.emptyGame S.bothPlayers
         (oid, gs0) = S.addCreature darksteelMyr S.alice base
         after = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [oid])
     Spec.assertEqWith s "indestructible survives" (Set.member oid (GameState.battlefield after)) True
 
   Spec.it s "CR 122.2 counters cease to exist when an object changes zones" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 0
         (oid, withCreature) = S.addCreature piker S.bob base
         withCounter = S.addCounter CounterKind.PlusOnePlusOne 2 oid withCreature
@@ -257,8 +257,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "the one new incarnation in hand has no counters" handCounters [Map.empty]
 
   Spec.it s "CR 704.5q both counter kinds annihilate to zero (symmetric)" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 0
         (oid, gs0) = S.addCreature piker S.bob base
         gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
@@ -267,8 +267,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "no counters remain" (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject oid after)) Map.empty
 
   Spec.it s "CR 704.5q annihilation removes N = min (asymmetric)" $ do
-    swamp <- Registry.printing registry "Swamp"
-    piker <- Registry.printing registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 0
         (oid, gs0) = S.addCreature piker S.bob base
         gs1 = S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0
@@ -296,8 +296,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)) "no match"
 
   Spec.it s "CR 400.7: a zone change forgets attachment" $ do
-    plains <- Registry.printing registry "Plains"
-    piker <- Registry.printing registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay plains 1
         (host, withHost) = S.addCreature piker S.bob base
         (rider, withRider) = S.addCreature piker S.alice withHost

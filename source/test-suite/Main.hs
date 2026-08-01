@@ -12,6 +12,7 @@ import qualified Pawl.CombatSpec
 import qualified Pawl.ConditionSpec
 import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
+import qualified Pawl.CorpusSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
 import qualified Pawl.DamageSpec
@@ -64,7 +65,7 @@ import qualified Test.Tasty.HUnit as HU
 main :: IO ()
 main = do
   root <- Registry.defaultRoot
-  registry <- Registry.new root
+  registry <- Registry.fileRegistry root
   Tasty.defaultMain (testTree registry)
 
 tasty :: Spec.Spec IO (Writer.Writer [Tasty.TestTree])
@@ -75,7 +76,7 @@ tasty =
       Spec.it = \s -> Writer.tell . List.singleton . HU.testCase s
     }
 
-testTree :: Registry.Registry -> Tasty.TestTree
+testTree :: Registry.Registry IO -> Tasty.TestTree
 testTree registry =
   Tasty.testGroup
     "pawl"
@@ -91,9 +92,9 @@ testTree registry =
           (Writer.execWriter (Pawl.ReplacementSpec.spec tasty registry))
     )
 
--- Specs that reach for card data are pinned to IO, since Registry.printing is an
--- IO action. The rest stay polymorphic in the assertion monad.
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+-- Specs that reach for card data take a registry over the same monad they
+-- assert in. The rest need none at all.
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = do
   Pawl.ActivateSpec.spec s registry
   Pawl.AuraSpec.spec s registry
@@ -106,6 +107,7 @@ spec s registry = do
   Pawl.CombatSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
+  Pawl.CorpusSpec.spec s
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry

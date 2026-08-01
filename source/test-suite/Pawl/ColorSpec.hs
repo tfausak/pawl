@@ -34,28 +34,28 @@ import qualified Pawl.Types.Zone as Zone
 nonblackCreature :: TargetSpec.TargetSpec
 nonblackCreature = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
 
-spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 202.2 a mono-black card's colour is black" $ do
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
         (ratsId, gs) = S.addCreature typhoidRats S.alice gs0
     Spec.assertEq s (Projection.colorsOf ratsId gs) $ Set.singleton Color.Black
 
   Spec.it s "CR 202.2 a generic-plus-red cost is red, and generic contributes nothing" $ do
-    piker <- Registry.printing registry "Goblin Piker"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, gs) = S.addCreature piker S.alice gs0
     Spec.assertEq s (Projection.colorsOf pikerId gs) $ Set.singleton Color.Red
 
   Spec.it s "CR 202.2b an object with no coloured mana symbols is colourless" $ do
-    darksteelMyr <- Registry.printing registry "Darksteel Myr"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let gs0 = Setup.emptyGame S.bothPlayers
         (myrId, gs) = S.addCreature darksteelMyr S.alice gs0
     Spec.assertEq s (Projection.colorsOf myrId gs) Set.empty
 
   Spec.it s "CR 202.1b a land has no mana cost, so it is colourless" $ do
-    mountain <- Registry.printing registry "Mountain"
+    mountain <- S.printingOf s registry "Mountain"
     let gs0 = Setup.emptyGame S.bothPlayers
         (mtnId, gs) = S.addCreature mountain S.alice gs0
     Spec.assertEq s (Projection.colorsOf mtnId gs) Set.empty
@@ -63,7 +63,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 702.114a devoid makes an object colourless despite a black mana cost" $ do
     -- THE FALSIFIER for "an object's colours are the coloured symbols in its
     -- mana cost": this card's cost is {1}{B} and it is colourless.
-    devoidDrone <- Registry.printing registry "Synthetic Devoid Drone"
+    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (droneId, gs) = S.addCreature devoidDrone S.alice gs0
     Spec.assertEq s (Projection.colorsOf droneId gs) Set.empty
@@ -71,30 +71,30 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 105.3 a new colour REPLACES all previous colours" $ do
     -- THE FALSIFIER for implementing "becomes red" as an ADD: the Rats are
     -- black, and after the effect they are red and NOT black.
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
         (ratsId, board) = S.addCreature typhoidRats S.alice gs0
         gs = S.withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) board
     Spec.assertEq s (Projection.colorsOf ratsId gs) $ Set.singleton Color.Red
 
   Spec.it s "CR 105.3 an effect may make a coloured object colourless" $ do
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
         (ratsId, board) = S.addCreature typhoidRats S.alice gs0
         gs = S.withEffect ratsId (Modification.SetColor Set.empty) board
     Spec.assertEq s (Projection.colorsOf ratsId gs) Set.empty
 
   Spec.it s "CR 613.1e a layer-5 colour change beats the CR 702.114a devoid seed" $ do
-    devoidDrone <- Registry.printing registry "Synthetic Devoid Drone"
+    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (droneId, board) = S.addCreature devoidDrone S.alice gs0
         gs = S.withEffect droneId (Modification.SetColor (Set.singleton Color.Black)) board
     Spec.assertEq s (Projection.colorsOf droneId gs) $ Set.singleton Color.Black
 
   Spec.it s "Bad Moon pumps a black creature but not a red one" $ do
-    badMoon <- Registry.printing registry "Bad Moon"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
-    piker <- Registry.printing registry "Goblin Piker"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withMoon) = S.addCreature badMoon S.alice gs0
         (ratsId, withRats) = S.addCreature typhoidRats S.alice withMoon
@@ -106,8 +106,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 702.114a Bad Moon does not pump a devoid creature with a black mana cost" $ do
     -- FALSIFIER, reader (b) half: a naive "colours are the mana cost's
     -- symbols" implementation pumps this 2/2 to 3/3.
-    badMoon <- Registry.printing registry "Bad Moon"
-    devoidDrone <- Registry.printing registry "Synthetic Devoid Drone"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withMoon) = S.addCreature badMoon S.alice gs0
         (droneId, gs) = S.addCreature devoidDrone S.alice withMoon
@@ -115,8 +115,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     Spec.assertEqWith s "toughness unchanged" (Projection.toughnessOf droneId gs) $ Just 2
 
   Spec.it s "CR 613 a layer-5 colour change moves a creature INTO Bad Moon's set" $ do
-    badMoon <- Registry.printing registry "Bad Moon"
-    piker <- Registry.printing registry "Goblin Piker"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withMoon) = S.addCreature badMoon S.alice gs0
         (pikerId, board) = S.addCreature piker S.alice withMoon
@@ -134,9 +134,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- (proven: even after Step 3's data fix, the empty-binding path still
     -- makes zero tokens). This needs a real cast, mirroring ResolveSpec's
     -- "CR 111 Dragon Fodder creates two 1/1 Goblin tokens".
-    mountain <- Registry.printing registry "Mountain"
-    badMoon <- Registry.printing registry "Bad Moon"
-    dragonFodder <- Registry.printing registry "Dragon Fodder"
+    mountain <- S.printingOf s registry "Mountain"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let base = S.landsInPlay mountain 2
         (_, withMoon) = S.addCreature badMoon S.alice base
         (gs, spellId) = S.handOne dragonFodder withMoon
@@ -154,8 +154,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
           tokenIds
 
   Spec.it s "CR 115.1a a black creature is not a legal 'target nonblack creature'" $ do
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
-    piker <- Registry.printing registry "Goblin Piker"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (ratsId, withRats) = S.addCreature typhoidRats S.alice gs0
         (pikerId, gs) = S.addCreature piker S.alice withRats
@@ -165,16 +165,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
 
   Spec.it s "CR 702.114a a devoid creature with a black cost IS a legal nonblack target" $ do
     -- FALSIFIER, reader (a) half.
-    devoidDrone <- Registry.printing registry "Synthetic Devoid Drone"
+    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (droneId, gs) = S.addCreature devoidDrone S.alice gs0
         legal = Target.legalRecipients Nothing S.noSource nonblackCreature gs
     Spec.assertBool s (Set.member (Recipient.ToCreature droneId) legal) "colourless is nonblack"
 
   Spec.it s "Doom Blade destroys a devoid creature whose mana cost is black" $ do
-    swamp <- Registry.printing registry "Swamp"
-    devoidDrone <- Registry.printing registry "Synthetic Devoid Drone"
-    doomBlade <- Registry.printing registry "Doom Blade"
+    swamp <- S.printingOf s registry "Swamp"
+    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
+    doomBlade <- S.printingOf s registry "Doom Blade"
     let base = S.landsInPlay swamp 2
         (_, board) = S.addCreature devoidDrone S.bob base
         (gs, dbId) = S.handOne doomBlade board
@@ -187,10 +187,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- and no legal Doom Blade target; after Crimson Wisps they are a 1/1 red
     -- creature that Doom Blade may target. An AddColor implementation fails
     -- every one of these assertions.
-    mountain <- Registry.printing registry "Mountain"
-    badMoon <- Registry.printing registry "Bad Moon"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
-    crimsonWisps <- Registry.printing registry "Crimson Wisps"
+    mountain <- S.printingOf s registry "Mountain"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    crimsonWisps <- S.printingOf s registry "Crimson Wisps"
     let base = S.landsInPlay mountain 1
         (_, withMoon) = S.addCreature badMoon S.alice base
         (ratsId, board) = S.addCreature typhoidRats S.alice withMoon
@@ -206,10 +206,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
       "after: a legal Doom Blade target"
 
   Spec.it s "Aphotic Wisps makes a creature black, the mirror of Crimson Wisps" $ do
-    swamp <- Registry.printing registry "Swamp"
-    badMoon <- Registry.printing registry "Bad Moon"
-    piker <- Registry.printing registry "Goblin Piker"
-    aphoticWisps <- Registry.printing registry "Aphotic Wisps"
+    swamp <- S.printingOf s registry "Swamp"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    aphoticWisps <- S.printingOf s registry "Aphotic Wisps"
     let base = S.landsInPlay swamp 1
         (_, withMoon) = S.addCreature badMoon S.alice base
         (pikerId, board) = S.addCreature piker S.alice withMoon
@@ -227,10 +227,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 608.2b Doom Blade fizzles when its target becomes black in response" $ do
     -- The fizzle is only reachable through a colour change, and Aphotic Wisps
     -- is the one card in the pool that makes something BLACK.
-    swamp <- Registry.printing registry "Swamp"
-    llanowarElves <- Registry.printing registry "Llanowar Elves"
-    doomBlade <- Registry.printing registry "Doom Blade"
-    aphoticWisps <- Registry.printing registry "Aphotic Wisps"
+    swamp <- S.printingOf s registry "Swamp"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    aphoticWisps <- S.printingOf s registry "Aphotic Wisps"
     let base = S.landsInPlay swamp 3
         (elvesId, board) = S.addCreature llanowarElves S.bob base
         (gs1, dbId) = S.handOne doomBlade board
@@ -253,7 +253,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- stacked SetColor effects rather than a card, since no card in the
     -- pool is printed multicoloured: the later effect leaves no residue
     -- of either colour the earlier one set, not just the printed colour.
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
         (ratsId, board) = S.addCreature typhoidRats S.alice gs0
         multi = S.withEffect ratsId (Modification.SetColor (Set.fromList [Color.Blue, Color.Black])) board
@@ -272,8 +272,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- guards CR 613.1e/613.1c's layer separation -- colour is layer 5,
     -- text-changing is layer 3 -- and must never be implemented as a
     -- colour change rewriting the object's own text.
-    badMoon <- Registry.printing registry "Bad Moon"
-    typhoidRats <- Registry.printing registry "Typhoid Rats"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
         (moonId, withMoon) = S.addCreature badMoon S.alice gs0
         (ratsId, board) = S.addCreature typhoidRats S.alice withMoon
