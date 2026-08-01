@@ -1263,6 +1263,56 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
       [[Map.empty]]
     Spec.assertEqWith s "nothing of it is a static or a replacement" (CardT.staticAbilities c, CardT.replacementEffects c) ([], [])
+  -- The pool's first producer of Modification.SetCreatureSubtype, and the first
+  -- card whose one sentence lands in FOUR layers at once: 4 (Frog), 5 (blue), 6
+  -- (loses all abilities) and 7b (base 1/1). Titania's Song is the pool's next
+  -- widest at three. One ModifyTarget per modification, for the reason
+  -- llanowar-augur.json states -- Pawl.Types.Modification is one modification per
+  -- effect -- and here the four are in four different layers besides.
+  --
+  -- The Frog is a SET, not an add: CR 205.1b's last sentence says such an effect
+  -- lets the object "retain all of its prior card types and subtypes other than
+  -- creature types, but replace any existing creature types". Pawl.ProjectionSpec
+  -- proves that end to end, including that a land type Ashaya gave the target
+  -- survives it.
+  --
+  -- No AddCardType Creature beside it: the target is already a creature (the
+  -- spell targets one), and CR 205.1a's last sentence -- "Removing an object's
+  -- subtype doesn't affect its card types at all" -- is why the subtype set
+  -- carries no card-type change of its own.
+  Spec.it s "turn-to-frog.json loads as a {1}{U} instant whose four modifications sit in four layers" $ do
+    c <- S.cardOf s registry "Turn to Frog"
+    let target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Turn to Frog")
+    Spec.assertEqWith
+      s
+      "{1}{U}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
+    Spec.assertEqWith
+      s
+      "Instant, with no subtype of its own"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty)
+    Spec.assertEqWith s "no P/T" (CardT.power c, CardT.toughness c) (Nothing, Nothing)
+    Spec.assertEqWith
+      s
+      "four ModifyTargets on one slot, all until end of turn"
+      (modeShapes (CardT.spell c))
+      [ ( Optionality.Mandatory,
+          [ Effect.ModifyTarget Duration.UntilEndOfTurn Modification.LoseAllAbilities (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetColor (Set.singleton Color.Blue)) (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetCreatureSubtype Subtype.Frog) (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)) (ObjectRef.InSlot target)
+          ]
+        )
+      ]
+    Spec.assertEqWith
+      s
+      "targeting any creature, unfiltered"
+      (fmap (Map.toList . Mode.targetSpecs) (Foldable.toList (Modal.modes (CardT.spell c))))
+      [[(target, TargetSpec.MkTargetSpec Pool.Creatures Nothing)]]
+    Spec.assertEqWith s "no permanent text at all" (CardT.staticAbilities c, CardT.triggeredAbilities c, CardT.replacementEffects c) ([], [], [])
 
 checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
 checkFile s root p = do

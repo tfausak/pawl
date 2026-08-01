@@ -70,6 +70,7 @@ layer m = case m of
   Modification.ModifyPowerToughness _ _ -> Layer.ModifyPT
   Modification.SetLandSubtype _ -> Layer.Type
   Modification.AddLandSubtype _ -> Layer.Type
+  Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
@@ -135,6 +136,31 @@ applyModification lyr src cands gs oid m pc =
             }
         Modification.AddLandSubtype s ->
           pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+        -- CR 205.1a: "when an effect sets one or more of an object's subtypes,
+        -- the new subtype(s) replaces any existing subtypes from the appropriate
+        -- set (creature types, land types, artifact types, enchantment types,
+        -- planeswalker types, or spell types)". The appropriate set here is the
+        -- CREATURE types (CR 205.3m, Pawl.Engine.Subtype.isCreatureType) and only
+        -- those -- CR 205.1b's last sentence says the object keeps "all of its
+        -- prior card types and subtypes other than creature types". So an
+        -- animated permanent's land type survives becoming a Frog, and so would
+        -- an artifact's or an enchantment's.
+        --
+        -- Nothing else moves. Unlike SetLandSubtype this strips no abilities:
+        -- CR 305.7's ability clause is a rule about LANDS, not about setting a
+        -- subtype, and Turn to Frog's own ability loss is a separate layer-6
+        -- modification (CR 613.1f). And CR 205.1a's last sentence -- "Removing
+        -- an object's subtype doesn't affect its card types at all" -- is why no
+        -- card type is touched: "becomes a blue Frog" leaves the object a
+        -- creature because it already was one, and Jade Statue's "becomes a
+        -- Golem artifact creature" says the card-type half separately with
+        -- AddCardType.
+        --
+        -- Not checked: CR 205.3d's "an object can't gain a subtype that doesn't
+        -- correspond to one of that object's types", which none of the layer-4
+        -- subtype arms asks (#530).
+        Modification.SetCreatureSubtype s ->
+          pc {PC.subtypes = Set.insert s (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 305.7, second sentence: "It loses all abilities generated from its
@@ -856,6 +882,7 @@ freezeQuantities gs oid you m =
         Modification.LoseAllAbilities -> Just m
         Modification.SetLandSubtype _ -> Just m
         Modification.AddLandSubtype _ -> Just m
+        Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.ChangeSubtypeWord _ _ -> Just m
         Modification.SetController _ -> Just m
@@ -879,6 +906,7 @@ quantitiesOf m = case m of
   Modification.LoseAllAbilities -> []
   Modification.SetLandSubtype _ -> []
   Modification.AddLandSubtype _ -> []
+  Modification.SetCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
@@ -898,6 +926,12 @@ setLandSubtypeEffects gs =
         -- named explicitly per Modification's exhaustiveness discipline.
         Modification.SetController _ -> False
         Modification.SetControllerToSource -> False
+        -- The OTHER subtype set, and the arm most at risk of being read as this
+        -- one. CR 305.7's ability strip is a rule about a LAND whose subtype is
+        -- set; CR 205.1a/205.1b's creature-type set carries no such clause, so a
+        -- Turn to Frog must not take its target's rules text. The existing
+        -- wildcard already covers it, but the confusion is worth naming.
+        Modification.SetCreatureSubtype _ -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -983,15 +1017,27 @@ textChangesAffecting oid gs =
    in Maybe.mapMaybe pairOf (GameState.continuousEffects gs)
 
 -- Apply text-changes to a modification's basic-land-type words (CR 612.1/612.2):
--- SetLandSubtype/AddLandSubtype carry a land-type word; every other modification
--- has none to rewrite here. Projection's charter (it cases on Modification); it is
--- delegated to by Resolve.rewriteEffect for the inner modification of ModifyTarget.
+-- SetLandSubtype/AddLandSubtype carry a land-type word. SetCreatureSubtype
+-- carries a subtype word too and is deliberately NOT rewritten -- see its arm --
+-- and every other modification carries none at all. Projection's charter (it cases
+-- on Modification); it is delegated to by Resolve.rewriteEffect for the inner
+-- modification of ModifyTarget.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
 rewriteModification pairs m =
   let swap from to s = if s == from then to else s
       apply1 acc (from, to) = case acc of
         Modification.SetLandSubtype s -> Modification.SetLandSubtype (swap from to s)
         Modification.AddLandSubtype s -> Modification.AddLandSubtype (swap from to s)
+        -- Carries a subtype word, and CR 612.2 does contemplate rewriting one --
+        -- it names "a creature type word used as a creature type" beside the
+        -- land-type case. What cannot reach it is the PAIR: the pool's only
+        -- ChangeSubtypeWord producer is Magical Hack, whose text replaces one
+        -- basic land type with another and whose pair is answered by
+        -- Prompt.ChooseBasicLandTypes. So `from` is never a creature type and a
+        -- swap here would be the identity on every board pawl can reach. The
+        -- card that would make the difference visible, Artificial Evolution, has
+        -- no producer in the pool (#529).
+        Modification.SetCreatureSubtype _ -> acc
         -- A control op carries no subtype word for CR 612 to rewrite: identity.
         Modification.SetController _ -> acc
         _ -> acc
@@ -1140,6 +1186,10 @@ removesAbilities m = case m of
   -- Answering True here would double-count it into a layer whose ordering it does
   -- not have.
   Modification.SetLandSubtype _ -> False
+  -- CR 205.1a/205.1b's creature-type set has no ability clause at all -- CR
+  -- 305.7's strip belongs to the LAND arm above, not to setting a subtype -- so
+  -- this removes nothing in any layer.
+  Modification.SetCreatureSubtype _ -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
   Modification.SwitchPowerToughness -> False
@@ -1463,6 +1513,7 @@ modificationWrites m = case m of
   Modification.SwitchPowerToughness -> Set.singleton PowerA
   Modification.SetLandSubtype _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
+  Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.singleton Subtypes
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors
