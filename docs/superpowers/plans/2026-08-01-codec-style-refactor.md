@@ -350,6 +350,7 @@ the `eof` case is new and is the reason this task exists.
 ```haskell
 module Pawl.Codec.CommonSpec where
 
+import qualified Data.Either as Either
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -358,7 +359,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Common" $ do
   Spec.describe s "parse" $ do
     Spec.it s "rejects trailing input" $
-      Spec.assertEq s (fmap Common.render . Common.parse $ Text.pack "\"a\" x") (Left . Text.pack $ "")
+      Spec.assertBool s (Either.isLeft . Common.parse $ Text.pack "\"a\" x") "expected a parse failure"
     Spec.it s "round trips through render" $
       Spec.assertEq s (Common.parse (Common.render (Common.array [Common.integer 1]))) (Right (Common.array [Common.integer 1]))
 
@@ -384,9 +385,9 @@ spec s = Spec.describe s "Pawl.Codec.Common" $ do
       Common.assertToJson s id (Common.object [Common.pair "b" (Common.integer 1), Common.pair "a" (Common.integer 2)]) "{\"a\":2,\"b\":1}"
 ```
 
-The `"rejects trailing input"` case above is written to fail on purpose in
-Step 2 — the expected `Left` message is a placeholder that Step 4 replaces with
-the parser's real text. Run Step 2 first and copy the actual message.
+The `"rejects trailing input"` case asserts only that the parse fails, not what
+parsec says about it — the wording is parsec's to change, and the property under
+test is that trailing input is rejected at all.
 
 - [ ] **Step 2: Run and observe the failures**
 
@@ -706,10 +707,9 @@ assertJson s j = case parse (Text.pack j) of
   Right v -> pure v
 ```
 
-- [ ] **Step 4: Fix the placeholder in the spec and wire it up**
+- [ ] **Step 4: Wire the spec up**
 
-Build, read the real parse-error text for `"\"a\" x"`, and put it in the
-`"rejects trailing input"` case. Then add to `source/test-suite/Main.hs`:
+Add to `source/test-suite/Main.hs`:
 `import qualified Pawl.Codec.CommonSpec` (alphabetical, after
 `Pawl.Codec.AbilityNameSpec`) and `Pawl.Codec.CommonSpec.spec s` in `spec`
 (same position). Then:
