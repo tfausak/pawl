@@ -22,7 +22,7 @@ import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Counterability as Counterability
-import Pawl.Codec.Effect (effectToJson, jsonToEffect)
+import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
@@ -108,11 +108,11 @@ cardToJson c =
            )
         <> ( if null (CardT.mulliganAction c)
                then []
-               else [(Text.pack "mulliganAction", Json.listTo (effectToJson cardToJson) (CardT.mulliganAction c))]
+               else [(Text.pack "mulliganAction", Json.listTo (Effect.toJson cardToJson) (CardT.mulliganAction c))]
            )
         <> ( if null (CardT.openingHandAction c)
                then []
-               else [(Text.pack "openingHandAction", Json.listTo (effectToJson cardToJson) (CardT.openingHandAction c))]
+               else [(Text.pack "openingHandAction", Json.listTo (Effect.toJson cardToJson) (CardT.openingHandAction c))]
            )
         <> ( case CardT.enchant c of
                Nothing -> []
@@ -153,8 +153,8 @@ jsonToCard value = do
   attackRequirements <- Json.listFromDefault AttackRequirement.fromJson (Json.getOpt (Text.pack "attackRequirements") ps)
   additionalCosts <- Json.listFromDefault CostComponent.fromJson (Json.getOpt (Text.pack "additionalCosts") ps)
   alternativeCosts <- Json.listFromDefault Cost.fromJson (Json.getOpt (Text.pack "alternativeCosts") ps)
-  mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
-  openingHandAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)
+  mulliganAction <- Json.listFromDefault (Effect.fromJson jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
+  openingHandAction <- Json.listFromDefault (Effect.fromJson jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)
   enchant <- Json.maybeFrom TargetSpec.fromJson (Json.getOpt (Text.pack "enchant") ps)
   counterability <- Counterability.fromJsonDefault (Json.getOpt (Text.pack "counterability") ps)
   pure

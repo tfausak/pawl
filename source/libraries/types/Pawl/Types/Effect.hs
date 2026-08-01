@@ -25,7 +25,7 @@ import Pawl.Types.SlotName (SlotName)
 import Pawl.Types.Uses (Uses)
 import Pawl.Types.Zone (Zone)
 
--- The ISA (design.md section 1): first-order, non-recursive (in CONTROL FLOW --
+-- | The ISA (design.md section 1): first-order, non-recursive (in CONTROL FLOW --
 -- no loops, branches, or recursive calls; design.md line 38), no functions in any
 -- field. The ONLY module that may case on a constructor is Pawl.Engine.Resolve -- the
 -- rules core asks classifications, never identities.
@@ -40,7 +40,7 @@ import Pawl.Types.Zone (Zone)
 -- embedded card's effects, so the control-flow non-recursion above still holds.
 data Effect card
   = DealDamage SlotName Quantity
-  | -- CR 611: create a continuous effect on the objects the ObjectRef names, for
+  | -- | CR 611: create a continuous effect on the objects the ObjectRef names, for
     -- a duration. Giant Growth and Serpent's Gift are this one opcode, differing
     -- only in the Modification (layer 7c vs 6). Resolve stores it -- or, when a
     -- quantity inside it has no answer at resolution (CR 608.2h), stores nothing
@@ -63,13 +63,13 @@ data Effect card
     -- that became attacking later. The one-shot opcodes that take an ObjectRef
     -- (Destroy, Untap) are under CR 608.2c/608.2f instead, and store nothing.
     ModifyTarget Duration Modification ObjectRef
-  | -- CR 612: rewrite basic-land-type words in the target spell or permanent. The
+  | -- | CR 612: rewrite basic-land-type words in the target spell or permanent. The
     -- SlotName is the target slot; the two basic land types are read from the
     -- caster's binding (Binding.subtypes on Object.bindings) and baked into a
     -- stored ChangeSubtypeWord continuous effect. Resolve stores it; Projection
     -- applies it.
     ChangeText SlotName
-  | -- CR 605: add one unit of mana, of the type the ManaProduction names -- one
+  | -- | CR 605: add one unit of mana, of the type the ManaProduction names -- one
     -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
     -- mode adding more says so by holding the opcode more than once: Sol Ring's
     -- "{T}: Add {C}{C}" is two of these, and Mana.manaRoutesOfGiven reads a
@@ -78,7 +78,7 @@ data Effect card
     -- Resolve.applyEffect never runs it. Read by Resolve.manaProduced (the
     -- "produces mana?" ABI bit).
     AddMana ManaProduction
-  | -- CR 701.23: search the controller's library for a card matching the Filter,
+  | -- | CR 701.23: search the controller's library for a card matching the Filter,
     -- put it where the SearchDestination says, then shuffle. The Filter is
     -- evaluated over the PRINTED-card view (Projection.viewOfCard) -- a card in a
     -- library has no projection. Evolving Wilds' "basic land card" (CR 701.23a /
@@ -88,18 +88,18 @@ data Effect card
     -- Finds at most one card, always: no card in the pool searches for two
     -- (#283).
     Search Filter SearchDestination
-  | -- CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
+  | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards
-  | -- CR 727.1/727.1a: restart the game. Targetless and game-wide (the
+  | -- | CR 727.1/727.1a: restart the game. Targetless and game-wide (the
     -- ExileAllGraveyards / BecomeMonarch shape); the starting player of the new
     -- game is the resolving controller, so no target slot is needed.
     RestartGame
-  | -- CR 723.1: "you control target player during that player's next turn."
+  | -- | CR 723.1: "you control target player during that player's next turn."
     -- Installs pending control keyed to the slot's chosen player, with the
     -- ability's controller as the decider. Mindslaver's exact shape.
     ControlPlayerNextTurn SlotName
-  | -- CR 701.8 / 702.12b: destroy the permanents the ObjectRef names -- move each
+  | -- | CR 701.8 / 702.12b: destroy the permanents the ObjectRef names -- move each
     -- to its owner's graveyard via the changeZone funnel UNLESS it is
     -- indestructible. NOT MoveToZone slot Graveyard: the indestructible check is
     -- why this is its own opcode (Murder vs Darksteel Myr). Indestructible aside,
@@ -146,7 +146,7 @@ data Effect card
     -- A COUNT, not the set: a rider that acts on each destroyed permanent rather
     -- than on how many there were is not implemented (#463).
     Destroy ObjectRef Regenerability (Maybe SlotName)
-  | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
+  | -- | CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
     -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor
     -- a regeneration shield (CR 701.19a), and is therefore not a reuse of Destroy.
@@ -156,7 +156,7 @@ data Effect card
     -- SOURCE into the reserved Pawl.Engine.Binding.triggerSource slot, and "this
     -- creature" recurs far too often to pay for a second opcode.
     Sacrifice SlotName
-  | -- CR 701.3 / 702.6a: attach THIS permanent (the effect's source) to the
+  | -- | CR 701.3 / 702.6a: attach THIS permanent (the effect's source) to the
     -- slot's target. "Equip [cost]" means "[Cost]: Attach this permanent to
     -- target creature you control", so the equipment is the source and the only
     -- slot is what it attaches TO -- the opcode carries one slot, not two.
@@ -166,7 +166,7 @@ data Effect card
     -- be attached to the target it does not move at all, and attaching it to what
     -- it already holds does nothing.
     Attach SlotName
-  | -- CR 701.3 / 303.4j: attach the SLOT'S TARGET -- an Aura, Equipment or
+  | -- | CR 701.3 / 303.4j: attach the SLOT'S TARGET -- an Aura, Equipment or
     -- Fortification already on the battlefield -- to an object chosen as this
     -- resolves. Crown of the Ages' "Attach target Aura attached to a creature to
     -- another creature".
@@ -196,7 +196,7 @@ data Effect card
     -- such a destination can reach it -- Crown of the Ages can, Aura Graft cannot
     -- -- which is why the rule and the atom are not the same thing.
     AttachTarget SlotName Filter
-  | -- CR 400.7: move the slot's target object to a zone through the changeZone
+  | -- | CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
     -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is
     -- data; one opcode for every targeted single-object move. Distinct from
@@ -218,7 +218,7 @@ data Effect card
     -- the two "it"s are two incarnations of one card. A DEFINITION, not a read:
     -- it is not a target and never appears in targetSpecs.
     MoveToZone SlotName Zone EntryRiders (Maybe SlotName)
-  | -- CR 121.1: the players the PlayerRef names each draw this many cards, one
+  | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one
     -- at a time (CR 121.2). Divination is `Relative You`; Ancestral Recall's
     -- "target player draws three cards" is `InSlot`, reading a slot that
     -- TARGETING filled (CR 601.2c). Empty-library draw is a loss (CR 104.3c),
@@ -229,16 +229,16 @@ data Effect card
     -- in step, which the effect DSL otherwise avoids (cf. MoveToZone's one
     -- opcode for every targeted single-object move).
     Draw PlayerRef Quantity
-  | -- CR 701.17: the slot's target player mills this many (top N of their library
+  | -- | CR 701.17: the slot's target player mills this many (top N of their library
     -- to their graveyard). Milling a short/empty library mills fewer, no penalty
     -- (CR 701.17b) -- unlike Draw, which loses on empty.
     Mill SlotName Quantity
-  | -- CR 701.9: the slot's target player discards this many. The DISCARDING player
+  | -- | CR 701.9: the slot's target player discards this many. The DISCARDING player
     -- chooses which (CR 701.9b) via Prompt.ChooseDiscard, routed through
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
     -- 609.3, "does only as much as possible"), forced -- so it is not prompted.
     Discard SlotName Quantity
-  | -- CR 119.3: "If an effect causes a player to gain life or lose life, that
+  | -- | CR 119.3: "If an effect causes a player to gain life or lose life, that
     -- player's life total is adjusted accordingly." The players the PlayerRef
     -- names each lose this much. Sign in Blood's "target player ... loses 2
     -- life" is `InSlot`, reading a slot that TARGETING filled (CR 601.2c); a
@@ -263,7 +263,7 @@ data Effect card
     -- are distinct game events for triggers ("whenever you gain life"), which a
     -- signed amount would fuse into one.
     LoseLife PlayerRef Quantity
-  | -- CR 119.3: "If an effect causes a player to gain life or lose life, that
+  | -- | CR 119.3: "If an effect causes a player to gain life or lose life, that
     -- player's life total is adjusted accordingly." The players the PlayerRef
     -- names each gain this much -- Soul Warden's "you gain 1 life" is
     -- `Relative You`. LoseLife's mirror in every respect but the sign, and
@@ -272,7 +272,7 @@ data Effect card
     -- No state-based action follows a gain (CR 704.5a is about a life total of 0
     -- or less), so unlike LoseLife this one can never kill anybody.
     GainLife PlayerRef Quantity
-  | -- CR 111: create this many tokens with the given effect-defined characteristics
+  | -- | CR 111: create this many tokens with the given effect-defined characteristics
     -- (CR 111.3). The `card` is the token's "text", embedded literally in the card
     -- data (a nested card, tied to Card by Card's own instantiation; the codec and
     -- round-trip cover it). Quantity is how many (reused from M4a as
@@ -297,7 +297,7 @@ data Effect card
     -- single-token create; a Create that binds a slot while making several tokens
     -- is rejected by the Pawl.CardSpec lint family rather than guessed at (#53).
     Create Quantity card EntryRiders (Maybe SlotName)
-  | -- CR 614.3 / 615.3: install a floating replacement effect for a duration, with
+  | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration, with
     -- a use count. Fog is
     -- `Replace UntilEndOfTurn Unlimited (DamageR (MkDamagePattern (Just Combat)) PreventAll)`;
     -- Drudge Skeletons' ability is
@@ -311,7 +311,7 @@ data Effect card
     -- with this effect's SOURCE (CR 113.7) and a fresh timestamp; Pawl.Engine.Replacement
     -- applies it.
     Replace Duration Uses ReplacementEffect
-  | -- CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
+  | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue is
     -- `SkipNextPhase (InSlot "target") (Step (Beginning DrawStep))`; Stonehorn
     -- Dignitary is `SkipNextPhase (InSlot "target") CombatPhase`, naming a phase
@@ -337,13 +337,13 @@ data Effect card
     -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
     -- "target player", but nothing here demands it.
     SkipNextPhase PlayerRef PhaseSelector
-  | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
+  | -- | CR 701.6: counter the slot's target spell -- remove it from the stack and
     -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
     -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way
     -- Destroy is (M4b): Counter is a keyword action on rule 701's list, and this is
     -- the future home of "can't be countered" and a distinct "was countered" event.
     Counter SlotName
-  | -- CR 122.6: put this many counters of this kind on the slot's target permanent.
+  | -- | CR 122.6: put this many counters of this kind on the slot's target permanent.
     -- Battlegrowth = PutCounters PlusOnePlusOne (Literal 1) slot; Instill Infection
     -- = PutCounters MinusOneMinusOne (Literal 1) slot. A counter is persistent
     -- object state, NOT a zone change -- Resolve.applyEffect edits Object.counters
@@ -351,7 +351,7 @@ data Effect card
     -- many (reused from M4a; a future X-counter card rides ChooseX). The counter's
     -- P/T effect is applied by the projection (CR 122.1a / 613.4c), not here.
     PutCounters CounterKind Quantity SlotName
-  | -- CR 122 / 107.14: the players the PlayerRef names each get N counters of a
+  | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
     -- player-counter kind. Subsumes any self-scoped player counter (energy,
     -- experience, rad) as `Relative You` -- Longtusk Cub's "you get {E}{E}" --
     -- without a new opcode.
@@ -366,7 +366,7 @@ data Effect card
     -- TARGETING (CR 601.2c), which is how a future "target player gets two
     -- poison counters" is written, but nothing here demands it (#120).
     GainPlayerCounters PlayerRef PlayerCounterKind Quantity
-  | -- CR 701.26a: "To tap a permanent, turn it sideways from an upright
+  | -- | CR 701.26a: "To tap a permanent, turn it sideways from an upright
     -- position. Only untapped permanents can be tapped." The exact mirror of
     -- Untap below, down to the ObjectRef -- Dream's Grip's "tap target
     -- permanent" is `InSlot`, and an "all creatures your opponents control" tap
@@ -377,7 +377,7 @@ data Effect card
     -- event, so nothing happens to it. That falls out of the resolution being an
     -- assignment to TapState.Tapped and needs no arm of its own.
     Tap ObjectRef
-  | -- CR 701.26b: untap the permanents the ObjectRef names. Act of Treason's
+  | -- | CR 701.26b: untap the permanents the ObjectRef names. Act of Treason's
     -- "untap that creature" is `InSlot`; Aggravated Assault's "untap all
     -- creatures you control" and Relentless Assault's "untap all creatures that
     -- attacked this turn" are both `EachMatching`, swept at resolution.
@@ -386,7 +386,7 @@ data Effect card
     -- gives at length: one opcode serving both the chosen permanent and the
     -- named set, rather than a sibling UntapAll to keep in step with it.
     Untap ObjectRef
-  | -- CR 506.4: "A permanent is removed from combat if ... an effect
+  | -- | CR 506.4: "A permanent is removed from combat if ... an effect
     -- specifically removes it from combat." THIS is that effect -- the rule's one
     -- clause that a card ASKS for rather than a condition the engine has to
     -- notice, which is why it is an opcode and not a sampler like
@@ -411,7 +411,7 @@ data Effect card
     -- effects that do something ELSE; this one says "remove from combat" in as
     -- many words, which is precisely what the rule's own clause names.
     RemoveFromCombat SlotName
-  | -- CR 500.8: "Some effects can add phases to a turn. They do this by adding
+  | -- | CR 500.8: "Some effects can add phases to a turn. They do this by adding
     -- the phases directly after the specified phase." The payload says which
     -- phases, in written order: Aggravated Assault and Relentless Assault are
     -- `[ExtraCombat, ExtraMain]`, Aurelia, the Warleader is `[ExtraCombat]`, and
@@ -427,7 +427,7 @@ data Effect card
     -- 505.1a/506.1 detail of WHAT is inserted and the CR 511.3 question of WHERE
     -- live.
     AddPhases [ExtraPhase]
-  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
+  | -- | CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
     -- ObjectRef names, for a duration. The new controller is THIS effect's
     -- source's controller (the `controller` passed to applyEffect), baked into a
     -- stored SetController continuous effect -- derived, never chosen. Also
@@ -444,7 +444,7 @@ data Effect card
     -- 611.2c names controller changes in as many words), so an enchantment that
     -- enters afterwards is not stolen.
     GainControl Duration ObjectRef
-  | -- CR 603.7: create a delayed triggered ability -- the one this card declares
+  | -- | CR 603.7: create a delayed triggered ability -- the one this card declares
     -- under this name (Card.delayedAbilities). First-order: the payload is card
     -- data joined by a name, so this opcode carries no nested ability and adds no
     -- type parameter. The resolving object's binding environment is captured as
@@ -463,7 +463,7 @@ data Effect card
     -- a total field rather than a second Maybe, and why the gate cannot live in
     -- the ability's own trigger condition.
     ArmDelayedTrigger AbilityName Onset (Maybe Duration)
-  | -- CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
+  | -- | CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
     -- effect on a class of players for a duration. Silence is
     -- `AffectPlayers UntilEndOfTurn Opponents CantCastSpells`.
     --
@@ -473,30 +473,30 @@ data Effect card
     -- its controller (CR 109.5, baked in -- the source may be in a graveyard by
     -- the time anyone asks), a fresh timestamp, and Expiry.arm's answer.
     AffectPlayers Duration PlayerScope PlayerEffect
-  | -- CR 114.2: "[you] get an emblem with [abilities]." Puts an emblem owned and
+  | -- | CR 114.2: "[you] get an emblem with [abilities]." Puts an emblem owned and
     -- controlled by the resolving controller into the command zone. Targetless
     -- (the beneficiary is always the resolving controller); the abilities ride a
     -- Card so the emblem reuses the whole ability pipeline. First-order: a data
     -- Card, tied to Card by Card's own instantiation, exactly as Create's is.
     CreateEmblem card
-  | -- CR 725: a player becomes the monarch. Targetless; the beneficiary is named
+  | -- | CR 725: a player becomes the monarch. Targetless; the beneficiary is named
     -- by the MonarchTarget (the resolving controller, or the controller of the
     -- ability's bound source). Setting the monarch emits GameEvent.BecameMonarch.
     BecomeMonarch MonarchTarget
-  | -- CR 725 (Palace Jailer): exile the slot's target UNTIL an opponent of the
+  | -- | CR 725 (Palace Jailer): exile the slot's target UNTIL an opponent of the
     -- effect's controller becomes the monarch. The exile is the usual targeted
     -- move; the DURATION is the novelty -- the exiled incarnation is registered in
     -- GameState.exiledUntilMonarch and returned by Pawl.Engine.Monarch's settle-loop
     -- sweep. NOT MoveToZone: that has no duration and schedules no return.
     ExileUntilMonarch SlotName
-  | -- CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived
+  | -- | CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived
     -- loser) into this slot for a later effect to read. This slot is DEFINED here
     -- (like Create's minted-token slot), not a cast-time target -- the loser is
     -- determined only when the subgame ends, so the following effect reads it
     -- through the per-effect binding re-read in resolveSpellWith. Generic: the
     -- engine reaches subgames through this opcode, never Shahrazad's identity.
     PlaySubgame SlotName
-  | -- CR 103.5b (Serum Powder): exile every card in the resolving controller's
+  | -- | CR 103.5b (Serum Powder): exile every card in the resolving controller's
     -- hand, then draw that many cards. Targetless and controller-scoped, the
     -- ExileAllGraveyards shape -- unlike Draw, which names its recipient.
     --
@@ -508,7 +508,7 @@ data Effect card
     -- The card granting the action is itself in the hand and is exiled with the
     -- rest: CR 103.5b's action is not a cost, and nothing sets it aside.
     ExileHandThenDraw
-  | -- CR 701.34a: choose any number of permanents and/or players that have a
+  | -- | CR 701.34a: choose any number of permanents and/or players that have a
     -- counter, then give each one additional counter of each kind it already has.
     --
     -- CHOOSE, not target (CR 701.34a says "choose"): there is no target spec, the
@@ -522,7 +522,7 @@ data Effect card
     -- opportunity; player counters are added directly, matching
     -- GainPlayerCounters and gapped for the same reason (#122).
     Proliferate
-  | -- CR 701.21a: the slot's target PLAYER sacrifices this many permanents
+  | -- | CR 701.21a: the slot's target PLAYER sacrifices this many permanents
     -- matching the Filter, chosen by that player. Diabolic Edict's exact shape.
     --
     -- Distinct from Sacrifice, which names a PERMANENT and is "this creature".
@@ -539,7 +539,7 @@ data Effect card
     -- all of them, and one with none sacrifices nothing -- "as much as possible",
     -- and forced, so neither case is prompted.
     PlayerSacrifices SlotName Filter Quantity
-  | -- CR 500.7: "Some effects can give a player extra turns. They do this by
+  | -- | CR 500.7: "Some effects can give a player extra turns. They do this by
     -- adding the turns directly after the specified turn." The players the
     -- PlayerRef names each get one extra turn, added directly after the turn
     -- this resolves in. Time Warp's "target player takes an extra turn after

@@ -129,6 +129,7 @@ library codec
     Pawl.Codec.Duration
     Pawl.Codec.DurationSpec
     Pawl.Codec.Effect
+    Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
     Pawl.Codec.EndingStepSpec
     Pawl.Codec.EntryOption

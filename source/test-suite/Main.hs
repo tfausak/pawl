@@ -36,6 +36,7 @@ import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DurationSpec
+import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRewriteSpec
@@ -222,6 +223,7 @@ spec s registry = do
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.DurationSpec.spec s
+  Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
