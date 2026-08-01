@@ -10,6 +10,7 @@ import Pawl.Types.BlockRequirement (BlockRequirement)
 import Pawl.Types.CastingPermission (CastingPermission)
 import Pawl.Types.CastingRestriction (CastingRestriction)
 import Pawl.Types.Color (Color)
+import Pawl.Types.CombatRestriction (CombatRestriction)
 import Pawl.Types.Cost (Cost)
 import Pawl.Types.CostComponent (CostComponent)
 import Pawl.Types.Counterability (Counterability)
@@ -225,6 +226,16 @@ data Card = MkCard
     -- these after the layer system rather than inside it. Empty for every other
     -- printing.
     attackRequirements :: [AttackRequirement],
+    -- CR 604.1/604.2 / 508.1c / 509.1b: this card's printed COMBAT RESTRICTIONS
+    -- -- "enchanted creature can't attack or block" (Pacifism). The FIFTH
+    -- printed-static-ability field; read by Pawl.Engine.CombatRestriction and never by
+    -- Pawl.Engine.Projection, since CR 613.11 applies these after the layer system
+    -- rather than inside it. Empty for every other printing.
+    --
+    -- ONE list for both of Pacifism's halves, where the requirements take two
+    -- fields: Pawl.Types.CombatRestriction argues why the axis that split those is
+    -- absent here.
+    combatRestrictions :: [CombatRestriction],
     -- CR 103.5b: the effects of this card's "any time you could mulligan"
     -- action, in written order. Empty for every printing but Serum Powder.
     --

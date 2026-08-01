@@ -12,6 +12,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Engine.AttackRequirement as AttackRequirement
 import qualified Pawl.Engine.BlockRequirement as BlockRequirement
+import qualified Pawl.Engine.CombatRestriction as CombatRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -129,26 +130,35 @@ isCreatureObjectGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId ->
 isCreatureObjectGiven = Projection.isCreatureGiven
 
 -- CR 508.1a: an attacking creature must be untapped, controlled by the active
--- player, and not summoning sick (CR 302.6).
+-- player, and not summoning sick (CR 302.6). Together with CR 508.1c's
+-- restrictions, which are the last two conjuncts: the rules ask them as separate
+-- steps, and pawl answers both here because every restriction it can state is per
+-- creature, so failing one is indistinguishable from never having been a
+-- candidate. A restriction on a SET of creatures could not be answered here
+-- (#533).
 --
 -- canAttackGiven is the half a LOOP wants: `grants` is one control-grant walk
--- (Projection.controlGrants) and `pcs` one whole-board projection
--- (Projection.projectAll), taken once per declaration pass by legalAttackers
--- below rather than once per candidate -- the questions this asks are otherwise
--- as many as three fresh gathers (haste, creature-ness, defender) and a fresh
--- grant walk apiece, which made the pass quadratic in the battlefield (#200).
--- Same hoist Sba.performStateBasedActions takes for the CR 704.3 sweep and
--- Projection.controls takes for the grant list; Projection.projectGiven carries
--- the argument for why a shared board is the same answer, and for why it is
--- valid only within one pure pass over one GameState.
+-- (Projection.controlGrants), `pcs` one whole-board projection
+-- (Projection.projectAll), and `restricted` one battlefield walk for CR 508.1c
+-- (CombatRestriction.cantAttack), each taken once per declaration pass by
+-- legalAttackers below rather than once per candidate -- the questions this asks
+-- are otherwise as many as three fresh gathers (haste, creature-ness, defender), a
+-- fresh grant walk and a fresh restriction walk apiece, which made the pass
+-- quadratic in the battlefield (#200). Same hoist Sba.performStateBasedActions
+-- takes for the CR 704.3 sweep and Projection.controls takes for the grant list;
+-- Projection.projectGiven carries the argument for why a shared board is the same
+-- answer, and for why it is valid only within one pure pass over one GameState.
 --
--- canAttack itself passes Map.empty, so a lone query projects per read exactly
--- as it always did.
+-- canAttack itself passes Map.empty for the projection, so a lone query projects
+-- per read exactly as it always did. It does NOT pass an empty restriction set:
+-- an absent projection is a cache miss the projection recovers from, while an
+-- absent restriction is a wrong answer, which is the distinction
+-- pairAllowedGiven's grant list already draws.
 canAttack :: PlayerId -> ObjectId -> GameState -> Bool
-canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty pid oid gs
+canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantAttack [oid] gs) pid oid gs
 
-canAttackGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> Bool
-canAttackGiven grants pcs pid oid gs = case Game.lookupObject oid gs of
+canAttackGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
+canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
     Projection.controllerOfGiven grants Set.empty oid gs == Just pid
@@ -160,15 +170,22 @@ canAttackGiven grants pcs pid oid gs = case Game.lookupObject oid gs of
       -- turn began.
       && Summoning.settledOrHastyGiven pcs pid oid gs
       && isCreatureObjectGiven pcs oid gs
-      -- CR 702.3b: a creature with defender can't attack. It may still block --
-      -- 702.3b says nothing about blocking.
+      -- CR 508.1c through CR 702.3b: a creature with defender can't attack. It may
+      -- still block -- 702.3b says nothing about blocking. A KEYWORD and not a
+      -- CombatRestriction, because rule 702 is part of the rulebook: casing on a
+      -- keyword is the closed half reading its own rules, where a printed "can't
+      -- attack" is open-half card data.
       && not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs)
+      -- CR 508.1c: every PRINTED attacking restriction in force (Pacifism).
+      && not (Set.member oid restricted)
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
 legalAttackers pid gs =
   let grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
-   in filter (\oid -> canAttackGiven grants pcs pid oid gs) (Projection.controlsGiven grants pid gs)
+      controlled = Projection.controlsGiven grants pid gs
+      restricted = CombatRestriction.cantAttack controlled gs
+   in filter (\oid -> canAttackGiven grants pcs restricted pid oid gs) controlled
 
 -- CR 508.1d's two halves, computed together because neither is usable alone: the
 -- requirement instances in force, and a declaration obeying the "maximum possible
@@ -182,16 +199,17 @@ legalAttackers pid gs =
 -- is exact only because of what pawl cannot yet print:
 --
 --   * every attacking RESTRICTION pawl models is per creature (CR 508.1a's own
---     clauses, plus CR 702.3b's defender), and canAttack has already applied all
---     of them to `candidates`, which AttackRequirement.instances then prunes its
---     instances by;
+--     clauses, CR 702.3b's defender, and CR 508.1c's printed
+--     CombatRestriction.CantAttack -- Pacifism), and canAttack has already applied
+--     all of them to `candidates`, which AttackRequirement.instances then prunes
+--     its instances by;
 --   * so declaring every required creature at once disobeys nothing -- attacking
 --     with one creature cannot make another's attack illegal -- which makes that
 --     declaration legal AND maximal by construction.
 --
 -- Both bullets fail the moment a set-shaped restriction lands (Silent Arbiter's
 -- "no more than one creature can attack each combat"), and the replacement is
--- blockCeiling's enumeration with blockCeiling's exponential cost (#459). The
+-- blockCeiling's enumeration with blockCeiling's exponential cost (#533). The
 -- closed form therefore rests on a missing capability rather than on a claim about
 -- Magic.
 --
@@ -238,7 +256,10 @@ obeysAttackRequirements (required, best) chosen =
 --
 -- CR 508.1c's restrictions are not a separate conjunct because they are not a
 -- separate set: canAttack is the whole of what pawl can say a creature "can't
--- attack" for, so being a candidate IS obeying every restriction it knows (#459).
+-- attack" for -- CR 508.1a's own clauses, CR 702.3b's defender, and every printed
+-- CombatRestriction.CantAttack -- so being a candidate IS obeying every
+-- restriction it knows. That collapse holds only while every restriction is per
+-- creature (#533).
 --
 -- CR 508.1d is not a check but a MAXIMIZATION -- "if the number of requirements
 -- that are being obeyed is fewer than the maximum possible number of requirements
@@ -266,7 +287,14 @@ forcedAttackDeclaration :: (Set ObjectId, Set ObjectId) -> [ObjectId] -> [Object
 forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 
 -- CR 509.1a: a blocking creature must be untapped and controlled by the
--- defending player.
+-- defending player. Plus CR 509.1b's PER-CREATURE restrictions, which are the
+-- last conjunct, on canAttackGiven's terms and for its reason.
+--
+-- Only the per-creature ones. CR 509.1b's restrictions are mostly PAIRWISE
+-- (flying, fear) and cannot be decided about a blocker alone -- those live in
+-- pairAllowed, which is asked of a (blocker, attacker) pair, and a set-shaped one
+-- would live in declarationAllowed. So the rule is answered in three places, one
+-- per shape of restriction, and this is the narrowest.
 --
 -- Summoning sickness is NOT a blocking restriction. CR 302.6 restricts attacking
 -- and activated abilities with the tap or untap symbol, and says nothing about
@@ -275,23 +303,34 @@ forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 -- canBlockGiven/legalBlockersGiven are canAttackGiven's pair, hoisted for the
 -- same reason and with the same snapshot argument.
 canBlock :: PlayerId -> ObjectId -> GameState -> Bool
-canBlock pid oid gs = canBlockGiven (Projection.controlGrants gs) Map.empty pid oid gs
+canBlock pid oid gs = canBlockGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBlock [oid] gs) pid oid gs
 
-canBlockGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> Bool
-canBlockGiven grants pcs pid oid gs = case Game.lookupObject oid gs of
+canBlockGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
+canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
     Projection.controllerOfGiven grants Set.empty oid gs == Just pid
       && Object.zone obj == Zone.Battlefield
       && Object.tapped obj == TapState.Untapped
       && isCreatureObjectGiven pcs oid gs
+      -- CR 509.1b: every PRINTED per-creature blocking restriction in force
+      -- (Pacifism).
+      && not (Set.member oid restricted)
 
 legalBlockers :: PlayerId -> GameState -> [ObjectId]
 legalBlockers pid gs = legalBlockersGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
+-- The restriction walk is taken HERE rather than handed in, where the grant list
+-- and the projection are both parameters: those two are shared with the whole
+-- blocking search (blockCeilingGiven's pairs, legalBlockDeclaration's checks),
+-- while the restricted set is read by nothing but this filter, and threading it
+-- through every caller would buy one battlefield walk that short-circuits on the
+-- first permanent of almost every board.
 legalBlockersGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 legalBlockersGiven grants pcs pid gs =
-  filter (\oid -> canBlockGiven grants pcs pid oid gs) (Projection.controlsGiven grants pid gs)
+  let controlled = Projection.controlsGiven grants pid gs
+      restricted = CombatRestriction.cantBlock controlled gs
+   in filter (\oid -> canBlockGiven grants pcs restricted pid oid gs) controlled
 
 -- CR 702.9b: a creature with flying can't be blocked except by creatures with
 -- flying and/or reach (CR 702.17b).
@@ -779,7 +818,7 @@ declareAttackers pid = do
             -- declareBlockers' posture and rests on its argument: a declaration is
             -- illegal AS A WHOLE (CR 508.1's own "the declaration is illegal"), and
             -- unioning the missing creatures into the player's answer would be
-            -- sound only while every restriction stays per-creature (#459). Nor is
+            -- sound only while every restriction stays per-creature (#533). Nor is
             -- it re-prompted -- a pure `Prompt r -> r` returns the identical wrong
             -- answer -- and this is NOT CR 733's rewind, which is about human
             -- error at a table rather than an engine check.

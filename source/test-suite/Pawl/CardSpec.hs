@@ -46,6 +46,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
@@ -269,6 +270,7 @@ cardSpec s registry = Spec.describe s "Card" $ do
               Card.Type.playerAbilities = [],
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
+              Card.Type.combatRestrictions = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],
@@ -2218,6 +2220,46 @@ attackRequirementCardSpec s registry = Spec.describe s "AttackRequirements" $ do
     -- CR 303.4: an Aura spell has no spell effects; it enters attached.
     Spec.assertEqWith s "no spell effects" (Card.allEffects card) []
 
+-- CR 508.1c and CR 509.1b's combat restrictions. Pacifism is a {1}{W} Enchantment
+-- -- Aura reading "Enchant creature. Enchanted creature can't attack or block."
+-- (Marvel Super Heroes Commander; name, cost, type line and oracle text checked
+-- against Scryfall.) Its shape is the point next to Lure's and Curse of the
+-- Nightly Hunt's: the same enchant-creature Aura, naming the same Affected, on a
+-- field that says the creature may NOT act where theirs say it must. The gameplay
+-- proof is Pawl.CombatSpec's CombatRestrictions group.
+combatRestrictionCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+combatRestrictionCardSpec s registry = Spec.describe s "CombatRestrictions" $ do
+  Spec.it s "Pacifism is a {1}{W} Aura whose only ability is a pair of CR 508.1c/509.1b restrictions" $ do
+    p <- S.printingOf s registry "Pacifism"
+    let card = Printing.card p
+        white = ManaSymbol.OfType (ManaType.Colored Color.White)
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Pacifism")
+    Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
+    Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Enchantment)
+    Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.singleton Subtype.Aura)
+    Spec.assertBool s (Card.isAura card) "is an Aura"
+    Spec.assertEqWith s "enchant creature" (Card.Type.enchant card) (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
+    -- "CAN'T ATTACK OR BLOCK" is TWO restrictions on one line, in printed order.
+    -- Both name Affected.Attached (CR 303.4m), which is Lure's own Affected --
+    -- same set, opposite polarity, different field.
+    Spec.assertEqWith
+      s
+      "two restrictions, both naming whatever the Aura is attached to"
+      (Card.Type.combatRestrictions card)
+      [ CombatRestriction.CantAttack Affected.Attached,
+        CombatRestriction.CantBlock Affected.Attached
+      ]
+    -- The field is what says this changes no CHARACTERISTIC: a CR 613.1 layer
+    -- computes an object's characteristics, and "can't attack" is not one.
+    Spec.assertEqWith s "and it modifies no characteristic" (Card.Type.staticAbilities card) []
+    -- The opposite polarity is ABSENT, which is what keeps the assertion above
+    -- from passing against a carrier that confused the two: this card requires
+    -- nothing of anyone.
+    Spec.assertEqWith s "and requires no attack" (Card.Type.attackRequirements card) []
+    Spec.assertEqWith s "and requires no block" (Card.Type.blockRequirements card) []
+    -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+    Spec.assertEqWith s "no spell effects" (Card.allEffects card) []
+
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
   cardSpec s registry
@@ -2244,3 +2286,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
   removeFromCombatCardSpec s registry
   blockRequirementCardSpec s registry
   attackRequirementCardSpec s registry
+  combatRestrictionCardSpec s registry
