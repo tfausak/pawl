@@ -1,11 +1,19 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers Pawl.Engine.Target: CR 115 target legality, and the rule-702 TARGETING
 -- RESTRICTIONS that narrow it. Shroud (CR 702.18) is the pool's first, and
 -- Blurred Mongoose is the card that prints it. One case covers the other side of
 -- that split -- Pawl.Engine.Sba's CR 303.4c re-check, which asks what an enchant
--- spec ADMITS and must not ask a targeting question -- and the last four cover
+-- spec ADMITS and must not ask a targeting question -- and the last seven cover
 -- CR 115.2's two escape hatches from "only permanents are legal targets": its
--- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead. (Those letters
--- are prose inside rule 115.2, not subrule numbers; there is no CR 115.2a.)
+-- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead and Withered
+-- Wretch. (Those letters are prose inside rule 115.2, not subrule numbers; there
+-- is no CR 115.2a.)
+--
+-- Raise Dead and Withered Wretch are the two halves of CR 400.1's per-player
+-- axis -- "in your graveyard" against "from a graveyard" -- and the case that
+-- reads their pools reads BOTH off one board, so neither is left to pass against
+-- a pool that had stopped asking whose graveyard it was reading.
 --
 -- Gameplay-level: every spec under test is read out of a committed card rather
 -- than hand-built, and the cases that turn on an effect cast and resolve through
@@ -39,6 +47,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
@@ -61,6 +70,16 @@ shroudBoard mongoose piker pid =
       (mongooseId, gs1) = S.addCreature mongoose pid gs0
       (pikerId, gs2) = S.addCreature piker pid gs1
    in (mongooseId, pikerId, gs2)
+
+-- Aims every target slot at one chosen card, tagged the way
+-- Pool.CardsInGraveyard tags its candidates (Recipient.ToObject -- the
+-- candidates are CARDS, not creatures). S.identityAnswer would answer with
+-- Set.lookupMin instead, which is whichever graveyard card happens to have the
+-- lowest id -- no way to say "bob's".
+aimAtCard :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCard oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
@@ -283,7 +302,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- mistake and any of them alone would pass against a pool that stayed empty:
   --
   --   * CR 400.1's per-player zone -- "each player has their own library, hand,
-  --     and graveyard" -- is why the pool carries a PlayerRelation at all, and
+  --     and graveyard" -- is why the pool carries a PlayerScope at all, and
   --     bob's copy of the very same card is what proves the axis is real rather
   --     than decorative. It cannot be a Filter: CR 108.4 says "a card doesn't
   --     have a controller unless that card represents a permanent or spell", so
@@ -360,3 +379,107 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "untouched, the Piker card comes back" (S.countByName (Text.pack "Goblin Piker") S.alice returned) 1
     Spec.assertEqWith s "exiled in response, nothing comes back" (S.countByName (Text.pack "Goblin Piker") S.alice fizzled) 0
     Spec.assertEqWith s "and Raise Dead is in alice's graveyard either way" (length (Game.zoneMembers Zone.Graveyard S.alice fizzled)) 1
+
+  -- CR 400.1's OTHER half. Raise Dead above says "in your graveyard"; Withered
+  -- Wretch's "{1}: Exile target card from a graveyard" names no player at all, so
+  -- every player's copy of the zone is in the pool at once -- a SET of players
+  -- rather than a relation to one.
+  --
+  -- Raise Dead is read on the SAME graveyards and asserted here, because widening
+  -- that axis and DELETING it look identical from the Wretch's side alone: a pool
+  -- that had stopped asking whose graveyard it was reading would satisfy every
+  -- assertion about the Wretch below and quietly hand Raise Dead bob's graveyard
+  -- too.
+  --
+  -- The ABSENT Filter is the second claim. "Target card" carries no card type, so
+  -- the Lightning Bolt card is as legal as the Piker card beside it; Raise Dead's
+  -- HasCardType Creature is what makes that contrast a real one rather than a
+  -- vacuous one. CR 109.2's battlefield default is switched off for both by the
+  -- printed word "card", so neither slot reaches the Piker on the battlefield.
+  Spec.it s "CR 115.2 clause (a) Withered Wretch reaches every graveyard, and Raise Dead still reaches only alice's" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    raiseDead <- S.printingOf s registry "Raise Dead"
+    let (inPlayId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (mineId, g2) = S.addGraveyardCard piker S.alice g1
+        (myBoltId, g3) = S.addGraveyardCard bolt S.alice g2
+        (theirsId, gs) = S.addGraveyardCard piker S.bob g3
+        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Card.Type.activatedAbilities (Printing.card wretch))
+    case (wretchSpecs, S.spellTargetSpec raiseDead) of
+      ([wretchSpec], Just raiseDeadSpec) -> do
+        let legal theSpec = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+        Spec.assertEqWith
+          s
+          "the Wretch offers every card in every graveyard, of every card type, and nothing else"
+          (legal wretchSpec)
+          (Set.fromList (fmap Recipient.ToObject [mineId, myBoltId, theirsId]))
+        Spec.assertBool
+          s
+          (not (Set.member (Recipient.ToCreature inPlayId) (legal wretchSpec)))
+          "and not the Piker on the battlefield under ToCreature either (disjoint from Pool.Creatures)"
+        Spec.assertEqWith
+          s
+          "while Raise Dead, on those same graveyards, still reaches only alice's creature card"
+          (legal raiseDeadSpec)
+          (Set.singleton (Recipient.ToObject mineId))
+      _ -> Spec.assertFailure s "Withered Wretch should print one ability with one target slot, and Raise Dead one slot"
+
+  -- The move itself, activated and resolved through the stack, in BOTH
+  -- directions off one board: "a graveyard" is a claim about two candidate sets,
+  -- and exiling from your own proves only the half Raise Dead already proved.
+  --
+  -- CR 406.2: "To exile an object is to put it into the exile zone from whatever
+  -- zone it's currently in." Exile is SHARED (CR 400.1: "the other zones are
+  -- shared by all players"), so Game.zoneMembers reads it per owner rather than
+  -- per player's copy -- which is how each assertion below names whose card
+  -- moved.
+  Spec.it s "CR 406.2 whole card: Withered Wretch exiles a card from alice's graveyard, and from bob's" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    let (wretchId, g1) = S.addCreature wretch S.alice (S.landsInPlay swamp 1)
+        (mineId, g2) = S.addGraveyardCard piker S.alice g1
+        (theirsId, g3) = S.addGraveyardCard piker S.bob g2
+        board = g3 {GameState.priority = Just S.alice}
+    case Card.Type.activatedAbilities (Printing.card wretch) of
+      [ability] -> do
+        let exiling oid = S.runPure (aimAtCard oid) (S.runPure (aimAtCard oid) board (Activate.activateAbility S.alice wretchId ability)) Stack.resolveTop
+            mine = exiling mineId
+            theirs = exiling theirsId
+        Spec.assertEqWith s "aimed at her own, alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice mine)) 0
+        Spec.assertEqWith s "and the exiled card is hers" (length (Game.zoneMembers Zone.Exile S.alice mine)) 1
+        Spec.assertEqWith s "with bob's graveyard untouched" (length (Game.zoneMembers Zone.Graveyard S.bob mine)) 1
+        Spec.assertEqWith s "aimed at bob's, HIS graveyard is the empty one" (length (Game.zoneMembers Zone.Graveyard S.bob theirs)) 0
+        Spec.assertEqWith s "and the exiled card is his" (length (Game.zoneMembers Zone.Exile S.bob theirs)) 1
+        Spec.assertEqWith s "with alice's graveyard untouched" (length (Game.zoneMembers Zone.Graveyard S.alice theirs)) 1
+      abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
+
+  -- CR 608.2b for an ABILITY rather than a spell, and against the opponent's
+  -- graveyard: "A target that's no longer in the zone it was in when it was
+  -- targeted is illegal. ... If all its targets ... are now illegal, the spell or
+  -- ability doesn't resolve."
+  --
+  -- The response moves the card to bob's HAND rather than exiling it, so the two
+  -- outcomes are told apart by the exile zone: a fizzle leaves it empty, and an
+  -- ability that resolved anyway would put something in it. Both halves run off
+  -- one activation, so the fizzle cannot be an activation that never worked.
+  Spec.it s "CR 608.2b Withered Wretch's activation fizzles when the card leaves the graveyard in response" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    let (wretchId, g1) = S.addCreature wretch S.alice (S.landsInPlay swamp 1)
+        (theirsId, g2) = S.addGraveyardCard piker S.bob g1
+        board = g2 {GameState.priority = Just S.alice}
+    case Card.Type.activatedAbilities (Printing.card wretch) of
+      [ability] -> do
+        let activated = S.runPure (aimAtCard theirsId) board (Activate.activateAbility S.alice wretchId ability)
+            resolve g = S.runPure (aimAtCard theirsId) g Stack.resolveTop
+            exiled = resolve activated
+            fizzled = resolve (S.runPure S.identityAnswer activated (Event.changeZone theirsId Zone.Hand))
+        Spec.assertEqWith s "the activation put one ability on the stack" (length (GameState.stack activated)) 1
+        Spec.assertEqWith s "untouched, bob's card is exiled" (length (Game.zoneMembers Zone.Exile S.bob exiled)) 1
+        Spec.assertEqWith s "taken to his hand in response, nothing is exiled at all" (length (Game.zoneMembers Zone.Exile S.bob fizzled)) 0
+        Spec.assertEqWith s "and the card is still in his hand" (length (Game.zoneMembers Zone.Hand S.bob fizzled)) 1
+        Spec.assertEqWith s "with the ability off the stack either way" (length (GameState.stack fizzled)) 0
+      abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
