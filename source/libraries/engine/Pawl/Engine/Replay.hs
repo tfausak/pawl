@@ -240,6 +240,7 @@ defaultAnswer p = case p of
     let blockers = filter isCreatureRecipient (Map.keys thresholds)
         isCreatureRecipient r = case r of
           Recipient.ToCreature _ -> True
+          Recipient.ToPlaneswalker _ -> False
           Recipient.ToPlayer _ -> False
           Recipient.ToObject _ -> False
      in case blockers of

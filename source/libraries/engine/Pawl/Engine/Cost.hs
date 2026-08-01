@@ -281,8 +281,7 @@ addLoyalty n obj = obj {Object.counters = Map.insertWith (+) CounterKind.Loyalty
 removeLoyalty :: Natural -> Object.Object -> Object.Object
 removeLoyalty n obj =
   let have = Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj)
-      left = if have >= n then have - n else 0
-   in obj {Object.counters = Map.insert CounterKind.Loyalty left (Object.counters obj)}
+   in obj {Object.counters = Map.insert CounterKind.Loyalty (Natural.minusSaturating have n) (Object.counters obj)}
 
 -- Which permanents a Filter admits, matched through the PROJECTION and never
 -- against printed characteristics: a card type is CR 613.1d layer 4 and a

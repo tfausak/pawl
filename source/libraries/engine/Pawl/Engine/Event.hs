@@ -1039,6 +1039,7 @@ eventBindings cond event = case (cond, event) of
     case DamageEvent.target ev of
       Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid Map.empty
       Recipient.ToCreature _ -> Map.empty
+      Recipient.ToPlaneswalker _ -> Map.empty
       Recipient.ToObject _ -> Map.empty
   -- CR 400.7e: "Abilities that trigger when an object moves from one zone to
   -- another ... can find the new object that it became in the zone it moved to
@@ -1205,6 +1206,7 @@ isPlayerRecipient :: Recipient.Recipient -> Bool
 isPlayerRecipient r = case r of
   Recipient.ToPlayer _ -> True
   Recipient.ToCreature _ -> False
+  Recipient.ToPlaneswalker _ -> False
   Recipient.ToObject _ -> False
 
 -- CR 603.6a: "Each time an event puts one or more permanents onto the
