@@ -36,7 +36,7 @@ import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
 import Pawl.Codec.TargetSpec (jsonToTargetSpec, targetSpecToJson)
 import Pawl.Codec.Toughness (jsonToToughness, toughnessToJson)
 import Pawl.Codec.TriggeredAbility (delayedAbilitiesToJson, jsonToDelayedAbilities, jsonToTriggeredAbility, triggeredAbilityToJson)
-import Pawl.Codec.TypeLine (jsonToTypeLine, typeLineToJson)
+import qualified Pawl.Codec.TypeLine as TypeLine
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.Counterability as Counterability
@@ -46,7 +46,7 @@ cardToJson c =
   Json.jObject
     ( [ (Text.pack "name", Json.jText (CardT.name c)),
         (Text.pack "manaCost", Json.maybeTo manaCostToJson (CardT.manaCost c)),
-        (Text.pack "typeLine", typeLineToJson (CardT.typeLine c)),
+        (Text.pack "typeLine", TypeLine.toJson (CardT.typeLine c)),
         (Text.pack "power", Json.maybeTo powerToJson (CardT.power c)),
         (Text.pack "toughness", Json.maybeTo toughnessToJson (CardT.toughness c)),
         (Text.pack "keywords", Json.setTo keywordToJson (CardT.keywords c)),
@@ -133,7 +133,7 @@ jsonToCard value = do
   ps <- Json.asObject value
   name <- Json.field (Text.pack "name") ps >>= Json.asText
   manaCost <- Json.maybeFrom jsonToManaCost (Json.getOpt (Text.pack "manaCost") ps)
-  typeLine <- Json.field (Text.pack "typeLine") ps >>= jsonToTypeLine
+  typeLine <- Json.field (Text.pack "typeLine") ps >>= TypeLine.fromJson
   power <- Json.maybeFrom jsonToPower (Json.getOpt (Text.pack "power") ps)
   toughness <- Json.maybeFrom jsonToToughness (Json.getOpt (Text.pack "toughness") ps)
   loyalty <- Json.maybeFrom Loyalty.fromJson (Json.getOpt (Text.pack "loyalty") ps)

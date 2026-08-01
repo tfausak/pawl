@@ -39,9 +39,11 @@ import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerIdSpec
+import qualified Pawl.Codec.PlayerRefSpec
 import qualified Pawl.Codec.PlayerRelationSpec
 import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PoolSpec
+import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.SearchDestinationSpec
@@ -49,9 +51,13 @@ import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TapStateSpec
+import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TurnScopeSpec
+import qualified Pawl.Codec.TypeLineSpec
 import qualified Pawl.Codec.UsesSpec
+import qualified Pawl.Codec.ZoneChangePatternSpec
+import qualified Pawl.Codec.ZoneChangeSpec
 import qualified Pawl.Codec.ZoneChangeSubjectSpec
 import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecSpec
@@ -185,9 +191,11 @@ spec s registry = do
   Pawl.Codec.PhaseSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerIdSpec.spec s
+  Pawl.Codec.PlayerRefSpec.spec s
   Pawl.Codec.PlayerRelationSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s
   Pawl.Codec.PoolSpec.spec s
+  Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
@@ -195,9 +203,13 @@ spec s registry = do
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
+  Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s
+  Pawl.Codec.TypeLineSpec.spec s
   Pawl.Codec.UsesSpec.spec s
+  Pawl.Codec.ZoneChangePatternSpec.spec s
+  Pawl.Codec.ZoneChangeSpec.spec s
   Pawl.Codec.ZoneChangeSubjectSpec.spec s
   Pawl.Codec.ZoneSpec.spec s
   Pawl.CodecSpec.spec s registry

@@ -11,14 +11,14 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerId as PlayerId
 import Pawl.Codec.ProjectedCharacteristics (jsonToProjectedCharacteristics, projectedCharacteristicsToJson)
-import Pawl.Codec.ZoneChange (jsonToZoneChange, zoneChangeToJson)
+import qualified Pawl.Codec.ZoneChange as ZoneChange
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
 import qualified Pawl.Types.GameEvent as GameEvent
 
 gameEventToJson :: GameEvent.GameEvent -> Value
 gameEventToJson e = case e of
-  GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array (MkArray [zoneChangeToJson zc, projectedCharacteristicsToJson pc])))
+  GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array (MkArray [ZoneChange.toJson zc, projectedCharacteristicsToJson pc])))
   GameEvent.DamageDealt ev -> Json.tagged (Text.pack "DamageDealt") (Just (damageEventToJson ev))
   GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array (MkArray [Phase.toJson p, PlayerId.toJson pid])))
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (PlayerId.toJson pid))
@@ -34,7 +34,7 @@ jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("Moved", Just (Array (MkArray [zc, pc]))) -> GameEvent.Moved <$> jsonToZoneChange zc <*> jsonToProjectedCharacteristics pc
+    ("Moved", Just (Array (MkArray [zc, pc]))) -> GameEvent.Moved <$> ZoneChange.fromJson zc <*> jsonToProjectedCharacteristics pc
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> jsonToDamageEvent v
     ("StepBegan", Just (Array (MkArray [p, pid]))) -> GameEvent.StepBegan <$> Phase.fromJson p <*> PlayerId.fromJson pid
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> PlayerId.fromJson v

@@ -4,7 +4,7 @@ import Pawl.Types.ControllerRelation (ControllerRelation)
 import Pawl.Types.Zone (Zone)
 import Pawl.Types.ZoneChangeSubject (ZoneChangeSubject)
 
--- CR 614.1a: which zone changes a redirect intercepts. Rest in Peace is
+-- | CR 614.1a: which zone changes a redirect intercepts. Rest in Peace is
 -- (Graveyard, Anyones, AnyObject) -- any object that would be put into a
 -- graveyard from anywhere. `whenDestination` is compared against the event's
 -- CURRENT destination, which is why a redirect whose output no longer matches

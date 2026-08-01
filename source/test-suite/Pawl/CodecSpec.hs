@@ -45,7 +45,6 @@ import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
 import Pawl.Codec.TargetSpec (jsonToTargetSpec, targetSpecToJson)
 import Pawl.Codec.TriggerCondition (jsonToTriggerCondition, triggerConditionToJson)
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
-import Pawl.Codec.TypeLine (jsonToTypeLine, typeLineToJson)
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Engine.Binding as Binding
@@ -140,7 +139,6 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -149,7 +147,6 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
-import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -625,33 +622,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       let spec' = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]))
        in Spec.assertEqWith s "preserved" (jsonToTargetSpec (targetSpecToJson spec')) (Right spec')
   Spec.describe s "records" $ do
-    Spec.it s "TypeLine" $
-      roundTrip
-        s
-        "tl"
-        typeLineToJson
-        jsonToTypeLine
-        (TypeLine.MkTypeLine (Set.singleton Supertype.Basic) (Set.singleton CardType.Land) (Set.singleton Subtype.Mountain))
-    -- CR 308.1/308.2: the kindred shape -- two card types, and a CREATURE
-    -- subtype on a card that is not a creature. Bitterblossom's type line,
-    -- and the only one in the pool where the subtype's family and the
-    -- card types disagree.
-    Spec.it s "TypeLine (kindred)" $
-      roundTrip
-        s
-        "tl-kindred"
-        typeLineToJson
-        jsonToTypeLine
-        (TypeLine.MkTypeLine Set.empty (Set.fromList [CardType.Kindred, CardType.Enchantment]) (Set.singleton Subtype.Faerie))
-    -- CR 306.3 / 205.3j: Jace Beleren's, and the first type line whose
-    -- subtype is a planeswalker type.
-    Spec.it s "TypeLine (planeswalker)" $
-      roundTrip
-        s
-        "tl-planeswalker"
-        typeLineToJson
-        jsonToTypeLine
-        (TypeLine.MkTypeLine (Set.singleton Supertype.Legendary) (Set.singleton CardType.Planeswalker) (Set.singleton Subtype.Jace))
     -- CR 614.1c / 306.5b: the intrinsic enters-with-counters rewrite.
     Spec.it s "EntryRewrite (with counters)" $
       roundTrip s "entry-counters" entryRewriteToJson jsonToEntryRewrite (EntryRewrite.WithCounters CounterKind.Loyalty 3)

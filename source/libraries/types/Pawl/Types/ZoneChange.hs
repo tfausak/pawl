@@ -3,7 +3,7 @@ module Pawl.Types.ZoneChange where
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Zone (Zone)
 
--- One zone-change event (CR 400.7): `object` is the RESULTING object's id (the
+-- | One zone-change event (CR 400.7): `object` is the RESULTING object's id (the
 -- fresh incarnation in the destination), which is what an enters trigger scans,
 -- and `departed` is the id the object had in the zone it LEFT.
 --

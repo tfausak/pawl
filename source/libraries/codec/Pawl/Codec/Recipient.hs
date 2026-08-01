@@ -1,27 +1,25 @@
--- | The @Recipient ⇆ Json@ codec (#481).
 module Pawl.Codec.Recipient where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
-import Pawl.Json.Value (Value)
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Recipient as Recipient
 
-recipientToJson :: Recipient.Recipient -> Value
-recipientToJson r = case r of
-  Recipient.ToCreature oid -> Json.tagged (Text.pack "ToCreature") (Just (ObjectId.toJson oid))
-  Recipient.ToPlaneswalker oid -> Json.tagged (Text.pack "ToPlaneswalker") (Just (ObjectId.toJson oid))
-  Recipient.ToPlayer pid -> Json.tagged (Text.pack "ToPlayer") (Just (PlayerId.toJson pid))
-  Recipient.ToObject oid -> Json.tagged (Text.pack "ToObject") (Just (ObjectId.toJson oid))
+toJson :: Recipient.Recipient -> Value.Value
+toJson r = case r of
+  Recipient.ToCreature oid -> Common.tagged "ToCreature" . Just $ ObjectId.toJson oid
+  Recipient.ToPlaneswalker oid -> Common.tagged "ToPlaneswalker" . Just $ ObjectId.toJson oid
+  Recipient.ToPlayer pid -> Common.tagged "ToPlayer" . Just $ PlayerId.toJson pid
+  Recipient.ToObject oid -> Common.tagged "ToObject" . Just $ ObjectId.toJson oid
 
-jsonToRecipient :: Value -> Either Text Recipient.Recipient
-jsonToRecipient value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
+fromJson :: Value.Value -> Either Text.Text Recipient.Recipient
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
     ("ToCreature", Just v) -> Recipient.ToCreature <$> ObjectId.fromJson v
     ("ToPlaneswalker", Just v) -> Recipient.ToPlaneswalker <$> ObjectId.fromJson v
     ("ToPlayer", Just v) -> Recipient.ToPlayer <$> PlayerId.fromJson v
     ("ToObject", Just v) -> Recipient.ToObject <$> ObjectId.fromJson v
-    _ -> Left (Text.pack "unknown Recipient: " <> t)
+    _ -> Left . Text.pack $ "unknown Recipient: " <> t
