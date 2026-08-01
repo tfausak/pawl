@@ -771,6 +771,34 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "CR 205.4g: damage equal to the snow permanents you control"
       (modeShapes (CardT.spell c))
       [(Optionality.Mandatory, [Effect.DealDamage target (Quantity.Count snowPermanentsYouControl)])]
+  -- The pool's first {S} (CR 107.4h). Exactly two cards print one in a MANA cost
+  -- -- this and Arcum's Astrolabe, which costs the same {S} and prints real text
+  -- on top of it -- so this is the minimal card the symbol has, and the whole
+  -- card IS the symbol. Its printed "({S} can be paid with one mana from a snow
+  -- source.)" is reminder text for the cost and not an ability, so the file
+  -- carries no text at all: the snow-covered-mountain.json posture, two tests up.
+  --
+  -- The supertype is the card's own (CR 205.4g), and it is not what makes the
+  -- cost payable: a Snow permanent does not pay for itself. What pays is a snow
+  -- SOURCE's mana (CR 106.3), proved in Pawl.ManaSpec.
+  Spec.it s "icehide-golem.json loads as an {S} Snow Artifact Creature - Golem 2/2 with no text" $ do
+    c <- S.cardOf s registry "Icehide Golem"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Icehide Golem")
+    Spec.assertEqWith s "{S}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Snow]))
+    Spec.assertEqWith
+      s
+      "Snow Artifact Creature - Golem"
+      (CardT.typeLine c)
+      ( TypeLine.MkTypeLine
+          (Set.singleton Supertype.Snow)
+          (Set.fromList [CardType.Artifact, CardType.Creature])
+          (Set.singleton Subtype.Golem)
+      )
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 2)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 2)))
+    Spec.assertEqWith s "no keywords" (CardT.keywords c) Set.empty
+    Spec.assertEqWith s "reminder text is not an ability" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and none of any other kind" (CardT.activatedAbilities c) []
   -- The pool's first KINDRED card (CR 308). CR 308.1 -- "each kindred card
   -- has another card type" -- is why the type line carries Enchantment
   -- alongside Kindred, and CR 110.4 keeps Kindred off the list of six

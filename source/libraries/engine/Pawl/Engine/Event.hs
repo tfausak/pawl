@@ -1724,6 +1724,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfDies -> False
+  TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
 
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition

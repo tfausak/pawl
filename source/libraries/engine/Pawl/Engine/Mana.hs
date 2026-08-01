@@ -41,11 +41,13 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Subtype (Subtype)
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 
 -- CR 305.6: a basic land's mana ability is granted intrinsically by its subtype,
@@ -149,6 +151,9 @@ subtypeMana subtype = case subtype of
   -- never applies to it.
   Subtype.Jace -> Nothing
   Subtype.Wraith -> Nothing
+  -- CR 205.3m: Golem is a creature type (Icehide Golem's), not a basic land
+  -- type, so CR 305.6's intrinsic mana ability never applies to it.
+  Subtype.Golem -> Nothing
   Subtype.Turtle -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
@@ -240,13 +245,45 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
 manaYieldsOfGiven pcs oid gs =
-  let asMana manaTypes = Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType}) manaTypes)
+  let tags = productionTagsGiven pcs oid gs
+      asMana manaTypes =
+        Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags}) manaTypes)
    in List.nub (fmap asMana (concatMap (traverse producedTypes) (manaRoutesOfGiven pcs oid gs)))
 
--- The types in one yield, in printed order. Reading a Mana rather than spending
+-- The production-time tags (Pawl.Types.ProductionTag) every mana this object
+-- adds will carry. THE one place they are decided -- manaYieldsOfGiven just
+-- above is the one place they are stamped onto a unit -- and the reason they are
+-- captured rather than looked up later is in that module and in
+-- Pawl.Types.ManaUnit's header: the mana outlives the source.
+--
+-- CR 106.3 is what makes reading the SOURCE the right question: "If mana is
+-- produced by an ability, the source of that mana is the source of that ability
+-- (see rule 113.7)" -- for everything here, the permanent being tapped. CR
+-- 107.4h then asks whether that source is a snow one, and the rules define no
+-- separate term for it: the glossary's "Snow Mana Symbol" points back at CR
+-- 107.4h, so a snow source is a source that is snow, which for a permanent is CR
+-- 205.4g's supertype and nothing else ("regardless of its name").
+--
+-- CR 205.4g is PERMANENT-scoped, and CR 106.3's first clause is wider than that
+-- -- "if mana is produced by a spell, the source of that mana is that spell" --
+-- so this read would be too narrow for a source that is not a permanent. Nothing
+-- reaches it with one: the two engine paths in are tapForMana and
+-- payableResolutions, and both take their oid from manaSourcesGiven, which
+-- filters the battlefield.
+productionTagsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Set.Set ProductionTag.ProductionTag
+productionTagsGiven pcs oid gs =
+  if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs)
+    then Set.singleton ProductionTag.Snow
+    else Set.empty
+
+-- The units of one yield, in printed order. Reading a Mana rather than spending
 -- or adding one, which is what every other unwrap in this module does.
+unitsOf :: Mana -> [ManaUnit]
+unitsOf (Mana.MkMana units) = units
+
+-- The types in one yield, in printed order.
 typesOf :: Mana -> [ManaType]
-typesOf (Mana.MkMana units) = fmap ManaUnit.manaType units
+typesOf = fmap ManaUnit.manaType . unitsOf
 
 -- CR 106.7's shape: every mana type this object COULD produce, flattened across
 -- its yields and deduplicated. A strictly weaker question than manaYieldsOf --
@@ -406,19 +443,88 @@ chooseManaYield pid oid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
--- Every way ONE symbol can be paid: a typed demand -- the SET of mana types one
--- unit of which satisfies it, and Nothing for a symbol that demands no particular
--- type -- paired with the generic mana that way adds and the LIFE it costs.
+-- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
+-- types, carrying at least these production-time tags.
 --
--- A set rather than a single type, because CR 107.4e's hybrid symbol "can be paid
--- in one of two ways". A plain `{R}` is the singleton case, so both payment paths
--- below read one shape and never case on hybrid-ness.
+-- A SET of types rather than a single one, because CR 107.4e's hybrid symbol "can
+-- be paid in one of two ways". A plain `{R}` is the singleton case, so every
+-- payment path below reads one shape and none cases on hybrid-ness.
+--
+-- The TAGS are CR 107.4h's {S}, and they are a second axis rather than more
+-- types: "a cost that can be paid with one mana of any type produced by a snow
+-- source", so the symbol constrains how the mana was PRODUCED and not what it is.
+-- Empty for every other symbol, which is what keeps them all indifferent to how
+-- their mana was made.
+data Demand = MkDemand
+  { demandTypes :: Set.Set ManaType,
+    demandTags :: Set.Set ProductionTag.ProductionTag
+  }
+  deriving (Eq, Ord, Show)
+
+-- ONE mana the player could put toward a cost, as what it could be: the types it
+-- might have, and the tags it would carry. A pool unit is the settled case (its
+-- type is already fixed); an untapped source is the open one, where the choice
+-- has not been made yet.
+data Supply = MkSupply
+  { supplyTypes :: Set.Set ManaType,
+    supplyTags :: Set.Set ProductionTag.ProductionTag
+  }
+  deriving (Eq, Ord, Show)
+
+-- Could this one mana serve that one demand? The ONE relation both payment and
+-- payability read, so the two can never disagree about it.
+--
+-- Types INTERSECT -- the supply need only be able to be one of the demanded
+-- types -- while tags are a SUPERSET: CR 107.4h demands mana from a snow source,
+-- and a mana that is not from one cannot become so. A supply carrying a tag
+-- nothing asked for is no worse for it.
+serves :: Supply -> Demand -> Bool
+serves supply demand =
+  not (Set.disjoint (supplyTypes supply) (demandTypes demand))
+    && Set.isSubsetOf (demandTags demand) (supplyTags supply)
+
+-- A pool unit as a supply. Its type is settled, so the option set is a
+-- singleton, and its tags are the ones production stamped on it
+-- (manaYieldsOfGiven).
+supplyOf :: ManaUnit -> Supply
+supplyOf unit =
+  MkSupply
+    { supplyTypes = Set.singleton (ManaUnit.manaType unit),
+      supplyTags = ManaUnit.tags unit
+    }
+
+-- A demand for one mana of one of these types, however it was produced -- every
+-- TYPED symbol but CR 107.4h's {S}. A symbol demanding no particular mana
+-- (Generic, and either symbol's second way) builds no demand at all.
+ofTypes :: Set.Set ManaType -> Demand
+ofTypes types = MkDemand {demandTypes = types, demandTags = Set.empty}
+
+-- CR 106.1b: "There are six types of mana: white, blue, black, red, green, and
+-- colorless." Written out rather than derived, for the reason producedTypes
+-- writes out CR 105.1's five: the enumeration IS the rule, and spelling it keeps
+-- the citation next to the list.
+--
+-- This is the whole type side of CR 107.4h's {S}: "one mana of ANY type", so the
+-- symbol narrows nothing about what the mana is and everything about where it
+-- came from.
+everyManaType :: Set.Set ManaType
+everyManaType =
+  Set.fromList
+    ( ManaType.Colorless
+        : fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
+    )
+
+-- Every way ONE symbol can be paid: a typed demand, and Nothing for a symbol that
+-- demands no particular mana at all -- paired with the generic mana that way adds
+-- and the LIFE it costs.
 --
 -- A LIST of ways, because CR 107.4e's other half is not a wider set but a
 -- different SHAPE: "a monocolored hybrid symbol such as {2/B} can be paid with
 -- either one black mana or two mana of any type", and one mana and two mana
--- cannot be the same demand. Every other symbol offers exactly one way, so the
--- list is a singleton everywhere else.
+-- cannot be the same demand. CR 107.4f's Phyrexian symbol is the other
+-- two-way symbol, for the different reason the LIFE field below gives; every
+-- other symbol, {S} included, offers exactly one way and the list is a singleton
+-- for it.
 --
 -- The LIFE field is CR 107.4f's Phyrexian symbol, and it is the one way that is
 -- not a mana payment at all, so it could not be folded into either of the other
@@ -430,22 +536,29 @@ chooseManaYield pid oid candidates gs = case candidates of
 -- which is what CR 118.13a and CR 601.2b call for -- so this enumeration reaches
 -- payment only where nothing announced. CR 107.4e's hybrid ways do survive to
 -- payment, which is the elision that remains (#261).
-waysOf :: ManaSymbol -> [(Maybe (Set.Set ManaType), Natural, Natural)]
+waysOf :: ManaSymbol -> [(Maybe Demand, Natural, Natural)]
 waysOf symbol = case symbol of
-  ManaSymbol.OfType t -> [(Just (Set.singleton t), 0, 0)]
+  ManaSymbol.OfType t -> [(Just (ofTypes (Set.singleton t)), 0, 0)]
   -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated type
   -- either way, so it contributes nothing to the generic count.
-  ManaSymbol.Hybrid a b -> [(Just (Set.fromList [a, b]), 0, 0)]
+  ManaSymbol.Hybrid a b -> [(Just (ofTypes (Set.fromList [a, b])), 0, 0)]
   -- CR 107.4e's two ways, and the one-mana way is FIRST -- see resolutions.
-  ManaSymbol.MonocoloredHybrid t -> [(Just (Set.singleton t), 0, 0), (Nothing, 2, 0)]
+  ManaSymbol.MonocoloredHybrid t -> [(Just (ofTypes (Set.singleton t)), 0, 0), (Nothing, 2, 0)]
   -- CR 107.4f's two ways: "a cost that can be paid either with one mana of its
   -- color or by paying 2 life." The colour is a ManaType here because that is
   -- what a demand is made of; CR 107.4f admits no colourless Phyrexian symbol,
   -- so ManaType.Colored is total rather than a case.
   --
   -- The mana way is FIRST, which resolutions' sort then keeps -- see there.
-  ManaSymbol.Phyrexian c -> [(Just (Set.singleton (ManaType.Colored c)), 0, 0), (Nothing, 0, 2)]
+  ManaSymbol.Phyrexian c -> [(Just (ofTypes (Set.singleton (ManaType.Colored c))), 0, 0), (Nothing, 0, 2)]
   ManaSymbol.Generic n -> [(Nothing, n, 0)]
+  -- CR 107.4h: "a cost that can be paid with one mana of any type produced by a
+  -- snow source." ONE way, and it is a typed demand rather than a generic count
+  -- -- which is the same rule's next sentence made structural: "Effects that
+  -- reduce the amount of generic mana you pay don't affect {S} costs." Every
+  -- type (CR 106.1b) and one tag, so nothing about the mana's identity is asked
+  -- and everything about its provenance is.
+  ManaSymbol.Snow -> [(Just (MkDemand everyManaType (Set.singleton ProductionTag.Snow)), 0, 0)]
   -- Unreachable in payment: substituteX removes every Variable before canPay
   -- (Task 4). The match must be total, so a bare {X} demands nothing and counts
   -- as 0 generic.
@@ -490,7 +603,7 @@ waysOf symbol = case symbol of
 --
 -- The sort is what makes rule 1 hold across symbols rather than within one: for
 -- {2/R}{G/P} the product alone would offer a 2-life way before a 0-life one.
-resolutions :: ManaCost -> [([Set.Set ManaType], Natural, Natural)]
+resolutions :: ManaCost -> [([Demand], Natural, Natural)]
 resolutions (ManaCost.MkManaCost symbols) =
   let collect ways =
         ( Maybe.mapMaybe (\(demand, _, _) -> demand) ways,
@@ -513,11 +626,11 @@ substituteX x (ManaCost.MkManaCost symbols) =
 
 -- Every way to remove one unit that satisfies `wanted`, one result per candidate
 -- unit. The branching point of the search below.
-removals :: Set.Set ManaType -> [ManaUnit] -> [[ManaUnit]]
+removals :: Demand -> [ManaUnit] -> [[ManaUnit]]
 removals wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
   where
     without (i, u) =
-      if Set.member (ManaUnit.manaType u) wanted
+      if serves (supplyOf u) wanted
         then Just (take i units <> drop (i + 1) units)
         else Nothing
 
@@ -535,7 +648,7 @@ removals wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
 -- and keep the first assignment that covers the rest. A mana cost is a handful of
 -- symbols, so the search is trivially small, and being exact means canPay's Hall
 -- condition and this never disagree about whether a cost is payable.
-spendDemands :: [ManaUnit] -> [Set.Set ManaType] -> Maybe [ManaUnit]
+spendDemands :: [ManaUnit] -> [Demand] -> Maybe [ManaUnit]
 spendDemands units demands = case demands of
   [] -> Just units
   wanted : rest ->
@@ -813,8 +926,19 @@ canPayCommitting pid committed cost gs = not (null (payableResolutions pid commi
 -- unpayable payment fails and rolls back (CR 601.2h, payCost), while
 -- under-counting would withhold an action the player was entitled to. No card in
 -- the pool has two yields of which either adds more than one mana (#450).
-sourceSupplies :: [Mana] -> [Set.Set ManaType]
-sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
+--
+-- The TAGS mix by union, and there the mixing is exact rather than
+-- over-permissive: manaYieldsOfGiven stamps one tag set on every unit of every
+-- yield of a source, because CR 106.3 makes them all facts about that one
+-- source. So the union is the value each of them already had.
+sourceSupplies :: [Mana] -> [Supply]
+sourceSupplies yields = fmap asSupply (List.transpose (fmap unitsOf yields))
+  where
+    asSupply units =
+      MkSupply
+        { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
+          supplyTags = Set.unions (fmap ManaUnit.tags units)
+        }
 
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
@@ -830,11 +954,12 @@ sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
 -- Birds' first colour would call it unaffordable.
 --
 -- So it is an assignment question, and it is answered exactly. Model each
--- available mana as a SUPPLY carrying the set of types it could be -- a pool
--- unit is its own type; an untapped source contributes ONE SUPPLY PER MANA IT
--- ADDS, which is what sourceSupplies below reads off its yields. Each typed
--- symbol of the cost is a DEMAND for a specific type; generic symbols demand a
--- count and nothing more.
+-- available mana as a SUPPLY carrying the set of types it could be and the
+-- production-time tags it would carry (CR 106.3) -- a pool unit is its own type
+-- and its own tags; an untapped source contributes ONE SUPPLY PER MANA IT ADDS,
+-- which is what sourceSupplies below reads off its yields. Each typed symbol of
+-- the cost is a DEMAND, which `serves` matches against a supply; generic symbols
+-- demand a count and nothing more.
 --
 -- A RESOLVED cost is payable exactly when all three hold:
 --
@@ -853,12 +978,22 @@ sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
 --      precisely so that this holds for a player the map does not hold either.
 --
 -- Clause 1 is Hall's condition: a saturating matching exists iff no set of
--- demands outruns the supplies that could serve it. Demands of the same type
--- have identical options, so it is enough to check one demand set per SUBSET of
--- the types actually demanded -- at most 2^6 subsets by CR 106.1b, and in
--- practice a handful. Checked directly rather than by running a matching
--- algorithm: the condition IS the specification, so there is no gap between what
--- this says and what it does.
+-- demands outruns the supplies that could serve it. Checked directly rather than
+-- by running a matching algorithm: the condition IS the specification, so there
+-- is no gap between what this says and what it does.
+--
+-- Enumerated over subsets of the DISTINCT demands, and that is enough for every
+-- subset. Equal demands have the same supplies, so for any violating set take
+-- every demand equal to one of its members: that set is no smaller and its
+-- supplies are exactly the same ones, so it violates the condition too. At most
+-- 2^(distinct typed symbols in the resolution) subsets, a handful for every cost
+-- in the pool.
+--
+-- Over DEMANDS rather than over TYPES, which is what this enumerated while a
+-- demand was nothing but a set of types. CR 107.4h's {S} is what ends that: its
+-- demand is every type (CR 106.1b) narrowed by a production tag, so two demands
+-- can name the same types and still be served by different supplies, and a
+-- subset of the types demanded no longer names the demand set it stands for.
 --
 -- Clauses 1 and 2 count one supply per typed demand, which is exactly why CR
 -- 107.4e's {2/B} is resolved AWAY before either is asked: `resolutions` turns the
@@ -868,7 +1003,7 @@ sourceSupplies yields = fmap Set.fromList (List.transpose (fmap typesOf yields))
 -- rides on the same enumeration: its life way is a resolution with one fewer
 -- demand, so neither clause has to learn about a symbol that consumes no supply
 -- at all.
-payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
+payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutions pid committed cost gs =
   let Mana.MkMana units = poolOf pid gs
       -- The SAME board manaSources is judged against serves the per-source
@@ -877,26 +1012,17 @@ payableResolutions pid committed cost gs =
       grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
       supplies =
-        fmap (Set.singleton . ManaUnit.manaType) units
+        fmap supplyOf units
           <> concatMap (\oid -> sourceSupplies (manaYieldsOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
-      couldServe wanted = length (filter (not . Set.disjoint wanted) supplies)
       payable (demands, generic, life) =
-        let -- A demand belongs to the set W exactly when every type that could
-            -- satisfy it is in W -- `isSubsetOf`, where a single-type demand only
-            -- needed `member`. That is the whole generalization CR 107.4e's
-            -- hybrid asks of Hall's condition: the demand side gained
-            -- option-sets, and the condition is still "no set of demands outruns
-            -- the supplies that could serve it".
-            demandedIn wanted = length (filter (`Set.isSubsetOf` wanted) demands)
+        let -- "The supplies that could serve this set of demands" and "the
+            -- demands in it", the two sides of Hall's condition for one subset.
+            couldServe wanted = length (filter (\supply -> any (serves supply) wanted) supplies)
+            demandedIn wanted = length (filter (`elem` wanted) demands)
             hallHolds wanted = demandedIn wanted <= couldServe wanted
-            -- Enumerated over TYPES, not over demands: taking W = the union of a
-            -- demand set's options recovers the worst case for that set, so
-            -- subsets of the demanded types cover every subset of demands. At
-            -- most 2^6 by CR 106.1b, unchanged by hybrids.
-            demandedTypes = Set.toList (Set.unions demands)
          in canPayLife pid (committed + life) gs
               && Natural.length supplies >= Natural.length demands + generic
-              && all (hallHolds . Set.fromList) (List.subsequences demandedTypes)
+              && all hallHolds (List.subsequences (List.nub demands))
    in filter payable (resolutions cost)
 
 -- The least life any payable resolution of this cost costs, or Nothing when none

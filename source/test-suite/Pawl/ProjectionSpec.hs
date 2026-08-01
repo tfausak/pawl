@@ -410,6 +410,22 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (sorcId, gs) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "one ability" (length (Projection.abilitiesOf sorcId gs)) 1
 
+  -- The same layer-6 removal from the OTHER kind of ability, and the card whose
+  -- ability does not sit at layer 6 alone: Titania's Song removes at 6, animates
+  -- at 4 and sets base P/T at 7b, all as ONE effect. CR 613.6 fixes its "each
+  -- noncreature artifact" set at layer 4 -- the Coating is still noncreature
+  -- there -- and every later part of the Song reuses that answer, which is why
+  -- the removal lands on a permanent the Song has itself just made a creature.
+  Spec.it s "CR 613.6 Titania's Song strips the artifact its own layer-4 part animates" $ do
+    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
+    titaniasSong <- S.printingOf s registry "Titania's Song"
+    let (coatingId, g0) = S.addCreature liquimetalCoating S.alice (Setup.emptyGame S.bothPlayers)
+        gs = snd (S.addCreature titaniasSong S.bob g0)
+    Spec.assertEqWith s "control: the Coating's {T} ability is there to begin with" (length (Projection.abilitiesOf coatingId g0)) 1
+    Spec.assertEqWith s "CR 613.1f: and gone under the Song" (Projection.abilitiesOf coatingId gs) []
+    Spec.assertEqWith s "CR 613.4b: base power is its mana value" (Projection.powerOf coatingId gs) (Just 2)
+    Spec.assertEqWith s "CR 613.4b: base toughness too" (Projection.toughnessOf coatingId gs) (Just 2)
+
   Spec.it s "CR 704.5g Humility's toughness drop makes an already-damaged creature die" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     mountain <- S.printingOf s registry "Mountain"

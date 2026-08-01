@@ -135,5 +135,10 @@ symbolValue symbol = case symbol of
   -- component to take, and its own example says so: "The mana value of a card
   -- with mana cost {1}{W/P}{W/P} is 3." Mutagenic Growth ({G/P}) is 1, not 2.
   ManaSymbol.Phyrexian _ -> 1
+  -- CR 202.3's own sentence, with no subrule of its own: the mana value is "the
+  -- total amount of mana in its mana cost, regardless of color", and CR 107.4h
+  -- makes {S} "a cost that can be paid with one mana of any type produced by a
+  -- snow source" -- one mana. Icehide Golem's mana value is 1.
+  ManaSymbol.Snow -> 1
   -- CR 202.3e: off the stack a variable's contribution to mana value is 0.
   ManaSymbol.Variable -> 0

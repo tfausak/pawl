@@ -6,9 +6,9 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The six gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower and Silence. Humility and Opalescence
--- join them for CR 604.2's "and has the ability" -- the one place this axis does
--- meet the CR 613 layer system.
+-- Medallion, Edgewalker, Reliquary Tower and Silence. Humility, Opalescence and
+-- Titania's Song join them for CR 604.2's "and has the ability" -- the one place
+-- this axis does meet the CR 613 layer system.
 module Pawl.PlayerEffectSpec where
 
 import qualified Data.List as List
@@ -670,9 +670,9 @@ humilitySpec s registry =
     -- The animated case: Rule of Law is an enchantment, so Humility alone
     -- leaves it alone. Opalescence's CR 613.1d layer-4 AddCardType is what
     -- brings it inside "each creature" -- and abilitiesRemoved judges the
-    -- affected set against the layers 1-5 partial, which is where that
-    -- animation already is. Opalescence itself is spared by its own "each
-    -- other enchantment", so it keeps animating.
+    -- affected set at CR 613.6's decision point, which for Humility is layer 6,
+    -- so the partial it reads already has that animation. Opalescence itself is
+    -- spared by its own "each other enchantment", so it keeps animating.
     Spec.it s "CR 613.1d Opalescence animates Rule of Law into Humility's set" $ do
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       humility <- S.printingOf s registry "Humility"
@@ -690,6 +690,87 @@ humilitySpec s registry =
         s
         (not (PlayerEffect.prohibitsCasting S.alice (castOne withOpalescence)))
         "once animated, Rule of Law loses the ability and the limit lifts"
+
+-- alice controls a Sapphire Medallion and two untapped Islands, with Divination
+-- ({2}{U}) in hand; the fourth component is the same board with bob's Titania's
+-- Song added, so a case can assert against both. Loaded fresh inside each case
+-- that needs it -- equivalent because loading is deterministic and cached
+-- (batch-recipe.md).
+titaniasSongBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+titaniasSongBoard island sapphireMedallion divinationPrinting titaniasSong =
+  let base = S.landsInPlay island 2
+      (medallion, gs1) = S.addCreature sapphireMedallion S.alice base
+      (divination, gs2) = S.addHandCard divinationPrinting S.alice gs1
+      bare =
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      (_, sung) = S.addCreature titaniasSong S.bob bare
+   in (medallion, divination, bare, sung)
+
+-- Titania's Song {3}{G} Enchantment: "Each noncreature artifact loses all
+-- abilities and becomes an artifact creature with power and toughness each equal
+-- to its mana value."
+--
+-- The card CR 613.6's LOWEST-LAYER reading exists for (#326), and the only one in
+-- the pool: its one static ability pairs an ability-removing part (CR 613.1f,
+-- layer 6) with a type-changing one (CR 613.1d, layer 4), and its affected set
+-- reads the very card type its layer-4 part writes. CR 613.6 -- "if an effect
+-- starts to apply in one layer and/or sublayer, it will continue to be applied to
+-- the same set of objects in each other applicable layer and/or sublayer" -- fixes
+-- that set at LAYER 4, where a Sapphire Medallion is still a noncreature artifact.
+-- Judged at layer 6 instead, the Medallion has already been animated by the
+-- Song's own layer-4 part and no longer matches "noncreature artifact", so the
+-- removal would miss it. Humility cannot state this: layer 6 is its lowest layer,
+-- so the two readings agree on it by coincidence.
+titaniasSongSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+titaniasSongSpec s registry =
+  Spec.describe s "TitaniasSong" $ do
+    -- THE PROVING CASE for #326. The middle assertion is what makes the last one
+    -- discriminate: the layer fold itself puts the Medallion inside the Song's
+    -- set (it is a 2/2 for its mana value), so CR 613.6 leaves CR 604.2's "and
+    -- has the ability" no room to disagree -- the discount has to be gone.
+    Spec.it s "CR 613.6 the Song's set is fixed at layer 4, so the Medallion it animates loses its discount" $ do
+      island <- S.printingOf s registry "Island"
+      sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+      divinationPrinting <- S.printingOf s registry "Divination"
+      titaniasSong <- S.printingOf s registry "Titania's Song"
+      let (medallion, divination, bare, sung) = titaniasSongBoard island sapphireMedallion divinationPrinting titaniasSong
+          printed = ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]
+      Spec.assertEqWith
+        s
+        "control: on its own the Medallion discounts {2}{U} to {1}{U}"
+        (totalManaCost S.alice divination printed bare)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]))
+      Spec.assertEqWith
+        s
+        "CR 613.1d / 613.4b: the Song does animate the Medallion, to its mana value"
+        (S.powerToughnessOf medallion sung)
+        (Just (2, 2))
+      Spec.assertEqWith
+        s
+        "CR 604.2: and having lost the ability, it discounts nothing"
+        (totalManaCost S.alice divination printed sung)
+        (Just printed)
+
+    -- THE DISCRIMINATOR against "Titania's Song silences every player ability".
+    -- Its set is "each noncreature artifact"; Thalia is a creature, so her tax
+    -- stands -- the mirror of the Humility group's Sapphire Medallion case.
+    Spec.it s "CR 613.1f the Song reaches only noncreature artifacts, so a creature's ability stands" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
+      titaniasSong <- S.printingOf s registry "Titania's Song"
+      let (bolt, _, taxed) = thaliaBoard mountain thalia lightningBolt piker 3
+          (_, sung) = S.addCreature titaniasSong S.bob taxed
+      Spec.assertEqWith
+        s
+        "the printed {R} is still taxed to {1}{R}"
+        (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) sung)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
 
 -- alice controls `copies` Edgewalkers and `n` untapped Plains; her hand holds
 -- one more Edgewalker ({1}{W}{B} Human Cleric) and one Goblin Piker ({1}{R}
@@ -1204,6 +1285,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   thaliaSpec s registry
   medallionSpec s registry
   humilitySpec s registry
+  titaniasSongSpec s registry
   edgewalkerSpec s registry
   reliquaryTowerSpec s registry
   storedSpec s registry

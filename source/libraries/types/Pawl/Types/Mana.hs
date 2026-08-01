@@ -7,7 +7,7 @@ import Pawl.Types.ManaUnit (ManaUnit)
 -- Counts discard provenance by construction, and mana is not fungible -- snow
 -- {S} and spend-restrictions care where a unit came from. Counts to units would
 -- be a rewrite of every payment call site; units to richer-units is a field
--- addition. M1a reads nothing but manaType, so nothing is gained today; the
--- point is that nothing must be redone.
+-- addition. The bet has since been collected: CR 107.4h's {S} added
+-- ManaUnit.tags and no call site here moved.
 newtype Mana = MkMana [ManaUnit]
   deriving (Eq, Ord, Show)
