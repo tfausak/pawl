@@ -13,7 +13,7 @@ import qualified Pawl.Codec.Loyalty as Loyalty
 import Pawl.Codec.Quantity (jsonToQuantityPair, quantityToJson)
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
 import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
-import Pawl.Codec.Supertype (jsonToSupertype, supertypeToJson)
+import qualified Pawl.Codec.Supertype as Supertype
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
@@ -23,7 +23,7 @@ projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
 projectedCharacteristicsToJson pc =
   Json.jObject
     [ (Text.pack "name", Json.jText (PC.name pc)),
-      (Text.pack "supertypes", Json.setTo supertypeToJson (PC.supertypes pc)),
+      (Text.pack "supertypes", Json.setTo Supertype.toJson (PC.supertypes pc)),
       (Text.pack "keywords", Json.multisetTo keywordToJson (PC.keywords pc)),
       (Text.pack "colors", Json.setTo Color.toJson (PC.colors pc)),
       (Text.pack "power", Json.maybeTo Json.jInt (PC.power pc)),
@@ -41,7 +41,7 @@ jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristi
 jsonToProjectedCharacteristics value = do
   ps <- Json.asObject value
   nm <- Json.field (Text.pack "name") ps >>= Json.asText
-  sups <- Json.field (Text.pack "supertypes") ps >>= Json.setFrom jsonToSupertype
+  sups <- Json.field (Text.pack "supertypes") ps >>= Json.setFrom Supertype.fromJson
   kws <- Json.field (Text.pack "keywords") ps >>= Json.multisetFrom jsonToKeyword
   cols <- Json.field (Text.pack "colors") ps >>= Json.setFrom Color.fromJson
   -- power/toughness/characteristicPT are encoded as required keys (Json.maybeTo

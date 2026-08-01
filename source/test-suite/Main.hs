@@ -36,6 +36,16 @@ import qualified Pawl.Codec.PlayerRelationSpec
 import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.RegenerabilitySpec
+import qualified Pawl.Codec.ScalingSpec
+import qualified Pawl.Codec.SearchDestinationSpec
+import qualified Pawl.Codec.SlotNameSpec
+import qualified Pawl.Codec.SupertypeSpec
+import qualified Pawl.Codec.TapStateSpec
+import qualified Pawl.Codec.TriggerFrequencySpec
+import qualified Pawl.Codec.TurnScopeSpec
+import qualified Pawl.Codec.UsesSpec
+import qualified Pawl.Codec.ZoneChangeSubjectSpec
+import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
@@ -164,6 +174,16 @@ spec s registry = do
   Pawl.Codec.PlayerScopeSpec.spec s
   Pawl.Codec.PoolSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
+  Pawl.Codec.ScalingSpec.spec s
+  Pawl.Codec.SearchDestinationSpec.spec s
+  Pawl.Codec.SlotNameSpec.spec s
+  Pawl.Codec.SupertypeSpec.spec s
+  Pawl.Codec.TapStateSpec.spec s
+  Pawl.Codec.TriggerFrequencySpec.spec s
+  Pawl.Codec.TurnScopeSpec.spec s
+  Pawl.Codec.UsesSpec.spec s
+  Pawl.Codec.ZoneChangeSubjectSpec.spec s
+  Pawl.Codec.ZoneSpec.spec s
   Pawl.CodecSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry

@@ -1,6 +1,6 @@
 module Pawl.Types.ZoneChangeSubject where
 
--- CR 614.1a: WHICH object a zone-change redirect is about, as distinct from
+-- | CR 614.1a: WHICH object a zone-change redirect is about, as distinct from
 -- Pawl.Types.ZoneChangePattern's `whoseObject`, which asks whose it is.
 --
 -- Rest in Peace and Leyline of the Void are AnyObject -- "if a card ... would be

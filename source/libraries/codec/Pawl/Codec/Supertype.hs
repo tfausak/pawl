@@ -1,25 +1,23 @@
--- | The @Supertype ⇆ Json@ codec (#481).
 module Pawl.Codec.Supertype where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Supertype as Supertype
 
-supertypeToJson :: Supertype.Supertype -> Value
-supertypeToJson s = Json.nullary . Text.pack $ case s of
+toJson :: Supertype.Supertype -> Value.Value
+toJson s = Common.nullary $ case s of
   Supertype.Basic -> "Basic"
   Supertype.Legendary -> "Legendary"
   Supertype.Snow -> "Snow"
   Supertype.World -> "World"
 
-jsonToSupertype :: Value -> Either Text Supertype.Supertype
-jsonToSupertype =
-  Json.decodeNullary
-    (Text.pack "Supertype")
-    [ (Text.pack "Basic", Supertype.Basic),
-      (Text.pack "Legendary", Supertype.Legendary),
-      (Text.pack "Snow", Supertype.Snow),
-      (Text.pack "World", Supertype.World)
+fromJson :: Value.Value -> Either Text.Text Supertype.Supertype
+fromJson =
+  Common.decodeNullary
+    "Supertype"
+    [ ("Basic", Supertype.Basic),
+      ("Legendary", Supertype.Legendary),
+      ("Snow", Supertype.Snow),
+      ("World", Supertype.World)
     ]

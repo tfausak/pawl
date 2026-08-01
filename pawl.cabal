@@ -174,26 +174,36 @@ library codec
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.Scaling
+    Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
     Pawl.Codec.SearchDestination
+    Pawl.Codec.SearchDestinationSpec
     Pawl.Codec.SlotName
+    Pawl.Codec.SlotNameSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.Subtype
     Pawl.Codec.Supertype
+    Pawl.Codec.SupertypeSpec
     Pawl.Codec.TapState
+    Pawl.Codec.TapStateSpec
     Pawl.Codec.TargetSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.Toughness
     Pawl.Codec.TriggerCondition
     Pawl.Codec.TriggeredAbility
     Pawl.Codec.TriggerFrequency
+    Pawl.Codec.TriggerFrequencySpec
     Pawl.Codec.TurnScope
+    Pawl.Codec.TurnScopeSpec
     Pawl.Codec.TypeLine
     Pawl.Codec.Uses
+    Pawl.Codec.UsesSpec
     Pawl.Codec.Zone
     Pawl.Codec.ZoneChange
     Pawl.Codec.ZoneChangePattern
     Pawl.Codec.ZoneChangeSubject
+    Pawl.Codec.ZoneChangeSubjectSpec
+    Pawl.Codec.ZoneSpec
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
 -- scientific packages.

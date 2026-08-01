@@ -7,7 +7,7 @@ import qualified Data.Text as Text
 import Pawl.Codec.Filter (filterToJson, jsonToFilter)
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Pool as Pool
-import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
+import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Json.Value (Value)
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -35,13 +35,13 @@ jsonToTargetSpec value = do
 
 targetSpecsToJson :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value
 targetSpecsToJson m =
-  Json.listTo (\(k, v) -> Json.jObject [(Text.pack "slot", slotNameToJson k), (Text.pack "spec", targetSpecToJson v)]) (Map.toAscList m)
+  Json.listTo (\(k, v) -> Json.jObject [(Text.pack "slot", SlotName.toJson k), (Text.pack "spec", targetSpecToJson v)]) (Map.toAscList m)
 
 jsonToTargetSpecs :: Value -> Either Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
 jsonToTargetSpecs value =
   let decodeEntry v = do
         ps <- Json.asObject v
-        k <- Json.field (Text.pack "slot") ps >>= jsonToSlotName
+        k <- Json.field (Text.pack "slot") ps >>= SlotName.fromJson
         s <- Json.field (Text.pack "spec") ps >>= jsonToTargetSpec
         pure (k, s)
    in Map.fromList <$> Json.listFrom decodeEntry value

@@ -5,7 +5,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Count (countToJson, jsonToCount)
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
+import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
 import qualified Pawl.Types.Quantity as Quantity
@@ -22,7 +22,7 @@ quantityToJson q = case q of
   Quantity.ManaValue -> Json.nullary (Text.pack "ManaValue")
   Quantity.Power -> Json.nullary (Text.pack "Power")
   Quantity.X -> Json.nullary (Text.pack "X")
-  Quantity.InSlot s -> Json.tagged (Text.pack "InSlot") (Just (slotNameToJson s))
+  Quantity.InSlot s -> Json.tagged (Text.pack "InSlot") (Just (SlotName.toJson s))
   Quantity.Star -> Json.nullary (Text.pack "Star")
   Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array (MkArray [quantityToJson a, quantityToJson b])))
   Quantity.Count c -> countToJson quantityToJson c
@@ -35,7 +35,7 @@ jsonToQuantity value = do
     ("ManaValue", _) -> Right Quantity.ManaValue
     ("Power", _) -> Right Quantity.Power
     ("X", _) -> Right Quantity.X
-    ("InSlot", Just v) -> Quantity.InSlot <$> jsonToSlotName v
+    ("InSlot", Just v) -> Quantity.InSlot <$> SlotName.fromJson v
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Array (MkArray [x, y]))) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
     -- jsonToCount re-derives the tag from the WHOLE value (see the comment on

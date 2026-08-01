@@ -4,7 +4,7 @@ module Pawl.Codec.EntryRiders where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.TapState (jsonToTapState, tapStateToJson)
+import qualified Pawl.Codec.TapState as TapState
 import Pawl.Json.Value (Value (Null))
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.TapState as TapState
@@ -12,14 +12,14 @@ import qualified Pawl.Types.TapState as TapState
 entryRidersToJson :: EntryRiders.EntryRiders -> Value
 entryRidersToJson e =
   Json.jObject
-    [ (Text.pack "tapped", tapStateToJson (EntryRiders.tapped e)),
+    [ (Text.pack "tapped", TapState.toJson (EntryRiders.tapped e)),
       (Text.pack "attacking", Json.jBool (EntryRiders.attacking e))
     ]
 
 jsonToEntryRiders :: Value -> Either Text EntryRiders.EntryRiders
 jsonToEntryRiders value = do
   ps <- Json.asObject value
-  t <- Json.getOpt (Text.pack "tapped") ps `orDefault` (TapState.Untapped, jsonToTapState)
+  t <- Json.getOpt (Text.pack "tapped") ps `orDefault` (TapState.Untapped, TapState.fromJson)
   a <- Json.jsonToBoolDefault False (Json.getOpt (Text.pack "attacking") ps)
   pure
     EntryRiders.MkEntryRiders

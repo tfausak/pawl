@@ -24,10 +24,10 @@ import qualified Pawl.Codec.PlayerScope as PlayerScope
 import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
 import qualified Pawl.Codec.Regenerability as Regenerability
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
-import Pawl.Codec.SearchDestination (jsonToSearchDestination, searchDestinationToJson)
-import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
-import Pawl.Codec.Uses (jsonToUses, usesToJson)
-import Pawl.Codec.Zone (jsonToZone, zoneToJson)
+import qualified Pawl.Codec.SearchDestination as SearchDestination
+import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Codec.Uses as Uses
+import qualified Pawl.Codec.Zone as Zone
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array, Object))
 import qualified Pawl.Types.Effect as Effect
@@ -35,26 +35,26 @@ import qualified Pawl.Types.Onset as Onset
 
 effectToJson :: (card -> Value) -> Effect.Effect card -> Value
 effectToJson codec e = case e of
-  Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
+  Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [SlotName.toJson s, quantityToJson q])))
   Effect.ModifyTarget d m r -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, objectRefToJson r])))
-  Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
+  Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (SlotName.toJson s))
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
-  Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [filterToJson f, searchDestinationToJson d])))
+  Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [filterToJson f, SearchDestination.toJson d])))
   Effect.ExileAllGraveyards -> Json.nullary (Text.pack "ExileAllGraveyards")
   Effect.Proliferate -> Json.nullary (Text.pack "Proliferate")
   Effect.ExileHandThenDraw -> Json.nullary (Text.pack "ExileHandThenDraw")
-  Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [slotNameToJson slot, filterToJson f, quantityToJson q])))
+  Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [SlotName.toJson slot, filterToJson f, quantityToJson q])))
   Effect.RestartGame -> Json.nullary (Text.pack "RestartGame")
-  Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
+  Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (SlotName.toJson s))
   -- The bound-count slot is ELIDED when absent, the posture Create's EntryRiders
   -- and ArmDelayedTrigger's duration both take, so every card that says nothing about
   -- counting its sweep stays byte-for-byte as it was written.
   Effect.Destroy s r ms ->
     Json.tagged (Text.pack "Destroy") . Just . Array . MkArray $
-      [objectRefToJson s, Regenerability.toJson r] <> fmap slotNameToJson (Maybe.maybeToList ms)
-  Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
-  Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (slotNameToJson s))
-  Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
+      [objectRefToJson s, Regenerability.toJson r] <> fmap SlotName.toJson (Maybe.maybeToList ms)
+  Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (SlotName.toJson s))
+  Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (SlotName.toJson s))
+  Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (SlotName.toJson s))
   -- MoveToZone's payload is positional and takes Create's shape, for the same
   -- reason and with the same two elisions: the EntryRiders are dropped when they
   -- are the CR 110.5b default and the bound slot when there is none, so every
@@ -63,12 +63,12 @@ effectToJson codec e = case e of
   -- slot name is a string, riders are an object.
   Effect.MoveToZone s z riders ms ->
     Json.tagged (Text.pack "MoveToZone") . Just . Array . MkArray $
-      [slotNameToJson s, zoneToJson z]
+      [SlotName.toJson s, Zone.toJson z]
         <> (if riders == defaultEntryRiders then [] else [entryRidersToJson riders])
-        <> fmap slotNameToJson (Maybe.maybeToList ms)
+        <> fmap SlotName.toJson (Maybe.maybeToList ms)
   Effect.Draw r q -> Json.tagged (Text.pack "Draw") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
-  Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
-  Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
+  Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array (MkArray [SlotName.toJson s, quantityToJson q])))
+  Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array (MkArray [SlotName.toJson s, quantityToJson q])))
   Effect.LoseLife r q -> Json.tagged (Text.pack "LoseLife") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
   Effect.GainLife r q -> Json.tagged (Text.pack "GainLife") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
   -- Create's payload is positional, and the EntryRiders are ELIDED when they are
@@ -76,16 +76,16 @@ effectToJson codec e = case e of
   -- `counterability` takes, so a card file that says nothing about how its
   -- tokens enter stays exactly as it was written. The three-element form is
   -- therefore two shapes, told apart on decode by JSON TYPE rather than by
-  -- position: a slot name is a string (slotNameToJson) and riders are an object,
+  -- position: a slot name is a string (SlotName.toJson) and riders are an object,
   -- so the two can never be confused.
   Effect.Create q c te ms ->
     Json.tagged (Text.pack "Create") . Just . Array . MkArray $
       [quantityToJson q, codec c]
         <> (if te == defaultEntryRiders then [] else [entryRidersToJson te])
-        <> fmap slotNameToJson (Maybe.maybeToList ms)
-  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [durationToJson d, usesToJson u, replacementEffectToJson re])))
+        <> fmap SlotName.toJson (Maybe.maybeToList ms)
+  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [durationToJson d, Uses.toJson u, replacementEffectToJson re])))
   Effect.SkipNextPhase r sel -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [playerRefToJson r, phaseSelectorToJson sel])))
-  Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [counterKindToJson k, quantityToJson q, slotNameToJson s])))
+  Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [counterKindToJson k, quantityToJson q, SlotName.toJson s])))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [playerRefToJson r, PlayerCounterKind.toJson k, quantityToJson q])))
   Effect.Tap r -> Json.tagged (Text.pack "Tap") (Just (objectRefToJson r))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
@@ -106,10 +106,10 @@ effectToJson codec e = case e of
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array (MkArray [durationToJson d, PlayerScope.toJson s, playerEffectToJson pe])))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (codec c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (MonarchTarget.toJson t))
-  Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (slotNameToJson s))
-  Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
-  Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson f])))
-  Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
+  Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (SlotName.toJson s))
+  Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (SlotName.toJson s))
+  Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [SlotName.toJson s, filterToJson f])))
+  Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (SlotName.toJson s))
   Effect.TakeExtraTurn r skips -> Json.tagged (Text.pack "TakeExtraTurn") (Just (Array (MkArray [playerRefToJson r, Json.setTo phaseSelectorToJson skips])))
 
 jsonToEffect :: (Value -> Either Text card) -> Value -> Either Text (Effect.Effect card)
@@ -117,48 +117,48 @@ jsonToEffect decode value = do
   (t, mv) <- Json.tag value
   case Text.unpack t of
     "DealDamage" -> case mv of
-      Just (Array (MkArray [s, q])) -> Effect.DealDamage <$> jsonToSlotName s <*> jsonToQuantity q
+      Just (Array (MkArray [s, q])) -> Effect.DealDamage <$> SlotName.fromJson s <*> jsonToQuantity q
       _ -> Left (Text.pack "DealDamage expects [slot, quantity]")
     "ModifyTarget" -> case mv of
       Just (Array (MkArray [d, m, r])) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToObjectRef r
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, objectRef]")
-    "ChangeText" -> Json.withValue mv (fmap Effect.ChangeText . jsonToSlotName)
+    "ChangeText" -> Json.withValue mv (fmap Effect.ChangeText . SlotName.fromJson)
     "AddMana" -> Json.withValue mv (fmap Effect.AddMana . jsonToManaProduction)
     "Search" -> case mv of
-      Just (Array (MkArray [f, d])) -> Effect.Search <$> jsonToFilter f <*> jsonToSearchDestination d
+      Just (Array (MkArray [f, d])) -> Effect.Search <$> jsonToFilter f <*> SearchDestination.fromJson d
       _ -> Left (Text.pack "Search expects [filter, destination]")
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
-      Just (Array (MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> jsonToSlotName sv <*> jsonToFilter fv <*> jsonToQuantity qv
+      Just (Array (MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> SlotName.fromJson sv <*> jsonToFilter fv <*> jsonToQuantity qv
       _ -> Left (Text.pack "PlayerSacrifices expects [slot, filter, quantity]")
     "RestartGame" -> Right Effect.RestartGame
-    "ControlPlayerNextTurn" -> Json.withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
+    "ControlPlayerNextTurn" -> Json.withValue mv (fmap Effect.ControlPlayerNextTurn . SlotName.fromJson)
     "Destroy" -> case mv of
       Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> Regenerability.fromJson rv <*> pure Nothing
-      Just (Array (MkArray [sv, rv, nv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> Regenerability.fromJson rv <*> (Just <$> jsonToSlotName nv)
+      Just (Array (MkArray [sv, rv, nv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> Regenerability.fromJson rv <*> (Just <$> SlotName.fromJson nv)
       _ -> Left (Text.pack "Destroy expects [objectRef, regenerability], optionally with a slot")
-    "Sacrifice" -> Json.withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
-    "RemoveFromCombat" -> Json.withValue mv (fmap Effect.RemoveFromCombat . jsonToSlotName)
-    "Counter" -> Json.withValue mv (fmap Effect.Counter . jsonToSlotName)
+    "Sacrifice" -> Json.withValue mv (fmap Effect.Sacrifice . SlotName.fromJson)
+    "RemoveFromCombat" -> Json.withValue mv (fmap Effect.RemoveFromCombat . SlotName.fromJson)
+    "Counter" -> Json.withValue mv (fmap Effect.Counter . SlotName.fromJson)
     -- The four shapes the encoder above can emit, read exactly as Create's are:
     -- an Object in third position is the EntryRiders, anything else is the bound
     -- slot name (a string).
     "MoveToZone" -> case mv of
-      Just (Array (MkArray [s, z])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> pure defaultEntryRiders <*> pure Nothing
-      Just (Array (MkArray [s, z, e@(Object _)])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> jsonToEntryRiders e <*> pure Nothing
-      Just (Array (MkArray [s, z, b])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> pure defaultEntryRiders <*> (Just <$> jsonToSlotName b)
-      Just (Array (MkArray [s, z, e, b])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z <*> jsonToEntryRiders e <*> (Just <$> jsonToSlotName b)
+      Just (Array (MkArray [s, z])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> pure defaultEntryRiders <*> pure Nothing
+      Just (Array (MkArray [s, z, e@(Object _)])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> jsonToEntryRiders e <*> pure Nothing
+      Just (Array (MkArray [s, z, b])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> pure defaultEntryRiders <*> (Just <$> SlotName.fromJson b)
+      Just (Array (MkArray [s, z, e, b])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> jsonToEntryRiders e <*> (Just <$> SlotName.fromJson b)
       _ -> Left (Text.pack "MoveToZone expects [slot, zone], optionally with EntryRiders and/or a slot")
     "Draw" -> case mv of
       Just (Array (MkArray [r, q])) -> Effect.Draw <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "Draw expects [playerRef, quantity]")
     "Mill" -> case mv of
-      Just (Array (MkArray [s, q])) -> Effect.Mill <$> jsonToSlotName s <*> jsonToQuantity q
+      Just (Array (MkArray [s, q])) -> Effect.Mill <$> SlotName.fromJson s <*> jsonToQuantity q
       _ -> Left (Text.pack "Mill expects [slot, quantity]")
     "Discard" -> case mv of
-      Just (Array (MkArray [s, q])) -> Effect.Discard <$> jsonToSlotName s <*> jsonToQuantity q
+      Just (Array (MkArray [s, q])) -> Effect.Discard <$> SlotName.fromJson s <*> jsonToQuantity q
       _ -> Left (Text.pack "Discard expects [slot, quantity]")
     "LoseLife" -> case mv of
       Just (Array (MkArray [r, q])) -> Effect.LoseLife <$> jsonToPlayerRef r <*> jsonToQuantity q
@@ -173,8 +173,8 @@ jsonToEffect decode value = do
     "Create" -> case mv of
       Just (Array (MkArray [q, c])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> pure defaultEntryRiders <*> pure Nothing
       Just (Array (MkArray [q, c, e@(Object _)])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> jsonToEntryRiders e <*> pure Nothing
-      Just (Array (MkArray [q, c, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> pure defaultEntryRiders <*> (Just <$> jsonToSlotName s)
-      Just (Array (MkArray [q, c, e, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> jsonToEntryRiders e <*> (Just <$> jsonToSlotName s)
+      Just (Array (MkArray [q, c, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> pure defaultEntryRiders <*> (Just <$> SlotName.fromJson s)
+      Just (Array (MkArray [q, c, e, s])) -> Effect.Create <$> jsonToQuantity q <*> decode c <*> jsonToEntryRiders e <*> (Just <$> SlotName.fromJson s)
       _ -> Left (Text.pack "Create expects [Quantity, Card], optionally with EntryRiders and/or a slot")
     -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
@@ -186,7 +186,7 @@ jsonToEffect decode value = do
     "Replace" -> case mv of
       Just (Array (MkArray [d, u, re])) -> do
         duration <- jsonToDuration d
-        uses <- jsonToUses u
+        uses <- Uses.fromJson u
         effect <- jsonToReplacementEffect re
         pure (Effect.Replace duration uses effect)
       _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
@@ -194,7 +194,7 @@ jsonToEffect decode value = do
       Just (Array (MkArray [r, sel])) -> Effect.SkipNextPhase <$> jsonToPlayerRef r <*> jsonToPhaseSelector sel
       _ -> Left (Text.pack "SkipNextPhase expects [playerRef, phaseSelector]")
     "PutCounters" -> case mv of
-      Just (Array (MkArray [k, q, s])) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
+      Just (Array (MkArray [k, q, s])) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> SlotName.fromJson s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
     "GainPlayerCounters" -> case mv of
       Just (Array (MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> jsonToPlayerRef r <*> PlayerCounterKind.fromJson k <*> jsonToQuantity q
@@ -212,12 +212,12 @@ jsonToEffect decode value = do
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")
     "CreateEmblem" -> Json.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Json.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
-    "ExileUntilMonarch" -> Json.withValue mv (fmap Effect.ExileUntilMonarch . jsonToSlotName)
-    "Attach" -> Json.withValue mv (fmap Effect.Attach . jsonToSlotName)
+    "ExileUntilMonarch" -> Json.withValue mv (fmap Effect.ExileUntilMonarch . SlotName.fromJson)
+    "Attach" -> Json.withValue mv (fmap Effect.Attach . SlotName.fromJson)
     "AttachTarget" -> case mv of
-      Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
+      Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> SlotName.fromJson s <*> jsonToFilter f
       _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
-    "PlaySubgame" -> Json.withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
+    "PlaySubgame" -> Json.withValue mv (fmap Effect.PlaySubgame . SlotName.fromJson)
     "TakeExtraTurn" -> case mv of
       Just (Array (MkArray [r, skips])) -> Effect.TakeExtraTurn <$> jsonToPlayerRef r <*> Json.setFrom jsonToPhaseSelector skips
       _ -> Left (Text.pack "TakeExtraTurn expects [playerRef, phaseSelectors]")

@@ -41,17 +41,13 @@ import Pawl.Codec.Power (jsonToPower, powerToJson)
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
 import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
 import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
-import Pawl.Codec.SearchDestination (jsonToSearchDestination, searchDestinationToJson)
-import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
+import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
-import Pawl.Codec.Supertype (jsonToSupertype, supertypeToJson)
 import Pawl.Codec.TargetSpec (jsonToTargetSpec, targetSpecToJson)
 import Pawl.Codec.TriggerCondition (jsonToTriggerCondition, triggerConditionToJson)
 import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
-import Pawl.Codec.TurnScope (jsonToTurnScope, turnScopeToJson)
 import Pawl.Codec.TypeLine (jsonToTypeLine, typeLineToJson)
-import Pawl.Codec.Zone (jsonToZone, zoneToJson)
-import Pawl.Codec.ZoneChangeSubject (jsonToZoneChangeSubject, zoneChangeSubjectToJson)
+import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -142,7 +138,6 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
-import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
@@ -262,21 +257,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "upkeep" castingRestrictionToJson jsonToCastingRestriction upkeep
       roundTrip s "attacked" castingRestrictionToJson jsonToCastingRestriction CastingRestriction.AttackedThisStep
       Spec.assertBool s (castingRestrictionToJson declareAttackers /= castingRestrictionToJson upkeep) "the phase is part of the encoding"
-    Spec.it s "ZoneChangeSubject" $ do
-      roundTrip s "any" zoneChangeSubjectToJson jsonToZoneChangeSubject ZoneChangeSubject.AnyObject
-      roundTrip s "source" zoneChangeSubjectToJson jsonToZoneChangeSubject ZoneChangeSubject.TheSource
     Spec.it s "CounterKind" $ do
       Spec.assertEqWith s "plus" (jsonToCounterKind (counterKindToJson CounterKind.PlusOnePlusOne)) (Right CounterKind.PlusOnePlusOne)
       Spec.assertEqWith s "minus" (jsonToCounterKind (counterKindToJson CounterKind.MinusOneMinusOne)) (Right CounterKind.MinusOneMinusOne)
       -- CR 122.1e, the first kind that modifies no characteristic.
       Spec.assertEqWith s "loyalty" (jsonToCounterKind (counterKindToJson CounterKind.Loyalty)) (Right CounterKind.Loyalty)
-    Spec.it s "Zone" $
-      roundTrip s "zone" zoneToJson jsonToZone Zone.Graveyard
-    Spec.it s "Zone.Command" $
-      roundTrip s "command" zoneToJson jsonToZone Zone.Command
-  Spec.describe s "newtypes" $ do
-    Spec.it s "SlotName" $
-      roundTrip s "slot" slotNameToJson jsonToSlotName (SlotName.MkSlotName (Text.pack "x"))
   Spec.describe s "mana + quantity (tagged-sum trap)" $ do
     Spec.it s "Quantity.Literal is a tagged object with numeric value" $
       Spec.assertEqWith
@@ -306,7 +291,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         s
         "the slot name is on the wire"
         (quantityToJson (Quantity.InSlot slot))
-        (J.tagged (Text.pack "InSlot") (Just (slotNameToJson slot)))
+        (J.tagged (Text.pack "InSlot") (Just (SlotName.toJson slot)))
     Spec.it s "ManaCost round-trips" $
       roundTrip
         s
@@ -645,13 +630,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
        in mapM_
             (roundTrip s "filter" filterToJson jsonToFilter)
             [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, relentlessAssault, crownOfTheAges, labyrinthOfSkophos, auraGraftTarget, auraGraftDestination]
-    -- Every supertype the type models, so a new constructor whose codec
-    -- arm is forgotten fails here rather than at the one card that carries
-    -- it. CR 205.4a lists five; Ongoing is scheme-only (#131).
-    Spec.it s "every Supertype round-trips" $
-      mapM_
-        (roundTrip s "supertype" supertypeToJson jsonToSupertype)
-        [Supertype.Basic, Supertype.Legendary, Supertype.Snow, Supertype.World]
   -- Sits beside "filter (P9)": a TargetSpec is Pool + Maybe Filter, so these
   -- exercise the Filter arm above in its embedded position. Covers a bare
   -- pool (Nothing filter, omitted key), a filtered pool, and the Not
@@ -1012,8 +990,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       let cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
       roundTrip s "cyc" keywordToJson jsonToKeyword (Keyword.Cycling cost Nothing)
       roundTrip s "typecyc" keywordToJson jsonToKeyword (Keyword.Cycling cost (Just (Filter.Type.HasCardType CardType.Land)))
-    Spec.it s "SearchDestination round-trips" $
-      mapM_ (roundTrip s "dest" searchDestinationToJson jsonToSearchDestination) [SearchDestination.BattlefieldTapped, SearchDestination.RevealThenHand]
     -- CR 701.9a's event, carrying the incarnation the discarded card
     -- became. Both causes, because the cause is what tells a cycle from an
     -- ordinary discard (CR 702.29c) and a trip that flattened it would
@@ -1101,8 +1077,6 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         triggerConditionToJson
         jsonToTriggerCondition
         (TriggerCondition.PermanentEnters (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsSource]))
-    Spec.it s "TurnScope round-trips" $
-      mapM_ (roundTrip s "scope" turnScopeToJson jsonToTurnScope) [TurnScope.EachTurn, TurnScope.ControllersTurn]
     Spec.it s "TriggerCondition.StepBegins round-trips" $
       roundTrip
         s
@@ -1159,7 +1133,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       Spec.assertEqWith
         s
         "default riders and no bound slot are not written"
-        (J.tagged (Text.pack "MoveToZone") (Just (J.jArray [slotNameToJson slot, zoneToJson Zone.Hand])))
+        (J.tagged (Text.pack "MoveToZone") (Just (J.jArray [SlotName.toJson slot, Zone.toJson Zone.Hand])))
         (effectToJson cardToJson (Effect.MoveToZone slot Zone.Hand defaultEntryRiders Nothing))
     -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
     -- only a Binding's `target` field via Binding.toObject. The codec is

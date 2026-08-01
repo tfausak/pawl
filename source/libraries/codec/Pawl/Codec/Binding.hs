@@ -8,7 +8,7 @@ import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.ModeIndex as ModeIndex
 import Pawl.Codec.ProjectedCharacteristics (jsonToProjectedCharacteristics, projectedCharacteristicsToJson)
 import Pawl.Codec.Recipient (jsonToRecipient, recipientToJson)
-import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
+import qualified Pawl.Codec.SlotName as SlotName
 import Pawl.Codec.Subtype (jsonToSubtypePair, subtypeToJson)
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
@@ -48,14 +48,14 @@ jsonToBinding value = do
 bindingsToJson :: Map.Map SlotName.SlotName Binding.Binding -> Value
 bindingsToJson m =
   Json.listTo
-    (\(k, v) -> Json.jObject [(Text.pack "slot", slotNameToJson k), (Text.pack "binding", bindingToJson v)])
+    (\(k, v) -> Json.jObject [(Text.pack "slot", SlotName.toJson k), (Text.pack "binding", bindingToJson v)])
     (Map.toAscList m)
 
 jsonToBindings :: Value -> Either Text (Map.Map SlotName.SlotName Binding.Binding)
 jsonToBindings value =
   let decodeEntry v = do
         ps <- Json.asObject v
-        k <- Json.field (Text.pack "slot") ps >>= jsonToSlotName
+        k <- Json.field (Text.pack "slot") ps >>= SlotName.fromJson
         b <- Json.field (Text.pack "binding") ps >>= jsonToBinding
         pure (k, b)
    in Map.fromList <$> Json.listFrom decodeEntry value

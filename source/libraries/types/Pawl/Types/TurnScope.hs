@@ -1,6 +1,6 @@
 module Pawl.Types.TurnScope where
 
--- CR 102.1 / 109.5: whose turn a phase-scoped ability means. "At the beginning
+-- | CR 102.1 / 109.5: whose turn a phase-scoped ability means. "At the beginning
 -- of EACH end step" is EachTurn; "at the beginning of YOUR upkeep" is
 -- ControllersTurn, relative to the ability's CONTROLLER, never the card's owner.
 -- CR 102.1 is what makes this an axis at all -- "The active player is the player

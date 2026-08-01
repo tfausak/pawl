@@ -1,21 +1,19 @@
--- | The @TapState ⇆ Json@ codec (#481).
 module Pawl.Codec.TapState where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.TapState as TapState
 
-tapStateToJson :: TapState.TapState -> Value
-tapStateToJson t = Json.nullary . Text.pack $ case t of
+toJson :: TapState.TapState -> Value.Value
+toJson t = Common.nullary $ case t of
   TapState.Untapped -> "Untapped"
   TapState.Tapped -> "Tapped"
 
-jsonToTapState :: Value -> Either Text TapState.TapState
-jsonToTapState =
-  Json.decodeNullary
-    (Text.pack "TapState")
-    [ (Text.pack "Untapped", TapState.Untapped),
-      (Text.pack "Tapped", TapState.Tapped)
+fromJson :: Value.Value -> Either Text.Text TapState.TapState
+fromJson =
+  Common.decodeNullary
+    "TapState"
+    [ ("Untapped", TapState.Untapped),
+      ("Tapped", TapState.Tapped)
     ]

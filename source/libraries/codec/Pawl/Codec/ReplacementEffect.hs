@@ -10,9 +10,9 @@ import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
 import Pawl.Codec.EntryRewrite (entryRewriteToJson, jsonToEntryRewrite)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.PhasePattern (jsonToPhasePattern, phasePatternToJson)
-import Pawl.Codec.Scaling (jsonToScaling, scalingToJson)
+import qualified Pawl.Codec.Scaling as Scaling
 import Pawl.Codec.TokenPattern (jsonToTokenPattern, tokenPatternToJson)
-import Pawl.Codec.Zone (jsonToZone, zoneToJson)
+import qualified Pawl.Codec.Zone as Zone
 import Pawl.Codec.ZoneChangePattern (jsonToZoneChangePattern, zoneChangePatternToJson)
 import Pawl.Json.Array (Array (MkArray))
 import Pawl.Json.Value (Value (Array))
@@ -21,7 +21,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 replacementEffectToJson :: ReplacementEffect.ReplacementEffect -> Value
 replacementEffectToJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
-    Json.tagged (Text.pack "ZoneChangeR") (Just (Array (MkArray [zoneChangePatternToJson p, zoneToJson z])))
+    Json.tagged (Text.pack "ZoneChangeR") (Just (Array (MkArray [zoneChangePatternToJson p, Zone.toJson z])))
   ReplacementEffect.EntryR r ->
     Json.tagged (Text.pack "EntryR") (Just (entryRewriteToJson r))
   ReplacementEffect.DamageR p r ->
@@ -29,9 +29,9 @@ replacementEffectToJson re = case re of
   ReplacementEffect.DestructionR r ->
     Json.tagged (Text.pack "DestructionR") (Just (DestructionRewrite.toJson r))
   ReplacementEffect.CounterR p s ->
-    Json.tagged (Text.pack "CounterR") (Just (Array (MkArray [counterPatternToJson p, scalingToJson s])))
+    Json.tagged (Text.pack "CounterR") (Just (Array (MkArray [counterPatternToJson p, Scaling.toJson s])))
   ReplacementEffect.TokenR p s ->
-    Json.tagged (Text.pack "TokenR") (Just (Array (MkArray [tokenPatternToJson p, scalingToJson s])))
+    Json.tagged (Text.pack "TokenR") (Just (Array (MkArray [tokenPatternToJson p, Scaling.toJson s])))
   ReplacementEffect.PhaseR p ->
     Json.tagged (Text.pack "PhaseR") (Just (phasePatternToJson p))
 
@@ -41,7 +41,7 @@ jsonToReplacementEffect value = do
   case (Text.unpack t, mv) of
     ("ZoneChangeR", Just (Array (MkArray [p, z]))) -> do
       pattern_ <- jsonToZoneChangePattern p
-      dest <- jsonToZone z
+      dest <- Zone.fromJson z
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
     ("EntryR", Just v) -> fmap ReplacementEffect.EntryR (jsonToEntryRewrite v)
     ("DamageR", Just (Array (MkArray [p, r]))) -> do
@@ -51,11 +51,11 @@ jsonToReplacementEffect value = do
     ("DestructionR", Just v) -> fmap ReplacementEffect.DestructionR (DestructionRewrite.fromJson v)
     ("CounterR", Just (Array (MkArray [p, s]))) -> do
       pattern_ <- jsonToCounterPattern p
-      scaling <- jsonToScaling s
+      scaling <- Scaling.fromJson s
       pure (ReplacementEffect.CounterR pattern_ scaling)
     ("TokenR", Just (Array (MkArray [p, s]))) -> do
       pattern_ <- jsonToTokenPattern p
-      scaling <- jsonToScaling s
+      scaling <- Scaling.fromJson s
       pure (ReplacementEffect.TokenR pattern_ scaling)
     ("PhaseR", Just v) -> fmap ReplacementEffect.PhaseR (jsonToPhasePattern v)
     _ -> Left (Text.pack "unknown ReplacementEffect: " <> t)
