@@ -3,9 +3,9 @@
 ## The problem
 
 `2dfeb6c` refactors `AbilityName` — the type, the codec, and a new spec — into a
-style the rest of the repo does not follow. It is one type out of 246. The work
-is to apply that style to the other 245 without changing a single byte of what
-the codec puts on the wire.
+style the rest of the repo does not follow. It covers one type and one codec out
+of 145 and 98. The work is to apply that style to the rest without changing a
+single byte of what the codec puts on the wire.
 
 The commit is small enough to read in one screen, which hides how much of it is
 policy rather than edit. Seven rules come out of it, and one of them —
@@ -186,7 +186,10 @@ changes:
 ## Tests
 
 Every codec module gets `Pawl.Codec.XSpec` with `describe "toJson"` /
-`describe "fromJson"` groups. **The bar is every constructor**: one
+`describe "fromJson"` groups. One name collides: `Pawl.Types.TargetSpec` is a
+real type, so its codec's spec is `Pawl.Codec.TargetSpecSpec`. The doubled
+suffix is correct — the convention appends `Spec` to the module name, and a type
+whose name already ends in `Spec` gets no exception. **The bar is every constructor**: one
 `assertJsonCodec` line per constructor of the type, ~600 in total across the
 codec'd types (`Subtype` 87, `Effect` 77, `Keyword` 27, `Filter` 27,
 `TriggerCondition` 26, `GameEvent` 20, and a long tail).
@@ -207,7 +210,7 @@ switch `Json` to `Common`.
 ## Scope
 
 **In:** `source/libraries/types/` (145 modules), `source/libraries/codec/`
-(101 modules), the ~100 new `XSpec` modules, `pawl.cabal`,
+(98 codecs plus `Common`), the 99 new `XSpec` modules, `pawl.cabal`,
 `source/test-suite/Main.hs`, and whatever `Pawl.Registry`, `Pawl.Corpus`,
 `Pawl.CardsSpec` and `Pawl.CodecSpec` must change to compile.
 
