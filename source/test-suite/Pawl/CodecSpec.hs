@@ -8,10 +8,8 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
 import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
-import Pawl.Codec.Card (cardToJson, jsonToCard)
 import qualified Pawl.Codec.Condition as Condition
 import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
 import qualified Pawl.Codec.Json as J
 import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
@@ -31,11 +29,8 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as CardT
-import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
-import qualified Pawl.Types.Cost as Cost.Type
-import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
@@ -49,7 +44,6 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -58,10 +52,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.PlayerScope as PlayerScope
-import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -101,53 +92,13 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   -- Pawl.Codec.ConditionSpec.
   -- PlayerEffect's own per-constructor coverage, including the Edgewalker
   -- typed-mana ReduceSpellCost, lives in Pawl.Codec.PlayerEffectSpec now.
-  Spec.describe s "player effects (P7)" $ do
-    -- StaticAbility's own per-constructor coverage, including the CR 613.6
-    -- empty-modifications-array rejection, lives in Pawl.Codec.StaticAbilitySpec
-    -- now. PlayerStaticAbility's own per-constructor coverage lives in
-    -- Pawl.Codec.PlayerStaticAbilitySpec now.
-    Spec.it s "a Card carrying player abilities round-trips" $ do
-      bloodMoon <- S.printingOf s registry "Blood Moon"
-      let base = Printing.card bloodMoon
-          c = base {CardT.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.NoMaximumHandSize]}
-      roundTrip s "card" cardToJson jsonToCard c
-    -- Byte-stability: an empty list must not appear in the rendered JSON,
-    -- or every committed card file changes. The same posture
-    -- colorIndicator and delayedAbilities already take.
-    Spec.it s "an empty playerAbilities list is omitted from the JSON" $ do
-      bloodMoon <- S.printingOf s registry "Blood Moon"
-      let base = Printing.card bloodMoon
-      Spec.assertEqWith s "the fixture really has none" (CardT.playerAbilities base) []
-      case J.asObject (cardToJson base) of
-        Left err -> Spec.assertFailure s (Text.unpack err)
-        Right pairs -> Spec.assertBool s (notElem (Text.pack "playerAbilities") (fmap fst pairs)) "key absent"
-    Spec.it s "a Card carrying a CR 103.5b mulligan action round-trips" $ do
-      bloodMoon <- S.printingOf s registry "Blood Moon"
-      let base = Printing.card bloodMoon
-          c = base {CardT.mulliganAction = [Effect.ExileHandThenDraw]}
-      roundTrip s "card" cardToJson jsonToCard c
-    -- Byte-stability: an empty list must not appear in the rendered JSON,
-    -- or every committed card file changes. The same posture
-    -- playerAbilities and additionalCosts already take.
-    Spec.it s "an empty mulliganAction list is omitted from the JSON" $ do
-      bloodMoon <- S.printingOf s registry "Blood Moon"
-      let base = Printing.card bloodMoon
-      Spec.assertEqWith s "the fixture really has none" (CardT.mulliganAction base) []
-      case J.asObject (cardToJson base) of
-        Left err -> Spec.assertFailure s (Text.unpack err)
-        Right pairs -> Spec.assertBool s (notElem (Text.pack "mulliganAction") (fmap fst pairs)) "key absent"
-    Spec.it s "a Card carrying a CR 103.6 opening-hand action round-trips" $ do
-      bloodMoon <- S.printingOf s registry "Blood Moon"
-      let base = Printing.card bloodMoon
-          c = base {CardT.openingHandAction = [Effect.MoveToZone Binding.triggerSource Zone.Battlefield EntryRiders.defaultValue Nothing]}
-      roundTrip s "card" cardToJson jsonToCard c
-    Spec.it s "an empty openingHandAction list is omitted from the JSON" $ do
-      bloodMoon <- S.printingOf s registry "Blood Moon"
-      let base = Printing.card bloodMoon
-      Spec.assertEqWith s "the fixture really has none" (CardT.openingHandAction base) []
-      case J.asObject (cardToJson base) of
-        Left err -> Spec.assertFailure s (Text.unpack err)
-        Right pairs -> Spec.assertBool s (notElem (Text.pack "openingHandAction") (fmap fst pairs)) "key absent"
+  -- StaticAbility's own per-constructor coverage, including the CR 613.6
+  -- empty-modifications-array rejection, lives in Pawl.Codec.StaticAbilitySpec
+  -- now. PlayerStaticAbility's own per-constructor coverage lives in
+  -- Pawl.Codec.PlayerStaticAbilitySpec now. The playerAbilities/mulliganAction/
+  -- openingHandAction round-trip-plus-byte-stability pairs formerly here needed
+  -- no registry fixture -- a synthetic Card proves them just as well -- so they
+  -- moved to Pawl.Codec.CardSpec with the rest of Card's own coverage.
   -- TargetSpec's own per-constructor coverage (a bare pool, a filtered pool,
   -- and the Not IsSource conjunct that carries CR 601.2c's "another", #163)
   -- lives in Pawl.Codec.TargetSpecSpec now; Filter's own per-constructor and
@@ -158,41 +109,12 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- CR 606.3's record.
     Spec.it s "GameEvent (loyalty ability activated)" $
       roundTrip s "loyalty-activated" gameEventToJson jsonToGameEvent (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7))
-    -- Cost's own per-constructor coverage, including the CR 118.6 absent-mana
-    -- and CR 118.5a {0} behavior, lives in Pawl.Codec.CostSpec now.
-    Spec.describe s "cost (P8)" $ do
-      Spec.it s "a Card carrying an additional cost round-trips" $ do
-        lightningBolt <- S.printingOf s registry "Lightning Bolt"
-        let base = Printing.card lightningBolt
-            c = base {CardT.additionalCosts = [CostComponent.Sacrifice 1 (Filter.Type.HasCardType CardType.Creature)]}
-        roundTrip s "card" cardToJson jsonToCard c
-      -- Byte-stability: an empty list must not appear in the rendered JSON,
-      -- or every committed card file changes. The posture colorIndicator,
-      -- delayedAbilities and playerAbilities already take.
-      Spec.it s "an empty additionalCosts list is omitted from the JSON" $ do
-        lightningBolt <- S.printingOf s registry "Lightning Bolt"
-        let base = Printing.card lightningBolt
-        Spec.assertEqWith s "the fixture really has none" (CardT.additionalCosts base) []
-        case J.asObject (cardToJson base) of
-          Left err -> Spec.assertFailure s (Text.unpack err)
-          Right pairs -> Spec.assertBool s (notElem (Text.pack "additionalCosts") (fmap fst pairs)) "key absent"
-      Spec.it s "a Card carrying an alternative cost round-trips" $ do
-        lightningBolt <- S.printingOf s registry "Lightning Bolt"
-        let base = Printing.card lightningBolt
-            alt =
-              Cost.Type.MkCost
-                { Cost.Type.mana = Just (ManaCost.MkManaCost []),
-                  Cost.Type.components = [CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)]
-                }
-            c = base {CardT.alternativeCosts = [alt]}
-        roundTrip s "card" cardToJson jsonToCard c
-      Spec.it s "an empty alternativeCosts list is omitted from the JSON" $ do
-        lightningBolt <- S.printingOf s registry "Lightning Bolt"
-        let base = Printing.card lightningBolt
-        Spec.assertEqWith s "the fixture really has none" (CardT.alternativeCosts base) []
-        case J.asObject (cardToJson base) of
-          Left err -> Spec.assertFailure s (Text.unpack err)
-          Right pairs -> Spec.assertBool s (notElem (Text.pack "alternativeCosts") (fmap fst pairs)) "key absent"
+  -- Cost's own per-constructor coverage, including the CR 118.6 absent-mana
+  -- and CR 118.5a {0} behavior, lives in Pawl.Codec.CostSpec now. The
+  -- additionalCosts/alternativeCosts round-trip-plus-byte-stability pairs
+  -- formerly here (as "cost (P8)") needed no registry fixture -- a synthetic
+  -- Card proves them just as well -- so they moved to Pawl.Codec.CardSpec
+  -- with the rest of Card's own coverage.
   -- ReplacementEffect's own per-constructor coverage -- including the
   -- ZoneChangeR Opponents/Anyones distinction, the CounterR/DamageR/TokenR
   -- "pattern and scaling/rewrite are data" shapes, the CounterR explicit

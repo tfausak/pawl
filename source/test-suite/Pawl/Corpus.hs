@@ -14,7 +14,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import Pawl.Codec.Card (jsonToCard)
+import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
@@ -62,7 +62,7 @@ loadOne root slug =
         bytes <- ByteString.readFile path
         pure $ case Encoding.decodeUtf8' bytes of
           Left err -> invalid ("not valid UTF-8: " <> show err)
-          Right contents -> case Json.parse contents >>= jsonToCard of
+          Right contents -> case Json.parse contents >>= Card.fromJson of
             Left err -> invalid (Text.unpack err)
             Right card ->
               let actual = Slug.fromText (Card.name card)

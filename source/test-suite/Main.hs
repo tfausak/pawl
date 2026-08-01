@@ -14,6 +14,7 @@ import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BlockRequirementSpec
+import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
@@ -205,6 +206,7 @@ spec s registry = do
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
+  Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s

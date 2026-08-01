@@ -4,7 +4,7 @@ module Pawl.Codec.ProjectedCharacteristics where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
-import Pawl.Codec.Card (cardToJson, jsonToCard)
+import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Json as Json
@@ -32,9 +32,9 @@ projectedCharacteristicsToJson pc =
       (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc)),
       (Text.pack "cardTypes", Json.setTo CardType.toJson (PC.cardTypes pc)),
       (Text.pack "subtypes", Json.setTo Subtype.toJson (PC.subtypes pc)),
-      (Text.pack "activatedAbilities", Json.listTo (ActivatedAbility.toJson cardToJson) (PC.activatedAbilities pc)),
+      (Text.pack "activatedAbilities", Json.listTo (ActivatedAbility.toJson Card.toJson) (PC.activatedAbilities pc)),
       (Text.pack "replacementEffects", Json.listTo ReplacementEffect.toJson (PC.replacementEffects pc)),
-      (Text.pack "triggeredAbilities", Json.listTo (TriggeredAbility.toJson cardToJson) (PC.triggeredAbilities pc))
+      (Text.pack "triggeredAbilities", Json.listTo (TriggeredAbility.toJson Card.toJson) (PC.triggeredAbilities pc))
     ]
 
 jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristics
@@ -54,9 +54,9 @@ jsonToProjectedCharacteristics value = do
   cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom Quantity.fromJsonPair
   cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom CardType.fromJson
   subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom Subtype.fromJson
-  acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (ActivatedAbility.fromJson jsonToCard)
+  acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (ActivatedAbility.fromJson Card.fromJson)
   reps <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom ReplacementEffect.fromJson
-  trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (TriggeredAbility.fromJson jsonToCard)
+  trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (TriggeredAbility.fromJson Card.fromJson)
   pure
     PC.MkProjectedCharacteristics
       { PC.name = nm,

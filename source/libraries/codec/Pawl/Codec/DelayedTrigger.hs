@@ -4,7 +4,7 @@ module Pawl.Codec.DelayedTrigger where
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Pawl.Codec.Binding (bindingsToJson, jsonToBindings)
-import Pawl.Codec.Card (cardToJson, jsonToCard)
+import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -16,7 +16,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 delayedTriggerToJson :: DelayedTrigger.DelayedTrigger -> Value
 delayedTriggerToJson d =
   Json.jObject
-    [ (Text.pack "ability", TriggeredAbility.toJson cardToJson (DelayedTrigger.ability d)),
+    [ (Text.pack "ability", TriggeredAbility.toJson Card.toJson (DelayedTrigger.ability d)),
       (Text.pack "source", ObjectId.toJson (DelayedTrigger.source d)),
       (Text.pack "controller", PlayerId.toJson (DelayedTrigger.controller d)),
       (Text.pack "bindings", bindingsToJson (DelayedTrigger.bindings d)),
@@ -31,7 +31,7 @@ delayedTriggerToJson d =
 jsonToDelayedTrigger :: Value -> Either Text DelayedTrigger.DelayedTrigger
 jsonToDelayedTrigger value = do
   ps <- Json.asObject value
-  a <- Json.field (Text.pack "ability") ps >>= TriggeredAbility.fromJson jsonToCard
+  a <- Json.field (Text.pack "ability") ps >>= TriggeredAbility.fromJson Card.fromJson
   s <- Json.field (Text.pack "source") ps >>= ObjectId.fromJson
   c <- Json.field (Text.pack "controller") ps >>= PlayerId.fromJson
   b <- Json.field (Text.pack "bindings") ps >>= jsonToBindings
