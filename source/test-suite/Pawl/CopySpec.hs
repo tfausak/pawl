@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -27,8 +28,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.HUnit as HU
 
 -- The battlefield objects whose printed card is named "Clone" (their source is
 -- unchanged by copying -- only their projected characteristics change).
@@ -71,123 +70,128 @@ resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> G
 resolveAndSettle answer gs =
   snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
 
-tests :: Registry.Registry -> Tasty.TestTree
-tests registry =
-  Tasty.testGroup
-    "Copy"
-    [ HU.testCase "Clone copies a creature and projects its P/T (CR 707.2)" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        clone <- Registry.printing registry "Clone"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board) = S.addCreature piker S.alice gs0
-            (_, staged) = S.spellOnStack clone S.alice board
-            resolved = resolveAndSettle copyNewest staged
-        case cloneOnBattlefield resolved of
-          Nothing -> HU.assertFailure "Clone left the battlefield unexpectedly"
-          Just cloneId -> do
-            HU.assertEqual "Clone's power is the Piker's" (Just 2) (Projection.powerOf cloneId resolved)
-            HU.assertEqual "Clone's toughness is the Piker's" (Just 1) (Projection.toughnessOf cloneId resolved)
-            HU.assertBool "Clone is a creature" (Projection.isCreatureOf cloneId resolved)
-            HU.assertBool "the copied Piker is untouched" (Projection.powerOf pikerId resolved == Just 2),
-      HU.testCase "Clone with no creature to copy enters as a 0/0 and dies (CR 704.5f)" $ do
-        clone <- Registry.printing registry "Clone"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (_, staged) = S.spellOnStack clone S.alice gs0
-            resolved = resolveAndSettle copyNewest staged
-        HU.assertEqual "the 0/0 Clone is gone (state-based action)" Nothing (cloneOnBattlefield resolved),
-      -- #222: with no creature on the battlefield there are no legal copy
-      -- targets at all, so an interpreter naming one must be refused -- the Clone
-      -- enters as a 0/0 and dies exactly as it does when it declines. Same
-      -- fixture as the "no creature to copy" test above, so the only variable is
-      -- the answer.
-      HU.testCase "#222 a copy target that was never offered is refused" $ do
-        clone <- Registry.printing registry "Clone"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (_, staged) = S.spellOnStack clone S.alice gs0
-            phantom = ObjectId.MkObjectId 9999
-            resolved = resolveAndSettle (copyForbidden phantom) staged
-        HU.assertEqual "the Clone copied nothing and died as a 0/0" Nothing (cloneOnBattlefield resolved),
-      HU.testCase "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        clone <- Registry.printing registry "Clone"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board0) = S.addCreature piker S.alice gs0
-            -- Put a +1/+1 counter on the Piker: projected 3/2, base 2/1.
-            board = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId board0
-            (_, staged) = S.spellOnStack clone S.alice board
-            resolved = resolveAndSettle copyNewest staged
-        case cloneOnBattlefield resolved of
-          Nothing -> HU.assertFailure "Clone left the battlefield unexpectedly"
-          Just cloneId -> do
-            HU.assertEqual "source is boosted to 3/2" (Just 3) (Projection.powerOf pikerId resolved)
-            HU.assertEqual "Clone copies the base 2, not 3" (Just 2) (Projection.powerOf cloneId resolved)
-            HU.assertEqual "Clone copies the base 1, not 2" (Just 1) (Projection.toughnessOf cloneId resolved),
-      HU.testCase "Clone copies a creature's activated abilities (CR 707.2)" $ do
-        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-        clone <- Registry.printing registry "Clone"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (_, board) = S.addCreature prodigalSorcerer S.alice gs0
-            (_, staged) = S.spellOnStack clone S.alice board
-            resolved = resolveAndSettle copyNewest staged
-        case cloneOnBattlefield resolved of
-          Nothing -> HU.assertFailure "Clone left the battlefield unexpectedly"
-          Just cloneId ->
-            HU.assertBool
-              "Clone has the copied activated ability"
-              (not (null (Projection.abilitiesOf cloneId resolved))),
-      HU.testCase "a copy of a copy resolves to the underlying creature (self-reference)" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        clone <- Registry.printing registry "Clone"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (_, board) = S.addCreature piker S.alice gs0
-            (_, stagedA) = S.spellOnStack clone S.alice board
-            afterA = resolveAndSettle copyNewest stagedA
-            (_, stagedB) = S.spellOnStack clone S.alice afterA
-            afterB = resolveAndSettle copyNewest stagedB
-            -- Both Clones now name "Clone"; the newest (highest id) is B.
-            afterBId = newest (clonesOnBattlefield afterB)
-        case afterBId of
-          Nothing -> HU.assertFailure "no Clones on the battlefield"
-          Just bId -> do
-            HU.assertEqual "the copy-of-a-copy is a 2/1" (Just 2) (Projection.powerOf bId afterB)
-            HU.assertBool "the copy-of-a-copy is a creature" (Projection.isCreatureOf bId afterB),
-      HU.testCase "a copy survives its source leaving the battlefield (CR 707.5 lock)" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        clone <- Registry.printing registry "Clone"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board) = S.addCreature piker S.alice gs0
-            (_, staged) = S.spellOnStack clone S.alice board
-            resolved = resolveAndSettle copyNewest staged
-            afterKill = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId])
-        case cloneOnBattlefield afterKill of
-          Nothing -> HU.assertFailure "Clone should survive the source's death"
-          Just cloneId -> do
-            HU.assertEqual "the source is gone" False (Set.member pikerId (GameState.battlefield afterKill))
-            HU.assertEqual "the Clone is still a 2/1" (Just 2) (Projection.powerOf cloneId afterKill)
-            HU.assertEqual "the Clone is still 1 toughness" (Just 1) (Projection.toughnessOf cloneId afterKill),
-      HU.testCase "Clone of Tarmogoyf copies the ABILITY, so both recompute (CR 707.2a)" $ do
-        -- THE FALSIFIER for snapshotting the NUMBER: CR 707.2a says a copy
-        -- acquires the abilities of the object it copies, because those values are
-        -- derived from its rules text. Seeding the CDA as an evaluated integer
-        -- would freeze the Clone at the graveyards' contents at the moment it
-        -- entered -- P2's deferred bill, paid here.
-        lightningBolt <- Registry.printing registry "Lightning Bolt"
-        tarmogoyf <- Registry.printing registry "Tarmogoyf"
-        clone <- Registry.printing registry "Clone"
-        piker <- Registry.printing registry "Goblin Piker"
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
-            (goyfId, board) = S.addCreature tarmogoyf S.alice withBolt
-            (_, staged) = S.spellOnStack clone S.alice board
-            resolved = resolveAndSettle copyNewest staged
-            -- A second card type reaches a graveyard AFTER the Clone entered.
-            (_, later) = S.addGraveyardCard piker S.bob resolved
-        case cloneOnBattlefield resolved of
-          Nothing -> HU.assertFailure "Clone did not reach the battlefield"
-          Just cloneId -> do
-            HU.assertEqual "at entry the Clone is the Goyf's 1/2" (Just 1) (Projection.powerOf cloneId resolved)
-            HU.assertEqual "at entry, toughness 1+1" (Just 2) (Projection.toughnessOf cloneId resolved)
-            HU.assertEqual "the source moves to 2" (Just 2) (Projection.powerOf goyfId later)
-            HU.assertEqual "and so does the COPY" (Just 2) (Projection.powerOf cloneId later)
-            HU.assertEqual "the copy's toughness moves too" (Just 3) (Projection.toughnessOf cloneId later)
-    ]
+spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
+spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  Spec.it s "Clone copies a creature and projects its P/T (CR 707.2)" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    clone <- Registry.printing registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (pikerId, board) = S.addCreature piker S.alice gs0
+        (_, staged) = S.spellOnStack clone S.alice board
+        resolved = resolveAndSettle copyNewest staged
+    case cloneOnBattlefield resolved of
+      Nothing -> Spec.assertFailure s "Clone left the battlefield unexpectedly"
+      Just cloneId -> do
+        Spec.assertEqWith s "Clone's power is the Piker's" (Projection.powerOf cloneId resolved) $ Just 2
+        Spec.assertEqWith s "Clone's toughness is the Piker's" (Projection.toughnessOf cloneId resolved) $ Just 1
+        Spec.assertBool s (Projection.isCreatureOf cloneId resolved) "Clone is a creature"
+        Spec.assertBool s (Projection.powerOf pikerId resolved == Just 2) "the copied Piker is untouched"
+
+  Spec.it s "Clone with no creature to copy enters as a 0/0 and dies (CR 704.5f)" $ do
+    clone <- Registry.printing registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, staged) = S.spellOnStack clone S.alice gs0
+        resolved = resolveAndSettle copyNewest staged
+    Spec.assertEqWith s "the 0/0 Clone is gone (state-based action)" (cloneOnBattlefield resolved) Nothing
+
+  -- #222: with no creature on the battlefield there are no legal copy
+  -- targets at all, so an interpreter naming one must be refused -- the Clone
+  -- enters as a 0/0 and dies exactly as it does when it declines. Same
+  -- fixture as the "no creature to copy" test above, so the only variable is
+  -- the answer.
+  Spec.it s "#222 a copy target that was never offered is refused" $ do
+    clone <- Registry.printing registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, staged) = S.spellOnStack clone S.alice gs0
+        phantom = ObjectId.MkObjectId 9999
+        resolved = resolveAndSettle (copyForbidden phantom) staged
+    Spec.assertEqWith s "the Clone copied nothing and died as a 0/0" (cloneOnBattlefield resolved) Nothing
+
+  Spec.it s "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    clone <- Registry.printing registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (pikerId, board0) = S.addCreature piker S.alice gs0
+        -- Put a +1/+1 counter on the Piker: projected 3/2, base 2/1.
+        board = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId board0
+        (_, staged) = S.spellOnStack clone S.alice board
+        resolved = resolveAndSettle copyNewest staged
+    case cloneOnBattlefield resolved of
+      Nothing -> Spec.assertFailure s "Clone left the battlefield unexpectedly"
+      Just cloneId -> do
+        Spec.assertEqWith s "source is boosted to 3/2" (Projection.powerOf pikerId resolved) $ Just 3
+        Spec.assertEqWith s "Clone copies the base 2, not 3" (Projection.powerOf cloneId resolved) $ Just 2
+        Spec.assertEqWith s "Clone copies the base 1, not 2" (Projection.toughnessOf cloneId resolved) $ Just 1
+
+  Spec.it s "Clone copies a creature's activated abilities (CR 707.2)" $ do
+    prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+    clone <- Registry.printing registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, board) = S.addCreature prodigalSorcerer S.alice gs0
+        (_, staged) = S.spellOnStack clone S.alice board
+        resolved = resolveAndSettle copyNewest staged
+    case cloneOnBattlefield resolved of
+      Nothing -> Spec.assertFailure s "Clone left the battlefield unexpectedly"
+      Just cloneId ->
+        Spec.assertBool
+          s
+          (not (null (Projection.abilitiesOf cloneId resolved)))
+          "Clone has the copied activated ability"
+
+  Spec.it s "a copy of a copy resolves to the underlying creature (self-reference)" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    clone <- Registry.printing registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, board) = S.addCreature piker S.alice gs0
+        (_, stagedA) = S.spellOnStack clone S.alice board
+        afterA = resolveAndSettle copyNewest stagedA
+        (_, stagedB) = S.spellOnStack clone S.alice afterA
+        afterB = resolveAndSettle copyNewest stagedB
+        -- Both Clones now name "Clone"; the newest (highest id) is B.
+        afterBId = newest (clonesOnBattlefield afterB)
+    case afterBId of
+      Nothing -> Spec.assertFailure s "no Clones on the battlefield"
+      Just bId -> do
+        Spec.assertEqWith s "the copy-of-a-copy is a 2/1" (Projection.powerOf bId afterB) $ Just 2
+        Spec.assertBool s (Projection.isCreatureOf bId afterB) "the copy-of-a-copy is a creature"
+
+  Spec.it s "a copy survives its source leaving the battlefield (CR 707.5 lock)" $ do
+    piker <- Registry.printing registry "Goblin Piker"
+    clone <- Registry.printing registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (pikerId, board) = S.addCreature piker S.alice gs0
+        (_, staged) = S.spellOnStack clone S.alice board
+        resolved = resolveAndSettle copyNewest staged
+        afterKill = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId])
+    case cloneOnBattlefield afterKill of
+      Nothing -> Spec.assertFailure s "Clone should survive the source's death"
+      Just cloneId -> do
+        Spec.assertEqWith s "the source is gone" (Set.member pikerId (GameState.battlefield afterKill)) False
+        Spec.assertEqWith s "the Clone is still a 2/1" (Projection.powerOf cloneId afterKill) $ Just 2
+        Spec.assertEqWith s "the Clone is still 1 toughness" (Projection.toughnessOf cloneId afterKill) $ Just 1
+
+  Spec.it s "Clone of Tarmogoyf copies the ABILITY, so both recompute (CR 707.2a)" $ do
+    -- THE FALSIFIER for snapshotting the NUMBER: CR 707.2a says a copy
+    -- acquires the abilities of the object it copies, because those values are
+    -- derived from its rules text. Seeding the CDA as an evaluated integer
+    -- would freeze the Clone at the graveyards' contents at the moment it
+    -- entered -- P2's deferred bill, paid here.
+    lightningBolt <- Registry.printing registry "Lightning Bolt"
+    tarmogoyf <- Registry.printing registry "Tarmogoyf"
+    clone <- Registry.printing registry "Clone"
+    piker <- Registry.printing registry "Goblin Piker"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
+        (goyfId, board) = S.addCreature tarmogoyf S.alice withBolt
+        (_, staged) = S.spellOnStack clone S.alice board
+        resolved = resolveAndSettle copyNewest staged
+        -- A second card type reaches a graveyard AFTER the Clone entered.
+        (_, later) = S.addGraveyardCard piker S.bob resolved
+    case cloneOnBattlefield resolved of
+      Nothing -> Spec.assertFailure s "Clone did not reach the battlefield"
+      Just cloneId -> do
+        Spec.assertEqWith s "at entry the Clone is the Goyf's 1/2" (Projection.powerOf cloneId resolved) $ Just 1
+        Spec.assertEqWith s "at entry, toughness 1+1" (Projection.toughnessOf cloneId resolved) $ Just 2
+        Spec.assertEqWith s "the source moves to 2" (Projection.powerOf goyfId later) $ Just 2
+        Spec.assertEqWith s "and so does the COPY" (Projection.powerOf cloneId later) $ Just 2
+        Spec.assertEqWith s "the copy's toughness moves too" (Projection.toughnessOf cloneId later) $ Just 3
