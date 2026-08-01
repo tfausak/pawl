@@ -630,7 +630,7 @@ tokenNameOffends token =
 lintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
 lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "every mode's slot reads equal its declared slots" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let modeOffends m =
           let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
               reads_ = Set.unions (fmap Resolve.slotsOf (Foldable.toList (Mode.effects m)))
@@ -651,7 +651,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- so sweeping the listing is the whole assertion: a stray file, a file whose
     -- card was renamed, and a file that no test happens to name all fail here.
     -- A hand-kept list is exactly what forgets the file nobody loads.
-    slugs <- S.corpusSlugs registry
+    slugs <- S.corpusSlugs
     Spec.assertBool s (not (null slugs)) "the corpus is not empty"
     mapM_ (Registry.card registry) slugs
   -- The other direction: Registry.card slugifies the NAME it is asked for,
@@ -661,9 +661,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Every committed file name must therefore already be its own slug.
   -- Slug.fromText normalizes rather than validates, so the assertion is that
   -- it is the identity on every stem -- read the listing directly, because
-  -- Registry.slugs has already normalized the evidence away.
+  -- Corpus.slugsIn has already normalized the evidence away.
   Spec.it s "every file name in data/cards is already a slug" $ do
-    entries <- Directory.listDirectory (Registry.root registry)
+    root <- Registry.defaultRoot
+    entries <- Directory.listDirectory root
     let stems = fmap (reverse . drop (length ".json") . reverse) (filter (List.isSuffixOf ".json") entries)
     Spec.assertBool s (not (null stems)) "the corpus is not empty"
     mapM_
@@ -688,7 +689,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
   Spec.it s "every printing that reads X declares {X}, and vice versa" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let readsX c = Resolve.readsX (Card.allEffects c)
         hasVariable c = case Card.Type.manaCost c of
           Nothing -> False
@@ -699,7 +700,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ps
     Spec.assertEqWith s "X read iff {X} declared" (fmap (Card.Type.name . Printing.card) offenders) []
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let tokensOf card = [token | Effect.Create _ token _ _ <- cardResolutionEffects card]
         tokens = concatMap (tokensOf . Printing.card) ps
     -- Guards the sweep against passing vacuously if Create ever moves out
@@ -723,7 +724,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- at all. See reservedDeclarations for why declaring one is a discarded
   -- prompt rather than a naming quibble.
   Spec.it s "no reserved binding slot is ever a declared target slot" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let offends = not . Set.null . reservedDeclarations
         offenders = filter (offends . Printing.card) ps
     Spec.assertEqWith s "no card declares a reserved slot" (fmap (Card.Type.name . Printing.card) offenders) []
@@ -818,7 +819,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- anything, and it arms from its spell mode); widening the lint to
   -- non-spell modes is a separate, deliberately out-of-scope change.
   Spec.it s "every armed delayed ability is declared, and every declared one is armed" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let cardOffends card =
           Resolve.armedAbilities (Card.allEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
         offenders = filter (cardOffends . Printing.card) ps
@@ -826,7 +827,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, or a token bound by a Create.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let cardOffends card =
           let available = Set.insert Binding.triggerSource (Resolve.definedSlots (Card.allEffects card))
               wanted = Set.unions (fmap Resolve.slotsOf (Card.delayedEffects card))
@@ -840,7 +841,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- No ACTIVATED-ability counterpart of this read check exists (#479).
   Spec.it s "every slot a triggered ability reads is bound for its condition" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
         offenders = filter (cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling triggered-ability slot" (fmap (Card.Type.name . Printing.card) offenders) []
@@ -880,7 +881,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
   -- of them. Rejected rather than guessed (#53).
   Spec.it s "no Create binds a slot while making more than one token" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let offenders =
           filter
             (Resolve.bindsSeveralTokens . Card.allEffects . Printing.card)
@@ -891,7 +892,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a
   -- zone no player owns individually (#161).
   Spec.it s "every InZone Count over a shared zone pairs with EachPlayer" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let offenders =
           filter
             (cardOffendsSharedZoneScope . Printing.card)
@@ -908,7 +909,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- nothing reads. The D4 lint cannot see either, because it walks
   -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
   Spec.it s "a card is an Aura iff it declares an enchant ability" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
         offenders = filter (offends . Printing.card) ps
     Spec.assertEqWith s "Aura iff enchant" (fmap (Card.Type.name . Printing.card) offenders) []
@@ -937,7 +938,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- A codec-level rejection would be the wrong shape: jsonToModification is
   -- shared with staticAbilities, which Control Magic legitimately uses.
   Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let offends effect = case effect of
           Effect.ModifyTarget _ modification _ -> Projection.layer modification == Layer.Control
           _ -> False
@@ -952,13 +953,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Projection.intrinsicReplacementsOf's own comment leans on this in both
   -- directions, which is why it is a lint and not a per-card assertion.
   Spec.it s "a card is a planeswalker iff it has a printed loyalty" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let isPlaneswalker c = Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine c))
         offends c = isPlaneswalker c /= Maybe.isJust (Card.Type.loyalty c)
         offenders = filter (offends . Printing.card) ps
     Spec.assertEqWith s "planeswalker iff loyalty" (fmap (Card.Type.name . Printing.card) offenders) []
   Spec.it s "no mode declares a slot named enchant" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))
         offenders = filter (offends . Printing.card) ps
     Spec.assertEqWith s "the enchant slot is never hand-declared" (fmap (Card.Type.name . Printing.card) offenders) []

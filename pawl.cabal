@@ -549,6 +549,7 @@ test-suite pawl-test-suite
     Pawl.ConditionSpec
     Pawl.CopySpec
     Pawl.CoreSpec
+    Pawl.Corpus
     Pawl.CostSpec
     Pawl.CountSpec
     Pawl.DamageSpec

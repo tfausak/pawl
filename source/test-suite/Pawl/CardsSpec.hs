@@ -89,7 +89,7 @@ modeShapes m =
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry -> n ()
 spec s registry = Spec.describe s "Pawl.Cards" $ do
   Spec.it s "each committed file re-parses to its compiled card (P3)" $ do
-    ps <- S.allPrintings registry
+    ps <- S.allPrintings s
     mapM_ (checkFile s registry) ps
   Spec.it s "clone.json loads as a 0/0 Shapeshifter with an EntryR AsCopy" $ do
     c <- Registry.card registry "Clone"

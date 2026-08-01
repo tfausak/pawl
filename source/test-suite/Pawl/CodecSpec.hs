@@ -938,10 +938,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         "left"
   Spec.describe s "honesty round-trip over allPrintings" $ do
     Spec.it s "P1: jsonToPrinting . printingToJson == Right" $ do
-      ps <- S.allPrintings registry
+      ps <- S.allPrintings s
       mapM_ (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (jsonToPrinting (printingToJson p)) (Right p)) ps
     Spec.it s "P2: through text" $ do
-      ps <- S.allPrintings registry
+      ps <- S.allPrintings s
       mapM_
         (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (J.parse (J.render (printingToJson p)) >>= jsonToPrinting) (Right p))
         ps

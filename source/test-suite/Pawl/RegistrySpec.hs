@@ -10,6 +10,7 @@ import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
+import qualified Pawl.Corpus as Corpus
 import qualified Pawl.Exceptions.CorruptCard as CorruptCard
 import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
@@ -209,11 +210,11 @@ spec s = Spec.describe s "Pawl.Registry" $ do
         ("README.md", Text.pack "not a card")
       ]
       $ \registry -> do
-        found <- Registry.slugs registry
+        found <- Corpus.slugsIn (Registry.root registry)
         Spec.assertEqWith s "sorted, .json only" (fmap Slug.unwrap found) [Text.pack "bird-maiden", Text.pack "goblin-piker"]
 
   Spec.it s "cards loads every card the pool enumerates" $ do
     piker <- pikerJson
     withCorpus "load-all" [("goblin-piker.json", piker)] $ \registry -> do
-      loaded <- Registry.cards registry
-      Spec.assertEqWith s "one card, by name" (fmap Card.name loaded) [Text.pack "Goblin Piker"]
+      loaded <- Corpus.loadAll (Registry.root registry)
+      Spec.assertEqWith s "one card, by name" [Card.name c | (_, Right c) <- loaded] [Text.pack "Goblin Piker"]

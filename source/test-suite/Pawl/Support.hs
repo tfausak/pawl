@@ -19,6 +19,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Corpus as Corpus
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -39,6 +40,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
+import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -1505,13 +1507,24 @@ stubView table oid =
               }
         [] -> Nothing
 
--- Every card file in a registry's root, by slug. The corpus-wide checks need
+-- Every card file in the bundled corpus, by slug. The corpus-wide checks need
 -- the directory listing rather than a hand-kept list: a file nobody loads is
 -- exactly the file a hand-kept list forgets. Kept as a String list because that
--- is what the sweeps feed back to Registry.card; the enumeration itself is the
--- library's since #167.
-corpusSlugs :: Registry.Registry -> IO [String]
-corpusSlugs registry = fmap (fmap (Text.unpack . Slug.unwrap)) (Registry.slugs registry)
+-- is what the sweeps feed back to a lookup.
+corpusSlugs :: IO [String]
+corpusSlugs = do
+  root <- Registry.defaultRoot
+  fmap (fmap (Text.unpack . Slug.unwrap)) (Corpus.slugsIn root)
 
-allPrintings :: Registry.Registry -> IO [Printing.Printing]
-allPrintings = Registry.printings
+-- Every card pawl ships, or a failure naming every file that would not load.
+--
+-- Takes no registry: the lint is about the BUNDLED corpus by definition, so
+-- being handed a pool to inspect would let a caller point it somewhere else and
+-- quietly stop checking what ships.
+allPrintings :: Spec.Spec IO n -> IO [Printing.Printing]
+allPrintings s = do
+  root <- Registry.defaultRoot
+  loaded <- Corpus.loadAll root
+  case [err | (_, Left err) <- loaded] of
+    [] -> pure [Printing.MkPrinting card | (_, Right card) <- loaded]
+    errs -> Spec.assertFailure s (List.intercalate "\n" (fmap show errs))
