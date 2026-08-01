@@ -28,6 +28,7 @@ keywordToJson k = case k of
   Keyword.FirstStrike -> Json.nullary (Text.pack "FirstStrike")
   Keyword.Flying -> Json.nullary (Text.pack "Flying")
   Keyword.Haste -> Json.nullary (Text.pack "Haste")
+  Keyword.Hexproof -> Json.nullary (Text.pack "Hexproof")
   Keyword.Indestructible -> Json.nullary (Text.pack "Indestructible")
   Keyword.Landwalk subtype -> Json.tagged (Text.pack "Landwalk") (Just (subtypeToJson subtype))
   Keyword.Reach -> Json.nullary (Text.pack "Reach")
@@ -54,6 +55,7 @@ jsonToKeyword value = do
     ("FirstStrike", _) -> Right Keyword.FirstStrike
     ("Flying", _) -> Right Keyword.Flying
     ("Haste", _) -> Right Keyword.Haste
+    ("Hexproof", _) -> Right Keyword.Hexproof
     ("Indestructible", _) -> Right Keyword.Indestructible
     ("Landwalk", Just v) -> Keyword.Landwalk <$> jsonToSubtype v
     ("Reach", _) -> Right Keyword.Reach

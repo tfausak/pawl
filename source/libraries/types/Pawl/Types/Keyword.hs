@@ -49,6 +49,22 @@ data Keyword
   | FirstStrike -- 702.7
   | Flying -- 702.9
   | Haste -- 702.10
+  | -- 702.11a: "Hexproof is a static ability." 702.11b: "'Hexproof' on a
+    -- permanent means 'This permanent can't be the target of spells or abilities
+    -- your opponents control.'"
+    --
+    -- Shroud's sibling (702.18a) and deliberately NOT the same constructor: the
+    -- CONTROLLER AXIS is the whole difference between them. Shroud names no
+    -- player, so it stops the permanent's own controller as readily as anyone
+    -- else; hexproof's "your opponents control" makes the answer depend on WHO
+    -- is aiming the spell. That is why Pawl.Engine.Target.targetable reads CR
+    -- 109.5's "you" -- the targeting player -- and not only the candidate.
+    --
+    -- Nullary, because rule 702.11b takes no parameter. Rule 702.11d's "hexproof
+    -- from [quality]" is the parameterized variant and is not this constructor
+    -- (#555): it reads the SOURCE's characteristics, which is protection's shape
+    -- (702.16) rather than this one's.
+    Hexproof
   | Indestructible -- 702.12
   | -- 702.14a: "Landwalk is a generic term that appears within an object's rules
     -- text as '[type]walk,' where [type] is usually a land type, but it can also
@@ -72,9 +88,9 @@ data Keyword
   | -- 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
     -- player can't be the target of spells or abilities.'"
     --
-    -- The pool's first TARGETING RESTRICTION, and so far the only keyword the CR
-    -- 115 target-legality gate reads -- Pawl.Engine.Target.targetable, which is
-    -- where every restriction rule 702 states lands.
+    -- The pool's first TARGETING RESTRICTION, read by the CR 115
+    -- target-legality gate -- Pawl.Engine.Target.targetable, which is where
+    -- every restriction rule 702 states lands. Hexproof (702.11b) is the second.
     --
     -- Nullary, because rule 702.18a takes no parameter. It is neither hexproof's
     -- "your opponents control" (702.11b) nor protection's stated quality
