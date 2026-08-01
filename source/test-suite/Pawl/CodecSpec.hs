@@ -438,6 +438,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
 -- non-Count, which the Count-on-the-left shape this type replaced could not
 -- say at all -- Deathknell Berserker's "if its power was 3 or greater", CR
 -- 603.4) lives in Pawl.Codec.ConditionSpec.
+
 -- Pawl.Types.Effect is parametric in `card` so that Pawl.Types stays an
 -- acyclic module graph, and the codec mirrors that: the encoder reaches its
 -- card payload ONLY through the codec it is handed, which lets

@@ -41,9 +41,10 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
--- | Every case below instantiates the `card` parameter at 'Text.Text', a
--- stand-in that is never a real card -- 'Effect.toJson'/'Effect.fromJson' reach
--- it only through the supplied codec (below), so any type proves the shape.
+-- | Every case below instantiates the `card` parameter at 'Text.Text' (the
+-- parametricity case at the bottom also uses 'Int'), a stand-in that is never
+-- a real card -- 'Effect.toJson'/'Effect.fromJson' reach it only through the
+-- supplied codec (below), so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
 cardToJson = Common.text
 
@@ -78,8 +79,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      "{\"type\":\"ModifyTarget\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Trample\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}]}"
+      (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking])))
+      "{\"type\":\"ModifyTarget\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Trample\"}},{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"IsAttacking\"}]}]}"
   Spec.it s "ChangeText" $
     Common.assertJsonCodec
       s
@@ -442,6 +443,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells)
       "{\"type\":\"AffectPlayers\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"Opponents\"},{\"type\":\"CantCastSpells\"}]}"
+  Spec.it s "CreateEmblem" $
+    Common.assertJsonCodec s toJson fromJson (Effect.CreateEmblem (Text.pack "Goblin Piker")) "{\"type\":\"CreateEmblem\",\"value\":\"Goblin Piker\"}"
   -- The `card` payload comes only from the caller-supplied codec, exactly like
   -- Create's above -- proven at two different `card` values through the SAME
   -- constant codec, so a leak straight to the constructor (bypassing the codec
