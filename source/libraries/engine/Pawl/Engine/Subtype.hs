@@ -110,6 +110,8 @@ isLandType subtype = case subtype of
   -- which is exactly what isCreatureType below is for: setting a creature type
   -- must leave an animated permanent's land type standing.
   Subtype.Frog -> False
+  -- CR 205.3m: a creature type (Child of Night's). Not a land type.
+  Subtype.Vampire -> False
 
 -- CR 205.3m: "Creatures and kindreds share their lists of subtypes; these
 -- subtypes are called creature types." The rulebook owns that list by name, so
@@ -201,3 +203,4 @@ isCreatureType subtype = case subtype of
   Subtype.Turtle -> True
   Subtype.Mongoose -> True
   Subtype.Frog -> True
+  Subtype.Vampire -> True

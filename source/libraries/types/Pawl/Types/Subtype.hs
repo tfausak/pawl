@@ -116,4 +116,6 @@ data Subtype
     -- here that no card in the pool prints on its own type line: it exists only
     -- as the payload of a layer-4 Modification.SetCreatureSubtype.
     Frog
+  | -- CR 205.3m (a creature type; Child of Night's).
+    Vampire
   deriving (Eq, Ord, Show)

@@ -84,6 +84,23 @@ data Keyword
     -- Only rule 702.14a's "usually a land type" case is represented. A Subtype
     -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
     Landwalk Subtype
+  | -- 702.15a: "Lifelink is a static ability." 702.15b: "Damage dealt by a
+    -- source with lifelink causes that source's controller, or its owner if it
+    -- has no controller, to gain that much life (in addition to any other
+    -- results that damage causes)."
+    --
+    -- Nullary, because rule 702.15b takes no parameter, and CR 702.15f
+    -- ("multiple instances of lifelink on the same object are redundant") is why
+    -- its reader takes membership rather than the per-keyword count
+    -- Pawl.Types.ProjectedCharacteristics.keywords carries -- flying's shape,
+    -- not toxic's.
+    --
+    -- Read ONCE, at deal time, into Pawl.Types.DamageEvent.dealtByLifelink:
+    -- CR 702.15c says the source's last known information decides whether it had
+    -- lifelink, and CR 702.15d says the rules "function no matter what zone an
+    -- object with lifelink deals damage from", so this is never a question asked
+    -- of a live board when the life is handed over. See Pawl.Engine.Damage.damageEvent.
+    Lifelink
   | Reach -- 702.17
   | -- 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
     -- player can't be the target of spells or abilities.'"

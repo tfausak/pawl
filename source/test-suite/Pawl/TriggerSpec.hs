@@ -1302,7 +1302,7 @@ poisonousSpec s registry =
         -- falsifier is an implementation that hands the poison to the ability's
         -- controller (Binding.you) instead.
         Spec.it s "CR 603.2 the damaged player rides the trigger in the reserved slot" $ do
-          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
+          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
               bindings = Event.eventBindings TriggerCondition.SelfDealsCombatDamageToPlayer ev
           Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.bob))
         -- The proving test. CR 702.70a: "Whenever this creature deals combat
@@ -2360,7 +2360,7 @@ representativeEvents cond =
       moved from to = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics
       combatDamage =
         GameEvent.DamageDealt
-          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
+          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
       one e = e NonEmpty.:| []
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
