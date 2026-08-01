@@ -28,7 +28,7 @@ withCorpus label files action =
 
 -- Like withCorpus, but writes a single file's raw bytes rather than Text:
 -- withCorpus cannot express a file containing invalid UTF-8, since Text.Text
--- cannot hold one. This exercises Registry.load's decodeUtf8' failure branch,
+-- cannot hold one. This exercises Registry.loadFile's decodeUtf8' failure branch,
 -- otherwise unreached by any case here.
 withInvalidUtf8Corpus :: String -> (FilePath -> Registry.Registry IO -> IO a) -> IO a
 withInvalidUtf8Corpus label action = do
