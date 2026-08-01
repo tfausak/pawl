@@ -169,6 +169,12 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- comment for why the abilities have to be in scope. Reading it under a
 -- condition that never binds it is the direction that IS enforced, by
 -- Pawl.Engine.Event.eventBindingSlots (see `triggerPlayer` above).
+--
+-- A condition that binds it only SOMETIMES is rejected by that same lint, which
+-- answers the guaranteed floor: CR 400.7e's proviso withholds this slot when the
+-- destination is hidden (CR 400.2), so the wider leaves-the-battlefield
+-- condition binds it for a death and not for a bounce, and no card may read it
+-- under that condition yet (#505).
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 

@@ -356,6 +356,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfDies -> []
+  TriggerCondition.SelfLeavesTheBattlefield -> []
   -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
   -- exactly as the discard condition above.
   TriggerCondition.SpellOrAbilityCounters _ -> []
