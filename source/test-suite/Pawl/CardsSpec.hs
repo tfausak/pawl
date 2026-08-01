@@ -189,6 +189,25 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "one keyword: swampwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk Subtype.Swamp))
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file with menace (CR 702.111), and so the first carrying a
+  -- restriction on a SET of blockers rather than on each blocker independently
+  -- (#533). Its entire printed rules text is the keyword, so a menace case in
+  -- Pawl.CombatSpec that uses this printing is asking about 702.111b and nothing
+  -- else.
+  Spec.it s "boggart-brute.json loads as a {2}{R} 3/2 Goblin Warrior whose only keyword is menace" $ do
+    c <- S.cardOf s registry "Boggart Brute"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Boggart Brute")
+    Spec.assertEqWith
+      s
+      "{2}{R}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 3)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 2)))
+    Spec.assertEqWith s "Creature -- Goblin Warrior" (TypeLine.subtypes (CardT.typeLine c)) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+    Spec.assertEqWith s "one keyword: menace" (CardT.keywords c) (Set.singleton Keyword.Menace)
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
   -- The first card file to carry BOTH a keyword and a counterability, and the
   -- first whose CR 113.6g clause sits on a creature rather than an instant
   -- (Rending Volley's). The two clauses are separate fields because they are

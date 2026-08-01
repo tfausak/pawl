@@ -162,6 +162,21 @@ data Keyword
     -- projection's per-keyword count.
     Poisonous Natural
   | Infect -- 702.90
+  | -- 702.111b: "A creature with menace can't be blocked except by two or more
+    -- creatures."
+    --
+    -- Nullary like fear (702.36) and unlike landwalk, because 702.111b names no
+    -- parameter -- the number two is written into the rule.
+    --
+    -- The first restriction of the SET shape #533 named, and its blocking half.
+    -- Every other evasion ability
+    -- here is a question about one (blocker, attacker) pair or less: flying asks
+    -- about the blocker, fear asks about the blocker, landwalk asks about neither.
+    -- Menace asks how MANY creatures are blocking, which no pairwise predicate can
+    -- answer, so it is read by Pawl.Engine.Combat.menaceAllowsGiven -- a
+    -- whole-declaration function -- rather than beside the other three in
+    -- pairAllowedGiven.
+    Menace
   | Devoid -- 702.114
   | -- 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
     -- a number." N rides the constructor, so `Toxic 1` and `Toxic 2` are

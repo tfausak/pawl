@@ -40,6 +40,7 @@ keywordToJson k = case k of
   Keyword.Entwine cost -> Json.tagged (Text.pack "Entwine") (Just (costToJson keywordToJson cost))
   Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (Json.natTo n))
   Keyword.Infect -> Json.nullary (Text.pack "Infect")
+  Keyword.Menace -> Json.nullary (Text.pack "Menace")
   Keyword.Devoid -> Json.nullary (Text.pack "Devoid")
   Keyword.Toxic n -> Json.tagged (Text.pack "Toxic") (Just (Json.natTo n))
 
@@ -65,6 +66,7 @@ jsonToKeyword value = do
     ("Entwine", Just v) -> Keyword.Entwine <$> jsonToCost jsonToKeyword v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Json.natFrom v
     ("Infect", _) -> Right Keyword.Infect
+    ("Menace", _) -> Right Keyword.Menace
     ("Devoid", _) -> Right Keyword.Devoid
     ("Toxic", Just v) -> Keyword.Toxic <$> Json.natFrom v
     _ -> Left (Text.pack "unknown Keyword: " <> t)

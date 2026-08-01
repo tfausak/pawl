@@ -279,11 +279,14 @@ legalAttackers pid gs =
 --     with one creature cannot make another's attack illegal -- which makes that
 --     declaration legal AND maximal by construction.
 --
--- Both bullets fail the moment a set-shaped restriction lands (Silent Arbiter's
--- "no more than one creature can attack each combat"), and the replacement is
--- blockCeiling's enumeration with blockCeiling's exponential cost (#533). The
--- closed form therefore rests on a missing capability rather than on a claim about
--- Magic.
+-- Both bullets fail the moment a set-shaped ATTACKING restriction lands (Silent
+-- Arbiter's "no more than one creature can attack each combat", Bonded
+-- Construct's "can't attack alone"), and the replacement is blockCeiling's
+-- enumeration with blockCeiling's exponential cost (#533). The closed form
+-- therefore rests on a missing capability rather than on a claim about Magic.
+-- The BLOCKING side's set-shaped restriction has landed -- CR 702.111b's menace,
+-- in declarationAllowed -- and reaches nothing here: no restriction on who may
+-- block bounds who may attack.
 --
 -- So nothing here is exponential, and #342's warning about the blocking search has
 -- no counterpart: the work is one battlefield walk plus, per requirement, one
@@ -364,9 +367,10 @@ forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 --
 -- Only the per-creature ones. CR 509.1b's restrictions are mostly PAIRWISE
 -- (flying, fear) and cannot be decided about a blocker alone -- those live in
--- pairAllowed, which is asked of a (blocker, attacker) pair, and a set-shaped one
--- would live in declarationAllowed. So the rule is answered in three places, one
--- per shape of restriction, and this is the narrowest.
+-- pairAllowed, which is asked of a (blocker, attacker) pair -- and CR 702.111b's
+-- menace is SET-SHAPED, which lives in declarationAllowed. So the rule is
+-- answered in three places, one per shape of restriction, and this is the
+-- narrowest.
 --
 -- Summoning sickness is NOT a blocking restriction. CR 302.6 restricts attacking
 -- and activated abilities with the tap or untap symbol, and says nothing about
@@ -510,6 +514,45 @@ landwalkAllowsGiven grants pcs attacker gs =
           && Set.member subtype (Projection.subtypesGiven pcs oid gs)
    in not (any (\subtype -> any (isLandOfType subtype) defendersLands) walked)
 
+-- CR 702.111b: "A creature with menace can't be blocked except by two or more
+-- creatures."
+--
+-- The first restriction of the SET shape #533 named -- its blocking half; the
+-- attacking half is still open, at attackCeiling -- and the reason this takes
+-- the whole declaration where its three siblings above take a pair: "two or more
+-- creatures" is a fact about how many blockers were assigned to one attacker,
+-- which no predicate on a single (blocker, attacker) pair can state. Splitting
+-- the declaration into pairs loses exactly the information the rule reads.
+--
+-- "EXCEPT BY two or more", not "must be blocked by two or more". An attacker
+-- nobody blocked is not blocked at all, so 702.111b has nothing to say about it
+-- -- and that is why this folds over the attackers the declaration MENTIONS
+-- (Map.elems) rather than over every attacker in combat. Declining to block is
+-- always legal under restrictions alone, which is the seed blockCeiling's fold
+-- relies on.
+--
+-- The same asymmetry the other three evasion gates have (see evasionAllows): the
+-- keyword is read off the ATTACKER. A creature with menace blocking alone is
+-- legal, since 702.111b restricts being blocked and says nothing about blocking.
+--
+-- Membership rather than the projection's per-keyword count, on
+-- landwalkAllowsGiven's terms: CR 702.111c says "multiple instances of menace on
+-- the same creature are redundant", so a creature with two of them still needs
+-- two blockers rather than four.
+menaceAllows :: Map ObjectId ObjectId -> GameState -> Bool
+menaceAllows = menaceAllowsGiven Map.empty
+
+menaceAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> Map ObjectId ObjectId -> GameState -> Bool
+menaceAllowsGiven pcs declaration gs =
+  let -- blocker -> attacker inverted into attacker -> how many blockers, which is
+      -- the only reading of a declaration 702.111b cares about.
+      blockerCounts = Map.fromListWith (+) (fmap (\attacker -> (attacker, 1 :: Int)) (Map.elems declaration))
+      -- The count first, so an attacker that is comfortably blocked never pays
+      -- for a keyword read (#200's posture, in the one place a declaration check
+      -- sits inside candidateDeclarations' exponential filter).
+      allowed (attacker, count) = count >= 2 || not (Projection.hasKeywordGiven pcs Keyword.Menace attacker gs)
+   in all allowed (Map.toList blockerCounts)
+
 -- CR 509.1b asked of ONE (blocker, attacker) pair: may this creature block that
 -- one at all? This is also what CR 509.1c's requirements mean by "able to block"
 -- (Lure), which is why it is a named function and not a lambda inside the
@@ -519,11 +562,13 @@ landwalkAllowsGiven grants pcs attacker gs =
 -- different evasion abilities are cumulative: an attacker with flying AND shadow
 -- admits only blockers that answer both.
 --
--- Every restriction in the pool today is at most pairwise, and CR 702.14c's
--- landwalk is less than that: it does not read the blocker at all. Menace (CR 702.111b,
--- "can't be blocked except by two or more creatures") is not -- it constrains the
--- SET blocking one attacker -- and when it lands it belongs in
--- declarationAllowed, which is asked of the whole declaration, never here.
+-- Every restriction ASKED HERE is at most pairwise, and CR 702.14c's landwalk is
+-- less than that: it does not read the blocker at all. Menace (CR 702.111b) is
+-- not pairwise -- it constrains the SET blocking one attacker -- so it is asked
+-- in declarationAllowed, of the whole declaration, and never here. The two are
+-- cumulative rather than alternative, which is CR 509.1b's own "different evasion
+-- abilities are cumulative" read across the shapes: a menace attacker that also
+-- has fear needs two blockers AND needs each of them to pass 702.36b.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowed candidates attackers blocker attacker gs =
   pairAllowedGiven (Projection.controlGrants gs) Map.empty candidates attackers blocker attacker gs
@@ -548,17 +593,26 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- any are disobeyed the DECLARATION is illegal.
 --
 -- The unit of legality is the whole declaration, not the pair, and that is not a
--- stylistic choice. Menace (CR 702.111b, one punchlist entry away) says a creature
--- can't be blocked except by TWO OR MORE creatures -- a constraint on the SET
--- blocking an attacker, which no per-pair predicate can express. Every evasion
--- ability the pool has -- flying, reach, fear, landwalk -- is pairwise or
--- narrower; designing to them would be designing to the case that misleads. See
--- the M2a spec, section 3. So this stays a whole-declaration
--- function even though its body is currently a fold of pairAllowed: this is the
--- seam a set-shaped restriction plugs into, and it is the seam blockCeiling's
--- enumeration is filtered through.
-declarationAllowed :: (ObjectId -> ObjectId -> Bool) -> Map ObjectId ObjectId -> Bool
-declarationAllowed able declaration = all (uncurry able) (Map.toList declaration)
+-- stylistic choice. Menace (CR 702.111b) says a creature can't be blocked except
+-- by TWO OR MORE creatures -- a constraint on the SET blocking an attacker, which
+-- no per-pair predicate can express. Every other evasion ability the pool has --
+-- flying, reach, fear, landwalk -- is pairwise or narrower; designing to them
+-- would be designing to the case that misleads. See the M2a spec, section 3.
+--
+-- So the two shapes of restriction are both asked here, one conjunct each:
+-- pairAllowed over the pairs, and menaceAllows over the whole map. This is also
+-- the seam blockCeiling's enumeration is filtered through, so CR 509.1c's
+-- "maximum possible number of requirements that could be obeyed without
+-- disobeying any restrictions" maximizes over declarations menace already allows.
+--
+-- Takes the projected board rather than projecting per read, because the
+-- set-shaped conjunct reads a keyword and this sits inside candidateDeclarations'
+-- exponential filter (#342). There is no per-read twin the way pairAllowed has
+-- one: both callers are already inside a hoisted pass.
+declarationAllowed :: Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId ObjectId -> GameState -> Bool
+declarationAllowed pcs able declaration gs =
+  all (uncurry able) (Map.toList declaration)
+    && menaceAllowsGiven pcs declaration gs
 
 -- How many of `requirements` this declaration obeys -- CR 509.1c's "the number of
 -- requirements that are being obeyed". A requirement instance is obeyed exactly
@@ -625,7 +679,7 @@ blockCeilingGiven grants pcs pid gs =
         if requirementsMet requirements declaration > requirementsMet requirements best
           then declaration
           else best
-      legal = filter (declarationAllowed able) (candidateDeclarations able candidates attackers)
+      legal = filter (\declaration -> declarationAllowed pcs able declaration gs) (candidateDeclarations able candidates attackers)
    in ( requirements,
         if Set.null requirements
           then Map.empty
@@ -656,7 +710,7 @@ legalBlockDeclaration pid declaration gs =
       candidates = legalBlockersGiven grants pcs pid gs
       able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
       (requirements, best) = blockCeilingGiven grants pcs pid gs
-   in declarationAllowed able declaration
+   in declarationAllowed pcs able declaration gs
         && requirementsMet requirements declaration >= requirementsMet requirements best
 
 -- A declaration that is always legal: one attaining CR 509.1c's maximum, which
