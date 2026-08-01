@@ -118,7 +118,7 @@ objectRefSlots ref = case ref of
 -- says why); Resolve.readsX below is X's own half of the contract.
 slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
-  Effect.DealDamage slot quantity -> Set.insert slot (Quantity.slots quantity)
+  Effect.DealDamage ref quantity -> Set.union (objectRefSlots ref) (Quantity.slots quantity)
   -- The modification's own quantities read slots too (Projection.quantitiesOf
   -- reaches inside it, since casing on a Modification is Projection's charter);
   -- no card in the pool reads a slot there, but a dangling one would otherwise
@@ -392,8 +392,8 @@ bindsSeveralTokens effects =
 -- CR 612's basic-land-type word swap, over an effect's AST. Cases on Effect
 -- (Resolve's charter); delegates the inner Modification of ModifyTarget to
 -- Projection.rewriteModification and every carried Filter to Filter.rewrite, so
--- no module touches another's constructors. DealDamage and ChangeText carry no
--- rewritable land-type word.
+-- no module touches another's constructors. ChangeText carries no rewritable
+-- land-type word.
 --
 -- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
 -- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
@@ -412,7 +412,7 @@ rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Ty
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification ref ->
     Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) (rewriteObjectRef pairs ref)
-  Effect.DealDamage _ _ -> effect
+  Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
   Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
@@ -908,6 +908,28 @@ objectRefObjects legality chosen controller source gs ref = case ref of
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
 
+-- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
+-- as RECIPIENTS, before the objects are picked out of them.
+--
+-- It exists because CR 115.4's "any target" includes a player and CR 120.1a lets
+-- damage go to one, so Effect.DealDamage's InSlot arm must be able to name
+-- something no ObjectId can -- Lightning Bolt at a player's face. Every other
+-- ObjectRef-taking opcode affects permanents only and reads objectRefObjects,
+-- which is this answer with the players dropped (Recipient.objectOf).
+--
+-- EachMatching names permanents, so its members arrive as Recipient.ToObject:
+-- CR 109.2 draws the set from the battlefield with no claim about card types
+-- beyond the Filter's own, and classifying each one is the OPCODE's job
+-- (Damage.damageRecipient sorts them into CR 120.3c's planeswalkers and CR
+-- 120.3e's creatures). Order, timing and CR 608.2f are objectRefObjects'
+-- haddock above, unchanged.
+objectRefRecipients :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [Recipient]
+objectRefRecipients legality chosen controller source gs ref = case ref of
+  ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    (Just recipient, True) -> [recipient]
+    _ -> []
+  ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen controller source gs ref)
+
 -- `resolving` is the object ON THE STACK whose resolution this is -- the spell
 -- itself for a spell, the ABILITY object for an activated or triggered one --
 -- and is where every slot this fold DEFINES is bound, and where
@@ -921,29 +943,41 @@ objectRefObjects legality chosen controller source gs ref = case ref of
 -- one holder that is always there to write to.
 applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame resolving source controller bound legality chosen effect = case effect of
-  Effect.DealDamage slot quantity -> do
+  Effect.DealDamage ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-    -- CR 120.1a: a slot may name something damage cannot be dealt to at all. A
-    -- slot bound by Pawl.Engine.Event.eventBindings names a permanent GENERICALLY --
-    -- Aether Flash's entrant under Pawl.Engine.Binding.became, tagged from a trigger
-    -- condition that said nothing about card types -- so what it names is
-    -- classified by Damage.damageRecipient before any event is built, and an
-    -- entrant that is no longer a creature (gone by resolution, CR 608.2h) makes
-    -- this a no-op rather than a damage event nothing can apply. This is the
-    -- only site that can hand applyDamage a generically named recipient.
-    case (Map.lookup slot chosen >>= Damage.damageRecipient gs, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Quantity.evaluate viewOf context gs source quantity of
-        -- An unevaluable quantity is a no-op, the powerOf posture.
-        Nothing -> pure ()
-        Just n ->
-          Monad.when (n > 0) $
-            -- The applied effect IS the event (the M3a spec, section 4):
-            -- constructing this DamageEvent and funneling it is the whole
-            -- application. CR 120.3e / 120.3a live in applyDamage.
-            Damage.applyDamage [Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)]
-      _ -> pure ()
+        -- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
+        -- creature, or a planeswalker." Both arms of the ObjectRef can name
+        -- something that is not one of those, so both go through
+        -- Damage.damageRecipient and neither is trusted:
+        --
+        --   * a SLOT bound by Pawl.Engine.Event.eventBindings names a permanent
+        --     GENERICALLY -- Aether Flash's entrant under
+        --     Pawl.Engine.Binding.became, tagged from a trigger condition that
+        --     said nothing about card types -- and an entrant that is no longer
+        --     a creature (gone by resolution, CR 608.2h) drops out here rather
+        --     than becoming a damage event nothing can apply.
+        --   * a SET's members are permanents matching the Filter, which is card
+        --     text and need not mention a card type at all.
+        --
+        -- A player recipient survives it untouched: CR 115.4's "any target"
+        -- includes one and CR 120.3a is what damage to it does.
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+    case Quantity.evaluate viewOf context gs source quantity of
+      -- An unevaluable quantity is a no-op, the powerOf posture.
+      Nothing -> pure ()
+      Just n ->
+        Monad.when (n > 0) $
+          -- The applied effect IS the event (the M3a spec, section 4):
+          -- constructing these DamageEvents and funneling them is the whole
+          -- application. CR 120.3e / 120.3a live in applyDamage.
+          --
+          -- ONE batch, not one call per recipient: CR 608.2f's "each such action
+          -- is processed simultaneously" is what Corrosive Gale's "each creature
+          -- with flying" needs, and applyDamage is the funnel that keeps it (its
+          -- haddock carries the CR 615/616 reading of a batch).
+          Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)) recipients)
   Effect.ModifyTarget duration modification ref ->
     State.modify' $ \gs ->
       -- The affected objects are enumerated ONCE, here, by the same sweep every

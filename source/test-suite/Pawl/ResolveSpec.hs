@@ -591,7 +591,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (Resolve.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (Resolve.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
-    Spec.assertEqWith s "damage produces no mana" (Resolve.manaProduced (Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1))) Nothing
+    Spec.assertEqWith s "damage produces no mana" (Resolve.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
   Spec.it s "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
     -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
     -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
@@ -987,7 +987,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.staticAbilities = [],
               Card.Type.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                   (ModeSelection.ChooseExactly 1),
               Card.Type.activatedAbilities = [],
               Card.Type.replacementEffects = [],
@@ -1050,7 +1050,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.staticAbilities = [],
               Card.Type.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                   (ModeSelection.ChooseExactly 1),
               Card.Type.activatedAbilities = [],
               Card.Type.replacementEffects = [],
@@ -3660,10 +3660,81 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
     Spec.assertBool s (S.onBattlefield groundId after) "the creature without flying was never a candidate"
     Spec.assertEqWith s "and the flier is in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
 
+-- Announces X=2 and takes the identity fallback everywhere else -- which answers
+-- CR 601.2b's Phyrexian question with the FIRST offer, the mana route, so the
+-- {G/P} is paid with a Forest rather than with life.
+answerXTwo :: Prompt.Prompt r -> r
+answerXTwo p = case p of
+  Prompt.ChooseX {} -> 2
+  _ -> S.identityAnswer p
+
+-- The damage marked on a permanent (CR 120.3e), or Nothing if it is gone.
+markedOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
+markedOn oid gs = fmap Object.damage (Game.lookupObject oid gs)
+
+-- Corrosive Gale ({X}{G/P} Sorcery, "Corrosive Gale deals X damage to each
+-- creature with flying") -- the pool's first Effect.DealDamage over a SET rather
+-- than a slot, and the first producer of ObjectRef.EachMatching at all whose
+-- filter names a keyword.
+--
+-- One board throughout: bob's Bird Maiden (1/2, prints flying), alice's
+-- Narcomoeba (1/1, prints flying) and bob's Goblin Piker (2/1, prints none),
+-- beside three of alice's Forests. The fliers are split between the two players
+-- on purpose: "each creature with flying" is not "each creature your opponents
+-- control", and alice burning her own Narcomoeba is what says so. The Piker is
+-- the other half of the claim: CR 109.2 hands an EachMatching the WHOLE
+-- battlefield, so a filter missing its HasKeyword half would burn it too.
+--
+-- The Forests are not a third control and could not be: CR 120.1a takes a land
+-- out of the batch at Damage.damageRecipient whatever the filter said. The
+-- HasCardType half of the filter is pinned by CardsSpec instead.
+corrosiveGaleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
+  Spec.it s "CR 109.2 Corrosive Gale deals X to each creature with flying, and none to the one without" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    narcomoeba <- S.printingOf s registry "Narcomoeba"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (maidenId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 3)
+        (moebaId, g2) = S.addCreature narcomoeba S.alice g1
+        (pikerId, g3) = S.addCreature piker S.bob g2
+        (gs, spellId) = S.handOne gale g3
+        cast = snd (Engine.runGamePure answerXTwo gs (Cast.castSpell S.alice spellId))
+        resolved = snd (Engine.runGamePure answerXTwo cast Stack.resolveTop)
+        after = S.settleSba resolved
+    Spec.assertEqWith s "three Forests paid {2}{G}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "CR 120.3e: 2 marked on the Bird Maiden" (markedOn maidenId resolved) (Just 2)
+    Spec.assertEqWith s "CR 120.3e: 2 marked on the Narcomoeba, an opponent's flier is no different" (markedOn moebaId resolved) (Just 2)
+    Spec.assertEqWith s "and nothing at all on the Goblin Piker" (markedOn pikerId resolved) (Just 0)
+    Spec.assertBool s (not (S.onBattlefield maidenId after)) "CR 704.5g buried the 1/2"
+    Spec.assertBool s (not (S.onBattlefield moebaId after)) "and the 1/1"
+    Spec.assertBool s (S.onBattlefield pikerId after) "the creature without flying was never in the set"
+  -- CR 613.1f: layer 6 is where abilities are removed, so the sweep reads the
+  -- PROJECTION and not the printed card. Humility ("all creatures lose all
+  -- abilities and have base power and toughness 1/1") takes the flying off the
+  -- Bird Maiden that prints it, and the set the Gale sweeps goes empty -- the
+  -- cast and the payment being unaffected is what separates "found nobody" from
+  -- "never happened".
+  Spec.it s "CR 613.1f Humility strips the printed flying, and the Gale finds nobody" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    humility <- S.printingOf s registry "Humility"
+    let (maidenId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 3)
+        (gs, spellId) = S.handOne gale (S.withHumility humility g1)
+        cast = snd (Engine.runGamePure answerXTwo gs (Cast.castSpell S.alice spellId))
+        after = S.settleSba (snd (Engine.runGamePure answerXTwo cast Stack.resolveTop))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying maidenId after)) "Humility took the flying"
+    Spec.assertEqWith s "three Forests paid {2}{G} all the same" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "no damage marked on the grounded Bird Maiden" (markedOn maidenId after) (Just 0)
+    Spec.assertBool s (S.onBattlefield maidenId after) "so it survives"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
   plummetSpec s registry
+  corrosiveGaleSpec s registry
   resolveSpec s registry
   fizzleSpec s registry
   indestructibleSpec s registry

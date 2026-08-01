@@ -578,9 +578,23 @@ answerAboveBound p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
--- How many Blazes sit in alice's hand (the reject-not-repair no-op check).
-blazeInHand :: GameState.GameState -> Int
-blazeInHand gs = length (filter (nameOnStack (Text.pack "Blaze") gs) (Game.zoneMembers Zone.Hand S.alice gs))
+-- answerAtBound and answerAboveBound in one, COUNTING the CR 601.2c target
+-- questions the cast asks: `offset` 0 announces the bound and 1 announces one
+-- past it. The count is the only way a test can see a step the cast did NOT
+-- take, since a cast reversed at CR 601.2h leaves a board identical to one
+-- reversed earlier.
+answerAtBoundOffsetCounting :: Natural -> Prompt.Prompt r -> State.State Int r
+answerAtBoundOffsetCounting offset p = case p of
+  Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
+  Prompt.ChooseTargets _ _ _ sets -> do
+    State.modify' (+ 1)
+    pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+  _ -> pure (S.identityAnswer p)
+
+-- How many cards of this name sit in alice's hand (the reject-not-repair no-op
+-- check: a cast that reverses leaves the card exactly where it was).
+inHandNamed :: String -> GameState.GameState -> Int
+inHandNamed name gs = length (filter (nameOnStack (Text.pack name) gs) (Game.zoneMembers Zone.Hand S.alice gs))
 
 blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
@@ -602,13 +616,13 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
         after = snd (Engine.runGamePure answerX0 gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop))
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "one Mountain paid {R}" (S.tappedCount S.alice after) 1
-    Spec.assertEqWith s "Blaze resolved out of hand" (blazeInHand after) 0
+    Spec.assertEqWith s "Blaze resolved out of hand" (inHandNamed "Blaze" after) 0
   Spec.it s "Blaze at an unaffordable X is a no-op (reject-not-repair)" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 1)
         after = snd (Engine.runGamePure answerX3 gs0 (Cast.castSpell S.alice oid))
-    Spec.assertEqWith s "still in hand" (blazeInHand after) 1
+    Spec.assertEqWith s "still in hand" (inHandNamed "Blaze" after) 1
     Spec.assertEqWith s "no mana spent" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
   -- The bound is what the BOARD can pay, so it moves with the board: {X}{R}
@@ -635,7 +649,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
         after = snd (State.evalState (Engine.runGame answerAtBound gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop)) [])
     Spec.assertEqWith s "Bob at 17, so the bound of 3 was announced and paid" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "all four Mountains paid {3}{R}" (S.tappedCount S.alice after) 4
-    Spec.assertEqWith s "Blaze resolved out of hand" (blazeInHand after) 0
+    Spec.assertEqWith s "Blaze resolved out of hand" (inHandNamed "Blaze" after) 0
   -- The assertion that keeps the bound honest. It is ADVISORY: CR 601.2b lets
   -- the player announce the value of the variable freely, so one more than the
   -- bound is announced, is unaffordable, and reverses the whole casting (CR
@@ -646,9 +660,28 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
         after = snd (Engine.runGamePure answerAboveBound gs0 (Cast.castSpell S.alice oid))
-    Spec.assertEqWith s "still in hand" (blazeInHand after) 1
+    Spec.assertEqWith s "still in hand" (inHandNamed "Blaze" after) 1
     Spec.assertEqWith s "no mana spent" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
+  -- WHERE the reversal happens, which the no-op above cannot see. CR 601.2 puts
+  -- the reversal at the step the player "is unable to comply with", and the
+  -- announced value of X is the first step that can be one -- every candidate
+  -- cost was measured at CR 601.2b's X=0 floor, since that is the only value
+  -- castability can know before the announcement exists. So the cast ends there,
+  -- and CR 601.2c's target question is never put to a player whose spell is
+  -- already lost.
+  --
+  -- That is the posture castability itself takes -- pawl refuses to propose a
+  -- cast it cannot pay rather than proposing and reversing at CR 601.2h -- and
+  -- carrying it through to the announced X is what leaves Mana.announcePhyrexian
+  -- with no cost it has no offer for (#417).
+  Spec.it s "CR 601.2 an unaffordable X ends the cast before CR 601.2c's targets are asked for" $ do
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
+    let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
+        asked offset = State.execState (Engine.runGame (answerAtBoundOffsetCounting offset) gs0 (Cast.castSpell S.alice oid)) 0
+    Spec.assertEqWith s "at the bound the cast goes on and asks for its target" (asked 0) 1
+    Spec.assertEqWith s "one above it, there is nothing left to target for" (asked 1) 0
   -- The bound is measured at CR 601.2f's TOTAL, not on the printed cost:
   -- Thalia's "noncreature spells cost {1} more" (EachPlayer-scoped, so her own
   -- controller pays it too) eats one of the four Mountains, and the board that
@@ -664,6 +697,61 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     Spec.assertEqWith s "the taxed bound is 2" bounds [2]
     Spec.assertEqWith s "Bob at 18" (S.lifeOf S.bob after) (Just 18)
     Spec.assertEqWith s "four Mountains paid {2}{R} plus Thalia's {1}" (S.tappedCount S.alice after) 4
+
+-- Corrosive Gale ({X}{G/P} Sorcery, "Corrosive Gale deals X damage to each
+-- creature with flying"), the only card in the pool -- and one of only two ever
+-- printed, the other being Postmortem Lunge -- carrying CR 107.3's {X} beside
+-- CR 107.4f's Phyrexian symbol. That pairing is what makes CR 601.2b's two
+-- announcements measure the same cost or visibly disagree, and #417 was the
+-- disagreement: castability was gated at X=0 while the Phyrexian announcement
+-- ran on the value the player named.
+--
+-- THE ARITHMETIC, stated once because every board below is Forests and nothing
+-- else. At the announced X the total is {X}{G/P}, and CR 601.2b's two nonhybrid
+-- equivalents of that are X+1 mana (paying the {G}) or X mana plus 2 life. Off n
+-- untapped Forests at 20 life the mana route therefore admits X <= n-1 and the
+-- life route X <= n, so the greatest payable X is n. A bound that counted only
+-- mana -- the obvious wrong implementation -- would answer n-1 on every one of
+-- them.
+corrosiveGaleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
+  Spec.it s "CR 601.2b the ChooseX bound counts CR 107.4f's 2-life route" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    let boundsOff n =
+          let (gs0, oid) = S.handOne gale (S.landsInPlay forest n)
+           in State.execState (Engine.runGame answerAtBound gs0 (Cast.castSpell S.alice oid)) []
+    Spec.assertEqWith s "three Forests bound X at 3, not the 2 the mana alone buys" (boundsOff 3) [3]
+    Spec.assertEqWith s "two Forests bound X at 2, not 1" (boundsOff 2) [2]
+  -- The bound is PAYABLE and not merely reported, and at the bound the life route
+  -- is the ONLY one left -- CR 601.2b's announcement has exactly one offer, so
+  -- there is no prompt and no choice to make. Alice paying 2 life is what proves
+  -- the bound was not an off-by-one dressed up as a life route.
+  Spec.it s "CR 107.4f announcing X at the bound pays 2 life, the only route left" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    let (gs0, oid) = S.handOne gale (S.landsInPlay forest 3)
+        after = snd (State.evalState (Engine.runGame answerAtBound gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop)) [])
+    Spec.assertEqWith s "all three Forests paid the {3}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "and CR 119.4 took the 2 life for the {G/P}" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "Corrosive Gale resolved out of hand" (inHandNamed "Corrosive Gale" after) 0
+  -- The CR 118.13a half of #417. One above the bound leaves NEITHER of CR
+  -- 601.2b's two resolutions payable, so there is nothing to announce and the
+  -- whole casting reverses (CR 601.2). Announcing it is legal all the same --
+  -- CR 601.2b lets the player announce the value of the variable, and the bound
+  -- is information rather than a clamp.
+  --
+  -- The life assertion is the one that carries the CR 118.13a claim: an engine
+  -- that answered the unpayable announcement for the player would have committed
+  -- one of the two routes, and the reversal has to give it back.
+  Spec.it s "CR 118.13a X one above the bound announces nothing and reverses the cast" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    let (gs0, oid) = S.handOne gale (S.landsInPlay forest 3)
+        after = snd (Engine.runGamePure answerAboveBound gs0 (Cast.castSpell S.alice oid))
+    Spec.assertEqWith s "still in hand" (inHandNamed "Corrosive Gale" after) 1
+    Spec.assertEqWith s "no Forest tapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "and no life paid for the {G/P}" (S.lifeOf S.alice after) (Just 20)
 
 -- CR 700.2a: an illegal mode can't be chosen, so a modal spell is castable when
 -- at least `count` of its modes are fillable -- not when every mode's slots are.
@@ -1262,6 +1350,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   sicknessSpec s registry
   magicalHackSpec s registry
   blazeSpec s registry
+  corrosiveGaleSpec s registry
   modalCastSpec s registry
   entwineSpec s registry
   auraTargetSpec s registry

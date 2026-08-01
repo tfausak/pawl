@@ -720,9 +720,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Variable, red]))
     Spec.assertBool s (not (Card.isInstant card)) "sorcery, not instant"
     Spec.assertEqWith s "one AnyTarget slot" (Card.allTargetSpecs card) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
-    Spec.assertEqWith s "effect deals X" (Card.allEffects card) [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X]
+    Spec.assertEqWith s "effect deals X" (Card.allEffects card) [Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Quantity.Type.X]
   Spec.it s "the lint itself catches a dangling reference" $
-    let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
+    let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))]
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
   Spec.it s "every printing that reads X declares {X}, and vice versa" $ do
     ps <- S.allPrintings s
@@ -1312,7 +1312,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Flame Javelin")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [twoOrRed, twoOrRed, twoOrRed])
     Spec.assertBool s (Card.isInstant c) "an instant"
-    Spec.assertEqWith s "effect deals four" (Card.allEffects c) [Effect.DealDamage target (Quantity.Type.Literal 4)]
+    Spec.assertEqWith s "effect deals four" (Card.allEffects c) [Effect.DealDamage (ObjectRef.InSlot target) (Quantity.Type.Literal 4)]
     Spec.assertEqWith s "one AnyTarget slot" (Card.allTargetSpecs c) (Map.singleton target (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
   -- CR 202.3f again, whose own worked example is this card's cost: "The mana
   -- value of a card with mana cost {2/B}{2/B}{2/B} is 6." The generic half is
