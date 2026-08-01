@@ -247,6 +247,31 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "CR 113.6g: this spell can't be countered" (CardT.counterability c) Counterability.CantBeCountered
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file with hexproof (CR 702.11), the second rule-702 TARGETING
+  -- restriction after the Mongoose's shroud above and the one that reads WHO is
+  -- targeting. Its entire printed rules text is the keyword, so a hexproof case
+  -- in Pawl.TargetSpec that uses this printing is asking about 702.11b and
+  -- nothing else -- unlike the Mongoose, which also carries CR 113.6g.
+  --
+  -- Its whole cost is one hybrid symbol (CR 107.4e), which is why the mana cost
+  -- is asserted here rather than taken for granted: the Bogle is a legal Doom
+  -- Blade target in Pawl.TargetSpec only because that symbol makes it green and
+  -- blue rather than black (CR 107.4e's "a hybrid mana symbol is all of its
+  -- component colors", CR 202.2).
+  Spec.it s "slippery-bogle.json loads as a {G/U} 1/1 Beast whose only keyword is hexproof" $ do
+    c <- S.cardOf s registry "Slippery Bogle"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Slippery Bogle")
+    Spec.assertEqWith
+      s
+      "{G/U}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Hybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 1)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 1)))
+    Spec.assertEqWith s "Creature -- Beast" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Beast)
+    Spec.assertEqWith s "one keyword: hexproof" (CardT.keywords c) (Set.singleton Keyword.Hexproof)
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
   -- The first card file whose keyword carries a payload that is not a
   -- number: rule 702.34a's flashback COST, which is where the whole ability
   -- lives -- Firebolt prints no alternativeCosts and no castingPermissions of

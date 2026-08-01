@@ -1,10 +1,14 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers Pawl.Engine.Target: CR 115 target legality, and the rule-702 TARGETING
--- RESTRICTIONS that narrow it. Shroud (CR 702.18) is the pool's first, and
--- Blurred Mongoose is the card that prints it. One case covers the other side of
--- that split -- Pawl.Engine.Sba's CR 303.4c re-check, which asks what an enchant
--- spec ADMITS and must not ask a targeting question -- and the last seven cover
+-- RESTRICTIONS that narrow it. Shroud (CR 702.18) is the pool's first, printed
+-- by Blurred Mongoose, and hexproof (CR 702.11) is the second, printed by
+-- Slippery Bogle. Their cases sit together because the pair is only interesting
+-- together: the two rules differ in exactly one thing, whether the restriction
+-- reads WHO is targeting. One case covers the other side of the
+-- restriction/admission split -- Pawl.Engine.Sba's CR 303.4c re-check, which
+-- asks what an enchant spec ADMITS and must not ask a targeting question -- and
+-- the last seven cover
 -- CR 115.2's two escape hatches from "only permanents are legal targets": its
 -- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead and Withered
 -- Wretch. (Those letters are prose inside rule 115.2, not subrule numbers; there
@@ -60,16 +64,17 @@ soleTargetSpec modal = case Map.elems (Modal.allTargetSpecs modal) of
   [only] -> Just only
   _ -> Nothing
 
--- `pid` controls a Blurred Mongoose and a Goblin Piker, and nothing else. The
--- Piker is the CONTROL in every shroud case below: it is a legal target of
--- everything the Mongoose is not, so "the Mongoose is excluded" cannot pass
--- because the whole legal set is empty.
-shroudBoard :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-shroudBoard mongoose piker pid =
+-- `pid` controls the restricted creature -- a Blurred Mongoose or a Slippery
+-- Bogle -- and a Goblin Piker, and nothing else. The Piker is the CONTROL in
+-- every rule-702 case below: it is a legal target of everything the restricted
+-- creature is not, so "the restricted creature is excluded" cannot pass because
+-- the whole legal set is empty.
+restrictionBoard :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+restrictionBoard restricted piker pid =
   let gs0 = Setup.emptyGame S.bothPlayers
-      (mongooseId, gs1) = S.addCreature mongoose pid gs0
+      (restrictedId, gs1) = S.addCreature restricted pid gs0
       (pikerId, gs2) = S.addCreature piker pid gs1
-   in (mongooseId, pikerId, gs2)
+   in (restrictedId, pikerId, gs2)
 
 -- Aims every target slot at one chosen card, tagged the way
 -- Pool.CardsInGraveyard tags its candidates (Recipient.ToObject -- the
@@ -91,7 +96,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     mongoose <- S.printingOf s registry "Blurred Mongoose"
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (mongooseId, pikerId, gs) = shroudBoard mongoose piker S.bob
+    let (mongooseId, pikerId, gs) = restrictionBoard mongoose piker S.bob
     case S.spellTargetSpec doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
       Just theSpec -> do
@@ -108,7 +113,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     mongoose <- S.printingOf s registry "Blurred Mongoose"
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (mongooseId, pikerId, gs) = shroudBoard mongoose piker S.alice
+    let (mongooseId, pikerId, gs) = restrictionBoard mongoose piker S.alice
     case S.spellTargetSpec doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
       Just theSpec -> do
@@ -124,7 +129,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     mongoose <- S.printingOf s registry "Blurred Mongoose"
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (mongooseId, pikerId, gs) = shroudBoard mongoose piker S.alice
+    let (mongooseId, pikerId, gs) = restrictionBoard mongoose piker S.alice
     case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Card.Type.activatedAbilities (Printing.card sorcerer)) of
       [theSpec] -> do
         let legal = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
@@ -144,7 +149,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     humility <- S.printingOf s registry "Humility"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (mongooseId, _, board) = shroudBoard mongoose piker S.bob
+    let (mongooseId, _, board) = restrictionBoard mongoose piker S.bob
         humbled = S.withHumility humility board
     case S.spellTargetSpec doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
@@ -253,6 +258,151 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         shrouded = S.withEffect pikerId (Modification.GainKeyword Keyword.Shroud) attached
     Spec.assertBool s (Set.member auraId (GameState.battlefield (S.settleSba attached))) "the Aura stays put with no shroud around"
     Spec.assertBool s (Set.member auraId (GameState.battlefield (S.settleSba shrouded))) "and stays put once its host has shroud"
+
+  -- CR 702.11b: "'Hexproof' on a permanent means 'This permanent can't be the
+  -- target of spells or abilities your opponents control.'" Slippery Bogle's
+  -- entire printed rules text is the keyword, so a case that uses this printing
+  -- is asking about 702.11b and nothing else.
+  --
+  -- BOTH HALVES ON ONE BOARD, with one spec and one Doom Blade, because the
+  -- controller axis IS the rule: an implementation that reused shroud's gate
+  -- passes the opponent half and fails the controller half, and one that
+  -- inverted the comparison does the reverse. Neither can pass this case.
+  --
+  -- Doom Blade is "target nonblack creature" and the Bogle is green and blue
+  -- (CR 202.2: "an object is the color or colors of the mana symbols in its mana
+  -- cost"; CR 107.4e: "a hybrid mana symbol is all of its component colors"), so
+  -- the Filter admits it and only the restriction can remove it.
+  Spec.it s "CR 702.11b an opponent's Doom Blade cannot target Slippery Bogle, but its own controller's can" $ do
+    bogle <- S.printingOf s registry "Slippery Bogle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (bogleId, pikerId, gs) = restrictionBoard bogle piker S.alice
+    case S.spellTargetSpec doomBlade of
+      Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
+      Just theSpec -> do
+        let mine = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+            theirs = Target.legalRecipients (Just S.bob) S.noSource theSpec gs
+        Spec.assertBool s (Set.member (Recipient.ToCreature bogleId) mine) "alice may target her own Bogle"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature bogleId) theirs)) "bob may not, and that is the whole of CR 702.11b"
+        Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) mine) "the Piker beside it is a legal target for alice"
+        Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) theirs) "and for bob"
+
+  -- CR 702.11b says "spells or ABILITIES your opponents control", so the axis is
+  -- read for an ability too, and off the ability's own controller: CR 113.8 fixes
+  -- that as "the player who activated it", which is the perspective passed here.
+  -- Prodigal Sorcerer's "{T}: This creature deals 1 damage to any target" is the
+  -- ability, and the same legality call serves it.
+  Spec.it s "CR 702.11b the controller axis holds for an ability, not only a spell" $ do
+    bogle <- S.printingOf s registry "Slippery Bogle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (bogleId, pikerId, gs) = restrictionBoard bogle piker S.alice
+    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Card.Type.activatedAbilities (Printing.card sorcerer)) of
+      [theSpec] -> do
+        let mine = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+            theirs = Target.legalRecipients (Just S.bob) S.noSource theSpec gs
+        Spec.assertBool s (Set.member (Recipient.ToCreature bogleId) mine) "alice's own ability may point at her Bogle"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature bogleId) theirs)) "bob's may not"
+        Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) theirs) "though bob's may point at the Piker"
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) theirs) "and at a player (CR 115.4)"
+      _ -> Spec.assertFailure s "Prodigal Sorcerer should print one ability with one target slot"
+
+  -- The whole card, cast and resolved through the stack rather than asked as a
+  -- set membership: alice's own Doom Blade destroys her own Slippery Bogle. The
+  -- Bogle is the only creature on the battlefield, so CR 601.2c's choice is
+  -- forced -- were 702.11b read as 702.18a's shroud, the spell would have no
+  -- legal target at all and the Bogle would live.
+  Spec.it s "CR 702.11b whole card: alice's Doom Blade destroys her own Slippery Bogle" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    bogle <- S.printingOf s registry "Slippery Bogle"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let base = S.landsInPlay swamp 2 -- {1}{B}
+        (_, board) = S.addCreature bogle S.alice base
+        (gs, dbId) = S.handOne doomBlade board
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId))
+        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        -- By NAME, not by id: CR 400.7 makes the graveyard incarnation a new
+        -- object, and Event.changeZone mints it a fresh ObjectId.
+        buried = Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid after)) (Game.zoneMembers Zone.Graveyard S.alice after)
+    Spec.assertEqWith s "Doom Blade went on the stack" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "alice's own creature is gone" (S.creaturesInPlay S.alice after) 0
+    Spec.assertBool s (elem (Text.pack "Slippery Bogle") buried) "the Bogle itself is in alice's graveyard"
+
+  -- CR 115.10a: "Just because an object or player is being affected by a spell
+  -- or ability doesn't make that object or player a target of that spell or
+  -- ability." Day of Judgment names no target at all, so hexproof has nothing to
+  -- say about it -- even though alice, who casts it, is exactly the opponent
+  -- rule 702.11b names. The classic way to get this rule wrong is to make the
+  -- restriction a property of being AFFECTED.
+  Spec.it s "CR 115.10a Day of Judgment still destroys Slippery Bogle: hexproof restricts targeting, not effects" $ do
+    plains <- S.printingOf s registry "Plains"
+    bogle <- S.printingOf s registry "Slippery Bogle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    dayOfJudgment <- S.printingOf s registry "Day of Judgment"
+    let base = S.landsInPlay plains 4 -- {2}{W}{W}
+        (_, b1) = S.addCreature bogle S.bob base
+        (_, b2) = S.addCreature piker S.bob b1
+        (gs, dojId) = S.handOne dayOfJudgment b2
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dojId))
+        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        buried = Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid after)) (Game.zoneMembers Zone.Graveyard S.bob after)
+    Spec.assertEqWith s "both of bob's creatures are gone" (S.creaturesInPlay S.bob after) 0
+    Spec.assertBool s (elem (Text.pack "Slippery Bogle") buried) "the Bogle itself is in bob's graveyard"
+    Spec.assertBool s (elem (Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
+
+  -- Hexproof is read off the PROJECTION and not off the printed card, so it
+  -- lives in the CR 613 layer system like every other keyword. Humility is "All
+  -- creatures lose all abilities and have base power and toughness 1/1" (CR
+  -- 613.1f, layer 6), and rule 702.11a's static ability is one of the abilities
+  -- it takes: a Humility'd Bogle is an ordinary 1/1 and an opponent's Doom Blade
+  -- may target it.
+  Spec.it s "CR 613.1f Humility takes hexproof away, and the Bogle becomes targetable by its opponent" $ do
+    bogle <- S.printingOf s registry "Slippery Bogle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humility <- S.printingOf s registry "Humility"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (bogleId, _, board) = restrictionBoard bogle piker S.bob
+        humbled = S.withHumility humility board
+    case S.spellTargetSpec doomBlade of
+      Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
+      Just theSpec -> do
+        Spec.assertBool
+          s
+          (not (Set.member (Recipient.ToCreature bogleId) (Target.legalRecipients (Just S.alice) S.noSource theSpec board)))
+          "before Humility alice cannot target bob's Bogle"
+        Spec.assertBool
+          s
+          (Set.member (Recipient.ToCreature bogleId) (Target.legalRecipients (Just S.alice) S.noSource theSpec humbled))
+          "under Humility it is a legal target"
+
+  -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
+  -- targets are still legal. ... If all its targets, for every instance of the
+  -- word 'target,' are now illegal, the spell or ability doesn't resolve." The
+  -- second of CR 115's two moments, and the controller axis has to be read at
+  -- both: a Goblin Piker that gains hexproof in response is out of an OPPONENT's
+  -- Doom Blade and still squarely in its own controller's.
+  --
+  -- Four resolutions off two boards that differ only in who controls the Piker,
+  -- so neither answer can be a Doom Blade that never worked. No card in this pool
+  -- GRANTS hexproof, so the grant is a stored layer-6 continuous effect
+  -- (S.withEffect), as the shroud case above does it.
+  Spec.it s "CR 608.2b gaining hexproof in response fizzles an opponent's Doom Blade but not its controller's" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let castAt controller =
+          let (pikerId, board) = S.addCreature piker controller (S.landsInPlay swamp 2)
+              (gs, dbId) = S.handOne doomBlade board
+           in (pikerId, snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId)))
+        resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
+        (theirPiker, atTheirs) = castAt S.bob
+        (myPiker, atMine) = castAt S.alice
+        hexproofed oid = S.withEffect oid (Modification.GainKeyword Keyword.Hexproof)
+    Spec.assertEqWith s "untouched, bob's Piker dies" (S.creaturesInPlay S.bob (resolve atTheirs)) 0
+    Spec.assertEqWith s "hexproofed in response, it survives alice's Doom Blade" (S.creaturesInPlay S.bob (resolve (hexproofed theirPiker atTheirs))) 1
+    Spec.assertEqWith s "untouched, alice's own Piker dies" (S.creaturesInPlay S.alice (resolve atMine)) 0
+    Spec.assertEqWith s "and hexproof does not save it from its own controller (CR 702.11b)" (S.creaturesInPlay S.alice (resolve (hexproofed myPiker atMine))) 0
 
   -- CR 113.9, the whole rule, as two DISJOINT pools: "activated and triggered
   -- abilities on the stack aren't spells, and therefore can't be countered by
