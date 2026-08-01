@@ -859,12 +859,12 @@ announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
           -- gate and this offer measure payability through the same totalling, so
           -- no completion payable here can be one the gate refused, and none it
           -- admitted can be missing here. {X} used to be the one wedge in that --
-          -- Cast.payableCost gates at X=0 while this runs on the value the player
-          -- named, so a large X on a {X}{G/P} (Corrosive Gale) could empty the
-          -- offers -- and Cast.castSpell closes it by re-asking payableCost at the
-          -- announced value before calling Cost.announce at all (#417). Activate
-          -- has no such wedge because it never substitutes an X -- which is a gap
-          -- of its own rather than a property to rely on (#544).
+          -- a gate at X=0 while this runs on the value the player named, so a
+          -- large X on a {X}{G/P} (Corrosive Gale) could empty the offers -- and
+          -- BOTH callers now close it the same way, by re-asking their own
+          -- payability predicate at the announced value before calling
+          -- Cost.announce at all: Cast.castSpell (#417) and Activate.activateAbility
+          -- (#544, Cinder Elemental's "{X}{R}, {T}, Sacrifice this creature").
           [] -> pure PhyrexianPayment.PaysMana
           [only] -> pure only
           first : others -> do

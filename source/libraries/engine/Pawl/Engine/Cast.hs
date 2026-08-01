@@ -118,6 +118,12 @@ payableCostAt x pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.
 -- Advisory, and nothing here clamps: see Prompt.ChooseX for why announcing past
 -- this is legal (CR 601.2b) and what it costs the player (CR 601.2, #56).
 --
+-- The SEARCH is Cost.greatestPayableX, shared with Activate.affordableX so that a
+-- spell and an activation cannot climb differently; what is not shared is the
+-- predicate, since an activation cost skips CR 601.2f's totalling (#90). This
+-- haddock is what discharges that search's monotonicity requirement for the
+-- spell's predicate.
+--
 -- FOUND BY ASCENDING SEARCH from 0, which is only sound because payability is
 -- MONOTONE in X -- unpayable at n means unpayable at every value above n. It is,
 -- and for reasons that hold structurally rather than by inspection of the pool:
@@ -148,19 +154,12 @@ payableCostAt x pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.
 -- are finite, so the generic comparison in (3) fails at some X no greater than
 -- the mana available plus whatever the reductions forgive.
 --
--- The one cost that would climb forever is one whose payability X cannot affect at
--- all -- a cost with no {X} in it -- so that one answers 0 without climbing. That
--- is a totality guard rather than a rule: such a cost has no X to name, so there
--- is no greatest value of it to report, and castSpell never asks (the prompt is
--- gated on the same Cost.hasVariable).
---
--- Answers 0 for a cost unpayable even at X=0 too, where no value of X is
--- affordable and 0 is the least misleading number to report. Unreachable from
--- castSpell, which asks only about a candidate that already passed payableCost.
+-- The two degenerate costs -- one with no {X} in it, which would climb forever,
+-- and one unpayable even at X=0 -- both answer 0, and Cost.greatestPayableX says
+-- why. Neither is reachable from castSpell, which asks only about a candidate
+-- that already passed payableCost and only when Cost.hasVariable holds.
 affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX pid oid gs cost =
-  let climb x = if payableCostAt (x + 1) pid oid gs cost then climb (x + 1) else x
-   in if Cost.hasVariable cost then climb 0 else 0
+affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid oid gs cost) cost
 
 -- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
 -- this modal spell's modes -- "You may choose all modes of this spell instead of

@@ -941,6 +941,13 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
 -- permanent would find nothing to capture. The stack object outlives its own
 -- effect list by construction (CR 608.2n removes it afterwards), so it is the
 -- one holder that is always there to write to.
+--
+-- It is where CR 601.2b's announced X is READ from for the same reason, which is
+-- why every Quantity below goes through Quantity.evaluateFor with both ids rather
+-- than through Quantity.evaluate with `source` alone: Cinder Elemental's "{X}{R},
+-- {T}, Sacrifice this creature: It deals X damage to any target" sacrifices the
+-- source to pay, so the announced value survives only on the ability object
+-- (#544).
 applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame resolving source controller bound legality chosen effect = case effect of
   Effect.DealDamage ref quantity -> do
@@ -964,7 +971,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         -- A player recipient survives it untouched: CR 115.4's "any target"
         -- includes one and CR 120.3a is what damage to it does.
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       -- An unevaluable quantity is a no-op, the powerOf posture.
       Nothing -> pure ()
       Just n ->
@@ -1298,7 +1305,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         -- so Event.drawCard would record them in GameState.drewFromEmpty,
         -- writing engine state for someone who is not in the game.
         drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             -- CR 121.2: draw n one at a time, folding the shared primitive so each
@@ -1313,7 +1320,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluate viewOf context gs source quantity of
+        case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 ->
                 -- CR 701.17/701.17b: top min(n, library) of the target's library to
@@ -1329,7 +1336,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluate viewOf context gs source quantity of
+        case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
@@ -1385,7 +1392,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         -- state-based actions only as a player would get priority, so no life
         -- total is observable between one adjustment and the next.
         losers = playerRefPlayers chosen legality controller gs ref
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             -- CR 119.3: the life total is simply adjusted, directly on the
@@ -1417,7 +1424,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
         gainers = playerRefPlayers chosen legality controller gs ref
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             Monad.forM_ gainers $ \pid ->
@@ -1445,7 +1452,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer victim), True) ->
-        case Quantity.evaluate viewOf context gs source quantity of
+        case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 -> do
                 -- Candidates are what the VICTIM controls, ascending, so both the
@@ -1489,7 +1496,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 -> do
             -- CR 111: create n tokens with these characteristics under the
@@ -1875,7 +1882,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient takes no counters
-        Just target -> case Quantity.evaluate viewOf context gs source quantity of
+        Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
@@ -1953,7 +1960,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
         recipients = playerRefPlayers chosen legality controller gs ref
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             -- CR 122 / 107.14: each recipient gets n counters of kind, directly
