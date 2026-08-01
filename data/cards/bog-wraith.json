@@ -1,0 +1,64 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Landwalk",
+      "value": {
+        "type": "Swamp"
+      }
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Bog Wraith",
+  "power": {
+    "type": "Literal",
+    "value": 3
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Wraith"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

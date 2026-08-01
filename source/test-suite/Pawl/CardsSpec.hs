@@ -101,6 +101,25 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Serum Powder")
     Spec.assertEqWith s "the CR 103.5b action" (CardT.mulliganAction c) [Effect.ExileHandThenDraw]
     Spec.assertEqWith s "one activated ability, the {T}: Add {C} mana ability" (length (CardT.activatedAbilities c)) 1
+  -- The first card file with landwalk (CR 702.14), and the first whose
+  -- keyword payload is a SUBTYPE. What it pins is that the land type is on
+  -- the KEYWORD and not on the type line: Bog Wraith is a Wraith and prints
+  -- no Swamp anywhere, so a reader that took the land type from
+  -- TypeLine.subtypes would find nothing to walk on.
+  Spec.it s "bog-wraith.json loads as a {3}{B} 3/3 Wraith whose only keyword is swampwalk" $ do
+    c <- Registry.card registry "Bog Wraith"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Bog Wraith")
+    Spec.assertEqWith
+      s
+      "{3}{B}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Black)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 3)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 3)))
+    Spec.assertEqWith s "Creature -- Wraith" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Wraith)
+    Spec.assertEqWith s "one keyword: swampwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk Subtype.Swamp))
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
   -- The first card file whose keyword carries a payload that is not a
   -- number: rule 702.34a's flashback COST, which is where the whole ability
   -- lives -- Firebolt prints no alternativeCosts and no castingPermissions of

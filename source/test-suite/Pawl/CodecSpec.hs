@@ -251,6 +251,17 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "entwine {3}" keywordToJson jsonToKeyword (entwine 3)
       Spec.assertBool s (keywordToJson (entwine 1) /= keywordToJson (entwine 3)) "the cost is part of the encoding"
       Spec.assertBool s (keywordToJson (entwine 1) /= keywordToJson (flashbackOf 1)) "entwine {1} is not flashback {1}"
+    -- CR 702.14a's "[type]" rides the constructor, so swampwalk and
+    -- islandwalk are DIFFERENT keywords and must encode differently -- a
+    -- Bog Wraith that decoded as an islandwalker would be blockable
+    -- exactly when it should not be.
+    Spec.it s "Keyword.Landwalk carries its land type" $ do
+      roundTrip s "swampwalk" keywordToJson jsonToKeyword (Keyword.Landwalk Subtype.Swamp)
+      roundTrip s "islandwalk" keywordToJson jsonToKeyword (Keyword.Landwalk Subtype.Island)
+      Spec.assertBool
+        s
+        (keywordToJson (Keyword.Landwalk Subtype.Swamp) /= keywordToJson (Keyword.Landwalk Subtype.Island))
+        "swampwalk and islandwalk encode differently"
     Spec.it s "CastingPermission" $ do
       roundTrip s "library" castingPermissionToJson jsonToCastingPermission CastingPermission.CastFromLibraryWhileSearching
       roundTrip s "graveyard" castingPermissionToJson jsonToCastingPermission CastingPermission.CastFromGraveyard

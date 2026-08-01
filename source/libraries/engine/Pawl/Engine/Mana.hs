@@ -148,6 +148,7 @@ subtypeMana subtype = case subtype of
   -- which reaches "an object with the land card type and a basic land type" --
   -- never applies to it.
   Subtype.Jace -> Nothing
+  Subtype.Wraith -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an
