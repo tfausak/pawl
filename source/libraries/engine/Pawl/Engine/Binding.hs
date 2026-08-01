@@ -55,16 +55,18 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- SPELL modes -- and every `Sacrifice Binding.triggerSource` in this phase lives
 -- in a TRIGGERED ability, whose modes that lint never visits.
 --
--- Two lints that now exist cover an ability's OWN reads of this slot -- the
+-- Three lints that now exist cover an ability's OWN reads of this slot -- the
 -- delayed one (CardSpec.hs, "every slot a delayed ability reads is bound by its
--- card") and the triggered one ("every slot a triggered ability reads is bound
--- for its condition") -- and neither runs into the equality trap above: both add
--- Binding.triggerSource to the AVAILABLE side (the slots a Create or a
--- MoveToZone binds, plus this one, plus the condition's own event slots for the
--- triggered lint) and
--- check the read slots are a SUBSET of that, never an equality. A subset check
+-- card"), the triggered one ("every slot a triggered ability reads is bound
+-- for its condition") and the activated one ("every slot an activated ability
+-- reads is bound for its activation") -- and none runs into the equality trap
+-- above: each adds Binding.triggerSource to the AVAILABLE side (the slots a
+-- Create or a MoveToZone binds, plus this one, plus the condition's own event
+-- slots for the triggered lint and CR 601.2b's announced X for the activated
+-- one) and
+-- checks the read slots are a SUBSET of that, never an equality. A subset check
 -- has no "declared but never read" half to retire, so reserved-slot subtraction
--- is not needed in either. This warning is about a DIFFERENT, still-hypothetical
+-- is not needed in any of them. This warning is about a DIFFERENT, still-hypothetical
 -- extension: an EQUALITY-style D4 lint (declared == read, the spell-mode lint's
 -- own shape) widened to run over a triggered/activated/delayed ability's modes.
 -- That extension MUST subtract the reserved slot names (this one, variableX,
@@ -83,14 +85,18 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- of every carrier: a card's spell modes and enchant slot, AND its activated,
 -- triggered and delayed abilities' modes. It has to reach the abilities to mean
 -- anything for this slot, because "you" is stamped exclusively on TRIGGERED
--- abilities (setYou below is called only when a triggered ability is placed,
--- Pawl.Engine.Engine): a card declaring a "you" target spec there would otherwise be
+-- abilities (setYou below is called only when a triggered ability is placed --
+-- Pawl.Engine.Engine for a borne one, Pawl.Engine.Monarch for CR 725's sourceless
+-- inherent ones): a card declaring a "you" target spec there would otherwise be
 -- prompted for a target and have the answer silently clobbered by setYou's
 -- insert.
 --
--- The triggered-ability READ lint is a different check and never covered this:
--- it is a subset check, and "you" sits on its AVAILABLE side precisely because
--- every triggered ability has it bound.
+-- The two ability READ lints are different checks, and they disagree about this
+-- slot on purpose. Both are subset checks: "you" sits on the TRIGGERED lint's
+-- available side precisely because every triggered ability has it bound, and is
+-- deliberately absent from the ACTIVATED lint's, because no activation binds it
+-- -- so an activated ability reading "you" is a failing test rather than a
+-- silent no-op (#569).
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
