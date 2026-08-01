@@ -7,6 +7,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Types.Action (Action)
+import Pawl.Types.AttackTarget (AttackTarget)
 import Pawl.Types.Color (Color)
 import Pawl.Types.Concession (Concession)
 import Pawl.Types.Cost (Cost)
@@ -160,14 +161,36 @@ data Prompt r where
   -- summoning sickness, none of which the shared name can see -- the same reason
   -- ChooseManaSource refuses to treat same-card candidates as interchangeable.
   ChooseLegend :: Decider -> PlayerId -> NonEmpty ObjectId -> Prompt ObjectId
-  -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
-  -- attack. WHOM they attack is not asked here: the defending player was already
-  -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b
-  -- calls for a per-creature announcement only if that player controls a
-  -- planeswalker, protects a battle, or the game lets the active player attack
-  -- multiple other players. A defending player can control a planeswalker now
-  -- (Jace Beleren), but AttackTarget has no arm to name one (#493, #59).
+  -- CR 508.1a. The [ObjectId] is the legal attackers; the answer is which of them
+  -- attack. WHAT each one attacks is a SEPARATE question, asked once per chosen
+  -- creature by ChooseAttackTarget below, because CR 508.1b is a separate step of
+  -- the declaration and asks per creature rather than per declaration.
   DeclareAttackers :: Decider -> PlayerId -> [ObjectId] -> Prompt [ObjectId]
+  -- CR 508.1b: "If the defending player controls any planeswalkers, is the
+  -- protector of any battles, or the game allows the active player to attack
+  -- multiple other players, the active player announces which player,
+  -- planeswalker, or battle each of the chosen creatures is attacking." The
+  -- ObjectId is the one creature being announced; the NonEmpty is what it may
+  -- attack (Combat.attackTargets), the defending player first.
+  --
+  -- ONE PROMPT PER CREATURE, which is what the rule asks for and not a
+  -- convenience: Hanweir Garrison's ruling spells out the same freedom for
+  -- CR 508.4's twin -- "the tokens don't both have to attack the same one" --
+  -- so a per-declaration answer would collapse a choice the rules keep apart.
+  --
+  -- CR 508.4 reaches this prompt too, for a creature PUT onto the battlefield
+  -- attacking: same question, same candidates, same chooser (the rule says "its
+  -- controller", and the controller of a creature entering attacking is the
+  -- attacking player by CR 506.3b). One prompt and not two, because an
+  -- interpreter that could tell them apart would still answer them identically:
+  -- both name the creature and offer the same set, and neither the rules nor any
+  -- ruling distinguishes what may be attacked in the two cases.
+  --
+  -- Elided at exactly one candidate, which is CR 508.1b's own condition read
+  -- backwards: with no planeswalker, no battle and one defending player, the
+  -- rule does not call for an announcement at all, and where the rules leave
+  -- nothing to ask, don't prompt.
+  ChooseAttackTarget :: Decider -> PlayerId -> ObjectId -> NonEmpty AttackTarget -> Prompt AttackTarget
   -- CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attacker it blocks.
   DeclareBlockers :: Decider -> PlayerId -> [ObjectId] -> [ObjectId] -> Prompt (Map ObjectId ObjectId)

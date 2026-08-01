@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
@@ -351,6 +352,33 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 508.1b: what each attacking creature was announced as attacking is
+        -- a decision, so it has to survive a transcript like any other -- and
+        -- both arms of AttackTarget have to survive it, since a transcript that
+        -- collapsed them would replay an attack on a planeswalker as an attack
+        -- on its controller.
+        Spec.it s "ChooseAttackTarget round-trips through the transcript" $ do
+          let atBob = AttackTarget.OfPlayer S.bob
+              atJace = AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 9)
+              p = Prompt.ChooseAttackTarget decider S.alice oid (atBob NonEmpty.:| [atJace])
+          Spec.assertEqWith s "the planeswalker round trips" (Replay.decode p (Replay.encode p atJace)) (Just atJace)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "the defending player round trips" (Replay.decode p (Replay.encode p atBob)) (Just atBob)
+        Spec.it s "an attack-target choice does not decode as a defending-player choice" $ do
+          -- Discriminating: fails if ChooseAttackTarget reuses ChoseDefender
+          -- rather than getting its own constructor.
+          let p = Prompt.ChooseAttackTarget decider S.alice oid (AttackTarget.OfPlayer S.bob NonEmpty.:| [])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseDefender S.bob)) Nothing
+        Spec.it s "a short transcript attacks the defending player" $
+          -- CR 508.1b: the defending player heads the list and is always a legal
+          -- thing to attack -- and it is what every attack announced before
+          -- planeswalkers existed named.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseAttackTarget decider S.alice oid (AttackTarget.OfPlayer S.bob NonEmpty.:| [AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 9)])))
+            (AttackTarget.OfPlayer S.bob)
         -- CR 118.13a: which way a Phyrexian mana symbol was announced to be
         -- paid is a decision made as the spell is proposed, so it has to
         -- survive a transcript like any other.

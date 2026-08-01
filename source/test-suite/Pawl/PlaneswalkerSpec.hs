@@ -8,6 +8,10 @@
 -- CR 115.4 "any target" pool, and Pawl.Engine.Damage's CR 306.8 / CR 120.3c
 -- loyalty removal.
 --
+-- CR 306.6 -- "Planeswalkers can be attacked" -- is the one clause of rule 306
+-- covered elsewhere: it is combat's, so it lives in CombatSpec's
+-- AttackingAPlaneswalker group, on the same card.
+--
 -- Jace Beleren is the whole proof: {1}{U}{U} Legendary Planeswalker -- Jace, with
 -- printed loyalty 3 and three loyalty abilities (+2, -1, -10). Its -10 is what
 -- makes CR 606.6 observable at 3 loyalty, and three -1s across three of alice's

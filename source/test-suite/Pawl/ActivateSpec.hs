@@ -865,7 +865,7 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
     let (desertId, _, board) = desertBoard piker desert
         attacked = desertAttacked board
         later = attacked {GameState.phase = Phase.PostcombatMain}
-    Spec.assertBool s (Combat.Type.attackersJoined (GameState.combat later)) "the attack is still on the record"
+    Spec.assertBool s (not (Set.null (Combat.Type.attacked (GameState.combat later)))) "the attack is still on the record"
     Spec.assertEqWith s "still offered in the step it names" (length (activationsOf desertId (Action.legalActions S.bob (attacked {GameState.phase = Phase.Combat CombatStep.EndOfCombat})))) 1
     Spec.assertEqWith s "and not one phase later" (activationsOf desertId (Action.legalActions S.bob later)) []
 

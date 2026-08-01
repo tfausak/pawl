@@ -35,6 +35,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
@@ -42,6 +43,7 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.GameState as GameState
@@ -416,6 +418,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter S.isCreatureRecipient (Map.keys thresholds) of
@@ -1122,6 +1125,14 @@ rallyBoard piker plains rally =
         -- unreachable; a bogus id fails the assertions rather than the suite.
         [] -> (bobsRally, alicesRally, S.noSource, tapped)
 
+-- CR 508.1b: is this offered attack target a planeswalker? The predicate the
+-- Rally case picks its announcement with; CombatSpec carries the same one for
+-- the combat side of this rule.
+isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
+isPlaneswalkerTarget target = case target of
+  AttackTarget.OfPlaneswalker _ -> True
+  AttackTarget.OfPlayer _ -> False
+
 printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
   -- Both clauses satisfied: bob is the defending player (CR 506.2), attackers
@@ -1134,6 +1145,37 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (Cast.castable S.bob bobsRally attacked) "castable"
     Spec.assertBool s (elem (A.Cast bobsRally) (Action.legalActions S.bob attacked)) "and offered as a legal action"
+  -- CR 306.6 / CR 508.1b: the same board, with the attack aimed at bob's
+  -- planeswalker instead of at bob. Eightfold Maze's ruling is the reading being
+  -- pinned -- "If all the attacking creatures attack your planeswalkers, you
+  -- can't cast Eightfold Maze. To cast it, a creature needs to have attacked
+  -- _you_" -- so this is the case that says "you've been attacked" is a question
+  -- about the ATTACK TARGET and not about whether a declaration happened.
+  --
+  -- Its own control is the test above: one Piker, one step, one declaration; the
+  -- only difference is what it was announced as attacking.
+  Spec.it s "CR 601.3 not castable when the only attacker attacked bob's planeswalker instead" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (bobsRally, _, _, board) = rallyBoard piker plains rally
+        (jaceId, withJace) = S.addCreature jace S.bob board
+        loyal = S.addCounter CounterKind.Loyalty 3 jaceId withJace
+        atPlaneswalker :: Prompt.Prompt r -> r
+        atPlaneswalker p = case p of
+          Prompt.ChooseAttackTarget _ _ _ options -> case filter isPlaneswalkerTarget (NonEmpty.toList options) of
+            target : _ -> target
+            [] -> NonEmpty.head options
+          _ -> S.aggressiveAnswer p
+        attacked = S.runPure atPlaneswalker loyal (Combat.declareAttackers S.alice)
+    Spec.assertEqWith
+      s
+      "the Piker really was declared, attacking the planeswalker"
+      (Map.elems (Combat.Type.attackers (GameState.combat attacked)))
+      [AttackTarget.OfPlaneswalker jaceId]
+    Spec.assertBool s (not (Cast.castable S.bob bobsRally attacked)) "not castable"
+    Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob attacked)) "and not offered"
   -- The "only if you've been attacked this step" clause, isolated: the step is
   -- right and nobody has attacked yet.
   Spec.it s "CR 601.3 not castable in the declare attackers step before attackers are declared" $ do
@@ -1171,7 +1213,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
         (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
         attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
         later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
-    Spec.assertBool s (Combat.Type.attackersJoined (GameState.combat later)) "still attacked"
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
     Spec.assertBool s (not (Cast.castable S.bob bobsRally later)) "not castable"
     Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob later)) "and not offered"
     Spec.assertBool s (elem (A.Cast boltId) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
@@ -1245,6 +1287,7 @@ castFirstOption p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter S.isCreatureRecipient (Map.keys thresholds) of
@@ -1304,6 +1347,7 @@ castPanglacial p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter S.isCreatureRecipient (Map.keys thresholds) of

@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Types.Action (Action)
+import Pawl.Types.AttackTarget (AttackTarget)
 import Pawl.Types.Concession (Concession)
 import Pawl.Types.Cost (Cost)
 import Pawl.Types.EntwineDecision (EntwineDecision)
@@ -55,6 +56,14 @@ data Response
     -- prompts sharing a constructor cannot do that.
     ChoseLegend ObjectId
   | DeclaredAttackers [ObjectId]
+  | -- CR 508.1b / CR 508.4: what one attacking creature was announced as
+    -- attacking, serialized so a DecisionLog replays an attack on a planeswalker
+    -- deterministically. Its own constructor rather than a reuse of
+    -- ChoseDefender: decode must return Nothing for a response that does not
+    -- match the prompt being asked, and two prompts sharing a constructor cannot
+    -- do that -- and the payloads differ anyway, since a defending player is
+    -- always a player and this may name a permanent.
+    ChoseAttackTarget AttackTarget
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)
   | ChoseTargets (Map SlotName Recipient)

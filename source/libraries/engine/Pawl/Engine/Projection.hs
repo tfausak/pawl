@@ -1413,7 +1413,10 @@ data Aspect
 -- Effect.RemoveFromCombat edits the same record from Resolve.applyEffect, which
 -- is a RESOLUTION and so between projections just as squarely as a settle is. The
 -- clauses that remain unbuilt -- phasing (#154), and the ones about an attacked
--- planeswalker or battle (#493, #302) -- arrive by one of those two doors as well.
+-- battle (#302) -- arrive by one of those two doors as well. The clauses about an
+-- attacked PLANESWALKER take a third door that disturbs this even less: they are
+-- answered where the attack target is read (Combat.stillAttacked), so they never
+-- edit the record at all, and this arm's input is untouched by them.
 --
 -- What that costs is TIMING, not dependency: the rules remove the permanent the
 -- instant control or creature-ness changes, and pawl removes it at the next
