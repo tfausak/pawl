@@ -967,7 +967,9 @@ matchesTrigger gs bearer you cond event = case cond of
   -- `to` is what keeps one EXILED off the battlefield silent -- the latter has
   -- left the battlefield (CR 603.6c) without dying (CR 700.4), and the whole
   -- point of naming this condition after the word the card prints is that the
-  -- two stay apart (#384).
+  -- two stay apart. SelfLeavesTheBattlefield below is the other one, and
+  -- TriggerSpec's LeavesTheBattlefield group proves the separation from both
+  -- sides: a bounced Thragtusk fires, a bounced Doomed Traveler does not.
   --
   -- Matched on `departed`, NOT on `object`. That is CR 603.10a's look-back:
   -- "some zone-change triggers look back in time. These are
@@ -980,6 +982,38 @@ matchesTrigger gs bearer you cond event = case cond of
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+  -- CR 603.6c taken whole: "leaves-the-battlefield abilities trigger when a
+  -- permanent moves from the battlefield to another zone". The `from` half is
+  -- the same as the SelfDies arm's; the `to` half is where the two part company,
+  -- and this one asks only that the destination be ANOTHER zone. Thragtusk's.
+  --
+  -- The `to /= Battlefield` guard is that rule's own word "another", and it is
+  -- load-bearing rather than decorative: recordTokenEntry files a
+  -- battlefield-to-battlefield pseudo-move for a newly created token whose
+  -- `departed` is the token's own id, so a token bearing this condition would
+  -- fire on its own creation without it.
+  --
+  -- Matched on `departed` for the reason the SelfDies arm gives -- CR 603.10a
+  -- names leaves-the-battlefield abilities as its first look-back exception, so
+  -- the bearer offered here is the permanent as it was immediately before the
+  -- event.
+  --
+  -- CR 603.6c's other trigger event, "when a phased-in permanent leaves the game
+  -- because its owner leaves the game", is not matched (#385).
+  TriggerCondition.SelfLeavesTheBattlefield -> case event of
+    GameEvent.Moved zc _ ->
+      ZoneChange.departed zc == bearer
+        && ZoneChange.from zc == Zone.Battlefield
+        && ZoneChange.to zc /= Zone.Battlefield
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
@@ -1064,11 +1098,29 @@ eventBindings cond event = case (cond, event) of
   -- CR 400.7e's public-zone proviso is satisfied by construction here and is
   -- therefore not a branch: matchesTrigger's SelfDies arm has already required
   -- `to == Graveyard` (CR 700.4), and CR 400.2 lists the graveyard among the
-  -- public zones. A wider leaves-the-battlefield condition, whose destination
-  -- may be a hand or a library, is where the proviso becomes a real test (#384)
-  -- -- and Pawl.Engine.Activate.isHiddenZone is the classifier it would reach for.
+  -- public zones. The arm below, for the wider condition, is where it becomes a
+  -- real test.
   (TriggerCondition.SelfDies, GameEvent.Moved zc _) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- The same rule, with its proviso doing real work for the first time. CR
+  -- 603.6c's wider condition accepts ANY destination, and CR 400.2 makes two of
+  -- them hidden -- "library and hand are hidden zones, even if all the cards in
+  -- one such zone happen to be revealed" -- so CR 400.7e's "if that zone is a
+  -- public zone" is a guard here rather than a fact.
+  --
+  -- The binding is ABSENT for a hidden destination, not present-but-useless.
+  -- ZoneChange.object names a real card sitting in that hand, and stamping it
+  -- would hand the ability an object the rule forbids it to find; an effect
+  -- reading the slot would then quietly do something the rules deny. Absence is
+  -- what CardSpec's slot lint reads (via eventBindingSlots below) and what
+  -- Pawl.Engine.Resolve's own arms treat as "nothing to act on".
+  --
+  -- Classified by the ZONE, through Game.isHiddenZone, never by asking whether
+  -- the card is currently visible: CR 400.2's "even if all the cards in one such
+  -- zone happen to be revealed" is exactly that distinction.
+  (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved zc _)
+    | not (Game.isHiddenZone (ZoneChange.to zc)) ->
+        Binding.setBecame (ZoneChange.object zc) Map.empty
   -- CR 400.7e again, read in the ENTRY direction: Aether Flash's "whenever a
   -- creature enters, this enchantment deals 2 damage to IT". The object that
   -- moved is the entrant, and "the new object that it became in the zone it
@@ -1130,20 +1182,21 @@ eventBindings cond event = case (cond, event) of
 -- this from that would mean fabricating a representative GameEvent per condition
 -- inside the rules core, which is fixture work the engine has no other use for;
 -- the agreement is therefore pinned from the test side instead, by TriggerSpec's
--- "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps",
--- which runs every condition against an event that genuinely fires it and
--- compares Map.keysSet of the result against the answer here.
+-- "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for
+-- EVERY event a condition admits", which runs every condition against the events
+-- that genuinely fire it and intersects the Map.keysSet of each result against
+-- the answer here.
 --
--- Every slot named here is unconditional GIVEN A MATCH, and that is what makes
--- a per-CONDITION set sound at all: matchesTrigger's SelfDies and
+-- Every slot named here is GUARANTEED given a match, which is the only reading
+-- that makes a per-CONDITION set sound: the answer must hold for every event the
+-- condition admits, because the card lint asking it has no event in hand. For
+-- most conditions the two readings coincide -- matchesTrigger's SelfDies and
 -- PermanentEnters arms have already required the graveyard and battlefield
 -- destinations respectively (so CR 400.7e's public-zone proviso holds by
 -- construction for both, CR 400.2), and its SelfDealsCombatDamageToPlayer arm
--- has already required a player recipient (isPlayerRecipient). #384's wider
--- leaves-the-battlefield condition is where that stops being true: its
--- destination may be a hand or a library, so `became` would be bound only for a
--- PUBLIC destination and the answer would become per-condition-AND-destination,
--- which this signature cannot express.
+-- has already required a player recipient (isPlayerRecipient).
+-- SelfLeavesTheBattlefield is the one where they come apart, and the floor is
+-- what it gets; see its own arm below.
 eventBindingSlots :: TriggerCondition -> Set.Set SlotName.SlotName
 eventBindingSlots cond = case cond of
   -- CR 603.6a's two written forms differ here, and only because of which object
@@ -1184,6 +1237,12 @@ eventBindingSlots cond = case cond of
   -- CR 400.7e: the incarnation the card became, which CR 603.10a's look-back
   -- keeps out of the source slot.
   TriggerCondition.SelfDies -> Set.singleton Binding.became
+  -- The same slot, and the same rule, but bound only for a PUBLIC destination
+  -- (CR 400.7e's proviso, over CR 400.2's hidden hand and library) -- so the
+  -- guaranteed floor this function answers is empty. The consequence is that a
+  -- card whose leaves-the-battlefield payload names `became` is rejected by the
+  -- lint (#505).
+  TriggerCondition.SelfLeavesTheBattlefield -> Set.empty
   -- CR 701.6a's countering names two objects and a player, and this condition
   -- binds none of them -- eventBindings has no arm for it, and this is that
   -- answer stated in the other dimension. Baral, Chief of Compliance's payload
@@ -1343,8 +1402,9 @@ eventTriggers events gs =
       -- EVERY battlefield departure contributes, not only the deaths. Which
       -- destinations a condition accepts is the CONDITION's business --
       -- matchesTrigger's SelfDies arm asks for a graveyard, CR 700.4 -- and
-      -- keeping that out of the candidate source is what lets CR 603.6c's wider
-      -- "leaves the battlefield" (#384) arrive as a matcher arm alone.
+      -- keeping that out of the candidate source is what let CR 603.6c's wider
+      -- "leaves the battlefield" arrive as a matcher arm alone, with this
+      -- function untouched.
       --
       -- The to /= Battlefield guard is CR 603.6c's own wording, "moves from the
       -- battlefield to ANOTHER zone": the battlefield-to-battlefield pseudo-move
@@ -1583,6 +1643,13 @@ functionsInGraveyard cond = case cond of
   -- NOT, or the ability would be read off the graveyard card's printed text and
   -- credited to its owner instead of its last controller.
   TriggerCondition.SelfDies -> False
+  -- The same answer as SelfDies just above, and for the same CR 603.10a reason:
+  -- a leaves-the-battlefield ability triggers from the battlefield, read
+  -- through the look-back, so CR 113.6k never reaches it. This condition makes
+  -- the point harder to miss -- its destination may be a hand or a library, and
+  -- an ability found in a GRAVEYARD could not be what fired for a permanent that
+  -- went somewhere else.
+  TriggerCondition.SelfLeavesTheBattlefield -> False
   -- CR 113.6's default again: Baral watches from the battlefield, so CR 113.6k's
   -- "a trigger condition that can't trigger from the battlefield" never reaches
   -- it. A card in a graveyard does not see its controller's counterspell
@@ -1665,6 +1732,7 @@ stateTriggers gs =
                 TriggerCondition.PlayerDiscards _ -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
                 TriggerCondition.SelfDies -> False
+                TriggerCondition.SelfLeavesTheBattlefield -> False
                 TriggerCondition.SpellOrAbilityCounters _ -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
            in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))

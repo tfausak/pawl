@@ -1112,6 +1112,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- CR 603.6c's condition (Doomed Traveler's), the other zone pair.
     Spec.it s "TriggerCondition.SelfDies round-trips" $
       roundTrip s "dies" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfDies
+    -- The same rule's wider written form (Thragtusk's), which is a separate tag
+    -- rather than a payload on the one above: the two must never decode to each
+    -- other.
+    Spec.it s "TriggerCondition.SelfLeavesTheBattlefield round-trips" $
+      roundTrip s "ltb" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfLeavesTheBattlefield
     -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that
     -- spells Soul Warden's "another creature" has to survive the trip.
     Spec.it s "TriggerCondition.PermanentEnters round-trips with its Filter" $

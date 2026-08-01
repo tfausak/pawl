@@ -27,6 +27,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.PlayerDiscards r -> Json.tagged (Text.pack "PlayerDiscards") (Just (playerRelationToJson r))
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Json.nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
   TriggerCondition.SelfDies -> Json.nullary (Text.pack "SelfDies")
+  TriggerCondition.SelfLeavesTheBattlefield -> Json.nullary (Text.pack "SelfLeavesTheBattlefield")
   TriggerCondition.SpellOrAbilityCounters r -> Json.tagged (Text.pack "SpellOrAbilityCounters") (Just (playerRelationToJson r))
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
@@ -44,6 +45,7 @@ jsonToTriggerCondition value = do
     ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> jsonToPlayerRelation v
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
+    ("SelfLeavesTheBattlefield", _) -> Right TriggerCondition.SelfLeavesTheBattlefield
     ("SpellOrAbilityCounters", Just v) -> TriggerCondition.SpellOrAbilityCounters <$> jsonToPlayerRelation v
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
