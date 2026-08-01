@@ -162,7 +162,15 @@ above are the first two.
 
 ### Test helpers
 
-`assertJson`, `assertFromJson` and `assertToJson` stay in `Common`. Two changes:
+`assertJson`, `assertFromJson` and `assertToJson` stay in `Common`. Three
+changes:
+
+- **`assertJson` goes through `parse`.** It currently calls
+  `Pawl.Extra.Parsec.parseString Value.decode`, which does not pin the end of
+  input, so `"\"a\" trailing garbage"` would parse as `"a"` and the spec would
+  pass. `Common.parse` already appends `Parsec.eof`; `assertJson` becomes
+  `parse . Text.pack`, leaving one parser in the module rather than two that
+  disagree.
 
 - **`assertToJson` normalizes with `sortKeys`.** It already parses its literal
   into a `Value` and compares `Value`s, so this is a one-line insertion. Without
@@ -259,8 +267,8 @@ a literal produces a spec that agrees with a wrong encoder. `Pawl.CardsSpec`
 catches this only for shapes that appear in `data/cards/`. Literals should be
 derived by reading the encoder, not by recalling the tag name.
 
-**`Common.parse` and `Common.assertJson` use different parsers** — `parse` goes
-through `Text.Parsec` on `Text` with `eof`, `assertJson` through
-`Pawl.Extra.Parsec.parseString` on `String` without one. They should be unified
-onto one, or the difference stated, before ~600 specs are written against
-`assertJson`.
+**Resolved: `assertJson` must not be its own parser.** It bypassed `parse` and
+so bypassed `Parsec.eof`, meaning a literal with trailing garbage would have
+parsed as its prefix and the spec would have passed. Folding it onto `parse`
+(above) is the first commit, before any of the ~600 literals are written against
+it.
