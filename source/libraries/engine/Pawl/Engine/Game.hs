@@ -37,6 +37,30 @@ freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
 
+-- CR 400.2: "Public zones are zones in which all players can see the cards'
+-- faces ... Library and hand are hidden zones, even if all the cards in one such
+-- zone happen to be revealed." That trailing clause is why this is a property of
+-- the ZONE and never of the card: a hand every one of whose cards is currently
+-- revealed is still a hidden zone.
+--
+-- Exhaustive rather than a membership test against a two-element list, so a new
+-- Zone constructor cannot join the public side by default.
+--
+-- It lives HERE, in the lowest layer, rather than beside either of its two
+-- callers: Pawl.Engine.Activate reads it for CR 602.2a's reveal and
+-- Pawl.Engine.Event for CR 400.7e's public-zone proviso, and Activate imports
+-- Event, so the only home both can reach is one below them.
+isHiddenZone :: Zone -> Bool
+isHiddenZone zone = case zone of
+  Zone.Library -> True
+  Zone.Hand -> True
+  Zone.Graveyard -> False
+  Zone.Battlefield -> False
+  Zone.Stack -> False
+  Zone.Exile -> False
+  -- CR 400.2 names the command zone among the public ones, alongside ante.
+  Zone.Command -> False
+
 zoneMembers :: Zone -> PlayerId -> GameState -> [ObjectId]
 zoneMembers zone pid gs =
   let perPlayer m = foldMap (foldr (:) []) (Map.lookup pid m)

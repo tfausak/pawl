@@ -106,6 +106,8 @@ data Subtype
     Jace
   | -- CR 205.3m (a creature type; Bog Wraith's).
     Wraith
+  | -- CR 205.3m (a creature type; Icehide Golem's).
+    Golem
   | -- CR 205.3m (a creature type; Blurred Mongoose's).
     Mongoose
   deriving (Eq, Ord, Show)

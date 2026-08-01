@@ -259,6 +259,18 @@ data Gathered = MkGathered
     gSource :: ObjectId,
     gAffected :: Affected.Affected,
     gLayer :: Layer,
+    -- CR 613.6's DECISION POINT: the lowest layer reached by any part of the
+    -- effect THIS part belongs to -- "if an effect starts to apply in one layer and/or
+    -- sublayer, it will continue to be applied to the same set of objects in each
+    -- other applicable layer and/or sublayer". The layer fold gets this for free
+    -- by visiting layers in order and memoizing on gEffect; a caller that must
+    -- ask the same question from OUTSIDE the fold (abilitiesRemoved) has no memo
+    -- to read, so the answer is carried here instead of re-derived at the wrong
+    -- layer (#326).
+    --
+    -- Equal to gLayer for every one-part effect, which is every counter, every
+    -- stored effect and every single-line static ability.
+    gLowest :: Layer,
     gTimestamp :: Timestamp,
     gModification :: Modification
   }
@@ -767,6 +779,11 @@ symbolColors symbol = case symbol of
   -- by ManaSpec's "Mutagenic Growth is green on the stack even when 2 life paid
   -- for it".
   ManaSymbol.Phyrexian c -> [c]
+  -- CR 107.4h's last sentence, which settles this outright: "Snow is neither a
+  -- color nor a type of mana." CR 202.2d's colour-granting list names the hybrid
+  -- and Phyrexian symbols and not this one, so Icehide Golem is colorless (CR
+  -- 202.2b) despite having a mana cost.
+  ManaSymbol.Snow -> []
   ManaSymbol.Generic _ -> []
   ManaSymbol.Variable -> []
 
@@ -1024,6 +1041,7 @@ gatherGiven stripped gs =
             gSource = ContinuousEffect.source eff,
             gAffected = ContinuousEffect.affected eff,
             gLayer = layer (ContinuousEffect.modification eff),
+            gLowest = layer (ContinuousEffect.modification eff),
             gTimestamp = ContinuousEffect.timestamp eff,
             gModification = ContinuousEffect.modification eff
           }
@@ -1072,10 +1090,11 @@ gatherGiven stripped gs =
 --
 -- The list is gathered with the layer-6 gate OFF, which is what the gate itself
 -- reads, and why this needs an extra pass rather than a fixpoint. Deciding
--- whether a source's abilities were removed means projecting that source through
--- layers 1-5 (abilitiesRemoved), and a projection bounded below layer 6 applies
--- no candidate at layer 6 or later -- so it cannot see, and so cannot be changed
--- by, the layer-7 parts the gate drops.
+-- whether a source's abilities were removed means projecting that source up to
+-- CR 613.6's decision point (abilitiesRemoved), which is never above layer 6, and
+-- a projection bounded below layer 6 applies no candidate at layer 6 or later --
+-- so it cannot see, and so cannot be changed by, the layer-7 parts the gate
+-- drops.
 --
 -- WELL-FOUNDED, and this is the whole argument: nothing reachable from here reads
 -- a player effect back. The layer machine's only inputs are static abilities,
@@ -1134,15 +1153,40 @@ removesAbilities m = case m of
 -- keeps applying its own layer-7b 1/1 (ProjectionSpec's Humility + Opalescence
 -- timestamp pair proves it).
 --
--- The affected set is judged against the projection layers 1-5 leave behind
--- (projectUpTo Layer.Ability), which is exactly the partial the fold itself uses
--- when it applies layer 6: no layer-6 modification WRITES an aspect any Filter
--- reads (modificationWrites), so CR 613.8 reorders nothing within layer 6 and the
--- two readings cannot disagree. This is what lets an Opalescence-animated Bad
--- Moon be inside Humility's "each creature" -- the animation is layer 4.
+-- Each remover's affected set is judged at CR 613.6's decision point -- the
+-- LOWEST layer its whole effect reaches (gLowest), not at layer 6 -- because "if
+-- an effect starts to apply in one layer and/or sublayer, it will continue to be
+-- applied to the same set of objects in each other applicable layer and/or
+-- sublayer". That is the same answer projectWith's `decided` memo reaches inside
+-- the fold, which is the point: the two must not disagree, or the fold strips an
+-- object this gate did not.
 --
--- Layer 6 is where a remover's set is asked here, rather than CR 613.6's lowest
--- layer of the ability carrying it (#326).
+-- Humility cannot tell the two readings apart -- layer 6 IS its lowest layer, so
+-- it decides there either way, which is what still lets an Opalescence-animated
+-- Rule of Law be inside its "each creature": the animation is layer 4 and the
+-- partial already has it. Titania's Song can tell them apart: its one ability
+-- pairs a layer-4 type change with the layer-6 removal, and its "each noncreature
+-- artifact" set reads the very card type that layer-4 part writes, so judging at
+-- layer 6 would find the artifact already animated and miss it (PlayerEffectSpec's
+-- Sapphire Medallion case).
+--
+-- The bound is never above layer 6: a remover carries a layer-6 modification (CR
+-- 613.1f), so its effect's lowest layer is at most that. The whole-game argument
+-- above -- that a projection bounded below layer 6 cannot see the layer-7 parts
+-- the gate drops -- therefore still holds, and holds more strongly the lower the
+-- bound goes.
+--
+-- Grouped by that layer so one projection serves every remover deciding there,
+-- and lazily enough that `any` short-circuits before projecting for a layer it
+-- never reaches. Almost every board with a remover at all has exactly one.
+--
+-- STILL an approximation in one place: projectUpTo excludes the whole of the
+-- decision layer, while the fold decides an effect's set against the state its
+-- SAME-LAYER predecessors have already produced (CR 613.7 timestamp order, CR
+-- 613.8 dependency). The two disagree only when another effect in that same layer
+-- moves the remover's set, which no layer-6 remover can suffer -- every layer-6
+-- arm of modificationWrites is empty, so nothing there moves anything -- and which
+-- Titania's Song would suffer only beside a second layer-4 effect (#510).
 --
 -- NOT asked of the remover's own source: whether a stripper was itself stripped
 -- is a question about ORDER WITHIN layer 6, which the fold settles by CR 613.7
@@ -1150,11 +1194,11 @@ removesAbilities m = case m of
 -- neighbourhood -- see the layer-6 grant/Humility timestamp test).
 abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemoved cands gs oid =
-  let partial = projectUpTo Layer.Ability cands oid gs
-      removes c =
-        removesAbilities (gModification c)
-          && affects (gSource c) oid (gAffected c) partial gs
-   in any removes cands
+  let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c)]
+      removesAt (lyr, cs) =
+        let partial = projectUpTo lyr cands oid gs
+         in any (\c -> affects (gSource c) oid (gAffected c) partial gs) cs
+   in any removesAt (Map.toList byLowest)
 
 -- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the
 -- ability's index on its source, and (src, n) is what every part of a MULTI-part
@@ -1186,24 +1230,30 @@ abilitiesRemoved cands gs oid =
 -- same statement: the branch is only taken when every part is a layer-7 one.
 gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic src ts changes stripped n sa =
-  let ms = StaticAbility.modifications sa
+  let ms = fmap (rewriteModification changes) (StaticAbility.modifications sa)
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
-      one m =
-        let m' = rewriteModification changes m
-         in MkGathered
-              { gEffect = key,
-                gSource = src,
-                gAffected = StaticAbility.affected sa,
-                gLayer = layer m',
-                gTimestamp = ts,
-                gModification = m'
-              }
+      -- CR 613.6's decision point, computed once for the whole ability and
+      -- copied onto each of its parts. Total: an ability has at least one
+      -- modification, so this minimum is over a NonEmpty.
+      lowest = minimum (fmap layer ms)
+      one m' =
+        MkGathered
+          { gEffect = key,
+            gSource = src,
+            gAffected = StaticAbility.affected sa,
+            gLayer = layer m',
+            gLowest = lowest,
+            gTimestamp = ts,
+            gModification = m'
+          }
       parts = fmap one (NonEmpty.toList ms)
    in -- The cheap structural test first, so `stripped`'s projection is forced only
-      -- for an ability the rest of the rule could actually reach.
-      if all ((> Layer.Ability) . gLayer) parts && stripped then [] else parts
+      -- for an ability the rest of the rule could actually reach. "Every part is
+      -- after layer 6" and "the lowest layer is after layer 6" are the same
+      -- statement.
+      if lowest > Layer.Ability && stripped then [] else parts
 
 -- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
 -- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c
@@ -1231,6 +1281,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
                   gSource = oid,
                   gAffected = Affected.TheseObjects (Set.singleton oid),
                   gLayer = lyr,
+                  gLowest = lyr,
                   gTimestamp = Object.timestamp obj,
                   gModification = m
                 }
@@ -1912,7 +1963,13 @@ nameOf oid gs = PC.name (project oid gs)
 
 -- CR 205.4: the object's projected supertypes, the sibling of subtypesOf.
 supertypesOf :: ObjectId -> GameState -> Set Supertype.Supertype
-supertypesOf oid gs = PC.supertypes (project oid gs)
+supertypesOf = supertypesGiven Map.empty
+
+-- The same supertypes against a pre-projected board, the subtypesGiven shape and
+-- carrying its reason (#200): Mana.productionTagsGiven asks this of every mana
+-- source in a sweep that has already gathered one.
+supertypesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Set Supertype.Supertype
+supertypesGiven pcs oid gs = PC.supertypes (projectGiven pcs oid gs)
 
 cardTypesOf :: ObjectId -> GameState -> Set CardType.CardType
 cardTypesOf = cardTypesGiven Map.empty
@@ -1927,6 +1984,16 @@ isCreatureOf = isCreatureGiven Map.empty
 
 isCreatureGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
 isCreatureGiven pcs oid gs = Set.member CardType.Creature (cardTypesGiven pcs oid gs)
+
+-- CR 613.1d again, for the card type CR 115.4's "any target" pool and CR 120.3c's
+-- loyalty removal both ask about. Projected for the same reason isCreatureOf is:
+-- CR 613.1d puts card types in layer 4, so an effect that adds or removes the
+-- type changes the answer, and the printed type line is the wrong place to ask.
+isPlaneswalkerOf :: ObjectId -> GameState -> Bool
+isPlaneswalkerOf = isPlaneswalkerGiven Map.empty
+
+isPlaneswalkerGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
+isPlaneswalkerGiven pcs oid gs = Set.member CardType.Planeswalker (cardTypesGiven pcs oid gs)
 
 -- The same question against a PRECOMPUTED candidate list rather than a
 -- pre-projected board -- projectFrom's posture instead of projectGiven's. For a

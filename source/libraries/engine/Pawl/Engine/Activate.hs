@@ -248,25 +248,6 @@ activatableGiven grants pcs pid srcId ability gs =
       >= Modal.selectionCount (ActivatedAbility.modal ability)
     && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
 
--- CR 400.2: "Public zones are zones in which all players can see the cards'
--- faces ... Library and hand are hidden zones, even if all the cards in one such
--- zone happen to be revealed." That trailing clause is why this is a property of
--- the ZONE and never of the card: a hand every one of whose cards is currently
--- revealed is still a hidden zone.
---
--- Exhaustive rather than a membership test against a two-element list, so a new
--- Zone constructor cannot join the public side by default.
-isHiddenZone :: Zone.Zone -> Bool
-isHiddenZone zone = case zone of
-  Zone.Library -> True
-  Zone.Hand -> True
-  Zone.Graveyard -> False
-  Zone.Battlefield -> False
-  Zone.Stack -> False
-  Zone.Exile -> False
-  -- CR 400.2 names the command zone among the public ones, alongside ante.
-  Zone.Command -> False
-
 -- CR 602.2a: "If an activated ability is being activated from a hidden zone, the
 -- card that has that ability is revealed (see rule 701.20a)." Note what the rule
 -- does NOT say: there is no qualifier about the cost. Every activation from a
@@ -298,7 +279,7 @@ revealIfHidden :: PlayerId -> ObjectId -> Game ()
 revealIfHidden pid srcId = do
   gs <- State.get
   case fmap Object.zone (Game.lookupObject srcId gs) of
-    Just zone | isHiddenZone zone -> Event.reveal pid srcId
+    Just zone | Game.isHiddenZone zone -> Event.reveal pid srcId
     _ -> pure ()
 
 -- CR 602.2: announce the activation, revealing the card if it is coming from a

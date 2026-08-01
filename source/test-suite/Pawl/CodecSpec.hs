@@ -1024,6 +1024,16 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         -- A NONZERO toxic value, so the CR 702.164b rider is round-tripped
         -- rather than defaulted past.
         (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 3 DamageKind.Combat))
+    -- CR 120.3c's recipient tag is a different arm of Recipient from the one
+    -- above, and a CR 608.2i record the codec cannot write is one no replay can
+    -- read back.
+    Spec.it s "GameEvent.DamageDealt to a planeswalker round-trips" $
+      roundTrip
+        s
+        "damage"
+        gameEventToJson
+        jsonToGameEvent
+        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2)) 3 False False 0 DamageKind.Noncombat))
     Spec.it s "GameEvent.StepBegan round-trips" $
       roundTrip s "step" gameEventToJson jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
     Spec.it s "GameEvent.SpellCast round-trips" $
@@ -1117,6 +1127,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     -- CR 603.6c's condition (Doomed Traveler's), the other zone pair.
     Spec.it s "TriggerCondition.SelfDies round-trips" $
       roundTrip s "dies" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfDies
+    -- The same rule's wider written form (Thragtusk's), which is a separate tag
+    -- rather than a payload on the one above: the two must never decode to each
+    -- other.
+    Spec.it s "TriggerCondition.SelfLeavesTheBattlefield round-trips" $
+      roundTrip s "ltb" triggerConditionToJson jsonToTriggerCondition TriggerCondition.SelfLeavesTheBattlefield
     -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that
     -- spells Soul Warden's "another creature" has to survive the trip.
     Spec.it s "TriggerCondition.PermanentEnters round-trips with its Filter" $

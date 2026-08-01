@@ -402,6 +402,55 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
         -- black.
         Spec.assertEqWith s "and black by colour indicator" (CardT.colorIndicator token) (Set.singleton Color.Black)
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
+  -- The pool's first card printing CR 603.6c's OTHER written form, "when this
+  -- creature leaves the battlefield", which is any destination rather than
+  -- doomed-traveler.json's graveyard. The two conditions sitting side by side in
+  -- data/cards is the point: the condition is pinned here so a future edit
+  -- cannot quietly turn this card into a second Doomed Traveler, which is the
+  -- one change that would make TriggerSpec's bounce cases prove nothing.
+  Spec.it s "thragtusk.json loads as a {4}{G} 5/3 that gains 5 life on entry and makes a 3/3 Beast on leaving" $ do
+    c <- S.cardOf s registry "Thragtusk"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Thragtusk")
+    Spec.assertEqWith
+      s
+      "{4}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith
+      s
+      "Creature -- Beast"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Beast))
+    Spec.assertEqWith s "5/3" (CardT.power c, CardT.toughness c) (Just (Power.MkPower (Quantity.Literal 5)), Just (Toughness.MkToughness (Quantity.Literal 3)))
+    Spec.assertEqWith s "no keywords" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "two triggers, on entering and on leaving"
+      (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+      [TriggerCondition.SelfEnters, TriggerCondition.SelfLeavesTheBattlefield]
+    Spec.assertEqWith s "neither with an intervening if" (fmap TriggeredAbility.intervening (CardT.triggeredAbilities c)) [Nothing, Nothing]
+    Spec.assertEqWith
+      s
+      "the enters trigger gains its controller 5 life"
+      (fmap (modeShapes . TriggeredAbility.modal) (take 1 (CardT.triggeredAbilities c)))
+      [[(Optionality.Mandatory, [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 5)])]]
+    case [(q, tc) | ab <- CardT.triggeredAbilities c, Effect.Create q tc _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))] of
+      [(quantity, token)] -> do
+        Spec.assertEqWith s "one token" quantity (Quantity.Literal 1)
+        -- CR 111.4 again: Thragtusk names no token, so the name is its subtype
+        -- plus "Token".
+        Spec.assertEqWith s "named Beast Token" (CardT.name token) (Text.pack "Beast Token")
+        Spec.assertEqWith
+          s
+          "Creature -- Beast"
+          (CardT.typeLine token)
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Beast))
+        Spec.assertEqWith s "3/3" (CardT.power token, CardT.toughness token) (Just (Power.MkPower (Quantity.Literal 3)), Just (Toughness.MkToughness (Quantity.Literal 3)))
+        Spec.assertEqWith s "no keywords" (CardT.keywords token) Set.empty
+        -- CR 202.2b/202.2e, as for every other token in the pool: no mana cost,
+        -- so only the colour indicator makes it green.
+        Spec.assertEqWith s "and green by colour indicator" (CardT.colorIndicator token) (Set.singleton Color.Green)
+      other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
   -- CR 702.19 trample plus the CR 510.1b combat-damage-to-a-player trigger
   -- condition on one card, which is what makes the trigger's event and the
   -- bearer's death land in a single CR 117.5 batch. The 1 toughness is
@@ -677,6 +726,34 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "CR 205.4g: damage equal to the snow permanents you control"
       (modeShapes (CardT.spell c))
       [(Optionality.Mandatory, [Effect.DealDamage target (Quantity.Count snowPermanentsYouControl)])]
+  -- The pool's first {S} (CR 107.4h). Exactly two cards print one in a MANA cost
+  -- -- this and Arcum's Astrolabe, which costs the same {S} and prints real text
+  -- on top of it -- so this is the minimal card the symbol has, and the whole
+  -- card IS the symbol. Its printed "({S} can be paid with one mana from a snow
+  -- source.)" is reminder text for the cost and not an ability, so the file
+  -- carries no text at all: the snow-covered-mountain.json posture, two tests up.
+  --
+  -- The supertype is the card's own (CR 205.4g), and it is not what makes the
+  -- cost payable: a Snow permanent does not pay for itself. What pays is a snow
+  -- SOURCE's mana (CR 106.3), proved in Pawl.ManaSpec.
+  Spec.it s "icehide-golem.json loads as an {S} Snow Artifact Creature - Golem 2/2 with no text" $ do
+    c <- S.cardOf s registry "Icehide Golem"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Icehide Golem")
+    Spec.assertEqWith s "{S}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Snow]))
+    Spec.assertEqWith
+      s
+      "Snow Artifact Creature - Golem"
+      (CardT.typeLine c)
+      ( TypeLine.MkTypeLine
+          (Set.singleton Supertype.Snow)
+          (Set.fromList [CardType.Artifact, CardType.Creature])
+          (Set.singleton Subtype.Golem)
+      )
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 2)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 2)))
+    Spec.assertEqWith s "no keywords" (CardT.keywords c) Set.empty
+    Spec.assertEqWith s "reminder text is not an ability" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and none of any other kind" (CardT.activatedAbilities c) []
   -- The pool's first KINDRED card (CR 308). CR 308.1 -- "each kindred card
   -- has another card type" -- is why the type line carries Enchantment
   -- alongside Kindred, and CR 110.4 keeps Kindred off the list of six

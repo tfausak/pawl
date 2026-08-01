@@ -281,8 +281,7 @@ addLoyalty n obj = obj {Object.counters = Map.insertWith (+) CounterKind.Loyalty
 removeLoyalty :: Natural -> Object.Object -> Object.Object
 removeLoyalty n obj =
   let have = Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj)
-      left = if have >= n then have - n else 0
-   in obj {Object.counters = Map.insert CounterKind.Loyalty left (Object.counters obj)}
+   in obj {Object.counters = Map.insert CounterKind.Loyalty (Natural.minusSaturating have n) (Object.counters obj)}
 
 -- Which permanents a Filter admits, matched through the PROJECTION and never
 -- against printed characteristics: a card type is CR 613.1d layer 4 and a
@@ -661,6 +660,17 @@ applyAdjustments adjustments cost =
         -- life rather than any amount of mana, so there is no generic component
         -- for CR 118.7a's reduction to come off either way.
         ManaSymbol.Phyrexian _ -> 0
+        -- CR 107.4h says this one outright rather than leaving it to be derived:
+        -- "Effects that reduce the amount of generic mana you pay don't affect
+        -- {S} costs." So {S} is no part of the generic component CR 118.7a's
+        -- reduction comes off -- which is the whole reason it is not spelled
+        -- Generic 1.
+        --
+        -- Right for the COST and wrong for a REDUCTION, the split the Phyrexian
+        -- arm below carries: CR 118.7g says an {S} in a reduction reduces the
+        -- cost "by that much generic mana", so this arm owes 1 there and gives 0
+        -- (#516).
+        ManaSymbol.Snow -> 0
         -- Unreachable: CR 601.2b precedes 601.2f, so Mana.substituteX has
         -- already replaced every Variable before a total cost is computed. The
         -- match must be total, so a bare {X} contributes 0 generic.
@@ -681,6 +691,10 @@ applyAdjustments adjustments cost =
         -- symbol, and it must keep its printed position to reach Mana.spend
         -- intact.
         ManaSymbol.Phyrexian _ -> True
+        -- Typed for this function's purpose, the MonocoloredHybrid reason: it is
+        -- not generic (CR 107.4h), so it must survive the filter and keep its
+        -- printed position to reach Mana.spend intact.
+        ManaSymbol.Snow -> True
         -- Unreachable for the same reason genericOf's Variable arm is: kept
         -- (retained, not stripped) so that if it ever were reachable, a bare
         -- {X} would still be treated as typed and survive the filter below.
@@ -721,6 +735,14 @@ applyAdjustments adjustments cost =
         -- wrong for it, which nothing in the pool can show because no card emits
         -- a reduction containing a Phyrexian symbol (#362).
         ManaSymbol.Phyrexian _ -> Nothing
+        -- CR 107.4h: {S} is paid "with one mana of ANY type", so it names no one
+        -- type on either side of the cancellation. In a COST that is exact
+        -- rather than an elision: a reduction of one white mana cannot single
+        -- out an {S} the way it singles out a {W}. In a REDUCTION it is right
+        -- too, but for a different reason -- CR 118.7g makes an {S} there a
+        -- GENERIC reduction rather than a typed one, so it belongs to genericOf
+        -- above and not to this cancellation at all (#516).
+        ManaSymbol.Snow -> Nothing
         -- Unreachable for the reason genericOf's Variable arm gives; {X} names
         -- no mana type either way.
         ManaSymbol.Variable -> Nothing

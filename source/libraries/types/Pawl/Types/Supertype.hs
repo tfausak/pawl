@@ -21,9 +21,13 @@ data Supertype
     -- this honest: a permanent without the supertype is nonsnow "regardless of
     -- its name", so nothing may shortcut through "Snow-Covered ...".
     --
-    -- What snow cards ask about the OTHER way round -- the {S} symbol
-    -- (CR 107.4h), and whether a MANA was produced by a snow source (CR 106.3)
-    -- -- is not modelled (#467).
+    -- What snow cards ask about the OTHER way round -- whether a MANA was
+    -- produced by a snow source (CR 106.3), which CR 107.4h's {S} is paid with
+    -- -- reads this same supertype, through Pawl.Engine.Mana.productionTagsGiven.
+    -- CR 205.4g's PERMANENT scope is narrower than that question in general:
+    -- CR 106.3 lets a spell be a source too. It is wide enough for every source
+    -- pawl has, which is a fact about the pool rather than about the rule --
+    -- see productionTagsGiven, which is where that reasoning is written out.
     Snow
   | -- CR 205.4f: subject to CR 704.5k's world rule, which Pawl.Engine.Sba implements
     -- (Sba.worldVictims). Unlike the legend rule that one asks nobody: it keeps
