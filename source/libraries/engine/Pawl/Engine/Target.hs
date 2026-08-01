@@ -224,8 +224,9 @@ opponentOfController perspective oid gs = case (perspective, Projection.controll
 -- why that is the right frame -- "the words 'you' and 'your' on an object refer
 -- to the object's controller, its WOULD-BE CONTROLLER (if a player is attempting
 -- to play, cast, or activate it)" -- which is the player CR 601.2c has choosing
--- targets. Every battlefield and stack arm ignores it, because those zones are
--- shared by all players (CR 400.1 again).
+-- targets. Every battlefield, stack and EXILE arm ignores it, because those
+-- zones are shared by all players (CR 400.1 again) -- so the graveyard arm is
+-- the only one with a "whose" to answer at all.
 basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Filter.Context -> Pool.Pool -> GameState -> Set Recipient
 basePoolGiven pcs context pool gs = case pool of
   Pool.Creatures -> creatureRecipientsGiven pcs gs
@@ -241,6 +242,7 @@ basePoolGiven pcs context pool gs = case pool of
   Pool.Abilities -> abilityRecipients gs
   Pool.SpellsAndPermanents -> Set.union (spellRecipients gs) (permanentRecipients gs)
   Pool.CardsInGraveyard scope -> graveyardRecipients context scope gs
+  Pool.CardsInExile -> exileRecipients gs
 
 -- CR 115.1a: creatures on the battlefield, per playing player's zone, tagged
 -- ToCreature. Reads Projection.isCreatureOf so a permanent made a creature by the
@@ -348,6 +350,43 @@ graveyardRecipients context scope gs =
       Set.fromList
         . fmap Recipient.ToObject
         $ concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) pids
+
+-- CR 406.1: the cards in the exile zone, tagged ToObject -- Riftsweeper's
+-- "choose target face-up exiled card". CR 115.2's clause (a) again, the same
+-- other-zone half graveyardRecipients above is, and the second pool to leave the
+-- battlefield and the stack behind.
+--
+-- Reads GameState.exile WHOLE, exactly as permanentRecipients reads
+-- GameState.battlefield, and takes no scope at all. That is CR 400.1's second
+-- sentence: "the other zones are shared by all players", so there is no
+-- per-player copy of exile to fold over and no "whose" for the Context's
+-- perspective to answer -- see Pawl.Types.Pool.CardsInExile for why a
+-- PlayerScope here would be an owner filter wearing a zone's type. So this pool
+-- sits with the battlefield and stack ones rather than with the graveyard one,
+-- which is why it takes only the GameState.
+--
+-- No stillPlaying filter, and none is needed -- unlike graveyardRecipients,
+-- which folds a list of players and so must have one. CR 800.4a: "when a player
+-- leaves the game, all objects (see rule 109) owned by that player leave the
+-- game", which Pawl.Engine.Departure.objectsLeaveWith performs by deleting every
+-- id they owned from GameState.objects and from every zone, exile included. So
+-- nothing of theirs is left in this set to skip. That sweep is gated on
+-- Departure.continuesAfterDeparture, so a two-player loser's exiled cards do
+-- stay in the set -- unobservably, because CR 104.2a ends that game at once ("a
+-- player still in the game wins the game if that player's opponents have all
+-- left the game"), and nobody is left to be offered a target.
+--
+-- The rule's LAST clause pushes the other way and is honoured by the same
+-- absence: "if there are any objects still controlled by that player, those
+-- objects are exiled" -- those are owned by somebody still here, and belong in
+-- the pool.
+--
+-- CR 406.3's face-up default is what makes the whole set offerable: "exiled
+-- cards are, by default, kept face up and may be examined by any player at any
+-- time." No card in pawl's pool exiles face down, so there is no face-down pile
+-- for CR 406.4's choose-at-random rule to reach (#557).
+exileRecipients :: GameState -> Set Recipient
+exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.exile gs)))
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

@@ -910,6 +910,51 @@ addGraveyardCard printing pid gs =
           }
       )
 
+-- One card of a printing OWNED by pid, in exile. Exile is shared (CR 400.1:
+-- "the other zones are shared by all players"), so unlike the graveyard and
+-- library helpers above this one files the id in the single GameState.exile set
+-- and the owner is carried only on the object -- which is exactly how
+-- Game.zoneMembers Zone.Exile then reports whose card it is.
+--
+-- Face up, per CR 406.3's default ("exiled cards are, by default, kept face
+-- up"): pawl has no face-down exile to opt into (#557).
+addExiledCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addExiledCard printing pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Exile,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Sick,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
+            Object.timestamp = ts
+          }
+   in ( oid,
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.exile = Set.insert oid (GameState.exile gs2)
+          }
+      )
+
+-- A creature of a printing on the battlefield under `pid`, WITH the CR 603.6a
+-- enters event crafted alongside it, so Engine.placePendingTriggers finds its
+-- SelfEnters trigger pending. addCreature alone puts the permanent there without
+-- an event, and no trigger fires off a board that was simply arranged.
+--
+-- The from-zone is the stack, which is where a resolved creature spell comes
+-- from (CR 608.3) -- unread by any trigger condition here, but the honest value.
+entersWithTrigger :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+entersWithTrigger printing pid gs0 =
+  let (oid, gs1) = addCreature printing pid gs0
+      entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+   in (oid, withEvents [GameEvent.Moved entered (Projection.project oid gs1)] gs1)
+
 -- One more card of a printing in pid's hand, APPENDED (contrast handOne, which
 -- replaces the hand and sets up the phase for a cast).
 addHandCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)

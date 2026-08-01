@@ -597,4 +597,40 @@ data Effect card
     -- resolves afterwards. Carried on the turn, the scoping cannot be got wrong:
     -- the skips go wherever CR 500.7's stack puts the turn.
     TakeExtraTurn PlayerRef (Set PhaseSelector)
+  | -- CR 701.24: the slot's target object is shuffled into its OWNER's library --
+    -- Riftsweeper's "choose target face-up exiled card. Its owner shuffles it
+    -- into their library." The move goes through the changeZone funnel (CR
+    -- 400.7's new incarnation), landing in the OWNER's library by CR 400.3 --
+    -- "if an object would go to any library, graveyard, or hand other than its
+    -- owner's, it goes to its owner's corresponding zone" -- which is the rule
+    -- the card's own "its owner" is restating. Then that library is shuffled
+    -- (CR 701.24a: "randomize the cards within it so that no player knows their
+    -- order").
+    --
+    -- NOT MoveToZone slot Library, and Counter's own comment gives the template
+    -- -- the three reasons it is not MoveToZone slot Graveyard line up one for
+    -- one here:
+    --
+    --   * Shuffle is a KEYWORD ACTION in its own right, on rule 701's list
+    --     (701.24), beside counter (701.6) and destroy (701.8).
+    --   * It carries a gate the bare move does not. CR 701.24c: "if an effect
+    --     would cause a player to shuffle one or more specific objects into a
+    --     library, that library is shuffled EVEN IF none of those objects are in
+    --     the zone they're expected to be in or an effect causes all of those
+    --     objects to be moved to another zone or remain in their current zone."
+    --     So a CR 616.1 replacement that cancels the move must not cancel the
+    --     shuffle -- which a rider read off the move's own result would.
+    --   * A shuffle is its own observable event, the way "was countered" is: CR
+    --     701.24e and CR 701.24f are both about "abilities that trigger when a
+    --     library is shuffled", which a library move alone does not fire.
+    --
+    -- No PlayerRef saying whose library, and none is expressible: the answer is
+    -- the OWNER of the object the slot names, and PlayerRef's three arms are
+    -- every player, a relation to the perspective, and a player bound in a slot
+    -- -- none of which can read an owner off a bound OBJECT. Derived rather than
+    -- named is also what the card says ("its owner"), and it is what makes this
+    -- one opcode rather than a move plus a shuffle: Resolve.resolveModes fixes a
+    -- resolving ABILITY's bindings before its effect fold begins, so a later
+    -- effect could not read an incarnation this one had just bound anyway.
+    ShuffleIntoLibrary SlotName
   deriving (Eq, Ord, Show)

@@ -26,6 +26,10 @@ poolToJson p = case p of
   Pool.Abilities -> Json.nullary (Text.pack "Abilities")
   Pool.SpellsAndPermanents -> Json.nullary (Text.pack "SpellsAndPermanents")
   Pool.CardsInGraveyard scope -> Json.tagged (Text.pack "CardsInGraveyard") (Just (playerScopeToJson scope))
+  -- Nullary, and that is CR 400.1's "the other zones are shared by all players"
+  -- showing through the wire format: exile has no per-player copy for a payload
+  -- to select among. See Pawl.Types.Pool.CardsInExile.
+  Pool.CardsInExile -> Json.nullary (Text.pack "CardsInExile")
 
 jsonToPool :: Value -> Either Text Pool.Pool
 jsonToPool value = do
@@ -42,4 +46,5 @@ jsonToPool value = do
     -- CardsInGraveyard with no value is a MALFORMED known constructor, and the
     -- fallthrough would report it as an unknown one.
     ("CardsInGraveyard", _) -> Json.withValue mv (fmap Pool.CardsInGraveyard . jsonToPlayerScope)
+    ("CardsInExile", _) -> Right Pool.CardsInExile
     _ -> Left (Text.pack "unknown Pool: " <> t)

@@ -39,10 +39,8 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -306,16 +304,8 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
 -- Wizard whose ETB is ChooseExactly 1 over: create a 1/1 flying Bird, return
 -- ANOTHER nonland permanent to hand, or draw a card). Aether Channeler enters
 -- via S.addCreature and the SelfEnters trigger is fed to Engine.placePendingTriggers
--- through a hand-built enters event (the same shape EventSpec uses), then the
--- placed ability resolves off the stack.
--- Put Aether Channeler on the battlefield and craft its enters event, so
--- placePendingTriggers sees the SelfEnters trigger pending.
-triggerModalEtb :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-triggerModalEtb acPrinting pid gs0 =
-  let (acId, gs1) = S.addCreature acPrinting pid gs0
-      entered = ZoneChange.MkZoneChange acId acId Zone.Stack Zone.Battlefield
-   in (acId, S.withEvents [GameEvent.Moved entered (Projection.project acId gs1)] gs1)
-
+-- through S.entersWithTrigger's hand-built enters event (the same shape
+-- EventSpec uses), then the placed ability resolves off the stack.
 triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card)
 triggerModalOf acPrinting = case Card.Type.triggeredAbilities (Printing.card acPrinting) of
   [ab] -> Just (TriggeredAbility.modal ab)
@@ -325,7 +315,7 @@ triggerModalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -
 triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.3d)" $ do
   Spec.it s "create mode ({0}) makes a 1/1 flying Bird; nothing bounced or drawn" $ do
     aetherChanneler <- S.printingOf s registry "Aether Channeler"
-    let (acId, gs) = triggerModalEtb aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
+    let (acId, gs) = S.entersWithTrigger aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToObject acId)
         placed = snd (Engine.runGamePure answer gs Engine.placePendingTriggers)
@@ -344,7 +334,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
   Spec.it s "bounce mode ({1}) returns another nonland permanent to its owner's hand (CR 601.2c)" $ do
     aetherChanneler <- S.printingOf s registry "Aether Channeler"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, gs1) = triggerModalEtb aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, gs1) = S.entersWithTrigger aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
         (victimId, gs2) = S.addCreature piker S.bob gs1
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToObject victimId)
@@ -377,7 +367,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
   Spec.it s "draw mode ({2}) draws exactly one; no token made" $ do
     aetherChanneler <- S.printingOf s registry "Aether Channeler"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (acId, gs1) = triggerModalEtb aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
+    let (acId, gs1) = S.entersWithTrigger aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs2) = S.addLibraryCard piker S.alice gs1
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 2) (Recipient.ToObject acId)
@@ -388,7 +378,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
 
   Spec.it s "bounce mode ({1}) excludes Aether Channeler itself (CR \"another\")" $ do
     aetherChanneler <- S.printingOf s registry "Aether Channeler"
-    let (acId, gs) = triggerModalEtb aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
+    let (acId, gs) = S.entersWithTrigger aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
     case triggerModalOf aetherChanneler of
       Nothing -> Spec.assertFailure s "Aether Channeler must have exactly one triggered ability"
       Just modal ->

@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
@@ -171,6 +172,7 @@ slotsOf effect = case effect of
   Effect.PlaySubgame _ -> Set.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
+  Effect.ShuffleIntoLibrary slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -226,6 +228,7 @@ readsX = any effectReadsX
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
       Effect.TakeExtraTurn {} -> False
+      Effect.ShuffleIntoLibrary _ -> False
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
 -- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
@@ -277,6 +280,7 @@ manaProduced effect = case effect of
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
+  Effect.ShuffleIntoLibrary _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -321,6 +325,10 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
+  -- CR 701.24 shuffles a library; it never LOOKS at one, which is what CR
+  -- 701.23a's search is ("to search for a card in a zone, look at all cards in
+  -- that zone"), so Panglacial Wurm gets no window here.
+  Effect.ShuffleIntoLibrary _ -> False
   Effect.TakeExtraTurn {} -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
@@ -464,6 +472,8 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
   Effect.TakeExtraTurn {} -> effect
+  -- No rewritable land-type word.
+  Effect.ShuffleIntoLibrary _ -> effect
 
 -- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
 -- an unchosen mode's effects never resolve), with every text-change affecting it
@@ -1246,7 +1256,8 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
-        -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
+        -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
+        -- (CR 400.3 for a library, graveyard or hand destination).
         -- CR 110.5b: the funnel is handed the riders' tap state, so a permanent
         -- an effect says enters tapped is never untapped for an instant.
         Just target -> do
@@ -1274,6 +1285,53 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
               -- exactly one object and it is the whole candidate set.
               Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
       _ -> pure ()
+  -- CR 701.24: shuffle the slot's target into its OWNER's library --
+  -- Riftsweeper's "its owner shuffles it into their library". Two steps, in this
+  -- order and with the owner read BEFORE either:
+  --
+  --   * CR 400.7's move, through the same changeZone funnel every other
+  --     destination uses, so a replacement watching a library entry gets its CR
+  --     616.1 opportunity. Game.insertIntoZone files a library arrival under
+  --     Object.owner, which is CR 400.3 ("if an object would go to any library,
+  --     graveyard, or hand other than its owner's, it goes to its owner's
+  --     corresponding zone") -- so the card lands in the owner's library without
+  --     this arm naming a player.
+  --   * CR 701.24a's randomisation of that library, through
+  --     Mulligan.shuffleLibrary -- the same call CR 103.3's opening shuffle
+  --     makes. NOT the only shuffle in this module: the Search arm above still
+  --     spells the prompt out inline against Game.honourShuffle, which is the
+  --     identical three steps and could be folded into that function.
+  --
+  -- The shuffle runs whether or not the move did, which is CR 701.24c: "if an
+  -- effect would cause a player to shuffle one or more specific objects into a
+  -- library, that library is shuffled even if none of those objects are in the
+  -- zone they're expected to be in or an effect causes all of those objects to
+  -- be moved to another zone or remain in their current zone." That is the whole
+  -- reason the owner is read from the PRE-MOVE object rather than from the
+  -- incarnation the funnel mints: a cancelled move leaves no incarnation, and
+  -- the library still has to be shuffled.
+  --
+  -- An id that no longer resolves at all shuffles NOTHING, which is the one
+  -- place this falls short of rule 701.24c -- there is no object left to read an
+  -- owner off (#558). Unreachable from this card: Riftsweeper names one target,
+  -- so CR 608.2b already fizzles the whole ability when that target is gone.
+  --
+  -- CR 701.24a's "so that no player knows their order" makes WHO shuffles
+  -- unobservable, which is why the card's "its owner shuffles" needs nothing
+  -- here: Prompt.Shuffle deliberately carries no Decider (randomness is not a
+  -- choice), so there is no player for it to be asked of.
+  Effect.ShuffleIntoLibrary slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
+        Nothing -> pure () -- a player recipient is not a card to shuffle
+        Just target -> do
+          gs <- State.get
+          case Game.lookupObject target gs of
+            Nothing -> pure ()
+            Just obj -> do
+              Monad.void (Event.changeZoneReturning target Zone.Library)
+              Mulligan.shuffleLibrary (Object.owner obj)
+      _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.Draw ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

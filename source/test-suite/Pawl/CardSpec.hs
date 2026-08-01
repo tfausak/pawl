@@ -412,6 +412,7 @@ effectCounts effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
+  Effect.ShuffleIntoLibrary _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -1320,6 +1321,55 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
           (Modal.allTargetSpecs (ActivatedAbility.modal ability))
           (Map.singleton target (TargetSpec.MkTargetSpec (Pool.CardsInGraveyard PlayerScope.EachPlayer) Nothing))
       abilities -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abilities))
+  -- CR 115.2 clause (a)'s other zone. Riftsweeper's slot is the first
+  -- Pool.CardsInExile in the corpus, and its two ABSENCES are the assertions
+  -- that matter, since either one filled in by mistake would narrow the card
+  -- without changing anything else about it:
+  --
+  --   * no PlayerScope on the pool, because CR 400.1 says "the other zones are
+  --     shared by all players" and exile is one of them -- the graveyard cards
+  --     above are the contrast, and both are read in this same group.
+  --   * no Filter, because "target face-up exiled card" names no card type, and
+  --     "face-up" is CR 406.3's default rather than a narrowing (#557).
+  --
+  -- The effect is ShuffleIntoLibrary and NOT a MoveToZone to the library: CR
+  -- 701.24 makes shuffling a keyword action of its own, with CR 701.24c's
+  -- shuffle-even-if-nothing-moved clause riding on it.
+  Spec.it s "Riftsweeper is a {1}{G} 2/2 Elf Shaman shuffling an exiled card into its owner's library" $ do
+    riftsweeper <- S.printingOf s registry "Riftsweeper"
+    let c = Printing.card riftsweeper
+        target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith
+      s
+      "cost"
+      (Card.Type.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith
+      s
+      "an Elf Shaman (CR 205.3m)"
+      (TypeLine.subtypes (Card.Type.typeLine c))
+      (Set.fromList [Subtype.Elf, Subtype.Shaman])
+    Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+    Spec.assertEqWith s "the spell itself does nothing (a vanilla creature spell)" (Card.allEffects c) []
+    case Card.Type.triggeredAbilities c of
+      [ability] -> do
+        Spec.assertEqWith
+          s
+          "CR 603.6a: it triggers on its own entry"
+          (TriggeredAbility.condition ability)
+          TriggerCondition.SelfEnters
+        Spec.assertEqWith
+          s
+          "which shuffles the target into its owner's library (CR 701.24)"
+          (Modal.allEffects (TriggeredAbility.modal ability))
+          [Effect.ShuffleIntoLibrary target]
+        Spec.assertEqWith
+          s
+          "off one unfiltered, scopeless exile slot"
+          (Modal.allTargetSpecs (TriggeredAbility.modal ability))
+          (Map.singleton target (TargetSpec.MkTargetSpec Pool.CardsInExile Nothing))
+      abilities -> Spec.assertFailure s ("expected one triggered ability, got " <> show (length abilities))
   -- Three modifications on ONE target, in printed order. Spelled out rather
   -- than spot-checked because the toxic 1 grant is what makes this card the
   -- CR 702.164b proof in DamageSpec: a card that granted toxic 2 by mistake

@@ -83,7 +83,32 @@ data Pool
     -- process for casting a spell listed in rules 601.2b-i". A scope is a set of
     -- players and nothing else, which is exactly what a graveyard fold needs.
     --
-    -- No pool reaches exile, a hand or a library, so a graveyard is the only
-    -- other zone clause (a) can name here (#552).
+    -- No pool reaches a hand or a library, so a graveyard and exile below are
+    -- the only other zones clause (a) can name here (#559).
     CardsInGraveyard PlayerScope
+  | -- CR 406.1: the cards in the exile zone (ToObject) -- Riftsweeper's "choose
+    -- target face-up exiled card". Clause (a)'s other-zone half again, and the
+    -- second pool to leave the battlefield and the stack behind. Public, so every
+    -- candidate is visible to the chooser: CR 400.2 lists "graveyard,
+    -- battlefield, stack, exile, ante, and command" as the public zones.
+    --
+    -- NO PlayerScope, and the asymmetry with CardsInGraveyard above is the whole
+    -- point. CR 400.1: "each player has their own library, hand, and graveyard.
+    -- THE OTHER ZONES ARE SHARED BY ALL PLAYERS." Exile is one of the shared
+    -- ones, so there is no per-player copy of it for a scope to select among; a
+    -- CardsInExile PlayerScope would be filtering candidates by their OWNER
+    -- while wearing a type that reads as naming a zone. Owner-filtering is a
+    -- Filter's job if a card ever asks for it, and the pool would still be this
+    -- one.
+    --
+    -- DISJOINT from every battlefield pool, and from CardsInGraveyard, for the
+    -- reason that pool's own note gives: the candidates are CARDS in another
+    -- zone, and CR 109.2's battlefield default ("doesn't refer to a specific
+    -- zone or include the word 'card'") is switched off by the card's own word.
+    --
+    -- "FACE-UP" is not modelled, and is vacuous rather than elided: CR 406.3
+    -- says "exiled cards are, BY DEFAULT, kept face up", and no card in pawl's
+    -- pool exiles anything face down, so every card this arm can offer is face
+    -- up already (#557).
+    CardsInExile
   deriving (Eq, Ord, Show)

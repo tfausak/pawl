@@ -8,16 +8,21 @@
 -- reads WHO is targeting. One case covers the other side of the
 -- restriction/admission split -- Pawl.Engine.Sba's CR 303.4c re-check, which
 -- asks what an enchant spec ADMITS and must not ask a targeting question -- and
--- the last seven cover
+-- the last ten cover
 -- CR 115.2's two escape hatches from "only permanents are legal targets": its
--- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead and Withered
--- Wretch. (Those letters are prose inside rule 115.2, not subrule numbers; there
--- is no CR 115.2a.)
+-- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead, Withered Wretch
+-- and Riftsweeper. (Those letters are prose inside rule 115.2, not subrule
+-- numbers; there is no CR 115.2a.)
 --
 -- Raise Dead and Withered Wretch are the two halves of CR 400.1's per-player
 -- axis -- "in your graveyard" against "from a graveyard" -- and the case that
 -- reads their pools reads BOTH off one board, so neither is left to pass against
 -- a pool that had stopped asking whose graveyard it was reading.
+--
+-- Riftsweeper is the other side of that same rule: exile is one of the zones CR
+-- 400.1 says are "shared by all players", so its pool has no per-player axis at
+-- all, and the case that reads it reads Withered Wretch's off the same board so
+-- neither off-battlefield pool can swallow the other.
 --
 -- Gameplay-level: every spec under test is read out of a committed card rather
 -- than hand-built, and the cases that turn on an effect cast and resolve through
@@ -54,6 +59,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- The one target spec a single-slot card or ability declares, read out of the
@@ -85,6 +91,18 @@ aimAtCard :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCard oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   _ -> S.identityAnswer p
+
+-- aimAtCard, plus a Prompt.Shuffle that REVERSES the library rather than
+-- returning it unchanged. CR 701.24a defines a shuffle as randomising an order,
+-- and S.identityAnswer's legal-but-inert answer makes a shuffled library
+-- indistinguishable from an unshuffled one -- so a reversal is what lets a test
+-- say "this library was shuffled" at all (MulliganSpec's own reversing
+-- interpreter, for the same reason). Game.honourShuffle accepts it: a reversal
+-- is a permutation, so the contents are unchanged.
+aimAtCardShuffling :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCardShuffling oid p = case p of
+  Prompt.Shuffle ids -> reverse ids
+  _ -> aimAtCard oid p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
@@ -633,3 +651,165 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertEqWith s "and the card is still in his hand" (length (Game.zoneMembers Zone.Hand S.bob fizzled)) 1
         Spec.assertEqWith s "with the ability off the stack either way" (length (GameState.stack fizzled)) 0
       abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
+
+  -- CR 115.2 clause (a)'s SECOND zone. Riftsweeper's "choose target face-up
+  -- exiled card" names exile, which CR 400.2 lists among the public zones
+  -- ("graveyard, battlefield, stack, exile, ante, and command are public
+  -- zones"), so every candidate is visible to the chooser exactly as a
+  -- graveyard's is.
+  --
+  -- Four claims off one board. The set equality is the load-bearing one and
+  -- subsumes the second; the others name mistakes it would not, on its own, tell
+  -- apart from each other:
+  --
+  --   * EITHER PLAYER's exiled card is legal. CR 400.1: "the other zones are
+  --     shared by all players", so exile has no per-player copy and the pool
+  --     carries no scope to select among them. bob's card is what proves that a
+  --     player axis has not crept in: a pool that had quietly become
+  --     "your exile" would still offer alice's.
+  --   * The battlefield Piker is NOT in it, under either tag -- the pool is
+  --     disjoint from Pool.Creatures and Pool.Permanents, the relation
+  --     Pool.Abilities has to Pool.Spells. CR 109.2's battlefield default is
+  --     switched off by the card's own word "card".
+  --   * The GRAVEYARD Piker is not in it either. Two off-battlefield pools now
+  --     exist and neither may swallow the other.
+  --   * Withered Wretch, read on the SAME board, still reaches exactly the
+  --     graveyard card and neither exiled one -- the other direction of that
+  --     same disjointness, which the Riftsweeper assertions alone cannot see.
+  Spec.it s "CR 115.2 clause (a) Riftsweeper reaches every exiled card and nothing else, and Withered Wretch still reaches only the graveyard" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    riftsweeper <- S.printingOf s registry "Riftsweeper"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    let (inPlayId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (buriedId, g2) = S.addGraveyardCard piker S.alice g1
+        (hersId, g3) = S.addExiledCard piker S.alice g2
+        (hisId, gs) = S.addExiledCard bolt S.bob g3
+        riftSpecs = Maybe.mapMaybe (soleTargetSpec . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card riftsweeper))
+        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Card.Type.activatedAbilities (Printing.card wretch))
+    case (riftSpecs, wretchSpecs) of
+      ([riftSpec], [wretchSpec]) -> do
+        let legal theSpec = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+        Spec.assertEqWith
+          s
+          "both exiled cards, hers and his, of both card types, and nothing else"
+          (legal riftSpec)
+          (Set.fromList (fmap Recipient.ToObject [hersId, hisId]))
+        Spec.assertBool
+          s
+          (not (Set.member (Recipient.ToCreature inPlayId) (legal riftSpec)))
+          "not the Piker on the battlefield under ToCreature either (disjoint from Pool.Creatures)"
+        Spec.assertEqWith
+          s
+          "while Withered Wretch, on that same board, still reaches only the graveyard card"
+          (legal wretchSpec)
+          (Set.singleton (Recipient.ToObject buriedId))
+      _ -> Spec.assertFailure s "Riftsweeper should print one triggered ability with one target slot, and Withered Wretch one activated ability with one"
+
+  -- The whole card, through the trigger pipeline and the stack, in BOTH
+  -- directions off one board -- because "its owner shuffles it into THEIR
+  -- library" is a claim about a player alice does not pick, and aiming only at
+  -- her own card would prove nothing about it.
+  --
+  -- CR 701.24 is the second half of the effect and is asserted by ORDER, under
+  -- an interpreter that REVERSES every Prompt.Shuffle. CR 701.24a ("randomize
+  -- the cards within it so that no player knows their order") makes a shuffle
+  -- unobservable by any other means -- an identity shuffle and no shuffle at all
+  -- look the same -- so the reversal is what turns "was it shuffled?" into a
+  -- question the test can ask. bob's run is then read out a SECOND time under
+  -- the identity interpreter as the control: that pins the arrival at the BOTTOM
+  -- (Game.insertIntoZone appends a library arrival), so the reversed run's
+  -- leading position cannot be merely where the move put the card.
+  --
+  -- alice controls the Riftsweeper in both runs. When the exiled card is bob's,
+  -- it is BOB's library that grows and BOB's that is shuffled: Game.insertIntoZone
+  -- files a library arrival under Object.owner, and the shuffle is asked of that
+  -- same owner -- which is what "its owner shuffles it into THEIR library" means
+  -- and what a controller-relative reading would get wrong.
+  Spec.it s "CR 701.24 whole card: Riftsweeper shuffles an exiled card into its OWNER's library, hers or his" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    riftsweeper <- S.printingOf s registry "Riftsweeper"
+    -- S.addLibraryCard puts each card ON TOP, so the SECOND of each pair is the
+    -- one at the head of the library and the first is under it.
+    let (_, g1) = S.entersWithTrigger riftsweeper S.alice (Setup.emptyGame S.bothPlayers)
+        (herDeeperId, g2) = S.addLibraryCard piker S.alice g1
+        (herTopId, g3) = S.addLibraryCard piker S.alice g2
+        (hisDeeperId, g4) = S.addLibraryCard bolt S.bob g3
+        (hisTopId, g5) = S.addLibraryCard bolt S.bob g4
+        (hersId, g6) = S.addExiledCard piker S.alice g5
+        (hisId, board) = S.addExiledCard bolt S.bob g6
+        runShuffling oid =
+          let placed = S.runPure (aimAtCardShuffling oid) board Engine.placePendingTriggers
+           in S.runPure (aimAtCardShuffling oid) placed Stack.resolveTop
+        runPlain oid =
+          let placed = S.runPure (aimAtCard oid) board Engine.placePendingTriggers
+           in S.runPure (aimAtCard oid) placed Stack.resolveTop
+        shuffledHers = runShuffling hersId
+        shuffledHis = runShuffling hisId
+        unshuffledHis = runPlain hisId
+        -- CR 400.7 mints a fresh id at the destination, so the arrival is
+        -- whichever library member was not seeded here.
+        arrivalIn pid seeded gs = filter (\oid -> notElem oid seeded) (Game.zoneMembers Zone.Library pid gs)
+    Spec.assertEqWith s "aimed at her own, exile holds only bob's card" (Set.size (GameState.exile shuffledHers)) 1
+    Spec.assertEqWith s "and ALICE's library grew to three" (length (Game.zoneMembers Zone.Library S.alice shuffledHers)) 3
+    Spec.assertEqWith s "with bob's library untouched" (Game.zoneMembers Zone.Library S.bob shuffledHers) [hisTopId, hisDeeperId]
+    case arrivalIn S.alice [herTopId, herDeeperId] shuffledHers of
+      [arrived] ->
+        Spec.assertEqWith
+          s
+          "CR 701.24a: her library was shuffled, so the reversal shows through"
+          (Game.zoneMembers Zone.Library S.alice shuffledHers)
+          [arrived, herDeeperId, herTopId]
+      _ -> Spec.assertFailure s "exactly one card should have arrived in alice's library"
+    Spec.assertEqWith s "aimed at bob's, exile holds only alice's card" (Set.size (GameState.exile shuffledHis)) 1
+    Spec.assertEqWith s "and it is BOB's library that grew, not the controller's" (length (Game.zoneMembers Zone.Library S.bob shuffledHis)) 3
+    Spec.assertEqWith s "with alice's library untouched" (Game.zoneMembers Zone.Library S.alice shuffledHis) [herTopId, herDeeperId]
+    case (arrivalIn S.bob [hisTopId, hisDeeperId] shuffledHis, arrivalIn S.bob [hisTopId, hisDeeperId] unshuffledHis) of
+      ([shuffledArrival], [plainArrival]) -> do
+        Spec.assertEqWith
+          s
+          "CR 701.24a: his library was shuffled too"
+          (Game.zoneMembers Zone.Library S.bob shuffledHis)
+          [shuffledArrival, hisDeeperId, hisTopId]
+        Spec.assertEqWith
+          s
+          "the control: unshuffled, the same card sits at the BOTTOM where the move put it"
+          (Game.zoneMembers Zone.Library S.bob unshuffledHis)
+          [hisTopId, hisDeeperId, plainArrival]
+      _ -> Spec.assertFailure s "exactly one card should have arrived in bob's library in each run"
+
+  -- CR 608.2b for a TRIGGERED ability, over exile: "a target that's no longer in
+  -- the zone it was in when it was targeted is illegal. ... If all its targets,
+  -- for every instance of the word 'target,' are now illegal, the spell or
+  -- ability doesn't resolve."
+  --
+  -- The response takes the card out of exile to bob's hand, which is a zone
+  -- change like any other, so the trigger's one target is gone. Two things must
+  -- then be true: nothing arrives in his library, AND his library is not
+  -- shuffled either. The second is the one CR 701.24c could be misread into
+  -- breaking -- "that library is shuffled even if none of those objects are in
+  -- the zone they're expected to be in" is about an effect that IS resolving,
+  -- and this ability never resolves at all, so the clause never comes up. The
+  -- reversing interpreter is what makes that assertion say anything: the library
+  -- is asserted in its ORIGINAL order, which an unconditional shuffle would have
+  -- reversed.
+  Spec.it s "CR 608.2b Riftsweeper's trigger fizzles when the card leaves exile in response, shuffling nothing" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    riftsweeper <- S.printingOf s registry "Riftsweeper"
+    let (_, g1) = S.entersWithTrigger riftsweeper S.alice (Setup.emptyGame S.bothPlayers)
+        (hisDeeperId, g2) = S.addLibraryCard bolt S.bob g1
+        (hisTopId, g3) = S.addLibraryCard bolt S.bob g2
+        (hisId, board) = S.addExiledCard piker S.bob g3
+        placed = S.runPure (aimAtCardShuffling hisId) board Engine.placePendingTriggers
+        resolve g = S.runPure (aimAtCardShuffling hisId) g Stack.resolveTop
+        shuffledIn = resolve placed
+        fizzled = resolve (S.runPure S.identityAnswer placed (Event.changeZone hisId Zone.Hand))
+    Spec.assertEqWith s "the enters trigger went on the stack" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "untouched, bob's library grew to three" (length (Game.zoneMembers Zone.Library S.bob shuffledIn)) 3
+    Spec.assertEqWith s "taken to his hand in response, his library is the two it started with, in their original order -- not even shuffled" (Game.zoneMembers Zone.Library S.bob fizzled) [hisTopId, hisDeeperId]
+    Spec.assertEqWith s "with the card itself in his hand" (length (Game.zoneMembers Zone.Hand S.bob fizzled)) 1
+    Spec.assertEqWith s "with exile empty when the trigger resolved (the card was shuffled in)" (Set.size (GameState.exile shuffledIn)) 0
+    Spec.assertEqWith s "and empty when it fizzled too (the card was taken to hand)" (Set.size (GameState.exile fizzled)) 0
+    Spec.assertEqWith s "with the ability off the stack" (length (GameState.stack fizzled)) 0

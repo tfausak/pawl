@@ -112,6 +112,10 @@ effectToJson codec e = case e of
   Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson keywordToJson f])))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
   Effect.TakeExtraTurn r skips -> Json.tagged (Text.pack "TakeExtraTurn") (Just (Array (MkArray [playerRefToJson r, Json.setTo phaseSelectorToJson skips])))
+  -- A bare slot name, not an array: whose library is DERIVED from the object
+  -- that slot names (CR 701.24 / "its owner"), so there is no second field for
+  -- a card file to write. The Counter and Sacrifice shape.
+  Effect.ShuffleIntoLibrary s -> Json.tagged (Text.pack "ShuffleIntoLibrary") (Just (slotNameToJson s))
 
 jsonToEffect :: (Value -> Either Text card) -> Value -> Either Text (Effect.Effect card)
 jsonToEffect decode value = do
@@ -222,4 +226,5 @@ jsonToEffect decode value = do
     "TakeExtraTurn" -> case mv of
       Just (Array (MkArray [r, skips])) -> Effect.TakeExtraTurn <$> jsonToPlayerRef r <*> Json.setFrom jsonToPhaseSelector skips
       _ -> Left (Text.pack "TakeExtraTurn expects [playerRef, phaseSelectors]")
+    "ShuffleIntoLibrary" -> Json.withValue mv (fmap Effect.ShuffleIntoLibrary . jsonToSlotName)
     _ -> Left (Text.pack "unknown Effect: " <> t)
