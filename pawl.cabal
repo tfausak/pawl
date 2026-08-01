@@ -100,6 +100,7 @@ library codec
     Pawl.Codec.EndingStep
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryRewrite
+    Pawl.Codec.EntryRiders
     Pawl.Codec.EventShape
     Pawl.Codec.Expiry
     Pawl.Codec.ExtraPhase
@@ -120,6 +121,7 @@ library codec
     Pawl.Codec.MonarchTarget
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectRef
+    Pawl.Codec.Onset
     Pawl.Codec.Optionality
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
@@ -148,7 +150,6 @@ library codec
     Pawl.Codec.Supertype
     Pawl.Codec.TapState
     Pawl.Codec.TargetSpec
-    Pawl.Codec.TokenEntry
     Pawl.Codec.TokenPattern
     Pawl.Codec.Toughness
     Pawl.Codec.TriggerCondition
@@ -404,6 +405,7 @@ library types
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
     Pawl.Types.EntryRewrite
+    Pawl.Types.EntryRiders
     Pawl.Types.EntwineDecision
     Pawl.Types.EventShape
     Pawl.Types.Expiry
@@ -436,6 +438,7 @@ library types
     Pawl.Types.Object
     Pawl.Types.ObjectId
     Pawl.Types.ObjectRef
+    Pawl.Types.Onset
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
     Pawl.Types.Payment
@@ -481,7 +484,6 @@ library types
     Pawl.Types.TapState
     Pawl.Types.TargetSpec
     Pawl.Types.Timestamp
-    Pawl.Types.TokenEntry
     Pawl.Types.TokenPattern
     Pawl.Types.Toughness
     Pawl.Types.TriggerCondition

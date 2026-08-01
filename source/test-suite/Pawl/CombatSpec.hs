@@ -14,6 +14,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -2123,6 +2124,145 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     -- The 2/3 Garrison plus two 1/1 tokens, all unblocked, against bob's 20.
     Spec.assertEqWith s "bob takes 2 + 1 + 1" (S.lifeOf S.bob after) (Just 16)
 
+-- CR 508.4 / CR 508.3a / CR 508.8, through the one card in the pool that puts a
+-- creature onto the battlefield attacking WITHOUT anything having been declared.
+--
+-- Meandering Towershell {3}{G}{G} -- Creature -- Turtle 5/9: "Islandwalk.
+-- Whenever this creature attacks, exile it. Return it to the battlefield under
+-- your control tapped and attacking at the beginning of the declare attackers
+-- step on your next turn."
+--
+-- Hanweir Garrison, the group above, cannot reach either of the two rules these
+-- cases are about. Its tokens arrive only because the Garrison itself was
+-- declared, so CR 508.8's second clause is never in question there; and a token
+-- can never fire a GARRISON's own attack trigger, so CR 508.3a's "including its
+-- own triggered ability" has no falsifier there either. The Towershell is both:
+-- it returns on a turn its controller declares nothing, and the ability that
+-- must not fire is its own.
+towershellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
+  let boardWith theirs = do
+        towershell <- S.printingOf s registry "Meandering Towershell"
+        island <- S.printingOf s registry "Island"
+        pure (towershellBoard towershell island theirs)
+      boardOf = boardWith []
+      towershellName = Text.pack "Meandering Towershell"
+  Spec.it s "CR 508.3a whole card: attacking exiles it, so CR 506.4 leaves it dealing no damage" $ do
+    (gs, ours) <- boardOf
+    let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+    Spec.assertEqWith s "it was declared as an attacker" (S.attackerDeclarationsOf atBlockers) [ours]
+    Spec.assertEqWith s "and its own trigger exiled it" (S.countOnBattlefieldByName towershellName S.alice atBlockers) 0
+    Spec.assertEqWith s "it is the one card in exile" (Set.size (GameState.exile atBlockers)) 1
+    -- CR 508.8's FIRST clause is historical (CR 508.1k), so the two steps stay
+    -- even though the attacker is gone -- the same fact TurnSpec's Ray of
+    -- Command case pins, reached here by the card exiling itself.
+    Spec.assertEqWith s "the declare blockers step was reached anyway" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
+    Spec.assertEqWith s "and one delayed ability is waiting" (length (GameState.delayedTriggers atBlockers)) 1
+    -- CR 506.4: the exiled Towershell left the battlefield, so it is no longer a
+    -- live combat participant and deals no combat damage. The stale entry stays
+    -- in the record on purpose (see Pawl.Engine.Projection's filterReads); every
+    -- combat-damage read filters it out by zone instead (Damage.onBattlefield).
+    let afterDamage = runToTurnStep 1 Phase.PostcombatMain S.aggressiveAnswer gs
+    Spec.assertEqWith s "a 5/9 that left combat deals nobody 5" (S.lifeOf S.bob afterDamage) (Just 20)
+  Spec.it s "CR 508.8 whole card: it returns attacking with NOTHING declared, and the two steps stay" $ do
+    -- The reason this card was worth adding: the rule's SECOND clause standing
+    -- alone, at gameplay level. alice declares no attacker on the return
+    -- turn -- she has none to declare -- and the declare blockers step happens
+    -- regardless, because a creature was put onto the battlefield attacking.
+    --
+    -- Reaching the declare blockers step at all IS the assertion: had the
+    -- Towershell not joined combat, Combat.skipEmptyCombat would have dropped
+    -- that step and the run would have sailed past it.
+    (gs, _) <- boardOf
+    let atReturn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        attackers = Combat.Type.attackers (GameState.combat atReturn)
+    Spec.assertEqWith s "the return turn is alice's" (GameState.activePlayer atReturn) S.alice
+    Spec.assertEqWith s "and the declare blockers step was NOT skipped" (GameState.phase atReturn) (Phase.Combat CombatStep.DeclareBlockers)
+    Spec.assertEqWith s "no creature was declared as an attacker" (S.attackerDeclarationsOf atReturn) []
+    Spec.assertEqWith s "the Towershell is back on the battlefield" (S.countOnBattlefieldByName towershellName S.alice atReturn) 1
+    case Map.toList attackers of
+      [(returned, target)] -> do
+        Spec.assertEqWith s "attacking bob (CR 508.4)" target (AttackTarget.OfPlayer S.bob)
+        Spec.assertEqWith s "and it entered tapped (CR 110.5b)" (tapStateOf returned atReturn) (Just TapState.Tapped)
+        Spec.assertBool s (S.onBattlefield returned atReturn) "the attacker is the returned permanent"
+      other -> Spec.assertFailure s ("exactly one attacking creature expected, got " <> show (length other))
+  Spec.it s "CR 508.3a on the return its OWN attack trigger does not fire" $ do
+    -- The discriminating case. Its ruling: "If Meandering Towershell enters the
+    -- battlefield attacking, it wasn't declared as an attacking creature that
+    -- turn. Abilities that trigger when a creature attacks, INCLUDING ITS OWN
+    -- TRIGGERED ABILITY, won't trigger." An engine that routed the return
+    -- through the declaration would exile it again on the spot and arm a second
+    -- delayed ability, so both halves are asserted.
+    (gs, _) <- boardOf
+    let atReturn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+    Spec.assertEqWith s "it is still on the battlefield, not exiled again" (S.countOnBattlefieldByName towershellName S.alice atReturn) 1
+    Spec.assertEqWith s "the delayed store is empty: nothing armed a second return" (length (GameState.delayedTriggers atReturn)) 0
+    Spec.assertEqWith s "and no declaration was recorded for it" (S.attackerDeclarationsOf atReturn) []
+  Spec.it s "CR 508.8 the combat damage step is not skipped either: bob takes 5" $ do
+    -- The other half of that clause, and the end-to-end statement of it. The
+    -- declare blockers step being reached says the schedule kept it; this says
+    -- the combat damage step ran and the creature that never attacked dealt its
+    -- damage anyway (CR 508.4: such creatures ARE attacking).
+    (gs, _) <- boardOf
+    let afterCombat = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
+    Spec.assertEqWith s "a 5/9 connected" (S.lifeOf S.bob afterCombat) (Just 15)
+  Spec.it s "CR 702.14c whole card: islandwalk keeps the returned Towershell unblockable" $ do
+    -- The pool's first ISLANDwalk (Bog Wraith, #500's card, prints swampwalk),
+    -- and the only window in which this card's own evasion can be read: on the
+    -- turn it is declared it exiles itself before blockers are declared, so the
+    -- return turn is where the keyword does its work.
+    --
+    -- bob controls an Island and a Wall of Stone, and blocks with everything he
+    -- can -- so a Towershell without islandwalk would be blocked here and deal
+    -- bob nothing.
+    --
+    -- A WALL and not a Goblin Piker, because bob's own turn falls between the
+    -- two combats: CR 702.3b keeps a creature with defender out of the
+    -- declaration, so the Wall is still untapped when the Towershell comes back,
+    -- where a Piker would have attacked on turn 2 and be tapped (CR 509.1a) --
+    -- unable to block for a reason that has nothing to do with evasion.
+    wall <- S.printingOf s registry "Wall of Stone"
+    island <- S.printingOf s registry "Island"
+    (gs, _) <- boardWith [island, wall]
+    let afterCombat = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
+    Spec.assertEqWith s "the Wall could not block it (CR 702.14c)" (S.lifeOf S.bob afterCombat) (Just 15)
+
+-- alice at her declare attackers step with one Meandering Towershell and bob
+-- defending, both players holding a small library so the draw steps of the turns
+-- these tests run through do not empty one (CR 104.3c).
+--
+-- The library cards are Islands, which is deliberate rather than filler: an
+-- Island is the only land in the pool the Towershell's own islandwalk (CR
+-- 702.14) reads, and a library is not the battlefield, so CR 702.14c's "the
+-- defending player controls at least one land with the specified land type"
+-- cannot see one there. A case that wants the evasion says so by putting an
+-- Island in `theirs`, which is bob's BATTLEFIELD.
+towershellBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId)
+towershellBoard towershell island theirs =
+  let (base, ours, _) = S.combatBoardOf [towershell] theirs
+      stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 6]
+      gs = stock S.bob (stock S.alice base)
+   in case ours of
+        [oid] -> (gs, oid)
+        -- Unreachable (combatBoardOf returns one id per printing), and total
+        -- rather than an `error`: S.noSource names no object, so a fixture that
+        -- somehow got here fails the first assertion instead of the whole suite.
+        _ -> (gs, S.noSource)
+
+-- runToStep's multi-turn twin: run whole steps until the board is at `phase` on
+-- turn `turn`, WITHOUT running that step. Bounded so a bug cannot loop forever,
+-- and it stops on a finished game so an empty library ends the run rather than
+-- spinning.
+runToTurnStep :: Natural -> Phase.Phase -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToTurnStep turn phase answer gs0 =
+  let go n g =
+        if n <= (0 :: Int)
+          || Maybe.isJust (GameState.result g)
+          || (GameState.turnNumber g == turn && GameState.phase g == phase)
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 64 gs0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -2144,3 +2284,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   typeChangeRemovalSpec s registry
   effectRemovalSpec s registry
   putOntoBattlefieldAttackingSpec s registry
+  towershellSpec s registry

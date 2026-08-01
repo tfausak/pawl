@@ -96,3 +96,7 @@ isLandType subtype = case subtype of
   -- saying out loud here, because Bog Wraith is also the pool's first card with
   -- landwalk, and the land type its keyword NAMES is Swamp rather than this.
   Subtype.Wraith -> False
+  -- CR 205.3m: a creature type (Meandering Towershell's). Not a land type --
+  -- worth saying out loud for the same reason Wraith is: the Towershell prints
+  -- ISLANDWALK, and the land type its keyword names is Island rather than this.
+  Subtype.Turtle -> False

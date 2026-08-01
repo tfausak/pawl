@@ -49,6 +49,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
@@ -2666,6 +2667,103 @@ kindredSpec s registry =
               Spec.assertBool s (Projection.isCreatureOf token after) "and it, unlike its maker, IS a creature"
             other -> Spec.assertFailure s ("expected exactly one token beside Bitterblossom, got " <> show (length other) <> " other permanents")
 
+-- CR 603.7's arming gate, through Meandering Towershell -- the pool's one card
+-- whose delayed ability is printed "on your NEXT turn" (Pawl.Types.Onset).
+--
+-- The gate is NOT vacuous, and this group's whole point is to prove it. The
+-- ability's own condition is StepBegins (Combat DeclareAttackers)
+-- ControllersTurn, and a TurnScope cannot tell one of the controller's turns
+-- from another -- so an extra combat phase in the SAME turn (Relentless Assault,
+-- and its siblings Aggravated Assault, Full Throttle and Aurelia) has a declare
+-- attackers step that begins on alice's turn and would fire the return early.
+towershellOnsetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
+  let boardOf = do
+        towershell <- S.printingOf s registry "Meandering Towershell"
+        mountain <- S.printingOf s registry "Mountain"
+        island <- S.printingOf s registry "Island"
+        assault <- S.printingOf s registry "Relentless Assault"
+        pure (towershellAssaultBoard towershell mountain island assault)
+      towershellName = Text.pack "Meandering Towershell"
+  Spec.it s "CR 603.7 a second declare attackers step THIS turn does not fire it" $ do
+    (gs, spell) <- boardOf
+    let -- alice attacks with the Towershell; its trigger exiles it and arms the
+        -- return, gated to a later turn.
+        atMain = runToTurnStep 1 Phase.PostcombatMain S.aggressiveAnswer gs
+        armed = GameState.delayedTriggers atMain
+        -- "After this main phase, there is an additional combat phase followed
+        -- by an additional main phase" (CR 500.8).
+        cast = snd (Engine.runGamePure S.identityAnswer atMain (Cast.castSpell S.alice spell))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        atExtra = runToTurnStep 1 (Phase.Combat CombatStep.DeclareAttackers) S.aggressiveAnswer resolved
+        afterExtra = snd (Engine.runGamePure S.aggressiveAnswer atExtra Engine.runStep)
+    Spec.assertEqWith s "the return is armed" (length armed) 1
+    Spec.assertEqWith
+      s
+      "and gated to a turn after the one it was armed on"
+      (fmap DelayedTrigger.notBefore (Foldable.toList armed))
+      [Just 2]
+    Spec.assertEqWith s "the extra combat's declare attackers step really happened" (GameState.phase atExtra) (Phase.Combat CombatStep.DeclareAttackers)
+    Spec.assertEqWith s "it is still in exile" (S.countOnBattlefieldByName towershellName S.alice afterExtra) 0
+    Spec.assertEqWith s "and still armed, unspent" (length (GameState.delayedTriggers afterExtra)) 1
+  -- The control that stops the case above from passing for the wrong reason: a
+  -- gate that never opened would satisfy every assertion in it. The SAME line of
+  -- play -- extra combat phase included -- returns the Towershell on alice's
+  -- next turn.
+  Spec.it s "CR 603.7b and the same line of play returns it on alice's next turn" $ do
+    (gs, spell) <- boardOf
+    let atMain = runToTurnStep 1 Phase.PostcombatMain S.aggressiveAnswer gs
+        cast = snd (Engine.runGamePure S.identityAnswer atMain (Cast.castSpell S.alice spell))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        atNextTurn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer resolved
+    Spec.assertEqWith s "alice's next turn is turn 3" (GameState.turnNumber atNextTurn) 3
+    Spec.assertEqWith s "and there it does return" (S.countOnBattlefieldByName towershellName S.alice atNextTurn) 1
+    Spec.assertEqWith s "spending the one shot (CR 603.7b)" (length (GameState.delayedTriggers atNextTurn)) 0
+
+-- alice at her declare attackers step with one Meandering Towershell, four
+-- untapped Mountains (exactly Relentless Assault's {2}{R}{R}) and the Assault in
+-- hand; bob defends. Both libraries hold Islands so the draw steps of the turns
+-- these cases run through cannot empty one (CR 104.3c).
+--
+-- The Islands are in LIBRARIES and never on the battlefield, which matters for
+-- this card: CR 702.14c's islandwalk reads the lands the DEFENDING PLAYER
+-- CONTROLS, and a library is not the battlefield -- so nothing here turns on
+-- evasion.
+towershellAssaultBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId)
+towershellAssaultBoard towershell mountain island assault =
+  let (base, _, _) = S.combatBoardOf [towershell] []
+      withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) base [1 :: Int .. 4]
+      stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 8]
+      (withCard, spell) = S.handOne assault (stock S.bob (stock S.alice withLands))
+   in ( withCard
+          { GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.phase = GameState.phase base,
+            GameState.combat = GameState.combat base,
+            GameState.remaining = GameState.remaining base
+          },
+        spell
+      )
+
+-- Run whole steps until the board is at `phase` on turn `turn`, WITHOUT running
+-- that step. Bounded so a bug cannot loop forever; stops on a finished game.
+-- Pawl.CombatSpec has the same helper for the same card, kept local to each
+-- group per the suite's convention.
+runToTurnStep :: Natural -> Phase.Phase -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToTurnStep turn phase answer gs0 =
+  let go n g =
+        if n <= (0 :: Int)
+          || Maybe.isJust (GameState.result g)
+          || (GameState.turnNumber g == turn && GameState.phase g == phase)
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 64 gs0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -2675,6 +2773,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   stateTriggerSpec s registry
   historySpec s registry
   delayedSpec s registry
+  towershellOnsetSpec s registry
   orderingSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry

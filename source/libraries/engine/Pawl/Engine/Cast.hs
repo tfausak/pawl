@@ -326,9 +326,12 @@ restrictionMet pid gs restriction = case restriction of
 -- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
 -- combat PHASE. The two spans coincide for every card in the pool -- the flag is
 -- written only by Pawl.Engine.Combat.declareAttackers (CR 508.1, the declare attackers
--- step's turn-based action) and by putOntoBattlefieldAttacking, whose only
--- producer is a CR 508.3a attack trigger resolving in that same step -- but that
--- is a fact about the pool rather than a rule (#447).
+-- step's turn-based action) and by putOntoBattlefieldAttacking, whose every
+-- producer resolves in a declare attackers step (a CR 508.3a attack trigger,
+-- Hanweir Garrison's; a CR 603.7 delayed ability keyed to the beginning of that
+-- step, Meandering Towershell's) -- but that is a fact about the pool rather
+-- than a rule (#447). CR 508.4d's later-step entries are the ones that would
+-- part them, and none is built (#368).
 attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
   let combat = GameState.combat gs

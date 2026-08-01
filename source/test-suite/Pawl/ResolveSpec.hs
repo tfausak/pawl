@@ -140,6 +140,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
           S.runPure S.identityAnswer gone $
             Resolve.applyEffect
               S.noSource
+              S.noSource
               S.bob
               Map.empty
               (Map.singleton slot True)
@@ -148,6 +149,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         control =
           S.runPure S.identityAnswer board $
             Resolve.applyEffect
+              S.noSource
               S.noSource
               S.bob
               Map.empty
@@ -854,7 +856,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         g3 = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g2 (replicate 5 ())
         after =
           S.runPure S.identityAnswer g3 $
-            Resolve.applyEffect S.noSource S.alice Map.empty Map.empty Map.empty Effect.ExileHandThenDraw
+            Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty Map.empty Effect.ExileHandThenDraw
     Spec.assertEqWith s "the hand is refilled to the size it had" (S.handSize S.alice after) 2
     Spec.assertEqWith s "both old cards went to exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 2
     Spec.assertEqWith s "and the library is two shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 3
@@ -1218,6 +1220,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         store m =
           S.runPure S.identityAnswer gs $
             Resolve.applyEffect
+              S.noSource
               S.noSource
               S.alice
               Map.empty
@@ -2184,6 +2187,7 @@ untapSpec s registry = Spec.describe s "Untap" $ do
         run =
           Resolve.applyEffect
             oid
+            oid
             S.alice
             Map.empty
             (Map.singleton slot True)
@@ -2201,6 +2205,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
         -- Apply as though a spell alice controls (controller = alice) resolved it.
         run =
           Resolve.applyEffect
+            oid
             oid
             S.alice
             Map.empty
@@ -2226,6 +2231,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
         run =
           Resolve.applyEffect
             oid
+            oid
             S.alice
             Map.empty
             (Map.singleton slot True)
@@ -2241,7 +2247,7 @@ gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
   Spec.it s "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
+        act = Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
         after = S.runPure S.identityAnswer gs0 act
     Spec.assertEqWith s "alice has two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
 
@@ -2261,7 +2267,7 @@ proliferatesNothing p = case p of
 -- Resolve one Proliferate for alice against `gs`, answered by `answer`.
 proliferate :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 proliferate answer src gs =
-  S.runPure answer gs (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)
+  S.runPure answer gs (Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)
 
 proliferateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 proliferateSpec s registry = Spec.describe s "Proliferate" $ do
@@ -2428,7 +2434,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)) 0
+        asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)) 0
     Spec.assertEqWith s "nobody has a counter: nothing to ask" (asks gs) 0
     Spec.assertEqWith s "someone does: one real decision" (asks (S.addCounter CounterKind.PlusOnePlusOne 1 src gs)) 1
   -- The gameplay-level proof (design.md section 4): a real card, cast and
@@ -2497,7 +2503,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
     let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (hisPiker, g1) = S.addCreature piker S.bob g0
         (hisRats, gs) = S.addCreature rats S.bob g1
-        edict = Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        edict = Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
         keptRats = S.runPure (sacrifices hisPiker) gs edict
         keptPiker = S.runPure (sacrifices hisRats) gs edict
     Spec.assertBool s (S.onBattlefield hisRats keptRats) "choosing the Piker leaves the Rats"
@@ -2521,7 +2527,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
         (hers, g1) = S.addCreature piker S.alice g0
         (hisPiker, g2) = S.addCreature piker S.bob g1
         (hisRats, gs) = S.addCreature rats S.bob g2
-        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
         bobsLeft = length (filter (`S.onBattlefield` after) [hisPiker, hisRats])
     Spec.assertBool s (S.onBattlefield hers after) "alice's creature is untouched"
     -- The edict still takes exactly one: an answer the engine refuses does not
@@ -2540,7 +2546,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        act = Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        act = Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
         asked = State.execState (Engine.runGame countingAnswer gs act) 0
         after = S.runPure S.identityAnswer gs act
     Spec.assertEqWith s "nothing to choose" asked 0
@@ -2550,7 +2556,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
   Spec.it s "CR 609.3 an edict against an empty board does nothing" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
     Spec.assertBool s (S.onBattlefield src after) "alice keeps hers"
   -- The gameplay-level proof: the real card, cast and resolved.
   Spec.it s "Diabolic Edict whole card: cast off two Swamps, bob sacrifices" $ do
@@ -2570,7 +2576,7 @@ createEmblemSpec s registry = Spec.describe s "CreateEmblem" $ do
   Spec.it s "CR 114.2 CreateEmblem puts an emblem in the command zone under the resolver" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (Printing.card piker))
+        act = Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (Printing.card piker))
         after = S.runPure S.identityAnswer gs0 act
         emblems = filter (\oid -> fmap Object.zone (Game.lookupObject oid after) == Just Zone.Command) (Set.toList (GameState.command after))
     Spec.assertEqWith s "one emblem in command" (Set.size (GameState.command after)) 1
@@ -2581,7 +2587,7 @@ becomeMonarchSpec s registry = Spec.describe s "BecomeMonarch" $ do
   Spec.it s "CR 725 BecomeMonarch TheController makes the resolver the monarch" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs0 (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.BecomeMonarch MonarchTarget.TheController))
+        after = S.runPure S.identityAnswer gs0 (Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty (Effect.BecomeMonarch MonarchTarget.TheController))
     Spec.assertEqWith s "alice is monarch" (GameState.monarch after) (Just S.alice)
     Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (GameState.events after)) "a BecameMonarch event was recorded"
 
@@ -2608,6 +2614,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         exile =
           Resolve.applyEffect
             S.noSource
+            S.noSource
             S.alice
             Map.empty
             (Map.singleton slot True)
@@ -2629,6 +2636,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         exile =
           Resolve.applyEffect
+            S.noSource
             S.noSource
             S.alice
             Map.empty
@@ -2656,6 +2664,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         exile =
           Resolve.applyEffect
+            S.noSource
             S.noSource
             S.alice
             Map.empty

@@ -43,6 +43,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import Pawl.Types.Game (Game)
@@ -60,6 +61,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -83,7 +85,6 @@ import qualified Pawl.Types.Source as Source
 import Pawl.Types.Subtype (Subtype)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TokenEntry as TokenEntry
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -139,7 +140,7 @@ slotsOf effect = case effect of
   Effect.Destroy ref _ _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.RemoveFromCombat slot -> Set.singleton slot
-  Effect.MoveToZone slot _ -> Set.singleton slot
+  Effect.MoveToZone slot _ _ _ -> Set.singleton slot
   Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Mill slot quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
@@ -158,7 +159,7 @@ slotsOf effect = case effect of
   Effect.Untap ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ ref -> objectRefSlots ref
-  Effect.ArmDelayedTrigger _ _ -> Set.empty
+  Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
@@ -216,7 +217,7 @@ readsX = any effectReadsX
       Effect.Untap _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
-      Effect.ArmDelayedTrigger _ _ -> False
+      Effect.ArmDelayedTrigger {} -> False
       Effect.AffectPlayers {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
@@ -267,7 +268,7 @@ manaProduced effect = case effect of
   Effect.Untap _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.GainControl _ _ -> Nothing
-  Effect.ArmDelayedTrigger _ _ -> Nothing
+  Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -312,7 +313,7 @@ searchesLibrary effect = case effect of
   Effect.Untap _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
-  Effect.ArmDelayedTrigger _ _ -> False
+  Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
@@ -337,17 +338,38 @@ textChangeSlots card =
 armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
 armedAbilities effects =
   let named effect = case effect of
-        Effect.ArmDelayedTrigger name _ -> Just name
+        Effect.ArmDelayedTrigger name _ _ -> Just name
+        _ -> Nothing
+   in Set.fromList (Maybe.mapMaybe named effects)
+
+-- CR 603.7: the delayed abilities an effect list arms with an ONSET -- the ones
+-- whose firing is gated past the turn that armed them (Pawl.Types.Onset). The
+-- sibling of armedAbilities above, narrowed to the arms that are not
+-- Onset.Immediately.
+--
+-- Its customer is the card lint (CardSpec's "every delayed ability armed for
+-- YOUR next turn is controller-scoped"), which joins these names against the
+-- card's own Card.delayedAbilities and asks
+-- Pawl.Engine.Event.controllerTurnScoped of each one's condition. The two halves
+-- live in the two modules that may case on the two types, and the join is the
+-- lint's.
+onsetGatedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
+onsetGatedAbilities effects =
+  let named effect = case effect of
+        Effect.ArmDelayedTrigger _ Onset.Immediately _ -> Nothing
+        Effect.ArmDelayedTrigger name _ _ -> Just name
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
 -- The slots an effect list DEFINES rather than reads: a Create that names the
--- token it mints (CR 603.7c's "it"), a PlaySubgame that names its loser, a
--- Destroy that names how many it destroyed. The write half of the same lint.
+-- token it mints (CR 603.7c's "it"), a MoveToZone that names the incarnation CR
+-- 400.7 minted at the destination, a PlaySubgame that names its loser, a Destroy
+-- that names how many it destroyed. The write half of the same lint.
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
 definedSlots effects =
   let bound effect = case effect of
         Effect.Create _ _ _ mSlot -> mSlot
+        Effect.MoveToZone _ _ _ mSlot -> mSlot
         Effect.PlaySubgame slot -> Just slot
         Effect.Destroy _ _ mSlot -> mSlot
         _ -> Nothing
@@ -426,7 +448,7 @@ rewriteEffect pairs effect = case effect of
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
   Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
-  Effect.ArmDelayedTrigger _ _ -> effect
+  Effect.ArmDelayedTrigger {} -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
   -- An emblem's embedded card carries no basic-land-type word here (as Create's
@@ -570,7 +592,7 @@ resolveSpellWith runSubgame oid = do
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalityNow = Map.mapWithKey legalSlot chosenNow
-                        applyEffectWith runSubgame oid effectController (Binding.subtypesOf bindingsNow) legalityNow chosenNow eff
+                        applyEffectWith runSubgame oid oid effectController (Binding.subtypesOf bindingsNow) legalityNow chosenNow eff
                   Monad.when taken (Monad.forM_ (Mode.effects mode) applyOne)
                 Event.changeZone oid Zone.Graveyard
 
@@ -636,7 +658,7 @@ resolveModes stackId srcId modes = do
             -- every target is already gone (CR 608.2b) -- it never resolves, so
             -- there is nothing for the answer to decide.
             taken <- exercises stackId effectController idx mode
-            Monad.when taken (Monad.mapM_ (applyEffect srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (Mode.effects mode))
+            Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (cease stackId)
@@ -890,8 +912,19 @@ objectRefObjects legality chosen controller source gs ref = case ref of
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
 
-applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
-applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
+-- `resolving` is the object ON THE STACK whose resolution this is -- the spell
+-- itself for a spell, the ABILITY object for an activated or triggered one --
+-- and is where every slot this fold DEFINES is bound, and where
+-- ArmDelayedTrigger reads CR 603.7c's captured environment back out. NOT
+-- `source`: for an ability those two differ (CR 113.7a keeps `source` on the
+-- SOURCE PERMANENT, which is what a DealDamage must come from), and the source
+-- permanent can be gone by the time a later effect of the same list runs --
+-- Meandering Towershell exiles itself and then arms, so a capture keyed to the
+-- permanent would find nothing to capture. The stack object outlives its own
+-- effect list by construction (CR 608.2n removes it afterwards), so it is the
+-- one holder that is always there to write to.
+applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
+applyEffectWith runSubgame resolving source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -1172,12 +1205,37 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
         _ -> gs
-  Effect.MoveToZone slot zone ->
+  Effect.MoveToZone slot zone entry mSlot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
-        Just target -> Event.changeZone target zone
+        -- CR 110.5b: the funnel is handed the riders' tap state, so a permanent
+        -- an effect says enters tapped is never untapped for an instant.
+        Just target -> do
+          mNew <- Event.changeZoneEntering target zone (EntryRiders.tapped entry)
+          case mNew of
+            -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
+            -- already gone (CR 603.7c's "no longer in the zone it's expected to
+            -- be in ... the ability won't affect it"). Nothing entered, so there
+            -- is nothing to join to combat and nothing to bind.
+            Nothing -> pure ()
+            Just newId -> do
+              -- CR 508.4: "if a creature is put onto the battlefield attacking,
+              -- its controller chooses which defending player ... it's
+              -- attacking". The rules for that live in Pawl.Engine.Combat, which
+              -- is also what keeps this from looking like a declaration -- CR
+              -- 508.3a's attack triggers see nothing, INCLUDING the returning
+              -- creature's own (Meandering Towershell's ruling says so in as
+              -- many words). The Create arm calls the same function for the same
+              -- rule.
+              Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
+              -- CR 603.7c: bind the arriving incarnation into the resolving
+              -- object's live bindings, so a delayed ability THIS SAME
+              -- resolution arms can name it -- the exiled card in "exile it.
+              -- Return IT to the battlefield". Nothing to ask: CR 400.7 minted
+              -- exactly one object and it is the whole candidate set.
+              Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
       _ -> pure ()
   Effect.Draw ref quantity -> do
     gs <- State.get
@@ -1409,7 +1467,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- 614's token replacements (Doubling Season) get their opportunity.
             -- CR 110.5b: the funnel is handed the entry's tap state, so a token
             -- the effect says is tapped is never untapped for an instant.
-            minted <- Event.createTokens controller card (Integer.toNaturalSaturating n) (TokenEntry.tapped entry)
+            minted <- Event.createTokens controller card (Integer.toNaturalSaturating n) (EntryRiders.tapped entry)
             -- CR 508.4: "if a creature is put onto the battlefield attacking, its
             -- controller chooses which defending player ... it's attacking". The
             -- rules for that live in Pawl.Engine.Combat, which is also what keeps this
@@ -1419,7 +1477,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- After the entry loops rather than inside them: CR 614.16's token
             -- replacement settles the COUNT first, so this joins the tokens that
             -- actually entered, however many that turned out to be.
-            Monad.when (TokenEntry.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking minted)
+            Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking minted)
             case (mSlot, minted) of
               (Nothing, _) -> pure ()
               -- Unreachable: createTokens places every token onto the battlefield
@@ -1432,7 +1490,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- where the rules leave nothing to ask, don't prompt. The
               -- Pawl.CardSpec lint keeps the PRINTED quantity at 1 (#53), which is
               -- why this is the ordinary case.
-              (Just slot, [only]) -> State.modify' (bindSlot source slot only)
+              (Just slot, [only]) -> State.modify' (bindSlot resolving slot only)
               -- CR 614.16 got there first: a token replacement (Doubling Season)
               -- multiplied the count at RESOLUTION, after the lint had passed, so
               -- several tokens now stand where CR 603.7c's "it" names one
@@ -1450,11 +1508,15 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                     decider = Decide.deciderFor controller gs1
                 answer <- Trans.lift (Program.prompt (Prompt.ChooseBoundToken decider controller source candidates))
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
-                State.modify' (bindSlot source slot named)
+                State.modify' (bindSlot resolving slot named)
       _ -> pure ()
-  Effect.ArmDelayedTrigger name duration -> do
+  Effect.ArmDelayedTrigger name onset duration -> do
     gs <- State.get
-    case Game.cardOf source gs >>= (Map.lookup name . Card.Type.delayedAbilities) of
+    -- CR 608.2h's last-known fallback, and NOT belt and braces: the source can
+    -- have left the battlefield an opcode earlier in this same list -- Meandering
+    -- Towershell's "exile it. Return it ..." -- and CR 400.7 has already deleted
+    -- the id `source` names by the time this runs.
+    case Game.cardOfWithLastKnown source gs >>= (Map.lookup name . Card.Type.delayedAbilities) of
       -- The dataflow lint makes a dangling name a failing test, never a silent
       -- no-op; this arm only keeps the executor total.
       Nothing -> pure ()
@@ -1463,13 +1525,23 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         -- ability AS IT RESOLVED -- `controller`, baked in now. CR 603.7a: an
         -- entry appended here can only ever match events at or after the current
         -- watermark, so it never fires on an event that already happened.
-        let captured = maybe Map.empty Object.bindings (Game.lookupObject source gs)
+        let captured = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
             entry =
               DelayedTrigger.MkDelayedTrigger
                 { DelayedTrigger.ability = ability,
                   DelayedTrigger.source = source,
                   DelayedTrigger.controller = controller,
                   DelayedTrigger.bindings = captured,
+                  -- CR 603.7a's other end, from Pawl.Types.Onset: Nothing for an
+                  -- ability armed the moment it is created (every card but one),
+                  -- and the NEXT turn number for one printed "on your next turn"
+                  -- -- read off the live board here, because a card cannot know
+                  -- which turn that is. Every turn that begins bumps the counter
+                  -- (Engine.beginTurnOf), extra turns included, so "a later turn
+                  -- than this one" is exactly what the successor names.
+                  DelayedTrigger.notBefore = case onset of
+                    Onset.Immediately -> Nothing
+                    Onset.FromYourNextTurn -> Just (GameState.turnNumber gs + 1),
                   -- CR 603.7b's stated duration, armed the way a continuous
                   -- effect's is. The two Maybes meet here and mean different
                   -- things: the OUTER one is the card printing no duration at
@@ -2003,7 +2075,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
-applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
+applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffect = applyEffectWith noSubgame
 
 -- CR 103.5b / CR 103.6: perform the effects of an action a card grants from a
@@ -2023,6 +2095,7 @@ performHandAction source player =
   Monad.mapM_
     ( applyEffect
         source
+        source
         player
         Map.empty
         -- CR 115.1: the reserved self slot is NOT a target, so there is no CR
@@ -2038,29 +2111,23 @@ performHandAction source player =
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.
--- `holder` is the effect SOURCE, which is the resolving spell itself for a
--- spell and the source PERMANENT for an ability -- the same object
--- ArmDelayedTrigger captures from (`Game.lookupObject source gs` there), so the
--- two always agree. Whether this makes the slot visible to a later effect of
--- the same fold now depends on the path: on the SPELL path, resolveSpellWith
--- re-reads Object.bindings before EACH effect, so a later Sacrifice/Destroy/
--- etc. reading the same slot DOES see the mid-fold value (this is exactly what
--- lets PlaySubgame's derived loser reach a follow-on DealDamage). On the
--- ABILITY path, resolveEffects still folds applyEffect over a `chosen`
--- snapshot taken once before the fold starts, so a later Sacrifice/Destroy/
--- etc. there still sees the pre-Create value (Nothing). Only ArmDelayedTrigger
--- sees it on either path, because it re-reads Object.bindings from LIVE
--- GameState rather than from `chosen`. A spell-mode effect that tried to read
--- a dangling Create slot would be caught loudly by the D4 lint (declared slots
--- == read slots) rather than silently no-op, so this gap is a documentation
--- defect, not a latent one.
+-- `holder` is `resolving` -- the object ON THE STACK, which is the spell itself
+-- for a spell and the ABILITY object for an activated or triggered one -- the
+-- same object ArmDelayedTrigger captures from, so the two always agree. See
+-- applyEffectWith for why the stack object and not the effect's `source`.
 --
--- For an ABILITY, `holder`/`source` is the source PERMANENT, not the ability
--- object on the stack -- so a delayed ability armed by a triggered or activated
--- ability captures the PERMANENT's bindings (e.g. an earlier Create on that
--- same permanent), never the arming ability's own chosen targets or its `self`
--- slot. Unexercised today: only Tidal Wave, a spell (whose `source` IS the
--- resolving stack object), arms anything.
+-- Whether this makes the slot visible to a later effect of the same fold depends
+-- on the path: on the SPELL path, resolveSpellWith re-reads Object.bindings
+-- before EACH effect, so a later Sacrifice/Destroy/etc. reading the same slot
+-- DOES see the mid-fold value (this is exactly what lets PlaySubgame's derived
+-- loser reach a follow-on DealDamage). On the ABILITY path, resolveModes still
+-- folds applyEffect over a `chosen` snapshot taken once before the fold starts,
+-- so a later Sacrifice/Destroy/etc. there still sees the pre-bind value
+-- (Nothing). Only ArmDelayedTrigger sees it on either path, because it re-reads
+-- Object.bindings from LIVE GameState rather than from `chosen`. A spell-mode
+-- effect that tried to read a dangling Create slot would be caught loudly by the
+-- D4 lint (declared slots == read slots) rather than silently no-op, so this gap
+-- is a documentation defect, not a latent one.
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
@@ -2076,6 +2143,12 @@ noSubgame = pure Result.Drawn
 -- CR 729.1b: bind the subgame's derived loser (a player) into `slot` on the
 -- resolving object, so a later effect (DealDamage) can read it. Mirrors bindSlot,
 -- but the recipient is a player (ToPlayer), not an object.
+--
+-- `holder` is the effect's `source` and not `resolving`, which is where its
+-- READER looks: the follow-on effect reads it through resolveSpellWith's
+-- re-read of the resolving SPELL's bindings, and only a spell can play a subgame
+-- (a subgame from an ability is deferred, see noSubgame), so for every producer
+-- that can exist the two ids are the same object.
 bindLoserSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
 bindLoserSlot holder slot loser gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer loser) (Object.bindings obj)}
@@ -2091,6 +2164,15 @@ bindLoserSlot holder slot loser gs =
 -- are. Harmless and unreadable: only an effect naming this slot can see it, the
 -- D4 lint makes every such read live under an effect list that also BINDS it,
 -- and a second sweep on the same holder overwrites the value before reading it.
+--
+-- `holder` is the effect's `source`, NOT `resolving`, and that asymmetry with
+-- bindSlot above is about where each is READ rather than about what each means:
+-- an amount is read back by Quantity.evaluate, which every arm calls aimed at
+-- `source` (CR 608.2h's "information from a specific object ... including the
+-- source of the ability itself"), while an object binding is read back by
+-- ArmDelayedTrigger off the stack object. Bane of Progress binds and reads one
+-- inside a TRIGGERED ability, where the two ids differ, so this is load-bearing
+-- rather than a convention.
 bindAmountSlot :: ObjectId -> SlotName -> Natural -> GameState -> GameState
 bindAmountSlot holder slot n gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}

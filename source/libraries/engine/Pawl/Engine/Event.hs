@@ -172,6 +172,21 @@ placeObject pid mkObj dest = do
 changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
+-- changeZoneReturning for a move whose effect says how the object ENTERS -- CR
+-- 110.5b's "unless a spell or ability says otherwise" -- rather than leaving it
+-- to the rule's default. Meandering Towershell's "return it to the battlefield
+-- tapped" is the one producer.
+--
+-- A separate door rather than a fifth parameter on changeZone, exactly as
+-- changeZoneInBatch is: the ~30 callers that move an object under the default
+-- have no tap state to name, and CR 110.5b is what says the default is theirs.
+-- Handed to the funnel rather than applied after it, for the reason
+-- createTokens' own comment gives: a permanent an effect says is tapped is never
+-- untapped for an instant, and CR 614.1c's entry replacements run inside this
+-- call.
+changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Game (Maybe ObjectId)
+changeZoneEntering oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing
+
 -- changeZone for one member of a batch of moves that CR 608.2f or CR 704.3
 -- processes SIMULTANEOUSLY -- the destroy funnel's graveyard moves below, and CR
 -- 704.3's put-into-graveyard batch in Pawl.Engine.Sba. `asOf` is the board the batch
@@ -185,14 +200,14 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- rare case, and the ~30 callers that move a single object have no footing to
 -- name -- for them the board the move begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped
 
 -- changeZoneReturning with an attachment seed. CR 303.4: "An Aura enters the
 -- battlefield attached to an object or player" -- attachment is a property of
@@ -209,9 +224,11 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- divergence is #188.
 --
 -- `asOf` is the CR 608.2f / 704.3 batch board changeZoneInBatch above supplies,
--- and Nothing for every other caller.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest seed = do
+-- and Nothing for every other caller. `tapped` is CR 110.5b's status as the
+-- moving effect states it, and TapState.Untapped -- that rule's default -- for
+-- every door but changeZoneEntering.
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest seed tapped = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -282,7 +299,12 @@ changeZoneAttaching asOf oid requestedDest seed = do
         Nothing -> pure Nothing
         Just settled -> do
           let dest = ZoneChange.to settled
-              mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
+              -- CR 110.5b: untapped unless the moving effect said otherwise
+              -- (changeZoneEntering). Meaningful only for a battlefield
+              -- destination -- CR 110.5a makes status a property of permanents
+              -- -- and every other door passes the default, so nothing else can
+              -- put a tapped card in a graveyard.
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -293,7 +315,7 @@ changeZoneAttaching asOf oid requestedDest seed = do
                     -- carries as its source (CR 113.7) -- and from the same
                     -- `snapshot` the Moved event below records, so the two
                     -- readings of "what was it" cannot drift apart.
-                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController) (GameState.lastKnown g1)
+                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj)) (GameState.lastKnown g1)
                   }
           newId <- placeObject pid mkObj dest
           -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
@@ -1589,6 +1611,52 @@ functionsInGraveyard cond = case cond of
   -- resolve.
   TriggerCondition.SpellOrAbilityCounters _ -> False
 
+-- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
+-- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
+-- <step>" and for nothing else.
+--
+-- A CLASSIFICATION of a trigger condition, the third of the same kind as
+-- eventBindingSlots and functionsInGraveyard above -- it asks a structural
+-- question about a rule 603 condition and never reaches the ability's payload.
+--
+-- Its customer is the card lint (CardSpec's "every delayed ability armed for
+-- YOUR next turn is controller-scoped"). Pawl.Types.Onset.FromYourNextTurn
+-- delivers only the NEXT half of "your next turn": it becomes a turn NUMBER
+-- (DelayedTrigger.notBefore) and a number cannot say whose turn it is. The YOUR
+-- half is this -- so an onset paired with a condition that answers False here
+-- would fire on an intervening opponent's turn, and the lint rejects that
+-- pairing rather than leaving the two fields to agree by luck.
+--
+-- Exhaustive with no wildcard, for eventBindingSlots' reason: a new condition
+-- must force a decision rather than defaulting to False, which for the arms that
+-- carry no turn scope at all is nonetheless the honest answer -- a condition
+-- that says nothing about whose turn it is does not restrict one.
+controllerTurnScoped :: TriggerCondition -> Bool
+controllerTurnScoped cond = case cond of
+  -- The one arm that carries a TurnScope, and the whole content of this
+  -- classification. CR 603.3a controls the ability and CR 109.5 is what makes
+  -- "your" mean that controller (see Pawl.Types.TurnScope).
+  TriggerCondition.StepBegins _ TurnScope.ControllersTurn -> True
+  -- "At the beginning of EACH <step>" admits every player's turn, which is
+  -- exactly the pairing the lint exists to reject.
+  TriggerCondition.StepBegins _ TurnScope.EachTurn -> False
+  -- None of the rest is a turn-scoped condition at all: each names an event that
+  -- can happen on anybody's turn, so none of them restricts one.
+  TriggerCondition.SelfEnters -> False
+  TriggerCondition.PermanentEnters _ -> False
+  TriggerCondition.StateIs _ -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+  TriggerCondition.SelfCycled -> False
+  TriggerCondition.PlayerDiscards _ -> False
+  -- CR 508.1a makes this one the ACTIVE player's turn, which is not the same
+  -- thing: CR 109.5's "you" is the ability's controller, and a stolen creature
+  -- attacks on its thief's turn. False is the honest answer.
+  TriggerCondition.SelfAttacks _ -> False
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+  TriggerCondition.SelfDies -> False
+  TriggerCondition.SpellOrAbilityCounters _ -> False
+
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.
 --
@@ -1680,8 +1748,10 @@ stateTriggers gs =
 -- ability resolves under the player who controlled the spell that created it
 -- even if that spell's source object is long gone.
 --
--- `fires` matches only against EVENTS (`matchesTrigger`), never against live
--- game state, so a stored entry whose condition is TriggerCondition.StateIs would
+-- `fires` matches its CONDITION only against EVENTS (`matchesTrigger`), never
+-- against live game state -- the live turn number `armed` reads is CR 603.7a's
+-- arming gate rather than part of the condition, and it can only ever WITHHOLD a
+-- match. So a stored entry whose condition is TriggerCondition.StateIs would
 -- never match here -- it would never fire, and unless it states a duration for a
 -- Pawl.Engine.Expiry sweep to end, never leave the store either. Not a live gap:
 -- TriggerCondition is a closed type (Pawl.Types.TriggerCondition) and no card in
@@ -1700,9 +1770,17 @@ stateTriggers gs =
 -- still armed for the next occurrence.
 delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending events gs =
-  let fires entry =
+  let -- CR 603.7a's floor -- "a delayed triggered ability won't trigger until it
+      -- has actually been created, even if its trigger event occurred just
+      -- beforehand" -- is the watermark's job, and is all an ordinary entry
+      -- (notBefore = Nothing) needs. This is the card's OWN further restriction:
+      -- an ability printed "on your next turn" (Pawl.Types.Onset) is not armed
+      -- on the turn it was created, whatever its condition matches. Read against
+      -- the LIVE turn number, so an entry with no onset is untouched.
+      armed entry = maybe True (GameState.turnNumber gs >=) (DelayedTrigger.notBefore entry)
+      fires entry =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
-         in any (matchesTrigger gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
+         in armed entry && any (matchesTrigger gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
       pend entry =
         PendingTrigger.MkPendingTrigger
           (TriggerSource.OfObject (DelayedTrigger.source entry))

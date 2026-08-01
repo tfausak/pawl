@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
+import Pawl.Codec.EntryRiders (defaultEntryRiders)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Printing (printingToJson)
 import qualified Pawl.Engine.Binding as Binding
@@ -15,6 +16,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -34,6 +36,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -46,6 +49,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -64,7 +68,6 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
-import qualified Pawl.Types.TokenEntry as TokenEntry
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -77,6 +80,13 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 slugOf :: Printing.Printing -> Slug.Slug
 slugOf = Slug.fromText . CardT.name . Printing.card
+
+-- The slot meandering-towershell.json binds its exiled incarnation under. An
+-- ordinary slot name, not one of Pawl.Engine.Binding's reserved ones: it names
+-- an object a resolution DEFINED (CR 400.7's new incarnation), the way a Create
+-- names the token it minted.
+exiledSlot :: SlotName.SlotName
+exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
 
 -- Each mode of a payload as (is it optional, what does it do) -- the shape the
 -- CR 603.5 assertions below compare against.
@@ -102,6 +112,63 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Serum Powder")
     Spec.assertEqWith s "the CR 103.5b action" (CardT.mulliganAction c) [Effect.ExileHandThenDraw]
     Spec.assertEqWith s "one activated ability, the {T}: Add {C} mana ability" (length (CardT.activatedAbilities c)) 1
+  -- The first card file whose delayed ability is armed from a TRIGGERED ability
+  -- rather than from a spell mode, the first with an Onset, and the first whose
+  -- MoveToZone carries entry riders and binds the incarnation it made.
+  --
+  -- Meandering Towershell {3}{G}{G} -- Creature -- Turtle 5/9: "Islandwalk.
+  -- Whenever this creature attacks, exile it. Return it to the battlefield under
+  -- your control tapped and attacking at the beginning of the declare attackers
+  -- step on your next turn."
+  --
+  -- "Under your control" is NOT in this file: the effect DSL has no way to say
+  -- it, so the card returns under its owner's control, which differs only when
+  -- the attacking player does not own it (#508).
+  Spec.it s "meandering-towershell.json loads as a {3}{G}{G} 5/9 islandwalking Turtle that exiles and returns itself" $ do
+    c <- S.cardOf s registry "Meandering Towershell"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Meandering Towershell")
+    Spec.assertEqWith
+      s
+      "{3}{G}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 5)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 9)))
+    Spec.assertEqWith s "Creature -- Turtle" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Turtle)
+    -- CR 702.14a: the land type rides the KEYWORD, never the type line -- the
+    -- Towershell is a Turtle and prints no Island anywhere.
+    Spec.assertEqWith s "one keyword: islandwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk Subtype.Island))
+    Spec.assertEqWith
+      s
+      "one trigger, on being declared as an attacker (CR 508.3a)"
+      (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+      [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
+    case concatMap (concatMap snd . modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c) of
+      [Effect.MoveToZone slot zone entry bound, Effect.ArmDelayedTrigger name onset duration] -> do
+        Spec.assertEqWith s "it exiles ITSELF" (slot, zone) (Binding.triggerSource, Zone.Exile)
+        Spec.assertEqWith s "with no entry riders on the way out" entry defaultEntryRiders
+        -- CR 400.7 / 603.7c: the exiled incarnation is a new object, so the
+        -- delayed ability can only name it through a slot this effect binds.
+        Spec.assertEqWith s "binding the exiled incarnation" bound (Just exiledSlot)
+        Spec.assertEqWith s "and arms the return" name (AbilityName.MkAbilityName (Text.pack "return it"))
+        Spec.assertEqWith s "on your NEXT turn (CR 603.7a)" onset Onset.FromYourNextTurn
+        -- CR 603.7b: no stated duration, so the entry is spent by firing once.
+        Spec.assertEqWith s "and only once" duration Nothing
+      other -> Spec.assertFailure s ("expected an exile and an arm, got " <> show (length other))
+    case Map.toList (CardT.delayedAbilities c) of
+      [(name, ability)] -> do
+        Spec.assertEqWith s "the declared ability is the one armed" name (AbilityName.MkAbilityName (Text.pack "return it"))
+        Spec.assertEqWith
+          s
+          "CR 603.2b at the beginning of YOUR declare attackers step"
+          (TriggeredAbility.condition ability)
+          (TriggerCondition.StepBegins (Phase.Combat CombatStep.DeclareAttackers) TurnScope.ControllersTurn)
+        Spec.assertEqWith
+          s
+          "returning the exiled card tapped and attacking"
+          (concatMap snd (modeShapes (TriggeredAbility.modal ability)))
+          [Effect.MoveToZone exiledSlot Zone.Battlefield EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True} Nothing]
+      other -> Spec.assertFailure s ("expected one delayed ability, got " <> show (length other))
   -- The first card file with landwalk (CR 702.14), and the first whose
   -- keyword payload is a SUBTYPE. What it pins is that the land type is on
   -- the KEYWORD and not on the type line: Bog Wraith is a Wraith and prints
@@ -236,7 +303,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "and may put the card itself onto the battlefield"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Optional, [Effect.MoveToZone Binding.triggerSource Zone.Battlefield])]]
+      [[(Optionality.Optional, [Effect.MoveToZone Binding.triggerSource Zone.Battlefield defaultEntryRiders Nothing])]]
   Spec.it s "hanweir-garrison.json loads as a {2}{R} 2/3 whose attack trigger makes two tapped attacking Humans" $ do
     c <- S.cardOf s registry "Hanweir Garrison"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Hanweir Garrison")
@@ -263,7 +330,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "the entry riders are the effect's, not the token's"
       [te | ab <- CardT.triggeredAbilities c, Effect.Create _ _ te _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))]
-      [TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Tapped, TokenEntry.attacking = True}]
+      [EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}]
     -- Meld (CR 702.157) is not modelled: the printed reminder text says it
     -- melds with Hanweir Battlements, and neither the partner nor the melded
     -- permanent is in the pool (#369).
@@ -338,7 +405,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "returning the became slot to its owner's hand"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Mandatory, [Effect.MoveToZone Binding.became Zone.Hand])]]
+      [[(Optionality.Mandatory, [Effect.MoveToZone Binding.became Zone.Hand defaultEntryRiders Nothing])]]
   -- The pool's first INTERVENING "if" on a look-back trigger (CR 603.4 read
   -- against CR 608.2h last known information), and the first condition whose
   -- measured side is not a Count at all.
@@ -426,7 +493,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "the CR 103.6a action puts itself onto the battlefield"
       (CardT.openingHandAction c)
-      [Effect.MoveToZone Binding.triggerSource Zone.Battlefield]
+      [Effect.MoveToZone Binding.triggerSource Zone.Battlefield defaultEntryRiders Nothing]
     Spec.assertEqWith
       s
       "and the redirect is scoped to an opponent's graveyard"
@@ -690,7 +757,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
         Spec.assertEqWith s "its controller loses the life" who (PlayerRef.Relative PlayerRelation.You)
         Spec.assertEqWith s "1 life" amount (Quantity.Literal 1)
         Spec.assertEqWith s "one token" quantity (Quantity.Literal 1)
-        Spec.assertEqWith s "with no entry riders" entry TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Untapped, TokenEntry.attacking = False}
+        Spec.assertEqWith s "with no entry riders" entry EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False}
         Spec.assertEqWith s "and no slot bound to it" slot Nothing
         -- CR 111.4: Bitterblossom names no token, so the name is the
         -- subtypes plus the word "Token" -- the rule's own example is
