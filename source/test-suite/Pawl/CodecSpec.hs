@@ -227,6 +227,14 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "Keyword.Hexproof" $ do
       roundTrip s "hexproof" keywordToJson jsonToKeyword Keyword.Hexproof
       Spec.assertBool s (keywordToJson Keyword.Hexproof /= keywordToJson Keyword.Shroud) "hexproof is not shroud"
+    -- CR 702.15a's lifelink is nullary, and the tag it must not share is
+    -- DEATHTOUCH's: Basilisk Collar grants both, so a lifelink that decoded as
+    -- deathtouch would leave the Collar granting deathtouch twice -- redundant
+    -- by CR 702.2f -- and every board-level assertion about killing blockers
+    -- would still hold while nobody gained any life.
+    Spec.it s "Keyword.Lifelink" $ do
+      roundTrip s "lifelink" keywordToJson jsonToKeyword Keyword.Lifelink
+      Spec.assertBool s (keywordToJson Keyword.Lifelink /= keywordToJson Keyword.Deathtouch) "lifelink is not deathtouch"
     -- CR 702.164a's N rides the constructor, so this is the first keyword
     -- that is not a bare tag.
     Spec.it s "Keyword.Toxic carries its N" $ do
@@ -1115,9 +1123,11 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         "damage"
         gameEventToJson
         jsonToGameEvent
-        -- A NONZERO toxic value, so the CR 702.164b rider is round-tripped
-        -- rather than defaulted past.
-        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 3 DamageKind.Combat))
+        -- A NONZERO toxic value and a PRESENT lifelink payee, so the CR 702.164b
+        -- and CR 702.15b riders are round-tripped rather than defaulted past.
+        -- The payee is alice while the damage lands on bob, so a codec that
+        -- read the payee back off DamageEvent.target would be caught here.
+        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 3 (Just S.alice) DamageKind.Combat))
     -- CR 120.3c's recipient tag is a different arm of Recipient from the one
     -- above, and a CR 608.2i record the codec cannot write is one no replay can
     -- read back.
@@ -1127,7 +1137,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
         "damage"
         gameEventToJson
         jsonToGameEvent
-        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2)) 3 False False 0 DamageKind.Noncombat))
+        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2)) 3 False False 0 Nothing DamageKind.Noncombat))
     Spec.it s "GameEvent.StepBegan round-trips" $
       roundTrip s "step" gameEventToJson jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
     Spec.it s "GameEvent.SpellCast round-trips" $

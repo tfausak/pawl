@@ -282,17 +282,17 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
 
   Spec.it s "CR 603.2 SelfDealsCombatDamageToPlayer matches the bearer's combat damage to a player" $ do
     let bearer = ObjectId.MkObjectId 1
-        ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
+        ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
     Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev) "matches"
 
   Spec.it s "it does not match combat damage to a creature" $ do
     let bearer = ObjectId.MkObjectId 1
-        ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToCreature (ObjectId.MkObjectId 2)) 2 False False 0 DamageKind.Combat)
+        ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToCreature (ObjectId.MkObjectId 2)) 2 False False 0 Nothing DamageKind.Combat)
     Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)) "no match"
 
   Spec.it s "it does not match noncombat damage to a player" $ do
     let bearer = ObjectId.MkObjectId 1
-        ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Noncombat)
+        ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Noncombat)
     Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)) "no match"
 
   Spec.it s "CR 400.7: a zone change forgets attachment" $ do

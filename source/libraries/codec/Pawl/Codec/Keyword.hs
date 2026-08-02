@@ -31,6 +31,7 @@ keywordToJson k = case k of
   Keyword.Hexproof -> Json.nullary (Text.pack "Hexproof")
   Keyword.Indestructible -> Json.nullary (Text.pack "Indestructible")
   Keyword.Landwalk subtype -> Json.tagged (Text.pack "Landwalk") (Just (subtypeToJson subtype))
+  Keyword.Lifelink -> Json.nullary (Text.pack "Lifelink")
   Keyword.Reach -> Json.nullary (Text.pack "Reach")
   Keyword.Shroud -> Json.nullary (Text.pack "Shroud")
   Keyword.Trample -> Json.nullary (Text.pack "Trample")
@@ -58,6 +59,7 @@ jsonToKeyword value = do
     ("Hexproof", _) -> Right Keyword.Hexproof
     ("Indestructible", _) -> Right Keyword.Indestructible
     ("Landwalk", Just v) -> Keyword.Landwalk <$> jsonToSubtype v
+    ("Lifelink", _) -> Right Keyword.Lifelink
     ("Reach", _) -> Right Keyword.Reach
     ("Shroud", _) -> Right Keyword.Shroud
     ("Trample", _) -> Right Keyword.Trample

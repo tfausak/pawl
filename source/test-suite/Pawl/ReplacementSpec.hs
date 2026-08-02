@@ -770,8 +770,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         -- this assertion (Fog prevents a whole batch, not just one event) does
         -- not need.
         batch =
-          [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False False 0 DamageKind.Combat,
-            DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False False 0 DamageKind.Combat
+          [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False False 0 Nothing DamageKind.Combat,
+            DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False False 0 Nothing DamageKind.Combat
           ]
         after = S.runPure S.identityAnswer resolved (Damage.applyDamage batch)
     Spec.assertEqWith s "the first attacker's damage was prevented" (S.damageOf victimA after) (Just 0)
@@ -850,7 +850,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (troll, g1) = S.addCreature uthdenTroll S.alice base
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
         -- 2 damage is lethal to a 2/2.
-        hurt = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent troll (Recipient.ToCreature troll) 2 False False 0 DamageKind.Combat])
+        hurt = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent troll (Recipient.ToCreature troll) 2 False False 0 Nothing DamageKind.Combat])
         settled = S.settleSba hurt
     Spec.assertBool s (Set.member troll (GameState.battlefield settled)) "the shield saved it"
   Spec.it s "CR 614.8 regeneration replaces the destruction, so Rest in Peace never sees it" $ do
