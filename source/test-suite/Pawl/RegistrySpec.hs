@@ -61,9 +61,6 @@ expectException s label expected action = do
     Left err -> Spec.assertEqWith s label err expected
     Right _ -> Spec.assertFailure s (label <> ": expected " <> show expected <> ", got a value")
 
-nameOf :: Printing.Printing -> Text.Text
-nameOf = Card.name . Printing.card
-
 -- The message an Invalid carries, for cases that assert on its content rather
 -- than on the constructor alone.
 reasonOf :: CardError.CardError -> String
@@ -77,7 +74,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
     piker <- S.pikerJson
     withCorpus "by-name" [("goblin-piker.json", piker)] $ \_ registry -> do
       p <- S.printingOf s registry "Goblin Piker"
-      Spec.assertEq s (nameOf p) $ Text.pack "Goblin Piker"
+      Spec.assertEq s (Card.name $ Printing.card p) . CardName.MkCardName $ Text.pack "Goblin Piker"
 
   Spec.it s "the same card loads by its slug -- slugify is idempotent" $ do
     piker <- S.pikerJson
@@ -124,8 +121,8 @@ spec s = Spec.describe s "Pawl.Registry" $ do
         Right _ -> Spec.assertFailure s "expected a misfiled card to fail"
         Left err -> do
           Spec.assertBool s (List.isInfixOf (root <> "/bird-maiden.json") (reasonOf err)) ("names the path: " <> show err)
-          Spec.assertBool s (List.isInfixOf "is named Goblin Piker" (reasonOf err)) ("names the card: " <> show err)
-          Spec.assertBool s (List.isInfixOf "files under goblin-piker" (reasonOf err)) ("names where it belongs: " <> show err)
+          Spec.assertBool s (List.isInfixOf "Goblin Piker" (reasonOf err)) ("names the card: " <> show err)
+          Spec.assertBool s (List.isInfixOf "goblin-piker" (reasonOf err)) ("names where it belongs: " <> show err)
 
   Spec.it s "a file with invalid UTF-8 bytes is Invalid, naming the path and the decode failure"
     . withInvalidUtf8Corpus "invalid-utf8"
@@ -148,7 +145,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       Spec.assertBool s (either (const True) (const False) broken) "the malformed file fails first"
       TextIO.writeFile (root <> "/goblin-piker.json") piker
       c <- S.cardOf s registry "Goblin Piker"
-      Spec.assertEq s (Card.name c) $ Text.pack "Goblin Piker"
+      Spec.assertEq s (Card.name c) . CardName.MkCardName $ Text.pack "Goblin Piker"
 
   -- (b) A mistyped --cards-dir should fail once, at startup, rather than
   -- once per card looked up (#167). This is the one failure that is still an

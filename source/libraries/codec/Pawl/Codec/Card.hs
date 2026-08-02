@@ -14,6 +14,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
@@ -43,7 +44,7 @@ import qualified Pawl.Types.Counterability as Counterability
 toJson :: Card.Card -> Value.Value
 toJson c =
   Common.object
-    ( [ Common.pair "name" . Common.text $ Card.name c,
+    ( [ Common.pair "name" . CardName.toJson $ Card.name c,
         Common.pair "manaCost" . Common.encodeMaybe ManaCost.toJson $ Card.manaCost c,
         Common.pair "typeLine" . TypeLine.toJson $ Card.typeLine c,
         Common.pair "power" . Common.encodeMaybe Power.toJson $ Card.power c,
@@ -134,7 +135,7 @@ toJson c =
 fromJson :: Value.Value -> Either Text.Text Card.Card
 fromJson value = do
   ps <- Common.asObject value
-  name <- Common.field "name" ps >>= Common.asText
+  name <- Common.field "name" ps >>= CardName.fromJson
   manaCost <- Common.decodeMaybe ManaCost.fromJson (Common.nullableField "manaCost" ps)
   typeLine <- Common.field "typeLine" ps >>= TypeLine.fromJson
   power <- Common.decodeMaybe Power.fromJson (Common.nullableField "power" ps)

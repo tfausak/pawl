@@ -48,6 +48,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -1019,7 +1020,7 @@ creaturesInPlay pid gs =
           Source.OfInherentTrigger _ _ -> False
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
-countByName :: Text.Text -> PlayerId.PlayerId -> GameState.GameState -> Int
+countByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countByName wanted pid gs =
   let named oid = case Game.lookupObject oid gs of
         Nothing -> False
@@ -1035,7 +1036,7 @@ countByName wanted pid gs =
    in length inLibrary + length inHand
 
 -- How many of pid's battlefield objects are copies of a card with this name.
-countOnBattlefieldByName :: Text.Text -> PlayerId.PlayerId -> GameState.GameState -> Int
+countOnBattlefieldByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countOnBattlefieldByName wanted pid gs =
   let named oid = case Game.lookupObject oid gs of
         Nothing -> False
@@ -1074,7 +1075,7 @@ zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.even
 -- snapshot down to the card's NAME: a reveal shows every characteristic, but the
 -- name is what identifies the card to the table and the only part an assertion
 -- can write down legibly. A test that needs more reads Event.revealOf directly.
-revealsOf :: GameState.GameState -> [(PlayerId.PlayerId, Text.Text)]
+revealsOf :: GameState.GameState -> [(PlayerId.PlayerId, CardName.CardName)]
 revealsOf gs = fmap (fmap PC.name) (Maybe.mapMaybe Event.revealOf (Foldable.toList (GameState.events gs)))
 
 -- The battlefield objects that are tokens (CR 111.1) rather than cards.

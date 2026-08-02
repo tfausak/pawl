@@ -22,6 +22,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
@@ -34,7 +35,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 clonesOnBattlefield :: GameState.GameState -> [ObjectId]
 clonesOnBattlefield gs = filter isClone (Set.toList (GameState.battlefield gs))
   where
-    isClone oid = maybe False (\c -> Card.Type.name c == Text.pack "Clone") (Game.cardOf oid gs)
+    isClone oid = maybe False (\c -> Card.Type.name c == CardName.MkCardName (Text.pack "Clone")) (Game.cardOf oid gs)
 
 cloneOnBattlefield :: GameState.GameState -> Maybe ObjectId
 cloneOnBattlefield = Maybe.listToMaybe . clonesOnBattlefield

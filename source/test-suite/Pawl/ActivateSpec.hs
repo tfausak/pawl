@@ -35,6 +35,7 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
@@ -640,12 +641,12 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
         -- 602.2a reveals Ash Barrens itself as the ability is announced,
         -- because a hand is a hidden zone; CR 702.29e's "reveal it" then
         -- reveals the Forest when the ability resolves. In that order.
-        Spec.assertEqWith s "only the announcement reveal before the ability resolves" (S.revealsOf cycled) [(S.alice, Text.pack "Ash Barrens")]
+        Spec.assertEqWith s "only the announcement reveal before the ability resolves" (S.revealsOf cycled) [(S.alice, CardName.MkCardName $ Text.pack "Ash Barrens")]
         Spec.assertEqWith
           s
           "then Alice revealed the Forest she found"
           (S.revealsOf after)
-          [(S.alice, Text.pack "Ash Barrens"), (S.alice, Text.pack "Forest")]
+          [(S.alice, CardName.MkCardName $ Text.pack "Ash Barrens"), (S.alice, CardName.MkCardName $ Text.pack "Forest")]
       abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
 
   -- CR 701.20a reveals "that card", so a search that finds none reveals
@@ -665,7 +666,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
       [ability] -> do
         let cycled = S.runPure findFirst gs (Activate.activateAbility S.alice oid ability)
             after = S.runPure findFirst cycled Stack.resolveTop
-        Spec.assertEqWith s "no basic land found, so only the announcement reveal" (S.revealsOf after) [(S.alice, Text.pack "Ash Barrens")]
+        Spec.assertEqWith s "no basic land found, so only the announcement reveal" (S.revealsOf after) [(S.alice, CardName.MkCardName $ Text.pack "Ash Barrens")]
       abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
 
   -- CR 702.29f: "typecycling abilities are cycling abilities, and typecycling
@@ -711,7 +712,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
     -- so CR 602.2a adds nothing. The contrast between these two tests is the
     -- whole of what that rule's zone condition does.
     Spec.assertEqWith s "nothing revealed while the ability is still on the stack" (S.revealsOf activated) []
-    Spec.assertEqWith s "Alice revealed the Forest, and only the Forest" (S.revealsOf after) [(S.alice, Text.pack "Forest")]
+    Spec.assertEqWith s "Alice revealed the Forest, and only the Forest" (S.revealsOf after) [(S.alice, CardName.MkCardName $ Text.pack "Forest")]
     Spec.assertEqWith s "the Forest is in her hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
     Spec.assertEqWith s "and out of her library" (length (Game.zoneMembers Zone.Library S.alice after)) 0
     -- CR 701.20b: revealing does not move the card, so the two Islands that
@@ -741,7 +742,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
       [ability] -> do
         let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
             events = Foldable.toList (GameState.events activated)
-        Spec.assertEqWith s "Alice revealed Barkhide Mauler" (S.revealsOf activated) [(S.alice, Text.pack "Barkhide Mauler")]
+        Spec.assertEqWith s "Alice revealed Barkhide Mauler" (S.revealsOf activated) [(S.alice, CardName.MkCardName $ Text.pack "Barkhide Mauler")]
         Spec.assertEqWith s "and the draw has not resolved, so this is the announcement" (length (GameState.stack activated)) 1
         case (List.findIndex (Maybe.isJust . Event.revealOf) events, List.findIndex ((== Just Zone.Graveyard) . fmap ZoneChange.to . Event.movedOf) events) of
           (Just revealed, Just discarded) -> Spec.assertBool s (revealed < discarded) "revealed before the cost discarded it"

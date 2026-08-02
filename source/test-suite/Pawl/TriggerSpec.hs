@@ -79,6 +79,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -351,7 +352,7 @@ scanSpec s registry =
           bobBefore = S.handSize S.bob gs
           cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
           settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
-      Spec.assertEqWith s "CR 704.5f buried the 0/0" (S.countOnBattlefieldByName (Text.pack "Ravenous Rats") S.alice settled) 0
+      Spec.assertEqWith s "CR 704.5f buried the 0/0" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ravenous Rats") S.alice settled) 0
       Spec.assertEqWith s "in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
       Spec.assertEqWith s "and bob still discarded, exactly once" (S.handSize S.bob settled) (bobBefore - 1)
     -- The no-double-fire half. Same board minus the -1/-1, so the Rats is on
@@ -368,7 +369,7 @@ scanSpec s registry =
           bobBefore = S.handSize S.bob gs
           cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
           settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
-      Spec.assertEqWith s "the Rats survived" (S.countOnBattlefieldByName (Text.pack "Ravenous Rats") S.alice settled) 1
+      Spec.assertEqWith s "the Rats survived" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ravenous Rats") S.alice settled) 1
       Spec.assertEqWith s "nothing in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 0
       Spec.assertEqWith s "bob discarded exactly one" (S.handSize S.bob settled) (bobBefore - 1)
 
@@ -1741,7 +1742,7 @@ counterTriggerSpec s registry =
           Spec.assertEqWith s "bob's spell was countered into his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob countered)) 1
           -- By NAME, not S.creaturesInPlay: bob's own Baral is a creature on
           -- his battlefield throughout, so a bare count could never read 0.
-          Spec.assertEqWith s "and the Piker never reached the battlefield" (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.bob countered) 0
+          Spec.assertEqWith s "and the Piker never reached the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.bob countered) 0
           Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
           Spec.assertEqWith s "so bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
         -- THE discriminating case for rule 701.6a's OTHER subject. That rule is
@@ -1869,7 +1870,7 @@ permanentEntersSpec s registry =
               (gs, spellId) = S.handOne soulWarden base
               cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
               settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
-          Spec.assertEqWith s "both Wardens are on the battlefield" (S.countOnBattlefieldByName (Text.pack "Soul Warden") S.alice settled) 2
+          Spec.assertEqWith s "both Wardens are on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Soul Warden") S.alice settled) 2
           Spec.assertEqWith s "alice gained exactly 1" (S.lifeOf S.alice settled) (fmap (+ 1) (S.lifeOf S.alice gs))
           Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob settled) (S.lifeOf S.bob gs)
         -- CR 603.6a: "all permanents on the battlefield (INCLUDING THE
@@ -2001,7 +2002,7 @@ graveyardTriggerSpec s registry =
          in (placed, S.runPure answer placed Stack.resolveTop)
       namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
-      narcomoebaName = Text.pack "Narcomoeba"
+      narcomoebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
    in Spec.describe s "GraveyardTrigger" $ do
         -- The gameplay-level proof, cast to resolution.
         Spec.it s "CR 113.6k whole card: Tome Scour mills Narcomoeba and its trigger puts it onto the battlefield" $ do
@@ -2049,7 +2050,7 @@ graveyardTriggerSpec s registry =
               buried = S.runPure S.identityAnswer gs0 (Event.changeZone wardenCard Zone.Graveyard)
               (pikerCard, gs1) = S.addHandCard piker S.alice buried
               entered = S.runPure S.identityAnswer gs1 (Event.changeZone pikerCard Zone.Battlefield)
-          Spec.assertBool s (Set.member (Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
+          Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
           Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents entered) entered))) []
 
 -- CR 603.6c: leaves-the-battlefield abilities "trigger when a permanent moves
@@ -2091,9 +2092,9 @@ diesTriggerSpec s registry =
         filter
           -- CR 111.4: Doomed Traveler does not specify the token's name, so the
           -- name is its subtype plus the word "Token".
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Spirit Token"))
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Spirit Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
-      travelerName = Text.pack "Doomed Traveler"
+      travelerName = CardName.MkCardName $ Text.pack "Doomed Traveler"
    in Spec.describe s "DiesTrigger" $ do
         -- The gameplay-level proof, cast to resolution, through a real
         -- removal spell and the state-based action it sets up.
@@ -2215,7 +2216,7 @@ leavesBattlefieldSpec s registry =
         filter
           -- CR 111.4: Thragtusk does not specify the token's name, so the name
           -- is its subtype plus the word "Token".
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Beast Token"))
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Beast Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
       assertOneBeast after =
         case beastsOf S.alice after of
@@ -2226,7 +2227,7 @@ leavesBattlefieldSpec s registry =
             Spec.assertEqWith s "green" (Projection.colorsOf beast after) (Set.singleton Color.Green)
             Spec.assertEqWith s "Beast" (Projection.subtypesOf beast after) (Set.singleton Subtype.Beast)
           other -> Spec.assertFailure s ("expected exactly one Beast token, got " <> show (length other))
-      tuskName = Text.pack "Thragtusk"
+      tuskName = CardName.MkCardName $ Text.pack "Thragtusk"
       namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
       -- Every slot stamped on every object currently on the stack, which for
@@ -2291,9 +2292,9 @@ leavesBattlefieldSpec s registry =
         Spec.it s "CR 700.4 a Doomed Traveler bounced by Unsummon does NOT fire its dies trigger" $ do
           (_, board) <- bounceBoard "Doomed Traveler"
           let (settled, _) = castIt board
-          Spec.assertBool s (Set.member (Text.pack "Doomed Traveler") (namesIn Zone.Hand S.alice settled)) "the Traveler left the battlefield for a hand"
+          Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Doomed Traveler") (namesIn Zone.Hand S.alice settled)) "the Traveler left the battlefield for a hand"
           Spec.assertEqWith s "and nothing triggered" (length (GameState.stack settled)) 0
-          Spec.assertEqWith s "so no Spirit was made" (S.countOnBattlefieldByName (Text.pack "Spirit Token") S.alice settled) 0
+          Spec.assertEqWith s "so no Spirit was made" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Spirit Token") S.alice settled) 0
         -- CR 400.7e's proviso in isolation, one case per zone CR 400.2
         -- classifies, so the branch is pinned to the RULE rather than to the two
         -- destinations the boards above happen to reach. "Graveyard,
@@ -2451,7 +2452,7 @@ becameSlotSpec s registry =
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
       namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
-      roachName = Text.pack "Endless Cockroaches"
+      roachName = CardName.MkCardName $ Text.pack "Endless Cockroaches"
    in Spec.describe s "CR 400.7e the card it became" $ do
         -- The gameplay-level proof, cast to resolution. The discriminating
         -- assertion is the HAND: an effect reading the trigger's source would
@@ -2467,7 +2468,7 @@ becameSlotSpec s registry =
           -- The Bolt itself is the graveyard's only remaining tenant, so the
           -- assertion above cannot be passing because the graveyard is read
           -- from the wrong player's zone.
-          Spec.assertEqWith s "only the Bolt is left there" (namesIn Zone.Graveyard S.alice after) (Set.singleton (Text.pack "Lightning Bolt"))
+          Spec.assertEqWith s "only the Bolt is left there" (namesIn Zone.Graveyard S.alice after) (Set.singleton (CardName.MkCardName $ Text.pack "Lightning Bolt"))
         -- The two slots, side by side on the placed trigger. CR 113.7a's
         -- source is the id that DIED and no longer resolves; CR 400.7e's
         -- "became" is the graveyard card, which does.
@@ -2568,7 +2569,7 @@ lookBackInterveningSpec s registry =
         filter
           -- CR 111.4: the name is BOTH subtypes plus "Token", which is exactly
           -- the rule's own Dwarven Reinforcements example.
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Zombie Berserker Token"))
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Zombie Berserker Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
    in Spec.describe s "CR 603.4 an intervening if over last known information" $ do
         Spec.it s "CR 603.4 with Bad Moon the Berserker died at power 3 and its trigger fires" $ do
@@ -2780,8 +2781,8 @@ aetherFlashSpec s registry =
         case filter (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just name) (Set.toList (GameState.battlefield gs)) of
           [oid] -> fmap Object.damage (Game.lookupObject oid gs)
           _ -> Nothing
-      pikerName = Text.pack "Goblin Piker"
-      sentryName = Text.pack "Ogre Sentry"
+      pikerName = CardName.MkCardName $ Text.pack "Goblin Piker"
+      sentryName = CardName.MkCardName $ Text.pack "Ogre Sentry"
    in Spec.describe s "CR 400.7e the entrant an enters trigger names" $ do
         -- The gameplay-level proof, cast to resolution. The discriminating
         -- assertion is the GRAVEYARD: an ability whose `became` slot went
@@ -2842,7 +2843,7 @@ aetherFlashSpec s registry =
           let (_, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
               (gs, spellId) = S.handOne dragonFodder withFlash
               after = castIt (gs, spellId)
-          Spec.assertEqWith s "no Goblin token survived" (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after) 0
+          Spec.assertEqWith s "no Goblin token survived" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 0
           Spec.assertEqWith s "two damage events of 2, one per token" (fmap DamageEvent.amount (damageEventsIn after)) [2, 2]
           Spec.assertEqWith s "and they were dealt to two different objects" (Set.size (Set.fromList (fmap DamageEvent.target (damageEventsIn after)))) 2
         -- CR 608.2h, the case Aether Flash makes reachable with no second
@@ -2964,7 +2965,7 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
         island <- S.printingOf s registry "Island"
         assault <- S.printingOf s registry "Relentless Assault"
         pure (towershellAssaultBoard towershell mountain island assault)
-      towershellName = Text.pack "Meandering Towershell"
+      towershellName = CardName.MkCardName $ Text.pack "Meandering Towershell"
   Spec.it s "CR 603.7 a second declare attackers step THIS turn does not fire it" $ do
     (gs, spell) <- boardOf
     let -- alice attacks with the Towershell; its trigger exiles it and arms the

@@ -37,6 +37,7 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -604,7 +605,7 @@ longtuskCubSpec s registry =
   Spec.describe s "LongtuskCub" $ do
     Spec.it s "Longtusk Cub is a {1}{G} 2/2 Cat with a pay-energy ability" $ do
       longtuskCub <- S.printingOf s registry "Longtusk Cub"
-      Spec.assertEqWith s "name" (Card.Type.name (Printing.card longtuskCub)) (Text.pack "Longtusk Cub")
+      Spec.assertEqWith s "name" (Card.Type.name (Printing.card longtuskCub)) (CardName.MkCardName $ Text.pack "Longtusk Cub")
       Spec.assertEqWith s "power" (Card.Type.power (Printing.card longtuskCub)) (Just (Power.MkPower (Quantity.Type.Literal 2)))
       Spec.assertEqWith s "one activated ability" (length (Card.Type.activatedAbilities (Printing.card longtuskCub))) 1
     Spec.it s "CR 118.6 the pay-energy ability is payable at two energy, not at one, and grows the Cub" $ do

@@ -55,6 +55,7 @@ import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -125,7 +126,7 @@ m2aCardSpec s registry = Spec.describe s "M2aCards" $ do
   Spec.it s "Bird Maiden is a {2}{R} 1/2 Human Bird with flying" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     let c = Printing.card birdMaiden
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Bird Maiden")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Bird Maiden")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, red])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
@@ -137,35 +138,35 @@ m2aCardSpec s registry = Spec.describe s "M2aCards" $ do
   Spec.it s "Nimble Birdsticker is a {2}{R} 2/3 Goblin with reach" $ do
     nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
     let c = Printing.card nimbleBirdsticker
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Nimble Birdsticker")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Nimble Birdsticker")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, red])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
   Spec.it s "Ogre Sentry is a {1}{R} 3/3 Ogre Warrior with defender" $ do
     ogreSentry <- S.printingOf s registry "Ogre Sentry"
     let c = Printing.card ogreSentry
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Ogre Sentry")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Ogre Sentry")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1, red])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 3)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
   Spec.it s "Windseeker Centaur is a {1}{R}{R} 2/2 Centaur with vigilance" $ do
     windseekerCentaur <- S.printingOf s registry "Windseeker Centaur"
     let c = Printing.card windseekerCentaur
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Windseeker Centaur")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Windseeker Centaur")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1, red, red])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
   Spec.it s "Goblin Chariot is a {2}{R} 2/2 Goblin Warrior with haste" $ do
     goblinChariot <- S.printingOf s registry "Goblin Chariot"
     let c = Printing.card goblinChariot
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Goblin Chariot")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Goblin Chariot")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, red])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
   Spec.it s "Glistener Elf is a {G} 1/1 Phyrexian Elf Warrior with infect" $ do
     glistenerElf <- S.printingOf s registry "Glistener Elf"
     let c = Printing.card glistenerElf
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Glistener Elf")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Glistener Elf")
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
     Spec.assertBool s (elem Keyword.Infect (Card.Type.keywords c)) "has infect"
@@ -173,7 +174,7 @@ m2aCardSpec s registry = Spec.describe s "M2aCards" $ do
   Spec.it s "Branchblight Stalker is a {1}{G} 3/1 Phyrexian Elf Scout with toxic 2" $ do
     stalker <- S.printingOf s registry "Branchblight Stalker"
     let c = Printing.card stalker
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Branchblight Stalker")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Branchblight Stalker")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1, green])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 3)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
@@ -185,7 +186,7 @@ m2aCardSpec s registry = Spec.describe s "M2aCards" $ do
   Spec.it s "Snake Cult Initiation is a {3}{B} Aura granting poisonous 3" $ do
     initiation <- S.printingOf s registry "Snake Cult Initiation"
     let c = Printing.card initiation
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Snake Cult Initiation")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Snake Cult Initiation")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, black])
     Spec.assertBool s (Card.isAura c) "is an Aura"
     Spec.assertEqWith s "no printed keywords of its own" (Card.Type.keywords c) Set.empty
@@ -209,7 +210,7 @@ cardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cardSpec s registry = Spec.describe s "Card" $ do
   Spec.it s "Mountain printing is named Mountain" $ do
     mountain <- S.printingOf s registry "Mountain"
-    Spec.assertEqWith s "name" (Card.Type.name (Printing.card mountain)) (Text.pack "Mountain")
+    Spec.assertEqWith s "name" (Card.Type.name (Printing.card mountain)) (CardName.MkCardName $ Text.pack "Mountain")
   Spec.it s "Mountain is a Land" $ do
     mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (Card.isLand (Printing.card mountain)) "isLand"
@@ -229,7 +230,7 @@ cardSpec s registry = Spec.describe s "Card" $ do
     Spec.assertEqWith s "toughness" (Card.Type.toughness (Printing.card mountain)) Nothing
   Spec.it s "Piker printing is named Goblin Piker" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    Spec.assertEqWith s "name" (Card.Type.name (Printing.card piker)) (Text.pack "Goblin Piker")
+    Spec.assertEqWith s "name" (Card.Type.name (Printing.card piker)) (CardName.MkCardName $ Text.pack "Goblin Piker")
   Spec.it s "Piker costs {1}{R}" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     Spec.assertEqWith
@@ -267,7 +268,7 @@ cardSpec s registry = Spec.describe s "Card" $ do
             }
         card =
           Card.Type.MkCard
-            { Card.Type.name = Text.pack "Some Instant",
+            { Card.Type.name = CardName.MkCardName $ Text.pack "Some Instant",
               Card.Type.manaCost = Nothing,
               Card.Type.typeLine = instantLine,
               Card.Type.power = Nothing,
@@ -989,7 +990,7 @@ tokenNameOffends token =
     Left _ -> True
     Right subtypes ->
       notElem
-        (Card.Type.name token)
+        (CardName.unwrap $ Card.Type.name token)
         (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
 
 -- CR 701.3a's Filter.CanHostSubject, counted wherever it appears inside ONE
@@ -1506,7 +1507,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     blaze <- S.printingOf s registry "Blaze"
     let card = Printing.card blaze
         red = ManaSymbol.OfType (ManaType.Colored Color.Red)
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Blaze")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Blaze")
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Variable, red]))
     Spec.assertBool s (not (Card.isInstant card)) "sorcery, not instant"
     Spec.assertEqWith s "one AnyTarget slot" (Card.allTargetSpecs card) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
@@ -1560,7 +1561,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
         -- the suffix dropped.
-        Spec.assertBool s (tokenNameOffends token {Card.Type.name = Text.pack "Spirit"}) "misnamed token detected"
+        Spec.assertBool s (tokenNameOffends token {Card.Type.name = CardName.MkCardName $ Text.pack "Spirit"}) "misnamed token detected"
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
   -- ONE sweep over the whole reserved set, replacing the five per-name
   -- cases this grew out of. Those five each filtered on
@@ -2212,7 +2213,7 @@ m2bCardSpec s registry = Spec.describe s "M2bCards" $ do
   Spec.it s "Sabretooth Tiger is a {2}{R} 2/1 Cat with first strike" $ do
     sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
     let c = Printing.card sabretoothTiger
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Sabretooth Tiger")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Sabretooth Tiger")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]))
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
@@ -2221,7 +2222,7 @@ m2bCardSpec s registry = Spec.describe s "M2bCards" $ do
   Spec.it s "Ridgetop Raptor is a {3}{R} 2/1 Dinosaur Beast with double strike" $ do
     ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
     let c = Printing.card ridgetopRaptor
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Ridgetop Raptor")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Ridgetop Raptor")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, red]))
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
@@ -2250,14 +2251,14 @@ m2cCardSpec s registry = Spec.describe s "M2cCards" $ do
   Spec.it s "Typhoid Rats is a {B} 1/1 Rat with deathtouch" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let c = Printing.card typhoidRats
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Typhoid Rats")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Typhoid Rats")
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
     Spec.assertEqWith s "keywords" (Card.Type.keywords c) (Set.singleton Keyword.Deathtouch)
   Spec.it s "War Mammoth is a {3}{G} 3/3 Elephant with trample" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     let c = Printing.card warMammoth
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "War Mammoth")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "War Mammoth")
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 3)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
     Spec.assertEqWith s "keywords" (Card.Type.keywords c) (Set.singleton Keyword.Trample)
@@ -2310,7 +2311,7 @@ m3cCardSpec s registry = Spec.describe s "M3cCards" $ do
   Spec.it s "Kormus Bell's affected set is a bare land-type filter, the shape CR 612.1 must reach" $ do
     kormusBell <- S.printingOf s registry "Kormus Bell"
     let card = Printing.card kormusBell
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Kormus Bell")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Kormus Bell")
     Spec.assertEqWith s "{4}" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
     Spec.assertEqWith s "Artifact" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Artifact)
     Spec.assertEqWith
@@ -2343,7 +2344,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
   Spec.it s "Darksteel Myr is a {3} 0/1 Artifact Creature with indestructible" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let c = Printing.card darksteelMyr
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Darksteel Myr")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Darksteel Myr")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]))
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 0)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
@@ -2374,7 +2375,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
     let c = Printing.card dayOfJudgment
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Day of Judgment")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Day of Judgment")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white, white]))
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Sorcery)
     -- CR 109.2 supplies the battlefield and the word "permanent"; the card
@@ -2397,7 +2398,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
   Spec.it s "The Walls of Ba Sing Se is an {8} 0/30 Legendary Artifact Creature granting indestructible to OTHER permanents you control" $ do
     walls <- S.printingOf s registry "The Walls of Ba Sing Se"
     let c = Printing.card walls
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "The Walls of Ba Sing Se")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "The Walls of Ba Sing Se")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 8]))
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 0)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 30)))
@@ -2602,7 +2603,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     let c = Printing.card flameJavelin
         twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
         target = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Flame Javelin")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Flame Javelin")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [twoOrRed, twoOrRed, twoOrRed])
     Spec.assertBool s (Card.isInstant c) "an instant"
     Spec.assertEqWith s "effect deals four" (Card.allEffects c) [Effect.DealDamage (ObjectRef.InSlot target) (Quantity.Type.Literal 4)]
@@ -2631,7 +2632,7 @@ m45p6CardSpec s registry = Spec.describe s "M45p6Cards" $ do
     let c = Printing.card masterThief
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
         slot = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Master Thief")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Master Thief")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue, blue]))
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
@@ -2659,7 +2660,7 @@ m45p6CardSpec s registry = Spec.describe s "M45p6Cards" $ do
     let c = Printing.card hagOfInnerWeakness
         black = ManaSymbol.OfType (ManaType.Colored Color.Black)
         slot = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Hag of Inner Weakness")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Hag of Inner Weakness")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, black]))
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
@@ -2693,7 +2694,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
     ruleOfLaw <- S.printingOf s registry "Rule of Law"
     let c = Printing.card ruleOfLaw
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Rule of Law")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Rule of Law")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white]))
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
     Spec.assertEqWith s "no object-axis static abilities" (Card.Type.staticAbilities c) []
@@ -2706,7 +2707,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     let c = Printing.card thalia
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Thalia, Guardian of Thraben")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Thalia, Guardian of Thraben")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
@@ -2721,7 +2722,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
   Spec.it s "Sapphire Medallion is a {2} artifact with one You ReduceSpellCost Blue ability" $ do
     sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
     let c = Printing.card sapphireMedallion
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Sapphire Medallion")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Sapphire Medallion")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]))
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
     Spec.assertEqWith
@@ -2736,7 +2737,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
     let c = Printing.card edgewalker
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
         black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Edgewalker")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Edgewalker")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Creature)
     Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine c)) (Set.fromList [Subtype.Human, Subtype.Cleric])
@@ -2750,7 +2751,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
   Spec.it s "Reliquary Tower is a land with a You NoMaximumHandSize ability and a {T} colorless mana ability" $ do
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
     let c = Printing.card reliquaryTower
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Reliquary Tower")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Reliquary Tower")
     Spec.assertEqWith s "no mana cost" (Card.Type.manaCost c) Nothing
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
     Spec.assertEqWith s "not basic" (TypeLine.supertypes (Card.Type.typeLine c)) Set.empty
@@ -2774,7 +2775,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
   Spec.it s "Radiant Fountain is a nonbasic land with a SelfEnters life gain and a {T} colorless mana ability" $ do
     radiantFountain <- S.printingOf s registry "Radiant Fountain"
     let c = Printing.card radiantFountain
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Radiant Fountain")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Radiant Fountain")
     Spec.assertEqWith s "no mana cost" (Card.Type.manaCost c) Nothing
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
     Spec.assertEqWith s "not basic, so Blood Moon reaches it (CR 305.8)" (TypeLine.supertypes (Card.Type.typeLine c)) Set.empty
@@ -2798,7 +2799,7 @@ m45p7CardSpec s registry = Spec.describe s "M4.5 P7" $ do
     silence <- S.printingOf s registry "Silence"
     let c = Printing.card silence
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Silence")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Silence")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [white]))
     Spec.assertBool s (Card.isInstant c) "an instant"
     Spec.assertEqWith s "no player abilities: it is not a permanent" (Card.Type.playerAbilities c) []
@@ -2814,7 +2815,7 @@ m45p11CardSpec s registry = Spec.describe s "M4.5 P11" $ do
   Spec.it s "Palace Jailer is a {2}{W}{W} 2/2 Human Soldier with two ETB triggers" $ do
     palaceJailer <- S.printingOf s registry "Palace Jailer"
     let c = Printing.card palaceJailer
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Palace Jailer")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Palace Jailer")
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
     Spec.assertEqWith s "two triggered abilities" (length (Card.Type.triggeredAbilities c)) 2
@@ -2829,7 +2830,7 @@ m55CardSpec s registry = Spec.describe s "M5.5" $ do
   Spec.it s "Barbarian Outcast's state trigger is a Count of exactly 0 Swamps you control (CR 603.8)" $ do
     barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
     let c = Printing.card barbarianOutcast
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Barbarian Outcast")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Barbarian Outcast")
     case Card.Type.triggeredAbilities c of
       [ab] -> do
         Spec.assertEqWith
@@ -2850,7 +2851,7 @@ m55CardSpec s registry = Spec.describe s "M5.5" $ do
     oneWithTheMachine <- S.printingOf s registry "One with the Machine"
     let c = Printing.card oneWithTheMachine
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "One with the Machine")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "One with the Machine")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, blue])
     Spec.assertBool s (not (Card.isInstant c)) "sorcery, not instant"
     Spec.assertEqWith
@@ -2903,7 +2904,7 @@ auraCardSpec s registry = Spec.describe s "Auras" $ do
     p <- S.printingOf s registry "Lure"
     let card = Printing.card p
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Lure")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Lure")
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green, green]))
     Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.singleton Subtype.Aura)
     Spec.assertEqWith s "enchant creature" (Card.Type.enchant card) (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
@@ -2923,7 +2924,7 @@ auraCardSpec s registry = Spec.describe s "Auras" $ do
     p <- S.printingOf s registry "Crown of the Ages"
     let c = Printing.card p
         target = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Crown of the Ages")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Crown of the Ages")
     -- The {4} is the ACTIVATION cost; the card itself costs {2}.
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
@@ -2957,7 +2958,7 @@ auraCardSpec s registry = Spec.describe s "Auras" $ do
     p <- S.printingOf s registry "Curse of Death's Hold"
     let card = Printing.card p
         black = ManaSymbol.OfType (ManaType.Colored Color.Black)
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Curse of Death's Hold")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Curse of Death's Hold")
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (costOf [ManaSymbol.Generic 3, black, black])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Enchantment)
     -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
@@ -2985,7 +2986,7 @@ auraCardSpec s registry = Spec.describe s "Auras" $ do
     let card = Printing.card p
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
         target = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Aura Graft")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Aura Graft")
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (costOf [ManaSymbol.Generic 1, blue])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Instant)
     Spec.assertEqWith s "no enchant ability: it is not an Aura itself" (Card.Type.enchant card) Nothing
@@ -3053,7 +3054,7 @@ animatorCardSpec s registry = Spec.describe s "Animators" $ do
                   Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
                 ]
             )
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "March of the Machines")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "March of the Machines")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, blue])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
     Spec.assertEqWith
@@ -3108,7 +3109,7 @@ animatorCardSpec s registry = Spec.describe s "Animators" $ do
                   Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
                 ]
             )
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Titania's Song")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Titania's Song")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, green])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
     Spec.assertEqWith
@@ -3128,7 +3129,7 @@ animatorCardSpec s registry = Spec.describe s "Animators" $ do
     p <- S.printingOf s registry "Liquimetal Coating"
     let c = Printing.card p
         target = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Liquimetal Coating")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Liquimetal Coating")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
     case Card.Type.activatedAbilities c of
@@ -3158,7 +3159,7 @@ animatorCardSpec s registry = Spec.describe s "Animators" $ do
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
         target = SlotName.MkSlotName (Text.pack "target")
         duration = Duration.ForAsLongAs sourceOnBattlefield
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Skilled Animator")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Skilled Animator")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, blue])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 3)))
@@ -3201,7 +3202,7 @@ cyclingCardSpec s registry = Spec.describe s "Cycling" $ do
     p <- S.printingOf s registry "Windcaller Aven"
     let c = Printing.card p
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Windcaller Aven")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Windcaller Aven")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 4, blue, blue])
     -- Two keywords, one printed and one that mints an ability: rule 702.9's
     -- flying is read where evasion is asked about, and rule 702.29a's cycling
@@ -3223,7 +3224,7 @@ cyclingCardSpec s registry = Spec.describe s "Cycling" $ do
     p <- S.printingOf s registry "Ash Barrens"
     let c = Printing.card p
         basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Ash Barrens")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Ash Barrens")
     Spec.assertEqWith s "a land, with no mana cost (CR 202.1)" (Card.Type.manaCost c) Nothing
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
     -- CR 702.29e's "[type]" is a Filter, and "basic land" is why: the same
@@ -3238,7 +3239,7 @@ cyclingCardSpec s registry = Spec.describe s "Cycling" $ do
     p <- S.printingOf s registry "Barkhide Mauler"
     let c = Printing.card p
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Barkhide Mauler")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Barkhide Mauler")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 4, green])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 4)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 4)))
@@ -3263,7 +3264,7 @@ worldCardSpec s registry = Spec.describe s "WorldEnchantments" $ do
     p <- S.printingOf s registry "Concordant Crossroads"
     let c = Printing.card p
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Concordant Crossroads")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Concordant Crossroads")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [green])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
     Spec.assertEqWith s "CR 205.4f: the supertype the world rule reads" (TypeLine.supertypes (Card.Type.typeLine c)) (Set.singleton Supertype.World)
@@ -3279,7 +3280,7 @@ worldCardSpec s registry = Spec.describe s "WorldEnchantments" $ do
     p <- S.printingOf s registry "Living Plane"
     let c = Printing.card p
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Living Plane")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Living Plane")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 2, green, green])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
     Spec.assertEqWith s "CR 205.4f: the supertype the world rule reads" (TypeLine.supertypes (Card.Type.typeLine c)) (Set.singleton Supertype.World)
@@ -3306,7 +3307,7 @@ revealCardSpec s registry = Spec.describe s "Reveal" $ do
     p <- S.printingOf s registry "Braidwood Sextant"
     let c = Printing.card p
         basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Braidwood Sextant")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Braidwood Sextant")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 1])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Artifact)
     case Card.Type.activatedAbilities c of
@@ -3339,7 +3340,7 @@ entersCardSpec s registry = Spec.describe s "Enters" $ do
     p <- S.printingOf s registry "Soul Warden"
     let c = Printing.card p
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Soul Warden")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Soul Warden")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [white])
     Spec.assertEqWith s "power" (Card.Type.power c) (Just (Power.MkPower (Quantity.Type.Literal 1)))
     Spec.assertEqWith s "toughness" (Card.Type.toughness c) (Just (Toughness.MkToughness (Quantity.Type.Literal 1)))
@@ -3377,7 +3378,7 @@ unspentManaCardSpec s registry = Spec.describe s "Unspent mana" $ do
     p <- S.printingOf s registry "Upwelling"
     let c = Printing.card p
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Upwelling")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Upwelling")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Generic 3, green])
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Enchantment)
     Spec.assertEqWith s "no object-axis static abilities" (Card.Type.staticAbilities c) []
@@ -3393,7 +3394,7 @@ phyrexianCardSpec s registry = Spec.describe s "Phyrexian" $ do
     p <- S.printingOf s registry "Mutagenic Growth"
     let c = Printing.card p
         target = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Mutagenic Growth")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Mutagenic Growth")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (costOf [ManaSymbol.Phyrexian Color.Green])
     Spec.assertBool s (Card.isInstant c) "an instant"
     Spec.assertEqWith
@@ -3420,7 +3421,7 @@ removeFromCombatCardSpec s registry = Spec.describe s "RemoveFromCombat" $ do
     labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
     let c = Printing.card labyrinth
         target = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "name" (Card.Type.name c) (Text.pack "Labyrinth of Skophos")
+    Spec.assertEqWith s "name" (Card.Type.name c) (CardName.MkCardName $ Text.pack "Labyrinth of Skophos")
     Spec.assertEqWith s "no mana cost" (Card.Type.manaCost c) Nothing
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine c)) (Set.singleton CardType.Land)
     Spec.assertEqWith s "not basic, so Blood Moon reaches it (CR 305.8)" (TypeLine.supertypes (Card.Type.typeLine c)) Set.empty
@@ -3458,7 +3459,7 @@ blockRequirementCardSpec s registry = Spec.describe s "BlockRequirements" $ do
     p <- S.printingOf s registry "Prized Unicorn"
     let card = Printing.card p
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Prized Unicorn")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Prized Unicorn")
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, green]))
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Creature)
     Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.singleton Subtype.Unicorn)
@@ -3491,7 +3492,7 @@ attackRequirementCardSpec s registry = Spec.describe s "AttackRequirements" $ do
     p <- S.printingOf s registry "Curse of the Nightly Hunt"
     let card = Printing.card p
         red = ManaSymbol.OfType (ManaType.Colored Color.Red)
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Curse of the Nightly Hunt")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Curse of the Nightly Hunt")
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]))
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Enchantment)
     -- CR 205.3h: "Enchantment -- Aura Curse" is two enchantment types.
@@ -3526,7 +3527,7 @@ combatRestrictionCardSpec s registry = Spec.describe s "CombatRestrictions" $ do
     p <- S.printingOf s registry "Pacifism"
     let card = Printing.card p
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
-    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Pacifism")
+    Spec.assertEqWith s "name" (Card.Type.name card) (CardName.MkCardName $ Text.pack "Pacifism")
     Spec.assertEqWith s "cost" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
     Spec.assertEqWith s "types" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Enchantment)
     Spec.assertEqWith s "subtypes" (TypeLine.subtypes (Card.Type.typeLine card)) (Set.singleton Subtype.Aura)

@@ -2,10 +2,10 @@ module Pawl.Types.ProjectedCharacteristics where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
@@ -35,7 +35,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Carried, not folded: rule 613's layer 3 could change it (a text-changing
     -- effect naming a name) but nothing in the pool does, so no layer touches it
     -- after the seed.
-    name :: Text.Text,
+    name :: CardName.CardName,
     -- | CR 205.4a: the object's supertypes after the layer fold -- the third part of
     -- the layer-4 type line, alongside cardTypes and subtypes. Copiable for the
     -- same reason as name: a Clone of a legend is itself legendary, without which

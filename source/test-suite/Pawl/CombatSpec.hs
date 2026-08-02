@@ -34,6 +34,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -2835,7 +2836,7 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
         island <- S.printingOf s registry "Island"
         pure (towershellBoard towershell island theirs)
       boardOf = boardWith []
-      towershellName = Text.pack "Meandering Towershell"
+      towershellName = CardName.MkCardName $ Text.pack "Meandering Towershell"
   Spec.it s "CR 508.3a whole card: attacking exiles it, so CR 506.4 leaves it dealing no damage" $ do
     (gs, ours) <- boardOf
     let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs

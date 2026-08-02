@@ -83,6 +83,8 @@ library codec
     Pawl.Codec.BlockRequirement
     Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.Card
+    Pawl.Codec.CardName
+    Pawl.Codec.CardNameSpec
     Pawl.Codec.CardSpec
     Pawl.Codec.CardType
     Pawl.Codec.CardTypeSpec
