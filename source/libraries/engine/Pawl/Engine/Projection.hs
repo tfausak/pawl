@@ -995,6 +995,15 @@ setLandSubtypeEffects gs =
         if isSet (ContinuousEffect.modification eff)
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
           else []
+      -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
+      -- 612's word swap to the same ability's (#402). So a text-changed source
+      -- would have this gate and the layer fold disagreeing about which
+      -- permanents it names. Unreachable: the pool's only SetLandSubtype is
+      -- Blood Moon, which selects by card type and supertype and so carries no
+      -- land-type word for a swap to reach. Rewriting here is not free either --
+      -- textChangesAffecting folds the whole effect list, and this function is
+      -- hoisted out of gather's walk precisely to avoid per-permanent cost
+      -- (#584).
       fromPerm permId = case Game.cardOf permId gs of
         Nothing -> []
         Just card ->
@@ -1383,13 +1392,25 @@ gatherStatic src ts changes stripped n sa =
       -- copied onto each of its parts. Total: an ability has at least one
       -- modification, so this minimum is over a NonEmpty.
       lowest = minimum (fmap layer ms)
+      -- CR 612.1: rewritten for the same reason the modifications above are --
+      -- the affected clause is rules text too (#402).
+      --
+      -- Hoisted out of `one` and short-circuited, both for the same reason: this
+      -- runs inside gather, which the SBA sweep reruns at every priority
+      -- boundary. Inside `one` it would rebuild the filter once PER PART (three
+      -- times for Kormus Bell), and Filter.rewrite walks and rebuilds the whole
+      -- tree even for an empty pair list -- unlike rewriteModification, whose
+      -- fold over [] is free. An ordinary board has no text change at all, so
+      -- the guard is what keeps this off the hot path entirely.
+      affected =
+        if null changes
+          then StaticAbility.affected sa
+          else rewriteAffected changes (StaticAbility.affected sa)
       one m' =
         MkGathered
           { gEffect = key,
             gSource = src,
-            -- CR 612.1: rewritten for the same reason the modifications above
-            -- are -- the affected clause is rules text too (#402).
-            gAffected = rewriteAffected changes (StaticAbility.affected sa),
+            gAffected = affected,
             gLayer = layer m',
             gLowest = lowest,
             gTimestamp = ts,

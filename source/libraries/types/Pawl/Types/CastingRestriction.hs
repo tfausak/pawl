@@ -37,16 +37,31 @@ data CastingRestriction
     --
     -- The change is small; the CARD is the obstacle, and it is worth writing
     -- down so the next reader does not re-run the search. Scryfall's
-    -- `oracle:/^Cast this spell only during combat.$/` returns FIVE printings
-    -- (checked 2026-08-02), and every one drags in machinery pawl lacks:
-    -- Mandate of Peace ends the combat phase, Angelic Favor has a conditional
-    -- alternative cost that taps another creature, and Cauldron Dance, Spinal
-    -- Embrace and Surprise Deployment each arm a delayed ability that must name
-    -- a TARGET slot -- which CardSpec's delayed-ability lint records as
-    -- unsupported, since a delayed ability may read only the trigger source or a
-    -- slot an effect minted. The narrower printings ("only during combat before
-    -- blockers are declared", Blaze of Glory and eight others) do not want this
-    -- arm at all: their window is not a phase.
+    -- `oracle:/^Cast this spell only during combat.$/` returns FIVE cards
+    -- (checked 2026-08-02), and every one drags in machinery pawl lacks --
+    -- three DIFFERENT pieces of it, not one:
+    --
+    --   * Mandate of Peace needs an end-the-combat-phase effect. (Its other
+    --     clause, "your opponents can't cast spells this turn", is already
+    --     PlayerEffect.CantCastSpells.)
+    --   * Angelic Favor needs a CONDITIONAL alternative cost that taps another
+    --     creature. Card.alternativeCosts exists, but a Cost is mana plus
+    --     components with no condition, and CostComponent's only tap arm is
+    --     TapThis.
+    --   * Cauldron Dance and Surprise Deployment both need an effect that puts
+    --     a chosen card from a HAND onto the battlefield. Cauldron Dance's
+    --     first arm is not the obstacle: "return target creature card from your
+    --     graveyard to the battlefield ... return IT to your hand at the
+    --     beginning of the next end step" is the Meandering Towershell shape,
+    --     which Resolve.definedSlots covers.
+    --   * Spinal Embrace is the one whose delayed ability really does name a
+    --     TARGET slot ("sacrifice it"), which CardSpec's delayed-ability lint
+    --     rejects: a delayed ability may read only the trigger source or a slot
+    --     an effect minted, and a spell mode's target slot is neither.
+    --
+    -- The narrower cards ("only during combat before blockers are declared",
+    -- Blaze of Glory and eight others) do not want this arm at all: their
+    -- window is not a phase.
     --
     -- WHOSE turn is a second axis this arm does not carry: "only during an
     -- opponent's upkeep" (Festival) and "only during your end step" (Necrologia)

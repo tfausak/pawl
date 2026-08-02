@@ -2311,6 +2311,8 @@ m3cCardSpec s registry = Spec.describe s "M3cCards" $ do
     kormusBell <- S.printingOf s registry "Kormus Bell"
     let card = Printing.card kormusBell
     Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Kormus Bell")
+    Spec.assertEqWith s "{4}" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
+    Spec.assertEqWith s "Artifact" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Artifact)
     Spec.assertEqWith
       s
       "one static ability, affecting exactly the Swamps"

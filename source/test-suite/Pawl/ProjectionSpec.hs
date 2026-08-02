@@ -579,6 +579,31 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "a 1/1 too" (Projection.powerOf islandId hacked) (Just 1)
     Spec.assertBool s (not (Projection.isCreatureOf swampId hacked)) "and the Swamp is not animated any more"
 
+  -- CR 613.8a: Kormus Bell's affected set READS subtypes at layer 4, and
+  -- Urborg's AddLandSubtype WRITES them at layer 4 -- so the two are dependent
+  -- and Urborg must apply first, which is the classic pairing. It is what makes
+  -- every land a 1/1: Urborg makes them all Swamps, and the Bell then animates
+  -- what Urborg produced rather than what the printed type lines said.
+  --
+  -- Not a text-change case, but it is the same reader (`affected` at layer 4)
+  -- that #402 changed, and nothing else in the suite pairs an affected-set read
+  -- with a same-layer write.
+  Spec.it s "CR 613.8a Urborg makes every land a Swamp, so Kormus Bell animates all of them" $ do
+    kormusBell <- S.printingOf s registry "Kormus Bell"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    forest <- S.printingOf s registry "Forest"
+    let base = Setup.emptyGame S.bothPlayers
+        (_, g1) = S.addCreature kormusBell S.alice base
+        (forestId, withBell) = S.addCreature forest S.alice g1
+        (_, withUrborg) = S.addCreature urborg S.alice withBell
+    -- Without Urborg the Forest is no Swamp, so the Bell leaves it alone.
+    Spec.assertBool s (not (Projection.isCreatureOf forestId withBell)) "the Forest is not animated on its own"
+    -- With Urborg it is a Swamp (layer 4, written) and therefore animated (layer
+    -- 4, read) -- and a 1/1 at 7b.
+    Spec.assertBool s (Set.member Subtype.Type.Swamp (Projection.subtypesOf forestId withUrborg)) "Urborg makes it a Swamp"
+    Spec.assertBool s (Projection.isCreatureOf forestId withUrborg) "so the Bell animates it"
+    Spec.assertEqWith s "as a 1/1" (Projection.powerOf forestId withUrborg) (Just 1)
+
   Spec.it s "CR 613.1d AddLandSubtype gives a Forest the Swamp subtype" $ do
     forest <- S.printingOf s registry "Forest"
     let gs0 = S.landsInPlay forest 1
