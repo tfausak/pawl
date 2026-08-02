@@ -10,6 +10,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Pawl.Codec.Card (cardToJson)
 import Pawl.Codec.EntryRiders (defaultEntryRiders)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Subtype (subtypeToJson)
@@ -33,6 +34,15 @@ import qualified Pawl.Engine.Quantity as Quantity
 
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
+-- The json sublibrary's own modules, for the CR 701.3a completeness cross-check
+-- alone: it counts the atom in a card's ENCODED form, which is a traversal of the
+-- whole card written by somebody else and so an independent witness to the
+-- hand-maintained one below.
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Object as Object
+import qualified Pawl.Json.Pair as Pair
+import qualified Pawl.Json.String as String
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
@@ -50,9 +60,11 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
@@ -80,6 +92,8 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
@@ -669,6 +683,400 @@ tokenNameOffends token =
         (Card.Type.name token)
         (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
 
+-- CR 701.3a's Filter.CanHostSubject, counted wherever it appears inside ONE
+-- Filter: under And/Or/Not, and inside the typecycling predicate a HasKeyword
+-- atom's own keyword may carry (CR 702.29e).
+--
+-- Counted rather than merely detected, because the completeness cross-check below
+-- compares this hand-maintained traversal against the codec's independent one,
+-- and that comparison needs a number.
+--
+-- Written out exhaustively rather than with a catch-all, so a later atom that can
+-- hold a Filter fails to compile here instead of silently hiding one.
+canHostSubjects :: Filter.Type.Filter Keyword.Keyword -> Int
+canHostSubjects predicate = case predicate of
+  Filter.Type.CanHostSubject -> 1
+  Filter.Type.And fs -> sum (fmap canHostSubjects fs)
+  Filter.Type.Or fs -> sum (fmap canHostSubjects fs)
+  Filter.Type.Not f -> canHostSubjects f
+  -- CR 702.29e's "[type]cycling" carries a Filter of its own, and any Cost a
+  -- keyword names can carry one through a Sacrifice component. Never EVALUATED
+  -- against a candidate -- HasKeyword asks whether the key is present in the
+  -- projection's keyword map, so what is inside the keyword is compared and not
+  -- run -- but still a Filter position a card author can write the atom into,
+  -- which is the only thing this lint is about.
+  Filter.Type.HasKeyword keyword -> sum (fmap canHostSubjects (keywordFilters keyword))
+  Filter.Type.HasCardType _ -> 0
+  Filter.Type.HasSupertype _ -> 0
+  Filter.Type.HasColor _ -> 0
+  Filter.Type.HasSubtype _ -> 0
+  Filter.Type.PowerAtLeast _ -> 0
+  Filter.Type.ControlledBy _ -> 0
+  Filter.Type.IsSource -> 0
+  Filter.Type.IsPlayer _ -> 0
+  Filter.Type.IsAttacking -> 0
+  Filter.Type.IsBlocking -> 0
+  Filter.Type.AttackedThisTurn -> 0
+  Filter.Type.IsAttachedToCreature -> 0
+  Filter.Type.IsAttachedToPermanent -> 0
+  Filter.Type.IsToken -> 0
+
+-- Every Filter a keyword carries: CR 702.29e's typecycling predicate, plus the
+-- components of any Cost a keyword names (CR 702.29a cycling, 702.34a flashback,
+-- 702.42a entwine), since CostComponent.Sacrifice carries one.
+keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
+keywordFilters keyword = case keyword of
+  Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
+  Keyword.Flashback cost -> costFilters cost
+  Keyword.Entwine cost -> costFilters cost
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Hexproof -> []
+  Keyword.Indestructible -> []
+  Keyword.Landwalk _ -> []
+  Keyword.Reach -> []
+  Keyword.Shroud -> []
+  Keyword.Trample -> []
+  Keyword.Vigilance -> []
+  Keyword.Fear -> []
+  Keyword.Poisonous _ -> []
+  Keyword.Infect -> []
+  Keyword.Menace -> []
+  Keyword.Devoid -> []
+  Keyword.Toxic _ -> []
+
+-- CR 118.1: a cost's Filters are its components'; the mana part holds none.
+costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
+costFilters = concatMap costComponentFilters . Cost.Type.components
+
+costComponentFilters :: CostComponent.CostComponent Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
+costComponentFilters component = case component of
+  -- CR 601.2f's "sacrificing permanents": Village Rites' "a creature".
+  CostComponent.Sacrifice _ f -> [f]
+  CostComponent.TapThis -> []
+  CostComponent.UntapThis -> []
+  CostComponent.SacrificeThis -> []
+  CostComponent.PayLife _ -> []
+  CostComponent.DiscardCards _ -> []
+  CostComponent.DiscardThis -> []
+  CostComponent.PayEnergy _ -> []
+  CostComponent.AddLoyaltyToThis _ -> []
+  CostComponent.RemoveLoyaltyFromThis _ -> []
+
+-- The Filter narrowing a target slot's CR 115 pool -- "target creature with
+-- flying" -- and CR 303.4a's enchant slot, which is a TargetSpec too.
+targetSpecFilters :: TargetSpec.TargetSpec -> [Filter.Type.Filter Keyword.Keyword]
+targetSpecFilters (TargetSpec.MkTargetSpec _ mFilter) = Maybe.maybeToList mFilter
+
+-- A continuous effect's affected set (Pawl.Types.Affected), wherever one is
+-- written -- a static ability, a combat restriction, an attack or block
+-- requirement. Only the two predicate arms carry a Filter; the fixed id set (CR
+-- 611.2c) and CR 303.4m's "enchanted permanent" carry none.
+affectedFilters :: Affected.Affected -> [Filter.Type.Filter Keyword.Keyword]
+affectedFilters affected = case affected of
+  Affected.TheseObjects _ -> []
+  Affected.Matching f -> [f]
+  Affected.Attached -> []
+  Affected.AttachedPlayerControls f -> [f]
+
+objectRefFilters :: ObjectRef.ObjectRef -> [Filter.Type.Filter Keyword.Keyword]
+objectRefFilters ref = case ref of
+  ObjectRef.InSlot _ -> []
+  -- Day of Judgment's "all creatures", Boil's "all Islands".
+  ObjectRef.EachMatching f -> [f]
+
+-- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
+-- above rather than re-walked: those traversals are already the project's answer
+-- to "every Count a card can author", and a Count's Filter is the only Filter it
+-- holds. That reuse is also the one seam here that -Werror does not police -- a
+-- Count added to a NEW carrier has to be added there, not here.
+countFilters :: [Count.Type.Count Quantity.Type.Quantity] -> [Filter.Type.Filter Keyword.Keyword]
+countFilters counts = [f | Count.Type.MkCount _ f _ <- counts]
+
+quantityFilters :: Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
+quantityFilters = countFilters . quantityCounts
+
+conditionFilters :: Condition.Type.Condition -> [Filter.Type.Filter Keyword.Keyword]
+conditionFilters = countFilters . conditionCounts
+
+durationFilters :: Duration.Duration -> [Filter.Type.Filter Keyword.Keyword]
+durationFilters = countFilters . durationCounts
+
+-- A Modification reaches a Filter two ways: through its layer-7 quantities (a
+-- Count) and through the keyword a layer-6 grant hands out (CR 702.29e again).
+modificationFilters :: Modification.Modification -> [Filter.Type.Filter Keyword.Keyword]
+modificationFilters modification = case modification of
+  Modification.GainKeyword keyword -> keywordFilters keyword
+  Modification.SetBasePowerToughness p t -> quantityFilters p <> quantityFilters t
+  Modification.ModifyPowerToughness p t -> quantityFilters p <> quantityFilters t
+  Modification.LoseAllAbilities -> []
+  Modification.SetLandSubtype _ -> []
+  Modification.AddLandSubtype _ -> []
+  Modification.SetCreatureSubtype _ -> []
+  Modification.AddCardType _ -> []
+  Modification.ChangeSubtypeWord _ _ -> []
+  Modification.SetController _ -> []
+  Modification.SetControllerToSource -> []
+  Modification.SetColor _ -> []
+  Modification.SwitchPowerToughness -> []
+
+staticAbilityFilters :: StaticAbility.StaticAbility -> [Filter.Type.Filter Keyword.Keyword]
+staticAbilityFilters ability =
+  affectedFilters (StaticAbility.affected ability)
+    <> concatMap modificationFilters (StaticAbility.modifications ability)
+
+-- CR 603.6a's "whenever [a permanent] enters" carries one directly; CR 603.8's
+-- state trigger carries one through its Condition's Counts.
+triggerConditionFilters :: TriggerCondition.TriggerCondition -> [Filter.Type.Filter Keyword.Keyword]
+triggerConditionFilters triggerCondition = case triggerCondition of
+  TriggerCondition.PermanentEnters f -> [f]
+  TriggerCondition.StateIs condition -> conditionFilters condition
+  TriggerCondition.SelfEnters -> []
+  TriggerCondition.StepBegins _ _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.SelfAttacks _ -> []
+  TriggerCondition.SelfCycled -> []
+  TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
+  TriggerCondition.SelfDies -> []
+  TriggerCondition.SelfLeavesTheBattlefield -> []
+  TriggerCondition.SpellOrAbilityCounters _ -> []
+
+-- CR 613.11: which spells a cost-modifying player effect applies to.
+playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
+playerEffectFilters playerEffect = case playerEffect of
+  PlayerEffect.IncreaseSpellCost f _ -> [f]
+  PlayerEffect.ReduceSpellCost f _ -> [f]
+  PlayerEffect.CantCastSpells -> []
+  PlayerEffect.CantCastMoreThan _ -> []
+  PlayerEffect.NoMaximumHandSize -> []
+  PlayerEffect.DontLoseUnspentMana -> []
+
+-- CR 614.1: only the counter-placement pattern narrows by a Filter
+-- (CounterPattern.onWhat -- "one or more counters would be put on a creature
+-- YOU control"). The other six patterns narrow by zone, damage, destruction,
+-- entry, token or phase, none of which holds one.
+replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
+replacementEffectFilters replacementEffect = case replacementEffect of
+  ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
+  ReplacementEffect.ZoneChangeR _ _ -> []
+  ReplacementEffect.EntryR _ -> []
+  ReplacementEffect.DamageR _ _ -> []
+  ReplacementEffect.DestructionR _ -> []
+  ReplacementEffect.TokenR _ _ -> []
+  ReplacementEffect.PhaseR _ -> []
+
+combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.Filter Keyword.Keyword]
+combatRestrictionFilters restriction = case restriction of
+  CombatRestriction.CantAttack affected -> affectedFilters affected
+  CombatRestriction.CantBlock affected -> affectedFilters affected
+
+-- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,
+-- which is every position in the type except the one below.
+unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+unframed = fmap ((,) False)
+
+-- Every Filter one effect carries, paired with whether an ATTACH frames it.
+-- Exactly one arm answers True: Effect.AttachTarget's destination, which is the
+-- only Filter position Pawl.Engine.Resolve evaluates against a view whose
+-- `canHostSubject` is filled in (the AttachTarget arm of applyEffectWith, from
+-- attachmentFor). Everywhere else the field is False by construction --
+-- Projection.viewOfCard, Projection.viewOfCharacteristics, Filter.playerView and
+-- Count's event snapshot all set it so -- because outside an attach there is no
+-- subject for CR 701.3a to be about. Widening the subject so that another
+-- position could answer is #572; until a card asks for it, the framed side of
+-- this traversal is exactly this one arm.
+effectFilters :: Effect.Effect Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+effectFilters effect = case effect of
+  -- THE one framed position. CR 701.3a: "An Aura, Equipment, or Fortification
+  -- can't be attached to an object or player it couldn't enchant, equip, or
+  -- fortify, respectively." Aura Graft's "another permanent it can enchant".
+  Effect.AttachTarget _ f -> [(True, f)]
+  Effect.DealDamage ref quantity -> unframed (objectRefFilters ref <> quantityFilters quantity)
+  Effect.ModifyTarget duration modification ref ->
+    unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
+  Effect.ChangeText _ -> []
+  Effect.AddMana _ -> []
+  Effect.Search f _ -> unframed [f]
+  Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
+  Effect.ExileHandThenDraw -> []
+  Effect.PlayerSacrifices _ f quantity -> unframed (f : quantityFilters quantity)
+  Effect.RestartGame -> []
+  Effect.ControlPlayerNextTurn _ -> []
+  Effect.Destroy ref _ _ -> unframed (objectRefFilters ref)
+  Effect.Sacrifice _ -> []
+  Effect.MoveToZone {} -> []
+  Effect.Draw _ quantity -> unframed (quantityFilters quantity)
+  Effect.Mill _ quantity -> unframed (quantityFilters quantity)
+  Effect.Discard _ quantity -> unframed (quantityFilters quantity)
+  Effect.LoseLife _ quantity -> unframed (quantityFilters quantity)
+  Effect.GainLife _ quantity -> unframed (quantityFilters quantity)
+  -- CR 111.1's token is a whole card, and every Filter position it has is one a
+  -- card author can write -- the same nesting Pawl.Codec's round trip walks.
+  Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> cardFilters card
+  Effect.Replace duration _ replacement -> unframed (durationFilters duration <> replacementEffectFilters replacement)
+  Effect.SkipNextPhase _ _ -> []
+  Effect.RemoveFromCombat _ -> []
+  Effect.Counter _ -> []
+  Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
+  Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
+  Effect.Tap ref -> unframed (objectRefFilters ref)
+  Effect.Untap ref -> unframed (objectRefFilters ref)
+  Effect.AddPhases _ -> []
+  Effect.GainControl duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
+  Effect.AffectPlayers duration _ playerEffect -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
+  -- CR 114.2's emblem is a whole card too.
+  Effect.CreateEmblem card -> cardFilters card
+  Effect.BecomeMonarch _ -> []
+  Effect.ExileUntilMonarch _ -> []
+  -- CR 701.3's other attach, which moves the SOURCE rather than a target and
+  -- carries no destination filter at all.
+  Effect.Attach _ -> []
+  Effect.PlaySubgame _ -> []
+  Effect.TakeExtraTurn _ _ -> []
+  Effect.ShuffleIntoLibrary _ -> []
+
+-- Per MODE rather than through Modal.allTargetSpecs, which is a Map.unions and so
+-- collapses two modes declaring the same slot name (#475) -- the cross-check
+-- below counts occurrences, and a collapse there would read as a Filter this
+-- traversal cannot see.
+modalFilters :: Modal.Modal Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+modalFilters modal =
+  concatMap
+    ( \mode ->
+        concatMap effectFilters (Mode.effects mode)
+          <> unframed (concatMap targetSpecFilters (Map.elems (Mode.targetSpecs mode)))
+    )
+    (Modal.modes modal)
+
+triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+triggeredAbilityFilters ability =
+  unframed
+    ( triggerConditionFilters (TriggeredAbility.condition ability)
+        <> concatMap conditionFilters (Maybe.maybeToList (TriggeredAbility.intervening ability))
+    )
+    <> modalFilters (TriggeredAbility.modal ability)
+
+activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+activatedAbilityFilters ability =
+  unframed (costFilters (ActivatedAbility.cost ability))
+    <> modalFilters (ActivatedAbility.modal ability)
+
+-- EVERY Filter position reachable from a card, each paired with whether an attach
+-- frames it. Nineteen of Pawl.Types.Card's twenty-seven fields can hold one, and
+-- here is where each one's comes from:
+--
+--   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
+--   * `power`, `toughness`, `characteristicPT` -- CR 208.2's printed star,
+--     through a Count.
+--   * `staticAbilities` -- the affected set, and the layer-6/7 modifications'
+--     own keywords and Counts.
+--   * `replacementEffects` -- CR 614.1's counter-placement pattern.
+--   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
+--   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
+--   * `playerAbilities` -- CR 613.11's cost modifiers.
+--   * `combatRestrictions` (CR 508.1c / 509.1b), `attackRequirements` (CR
+--     508.1d) and `blockRequirements` (CR 509.1c) -- three more affected sets.
+--   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
+--     every mode's target specs and effects, plus an activation cost, a
+--     trigger's own condition and its intervening clause.
+--   * `mulliganAction` (CR 103.5b) and `openingHandAction` (CR 103.6) -- the two
+--     pregame actions, which `cardResolutionEffects` above does not reach.
+--
+-- The other eight fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
+-- `colorIndicator`, `counterability`, `castingPermissions` and
+-- `castingRestrictions`. That is checkable rather than asserted: exactly ten
+-- modules under Pawl.Types import Pawl.Types.Filter -- Affected, CostComponent,
+-- Count, CounterPattern, Effect, Keyword, ObjectRef, PlayerEffect, TargetSpec and
+-- TriggerCondition -- and nothing those eight fields reach is one of them.
+--
+-- Every case BELOW this function is exhaustive with no catch-all, so a new
+-- constructor on any of those types fails to compile until it is classified. This
+-- record fold is the exception, exactly as cardCounts' own caveat says: a NEW
+-- Card field that can hold a Filter would bypass it silently. That is what the
+-- codec cross-check in canHostSubjectOffends is for.
+cardFilters :: Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+cardFilters card =
+  unframed
+    ( concatMap keywordFilters (Set.toList (Card.Type.keywords card))
+        <> concatMap quantityFilters (Maybe.maybeToList (Card.Type.characteristicPT card))
+        <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Card.Type.power card))
+        <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Card.Type.toughness card))
+        <> concatMap staticAbilityFilters (Card.Type.staticAbilities card)
+        <> concatMap replacementEffectFilters (Card.Type.replacementEffects card)
+        <> concatMap targetSpecFilters (Maybe.maybeToList (Card.Type.enchant card))
+        <> concatMap costComponentFilters (Card.Type.additionalCosts card)
+        <> concatMap costFilters (Card.Type.alternativeCosts card)
+        <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Card.Type.playerAbilities card)
+        <> concatMap (affectedFilters . BlockRequirement.attacker) (Card.Type.blockRequirements card)
+        <> concatMap (affectedFilters . AttackRequirement.subject) (Card.Type.attackRequirements card)
+        <> concatMap combatRestrictionFilters (Card.Type.combatRestrictions card)
+    )
+    <> modalFilters (Card.Type.spell card)
+    <> concatMap activatedAbilityFilters (Card.Type.activatedAbilities card)
+    <> concatMap triggeredAbilityFilters (Card.Type.triggeredAbilities card)
+    <> concatMap triggeredAbilityFilters (Map.elems (Card.Type.delayedAbilities card))
+    <> concatMap effectFilters (Card.Type.mulliganAction card)
+    <> concatMap effectFilters (Card.Type.openingHandAction card)
+
+-- How many CR 701.3a atoms this card carries in an Effect.AttachTarget's
+-- destination filter, and how many anywhere else. The second number is the
+-- offence; the first is what Aura Graft legitimately has one of.
+canHostSubjectCounts :: Card.Type.Card -> (Int, Int)
+canHostSubjectCounts card =
+  let total wanted = sum [canHostSubjects f | (framed, f) <- cardFilters card, framed == wanted]
+   in (total True, total False)
+
+-- Every occurrence of the atom's codec tag in an ENCODED card. The completeness
+-- witness for the traversal above: Pawl.Codec.Card.cardToJson visits every field
+-- of a Card and every type under it, is round-tripped by CodecSpec, and was
+-- written for another purpose entirely -- so a Filter position cardFilters forgets
+-- is one this still sees.
+--
+-- A tag and not a name: Pawl.Codec.Filter spells the atom `Json.nullary
+-- "CanHostSubject"`, so the only string equal to this in a card's encoding is
+-- that tag (a card NAMED "CanHostSubject" would be a false positive, and a loud
+-- one rather than a silent miss).
+jsonCanHostSubjects :: Value.Value -> Int
+jsonCanHostSubjects value = case value of
+  Value.String s -> if String.unwrap s == Text.pack "CanHostSubject" then 1 else 0
+  Value.Array a -> sum (fmap jsonCanHostSubjects (Array.unwrap a))
+  Value.Object o -> sum (fmap (jsonCanHostSubjects . Pair.value) (Object.unwrap o))
+  Value.Null _ -> 0
+  Value.Boolean _ -> 0
+  Value.Number _ -> 0
+
+-- CR 701.3a is answerable only where an attach FRAMES the match, and
+-- Filter.CanHostSubject is vacuously False in every other Filter position. A card
+-- author who wrote it into a target spec, a static ability's affected set, a Count
+-- filter or a Search filter would otherwise get a False predicate and no failure
+-- at all -- neither the codec, the type nor any other lint says a word -- so this
+-- is where that is made loud.
+--
+-- TWO offences under one name, because they are two ways for the same claim to be
+-- untrue:
+--
+--   * the traversal found the atom somewhere no attach frames it -- the misuse
+--     itself; and
+--   * the traversal and the codec disagree about how many the card holds -- which
+--     means cardFilters has a blind spot, and an atom sitting in it would be
+--     reported as zero rather than as an offence.
+--
+-- The second is not hypothetical maintenance theatre: cardFilters' Card-record
+-- fold is hand-maintained, and a new field holding a Filter is exactly the kind of
+-- change that would otherwise make this lint quietly stop doing its job.
+canHostSubjectOffends :: Card.Type.Card -> Bool
+canHostSubjectOffends card =
+  let (framed, unframedCount) = canHostSubjectCounts card
+   in unframedCount /= 0 || framed + unframedCount /= jsonCanHostSubjects (cardToJson card)
+
 -- The D4 dataflow lint: every slot an effect reads is declared, and every
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
@@ -1069,6 +1477,204 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))
         offenders = filter (offends . Printing.card) ps
     Spec.assertEqWith s "the enchant slot is never hand-declared" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- CR 701.3a: "An Aura, Equipment, or Fortification can't be attached to an
+  -- object or player it couldn't enchant, equip, or fortify, respectively." The
+  -- atom that asks that question is answerable only where an attach frames the
+  -- match, and vacuously False everywhere else. See canHostSubjectOffends for the
+  -- two offences this one predicate covers.
+  Spec.it s "CR 701.3a no card asks CanHostSubject outside an attach's destination" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (canHostSubjectOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in an AttachTarget destination" (fmap (Card.Type.name . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the one card that does is
+    -- ACCEPTED here rather than skipped. Aura Graft's "another permanent it can
+    -- enchant" is the whole legal use, so a lint that swept past it would be
+    -- indistinguishable from one that swept past everything.
+    graft <- S.printingOf s registry "Aura Graft"
+    Spec.assertEqWith
+      s
+      "Aura Graft's one atom is framed by its own attach"
+      (canHostSubjectCounts (Printing.card graft))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and it is the pool's only one"
+      (sum (fmap (\p -> uncurry (+) (canHostSubjectCounts (Printing.card p))) ps))
+      1
+    -- The traversal reaches a Filter position no effect, target spec or affected
+    -- set would have led it to: CR 702.29e's typecycling predicate, on a real
+    -- card. Its absence would not show up in the sweep above, because Ash Barrens
+    -- does not author the atom -- only in this.
+    barrens <- S.printingOf s registry "Ash Barrens"
+    Spec.assertBool
+      s
+      ( elem
+          (False, Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic])
+          (cardFilters (Printing.card barrens))
+      )
+      "CR 702.29e landcycling's filter is a position the sweep walks"
+  -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
+  -- Graft only exercises the ACCEPTING direction, so the rejecting direction is
+  -- proven here instead -- hand-built, never a card file, because a card that
+  -- offends a lint must not be loadable.
+  --
+  -- Every fixture plants the atom BURIED under all three combinators rather than
+  -- bare, so an implementation that looked only at the top of a Filter would
+  -- accept every one of them. And each is asserted through canHostSubjectCounts
+  -- as well as through the predicate: the counts say the TRAVERSAL found it in
+  -- that position, where the predicate alone would also be satisfied by the codec
+  -- half of the cross-check noticing an atom the traversal missed entirely.
+  Spec.it s "the lint itself catches CanHostSubject outside an attach's destination" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    graft <- S.printingOf s registry "Aura Graft"
+    let base = Printing.card piker
+        slot = SlotName.MkSlotName (Text.pack "target")
+        atom = Filter.Type.CanHostSubject
+        buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
+        -- A one-mode, mandatory spell running these effects and declaring these
+        -- slots -- the smallest carrier that reaches Mode.effects and
+        -- Mode.targetSpecs at once.
+        spellOf effects specs =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory))
+            (ModeSelection.ChooseExactly 1)
+        boostedBy quantity =
+          StaticAbility.MkStaticAbility
+            (Affected.Matching Filter.Type.IsSource)
+            (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
+        planted =
+          [ ( "a target spec",
+              base {Card.Type.spell = spellOf [] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just buried)))}
+            ),
+            ( "CR 303.4a's enchant ability",
+              base {Card.Type.enchant = Just (TargetSpec.MkTargetSpec Pool.Permanents (Just buried))}
+            ),
+            ( "a static ability's affected set",
+              base
+                { Card.Type.staticAbilities =
+                    [ StaticAbility.MkStaticAbility
+                        (Affected.Matching buried)
+                        (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
+                    ]
+                }
+            ),
+            ( "a Count's filter",
+              base
+                { Card.Type.staticAbilities =
+                    [ boostedBy
+                        ( Quantity.Type.Count
+                            (Count.Type.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) buried Aggregation.Objects)
+                        )
+                    ]
+                }
+            ),
+            ( "a Search filter",
+              base {Card.Type.spell = spellOf [Effect.Search buried SearchDestination.RevealThenHand] Map.empty}
+            ),
+            ( "an ObjectRef.EachMatching set",
+              base {Card.Type.spell = spellOf [Effect.Destroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing] Map.empty}
+            ),
+            ( "CR 603.6a's trigger condition",
+              base
+                { Card.Type.triggeredAbilities =
+                    [ oneEffectTrigger
+                        (TriggerCondition.PermanentEnters buried)
+                        (Effect.Draw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1))
+                    ]
+                }
+            ),
+            ( "CR 601.2f's sacrifice cost component",
+              (Printing.card sorcerer)
+                { Card.Type.activatedAbilities =
+                    fmap
+                      (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice 1 buried]}})
+                      (Card.Type.activatedAbilities (Printing.card sorcerer))
+                }
+            ),
+            ( "CR 702.29e's typecycling predicate",
+              base {Card.Type.keywords = Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried))}
+            ),
+            ( "CR 613.11's spell-cost modifier",
+              base
+                { Card.Type.playerAbilities =
+                    [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.IncreaseSpellCost buried 1)]
+                }
+            ),
+            ( "CR 508.1c's combat restriction",
+              base {Card.Type.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried)]}
+            ),
+            ( "CR 614.1's counter-placement pattern",
+              base
+                { Card.Type.replacementEffects =
+                    [ReplacementEffect.CounterR (CounterPattern.MkCounterPattern Nothing ControllerRelation.Yours buried) (Scaling.AddMore 1)]
+                }
+            ),
+            ( "a created token's own static ability",
+              base
+                { Card.Type.spell =
+                    spellOf
+                      [ Effect.Create
+                          (Quantity.Type.Literal 1)
+                          (base {Card.Type.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) (NonEmpty.singleton Modification.LoseAllAbilities)]})
+                          defaultEntryRiders
+                          Nothing
+                      ]
+                      Map.empty
+                }
+            ),
+            ( "CR 103.5b's pregame action",
+              base {Card.Type.mulliganAction = [Effect.Search buried SearchDestination.RevealThenHand]}
+            )
+          ]
+        report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)
+    Spec.assertEqWith
+      s
+      "every unframed position is rejected, and the traversal is what finds it"
+      (fmap report planted)
+      (fmap (\(label, _) -> (label, True, (0, 1))) planted)
+    -- The cross-check agrees on every fixture, which is what says it reports a
+    -- blind spot rather than firing on cards that have none.
+    Spec.assertEqWith
+      s
+      "and the codec counts exactly the atoms the traversal does"
+      (fmap (\(_, card) -> jsonCanHostSubjects (cardToJson card)) planted)
+      (fmap (const 1) planted)
+    -- The nesting, stated on its own: a top-level-only check would score every
+    -- one of these zero but the first.
+    Spec.assertEqWith
+      s
+      "the atom is found at every nesting depth"
+      ( fmap
+          canHostSubjects
+          [ atom,
+            Filter.Type.And [atom],
+            Filter.Type.Or [atom],
+            Filter.Type.Not atom,
+            buried,
+            Filter.Type.HasKeyword (Keyword.Cycling (Cost.Type.MkCost Nothing []) (Just atom))
+          ]
+      )
+      [1, 1, 1, 1, 1, 1]
+    -- The ACCEPTING direction, twice: the real card, and the buried atom in an
+    -- AttachTarget destination grafted onto a card with no attach of its own --
+    -- so the acceptance is about the POSITION and not about Aura Graft.
+    Spec.assertEqWith
+      s
+      "Aura Graft is accepted"
+      (canHostSubjectOffends (Printing.card graft), canHostSubjectCounts (Printing.card graft))
+      (False, (1, 0))
+    let grafted = base {Card.Type.spell = spellOf [Effect.AttachTarget slot buried] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents Nothing))}
+    Spec.assertEqWith
+      s
+      "a buried atom in an AttachTarget destination is accepted"
+      (canHostSubjectOffends grafted, canHostSubjectCounts grafted)
+      (False, (1, 0))
+    Spec.assertEqWith
+      s
+      "and the ungrafted base card carries no atom at all"
+      (canHostSubjectOffends base, canHostSubjectCounts base)
+      (False, (0, 0))
 
 m2bCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m2bCardSpec s registry = Spec.describe s "M2bCards" $ do

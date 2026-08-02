@@ -113,8 +113,11 @@ data View = MkView
     --
     -- False everywhere else, and that is not a lost distinction: outside an attach
     -- there is no subject for the question to be about. The vacuous posture
-    -- `playerIdentity` and `attacking` take -- and a Filter that named the atom
-    -- from any other position would read that vacuous False (#471).
+    -- `playerIdentity` and `attacking` take. A Filter that named the atom from any
+    -- other position would read that vacuous False, so no card is allowed to:
+    -- Pawl.CardSpec's "CR 701.3a no card asks CanHostSubject outside an attach's
+    -- destination" rejects it in every Filter position a card has but this one's.
+    -- Widening the subject to somewhere every evaluation can see it is #572.
     canHostSubject :: Bool,
     -- CR 111.1 / 111.6: is this candidate a token rather than a card? Read from
     -- Object.source (Pawl.Engine.Game.isToken), never from a projection -- CR 111.3 makes
