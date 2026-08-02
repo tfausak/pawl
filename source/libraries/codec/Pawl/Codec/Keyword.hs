@@ -4,7 +4,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Keyword as Keyword
@@ -29,7 +28,7 @@ toJson k = case k of
   Keyword.Haste -> Common.nullary "Haste"
   Keyword.Hexproof -> Common.nullary "Hexproof"
   Keyword.Indestructible -> Common.nullary "Indestructible"
-  Keyword.Landwalk subtype -> Common.tagged "Landwalk" . Just $ Subtype.toJson subtype
+  Keyword.Landwalk criterion -> Common.tagged "Landwalk" . Just $ Filter.toJson toJson criterion
   Keyword.Lifelink -> Common.nullary "Lifelink"
   Keyword.Reach -> Common.nullary "Reach"
   Keyword.Shroud -> Common.nullary "Shroud"
@@ -58,7 +57,7 @@ fromJson value = do
     ("Haste", _) -> Right Keyword.Haste
     ("Hexproof", _) -> Right Keyword.Hexproof
     ("Indestructible", _) -> Right Keyword.Indestructible
-    ("Landwalk", Just v) -> Keyword.Landwalk <$> Subtype.fromJson v
+    ("Landwalk", Just v) -> Keyword.Landwalk <$> Filter.fromJson fromJson v
     ("Lifelink", _) -> Right Keyword.Lifelink
     ("Reach", _) -> Right Keyword.Reach
     ("Shroud", _) -> Right Keyword.Shroud

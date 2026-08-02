@@ -145,7 +145,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "Creature -- Turtle" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Turtle)
     -- CR 702.14a: the land type rides the KEYWORD, never the type line -- the
     -- Towershell is a Turtle and prints no Island anywhere.
-    Spec.assertEqWith s "one keyword: islandwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk Subtype.Island))
+    Spec.assertEqWith s "one keyword: islandwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk (Filter.HasSubtype Subtype.Island)))
     Spec.assertEqWith
       s
       "one trigger, on being declared as an attacker (CR 508.3a)"
@@ -193,9 +193,62 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 3)))
     Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 3)))
     Spec.assertEqWith s "Creature -- Wraith" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Wraith)
-    Spec.assertEqWith s "one keyword: swampwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk Subtype.Swamp))
+    Spec.assertEqWith s "one keyword: swampwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)))
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- CR 702.14c's FOURTH clause, "with both the specified type or supertype and
+  -- the specified subtype". Legions of Lim-Dûl {1}{B}{B} Creature -- Zombie 2/3,
+  -- "Snow swampwalk". (Checked against Scryfall.) The conjunction is the point:
+  -- a Swamp alone does not satisfy it, which the CombatSpec pair proves.
+  Spec.it s "legions-of-lim-dul.json loads as a {1}{B}{B} 2/3 Zombie with snow swampwalk" $ do
+    c <- S.cardOf s registry "Legions of Lim-Dûl"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Legions of Lim-Dûl")
+    Spec.assertEqWith
+      s
+      "{1}{B}{B}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black), ManaSymbol.OfType (ManaType.Colored Color.Black)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 2)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 3)))
+    Spec.assertEqWith s "Creature -- Zombie" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Zombie)
+    Spec.assertEqWith
+      s
+      "one keyword: snow swampwalk, a supertype AND a subtype"
+      (CardT.keywords c)
+      (Set.singleton (Keyword.Landwalk (Filter.And [Filter.HasSupertype Supertype.Snow, Filter.HasSubtype Subtype.Swamp])))
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+  -- CR 702.14c's THIRD clause, "without the specified type or supertype" -- the
+  -- one no positive test can state. Dryad Sophisticate {1}{G} Creature -- Dryad
+  -- 2/1, "Nonbasic landwalk". (Checked against Scryfall.) Its criterion is a
+  -- NEGATION, which is why Keyword.Landwalk carries a Filter and not a Subtype.
+  Spec.it s "dryad-sophisticate.json loads as a {1}{G} 2/1 Dryad with nonbasic landwalk" $ do
+    c <- S.cardOf s registry "Dryad Sophisticate"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Dryad Sophisticate")
+    Spec.assertEqWith
+      s
+      "{1}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 2)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 1)))
+    Spec.assertEqWith s "Creature -- Dryad" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Dryad)
+    Spec.assertEqWith
+      s
+      "one keyword: nonbasic landwalk, a negated supertype"
+      (CardT.keywords c)
+      (Set.singleton (Keyword.Landwalk (Filter.Not (Filter.HasSupertype Supertype.Basic))))
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+  -- The snow Swamp the snow swampwalker needs. Snow-Covered Swamp is "Basic Snow
+  -- Land -- Swamp" (checked against Scryfall), so it carries BOTH supertypes --
+  -- and being Basic as well as Snow is what makes it a fair test of the
+  -- conjunction rather than of Snow alone.
+  Spec.it s "snow-covered-swamp.json loads as a Basic Snow Land -- Swamp" $ do
+    c <- S.cardOf s registry "Snow-Covered Swamp"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Snow-Covered Swamp")
+    Spec.assertEqWith s "no mana cost" (CardT.manaCost c) Nothing
+    Spec.assertEqWith s "Land" (TypeLine.types (CardT.typeLine c)) (Set.singleton CardType.Land)
+    Spec.assertEqWith s "Basic and Snow" (TypeLine.supertypes (CardT.typeLine c)) (Set.fromList [Supertype.Basic, Supertype.Snow])
+    Spec.assertEqWith s "-- Swamp" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Swamp)
   -- The first card file with menace (CR 702.111), and so the first carrying a
   -- restriction on a SET of blockers rather than on each blocker independently
   -- (#533). Its entire printed rules text is the keyword, so a menace case in

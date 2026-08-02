@@ -3,7 +3,6 @@ module Pawl.Types.Keyword where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Subtype as Subtype
 
 -- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
@@ -92,19 +91,40 @@ data Keyword
     -- be the card type land plus any combination of land types, card types,
     -- and/or supertypes."
     --
-    -- The land type rides the constructor, as Toxic's N does, so `Landwalk Swamp`
-    -- and `Landwalk Island` are distinct keywords. That is what CR 702.14d
-    -- ("landwalk abilities don't 'cancel' one another") needs them to be: the
-    -- reader looks up the DEFENDING PLAYER'S lands per land type walked, never at
-    -- the blocker -- see Pawl.Engine.Combat.landwalkAllowsGiven.
+    -- The qualification rides the constructor, as Cycling's Filter does, so
+    -- `Landwalk (HasSubtype Swamp)` and `Landwalk (HasSubtype Island)` are
+    -- distinct keywords. That is what CR 702.14d ("landwalk abilities don't
+    -- 'cancel' one another") needs them to be: the reader looks up the DEFENDING
+    -- PLAYER'S lands per landwalk walked, never at the blocker -- see
+    -- Pawl.Engine.Combat.landwalkAllowsGiven.
+    --
+    -- A FILTER, not a Subtype, because CR 702.14c names four shapes and only the
+    -- first is a bare land type -- "with the specified land type (as in
+    -- 'islandwalk'), with the specified type or supertype (as in 'artifact
+    -- landwalk'), WITHOUT the specified type or supertype (as in 'nonbasic
+    -- landwalk'), or with both the specified type or supertype and the specified
+    -- subtype (as in 'snow swampwalk')". The third needs a negation and the
+    -- fourth a conjunction, neither of which a Subtype can say. Filter has both,
+    -- so the four clauses are:
+    --
+    --   islandwalk         HasSubtype Island
+    --   artifact landwalk  HasCardType Artifact
+    --   nonbasic landwalk  Not (HasSupertype Basic)
+    --   snow swampwalk     And [HasSupertype Snow, HasSubtype Swamp]
+    --
+    -- The filter carries the QUALIFICATION only, never the land-ness. Every
+    -- clause of CR 702.14c is "at least one LAND with/without ...", so being a
+    -- land is the rule's own conjunct rather than a parameter a card supplies,
+    -- and landwalkAllowsGiven asks it separately -- which also keeps the CR
+    -- 205.3d guard that comment describes. A card cannot forget it.
     --
     -- CR 702.14e ("multiple instances of the same kind of landwalk on the same
     -- creature are redundant") is why that reader takes membership rather than
     -- the per-keyword count Pawl.Types.ProjectedCharacteristics.keywords carries.
-    --
-    -- Only rule 702.14a's "usually a land type" case is represented. A Subtype
-    -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
-    Landwalk Subtype.Subtype
+    -- "The same kind" is filter equality here, which is structural: two filters
+    -- that mean the same thing written differently would count as two kinds, and
+    -- redundancy would still give the same answer because the reader is an `any`.
+    Landwalk (Filter.Filter Keyword)
   | -- | 702.15a: "Lifelink is a static ability." 702.15b: "Damage dealt by a
     -- source with lifelink causes that source's controller, or its owner if it
     -- has no controller, to gain that much life (in addition to any other

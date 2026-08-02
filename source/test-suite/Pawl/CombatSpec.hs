@@ -862,6 +862,75 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
+  -- CR 702.14c's FOURTH clause: "with both the specified type or supertype and
+  -- the specified subtype (as in 'snow swampwalk')". Legions of Lim-Dûl is the
+  -- printing, and the pair of cases below is what a bare land type could not
+  -- distinguish at all -- both lands are Swamps, and only one is snow.
+  Spec.it s "CR 702.14c a snow swampwalker walks on a Snow-Covered Swamp" $ do
+    legions <- S.printingOf s registry "Legions of Lim-Dûl"
+    piker <- S.printingOf s registry "Goblin Piker"
+    snowSwamp <- S.printingOf s registry "Snow-Covered Swamp"
+    let (gs0, mine, theirs) = attacking [legions] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [snowSwamp] gs0))) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+  Spec.it s "CR 702.14c a snow swampwalker does NOT walk on an ordinary Swamp" $ do
+    -- THE DISCRIMINATOR for the supertype half. A plain Swamp satisfies the
+    -- subtype and not the supertype, so the conjunction must fail -- which is
+    -- exactly what the old bare-Subtype payload could not express, since it
+    -- would have seen a Swamp and stopped there.
+    legions <- S.printingOf s registry "Legions of Lim-Dûl"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gs0, mine, theirs) = attacking [legions] [piker]
+        gs = withLands [swamp] gs0
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+  -- CR 702.14c's THIRD clause: "without the specified type or supertype (as in
+  -- 'nonbasic landwalk')". Dryad Sophisticate is the printing, and this is the
+  -- clause NO positive subtype test can express -- the criterion is a negation.
+  Spec.it s "CR 702.14c a nonbasic landwalker walks on a nonbasic land" $ do
+    dryad <- S.printingOf s registry "Dryad Sophisticate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    let (gs0, mine, theirs) = attacking [dryad] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        -- Urborg is a nonbasic land, so bob controls exactly what the negation
+        -- names. It is BOB's here, unlike the Urborg case above.
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [urborg] gs0))) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+  Spec.it s "CR 702.14c a nonbasic landwalker is blocked normally when every land is basic" $ do
+    -- THE FALSIFIER for the negation, and the case that separates it from every
+    -- positive test: a basic Swamp is a land the criterion must REJECT. An
+    -- implementation that ignored the Not and matched any land would call this
+    -- illegal.
+    --
+    -- It falsifies the LAND-NESS conjunct too, which is the other half of the
+    -- design. landwalkAllowsGiven's candidate set is everything the defender
+    -- controls, not only their lands, and bob's blocking Goblin Piker is a
+    -- nonbasic permanent -- so a reader that left the CardType.Land test out
+    -- would match the Piker and call this illegal as well.
+    dryad <- S.printingOf s registry "Dryad Sophisticate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gs0, mine, theirs) = attacking [dryad] [piker]
+        gs = withLands [swamp] gs0
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
   Spec.it s "CR 702.14d swampwalk on the BLOCKER cancels nothing" $ do
     -- CR 702.14d's own example, in swamps: the defending player controls the
     -- named land AND a creature with the same landwalk, and still may not

@@ -5,9 +5,12 @@
     {
       "type": "Landwalk",
       "value": {
-        "type": "HasSubtype",
+        "type": "Not",
         "value": {
-          "type": "Swamp"
+          "type": "HasSupertype",
+          "value": {
+            "type": "Basic"
+          }
         }
       }
     }
@@ -15,22 +18,22 @@
   "manaCost": [
     {
       "type": "Generic",
-      "value": 3
+      "value": 1
     },
     {
       "type": "OfType",
       "value": {
         "type": "Colored",
         "value": {
-          "type": "Black"
+          "type": "Green"
         }
       }
     }
   ],
-  "name": "Bog Wraith",
+  "name": "Dryad Sophisticate",
   "power": {
     "type": "Literal",
-    "value": 3
+    "value": 2
   },
   "replacementEffects": [],
   "spell": {
@@ -48,13 +51,13 @@
   "staticAbilities": [],
   "toughness": {
     "type": "Literal",
-    "value": 3
+    "value": 1
   },
   "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
-        "type": "Wraith"
+        "type": "Dryad"
       }
     ],
     "supertypes": [],

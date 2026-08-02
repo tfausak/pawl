@@ -287,10 +287,15 @@ rewrite pairs predicate = case predicate of
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
   -- Not rewritten, and CR 702.14a is why it is a live question rather than an
-  -- obvious no: landwalk carries a land type (Keyword.Landwalk Swamp), so a
-  -- text-changing effect could in principle reach the word inside this atom. It
-  -- does not here, matching Pawl.Engine.Projection.rewriteModification's identical
-  -- silence on Modification.GainKeyword (#523).
+  -- obvious no: landwalk carries a criterion naming a land type
+  -- (Keyword.Landwalk (HasSubtype Swamp)), so a text-changing effect could in
+  -- principle reach the word inside this atom. Since #499 made that payload a
+  -- Filter, the fix is no longer a new traversal -- it is this very function,
+  -- called on the keyword's own criterion -- but the trigger is unchanged and
+  -- unmet: no card in the pool GRANTS a landwalk or FILTERS by one, so there is
+  -- still nothing to rewrite. Matches
+  -- Pawl.Engine.Projection.rewriteModification's identical silence on
+  -- Modification.GainKeyword (#523).
   Filter.HasKeyword _ -> predicate
   Filter.PowerAtLeast _ -> predicate
   Filter.ControlledBy _ -> predicate
