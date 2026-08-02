@@ -1261,13 +1261,19 @@ galvanicBlastSpec s registry =
       -- row that failed to apply. An unspent row would be the visible difference.
       Spec.assertEqWith s "and no replacement was installed at all" (GameState.replacements after) []
     -- The discriminating twin: one more artifact, everything else identical.
-    Spec.it s "CR 614.15 with three artifacts the self-replacement applies: 4 instead of 2" $ do
+    --
+    -- The FOUR-artifact leg is what makes this a Comparison.AtLeast test rather
+    -- than an Exactly one -- the card says "three or MORE", and at exactly three
+    -- the two comparisons agree.
+    Spec.it s "CR 614.15 with three or more artifacts the self-replacement applies: 4 instead of 2" $ do
       mountain <- S.printingOf s registry "Mountain"
       myr <- S.printingOf s registry "Darksteel Myr"
       galvanicBlast <- S.printingOf s registry "Galvanic Blast"
-      let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 3 []
-          after = castAndResolve atBob gs spellId
-      Spec.assertEqWith s "bob takes 4" (S.lifeOf S.bob after) (Just 16)
+      let (three, threeId) = metalcraftBoard mountain myr galvanicBlast 3 []
+          (four, fourId) = metalcraftBoard mountain myr galvanicBlast 4 []
+          after = castAndResolve atBob three threeId
+      Spec.assertEqWith s "at three, bob takes 4" (S.lifeOf S.bob after) (Just 16)
+      Spec.assertEqWith s "at four, still 4 -- not back down to the printed 2" (S.lifeOf S.bob (castAndResolve atBob four fourId)) (Just 16)
       -- CR 614.3's "until they're used up": the row applied, so Uses.Once spent
       -- it. Nothing is left to replace a later damage event this turn.
       Spec.assertEqWith s "and the one-shot was consumed" (GameState.replacements after) []
