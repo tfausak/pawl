@@ -90,22 +90,28 @@ sicknessOkGiven pcs pid srcId ability gs =
 -- that second question yet; when something does, it must ask the CARD rather
 -- than this function, which deliberately answers a narrower one.
 --
--- INLINE, and not for the usual reason. This body reaches Projection.project,
--- which sicknessOk above and activatable's membership check also compute FOR THE
--- SAME OBJECT. Inlined, GHC shares those; opaque, it cannot, and
--- Projection.gather -- the sweep its own haddock warns is superlinear -- runs
--- again per object per enumeration. Measured on "a three-seat lands-only mirror
--- needs TWO deck-outs to find a winner": 10.4s inlined, 29.3s not, which was the
--- whole of a 2x regression in the suite.
+-- This is the LONE-QUERY convenience wrapper: it precomputes nothing, so it
+-- reaches Projection.project for itself, as do sicknessOk above and
+-- activatable's membership check when they are called the same way. Fine for a
+-- caller asking about one object (Pawl.CostSpec, Pawl.ActivateSpec); the
+-- ENUMERATION path does not come through here.
 --
--- The ENUMERATION path no longer rests on that: Action.legalActions projects the
--- whole board once and threads it through abilitiesForGiven and
--- activatableGiven, so the sharing there is explicit, the way
--- Projection.controllerOfGiven and Sba's one-projection-per-pass make it (#200,
--- and #316's own prescription). The pragma stays for the LONE-QUERY path -- the
--- wrapper here, which precomputes nothing and where GHC's sharing is still all
--- there is.
-{-# INLINE abilitiesFor #-}
+-- It once carried an INLINE pragma, and so did abilitiesForGiven below, because
+-- those repeated per-object projections were shared only by GHC's CSE: opaque,
+-- Projection.gather -- the sweep its own haddock warns is superlinear -- ran
+-- again per object per enumeration. Measured then on "a three-seat lands-only
+-- mirror needs TWO deck-outs to find a winner": 10.4s inlined, 29.3s not, a 2x
+-- regression in the whole suite.
+--
+-- Both pragmas are gone, and the reason is that the enumeration no longer rests
+-- on them: Action.legalActions projects the whole board once and threads it
+-- through abilitiesForGiven and activatableGiven, so that sharing is explicit,
+-- the way Projection.controllerOfGiven and Sba's one-projection-per-pass make it
+-- (#200, then #316). Removing them was measured rather than assumed -- all five
+-- benchmarks unmoved inside their error bars, "fighting 2p aura" (a 115-120
+-- permanent board, the one built to stress this) 597ms to 594ms, and the named
+-- test above unchanged at 0.67s. What the pragmas were holding up is now held up
+-- by the threading, and the library has no INLINE pragma left.
 abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesFor = abilitiesForGiven Map.empty
 
@@ -115,10 +121,10 @@ abilitiesFor = abilitiesForGiven Map.empty
 -- printed card and a hand object's absence from the board is not a miss (#160;
 -- see Projection.projectGiven).
 --
--- This carries the pragma too, and is what makes the wrapper's one effective: the
--- wrapper is a partial application of this, so inlining it exposes nothing for
--- GHC to share unless this body comes with it.
-{-# INLINE abilitiesForGiven #-}
+-- The ...Given half of the pair, and the one the enumeration calls:
+-- Action.legalActions hands it the board it projected once, so nothing here
+-- re-derives a projection per object. See abilitiesFor above for the pragma this
+-- used to carry and why it no longer needs one.
 abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
   Just Zone.Battlefield -> Projection.abilitiesGiven pcs oid gs
