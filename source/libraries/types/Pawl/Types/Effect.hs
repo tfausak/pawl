@@ -93,7 +93,7 @@ data Effect card
     -- "{T}: Add {C}{C}" is two of these, and Mana.manaRoutesOfGiven reads a
     -- mode's whole list as one activation's yield. Executed by Mana.tapForMana at
     -- payment (CR 605.3b: a mana ability never uses the stack);
-    -- Resolve.applyEffect never runs it. Read by Resolve.manaProduced (the
+    -- Resolve.applyEffect never runs it. Read by ManaAbility.manaProduced (the
     -- "produces mana?" ABI bit).
     AddMana ManaProduction.ManaProduction
   | -- | CR 701.23: search the controller's library for a card matching the Filter,

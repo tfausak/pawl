@@ -146,6 +146,7 @@ cardSpec s = Spec.describe s "Card" $ do
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
               Card.Type.combatRestrictions = [],
+              Card.Type.attackCosts = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],

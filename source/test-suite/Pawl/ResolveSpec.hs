@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Projection as Projection
@@ -580,6 +581,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
               Card.Type.combatRestrictions = [],
+              Card.Type.attackCosts = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],
@@ -590,9 +592,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText slot)) (Set.singleton slot)
     Spec.assertEqWith s "textChangeSlots" (Resolve.textChangeSlots card) [slot]
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
-    Spec.assertEqWith s "add mana" (Resolve.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
-    Spec.assertEqWith s "add mana of any color" (Resolve.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
-    Spec.assertEqWith s "damage produces no mana" (Resolve.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
+    Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
+    Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
+    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
   Spec.it s "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
     -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
     -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
@@ -1001,6 +1003,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
               Card.Type.combatRestrictions = [],
+              Card.Type.attackCosts = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],
@@ -1064,6 +1067,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
               Card.Type.combatRestrictions = [],
+              Card.Type.attackCosts = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],

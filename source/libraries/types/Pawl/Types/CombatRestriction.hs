@@ -28,6 +28,13 @@ import qualified Pawl.Types.Affected as Affected
 -- distinguishes them is which declaration they forbid. Splitting them into two
 -- carriers would copy the requirements' shape without the reason for it.
 --
+-- A restriction a player may PAY THROUGH is not one of these at all. Ghostly
+-- Prison's "creatures can't attack you unless their controller pays {2} ..." is
+-- CR 508.1d's cost clause and rides Pawl.Types.AttackCost, the SIXTH carrier,
+-- whose header argues the split: this type's answer is a set of creatures that
+-- may not attack, and CantAttack takes its subject off CR 508.1a's candidate list
+-- entirely, where a taxed creature has to stay on it.
+--
 -- The axis is missing rather than collapsed, and the missing capabilities are
 -- named: an attacking restriction with an object (Crown-Hunter Hireling's "can't
 -- attack unless defending player is the monarch") needs CR 508.1b's per-creature

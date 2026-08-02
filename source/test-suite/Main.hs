@@ -11,6 +11,7 @@ import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationTimingSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
+import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BindingSpec
@@ -216,6 +217,7 @@ spec s registry = do
   Pawl.Codec.ActivationTimingSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
+  Pawl.Codec.AttackCostSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
   Pawl.Codec.BindingSpec.spec s

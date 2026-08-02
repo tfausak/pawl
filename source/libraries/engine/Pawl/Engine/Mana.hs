@@ -11,10 +11,10 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -223,7 +223,7 @@ manaRoutesOfGiven pcs oid gs =
           (\manaType -> [ManaProduction.OfType manaType])
           (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
       modeRoutes ability =
-        fmap (Maybe.mapMaybe Resolve.manaProduced) (Modal.modeEffects (ActivatedAbility.modal ability))
+        fmap (Maybe.mapMaybe ManaAbility.manaProduced) (Modal.modeEffects (ActivatedAbility.modal ability))
       fromAbilities = concatMap modeRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
 
@@ -311,7 +311,7 @@ manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 -- where the game state stops it producing.
 isManaAbility :: ActivatedAbility.ActivatedAbility Card.Card -> Bool
 isManaAbility ab =
-  not (null (Maybe.mapMaybe Resolve.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
+  not (null (Maybe.mapMaybe ManaAbility.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
     && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
 
 -- CR 106.4. Absent from the map means an empty pool.

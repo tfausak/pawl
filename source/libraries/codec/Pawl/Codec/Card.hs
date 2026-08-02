@@ -12,6 +12,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.AttackCost as AttackCost
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
 import qualified Pawl.Codec.CardName as CardName
@@ -94,6 +95,10 @@ toJson c =
                then []
                else [Common.pair "combatRestrictions" (Common.encodeList CombatRestriction.toJson (Card.combatRestrictions c))]
            )
+        <> ( if null (Card.attackCosts c)
+               then []
+               else [Common.pair "attackCosts" (Common.encodeList AttackCost.toJson (Card.attackCosts c))]
+           )
         <> ( if null (Card.additionalCosts c)
                then []
                else [Common.pair "additionalCosts" (Common.encodeList (CostComponent.toJson Keyword.toJson) (Card.additionalCosts c))]
@@ -156,6 +161,7 @@ fromJson value = do
   blockRequirements <- Common.decodeListDefault BlockRequirement.fromJson (Common.nullableField "blockRequirements" ps)
   attackRequirements <- Common.decodeListDefault AttackRequirement.fromJson (Common.nullableField "attackRequirements" ps)
   combatRestrictions <- Common.decodeListDefault CombatRestriction.fromJson (Common.nullableField "combatRestrictions" ps)
+  attackCosts <- Common.decodeListDefault AttackCost.fromJson (Common.nullableField "attackCosts" ps)
   additionalCosts <- Common.decodeListDefault (CostComponent.fromJson Keyword.fromJson) (Common.nullableField "additionalCosts" ps)
   alternativeCosts <- Common.decodeListDefault (Cost.fromJson Keyword.fromJson) (Common.nullableField "alternativeCosts" ps)
   mulliganAction <- Common.decodeListDefault (Effect.fromJson fromJson) (Common.nullableField "mulliganAction" ps)
@@ -185,6 +191,7 @@ fromJson value = do
         Card.blockRequirements = blockRequirements,
         Card.attackRequirements = attackRequirements,
         Card.combatRestrictions = combatRestrictions,
+        Card.attackCosts = attackCosts,
         Card.additionalCosts = additionalCosts,
         Card.alternativeCosts = alternativeCosts,
         Card.mulliganAction = mulliganAction,

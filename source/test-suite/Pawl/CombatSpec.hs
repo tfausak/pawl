@@ -4,8 +4,9 @@
 -- Covers Pawl.Engine.Combat: attack/block legality, combat damage, and the combat
 -- keywords (flying, reach, defender, vigilance, haste, first/double strike).
 -- Also Pawl.Engine.BlockRequirement, whose only consumer is Pawl.Engine.Combat's CR 509.1c
--- check, and Pawl.Engine.CombatRestriction, whose only consumer is that module's CR
--- 508.1c and CR 509.1b checks.
+-- check, Pawl.Engine.CombatRestriction, whose only consumer is that module's CR
+-- 508.1c and CR 509.1b checks, and Pawl.Engine.AttackCost, whose only consumer is
+-- its CR 508.1d cost clause and CR 508.1h total.
 module Pawl.CombatSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -3034,6 +3035,176 @@ runToTurnStep turn phase answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 64 gs0
 
+-- A declare-attackers board with a real Ghostly Prison under `who`'s control and
+-- `lands` untapped Forests under alice's. `cursing`'s twin on the cost side of CR
+-- 508.1d: alice is active with one creature per printing in `mine`, and the
+-- Prison's controller is the only thing that decides whether her attacks are
+-- taxed at all.
+--
+-- The Forests are real Forests, so CR 305.6's intrinsic ability is what pays --
+-- a fixture that seeded a mana pool would not survive CR 500.4's emptying and
+-- would prove nothing about CR 508.1i's window. Their ids come back so a test
+-- can read the payment off the board rather than off a pool.
+imprisoning :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> [Printing.Printing] -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+imprisoning prison forest who mine lands =
+  let (gs, ours, _) = S.combatBoardOf mine []
+      (forests, board) = addForests forest lands (snd (S.addCreature prison who gs))
+   in (board, ours, forests)
+
+-- `n` untapped Forests under alice's control, ids first. Not S.landsInPlay, which
+-- builds a whole fresh game: these go onto a board that already exists.
+addForests :: Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
+addForests forest n gs =
+  let add (ids, g) _ = let (oid, g1) = S.addCreature forest S.alice g in (ids <> [oid], g1)
+   in List.foldl' add ([], gs) [1 .. n]
+
+-- Are all of these permanents tapped? What a test asks of the Forests to see CR
+-- 508.1j's payment: the mana pool is empty again by the time anything can look at
+-- it, so the tapped lands are the payment's only trace.
+allTapped :: [ObjectId.ObjectId] -> GameState.GameState -> Bool
+allTapped oids gs = all (\oid -> tapStateOf oid gs == Just TapState.Tapped) oids
+
+-- The complement, and NOT `not . allTapped`: a payment that tapped one Forest of
+-- two would satisfy that, and what these cases assert is that nothing was spent.
+allUntapped :: [ObjectId.ObjectId] -> GameState.GameState -> Bool
+allUntapped oids gs = all (\oid -> tapStateOf oid gs == Just TapState.Untapped) oids
+
+-- CR 508.1d's cost clause and CR 508.1h-508.1j, proved by Ghostly Prison
+-- ("Creatures can't attack you unless their controller pays {2} for each creature
+-- they control that's attacking you") -- the pool's first cost to attack, and the
+-- first board on which a legal declaration can leave the active player unable to
+-- comply with CR 508.1.
+--
+-- Every case here is arithmetic rather than a threshold: the tax is {2} a
+-- creature and a Forest makes one mana, so "how many Forests were tapped" reads
+-- the total cost off the board directly.
+attackCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
+  Spec.it s "CR 508.1h/508.1j attacking under a Ghostly Prison costs {2}, and the mana is paid" $ do
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, forests) = imprisoning prison forest S.bob [piker] 2
+        after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "the Piker really was declared" (S.attackerDeclarationsOf after) mine
+    Spec.assertBool s (allTapped forests after) "CR 508.1j: both Forests paid for it"
+  Spec.it s "CR 508.1 the same board WITHOUT the Prison pays nothing" $ do
+    -- The control for the test above, and the reason it is not vacuous: attacking
+    -- is free by default (CR 508.1f: "tapping a creature when it's declared as an
+    -- attacker isn't a cost"), so the Prison is what tapped the Forests.
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] []
+        (forests, board) = addForests forest 2 gs
+        after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "the Piker still attacks" (S.attackerDeclarationsOf after) mine
+    Spec.assertBool s (allUntapped forests after) "and no Forest was tapped"
+  Spec.it s "CR 508.1h the total scales with the declaration: two attackers owe {4}" $ do
+    -- CR 508.1h totals the WHOLE declaration, which is what makes Ghostly Prison's
+    -- "for each creature they control that's attacking you" a multiplication.
+    -- Ghostly Prison's own Two-Headed Giant ruling states the same arithmetic from
+    -- the other end: "you still only have to pay once per creature."
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, forests) = imprisoning prison forest S.bob [piker, piker] 4
+        after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "both Pikers were declared" (S.attackerDeclarationsOf after) mine
+    Spec.assertBool s (allTapped forests after) "CR 508.1h: all four Forests went"
+  Spec.it s "CR 508.1j partial payments are not allowed: three Forests do not buy two attacks" $ do
+    -- The same board one Forest short. CR 508.1's preamble -- "the declaration is
+    -- illegal; the game returns to the moment before the declaration" -- so it is
+    -- not that one Piker attacks and the other does not: NEITHER does, and the
+    -- three Forests that could have paid for one are untapped again.
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, forests) = imprisoning prison forest S.bob [piker, piker] 3
+        after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "nothing was declared" (S.attackerDeclarationsOf after) []
+    Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
+    Spec.assertBool s (allUntapped forests after) "the Forests are untapped again"
+    Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
+  Spec.it s "CR 109.5 a Ghostly Prison its own controller is attacking WITH taxes nothing" $ do
+    -- The direction, which is the whole of the "you": alice controls the Prison
+    -- and attacks bob, so nothing is attacking alice and no cost is owed. An
+    -- engine that taxed every attack while any Prison was on the battlefield
+    -- would tap her Forests here.
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, forests) = imprisoning prison forest S.alice [piker] 2
+        after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "the Piker attacks" (S.attackerDeclarationsOf after) mine
+    Spec.assertBool s (allUntapped forests after) "and paid nothing"
+  Spec.it s "Ghostly Prison's ruling: a creature that can't attack you can still attack a planeswalker you control" $ do
+    -- "Unless some effect explicitly says otherwise, a creature that can't attack
+    -- you can still attack a planeswalker you control" (Ghostly Prison, 2014-02-01).
+    --
+    -- ONE board, two interpreters: attacking Jace is free and attacking bob costs
+    -- {2}. An engine that read the DEFENDING PLAYER rather than what each creature
+    -- was announced as attacking could not produce both lines.
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, jaceId) = jaceBoard jace [piker]
+        withPrison = snd (S.addCreature prison S.bob gs)
+        (forests, board) = addForests forest 2 withPrison
+        atJace = S.runPure attackThePlaneswalker board (Combat.declareAttackers S.alice)
+        atBob = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+    Spec.assertEqWith
+      s
+      "attacking Jace: the record names the planeswalker"
+      (Map.elems (Combat.Type.attackers (GameState.combat atJace)))
+      [AttackTarget.OfPlaneswalker jaceId]
+    Spec.assertBool s (allUntapped forests atJace) "attacking Jace: nothing was paid"
+    Spec.assertEqWith s "attacking bob: the Piker was declared" (S.attackerDeclarationsOf atBob) mine
+    Spec.assertBool s (allTapped forests atBob) "attacking bob: the {2} was paid"
+  Spec.it s "CR 508.1d a Curse of the Nightly Hunt does not force an attack a Ghostly Prison taxes" $ do
+    -- THE COST CLAUSE: "if a creature can't attack unless a player pays a cost,
+    -- that player is not required to pay that cost, even if attacking with that
+    -- creature would increase the number of requirements being obeyed."
+    --
+    -- Both worlds on one line each. Without the Prison the Curse makes declining
+    -- illegal (that is AttackRequirements' first case); with it, declining is
+    -- legal again, and the requirement has not gone anywhere -- attacking with the
+    -- Piker is still a legal declaration, it is just no longer a forced one.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    prison <- S.printingOf s registry "Ghostly Prison"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (cursed, mine, _) = cursing curse S.alice [piker] []
+        taxed = snd (S.addCreature prison S.bob cursed)
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] cursed)) "without the Prison, declining is illegal"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] taxed) "CR 508.1d: with the Prison, declining is legal"
+    case mine of
+      a : _ -> Spec.assertBool s (Combat.legalAttackDeclaration S.alice [a] taxed) "and attacking anyway is still legal"
+      _ -> Spec.assertFailure s "fixture should have a creature"
+  Spec.it s "CR 508.1d whole cards: the Curse forces the attack, and the Prison unforces it" $ do
+    -- The gameplay-level case, run through Engine.runStep -- the priority loop and
+    -- the CR 703.4i turn-based action, not a direct call -- with an interpreter
+    -- that declines to attack. It has the mana to pay twice over, so the Forests
+    -- are the discriminator rather than the affordability: WITH the Prison the
+    -- engine must not reach for them.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (cursed, _, _) = cursing curse S.alice [piker] []
+        (forests, forced) = addForests forest 2 cursed
+        taxed = snd (S.addCreature prison S.bob forced)
+        declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareAttackers {} -> []
+          _ -> S.aggressiveAnswer p
+        forcedRun = S.runCombat declining forced
+        taxedRun = S.runCombat declining taxed
+    Spec.assertEqWith s "without the Prison the Curse forces the attack and bob takes two" (S.lifeOf S.bob forcedRun) (Just 18)
+    Spec.assertBool s (allUntapped forests forcedRun) "and it cost nothing"
+    Spec.assertEqWith s "CR 508.1d: with the Prison, declining stands and bob takes nothing" (S.lifeOf S.bob taxedRun) (Just 20)
+    Spec.assertEqWith s "nothing attacked" (S.attackerDeclarationsOf taxedRun) []
+    Spec.assertBool s (allUntapped forests taxedRun) "and no mana was spent"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -3059,3 +3230,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   putOntoBattlefieldAttackingSpec s registry
   towershellSpec s registry
   planeswalkerAttackSpec s registry
+  attackCostSpec s registry
