@@ -38,6 +38,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -538,6 +539,83 @@ triggeredAbilityOffends ability =
       wanted = Set.unions (fmap Resolve.slotsOf effects)
    in not (Set.isSubsetOf wanted available)
 
+-- The ACTIVATED-ability half of the same lint: every slot one of an
+-- activated ability's effects READS must be a slot the ACTIVATION binds. Without
+-- it, an ability naming CR 109.5's `you` loads, activates, misses the lookup and
+-- silently no-ops, exactly as an unbound `became` does above.
+--
+-- A SUBSET check, never an equality, for the reason
+-- Pawl.Engine.Binding.triggerSource's comment gives and the two lints around it
+-- take.
+--
+-- The available side is what Pawl.Engine.Activate.activateAbility stamps on the
+-- ability object as it goes on the stack, and nothing else:
+--
+--   * Binding.triggerSource. CR 113.7: "The source of an activated ability on
+--     the stack is the object whose ability was activated" -- stamped for every
+--     activation, so Longtusk Cub's "put a +1/+1 counter on Longtusk Cub" is a
+--     slot read.
+--   * the ability's own declared target specs, unioned across its modes. CR
+--     602.2b: "The remainder of the process for activating an ability is
+--     identical to the process for casting a spell listed in rules 601.2b-i",
+--     which is what routes an activation through CR 601.2c's target
+--     announcement.
+--   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
+--     CR 601.2b's "the player announces the value of that variable", measured
+--     against what CR 602.2b calls "an activated ability's analog to a spell's
+--     mana cost ... its activation cost" (Cinder Elemental). Nothing reads it as
+--     a slot today -- a printed X is Quantity.X, whose own half of the contract
+--     is the CR 602.2b sweep below -- but the activation really does bind it, so
+--     leaving it out would reject a read that works (#14 is what would make one
+--     sayable).
+--   * Resolve.definedSlots, the slot an effect of this ability MINTS rather than
+--     reads. The same exemption all three sibling lints take.
+--
+-- What is NOT on it is the point:
+--
+--   * CR 109.5's `you`, which for an activated ability the rule does define
+--     ("For an activated ability, this is the player who activated the
+--     ability") -- but Binding.setYou is called only when a TRIGGERED ability is
+--     placed (Pawl.Engine.Engine, Pawl.Engine.Monarch), so an activated ability
+--     reading the slot reads nothing (#569).
+--   * both event slots (CR 400.7e's `became`, CR 702.70a's `thatPlayer`): an
+--     activation is not an event, so Pawl.Engine.Event.eventBindings never runs
+--     for one.
+--   * Binding.chosenModes (CR 700.2), which IS stamped and is still not an
+--     exemption: its binding carries a mode set and nothing else, so no effect
+--     read can be answered from it -- Resolve reads a slot as a recipient
+--     (Binding.targetsOf) or as an amount (Binding.amountOf), and both are
+--     Nothing there. Admitting it would exempt a read that silently no-ops,
+--     which is the failure this lint exists to catch.
+--
+-- Unions the specs across every mode (Modal.allTargetSpecs) rather than pairing
+-- each mode's reads with its own specs, so a mode reading a slot only ANOTHER
+-- mode declares passes. The two lints above have the same hole (#570).
+--
+-- SCOPE: the abilities that reach Activate. CR 605.3b's mana abilities do not --
+-- one "doesn't go on the stack, so it can't be targeted, countered, or otherwise
+-- responded to. Rather, it resolves immediately after it is activated" -- and
+-- pawl's mana path lifts a route's AddMana effects out rather than activating
+-- anything (#238), so NOTHING is bound for one and none of its other effects
+-- runs either. No mana ability in the pool reads a slot, so applying the same
+-- available side to one is uniformity rather than a claim.
+activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
+activatedAbilityOffends ability =
+  let effects = Modal.allEffects (ActivatedAbility.modal ability)
+      announcedX =
+        if declaresVariable (Cost.Type.mana (ActivatedAbility.cost ability))
+          then Set.singleton Binding.variableX
+          else Set.empty
+      available =
+        Set.unions
+          [ Set.singleton Binding.triggerSource,
+            announcedX,
+            Resolve.definedSlots effects,
+            Map.keysSet (Modal.allTargetSpecs (ActivatedAbility.modal ability))
+          ]
+      wanted = Set.unions (fmap Resolve.slotsOf effects)
+   in not (Set.isSubsetOf wanted available)
+
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
 --
@@ -583,6 +661,29 @@ oneEffectTrigger condition effect =
           (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
+    }
+
+-- oneEffectTrigger's ACTIVATED twin: a one-mode, targetless ability running one
+-- effect, and the fixture the read lint's self-test misauthors on purpose. Kept
+-- out of data/cards for that lint's reason -- a card that offends a lint must not
+-- be loadable.
+--
+-- The mana cost is a parameter because it is part of the available side: CR
+-- 601.2b's announced X is bound only when the ACTIVATION cost prints an {X} (CR
+-- 602.2b). No cost components and no timing rider, neither of which the lint
+-- reads.
+oneEffectActivated ::
+  Maybe ManaCost.ManaCost ->
+  Effect.Effect Card.Type.Card ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card
+oneEffectActivated mana effect =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.timing = ActivationTiming.AnyTime
     }
 
 -- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
@@ -944,8 +1045,6 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- the condition-specific reserved slots live -- CR 400.7e's `became` and
   -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
   -- side and for why this cannot be an equality check.
-  --
-  -- No ACTIVATED-ability counterpart of this read check exists (#479).
   Spec.it s "every slot a triggered ability reads is bound for its condition" $ do
     ps <- S.allPrintings s
     let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
@@ -984,6 +1083,89 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any triggeredAbilityOffends (Card.Type.triggeredAbilities (Printing.card roaches))))
       "the real card's dies trigger is accepted"
+  -- The same subset shape over a card's ACTIVATED abilities, whose available
+  -- side is the narrowest of the three: an activation has no event, and is never
+  -- given CR 109.5's `you`. See activatedAbilityOffends for the available side.
+  Spec.it s "every slot an activated ability reads is bound for its activation" $ do
+    ps <- S.allPrintings s
+    let abilitiesOf p = fmap ((,) (Card.Type.name (Printing.card p))) (Card.Type.activatedAbilities (Printing.card p))
+        abilities = concatMap abilitiesOf ps
+        readsAnySlot ab = not (Set.null (Set.unions (fmap Resolve.slotsOf (Modal.allEffects (ActivatedAbility.modal ab)))))
+    -- Guards the sweep against passing vacuously, in both directions: an empty
+    -- pool of abilities, and a pool in which none reads a slot at all (where
+    -- every ability would pass on an empty read side whatever the lint said).
+    Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
+    Spec.assertBool s (any (readsAnySlot . snd) abilities) "and one of them reads a slot"
+    Spec.assertEqWith s "no dangling activated-ability slot" (fmap fst (filter (activatedAbilityOffends . snd) abilities)) []
+  -- The sweep above passes VACUOUSLY on the rejecting side: no committed
+  -- activated ability reads a slot it is not given, so the REJECTING direction is
+  -- proven here instead, against hand-built offenders and against three real
+  -- cards that exercise each part of the available side.
+  --
+  -- Every reserved slot an activation does NOT bind gets its own case, because a
+  -- classification answering "every slot, always" would pass any one of them
+  -- alone. The `you` case is asserted twice over: rejected for an activated
+  -- ability AND accepted for a triggered one, which is the whole difference
+  -- between the two lints (Binding.setYou is stamped only on the triggered path).
+  Spec.it s "the lint itself catches an activated ability reading a slot activation never binds" $ do
+    longtuskCub <- S.printingOf s registry "Longtusk Cub"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    cinderElemental <- S.printingOf s registry "Cinder Elemental"
+    let free = Just (ManaCost.MkManaCost [])
+        variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
+        -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
+        -- ability uses it: a bare-SlotName opcode (#378) naming the controller.
+        youDiscards = Effect.Discard Binding.you (Quantity.Type.Literal 1)
+        -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
+        -- event slots, neither of which an activation has an event to bind.
+        returnIt = Effect.MoveToZone Binding.became Zone.Hand defaultEntryRiders Nothing
+        thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
+        -- CR 113.7's source slot, which every activation DOES bind.
+        tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
+        -- An ordinary slot this ability neither declares nor mints.
+        tapGhost = Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost")))
+        -- CR 601.2b's announced value, read as a slot rather than as Quantity.X.
+        drawX = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX)
+    Spec.assertBool
+      s
+      (activatedAbilityOffends (oneEffectActivated free youDiscards))
+      "CR 109.5 you is rejected: an activation never binds it"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies youDiscards)))
+      "and the very same effect is accepted on a triggered ability"
+    Spec.assertBool
+      s
+      (activatedAbilityOffends (oneEffectActivated free returnIt))
+      "CR 400.7e became is rejected: an activation is not an event"
+    Spec.assertBool
+      s
+      (activatedAbilityOffends (oneEffectActivated free thatPlayerDraws))
+      "CR 702.70a thatPlayer is rejected for the same reason"
+    Spec.assertBool
+      s
+      (activatedAbilityOffends (oneEffectActivated free tapGhost))
+      "and so is an ordinary slot the ability never declares"
+    Spec.assertBool
+      s
+      (not (activatedAbilityOffends (oneEffectActivated free tapSelf)))
+      "CR 113.7 self is accepted, stamped for every activation"
+    Spec.assertBool
+      s
+      (not (activatedAbilityOffends (oneEffectActivated variable drawX)))
+      "CR 601.2b X is accepted when the activation cost prints {X}"
+    Spec.assertBool
+      s
+      (activatedAbilityOffends (oneEffectActivated free drawX))
+      "and rejected when it does not"
+    -- The three real cards between them cover every part of the available side
+    -- that a committed card reaches: CR 113.7's self, CR 601.2c's declared
+    -- target, and an ability whose cost carries CR 601.2b's {X}.
+    Spec.assertEqWith
+      s
+      "Longtusk Cub, Prodigal Sorcerer and Cinder Elemental are all accepted"
+      (fmap (any activatedAbilityOffends . Card.Type.activatedAbilities . Printing.card) [longtuskCub, sorcerer, cinderElemental])
+      [False, False, False]
   -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
   -- of them. Rejected rather than guessed (#53).
   Spec.it s "no Create binds a slot while making more than one token" $ do
