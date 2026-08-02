@@ -2092,7 +2092,10 @@ replacementsOf oid gs =
 -- directions.
 intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
-  [ ReplacementEffect.EntryR (EntryRewrite.WithCounters CounterKind.Loyalty n)
+  [ -- CR 614.1c: "[THIS PERMANENT] enters with . . .", which is Filter.IsSource
+  -- -- the entering object is the ability's own source (see
+  -- Pawl.Types.ReplacementEffect on why the pattern is a Filter).
+  ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Loyalty n)
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
@@ -2349,7 +2352,7 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
   Just obj ->
     if Set.member oid visited
-      then Just (Object.owner obj)
+      then Just (defaultControllerOf obj)
       else
         let visited' = Set.insert oid visited
             -- Does an affected set carried by `source` name `oid`? Parameterized
@@ -2381,8 +2384,34 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
                   Just who -> Just (cgTimestamp g, who)
             derived = Maybe.mapMaybe fromGrant grants
          in case stored <> derived of
-              [] -> Just (Object.owner obj)
+              [] -> Just (defaultControllerOf obj)
               setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
+
+-- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES.
+--
+-- Two rules, one per kind of object this is asked about, exactly as
+-- Pawl.Types.Object's own note splits them. For a PERMANENT it is CR 110.2 --
+-- "a permanent's controller is, by default, the player under whose control it
+-- entered the battlefield" -- and the owner fallback is not 108.4a but the fact
+-- that in this pool the player who put it there IS its owner unless a CR 616.1b
+-- replacement said otherwise. For anything else -- a card in a library, a
+-- graveyard, a hand -- there is no controller at all, and CR 108.4a is what says
+-- to use the owner: "if anything asks for the controller of a card that doesn't
+-- have one (because it's not a permanent or spell), use its owner instead".
+--
+-- Object.enteredUnder is written by exactly one thing, Pawl.Engine.Replacement's
+-- CR 616.1b rewrite, and is Nothing on every other object -- so for the whole
+-- pool but Gather Specimens' victims this is the owner it always was.
+--
+-- ON THE HOT PATH, which #582 flagged as the cost of moving the base off
+-- Object.owner: controllerOfGiven runs once per battlefield object inside
+-- `controls`, which the state-based-action sweep calls at every priority
+-- boundary. One Maybe match, measured on the tasty-bench suite (main vs. this
+-- branch: goldfish / casting / fighting / fighting-aura / fighting-no-aura, 2p):
+-- 20.0/159/29.9/588/338 ms -> 20.1/164/30.4/598/350 ms, every move inside the
+-- benchmark's own run-to-run stddev (+-0.9 to +-30 ms on those means).
+defaultControllerOf :: Object.Object -> PlayerId.PlayerId
+defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)
 
 -- The battlefield permanents a player controls (CR 108.4). Computes the grant
 -- list ONCE and threads it, rather than letting each controllerOf rebuild it --

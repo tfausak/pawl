@@ -7,6 +7,8 @@ import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Codec.EntryRewrite as EntryRewrite
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PhasePattern as PhasePattern
 import qualified Pawl.Codec.Scaling as Scaling
 import qualified Pawl.Codec.TokenPattern as TokenPattern
@@ -20,8 +22,8 @@ toJson :: ReplacementEffect.ReplacementEffect -> Value.Value
 toJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
     Common.tagged "ZoneChangeR" . Just . Common.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
-  ReplacementEffect.EntryR r ->
-    Common.tagged "EntryR" . Just $ EntryRewrite.toJson r
+  ReplacementEffect.EntryR p r ->
+    Common.tagged "EntryR" . Just . Common.array $ [Filter.toJson Keyword.toJson p, EntryRewrite.toJson r]
   ReplacementEffect.DamageR p r ->
     Common.tagged "DamageR" . Just . Common.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
   ReplacementEffect.DestructionR r ->
@@ -41,7 +43,10 @@ fromJson value = do
       pattern_ <- ZoneChangePattern.fromJson p
       dest <- Zone.fromJson z
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
-    ("EntryR", Just v) -> ReplacementEffect.EntryR <$> EntryRewrite.fromJson v
+    ("EntryR", Just (Value.Array (Array.MkArray [p, r]))) -> do
+      pattern_ <- Filter.fromJson Keyword.fromJson p
+      rewrite <- EntryRewrite.fromJson r
+      pure (ReplacementEffect.EntryR pattern_ rewrite)
     ("DamageR", Just (Value.Array (Array.MkArray [p, r]))) -> do
       pattern_ <- DamagePattern.fromJson p
       rewrite <- DamageRewrite.fromJson r

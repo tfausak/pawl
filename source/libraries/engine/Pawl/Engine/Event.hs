@@ -304,7 +304,12 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- destination -- CR 110.5a makes status a property of permanents
               -- -- and every other door passes the default, so nothing else can
               -- put a tapped card in a graveyard.
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
+              -- CR 110.2 / 400.7: `enteredUnder` is reset like every other
+              -- per-incarnation field, so the new object enters under its
+              -- owner's control until a CR 616.1b replacement says otherwise --
+              -- Replacement.runEntry's loop, below, is the only thing that ever
+              -- writes it.
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.timestamp = ts}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -652,10 +657,11 @@ sacrifice pid oid = do
 -- not that one is created and then removed, so nothing may be minted and nothing
 -- may be spent getting there -- resolveTokens consumes replacement use counts (CR
 -- 614.3), and burning one on a token that the rules say never existed would be a
--- second, quieter violation. Guarding the parameter rather than the resolved
--- owner is exact today because no producer can move a token's controller as it is
--- created (#69); if CR 616.1b's control-modifying entry replacements ever gain
--- one, this check has to move after them and become a re-check.
+-- second, quieter violation.
+--
+-- Not implemented: the guard reads the PARAMETER, so a CR 616.1b control rewrite
+-- applied by the entry loop below can still hand the finished token to a player
+-- who has left the game (#592). Nothing re-checks after the loop.
 --
 -- Inline rather than a guard delegating to a `createTokensFor` body: the project
 -- writes no export lists, so a second top-level name would be a public door
@@ -674,6 +680,7 @@ createTokens controller card n tapped = do
           let mkObj ts =
                 Object.MkObject
                   { Object.owner = owner,
+                    Object.enteredUnder = Nothing,
                     Object.source = Source.OfToken tokenCard,
                     Object.zone = Zone.Battlefield,
                     -- CR 110.5b: "permanents enter the battlefield untapped ...

@@ -373,6 +373,7 @@ activateAbility pid srcId ability = do
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfAbility srcId ability,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,

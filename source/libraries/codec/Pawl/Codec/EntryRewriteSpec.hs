@@ -36,3 +36,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       (EntryRewrite.WithCounters CounterKind.Loyalty 3)
       "{\"type\":\"WithCounters\",\"value\":[{\"type\":\"Loyalty\"},3]}"
+  -- CR 616.1b: Gather Specimens' control rewrite, payload-free for the reason
+  -- Pawl.Types.EntryRewrite gives -- CR 109.5 derives the player.
+  Spec.it s "UnderSourceControl (Gather Specimens)" $
+    Common.assertJsonCodec s EntryRewrite.toJson EntryRewrite.fromJson EntryRewrite.UnderSourceControl "{\"type\":\"UnderSourceControl\"}"

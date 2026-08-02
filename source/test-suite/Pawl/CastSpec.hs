@@ -499,6 +499,7 @@ handInPlay printing board =
       obj =
         Object.MkObject
           { Object.owner = S.alice,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,

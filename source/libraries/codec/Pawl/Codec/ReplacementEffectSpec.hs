@@ -21,6 +21,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SourceRelation as SourceRelation
@@ -62,15 +63,15 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
           Zone.Exile
       )
       "{\"type\":\"ZoneChangeR\",\"value\":[{\"whenDestination\":{\"type\":\"Graveyard\"},\"whichObject\":{\"type\":\"AnyObject\"},\"whoseObject\":{\"type\":\"Opponents\"}},{\"type\":\"Exile\"}]}"
-  -- EntryR carries the EntryRewrite directly, with no array -- unlike the
-  -- patterned constructors below. AsCopy pins the payload-free case.
-  Spec.it s "EntryR (Clone, AsCopy)" $
+  -- CR 614.1c: EntryR's pattern is a bare Filter, and "as [THIS PERMANENT]
+  -- enters" is Filter.IsSource. AsCopy pins the payload-free rewrite beside it.
+  Spec.it s "EntryR (Clone, IsSource + AsCopy)" $
     Common.assertJsonCodec
       s
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
-      (ReplacementEffect.EntryR EntryRewrite.AsCopy)
-      "{\"type\":\"EntryR\",\"value\":{\"type\":\"AsCopy\"}}"
+      (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy)
+      "{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}"
   -- CR 208.2b: Primal Plasma's ChoiceOf, carrying P/T and keywords.
   Spec.it s "EntryR (Primal Plasma, ChoiceOf)" $
     Common.assertJsonCodec
@@ -78,13 +79,26 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
       ( ReplacementEffect.EntryR
+          Filter.IsSource
           ( EntryRewrite.ChoiceOf
               [ EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty},
                 EntryOption.MkEntryOption {EntryOption.power = 1, EntryOption.toughness = 6, EntryOption.keywords = Set.singleton Keyword.Defender}
               ]
           )
       )
-      "{\"type\":\"EntryR\",\"value\":{\"type\":\"ChoiceOf\",\"value\":[{\"power\":3,\"toughness\":3,\"keywords\":[]},{\"power\":1,\"toughness\":6,\"keywords\":[{\"type\":\"Defender\"}]}]}}"
+      "{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"ChoiceOf\",\"value\":[{\"power\":3,\"toughness\":3,\"keywords\":[]},{\"power\":1,\"toughness\":6,\"keywords\":[{\"type\":\"Defender\"}]}]}]}"
+  -- CR 614.1d / 616.1b: Gather Specimens -- the other-objects form, whose Filter
+  -- is a real characteristic predicate rather than an identity test.
+  Spec.it s "EntryR (Gather Specimens, an opponent's creature + UnderSourceControl)" $
+    Common.assertJsonCodec
+      s
+      ReplacementEffect.toJson
+      ReplacementEffect.fromJson
+      ( ReplacementEffect.EntryR
+          (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.Opponent])
+          EntryRewrite.UnderSourceControl
+      )
+      "{\"type\":\"EntryR\",\"value\":[{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"Opponent\"}}]},{\"type\":\"UnderSourceControl\"}]}"
   -- Pattern and rewrite are both DATA, so both have to survive the trip.
   Spec.it s "DamageR (combat damage, prevented)" $
     Common.assertJsonCodec

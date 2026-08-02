@@ -24,34 +24,39 @@
   "replacementEffects": [
     {
       "type": "EntryR",
-      "value": {
-        "type": "ChoiceOf",
-        "value": [
-          {
-            "keywords": [],
-            "power": 3,
-            "toughness": 3
-          },
-          {
-            "keywords": [
-              {
-                "type": "Flying"
-              }
-            ],
-            "power": 2,
-            "toughness": 2
-          },
-          {
-            "keywords": [
-              {
-                "type": "Defender"
-              }
-            ],
-            "power": 1,
-            "toughness": 6
-          }
-        ]
-      }
+      "value": [
+        {
+          "type": "IsSource"
+        },
+        {
+          "type": "ChoiceOf",
+          "value": [
+            {
+              "keywords": [],
+              "power": 3,
+              "toughness": 3
+            },
+            {
+              "keywords": [
+                {
+                  "type": "Flying"
+                }
+              ],
+              "power": 2,
+              "toughness": 2
+            },
+            {
+              "keywords": [
+                {
+                  "type": "Defender"
+                }
+              ],
+              "power": 1,
+              "toughness": 6
+            }
+          ]
+        }
+      ]
     }
   ],
   "spell": {

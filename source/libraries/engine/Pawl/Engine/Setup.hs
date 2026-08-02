@@ -104,6 +104,7 @@ createCard pid printing = do
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,

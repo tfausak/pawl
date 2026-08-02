@@ -15,6 +15,38 @@ import qualified Pawl.Types.Zone as Zone
 
 data Object = MkObject
   { owner :: PlayerId.PlayerId,
+    -- | CR 110.2: "A permanent's controller is, by DEFAULT, the player under
+    -- whose control it entered the battlefield." That default is a fact about
+    -- the permanent rather than a continuous effect, and this field is where it
+    -- is recorded -- read by Pawl.Engine.Projection.controllerOfGiven as the base
+    -- a CR 613.1b layer-2 effect then overrides.
+    --
+    -- Nothing means "no recorded entry controller, so use the owner". That
+    -- covers two things at once: CR 108.4a's fallback for a card that is not a
+    -- permanent at all ("if anything asks for the controller of a card that
+    -- doesn't have one ... use its owner instead"), and, for a permanent, the
+    -- fact that every effect in this pool that puts one onto the battlefield is
+    -- controlled by that permanent's own owner, so CR 110.2a's "under that
+    -- player's control" and the owner are the same player. The one write is a CR
+    -- 616.1b replacement redirecting the entry, which is CR 110.2a's "unless the
+    -- effect states otherwise".
+    --
+    -- CR 110.2a's OTHER shape -- an effect naming a controller who is not the
+    -- owner -- does not come through this field: Resolve.applyEntryControl still
+    -- expresses it as a stored layer-2 effect, and no card reaches that store
+    -- (#582).
+    --
+    -- NOT a control-changing EFFECT, and the difference is CR 800.4c's in as many
+    -- words: it distinguishes "an effect that gives a player still in the game
+    -- control of an object" from "the player who controlled that object by
+    -- default". Writing
+    -- a CR 616.1b rewrite as a layer-2 effect would put it on the wrong side of
+    -- that line.
+    --
+    -- Per-incarnation state, like damage and counters: reset by changeZone,
+    -- because CR 400.7 makes the moved object a new one and CR 110.2's "entered
+    -- the battlefield" is about the entry this incarnation made.
+    enteredUnder :: Maybe PlayerId.PlayerId,
     source :: Source.Source,
     zone :: Zone.Zone,
     tapped :: TapState.TapState,

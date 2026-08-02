@@ -1,0 +1,106 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Gather Specimens",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "Replace",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "Unlimited"
+              },
+              {
+                "type": "Other"
+              },
+              null,
+              {
+                "type": "EntryR",
+                "value": [
+                  {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "Opponent"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "UnderSourceControl"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

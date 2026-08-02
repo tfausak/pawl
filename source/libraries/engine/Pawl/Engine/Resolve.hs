@@ -1723,6 +1723,12 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                     ActiveReplacement.MkActiveReplacement
                       { ActiveReplacement.effect = re,
                         ActiveReplacement.source = source,
+                        -- CR 109.5: the resolution's controller, BAKED now --
+                        -- the source is a spell CR 608.2n is about to put in a
+                        -- graveyard, so it will have no controller to project
+                        -- by the time the row is consulted. Gather Specimens'
+                        -- "an opponent's" and "your" are both read off this.
+                        ActiveReplacement.controller = controller,
                         ActiveReplacement.timestamp = ts,
                         ActiveReplacement.expiry = expiry,
                         ActiveReplacement.uses = uses,
@@ -1768,6 +1774,11 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                             PhasePattern.whosePhase = Just pid
                           },
                     ActiveReplacement.source = source,
+                    -- CR 109.5: the resolution's controller. Not the same
+                    -- player as `pid` above, which the effect NAMED (Fatigue's
+                    -- "target player"); nothing reads this, since a PhaseR
+                    -- resolves no ControllerRelation.
+                    ActiveReplacement.controller = controller,
                     ActiveReplacement.timestamp = ts,
                     ActiveReplacement.expiry = Expiry.Type.Never,
                     ActiveReplacement.uses = Uses.Once,
@@ -1805,6 +1816,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     let mkObj ts =
           Object.MkObject
             { Object.owner = controller,
+              Object.enteredUnder = Nothing,
               Object.source = Source.OfEmblem card,
               Object.zone = Zone.Command,
               Object.tapped = TapState.Untapped,
@@ -2237,12 +2249,19 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
 -- resolving effect's controller (CR 109.5) -- and this is what makes it so.
 --
 -- A stored CR 613.1b layer-2 effect over the ONE incarnation CR 400.7 just
--- minted, because pawl has no per-object controller field:
--- Projection.controllerOf derives control from layer-2 effects over a base of
--- Object.owner, so storing one IS "entered under that player's control" here.
+-- minted: Projection.controllerOf derives control from layer-2 effects over a
+-- base, so storing one IS "entered under that player's control" here.
 -- Effect.GainControl's arm builds the same shape for the other producer; the
 -- difference is only that this names an id minted a moment ago rather than a
 -- chosen target.
+--
+-- That base is now Projection.defaultControllerOf -- Object.enteredUnder, and
+-- Object.owner where nothing recorded an entry -- so #582's option 2 exists and
+-- this could write the field instead of storing an effect. It does not, and the
+-- issue is still open: no card in the pool reaches the store at all (see
+-- "NOTHING STORED" below), so switching carriers would be an unexercised change
+-- to CR 800.4a's answer. The field arrived for CR 616.1b's rewrite, which is
+-- CR 110.2's other route to a controller who is not the owner.
 --
 -- Indefinite (Expiry.Never), CR 611.2a's "lasts until the end of the game":
 -- entering under someone's control is not a duration a card states an end for.
@@ -2275,8 +2294,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
 -- has left.
 --
 -- Modelling this as a stored effect diverges from CR 800.4a at three or more
--- seats, and there is no way around it while control is derived rather than
--- stored on the object: if this controller later leaves,
+-- seats: if this controller later leaves,
 -- Departure.controlEffectsEnd ends the effect by payload player and the
 -- permanent reverts to its owner, where the rules would leave it controlled by
 -- the departing player -- CR 110.2a's control is base state, not "an effect
@@ -2285,10 +2303,20 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
 --
 -- The store lands AFTER Event.changeZoneEntering returns, so during CR 614.1c's
 -- entry-replacement loop and at the GameEvent.Moved snapshot the permanent still
--- reads as its owner's -- the one moment "enters under that player's control"
--- describes. Unobservable: ReplacementEffect.EntryR is self-only and no
--- EntryRewrite reads control, and a trigger re-derives the controller at the CR
--- 117.5 scan boundary.
+-- reads as its owner's rather than as this controller's -- which contradicts CR
+-- 614.12's "continuous effects that already exist and would apply to the
+-- permanent", since an entry replacement reading control would read the wrong
+-- player. Not that rule's "as it would exist on the battlefield" clause: CR
+-- 109.3 excludes an object's controller from its characteristics by name. CR 614.1d's forms DO read it now
+-- (Gather Specimens' "under an opponent's control"), so this is a live ordering
+-- question rather than a vacuous one -- but it is still unobservable, because no
+-- card in the pool reaches the store: every producer's controller already owns
+-- what it puts onto the battlefield (see "NOTHING STORED" above), and the
+-- branch that skips the store leaves owner and controller agreeing anyway. The
+-- trigger side is fine regardless: a trigger re-derives the controller at the CR
+-- 117.5 scan boundary. Fixing the ordering means settling the control before the
+-- entry loop runs, which is #582's option 2 (write Object.enteredUnder) plus a
+-- door through Event.changeZone to write it early.
 applyEntryControl :: PlayerId -> ObjectId -> Zone.Zone -> ObjectId -> Game ()
 applyEntryControl controller source zone newId =
   Monad.when (zone == Zone.Battlefield) . State.modify' $ \gs ->

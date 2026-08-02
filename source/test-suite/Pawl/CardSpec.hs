@@ -504,7 +504,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.PhaseR phasePattern -> Maybe.isJust (PhasePattern.whosePhase phasePattern)
   ReplacementEffect.CounterR _ _ -> False
   ReplacementEffect.ZoneChangeR _ _ -> False
-  ReplacementEffect.EntryR _ -> False
+  ReplacementEffect.EntryR _ _ -> False
   ReplacementEffect.DamageR _ _ -> False
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR _ _ -> False
@@ -1044,15 +1044,17 @@ playerEffectFilters playerEffect = case playerEffect of
   -- players, and this traversal is about the spells a cost modifier matches.
   PlayerEffect.CantBeTargetedBy _ -> []
 
--- CR 614.1: only the counter-placement pattern narrows by a Filter
--- (CounterPattern.onWhat -- "one or more counters would be put on a creature
--- YOU control"). The other six patterns narrow by zone, damage, destruction,
--- entry, token or phase, none of which holds one.
+-- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
+-- is "one or more counters would be put on a creature YOU control", and EntryR's
+-- whole pattern is one -- CR 614.1c's "as [THIS PERMANENT] enters" (Filter.IsSource)
+-- and CR 614.1d's "[Objects] enter [the battlefield] . . ." (Gather Specimens'
+-- creature clause). The other five narrow by zone, damage, destruction, token or
+-- phase, none of which holds one.
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
   ReplacementEffect.ZoneChangeR _ _ -> []
-  ReplacementEffect.EntryR _ -> []
+  ReplacementEffect.EntryR entryPattern _ -> [entryPattern]
   ReplacementEffect.DamageR _ _ -> []
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR _ _ -> []

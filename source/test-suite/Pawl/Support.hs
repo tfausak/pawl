@@ -479,6 +479,7 @@ addCreature printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
@@ -640,6 +641,7 @@ addToken card pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfToken card,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
@@ -665,6 +667,7 @@ addLibraryCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
@@ -690,6 +693,7 @@ addGraveyardCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Graveyard,
             Object.tapped = TapState.Untapped,
@@ -722,6 +726,7 @@ addExiledCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Exile,
             Object.tapped = TapState.Untapped,
@@ -761,6 +766,7 @@ addHandCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
@@ -803,6 +809,7 @@ landsInPlay land n =
             obj =
               Object.MkObject
                 { Object.owner = alice,
+                  Object.enteredUnder = Nothing,
                   Object.source = Source.OfCard land,
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
@@ -827,6 +834,7 @@ handOne printing base =
       obj =
         Object.MkObject
           { Object.owner = alice,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
@@ -857,6 +865,7 @@ pikerInHand land piker n ph =
       obj =
         Object.MkObject
           { Object.owner = alice,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard piker,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
@@ -1141,6 +1150,10 @@ addRegenShield oid gs =
         ActiveReplacement.MkActiveReplacement
           { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
             ActiveReplacement.source = oid,
+            -- CR 109.5: the shield's "you" is whoever controls the permanent it
+            -- is on. Nothing reads it -- a DestructionR carries no pattern --
+            -- so this is honesty rather than behaviour.
+            ActiveReplacement.controller = Maybe.fromMaybe alice (Projection.controllerOf oid gs),
             ActiveReplacement.timestamp = ts,
             ActiveReplacement.expiry = Expiry.AtCleanup,
             ActiveReplacement.uses = Uses.Once,
@@ -1280,6 +1293,7 @@ oneMountainState mountain ph =
       obj =
         Object.MkObject
           { Object.owner = alice,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard mountain,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
@@ -1359,6 +1373,7 @@ spellOnStack printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
