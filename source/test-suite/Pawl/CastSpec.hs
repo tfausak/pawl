@@ -1292,11 +1292,27 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
   -- Carries its own control, in the same step and for the same player: bob's
   -- Bolt is still offered, so what stops the Rally is the clause and not the
   -- step being closed to bob altogether.
+  Spec.it s "CR 601.3 not castable in the declare blockers step, though bob was attacked" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (bobsRally, _, _, board) = rallyBoard piker plains rally
+        (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
+        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
+        later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
+    Spec.assertBool s (not (Cast.castable S.bob bobsRally later)) "not castable"
+    Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob later)) "and not offered"
+    Spec.assertBool s (elem (A.Cast boltId) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
   -- CR 508.4's last-but-one sentence: "Such creatures are 'attacking' but, for
-  -- the purposes of trigger events and effects, they never 'attacked.'" CR
-  -- 508.3b says the same for the player side outright -- an ability that reads
-  -- "whenever [a player] is attacked" "won't trigger if a creature is put onto
-  -- the battlefield attacking that player or permanent".
+  -- the purposes of trigger events and effects, they never 'attacked.'" The
+  -- words that reach a printed casting restriction are "AND EFFECTS" -- a
+  -- restriction is an effect, not a trigger. CR 508.3b works the same principle
+  -- out for the trigger case ("Whenever [a player, planeswalker, or battle] is
+  -- attacked" "won't trigger if a creature is put onto the battlefield attacking
+  -- that player or permanent"), so it corroborates rather than governs.
   --
   -- So Rally's "only if you've been attacked this step" must NOT be satisfied by
   -- a creature that arrived attacking. A DIRECT call, the shape TurnSpec's CR
@@ -1330,20 +1346,6 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (Cast.castable S.bob bobsRally declared) "declared instead, it IS castable"
 
-  Spec.it s "CR 601.3 not castable in the declare blockers step, though bob was attacked" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    plains <- S.printingOf s registry "Plains"
-    rally <- S.printingOf s registry "Rally the Troops"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (bobsRally, _, _, board) = rallyBoard piker plains rally
-        (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
-        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
-        later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
-    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
-    Spec.assertBool s (not (Cast.castable S.bob bobsRally later)) "not castable"
-    Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob later)) "and not offered"
-    Spec.assertBool s (elem (A.Cast boltId) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
   -- CR 117.1a is not what is stopping it: an unrestricted instant with the
   -- same cost, in the same hand, in the same step, is castable. Without this
   -- the negatives above would also pass on an engine that refused every cast

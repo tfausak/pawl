@@ -710,8 +710,8 @@ recordTokenEntry newId = do
   State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot))
 
 -- CR 121.1 ("A player draws a card by putting the top card of their library into
--- their hand"), one at a time per CR 121.2, with CR 121.3 for the empty-library
--- case. Move pid's top library card to their hand; an empty library records the failed draw (CR 704.5b makes it a loss at
+-- their hand"), one at a time per CR 121.2. Move pid's top library card to their
+-- hand; an empty library records the failed draw (CR 704.5b makes it a loss at
 -- the next state-based-action check). The primitive shared by the draw step
 -- (Engine.runTurnBasedActions), opening hands (Setup.newGame), and the Draw
 -- effect (Resolve).
@@ -1765,7 +1765,7 @@ controllerTurnScoped cond = case cond of
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.
 --
--- Armedness is DERIVED, never stored. CR 603.8's last sentence -- "doesn't
+-- Armedness is DERIVED, never stored. CR 603.8 -- a state trigger "doesn't
 -- trigger again until the ability has resolved, has been countered, or has
 -- otherwise left the stack" -- names three outcomes that are all "no longer on
 -- the stack", so an instance sitting there is the whole suppression rule and

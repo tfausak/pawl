@@ -1067,7 +1067,7 @@ declareAttackers pid = do
                         -- CR 506.4 removal later in the step cannot un-declare
                         -- these creatures, and never narrowed to the targets still
                         -- being attacked -- Pawl.Types.Combat's `attacked` field
-                        -- says why both readers want the historical answer.
+                        -- says why its reader wants the historical answer.
                         Combat.attacked =
                           Set.union (Set.fromList (Map.elems recorded)) (Combat.attacked (GameState.combat g)),
                         -- CR 508.3b / 508.4's narrower record, written HERE and

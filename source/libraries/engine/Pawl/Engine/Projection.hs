@@ -840,10 +840,12 @@ manaCostColors mc = case mc of
 -- A LIST, not a Maybe, because of CR 107.4e's last sentence: "A hybrid mana
 -- symbol is all of its component colors." Burning-Tree Emissary's {R/G}{R/G}
 -- makes it both red and green, not one or the other and not multicoloured-as-a-
--- third-thing (CR 202.2c: "an object with two or more different colored mana
--- symbols in its mana cost is each of the colors of those mana symbols"). NOT
--- CR 105.3, which is about an EFFECT changing a colour, not about what a mana
--- cost makes an object.
+-- third-thing (CR 202.2d: "An object with one or more hybrid mana symbols
+-- and/or Phyrexian mana symbols in its mana cost is all of the colors of those
+-- mana symbols"). NOT CR 202.2c, whose premise is "two or more DIFFERENT colored
+-- mana symbols" and so does not reach {R/G}{R/G}'s two identical ones; and not
+-- CR 105.3, which is about an EFFECT changing a colour rather than about what a
+-- mana cost makes an object.
 --
 -- CONTRIBUTIONS, not a set: this may repeat a colour, and deduplicating is the
 -- caller's job because the caller is the one building a set. Colour is a set
@@ -2096,10 +2098,11 @@ intrinsicReplacementsOf pc =
   ]
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
--- SOURCE. That rule is why there is a live set to collect at all -- replacement
+-- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
+-- without it. CR 614.1 is why there is a live set to collect at all: replacement
 -- effects "apply continuously as events happen -- they aren't locked in ahead of
--- time" -- where CR 614.6 (which this used to cite) is about what happens once
--- an event IS replaced, and names no set -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
+-- time". NOT CR 614.6, which this used to cite and which is about what happens
+-- once an event IS replaced -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
 -- without it. Short-circuits when no permanent has one in its base card, so an
 -- ordinary zone change (a draw, a land entering) does NOT project the whole
 -- board.
