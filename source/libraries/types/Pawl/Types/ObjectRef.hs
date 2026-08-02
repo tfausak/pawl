@@ -1,7 +1,7 @@
 module Pawl.Types.ObjectRef where
 
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | WHICH OBJECTS an object-affecting effect names -- the object-side counterpart
 -- of Pawl.Types.PlayerRef, and for the same reason: an opcode that could only
@@ -21,7 +21,7 @@ data ObjectRef
     -- engine reserved it -- Binding.triggerSource). At most one: a slot holds a
     -- single Recipient. Subject to CR 608.2b's illegal-target check when the
     -- slot was a target.
-    InSlot SlotName
+    InSlot SlotName.SlotName
   | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it:
     -- "If a spell or ability uses a description of an object that includes a
@@ -45,5 +45,5 @@ data ObjectRef
     -- creatures") and Effect.GainControl (Aura Thief's "all enchantments") both
     -- do that, storing Affected.TheseObjects; the one-shots that take this type
     -- store nothing and are governed by CR 608.2c/608.2f instead.
-    EachMatching Filter
+    EachMatching Filter.Filter
   deriving (Eq, Ord, Show)

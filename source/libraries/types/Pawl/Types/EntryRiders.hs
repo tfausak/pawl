@@ -1,6 +1,6 @@
 module Pawl.Types.EntryRiders where
 
-import Pawl.Types.TapState (TapState)
+import qualified Pawl.Types.TapState as TapState
 
 -- | What an effect says about a permanent AS IT ENTERS the battlefield, beyond the
 -- permanent's own text -- Hanweir Garrison's "that are tapped and attacking",
@@ -40,7 +40,7 @@ import Pawl.Types.TapState (TapState)
 -- "you choose which opponent or opposing planeswalker it's attacking. It doesn't
 -- have to attack the same opponent ... that it was when it was exiled."
 data EntryRiders = MkEntryRiders
-  { tapped :: TapState,
+  { tapped :: TapState.TapState,
     attacking :: Bool
   }
   deriving (Eq, Ord, Show)

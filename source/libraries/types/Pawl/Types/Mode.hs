@@ -1,11 +1,11 @@
 module Pawl.Types.Mode where
 
-import Data.Map.Strict (Map)
-import Data.Sequence (Seq)
-import Pawl.Types.Effect (Effect)
-import Pawl.Types.Optionality (Optionality)
-import Pawl.Types.SlotName (SlotName)
-import Pawl.Types.TargetSpec (TargetSpec)
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TargetSpec as TargetSpec
 
 -- | CR 700.2: one mode of a modal spell or ability -- its own effects and its own
 -- target namespace. `effects` is a Seq (ordered; CR 608.2c resolves in written
@@ -20,8 +20,8 @@ import Pawl.Types.TargetSpec (TargetSpec)
 -- non-modal card's single mode is its whole instruction list, which is exactly
 -- what "you may [everything this ability says]" means.
 data Mode card = MkMode
-  { effects :: Seq (Effect card),
-    targetSpecs :: Map SlotName TargetSpec,
-    optionality :: Optionality
+  { effects :: Seq.Seq (Effect.Effect card),
+    targetSpecs :: Map.Map SlotName.SlotName TargetSpec.TargetSpec,
+    optionality :: Optionality.Optionality
   }
   deriving (Eq, Ord, Show)

@@ -1,7 +1,7 @@
 module Pawl.Types.Recipient where
 
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 510.1: combat damage is assigned to a blocking creature or to the player
 -- being attacked. Grows toward battles (#302), the remaining attack target. Ord
@@ -10,7 +10,7 @@ import Pawl.Types.PlayerId (PlayerId)
 -- Bolt targeting a player is the second consumer (M3a): "defender" was combat's
 -- name for this recipient, not the type's meaning, so ToPlayer names the object.
 data Recipient
-  = ToCreature ObjectId
+  = ToCreature ObjectId.ObjectId
   | -- | CR 115.4's third kind of "any target". A tag of its own rather than a
     -- ToObject, because CR 120.3c gives damage to a planeswalker a DIFFERENT
     -- result from CR 120.3e's marked damage -- so the classification that says
@@ -20,12 +20,12 @@ data Recipient
     --
     -- Nothing declares an attack on one yet (CR 306.6, #493), so today this is a
     -- noncombat-damage tag only.
-    ToPlaneswalker ObjectId
-  | ToPlayer PlayerId
+    ToPlaneswalker ObjectId.ObjectId
+  | ToPlayer PlayerId.PlayerId
   | -- | A spell on the stack or a permanent, named generically (Magical Hack's
     -- "target spell or permanent", the fixture's "target land"). Text-changing
     -- does not care about creature-ness, so it does not reuse ToCreature.
-    ToObject ObjectId
+    ToObject ObjectId.ObjectId
   deriving (Eq, Ord, Show)
 
 -- | The object a recipient names, if any -- Nothing for a player, which CR 115.1
@@ -37,7 +37,7 @@ data Recipient
 -- Binding.empty does: it is a fact about the shape, not about the game, and
 -- callers on both sides of the module graph need it (Pawl.Engine.Projection cannot
 -- import Pawl.Engine.Resolve, where this used to live).
-objectOf :: Recipient -> Maybe ObjectId
+objectOf :: Recipient -> Maybe ObjectId.ObjectId
 objectOf r = case r of
   ToCreature oid -> Just oid
   ToPlaneswalker oid -> Just oid

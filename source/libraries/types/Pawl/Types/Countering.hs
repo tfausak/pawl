@@ -1,7 +1,7 @@
 module Pawl.Types.Countering where
 
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 701.6a: one act of COUNTERING a spell -- "to counter a spell or ability
 -- means to cancel it, removing it from the stack. It doesn't resolve and none of
@@ -25,7 +25,7 @@ data Countering = MkCountering
     -- incarnation in the graveyard. Carried anyway, because it is WHAT HAPPENED
     -- -- the event otherwise says only that somebody countered something, and
     -- two counters in one batch would be indistinguishable entries.
-    spell :: ObjectId,
+    spell :: ObjectId.ObjectId,
     -- | The spell or ability that did the countering, which is what Baral, Chief
     -- of Compliance's "a spell or ability YOU CONTROL counters a spell" names.
     -- Whichever object Pawl.Engine.Resolve calls the effect's source: the
@@ -36,7 +36,7 @@ data Countering = MkCountering
     -- record describes, and because a condition scoped to the bearer ("whenever
     -- THIS creature counters a spell") is the one thing `controller` below could
     -- not answer.
-    source :: ObjectId,
+    source :: ObjectId.ObjectId,
     -- | CR 405.4: who controlled `source` AT THE MOMENT IT COUNTERED -- "the
     -- controller of a spell is the player who cast it", and for an ability the
     -- player who activated it or who controlled its source when it triggered.
@@ -62,6 +62,6 @@ data Countering = MkCountering
     -- Even for a source that is still there, re-deriving would read control at
     -- the scan boundary rather than at the event -- #47's elision, which this
     -- field simply does not have.
-    controller :: PlayerId
+    controller :: PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

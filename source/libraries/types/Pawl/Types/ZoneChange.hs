@@ -1,7 +1,7 @@
 module Pawl.Types.ZoneChange where
 
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.Zone (Zone)
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Zone as Zone
 
 -- | One zone-change event (CR 400.7): `object` is the RESULTING object's id (the
 -- fresh incarnation in the destination), which is what an enters trigger scans,
@@ -20,9 +20,9 @@ import Pawl.Types.Zone (Zone)
 -- object that will leave is the only one that exists. They diverge only in the
 -- RECORDED event, once the move has minted the destination incarnation.
 data ZoneChange = MkZoneChange
-  { departed :: ObjectId,
-    object :: ObjectId,
-    from :: Zone,
-    to :: Zone
+  { departed :: ObjectId.ObjectId,
+    object :: ObjectId.ObjectId,
+    from :: Zone.Zone,
+    to :: Zone.Zone
   }
   deriving (Eq, Ord, Show)

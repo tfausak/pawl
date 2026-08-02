@@ -1,6 +1,6 @@
 module Pawl.Types.CastingRestriction where
 
-import Pawl.Types.Phase (Phase)
+import qualified Pawl.Types.Phase as Phase
 
 -- | CR 601.3: "A player can begin to cast a spell only if a rule or effect allows
 -- that player to cast it and no rule or effect prohibits that player from casting
@@ -38,7 +38,7 @@ data CastingRestriction
     -- opponent's upkeep" (Festival) and "only during your end step" (Necrologia)
     -- narrow the same window by turn as well. Pawl.Types.TurnScope is the type that
     -- would say it; no card in the pool needs it yet (#445).
-    DuringPhase Phase
+    DuringPhase Phase.Phase
   | -- | "and only if you've been attacked this step" -- the second clause fourteen
     -- cards carry on a CAST, Rally the Troops among them. (Kongming's
     -- Contraptions prints the same words on an activated ability, which is the

@@ -8,10 +8,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.AbilityName" $ do
-  Spec.describe s "fromJson" $ do
-    Spec.it s "works" $ do
-      Common.assertFromJson s AbilityName.fromJson "\"a\"" (AbilityName.MkAbilityName $ Text.pack "a")
-
-  Spec.describe s "toJson" $ do
-    Spec.it s "works" $ do
-      Common.assertToJson s AbilityName.toJson (AbilityName.MkAbilityName $ Text.pack "b") "\"b\""
+  Spec.it s "MkAbilityName \"a\"" $
+    Common.assertJsonCodec s AbilityName.toJson AbilityName.fromJson (AbilityName.MkAbilityName $ Text.pack "a") "\"a\""
+  Spec.it s "MkAbilityName \"b\"" $
+    Common.assertJsonCodec s AbilityName.toJson AbilityName.fromJson (AbilityName.MkAbilityName $ Text.pack "b") "\"b\""

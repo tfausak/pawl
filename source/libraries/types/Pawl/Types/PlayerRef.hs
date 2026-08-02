@@ -1,7 +1,7 @@
 module Pawl.Types.PlayerRef where
 
-import Pawl.Types.PlayerRelation (PlayerRelation)
-import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." This says WHOSE zone a scope folds
@@ -18,8 +18,8 @@ data PlayerRef
     -- checked by the card lint, not by this type (#161).
     EachPlayer
   | -- | CR 109.5 / 102.2, resolved against the evaluation context's perspective.
-    Relative PlayerRelation
+    Relative PlayerRelation.PlayerRelation
   | -- | The player bound in a slot -- Sudden Impact's "that player's hand", where
     -- the slot was filled by targeting (CR 601.2c).
-    InSlot SlotName
+    InSlot SlotName.SlotName
   deriving (Eq, Ord, Show)

@@ -1,6 +1,6 @@
 module Pawl.Types.BlockRequirement where
 
-import Pawl.Types.Affected (Affected)
+import qualified Pawl.Types.Affected as Affected
 
 -- | CR 509.1c: one printed BLOCKING REQUIREMENT -- an "effect that says a creature
 -- must block, or that it must block if some condition is met". Lure's "All
@@ -54,6 +54,6 @@ newtype BlockRequirement = MkBlockRequirement
     -- that continuous effect began", and CR 613.11 classifies a requirement as
     -- exactly that kind of effect. So Affected.TheseObjects is the one arm this
     -- field has no use for.
-    attacker :: Affected
+    attacker :: Affected.Affected
   }
   deriving (Eq, Ord, Show)

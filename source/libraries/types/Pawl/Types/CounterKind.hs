@@ -1,6 +1,6 @@
 module Pawl.Types.CounterKind where
 
-import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.Keyword as Keyword
 
 -- | CR 122: a counter is a marker that modifies characteristics or interacts with a
 -- rule (CR 122.1). Its KIND is a closed-half classification -- the same posture as
@@ -30,7 +30,7 @@ data CounterKind
     --
     -- CR 613.1f is the layer: this grants an ability, so Projection gathers it at
     -- Layer.Ability, NOT at the layer 7c where CR 122.1a's P/T counters land.
-    Keyword Keyword
+    Keyword Keyword.Keyword
   | -- | CR 122.1e: "The number of loyalty counters on a planeswalker on the
     -- battlefield indicates how much loyalty it has." CR 306.5c says the same
     -- thing from the other side, which is why a planeswalker's loyalty on the

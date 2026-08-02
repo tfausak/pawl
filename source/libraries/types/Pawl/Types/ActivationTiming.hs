@@ -1,7 +1,7 @@
 module Pawl.Types.ActivationTiming where
 
-import Pawl.Types.Phase (Phase)
-import Pawl.Types.TurnScope (TurnScope)
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | CR 307.5: when an activated ability may be activated.
 --
@@ -74,5 +74,5 @@ data ActivationTiming
     -- Neither "an opponent's turn" (Trade Caravan, Nettling Imp) nor a turn named
     -- with no phase at all (Lavinia, Foil to Conspiracy) is sayable: TurnScope has
     -- two arms, and this one requires a Phase (#520).
-    DuringPhase Phase TurnScope
+    DuringPhase Phase.Phase TurnScope.TurnScope
   deriving (Eq, Ord, Show)

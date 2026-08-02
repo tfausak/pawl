@@ -1,9 +1,9 @@
 module Pawl.Types.DamageEvent where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.DamageKind (DamageKind)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.Recipient (Recipient)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Recipient as Recipient
 
 -- | One instance of damage: a source dealt `amount` to `target`. The first reader
 -- is deathtouch's CR 704.5h SBA, which asks `dealtByDeathtouch`. Started minimal
@@ -15,9 +15,9 @@ import Pawl.Types.Recipient (Recipient)
 -- because it may be unaskable later. Pawl.Engine.Damage.damageEvent is where they are
 -- read.
 data DamageEvent = MkDamageEvent
-  { source :: ObjectId,
-    target :: Recipient,
-    amount :: Natural,
+  { source :: ObjectId.ObjectId,
+    target :: Recipient.Recipient,
+    amount :: Natural.Natural,
     -- | CR 702.2e: whether the source had deathtouch WHEN THIS DAMAGE WAS DEALT.
     -- Captured from the projection at deal time (Projection.hasKeyword), not
     -- re-derived at SBA-check time -- last-known information. Read by the CR
@@ -34,10 +34,10 @@ data DamageEvent = MkDamageEvent
     -- Pawl.Engine.Damage.applyDamage, and only for COMBAT damage dealt to a player --
     -- CR 120.3g scopes toxic to that alone, so a noncombat event carries the
     -- value and ignores it.
-    dealtByToxic :: Natural,
+    dealtByToxic :: Natural.Natural,
     -- | CR 510 vs CR 608: combat damage or not. Set at deal time -- Damage tags
     -- Combat, Resolve's DealDamage tags Noncombat. Read by Replacement.applies's
     -- DamageR arm (CR 615.1's damage pattern).
-    kind :: DamageKind
+    kind :: DamageKind.DamageKind
   }
   deriving (Eq, Ord, Show)

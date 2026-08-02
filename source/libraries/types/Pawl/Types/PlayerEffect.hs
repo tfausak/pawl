@@ -1,8 +1,8 @@
 module Pawl.Types.PlayerEffect where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.ManaCost (ManaCost)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ManaCost as ManaCost
 
 -- | CR 611.1's third clause: a continuous effect that "affects players or the
 -- rules of the game" rather than the characteristics of an object. The player
@@ -19,10 +19,10 @@ data PlayerEffect
     -- each turn. The limit is carried, not hardcoded: Rule of Law and Arcane
     -- Laboratory both say one, and a card that says two must not need a sibling
     -- constructor.
-    CantCastMoreThan Natural
+    CantCastMoreThan Natural.Natural
   | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
-    IncreaseSpellCost Filter Natural
+    IncreaseSpellCost Filter.Filter Natural.Natural
   | -- | CR 613.11 / 601.2f / Sapphire Medallion, Edgewalker: matching spells cost
     -- this much less to cast.
     --
@@ -42,7 +42,7 @@ data PlayerEffect
     -- An EXCESS typed symbol is dropped rather than spilling onto the generic
     -- component, which is Edgewalker's "This effect reduces only the amount of
     -- colored mana you pay" and not CR 118.7b-d (#309).
-    ReduceSpellCost Filter ManaCost
+    ReduceSpellCost Filter.Filter ManaCost.ManaCost
   | -- | CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
   | -- | CR 500.5 / 703.4q / Upwelling: this player does not lose the unspent mana

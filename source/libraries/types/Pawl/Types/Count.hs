@@ -1,8 +1,8 @@
 module Pawl.Types.Count where
 
-import Pawl.Types.Aggregation (Aggregation)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.Scope (Scope)
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Scope as Scope
 
 -- | A number derived from game state: a scope to fold over, a per-object predicate
 -- to keep by, and an aggregation. First-order and analyzable -- never a
@@ -17,5 +17,5 @@ import Pawl.Types.Scope (Scope)
 -- is where it is actually used and where the reason for it is written. Every
 -- customer but Pawl.Types.Quantity instantiates it concretely as
 -- `Count Quantity`.
-data Count quantity = MkCount Scope Filter (Aggregation quantity)
+data Count quantity = MkCount Scope.Scope Filter.Filter (Aggregation.Aggregation quantity)
   deriving (Eq, Ord, Show)

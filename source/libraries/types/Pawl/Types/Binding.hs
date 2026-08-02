@@ -1,11 +1,11 @@
 module Pawl.Types.Binding where
 
-import Data.Set (Set)
-import Numeric.Natural (Natural)
-import Pawl.Types.ModeIndex (ModeIndex)
-import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
-import Pawl.Types.Recipient (Recipient)
-import Pawl.Types.Subtype (Subtype)
+import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 
 -- | CR 601.2: the cast-time choices bound to one named slot of a spell or ability
 -- on the stack. A record, not a sum, because one slot may carry several kinds of
@@ -14,21 +14,21 @@ import Pawl.Types.Subtype (Subtype)
 -- slot is Nothing. Grows a field per future binding (a mode, a for-each count).
 data Binding = MkBinding
   { -- | CR 601.2c: the chosen target for this slot; re-validated at CR 608.2b.
-    target :: Maybe Recipient,
+    target :: Maybe Recipient.Recipient,
     -- | CR 612: the (from, to) basic land types chosen for a text-changing slot.
-    subtypes :: Maybe (Subtype, Subtype),
+    subtypes :: Maybe (Subtype.Subtype, Subtype.Subtype),
     -- | CR 601.2b: the value chosen for a variable in the cost (X). Read by
     -- Quantity.evaluate. Nothing for a slot with no amount.
-    amount :: Maybe Natural,
+    amount :: Maybe Natural.Natural,
     -- | CR 700.2 / 601.2b: the modes chosen for a modal spell, by index. A Set: no
     -- duplicate modes (CR 700.2d "same mode more than once" is future), and Set's
     -- ordering IS printed order (CR 608.2c), so resolution reads them pre-sorted.
     -- Stored only under the reserved Binding.chosenModes slot. Nothing elsewhere.
-    modes :: Maybe (Set ModeIndex),
+    modes :: Maybe (Set.Set ModeIndex.ModeIndex),
     -- | CR 707.2 / 707.5: the copiable-value snapshot a permanent copies AS IT
     -- ENTERS (P2). Stored only under Pawl.Engine.Binding.copySource; the layer fold reads
     -- it as the layer-1 seed. Nothing for a non-copy object.
-    copy :: Maybe ProjectedCharacteristics
+    copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics
   }
   deriving (Eq, Ord, Show)
 

@@ -1,8 +1,8 @@
 module Pawl.Types.StaticAbility where
 
-import Data.List.NonEmpty (NonEmpty)
-import Pawl.Types.Affected (Affected)
-import Pawl.Types.Modification (Modification)
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Modification as Modification
 
 -- | A card's printed static continuous ability (CR 604.1/604.2: a static ability
 -- creates a continuous effect active while its permanent is on the battlefield).
@@ -32,7 +32,7 @@ import Pawl.Types.Modification (Modification)
 -- Its order is the card's PRINTED order, not the application order --
 -- Projection.layer decides that, per CR 613.1.
 data StaticAbility = MkStaticAbility
-  { affected :: Affected,
-    modifications :: NonEmpty Modification
+  { affected :: Affected.Affected,
+    modifications :: NonEmpty.NonEmpty Modification.Modification
   }
   deriving (Eq, Ord, Show)

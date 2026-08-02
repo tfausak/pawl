@@ -1,8 +1,8 @@
 module Pawl.Types.Affected where
 
-import Data.Set (Set)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.ObjectId (ObjectId)
+import qualified Data.Set as Set
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | What a continuous effect applies to. CR 611.2c: a resolution effect's set is
 -- LOCKED when it begins (TheseObjects -- a bounced-and-returned creature is a new
@@ -12,7 +12,7 @@ import Pawl.Types.ObjectId (ObjectId)
 -- re-derived each projection, never captured once.
 data Affected
   = -- | CR 611.2c: a fixed id set, NOT a predicate.
-    TheseObjects (Set ObjectId)
+    TheseObjects (Set.Set ObjectId.ObjectId)
   | -- | Dynamic: any object matching the Filter, re-derived each projection against
     -- the PARTIAL projection accumulated so far, so it reads each axis as of
     -- whichever layers have already applied (CR 613: layers apply in order) -- a
@@ -20,7 +20,7 @@ data Affected
     -- other" card text (not a rule -- Opalescence does not animate itself) is
     -- Filter.Not Filter.IsSource inside the Filter, not a separate field -- the
     -- predicate language already names the source that way.
-    Matching Filter
+    Matching Filter.Filter
   | -- | CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". A THIRD kind of affected set: TheseObjects is fixed at
     -- resolution (CR 611.2c) and Matching is a predicate re-derived per
@@ -52,5 +52,5 @@ data Affected
     -- Filtered rather than payload-free, unlike Attached: "creatures enchanted
     -- player controls" narrows by card type, and CR 303.4m's phrase names only
     -- whose permanents they are.
-    AttachedPlayerControls Filter
+    AttachedPlayerControls Filter.Filter
   deriving (Eq, Ord, Show)

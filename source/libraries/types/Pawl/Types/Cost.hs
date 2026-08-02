@@ -1,7 +1,7 @@
 module Pawl.Types.Cost where
 
-import Pawl.Types.CostComponent (CostComponent)
-import Pawl.Types.ManaCost (ManaCost)
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.ManaCost as ManaCost
 
 -- | CR 118.1: "a cost is an action or payment necessary to take another action".
 -- ONE type for both carriers -- a spell's cost (CR 601.2f) and an activated
@@ -27,7 +27,7 @@ import Pawl.Types.ManaCost (ManaCost)
 -- Scryfall spells the difference exactly: Ancestral Vision's mana_cost is '',
 -- Ornithopter's is '{0}'.
 data Cost = MkCost
-  { mana :: Maybe ManaCost,
-    components :: [CostComponent]
+  { mana :: Maybe ManaCost.ManaCost,
+    components :: [CostComponent.CostComponent]
   }
   deriving (Eq, Ord, Show)

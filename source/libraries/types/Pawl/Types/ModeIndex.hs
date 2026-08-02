@@ -1,6 +1,6 @@
 module Pawl.Types.ModeIndex where
 
-import Numeric.Natural (Natural)
+import qualified Numeric.Natural as Natural
 
 -- | CR 700.2: a mode is one option in the printed bulleted list. Modes have no
 -- meaningful label to conjure (unlike a target SlotName), so a mode is referenced
@@ -10,6 +10,6 @@ import Numeric.Natural (Natural)
 -- A newtype, not a bare Natural, so the reference is typed. Ord is load-bearing:
 -- ModeIndex is a Set element (the chosen modes) and its ordering IS printed order.
 newtype ModeIndex = MkModeIndex
-  { unwrap :: Natural
+  { unwrap :: Natural.Natural
   }
   deriving (Eq, Ord, Show)

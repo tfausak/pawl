@@ -1,13 +1,13 @@
 module Pawl.Types.ManaSymbol where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.Color (Color)
-import Pawl.Types.ManaType (ManaType)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.ManaType as ManaType
 
 -- | CR 107.4. Grows: hybrid Phyrexian (#364).
 data ManaSymbol
-  = Generic Natural
-  | OfType ManaType
+  = Generic Natural.Natural
+  | OfType ManaType.ManaType
   | -- | CR 107.4e: "Each one represents a cost that can be paid in one of two ways,
     -- as represented by the two halves of the symbol. A hybrid symbol such as
     -- {W/U} can be paid with either white or blue mana."
@@ -22,7 +22,7 @@ data ManaSymbol
     -- two are ALTERNATIVES, so order carries no meaning beyond presentation, and
     -- `Hybrid t t` is degenerate rather than illegal -- it simply means `OfType
     -- t`, and no card prints one.
-    Hybrid ManaType ManaType
+    Hybrid ManaType.ManaType ManaType.ManaType
   | -- | CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
     -- either one black mana or two mana of any type."
     --
@@ -41,7 +41,7 @@ data ManaSymbol
     -- Pawl.Engine.Mana.resolutions is what absorbs it: CR 601.2b's "nonhybrid equivalent
     -- cost" is enumerated above the search, so each symbol is still paid one way
     -- at a time and nothing below ever sees a demand that eats two units.
-    MonocoloredHybrid ManaType
+    MonocoloredHybrid ManaType.ManaType
   | -- | CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid
     -- either with one mana of its color or by paying 2 life" (Mutagenic Growth).
     --
@@ -66,7 +66,7 @@ data ManaSymbol
     -- CR 107.4f's OTHER half -- the ten hybrid Phyrexian symbols, "{G/U/P}", paid
     -- with either of two colours or with 2 life -- is not this constructor and
     -- has none of its own (#364).
-    Phyrexian Color
+    Phyrexian Color.Color
   | -- | CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
     -- that can be paid with one mana of any type produced by a snow source (see
     -- rule 106.3)." Icehide Golem, whose whole cost this is.

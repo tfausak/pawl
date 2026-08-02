@@ -1,15 +1,15 @@
 module Pawl.Types.ReplacementEffect where
 
-import Pawl.Types.CounterPattern (CounterPattern)
-import Pawl.Types.DamagePattern (DamagePattern)
-import Pawl.Types.DamageRewrite (DamageRewrite)
-import Pawl.Types.DestructionRewrite (DestructionRewrite)
-import Pawl.Types.EntryRewrite (EntryRewrite)
-import Pawl.Types.PhasePattern (PhasePattern)
-import Pawl.Types.Scaling (Scaling)
-import Pawl.Types.TokenPattern (TokenPattern)
-import Pawl.Types.Zone (Zone)
-import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
+import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
 -- | CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
 -- and the REWRITE SHAPE it applies. One arm per replaceable event class -- the
@@ -50,11 +50,11 @@ import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
 -- The sole rules-casing site is Pawl.Engine.Replacement (CR 616.1's loop). Pawl.Codec
 -- also cases on every constructor, but only as the JSON data boundary.
 data ReplacementEffect
-  = ZoneChangeR ZoneChangePattern Zone
-  | EntryR EntryRewrite
-  | DamageR DamagePattern DamageRewrite
-  | DestructionR DestructionRewrite
-  | CounterR CounterPattern Scaling
-  | TokenR TokenPattern Scaling
-  | PhaseR PhasePattern
+  = ZoneChangeR ZoneChangePattern.ZoneChangePattern Zone.Zone
+  | EntryR EntryRewrite.EntryRewrite
+  | DamageR DamagePattern.DamagePattern DamageRewrite.DamageRewrite
+  | DestructionR DestructionRewrite.DestructionRewrite
+  | CounterR CounterPattern.CounterPattern Scaling.Scaling
+  | TokenR TokenPattern.TokenPattern Scaling.Scaling
+  | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

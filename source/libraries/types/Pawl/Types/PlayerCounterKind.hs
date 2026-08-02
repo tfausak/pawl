@@ -14,8 +14,10 @@ module Pawl.Types.PlayerCounterKind where
 --
 -- Ord is load-bearing: PlayerCounterKind is a Map key on Player.counters.
 -- Constructors are ordered by rule number so the type stays diffable against the
--- rules, matching CounterKind's and Keyword's posture. Experience and rad
--- counters (CR 122.1i) are one constructor each once a card wants them.
+-- rules, matching CounterKind's and Keyword's posture. Rad counters (CR
+-- 122.1i) are a constructor once a card wants them; experience counters have
+-- no rule in docs/rules.txt to cite (the word does not appear there) and get
+-- one only once a card and its rule turn up together.
 data PlayerCounterKind
   = Energy -- CR 107.14
   | Poison -- CR 122.1f

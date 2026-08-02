@@ -1,8 +1,8 @@
 module Pawl.Types.ZoneChangePattern where
 
-import Pawl.Types.ControllerRelation (ControllerRelation)
-import Pawl.Types.Zone (Zone)
-import Pawl.Types.ZoneChangeSubject (ZoneChangeSubject)
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- | CR 614.1a: which zone changes a redirect intercepts. Rest in Peace is
 -- (Graveyard, Anyones, AnyObject) -- any object that would be put into a
@@ -19,8 +19,8 @@ import Pawl.Types.ZoneChangeSubject (ZoneChangeSubject)
 -- else" is expressible only as the one destination a spell actually leaves the
 -- stack for in this pool (#293).
 data ZoneChangePattern = MkZoneChangePattern
-  { whenDestination :: Zone,
-    whoseObject :: ControllerRelation,
-    whichObject :: ZoneChangeSubject
+  { whenDestination :: Zone.Zone,
+    whoseObject :: ControllerRelation.ControllerRelation,
+    whichObject :: ZoneChangeSubject.ZoneChangeSubject
   }
   deriving (Eq, Ord, Show)

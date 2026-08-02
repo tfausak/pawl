@@ -1,6 +1,6 @@
 module Pawl.Types.AttackRequirement where
 
-import Pawl.Types.Affected (Affected)
+import qualified Pawl.Types.Affected as Affected
 
 -- | CR 508.1d: one printed ATTACKING REQUIREMENT -- an "effect that says a creature
 -- attacks if able, or that it attacks if some condition is met". Curse of the
@@ -43,6 +43,6 @@ newtype AttackRequirement = MkAttackRequirement
     -- the controller of any objects modifies the rules of the game, so it can
     -- affect objects that weren't affected when that continuous effect began",
     -- and CR 613.11 classifies a requirement as exactly that kind of effect.
-    subject :: Affected
+    subject :: Affected.Affected
   }
   deriving (Eq, Ord, Show)

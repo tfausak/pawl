@@ -1,7 +1,7 @@
 module Pawl.Types.TargetSpec where
 
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.Pool (Pool)
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Pool as Pool
 
 -- | What a target slot may hold: a closed Pool of candidate recipients (CR 115),
 -- narrowed by an open Filter (Nothing = the whole pool, e.g. bare "target
@@ -14,5 +14,5 @@ import Pawl.Types.Pool (Pool)
 -- own recipient tagging -- a separate field was applied by deleting a
 -- Recipient.ToObject, which never matched the ToCreature tags a Creatures pool
 -- produces, so "another target creature" did not exclude itself.
-data TargetSpec = MkTargetSpec Pool (Maybe Filter)
+data TargetSpec = MkTargetSpec Pool.Pool (Maybe Filter.Filter)
   deriving (Eq, Ord, Show)

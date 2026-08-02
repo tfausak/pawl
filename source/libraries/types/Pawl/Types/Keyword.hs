@@ -1,9 +1,9 @@
 module Pawl.Types.Keyword where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.Cost (Cost)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.Subtype (Subtype)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Subtype as Subtype
 
 -- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
@@ -60,7 +60,7 @@ data Keyword
     --
     -- Only rule 702.14a's "usually a land type" case is represented. A Subtype
     -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
-    Landwalk Subtype
+    Landwalk Subtype.Subtype
   | Reach -- 702.17
   | -- | 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
     -- player can't be the target of spells or abilities.'"
@@ -106,7 +106,7 @@ data Keyword
     -- type is usually a subtype (as in 'mountaincycling') but can be any card
     -- type, subtype, supertype, or combination thereof (as in 'basic
     -- landcycling')" -- which is a Filter's whole job.
-    Cycling Cost (Maybe Filter)
+    Cycling Cost.Cost (Maybe Filter.Filter)
   | -- | 702.34a: "Flashback appears on some instants and sorceries. It represents
     -- two static abilities: one that functions while the card is in a player's
     -- graveyard and another that functions while the card is on the stack.
@@ -125,7 +125,7 @@ data Keyword
     -- Pawl.Engine.Cost.costsFor only in the graveyard), the permission
     -- (Keyword.castingPermissionsOf) and the exile replacement
     -- (Keyword.flashbackExile).
-    Flashback Cost
+    Flashback Cost.Cost
   | Fear -- 702.36
   | -- | 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
     -- that functions while the spell is on the stack. 'Entwine [cost]' means
@@ -145,7 +145,7 @@ data Keyword
     -- completely -- "all modes", never some other number -- so Pawl.Engine.Cast reads
     -- the payload's own mode count (Modal.modeCount) rather than a number
     -- restated here, and Pawl.Types.ModeSelection stays what the card PRINTS.
-    Entwine Cost
+    Entwine Cost.Cost
   | -- | 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
     -- this creature deals combat damage to a player, that player gets N poison
     -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the
@@ -153,7 +153,7 @@ data Keyword
     -- separately, so `Poisonous 1` twice is two abilities and two triggers --
     -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds from the
     -- projection's per-keyword count.
-    Poisonous Natural
+    Poisonous Natural.Natural
   | Infect -- 702.90
   | Devoid -- 702.114
   | -- | 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
@@ -161,7 +161,7 @@ data Keyword
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over
     -- every toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --
     -- including two with the same N, which the projection counts separately.
-    Toxic Natural
+    Toxic Natural.Natural
   deriving (Eq, Ord, Show)
 
 -- Devoid is read only at the projection SEED (Projection.baseColorsOf), not as a

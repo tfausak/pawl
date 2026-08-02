@@ -1,10 +1,10 @@
 module Pawl.Types.Filter where
 
-import Pawl.Types.CardType (CardType)
-import Pawl.Types.Color (Color)
-import Pawl.Types.PlayerRelation (PlayerRelation)
-import Pawl.Types.Subtype (Subtype)
-import Pawl.Types.Supertype (Supertype)
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 
 -- | A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
 -- predicate over one candidate -- an object, or (CR 115.1) a player, since a
@@ -31,12 +31,12 @@ import Pawl.Types.Supertype (Supertype)
 -- `And []` is the trivial predicate -- the identity that matches everything -- so
 -- a bare "target creature" (no narrowing) needs no separate "always" arm.
 data Filter
-  = HasCardType CardType -- CR 205 / 300: the object's card types include this one.
-  | HasSupertype Supertype -- CR 205.4: the object's supertypes include this one.
-  | HasColor Color -- CR 105.2: the object's colours include this one.
-  | HasSubtype Subtype -- CR 205.3: the object's subtypes include this one.
+  = HasCardType CardType.CardType -- CR 205 / 300: the object's card types include this one.
+  | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
+  | HasColor Color.Color -- CR 105.2: the object's colours include this one.
+  | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
-  | ControlledBy PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
+  | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | The candidate IS the evaluation's source object. Context-relative in the
     -- same way ControlledBy is: the Filter value carries no object id, and the
     -- answer comes from the Context the caller supplies. `Not IsSource` is how
@@ -56,7 +56,7 @@ data Filter
     -- has no "player" in it, and CR 108.4 gives a controller only to a card
     -- representing a permanent or spell -- so the two are never both answerable
     -- for one candidate.
-    IsPlayer PlayerRelation
+    IsPlayer PlayerRelation.PlayerRelation
   | -- | CR 508.1k: the candidate is an ATTACKING creature -- a creature declared
     -- as an attacker this combat phase and not since removed from combat
     -- (CR 506.4). "Target attacking creature" (Kill Shot) is the card text this

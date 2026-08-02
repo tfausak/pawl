@@ -1,6 +1,6 @@
 module Pawl.Types.ModeSelection where
 
-import Numeric.Natural (Natural)
+import qualified Numeric.Natural as Natural
 
 -- | CR 700.2: the instruction preceding the bulleted list ("Choose one --"). A sum,
 -- not a bare Natural, so it grows without primitive blindness. Only ChooseExactly
@@ -17,6 +17,6 @@ import Numeric.Natural (Natural)
 -- made as one particular cast is announced. Pawl.Engine.Cast substitutes
 -- Modal.modeCount for this count for that cast alone; nothing rewrites the card.
 newtype ModeSelection = ChooseExactly
-  { unwrap :: Natural
+  { unwrap :: Natural.Natural
   }
   deriving (Eq, Ord, Show)

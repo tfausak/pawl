@@ -1,7 +1,7 @@
 module Pawl.Types.Expiry where
 
-import Pawl.Types.Condition (Condition)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 611.2: how long a STORED effect lasts, as the game remembers it. The
 -- runtime counterpart of the printed Pawl.Types.Duration, the same way
@@ -27,8 +27,8 @@ data Expiry
     -- the effect's controller, never chosen. The duration is ONE continuous
     -- period: once the condition stops holding the effect is DELETED, and a
     -- condition that becomes true again does not bring it back.
-    While PlayerId Condition
+    While PlayerId.PlayerId Condition.Condition
   | -- | CR 611.2a: "until your next turn", as a concrete player. Ends as that
     -- player's turn begins.
-    AtTurnOf PlayerId
+    AtTurnOf PlayerId.PlayerId
   deriving (Eq, Ord, Show)

@@ -1,7 +1,7 @@
 module Pawl.Types.Quantity where
 
-import Pawl.Types.Count (Count)
-import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | A number that may not be a literal number.
 --
@@ -68,7 +68,7 @@ data Quantity
     -- yet, or bound nothing. Not 0: "how many were destroyed" is unanswered, not
     -- answered with zero, and Resolve's arms already no-op on an unevaluable
     -- quantity.
-    InSlot SlotName
+    InSlot SlotName.SlotName
   | -- | CR 208.2 / 208.2a: the star printed in a power/toughness box, standing for
     -- a value a characteristic-defining ability defines. NOTATION, not a value:
     -- Quantity.evaluate returns Nothing for it. Projection.baseCharacteristics
@@ -101,5 +101,5 @@ data Quantity
     -- `Count Quantity` and the recursion lives in the DATA rather than in a
     -- module cycle. Structural, not a recursive call -- evaluating a Greatest
     -- descends into a strictly smaller Quantity, so the fold terminates.
-    Count (Count Quantity)
+    Count (Count.Count Quantity)
   deriving (Eq, Ord, Show)

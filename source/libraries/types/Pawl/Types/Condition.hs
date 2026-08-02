@@ -1,7 +1,7 @@
 module Pawl.Types.Condition where
 
-import Pawl.Types.Comparison (Comparison)
-import Pawl.Types.Quantity (Quantity)
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | A predicate over game STATE rather than over an event, with three customers
 -- and one vocabulary: a state trigger's condition (CR 603.8, checked at every
@@ -33,5 +33,5 @@ import Pawl.Types.Quantity (Quantity)
 -- InSlot count stored that way outlives its slot binding: Pawl.Engine.Count.playersFor
 -- then yields Nothing, and Pawl.Engine.Condition.holds collapses that to False
 -- silently (#159).
-data Condition = MkCondition Quantity Comparison Quantity
+data Condition = MkCondition Quantity.Quantity Comparison.Comparison Quantity.Quantity
   deriving (Eq, Ord, Show)

@@ -1,14 +1,14 @@
 module Pawl.Types.DelayedTrigger where
 
-import Data.Map.Strict (Map)
-import Numeric.Natural (Natural)
-import Pawl.Types.Binding (Binding)
-import Pawl.Types.Card (Card)
-import Pawl.Types.Expiry (Expiry)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.PlayerId (PlayerId)
-import Pawl.Types.SlotName (SlotName)
-import Pawl.Types.TriggeredAbility (TriggeredAbility)
+import qualified Data.Map.Strict as Map
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | CR 603.7: a delayed triggered ability that has been created and is waiting for
 -- its trigger event. A concrete `TriggeredAbility Card`, exactly as
@@ -36,10 +36,10 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 -- card data says "this turn", and the game remembers whose turn and when. It is
 -- armed by Pawl.Engine.Expiry.arm exactly as a continuous effect's is.
 data DelayedTrigger = MkDelayedTrigger
-  { ability :: TriggeredAbility Card,
-    source :: ObjectId,
-    controller :: PlayerId,
-    bindings :: Map SlotName Binding,
+  { ability :: TriggeredAbility.TriggeredAbility Card.Card,
+    source :: ObjectId.ObjectId,
+    controller :: PlayerId.PlayerId,
+    bindings :: Map.Map SlotName.SlotName Binding.Binding,
     -- | Pawl.Types.Onset as the game remembers it: the earliest
     -- GameState.turnNumber at which this entry may fire. Nothing is the ordinary
     -- case -- an ability watches for its event from the moment it is created,
@@ -63,7 +63,7 @@ data DelayedTrigger = MkDelayedTrigger
     -- (Stonehorn Dignitary) leaves the entry armed for a LATER turn, where the
     -- printed "your next turn" named one particular turn and the event can never
     -- occur again (#507).
-    notBefore :: Maybe Natural,
-    expiry :: Maybe Expiry
+    notBefore :: Maybe Natural.Natural,
+    expiry :: Maybe Expiry.Expiry
   }
   deriving (Eq, Show)

@@ -1,6 +1,6 @@
 module Pawl.Types.Duration where
 
-import Pawl.Types.Condition (Condition)
+import qualified Pawl.Types.Condition as Condition
 
 -- | How long a stored continuous effect lasts, as the CARD says it (CR 611.2).
 -- PRINTED data: this is what appears in card JSON. The game stores
@@ -17,5 +17,5 @@ data Duration
   | -- | CR 611.2b: "for as long as ...". The duration has a BEGINNING as well as
     -- an end -- "if the 'for as long as' duration never starts, the effect does
     -- nothing" -- which is why Pawl.Engine.Expiry.arm returns a Maybe.
-    ForAsLongAs Condition
+    ForAsLongAs Condition.Condition
   deriving (Eq, Ord, Show)

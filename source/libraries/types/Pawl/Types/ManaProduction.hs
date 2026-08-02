@@ -1,6 +1,6 @@
 module Pawl.Types.ManaProduction where
 
-import Pawl.Types.ManaType (ManaType)
+import qualified Pawl.Types.ManaType as ManaType
 
 -- | CR 106.3: how an AddMana effect decides WHICH mana it puts into the pool.
 -- Either one fixed type -- Llanowar Elves' "Add {G}" -- or one mana of a colour
@@ -19,6 +19,6 @@ import Pawl.Types.ManaType (ManaType)
 -- control"). Each is a new constructor whose only obligation is to answer
 -- producedTypes.
 data ManaProduction
-  = OfType ManaType
+  = OfType ManaType.ManaType
   | AnyColor
   deriving (Eq, Ord, Show)

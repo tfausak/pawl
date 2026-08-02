@@ -1,7 +1,7 @@
 module Pawl.Types.CostComponent where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.Filter (Filter)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Filter as Filter
 
 -- | CR 601.2f's list of what a cost's non-mana part can be: "paying mana, tapping
 -- permanents, sacrificing permanents, discarding cards, and so on." One
@@ -47,7 +47,7 @@ data CostComponent
     -- A Natural and not a Quantity: a Quantity's evaluation needs a binding
     -- environment, which a cost has no access to at CR 601.2f time, and no card
     -- in the pool pays a variable amount of life (#99).
-    PayLife Natural
+    PayLife Natural.Natural
   | -- | CR 701.21a / CR 601.2f's "sacrificing permanents": sacrifice this many
     -- permanents matching the Filter (Village Rites' one creature, Fireblast's
     -- two Mountains). The player chooses which (CR 701.21a), so this is a prompt
@@ -56,7 +56,7 @@ data CostComponent
     -- The Filter is matched against the PROJECTION, never a printed
     -- characteristic: Blood Moon makes a nonbasic land a Mountain, and it may be
     -- sacrificed as one.
-    Sacrifice Natural Filter
+    Sacrifice Natural.Natural Filter.Filter
   | -- | CR 601.2f's "discarding cards", one of the cost kinds that rule names
     -- outright: discard this many cards from hand (Cathartic Reunion's two).
     -- CR 701.9b gives the choice to the discarding player, so this is a prompt
@@ -69,7 +69,7 @@ data CostComponent
     --
     -- A Natural and not a Quantity, for the reason PayLife and PayEnergy give: a
     -- cost has no binding environment at CR 601.2f time.
-    DiscardCards Natural
+    DiscardCards Natural.Natural
   | -- | CR 702.29a's "Discard this card": discard the card the cost is on, from
     -- the hand it is in.
     --
@@ -94,7 +94,7 @@ data CostComponent
     -- cost. A Natural, not a Quantity: a cost has no binding environment at CR
     -- 601.2f time, and a variable-amount energy cost is not representable
     -- (#121).
-    PayEnergy Natural
+    PayEnergy Natural.Natural
   | -- | CR 606.4: "The cost to activate a loyalty ability of a permanent is to put
     -- on or remove from that permanent a certain number of loyalty counters, as
     -- shown by the loyalty symbol in the ability's cost." Jace Beleren's `+2`.
@@ -114,12 +114,12 @@ data CostComponent
     --
     -- A Natural and not a Quantity, for the reason PayLife and PayEnergy give: a
     -- cost has no binding environment at CR 601.2f time.
-    AddLoyaltyToThis Natural
+    AddLoyaltyToThis Natural.Natural
   | -- | CR 606.4's other half: Jace Beleren's `-1` and `-10`. The arm CR 606.6
     -- gates -- "A loyalty ability with a negative loyalty cost, taking into
     -- account any additional costs, can't be activated unless the permanent has
     -- at least that many loyalty counters on it" -- which
     -- Pawl.Engine.Cost.canPayComponent answers by counting CounterKind.Loyalty on
     -- the source.
-    RemoveLoyaltyFromThis Natural
+    RemoveLoyaltyFromThis Natural.Natural
   deriving (Eq, Ord, Show)

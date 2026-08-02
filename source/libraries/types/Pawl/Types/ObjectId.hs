@@ -1,8 +1,8 @@
 module Pawl.Types.ObjectId where
 
-import Numeric.Natural (Natural)
+import qualified Numeric.Natural as Natural
 
 newtype ObjectId = MkObjectId
-  { unwrap :: Natural
+  { unwrap :: Natural.Natural
   }
   deriving (Eq, Ord, Show)

@@ -1,7 +1,7 @@
 module Pawl.Types.PlayerStaticAbility where
 
-import Pawl.Types.PlayerEffect (PlayerEffect)
-import Pawl.Types.PlayerScope (PlayerScope)
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerScope as PlayerScope
 
 -- | A card's printed player/rules-modifying static ability (CR 604.1/604.2: a
 -- static ability creates a continuous effect active while its permanent is on
@@ -13,7 +13,7 @@ import Pawl.Types.PlayerScope (PlayerScope)
 -- restriction with nothing to unwind. Rule of Law, Thalia, Sapphire Medallion and
 -- Reliquary Tower each declare exactly one.
 data PlayerStaticAbility = MkPlayerStaticAbility
-  { scope :: PlayerScope,
-    effect :: PlayerEffect
+  { scope :: PlayerScope.PlayerScope,
+    effect :: PlayerEffect.PlayerEffect
   }
   deriving (Eq, Ord, Show)

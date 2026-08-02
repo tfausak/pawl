@@ -30,6 +30,7 @@ import qualified Pawl.Types.Supertype as Supertype
 -- round trips over a REAL Typhoid Rats snapshot (multiple keywords, colors,
 -- power, toughness, cardTypes and subtypes all populated by the engine) stay in
 -- Pawl.CodecIntegrationSpec.
+
 -- | A synthetic snapshot, not any real card's projection (its Legendary
 -- supertype and Human subtype are an arbitrary combination chosen to exercise
 -- every collection field, not a claim about a printed creature).

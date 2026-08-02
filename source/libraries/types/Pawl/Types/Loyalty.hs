@@ -1,6 +1,6 @@
 module Pawl.Types.Loyalty where
 
-import Numeric.Natural (Natural)
+import qualified Numeric.Natural as Natural
 
 -- | CR 306.5: "Loyalty is a characteristic only planeswalkers have." CR 109.3
 -- lists it among an object's characteristics, and CR 707.2 makes it a copiable
@@ -21,6 +21,6 @@ import Numeric.Natural (Natural)
 -- separate capability -- it needs the value of X chosen as the spell was cast --
 -- and is unrepresentable here (#495).
 newtype Loyalty = MkLoyalty
-  { unwrap :: Natural
+  { unwrap :: Natural.Natural
   }
   deriving (Eq, Ord, Show)
