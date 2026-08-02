@@ -276,7 +276,10 @@ basePoolGiven pcs context pool gs = case pool of
   Pool.CardsInGraveyard scope -> graveyardRecipients context scope gs
   Pool.CardsInExile -> exileRecipients gs
 
--- CR 115.1a: creatures on the battlefield, per playing player's zone, tagged
+-- CR 115.2 ("only permanents are legal targets for spells and abilities") with
+-- CR 109.2 (an unqualified creature description "means a permanent of that card
+-- type or subtype on the battlefield"): creatures on the battlefield, per playing
+-- player's zone, tagged
 -- ToCreature. Reads Projection.isCreatureOf so a permanent made a creature by the
 -- layer system (M3c) counts and one that lost the type does not.
 creatureRecipients :: GameState -> Set Recipient

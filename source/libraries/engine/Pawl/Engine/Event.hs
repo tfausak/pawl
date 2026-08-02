@@ -320,8 +320,9 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
           newId <- placeObject pid mkObj dest
           -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
           -- nowhere else. CR 616.1g: this loop is NESTED inside the zone change,
-          -- which is how "an effect may apply to an event contained within another
-          -- event" is expressed -- as call nesting, not as a field. A lone entry
+          -- which is how "one replacement or prevention effect may
+          -- apply to an event, and another may apply to an event contained
+          -- within the first event" is expressed -- as call nesting, not as a field. A lone entry
           -- has no same-batch siblings (CR 614.12a; see Pawl.Engine.Replacement's
           -- applyReplacementsIn for why 614.12a, not 614.13a, is the cite).
           Monad.when (dest == Zone.Battlefield) (Replacement.runEntry Set.empty newId)
@@ -374,7 +375,8 @@ destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
 destroy regenerability oids = Monad.void (destroyIn Nothing regenerability oids)
 
 -- destroy, answering with the permanents it ACTUALLY destroyed -- CR 701.8b's
--- "destroyed this way", which is emphatically not the batch it was handed. A
+-- "if a permanent is put into its owner's graveyard for any other reason, it
+-- hasn't been 'destroyed'", which is emphatically not the batch it was handed. A
 -- member with indestructible never reaches the destruction event at all (CR
 -- 702.12b, the gate below), and a regenerated one has that event replaced (CR
 -- 701.8c, "A regeneration effect replaces a destruction event"), so neither was
@@ -707,8 +709,9 @@ recordTokenEntry newId = do
   let snapshot = Projection.project newId placed
   State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot))
 
--- CR 121.2/121.3: the single-card draw. Move pid's top library card to their
--- hand; an empty library records the failed draw (CR 704.5b makes it a loss at
+-- CR 121.1 ("A player draws a card by putting the top card of their library into
+-- their hand"), one at a time per CR 121.2, with CR 121.3 for the empty-library
+-- case. Move pid's top library card to their hand; an empty library records the failed draw (CR 704.5b makes it a loss at
 -- the next state-based-action check). The primitive shared by the draw step
 -- (Engine.runTurnBasedActions), opening hands (Setup.newGame), and the Draw
 -- effect (Resolve).
@@ -1762,7 +1765,7 @@ controllerTurnScoped cond = case cond of
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.
 --
--- Armedness is DERIVED, never stored. CR 603.8's second sentence -- "doesn't
+-- Armedness is DERIVED, never stored. CR 603.8's last sentence -- "doesn't
 -- trigger again until the ability has resolved, has been countered, or has
 -- otherwise left the stack" -- names three outcomes that are all "no longer on
 -- the stack", so an instance sitting there is the whole suppression rule and

@@ -117,7 +117,9 @@ skipEmptyCombat gs =
 -- carries no such note and is deliberately not cited here as though it did.
 --
 -- SEATING order (Game.stillPlayingInOrder), not player-id order: the seating
--- roster is the game's own ordering for anything player-shaped (CR 800.5), and
+-- roster is the game's own ordering for anything player-shaped (CR 103.1: "the
+-- game's default turn order begins with the starting player and proceeds
+-- clockwise"; CR 800.5 only says the seating itself is agreed at the table), and
 -- Game.stillPlaying's order is an artifact of reading the players map. It
 -- makes the first candidate the next seat rather than the lowest id, which is
 -- what an interpreter that takes the head should get.

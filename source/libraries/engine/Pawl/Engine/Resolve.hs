@@ -506,8 +506,8 @@ modesOf oid gs = case Game.lookupObject oid gs of
 -- (Pawl.Engine.Stack), which is the whole point of it being a function: an Aura spell is
 -- the first PERMANENT spell that can be countered on resolution, and a second
 -- copy of this logic would drift.
--- CR 405.4: who controls a SPELL on the stack -- "a spell's controller is the
--- player who cast it", fixed at cast time -- for both CR 608.2b's legality
+-- CR 405.4: who controls a SPELL on the stack -- "The controller of a spell is
+-- the player who cast it", fixed at cast time -- for both CR 608.2b's legality
 -- perspective and the effects' own execution.
 --
 -- One function because those two must name the same player, not because they
@@ -921,8 +921,10 @@ objectRefObjects legality chosen controller source gs ref = case ref of
 -- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
 -- as RECIPIENTS, before the objects are picked out of them.
 --
--- It exists because CR 115.4's "any target" includes a player and CR 120.1a lets
--- damage go to one, so Effect.DealDamage's InSlot arm must be able to name
+-- It exists because CR 115.4's "any target" includes a player and CR 120.1
+-- ("objects can deal damage to battles, creatures, planeswalkers, and players")
+-- lets damage go to one -- NOT CR 120.1a, which only forbids damage to an object
+-- that is none of those and licenses nothing, so Effect.DealDamage's InSlot arm must be able to name
 -- something no ObjectId can -- Lightning Bolt at a player's face. Every other
 -- ObjectRef-taking opcode affects permanents only and reads objectRefObjects,
 -- which is this answer with the players dropped (Recipient.objectOf).
@@ -1117,7 +1119,10 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
           -- players" is done by the player following the instruction, which for
           -- a search of "your library" is its controller.
           mapM_ (putFound controller destination) found
-          -- CR 701.23: shuffle the (possibly reduced) library afterward.
+          -- Shuffle the (possibly reduced) library afterward. The CARD's
+          -- instruction, not rule 701.23's -- as eleven lines above, that rule
+          -- says only how to look. CR 701.23h and CR 701.24b both describe the
+          -- shuffle as something an effect instructs, never as part of a search.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
           shuffleAnswer <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
           State.modify' (reorderLibrary controller (Game.honourShuffle lib shuffleAnswer))

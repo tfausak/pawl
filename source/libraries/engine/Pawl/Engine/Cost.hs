@@ -400,8 +400,9 @@ canPayComponent pid oid component gs = case component of
     Natural.length (sacrificeCandidates pid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards.
   --
-  -- `oid` is excluded, and that is CR 601.2a, not a convenience: "the card …
-  -- becomes a spell and is moved to the stack" is step (a) of casting, so by the
+  -- `oid` is excluded, and that is CR 601.2a, not a convenience: "To propose the
+  -- casting of a spell, a player first moves that card ... from where it is to
+  -- the stack" is step (a) of casting, so by the
   -- time 601.2f determines the total cost the spell is NOT in its controller's
   -- hand and cannot be discarded to pay its own additional cost. Pawl.Engine.Cast pays
   -- one step earlier than that, while the object is still in hand (#89), so
@@ -422,8 +423,9 @@ canPayComponent pid oid component gs = case component of
   CostComponent.DiscardThis -> case Game.lookupObject oid gs of
     Nothing -> False
     Just obj -> Object.zone obj == Zone.Hand && Object.owner obj == pid
-  -- CR 107.14 / CR 118.6: payable only if the player has at least that many
-  -- energy counters. The bidirectional proof: GainPlayerCounters (P10 #37)
+  -- CR 107.14 / CR 118.3 ("A player can't pay a cost without having the
+  -- necessary resources to pay it fully"): payable only if the player has at
+  -- least that many energy counters. The bidirectional proof: GainPlayerCounters (P10 #37)
   -- adds energy, this component spends it.
   CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
     Nothing -> False
@@ -491,9 +493,14 @@ payComponent pid oid component = case component of
   CostComponent.TapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)})
     pure Payment.Paid
-  -- CR 107.6: "Untap this permanent." A direct edit like TapThis above, and not
-  -- through any funnel: untapping to pay a cost is not CR 701.26b's untap EVENT
-  -- (Effect.Untap), which is what a spell or ability does TO a permanent.
+  -- CR 107.6: "The untap symbol in an activation cost means 'Untap this
+  -- permanent.'" A direct edit like TapThis above, and not through any funnel.
+  -- That is an implementation choice and NOT a distinction CR 701.26b draws --
+  -- that rule says only "To untap a permanent, rotate it back to the upright
+  -- position from a sideways position", which is the same act however it is
+  -- reached. Nothing in the pool watches for an untap, so the two routes are
+  -- observationally identical; the first card that triggers on untapping is what
+  -- would force this through the funnel.
   CostComponent.UntapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)})
     pure Payment.Paid

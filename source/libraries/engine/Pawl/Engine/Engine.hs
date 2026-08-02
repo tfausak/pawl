@@ -226,7 +226,11 @@ checkControlContinuity = do
               else Map.insert oid obj {Object.sickness = Sickness.Sick} objs
   State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
 
--- CR 514.2. Non-identical cards now share a hand (Mountains and Pikers), so
+-- CR 514.1's cleanup discard ("if the active player's hand contains more cards
+-- than their maximum hand size ... they discard enough cards to reduce their hand
+-- size to that number") -- NOT CR 514.2, which is the damage-removal and
+-- end-of-turn sweep beside it. Non-identical cards now share a hand (Mountains
+-- and Pikers), so
 -- trimming front-of-hand would be the engine choosing what to pitch -- policy in
 -- the rules core, not canonicalization. The choice is the player's.
 --
@@ -760,7 +764,7 @@ priorityLoop = do
                             -- FILTERED, NOT TRUSTED. Everything Action.legalActions
                             -- computed -- the controller check, CR 302.6's
                             -- tap-sickness gate, CR 307.5 timing, cost payability,
-                            -- CR 305.1's one land per turn, CR 117.1a's casting
+                            -- CR 305.2's one land per turn, CR 117.1a's casting
                             -- timing and every prohibition -- is enforced here.
                             -- Acting on an unoffered answer would make all of it
                             -- advisory (#219). Cast.castSpell and
