@@ -324,12 +324,11 @@ applies gs event candidate =
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
             && matchesZoneSubject src (ZoneChangePattern.whichObject pat) (ZoneChange.object zc)
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
+        -- CR 615.1: a pattern naming no kind admits every damage event. CR
+        -- 614.15: one naming TheSource admits only the damage its own source is
+        -- dealing.
         (ReplacementEffect.DamageR pat _, ProposedEvent.WouldDealDamage de) ->
-          maybe
-            -- CR 615.1: no kind named means every damage event.
-            True
-            (== DamageEvent.kind de)
-            (DamagePattern.whichKind pat)
+          maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
             && matchesDamageSource src (DamagePattern.whichSource pat) de
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only.
@@ -479,8 +478,10 @@ matchesPermanent gs filter_ oid =
   -- No source in scope at this site.
   Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
 
--- CR 614.16: apply a scaling to a count. "That many plus one" and "twice that
--- many" are the same operation with different data.
+-- CR 614.1a: apply a scaling to a number. "That many plus one" and "twice that
+-- many" are the same operation with different data, and so is Furnace of Rath's
+-- "double that damage" -- which is why CounterR, TokenR (CR 614.16's two shapes)
+-- and DamageR all rewrite through this one function.
 scale :: Scaling.Scaling -> Natural -> Natural
 scale s n = case s of
   Scaling.Multiply m -> n * m
@@ -567,6 +568,11 @@ bucketOfEffect re = case re of
 -- Not implemented: the comparison reads `effect` alone, so two floating rows
 -- alike in it but differing in `expiry` or `uses` are treated as
 -- indistinguishable even though `consume` spends only the one that applied (#490).
+--
+-- `origin` is NOT such a hole. highestBucket has already partitioned by bucket
+-- before this runs, and CR 616.1a's bucket is exactly "origin is
+-- SelfReplacement", so every candidate reaching this comparison shares one
+-- origin and comparing `effect` alone can never conflate two that differ in it.
 --
 -- Anything else prompts. The pure fold has silently picked list order since M3f;
 -- that is the second-invariant violation this phase exists to retire, and unlike

@@ -347,10 +347,16 @@ data Effect card
     -- check-on-install and a check-on-apply would visibly differ -- has no
     -- producer (#587).
     --
-    -- A gate on this opcode rather than a general conditional Effect arm: what
-    -- the pool asks for is a base effect plus a conditional replacement of that
-    -- effect, not one effect OR another, and a branching opcode would be the
-    -- control flow design.md section 1 keeps out of the ISA.
+    -- A field on this opcode rather than a general conditional Effect arm, and
+    -- the difference is not cosmetic. This gates ONE opcode's own creation of
+    -- ONE object, so the effect list is still a straight-line sequence a static
+    -- analysis can read end to end -- Duration.ForAsLongAs is already gated the
+    -- same way, by CR 611.2b, and Resolve's arm below handles both in one
+    -- expression. An `If condition [Effect] [Effect]` arm would instead put a
+    -- BRANCH between two effect lists, which is the control flow design.md
+    -- section 1 keeps out of the ISA. What the card asks for is the narrow
+    -- shape: a base effect plus a conditional replacement of that effect, never
+    -- one effect or another.
     Replace Duration.Duration Uses.Uses ReplacementOrigin.ReplacementOrigin (Maybe Condition.Condition) ReplacementEffect.ReplacementEffect
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue is

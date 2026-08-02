@@ -37,6 +37,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
@@ -126,8 +127,8 @@ slotsOf effect = case effect of
   -- reaches inside it, since casing on a Modification is Projection's charter);
   -- no card in the pool reads a slot there, but a dangling one would otherwise
   -- slip past the lint entirely.
-  Effect.ModifyTarget _ modification ref ->
-    Set.union (objectRefSlots ref) (foldMap Quantity.slots (Projection.quantitiesOf modification))
+  Effect.ModifyTarget duration modification ref ->
+    Set.unions [objectRefSlots ref, foldMap Quantity.slots (Projection.quantitiesOf modification), durationSlots duration]
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
   Effect.Search _ _ -> Set.empty
@@ -152,7 +153,13 @@ slotsOf effect = case effect of
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> Quantity.slots quantity
-  Effect.Replace {} -> Set.empty
+  -- The ReplacementEffect itself carries no Quantity, but the Duration and the
+  -- Condition each carry two, and a Quantity.InSlot inside either is a slot read
+  -- like any other. No card in the pool writes one -- Galvanic Blast's metalcraft
+  -- condition counts artifacts, which names no slot -- but a dangling one would
+  -- otherwise slip past the lint entirely, exactly as ModifyTarget's Modification
+  -- would.
+  Effect.Replace duration _ _ condition _ -> Set.union (durationSlots duration) (foldMap conditionSlots condition)
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
   Effect.Counter slot -> Set.singleton slot
@@ -182,6 +189,21 @@ slotsOf effect = case effect of
 -- charter. NOTE: when an opcode gains a Quantity field, add its arm here -- the
 -- compiler will not force it, since Quantity is compared by ==.
 --
+-- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
+-- Condition.
+durationSlots :: Duration.Duration -> Set SlotName
+durationSlots duration = case duration of
+  Duration.UntilEndOfTurn -> Set.empty
+  Duration.Indefinite -> Set.empty
+  Duration.UntilYourNextTurn -> Set.empty
+  Duration.ForAsLongAs condition -> conditionSlots condition
+  Duration.UntilEndOfCombat -> Set.empty
+
+-- Both sides of a Condition are a Quantity, and either may read a slot.
+conditionSlots :: Condition.Type.Condition -> Set SlotName
+conditionSlots (Condition.Type.MkCondition measured _ threshold) =
+  Set.union (Quantity.slots measured) (Quantity.slots threshold)
+
 -- The comparison is by == and so is shallow: an X nested inside a Plus or a
 -- Count is not detected, unlike slotsOf, which recurses through Quantity.slots
 -- (#482).

@@ -1235,16 +1235,18 @@ atBob p = case p of
 -- Galvanic Blast is CR 614.15's own description almost word for word -- "the text
 -- creating a self-replacement effect is usually part of the ability whose effect
 -- is being replaced, but the text can be a separate ability, particularly when
--- preceded by an ability word." Metalcraft is the ability word (CR 207.2c: an
--- ability word "has no rules meaning"), the clause replaces the damage the
--- spell's own first line deals, and the whole thing is one instant.
+-- preceded by an ability word." Metalcraft is the ability word -- CR 207.2c lists
+-- it by name and says ability words "have no special rules meaning" -- the clause
+-- replaces the damage the spell's own first line deals, and the whole thing is
+-- one instant.
 --
 -- The card's two lines resolve as two effects in the ISA, and in the opposite
 -- order from the printing: the Replace comes first so the replacement exists
 -- before the DealDamage proposes the event it replaces (CR 614.4, "replacement
 -- effects must exist before the appropriate event occurs"). Nothing observes the
--- gap -- no player gets priority inside a resolution (CR 608.2) -- so the printed
--- reading and this one agree on every board.
+-- gap: CR 117.3b gives the active player priority only AFTER a spell resolves,
+-- and CR 608.2g's last sentence forbids casting or activating anything during one.
+-- So the printed reading and this one agree on every board.
 galvanicBlastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 galvanicBlastSpec s registry =
   Spec.describe s "Galvanic Blast (CR 614.15)" $ do

@@ -14,9 +14,10 @@ module Pawl.Types.ReplacementOrigin where
 -- ability created the effect.
 --
 -- A PERMANENT's static replacement ability is therefore always Other, and that is
--- a rules fact rather than an engine convenience: CR 614.15's first sentence says
--- self-replacement effects "are not continuous effects", and a static ability
--- generates exactly one of those (CR 611.1).
+-- a rules fact rather than an engine convenience: CR 604.2 says "static abilities
+-- create continuous effects, some of which are prevention effects or replacement
+-- effects", and CR 614.15's first sentence puts self-replacement effects outside
+-- that class -- "some replacement effects are not continuous effects".
 --
 -- Read only by Pawl.Engine.Replacement.bucketOf, which is CR 616.1a's step --
 -- "if any of the replacement and/or prevention effects are self-replacement
