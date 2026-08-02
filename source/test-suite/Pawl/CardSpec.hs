@@ -554,7 +554,59 @@ modalReadOffends abilityBound modal =
 cardReplacementEffects :: Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
 cardReplacementEffects card =
   Card.Type.replacementEffects card
-    <> [replacement | Effect.Replace _ _ replacement <- cardResolutionEffects card]
+    <> concatMap effectReplacements (cardResolutionEffects card)
+
+-- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
+-- directly, plus everything a minted token (CR 111) or emblem (CR 114.2) prints,
+-- since each of those is a whole Card that can carry replacementEffects of its
+-- own. The same recursion cardCounts and cardFilters take, and for the same
+-- reason -- without it a baked whosePhase could hide one Card deep.
+--
+-- Exhaustive and hand-maintained, with effectCounts' caveat: a NEW effect
+-- carrying a ReplacementEffect or embedding a Card must be added here too, and
+-- the build breaks until it is.
+effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
+effectReplacements effect = case effect of
+  Effect.Replace _ _ replacement -> [replacement]
+  Effect.Create _ token _ _ -> cardReplacementEffects token
+  Effect.CreateEmblem emblem -> cardReplacementEffects emblem
+  Effect.DealDamage _ _ -> []
+  Effect.ModifyTarget {} -> []
+  Effect.AddMana _ -> []
+  Effect.Search _ _ -> []
+  Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
+  Effect.ExileHandThenDraw -> []
+  Effect.PlayerSacrifices {} -> []
+  Effect.RestartGame -> []
+  Effect.ControlPlayerNextTurn _ -> []
+  Effect.Destroy {} -> []
+  Effect.Sacrifice _ -> []
+  Effect.MoveToZone {} -> []
+  Effect.Draw _ _ -> []
+  Effect.Mill _ _ -> []
+  Effect.Discard _ _ -> []
+  Effect.LoseLife _ _ -> []
+  Effect.GainLife _ _ -> []
+  Effect.SkipNextPhase _ _ -> []
+  Effect.RemoveFromCombat _ -> []
+  Effect.Counter _ -> []
+  Effect.PutCounters {} -> []
+  Effect.GainPlayerCounters {} -> []
+  Effect.Tap _ -> []
+  Effect.Untap _ -> []
+  Effect.AddPhases _ -> []
+  Effect.GainControl _ _ -> []
+  Effect.ArmDelayedTrigger {} -> []
+  Effect.AffectPlayers {} -> []
+  Effect.BecomeMonarch _ -> []
+  Effect.ExileUntilMonarch _ -> []
+  Effect.Attach _ -> []
+  Effect.AttachTarget {} -> []
+  Effect.PlaySubgame _ -> []
+  Effect.TakeExtraTurn {} -> []
+  Effect.ShuffleIntoLibrary _ -> []
+  Effect.ChangeText _ -> []
 
 -- #437: does this replacement carry a PhasePattern with a BAKED player in it?
 --
