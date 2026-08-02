@@ -2396,6 +2396,14 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 -- Object.enteredUnder is written by exactly one thing, Pawl.Engine.Replacement's
 -- CR 616.1b rewrite, and is Nothing on every other object -- so for the whole
 -- pool but Gather Specimens' victims this is the owner it always was.
+--
+-- ON THE HOT PATH, which #582 flagged as the cost of moving the base off
+-- Object.owner: controllerOfGiven runs once per battlefield object inside
+-- `controls`, which the state-based-action sweep calls at every priority
+-- boundary. One Maybe match, measured on the tasty-bench suite (main vs. this
+-- branch: goldfish / casting / fighting / fighting-aura / fighting-no-aura, 2p):
+-- 20.0/159/29.9/588/338 ms -> 20.1/164/30.4/598/350 ms, every move inside the
+-- benchmark's own run-to-run stddev (+-0.9 to +-30 ms on those means).
 defaultControllerOf :: Object.Object -> PlayerId.PlayerId
 defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)
 
