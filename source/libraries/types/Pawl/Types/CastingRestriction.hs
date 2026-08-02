@@ -30,10 +30,23 @@ data CastingRestriction
     -- Pawl.Types.Phase is one type over the CR 500.1 phases and their steps, so
     -- naming a step and naming a STEPLESS phase (the two main phases) are the same
     -- act here. A phase that HAS steps is not nameable -- "Cast this spell only
-    -- during combat" (Mandate of Peace, Angelic Favor) would have to name five
-    -- steps at once. Pawl.Types.PhaseSelector is the type that already says it,
-    -- and Pawl.Types.ActivationTiming.DuringPhase already carries one; this arm
-    -- does not (#527).
+    -- during combat" would have to name five steps at once.
+    -- Pawl.Types.PhaseSelector is the type that already says it, and
+    -- Pawl.Types.ActivationTiming.DuringPhase already carries one; this arm does
+    -- not (#527).
+    --
+    -- The change is small; the CARD is the obstacle, and it is worth writing
+    -- down so the next reader does not re-run the search. Scryfall's
+    -- `oracle:/^Cast this spell only during combat.$/` returns FIVE printings
+    -- (checked 2026-08-02), and every one drags in machinery pawl lacks:
+    -- Mandate of Peace ends the combat phase, Angelic Favor has a conditional
+    -- alternative cost that taps another creature, and Cauldron Dance, Spinal
+    -- Embrace and Surprise Deployment each arm a delayed ability that must name
+    -- a TARGET slot -- which CardSpec's delayed-ability lint records as
+    -- unsupported, since a delayed ability may read only the trigger source or a
+    -- slot an effect minted. The narrower printings ("only during combat before
+    -- blockers are declared", Blaze of Glory and eight others) do not want this
+    -- arm at all: their window is not a phase.
     --
     -- WHOSE turn is a second axis this arm does not carry: "only during an
     -- opponent's upkeep" (Festival) and "only during your end step" (Necrologia)
