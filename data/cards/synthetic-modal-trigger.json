@@ -43,7 +43,7 @@
               {
                 "type": "MoveToZone",
                 "value": [
-                  "x",
+                  "bounced",
                   {
                     "type": "Hand"
                   }
@@ -52,7 +52,7 @@
             ],
             "targetSpecs": [
               {
-                "slot": "x",
+                "slot": "bounced",
                 "spec": {
                   "filter": {
                     "type": "And",
@@ -86,7 +86,7 @@
               {
                 "type": "MoveToZone",
                 "value": [
-                  "x",
+                  "exiled",
                   {
                     "type": "Exile"
                   }
@@ -95,7 +95,7 @@
             ],
             "targetSpecs": [
               {
-                "slot": "x",
+                "slot": "exiled",
                 "spec": {
                   "filter": {
                     "type": "And",

@@ -52,7 +52,7 @@
           {
             "type": "DealDamage",
             "value": [
-              "creature",
+              "damaged",
               {
                 "type": "Literal",
                 "value": 1
@@ -62,7 +62,7 @@
         ],
         "targetSpecs": [
           {
-            "slot": "creature",
+            "slot": "damaged",
             "spec": {
               "pool": {
                 "type": "Creatures"
@@ -85,13 +85,13 @@
                   "type": "Haste"
                 }
               },
-              "creature"
+              "hasted"
             ]
           }
         ],
         "targetSpecs": [
           {
-            "slot": "creature",
+            "slot": "hasted",
             "spec": {
               "pool": {
                 "type": "Creatures"

@@ -544,6 +544,42 @@ modalReadOffends abilityBound modal =
          in not (Set.isSubsetOf wanted available)
    in any modeOffends (Modal.modes modal)
 
+-- Do these slot-name sets overlap? True when any name appears in more than one
+-- of them, which is exactly what a Map.unions over them would silently collapse.
+slotNamesCollide :: [Set.Set SlotName.SlotName] -> Bool
+slotNamesCollide sets = Set.size (Set.unions sets) /= sum (fmap Set.size sets)
+
+-- CR 700.2c: do two modes of one modal declare the same slot NAME -- or does a
+-- spell mode collide with CR 303.4a's enchant slot?
+--
+-- Modal.modesTargetSpecs, Modal.allTargetSpecs and Card.allTargetSpecs are all
+-- Map.unions, so a shared name collapses to ONE entry: the controller is
+-- prompted once and every mode holding that name reads the one answer. Harmless
+-- while exactly one mode can ever be chosen, and a silent wrong answer the
+-- moment two can -- CR 702.42a's entwine, "you may choose all modes of this
+-- spell instead of just the number specified", is what makes that real (#399).
+-- Dream's Grip authored with one shared slot would tap and untap the same
+-- permanent, and could not express "tap one, untap another" at all.
+--
+-- A lint about NAMES, not about CR 601.2c. Two modes naming the same OBJECT as a
+-- target is legal and stays legal: the player may aim distinct slots at one
+-- permanent, which is what the CR 702.42b resolution-order test in CastSpec
+-- does.
+--
+-- The enchant slot joins the SPELL's modes and no ability's, because
+-- Card.modesTargetSpecs is the only union that adds it -- CR 303.4a's slot is
+-- announced when the Aura spell is cast, and Activate stamps
+-- Modal.modesTargetSpecs, which has no enchant half. Each ability is checked on
+-- its own for the same reason: two abilities are two separate announcements, so
+-- a name they share is never fused.
+cardSlotNamesCollide :: Card.Type.Card -> Bool
+cardSlotNamesCollide card =
+  let modeSlots modal = fmap (Map.keysSet . Mode.targetSpecs) (Foldable.toList (Modal.modes modal))
+   in slotNamesCollide (Map.keysSet (Card.enchantSpecs card) : modeSlots (Card.Type.spell card))
+        || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
+        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Card.Type.triggeredAbilities card)
+        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Card.Type.delayedAbilities card))
+
 -- The TRIGGERED-ability half of the D4 dataflow lint: every slot one of a
 -- triggered ability's effects READS must be a slot something binds for that
 -- ability. Without it, an effect naming CR 400.7e's `became` under a condition
@@ -1264,6 +1300,42 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (cardOffends . Printing.card)
             ps
     Spec.assertEqWith s "no dangling or unused slots" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The D4 lint above is strictly per mode, so two modes of one card sharing a
+  -- slot NAME pass it. This is the missing half: the promise Modal.allTargetSpecs
+  -- and Modal.modesTargetSpecs make in their own comments -- "slot names unique
+  -- by authoring discipline" -- with something finally checking it (#475). See
+  -- cardSlotNamesCollide for what a shared name silently does.
+  Spec.it s "no card's modes share a target slot name" $ do
+    ps <- S.allPrintings s
+    let declaring card =
+          length (filter (not . Map.null . Mode.targetSpecs) (Foldable.toList (Modal.modes (Card.Type.spell card))))
+        offenders = filter (cardSlotNamesCollide . Printing.card) ps
+    -- Guards against passing vacuously: a pool whose every modal card had at
+    -- most one slot-declaring mode could not collide whatever the lint said.
+    -- Dream's Grip is the card that makes it real.
+    Spec.assertBool s (any ((> 1) . declaring . Printing.card) ps) "the pool has a card with two slot-declaring modes"
+    Spec.assertEqWith s "no fused mode slot" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The sweep above passes because the pool is authored correctly, so it proves
+  -- nothing about the lint. The REJECTING direction is proven here, against
+  -- hand-built offenders and against Dream's Grip misauthored on purpose --
+  -- never a card file, since a card that offends a lint must not be loadable.
+  Spec.it s "the lint itself catches two modes declaring one slot name" $ do
+    dreamsGrip <- S.printingOf s registry "Dream's Grip"
+    let creature = SlotName.MkSlotName (Text.pack "creature")
+        victim = SlotName.MkSlotName (Text.pack "victim")
+        tap slot = Effect.Tap (ObjectRef.InSlot slot)
+        shared = modalActivated [lintMode [tap creature] [creature], lintMode [tap creature] [creature]]
+        distinct = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
+        collides = cardSlotNamesCollide . Printing.card
+        -- Dream's Grip's own two modes, renamed to one shared slot: the exact
+        -- authoring the card avoids, and the CR 702.42a fusion it would cause.
+        card = Printing.card dreamsGrip
+        fuse mode = mode {Mode.targetSpecs = Map.mapKeys (const creature) (Mode.targetSpecs mode)}
+        fused = card {Card.Type.spell = (Card.Type.spell card) {Modal.modes = fmap fuse (Modal.modes (Card.Type.spell card))}}
+    Spec.assertBool s (cardSlotNamesCollide (card {Card.Type.activatedAbilities = [shared]})) "two modes sharing one name are rejected"
+    Spec.assertBool s (not (cardSlotNamesCollide (card {Card.Type.activatedAbilities = [distinct]}))) "and two modes naming distinct slots are accepted"
+    Spec.assertBool s (cardSlotNamesCollide fused) "Dream's Grip with both modes on one slot is rejected"
+    Spec.assertBool s (not (collides dreamsGrip)) "and the real card, naming them 'tapped' and 'untapped', is accepted"
   Spec.it s "every file in data/cards loads, and its card is named by its file name" $ do
     -- The registry checks name-against-file-name on each load
     -- (Pawl.Registry.loadFile), so sweeping the listing is the whole assertion:
