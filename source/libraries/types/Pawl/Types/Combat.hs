@@ -103,6 +103,30 @@ data Combat = MkCombat
     -- end of combat step ends (CR 511.3), so a CR 500.8 additional combat phase
     -- asks the question again from empty.
     attacked :: Set.Set AttackTarget.AttackTarget,
+    -- | CR 508.3b / 508.4: the targets a creature was DECLARED attacking --
+    -- `attacked` minus everything put onto the battlefield attacking.
+    --
+    -- The two are different questions and the rules answer them differently,
+    -- which is the whole reason this field exists beside the one above. CR 508.8
+    -- counts both ("if no creatures are declared as attackers OR PUT ONTO THE
+    -- BATTLEFIELD ATTACKING, skip ..."), so the skip reads `attacked`. But CR
+    -- 508.4's last-but-one sentence is emphatic that the second kind never
+    -- attacked: "Such creatures are 'attacking' but, for the purposes of trigger
+    -- events and effects, they never 'attacked.'" CR 508.3b says the same thing
+    -- for the player side outright -- an ability that reads "whenever [a player]
+    -- is attacked" "won't trigger if a creature is put onto the battlefield
+    -- attacking that player or permanent".
+    --
+    -- So anything asking whether a PLAYER was attacked reads this one:
+    -- Pawl.Engine.Cast.attackedThisStep, for Rally the Troops' "only if you've
+    -- been attacked this step". Reading `attacked` there let a Meandering
+    -- Towershell that returned attacking -- on a turn its controller declared
+    -- nothing -- make the defending player "attacked", which CR 508.4 denies.
+    --
+    -- Written only by Pawl.Engine.Combat.declareAttackers, never by
+    -- putOntoBattlefieldAttacking; same lifetime and same never-cleared posture
+    -- as `attacked`, for that field's reasons.
+    declaredAttacked :: Set.Set AttackTarget.AttackTarget,
     -- | CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
     -- a turn-based action immediately after the beginning of combat step begins
     -- (CR 703.4h, CR 507.1) by Pawl.Engine.Combat.chooseDefender.

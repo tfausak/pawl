@@ -363,9 +363,21 @@ restrictionMet pid gs restriction = case restriction of
 -- CR 506.2: "During the combat phase of a two-player game, the nonactive player
 -- is the defending player; that player, planeswalkers they control, and battles
 -- they protect may be attacked." So the question is whether any creature was
--- declared attacking -- or put onto the battlefield attacking (CR 508.8) -- THIS
--- PLAYER, rather than a planeswalker of theirs, which is exactly membership in
--- Combat.attacked.
+-- DECLARED attacking THIS PLAYER, rather than a planeswalker of theirs -- which
+-- is exactly membership in Combat.declaredAttacked.
+--
+-- DECLARED, and not "or put onto the battlefield attacking" as this used to say
+-- (citing CR 508.8, which is about skipping steps and licenses nothing here). CR
+-- 508.4 is emphatic the other way: "Such creatures are 'attacking' but, for the
+-- purposes of trigger events and effects, they never 'attacked.'" CR 508.3b
+-- spells out the player side -- an ability reading "whenever [a player] is
+-- attacked" "won't trigger if a creature is put onto the battlefield attacking
+-- that player or permanent" -- and a printed "only if you've been attacked this
+-- step" is asking that same question of the same record.
+--
+-- So this reads Combat.declaredAttacked and NOT Combat.attacked, which is CR
+-- 508.8's wider set and counts both kinds. The two fields exist because the two
+-- rules disagree; see Pawl.Types.Combat.
 --
 -- Eightfold Maze's ruling is the reading pinned here, both sentences of it: "If
 -- all the attacking creatures attack your planeswalkers, you can't cast Eightfold
@@ -380,17 +392,16 @@ restrictionMet pid gs restriction = case restriction of
 -- OfPlayer entry naming this player IS that conjunct.
 --
 -- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
--- combat PHASE. The two spans coincide for every card in the pool -- the set is
--- written only by Pawl.Engine.Combat.declareAttackers (CR 508.1, the declare attackers
--- step's turn-based action) and by putOntoBattlefieldAttacking, whose every
--- producer resolves in a declare attackers step (a CR 508.3a attack trigger,
--- Hanweir Garrison's; a CR 603.7 delayed ability keyed to the beginning of that
--- step, Meandering Towershell's) -- but that is a fact about the pool rather
--- than a rule (#447). CR 508.4d's later-step entries are the ones that would
--- part them, and none is built (#368).
+-- combat PHASE. The two spans coincide for every card in the pool, and now for a
+-- simpler reason than before: this set is written ONLY by
+-- Pawl.Engine.Combat.declareAttackers, which is CR 508.1's turn-based action and
+-- runs only at the start of a declare attackers step. That is still a fact about
+-- the pool rather than a rule (#447) -- CR 500.8's additional combat phase has
+-- its own declare attackers step, and clearCombat resets the record between
+-- them, so what remains open is a second declaration inside one phase.
 attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
-  Set.member (AttackTarget.OfPlayer pid) (Combat.attacked (GameState.combat gs))
+  Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
 
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least

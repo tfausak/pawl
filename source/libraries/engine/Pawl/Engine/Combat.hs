@@ -47,6 +47,7 @@ emptyCombat =
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
       Combat.attacked = Set.empty,
+      Combat.declaredAttacked = Set.empty,
       Combat.defender = Nothing
     }
 
@@ -1068,7 +1069,13 @@ declareAttackers pid = do
                         -- being attacked -- Pawl.Types.Combat's `attacked` field
                         -- says why both readers want the historical answer.
                         Combat.attacked =
-                          Set.union (Set.fromList (Map.elems recorded)) (Combat.attacked (GameState.combat g))
+                          Set.union (Set.fromList (Map.elems recorded)) (Combat.attacked (GameState.combat g)),
+                        -- CR 508.3b / 508.4's narrower record, written HERE and
+                        -- only here: these creatures were DECLARED, which is
+                        -- exactly what those two rules distinguish from being put
+                        -- onto the battlefield attacking.
+                        Combat.declaredAttacked =
+                          Set.union (Set.fromList (Map.elems recorded)) (Combat.declaredAttacked (GameState.combat g))
                       }
                 }
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
