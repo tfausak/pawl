@@ -721,9 +721,9 @@ youControlSource =
 
 -- Barbarian Outcast's migrated StateIs (retired StateCondition.YouControlNo
 -- Swamp -- CR 603.8): "you control no Swamps" as a Count of exactly 0. Shared by
--- Pawl.CodecSpec (round-trip) and Pawl.CardSpec (the decoded card equals this
--- value), so one fixture is what both the wire format and the corpus are pinned
--- against -- the shape youControlSource already has.
+-- Pawl.CodecIntegrationSpec (round-trip) and Pawl.CardSpec (the decoded card
+-- equals this value), so one fixture is what both the wire format and the
+-- corpus are pinned against -- the shape youControlSource already has.
 youControlNoSwamps :: Condition.Type.Condition
 youControlNoSwamps =
   Condition.Type.MkCondition

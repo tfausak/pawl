@@ -143,6 +143,11 @@ project-specific rules it doesn't cover:
   per source type, each function named for its target and for what it does at
   the boundary (`Maybe` in the type, or `Saturating` in the name). Add the
   missing conversion there rather than reaching around the ban.
+- **A per-type codec module exposes `toJson`/`fromJson`.** `Pawl.Codec.Common`
+  is the codec's base module — the tagged-object convention, the
+  element-generic `encode*`/`decode*` combinators, and the `assertJson*` spec
+  helpers every per-type module and spec is written in terms of.
+  `Pawl.Codec.Json` no longer exists.
 
 ## Adding a module
 
@@ -179,11 +184,12 @@ files.
 Two conventions, split by whether the module is in the engine.
 
 **Outside the engine**, the spec sits next to the module it covers
-(`Pawl.Json.Value` → `Pawl.Json.ValueSpec`), is an ordinary exposed module of
-that sublibrary, and exposes
-`spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()` built from
-`Pawl.Spec`. Wire it into the `spec` function in `Main.hs`. Shipping the specs
-as exposed modules is deliberate: `Pawl.Spec` is base-only, so they cost
+(`Pawl.Json.Value` → `Pawl.Json.ValueSpec`; `Pawl.Codec.Color` →
+`Pawl.Codec.ColorSpec`), is an ordinary exposed module of that sublibrary, and
+exposes `spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()` built from
+`Pawl.Spec` — codec specs need `(Monad m, Monad n)`, since `Common.assertJson`
+binds. Wire it into the `spec` function in `Main.hs`. Shipping the specs as
+exposed modules is deliberate: `Pawl.Spec` is base-only, so they cost
 essentially nothing and stay runnable by any consumer.
 
 **In the engine** (`source/libraries/engine/`), tests go in the subsystem spec

@@ -220,8 +220,8 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.alternativeCosts <$> Card.fromJson v) (Right [])
     -- CR 113.6g's default, the stand-in for the registry-backed Rending
-    -- Volley/Cancel pair kept in Pawl.CodecSpec (that test needs real
-    -- Printings, which this sublibrary cannot reach).
+    -- Volley/Cancel pair kept in Pawl.CodecIntegrationSpec (that test needs
+    -- real Printings, which this sublibrary cannot reach).
     Spec.it s "counterability (CR 113.6g) defaults to Counterable" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.counterability <$> Card.fromJson v) (Right Counterability.Counterable)

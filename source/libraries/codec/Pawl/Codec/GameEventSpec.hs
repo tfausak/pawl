@@ -22,7 +22,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- snapshot -- this sublibrary sits above Pawl.Registry and Pawl.Engine, so it
 -- cannot build a real one the way Pawl.Engine.Projection.project does. The
 -- registry-backed round-trips over REAL snapshots (Typhoid Rats, and the
--- doubled-toxic-keyword count survives the encoding) stay in Pawl.CodecSpec.
+-- doubled-toxic-keyword count survives the encoding) stay in
+-- Pawl.CodecIntegrationSpec.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
   Spec.it s "Moved" $

@@ -10,7 +10,7 @@ module Pawl.Types.ControllerRelation where
 data ControllerRelation
   = Yours
   | Anyones
-  | -- | CR 102.1: "an opponent" -- any other player. Leyline of the Void's "an
+  | -- | CR 102.2/102.3: "an opponent" -- any other player. Leyline of the Void's "an
     -- opponent's graveyard". Read against the effect SOURCE's controller, like
     -- its siblings, but see Pawl.Engine.Replacement: for a ZONE CHANGE the subject is
     -- the object's OWNER (CR 400.3), because the destination zone is theirs.

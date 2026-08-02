@@ -30,8 +30,9 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
   -- Comparison, including both sides non-Count -- which the Count-on-the-left
   -- shape this type replaced could not say at all (Deathknell Berserker's "if
   -- its power was 3 or greater", CR 603.4). The Barbarian Outcast /
-  -- Sarcomancy fixtures stay in Pawl.CodecSpec: they are shared, by design,
-  -- with Pawl.CardSpec and other test-suite specs Pawl.Codec cannot import.
+  -- Sarcomancy fixtures stay in Pawl.CodecIntegrationSpec: they are shared, by
+  -- design, with Pawl.CardSpec and other test-suite specs Pawl.Codec cannot
+  -- import.
   Spec.it s "round-trips at every comparison" $
     mapM_
       (\v -> Spec.assertEqWith s "preserved" (Condition.fromJson (Condition.toJson v)) (Right v))
@@ -42,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
       ]
 
 -- A count with every axis non-default, so a codec that drops one is caught.
--- Mirrors Pawl.CodecSpec's fixture of the same name.
+-- Mirrors Pawl.CodecIntegrationSpec's fixture of the same name.
 zeroSwamps :: Count.Count Quantity.Quantity
 zeroSwamps =
   Count.MkCount

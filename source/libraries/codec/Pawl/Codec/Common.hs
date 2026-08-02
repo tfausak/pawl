@@ -194,11 +194,14 @@ encodeList f = array . fmap f
 decodeList :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text [a]
 decodeList f value = asArray value >>= traverse f
 
--- CR 613.6's card-data invariant: a static ability has at least one part. An
--- empty array is a decode failure, not an ability that does nothing.
+-- | Writes a non-empty list as a plain JSON array, the same shape 'encodeList'
+-- writes.
 encodeNonEmpty :: (a -> Value.Value) -> NonEmpty.NonEmpty a -> Value.Value
 encodeNonEmpty f = encodeList f . NonEmpty.toList
 
+-- | The card-data invariant this type exists to enforce: whatever field is
+-- typed 'NonEmpty.NonEmpty' has at least one part. An empty array is a decode
+-- failure, not a value that does nothing.
 decodeNonEmpty :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (NonEmpty.NonEmpty a)
 decodeNonEmpty f value = do
   xs <- decodeList f value

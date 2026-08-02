@@ -10,7 +10,7 @@ import qualified Pawl.Types.Printing as Printing
 -- Card's own codec (Pawl.Codec.Card.toJson/fromJson) -- so 'CardSpec.baseCard'
 -- is reused rather than a second synthetic Card being built here. The
 -- registry-backed "honesty round-trip over allPrintings" proof, over every real
--- Printing in the pool, stays in Pawl.CodecSpec: this sublibrary sits above
+-- Printing in the pool, stays in Pawl.CodecIntegrationSpec: this sublibrary sits above
 -- Pawl.Registry and cannot reach it.
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =

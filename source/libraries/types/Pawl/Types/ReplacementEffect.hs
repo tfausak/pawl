@@ -26,8 +26,10 @@ import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
 -- rules out "redirect a damage event" without a validity pass.
 --
 -- EntryR and DestructionR carry NO pattern: both are self-only in the pool today
--- (CR 614.1c's "[this permanent] enters as"; CR 201.5/201.5c make "regenerate
--- this creature" name the ability's own source). CR 614.1d's other-objects form
+-- (CR 614.1c's "[this permanent] enters as"; CR 113.7a's own example --
+-- "This creature deals 1 damage to any target" -- establishes that "this
+-- creature" names the ability's source, so "regenerate this creature" names no
+-- object but its own). CR 614.1d's other-objects form
 -- ("[Objects] enter the battlefield ...", Essence of the Wild) has no producer,
 -- so the field appears when a card needs it rather than as speculative structure.
 --
