@@ -83,7 +83,9 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -543,6 +545,60 @@ modalReadOffends abilityBound modal =
             wanted = Set.unions (fmap Resolve.slotsOf effects)
          in not (Set.isSubsetOf wanted available)
    in any modeOffends (Modal.modes modal)
+
+-- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
+-- (Card.replacementEffects, Eon Hub's) and the ones an effect of its own
+-- installs (Effect.Replace, a floating one). Both come out of card JSON, which
+-- is the whole of what the lint below is about; a replacement the ENGINE bakes
+-- reaches GameState without passing through a Card and is not swept here.
+cardReplacementEffects :: Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
+cardReplacementEffects card =
+  Card.Type.replacementEffects card
+    <> [replacement | Effect.Replace _ _ replacement <- cardResolutionEffects card]
+
+-- #437: does this replacement carry a PhasePattern with a BAKED player in it?
+--
+-- PhasePattern.whosePhase is meant to be runtime-only. Nothing is the value card
+-- data writes -- Eon Hub's "players skip their upkeep steps" is symmetric and
+-- names nobody -- and Just is baked by the engine out of a player a resolution
+-- named (Resolve.applyEffect's SkipNextPhase arm, Fatigue's target) or out of a
+-- pending extra turn (Replacement.installTurnSkips). Card data cannot name a
+-- player at all.
+--
+-- Nothing enforced that split. Codec.PhasePattern round-trips the field in both
+-- directions and has to, since a stored ActiveReplacement carrying a baked
+-- pattern must survive the trip -- so a card file could write `"whosePhase": 1`,
+-- which is meaningless. Player 1 is a seat in some game, not a fact about a
+-- printed card, and the skip would land on whoever happened to hold that id.
+--
+-- A LINT rather than a type-level split, which is the call #199 already records
+-- for the sibling case (Modification.SetController's baked PlayerId, likewise
+-- accepted by its codec and likewise kept out of card data by a lint here). A
+-- split -- a card-side pattern and a runtime-side one, the way Duration and
+-- Expiry are split -- would make the bad value unrepresentable rather than
+-- merely rejected, at the cost of a second type and a conversion. Worth doing
+-- for BOTH baked PlayerIds or neither; doing it for one would leave the pair
+-- inconsistent, which is what the issue asks be decided once.
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
+-- pattern-carrying replacement must break this build rather than silently pass.
+phasePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
+phasePatternOffends replacement = case replacement of
+  ReplacementEffect.PhaseR phasePattern -> Maybe.isJust (PhasePattern.whosePhase phasePattern)
+  ReplacementEffect.CounterR _ _ -> False
+  ReplacementEffect.ZoneChangeR _ _ -> False
+  ReplacementEffect.EntryR _ -> False
+  ReplacementEffect.DamageR _ _ -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.TokenR _ _ -> False
+
+-- The non-vacuity half of the same lint: is this the replacement that carries a
+-- PhasePattern at all? A wildcard is right here, where it is not above -- this
+-- asks "did the sweep have anything to look at", not "is it well-formed".
+isPhaseR :: ReplacementEffect.ReplacementEffect -> Bool
+isPhaseR replacement = case replacement of
+  ReplacementEffect.PhaseR _ -> True
+  _ -> False
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
 -- of them, which is exactly what a Map.unions over them would silently collapse.
@@ -1824,6 +1880,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         offenders = filter (any offends . cardResolutionEffects . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
+  -- the codec accepts. See phasePatternOffends for why a card cannot name a
+  -- player, and for why this is a lint rather than a type split (#437).
+  Spec.it s "no card authors a player-scoped phase skip (#437)" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (any phasePatternOffends . cardReplacementEffects . Printing.card) ps
+    -- Guards against a vacuous sweep: with no PhaseR in the pool at all this
+    -- would pass whatever the classification said. Eon Hub is the card that
+    -- prints one.
+    Spec.assertBool s (any (any isPhaseR . cardReplacementEffects . Printing.card) ps) "the pool has a card printing a phase skip"
+    Spec.assertEqWith s "whosePhase is baked by the engine, never authored" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The sweep passes because the pool is authored correctly, so the REJECTING
+  -- direction is proven here against Eon Hub with a seat baked into it -- never
+  -- a card file, since a card that offends a lint must not be loadable.
+  Spec.it s "the lint itself catches a baked whosePhase" $ do
+    eonHub <- S.printingOf s registry "Eon Hub"
+    let card = Printing.card eonHub
+        bake replacement = case replacement of
+          ReplacementEffect.PhaseR phasePattern ->
+            ReplacementEffect.PhaseR phasePattern {PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
+          other -> other
+        baked = card {Card.Type.replacementEffects = fmap bake (Card.Type.replacementEffects card)}
+    Spec.assertBool s (not (any phasePatternOffends (cardReplacementEffects card))) "the real Eon Hub is symmetric and accepted"
+    Spec.assertBool s (any phasePatternOffends (cardReplacementEffects baked)) "and the same card naming a seat is rejected"
   -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
   -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
   -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
