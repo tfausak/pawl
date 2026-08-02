@@ -1040,7 +1040,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- players, and this traversal is about the spells a cost modifier matches.
   PlayerEffect.CantBeTargetedBy _ -> []
 
--- CR 614.1: two replacement patterns narrow by a Filter. CounterPattern.onWhat
+-- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
 -- is "one or more counters would be put on a creature YOU control", and EntryR's
 -- whole pattern is one -- CR 614.1c's "as [THIS PERMANENT] enters" (Filter.IsSource)
 -- and CR 614.1d's "[Objects] enter [the battlefield] . . ." (Gather Specimens'

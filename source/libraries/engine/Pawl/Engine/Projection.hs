@@ -2387,11 +2387,17 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
               [] -> Just (defaultControllerOf obj)
               setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
 
--- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES -- "a
--- permanent's controller is, by default, the player under whose control it
--- entered the battlefield", falling back to the owner where nothing recorded an
--- entry ("if anything asks for the controller of a card that doesn't have one
--- ... use its owner instead").
+-- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES.
+--
+-- Two rules, one per kind of object this is asked about, exactly as
+-- Pawl.Types.Object's own note splits them. For a PERMANENT it is CR 110.2 --
+-- "a permanent's controller is, by default, the player under whose control it
+-- entered the battlefield" -- and the owner fallback is not 108.4a but the fact
+-- that in this pool the player who put it there IS its owner unless a CR 616.1b
+-- replacement said otherwise. For anything else -- a card in a library, a
+-- graveyard, a hand -- there is no controller at all, and CR 108.4a is what says
+-- to use the owner: "if anything asks for the controller of a card that doesn't
+-- have one (because it's not a permanent or spell), use its owner instead".
 --
 -- Object.enteredUnder is written by exactly one thing, Pawl.Engine.Replacement's
 -- CR 616.1b rewrite, and is Nothing on every other object -- so for the whole

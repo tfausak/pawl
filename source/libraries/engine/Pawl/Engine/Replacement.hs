@@ -581,8 +581,8 @@ bucketOfEffect re = case re of
   -- under whose control an object would enter the battlefield, one of them must
   -- be chosen." One step ABOVE the copy bucket, and Gather Specimens racing an
   -- entering Clone is the board where the two orders disagree: taking the
-  -- control rewrite first hands CR 707.5's copy choice to the NEW controller,
-  -- and taking the copy first hands it to the old one. ReplacementSpec's
+  -- control rewrite first hands Clone's own CR 109.5 copy choice to the NEW
+  -- controller, and taking the copy first hands it to the old one. ReplacementSpec's
   -- "CR 616.1b before CR 616.1c: the NEW controller chooses the copy" is the
   -- test that pins it, and unlike the copy bucket below this one is exercised.
   ReplacementEffect.EntryR _ EntryRewrite.UnderSourceControl -> ReplacementBucket.ControlOnEntry

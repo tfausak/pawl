@@ -37,8 +37,9 @@ data Object = MkObject
     -- (#582).
     --
     -- NOT a control-changing EFFECT, and the difference is CR 800.4c's in as many
-    -- words: it distinguishes "an effect that gives a player control of an
-    -- object" from "the player who controlled that object by default". Writing
+    -- words: it distinguishes "an effect that gives a player still in the game
+    -- control of an object" from "the player who controlled that object by
+    -- default". Writing
     -- a CR 616.1b rewrite as a layer-2 effect would put it on the wrong side of
     -- that line.
     --

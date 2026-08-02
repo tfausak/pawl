@@ -27,11 +27,11 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- A (effect, event) pair whose arms disagree simply does not apply, so the type
 -- rules out "redirect a damage event" without a validity pass.
 --
--- DestructionR carries NO pattern: it is self-only in the pool today (CR 113.7a's
--- own example -- "This creature deals 1 damage to any target" -- establishes that
--- "this creature" names the ability's source, so "regenerate this creature" names
--- no object but its own), so the field appears when a card needs it rather than
--- as speculative structure.
+-- DestructionR carries NO pattern: it is self-only in the pool today, because CR
+-- 201.5 makes "text that refers to the object it's on by name mean just that
+-- particular object" -- so "regenerate this creature" (CR 701.19a) names no
+-- object but its own. The field appears when a card needs it rather than as
+-- speculative structure.
 --
 -- EntryR's pattern is a bare Filter rather than a pattern RECORD, and that is
 -- CR 614.1c and CR 614.1d collapsing into one field rather than an omission.

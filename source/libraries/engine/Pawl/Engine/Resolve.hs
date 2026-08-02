@@ -2260,8 +2260,8 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
 -- this could write the field instead of storing an effect. It does not, and the
 -- issue is still open: no card in the pool reaches the store at all (see
 -- "NOTHING STORED" below), so switching carriers would be an unexercised change
--- to CR 800.4a's answer. The field arrived for CR 616.1b's rewrite, which is a
--- different clause of the same rule.
+-- to CR 800.4a's answer. The field arrived for CR 616.1b's rewrite, which is
+-- CR 110.2's other route to a controller who is not the owner.
 --
 -- Indefinite (Expiry.Never), CR 611.2a's "lasts until the end of the game":
 -- entering under someone's control is not a duration a card states an end for.
@@ -2304,8 +2304,10 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
 -- The store lands AFTER Event.changeZoneEntering returns, so during CR 614.1c's
 -- entry-replacement loop and at the GameEvent.Moved snapshot the permanent still
 -- reads as its owner's rather than as this controller's -- which contradicts CR
--- 614.12's "as it would exist on the battlefield", since an entry replacement
--- reading control would read the wrong player. CR 614.1d's forms DO read it now
+-- 614.12's "continuous effects that already exist and would apply to the
+-- permanent", since an entry replacement reading control would read the wrong
+-- player. Not that rule's "as it would exist on the battlefield" clause: CR
+-- 109.3 excludes an object's controller from its characteristics by name. CR 614.1d's forms DO read it now
 -- (Gather Specimens' "under an opponent's control"), so this is a live ordering
 -- question rather than a vacuous one -- but it is still unobservable, because no
 -- card in the pool reaches the store: every producer's controller already owns

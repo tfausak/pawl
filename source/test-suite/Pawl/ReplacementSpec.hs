@@ -1392,9 +1392,9 @@ specimenBoard island pikerPrinting gatherSpecimens bobsHand =
       )
 
 -- Copy `wanted` if and only if the copy choice is offered to `who`, and decline
--- otherwise. The readout for WHICH player CR 616.1 made the chooser: the copy
--- lands (a 2/1) only when the engine asked the named player, and the Clone stays
--- a 0/0 when it asked anyone else.
+-- otherwise. The readout for WHICH player held Clone's own CR 109.5 "you" when
+-- the copy choice was made: the copy lands (a 2/1) only when the engine asked
+-- the named player, and the Clone stays a 0/0 when it asked anyone else.
 copyIfAskedOf :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 copyIfAskedOf who wanted p = case p of
   Prompt.ChooseCopyTarget _ asked _ legal ->
@@ -1412,9 +1412,13 @@ copyIfAskedOf who wanted p = case p of
 --
 -- Clone is the competing entry replacement. CR 616.1c's copy bucket sits one step
 -- BELOW 616.1b's, so on the entering Clone's first iteration the control rewrite
--- is the only candidate in the highest non-empty bucket, and CR 616.1 hands the
--- copy choice that follows to whoever controls the object THEN -- which the
--- control rewrite has just changed.
+-- is the only candidate in the highest non-empty bucket -- and the copy choice
+-- that follows goes to whoever controls the object THEN, which the control
+-- rewrite has just changed. CR 109.5 is the rule for that second question:
+-- Clone's "YOU may have this enter as a copy" is its own controller's choice,
+-- made at CR 614.12a's moment (before the permanent enters). CR 616.1's chooser
+-- is a different question -- WHICH replacement to apply -- and this board never
+-- raises it, since each bucket holds one candidate.
 gatherSpecimensSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gatherSpecimensSpec s registry =
   Spec.describe s "Gather Specimens (CR 616.1b)" $ do
@@ -1441,15 +1445,16 @@ gatherSpecimensSpec s registry =
     -- -- which is what makes this an assertion rather than a coincidence:
     --
     --   * CR 616.1b's order -- the control rewrite first, so the object is
-    --     alice's by the time CR 707.5's copy choice is offered, and ALICE
-    --     picks the copy target.
+    --     alice's by the time Clone's own choice is offered, and ALICE picks
+    --     the copy target.
     --   * the other order -- the copy first, while the object is still bob's,
     --     so BOB picks.
     --
-    -- CR 616.1 names the chooser as "the affected object's controller", which for
-    -- an opponent's entering creature is NOT the Gather Specimens controller
-    -- until CR 616.1b's rewrite has been applied. That is the whole point: the
-    -- bucket ordering decides who the second question goes to.
+    -- CR 109.5 makes Clone's "you" the entering object's CONTROLLER, and CR
+    -- 614.12a fixes when that is read (before the permanent enters). For an
+    -- opponent's entering creature that controller is not the Gather Specimens
+    -- controller until CR 616.1b's rewrite has been applied -- which is the whole
+    -- point: the bucket ordering decides who the second question goes to.
     Spec.it s "CR 616.1b before CR 616.1c: the NEW controller chooses the copy" $ do
       island <- S.printingOf s registry "Island"
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
