@@ -1,11 +1,11 @@
 module Pawl.Types.ExtraTurn where
 
-import Data.Set (Set)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.PhaseSelector (PhaseSelector)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Data.Set as Set
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerId as PlayerId
 
--- CR 500.7: one turn that has been created and not yet taken, as an entry on
+-- | CR 500.7: one turn that has been created and not yet taken, as an entry on
 -- GameState.extraTurns. Runtime-only, like ActiveReplacement: card data writes
 -- the Effect.TakeExtraTurn that makes one, never one of these.
 --
@@ -29,8 +29,8 @@ import Pawl.Types.PlayerId (PlayerId)
 -- or sorcery spell's resolution, the spell is put into its owner's graveyard" --
 -- exactly as it has Fatigue by the time Fatigue's own skip matters.
 data ExtraTurn = MkExtraTurn
-  { taker :: PlayerId,
-    source :: ObjectId,
-    skipped :: Set PhaseSelector
+  { taker :: PlayerId.PlayerId,
+    source :: ObjectId.ObjectId,
+    skipped :: Set.Set PhaseSelector.PhaseSelector
   }
   deriving (Eq, Ord, Show)

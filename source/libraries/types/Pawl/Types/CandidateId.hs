@@ -1,10 +1,10 @@
 module Pawl.Types.CandidateId where
 
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.ReplacementEffect (ReplacementEffect)
-import Pawl.Types.Timestamp (Timestamp)
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Timestamp as Timestamp
 
--- CR 614.5's identity: "A replacement effect doesn't invoke itself repeatedly; it
+-- | CR 614.5's identity: "A replacement effect doesn't invoke itself repeatedly; it
 -- gets only one opportunity to affect an event or any modified events that may
 -- replace that event." This is what counts as ONE effect for that rule. Without
 -- it Hardened Scales and Corpsejack Menace re-fire on each other's output
@@ -27,6 +27,6 @@ import Pawl.Types.Timestamp (Timestamp)
 -- timestamp counter is monotone, so two Fogs are two instances even from one
 -- source object.
 data CandidateId
-  = OfPermanent ObjectId ReplacementEffect
-  | OfFloating ObjectId Timestamp
+  = OfPermanent ObjectId.ObjectId ReplacementEffect.ReplacementEffect
+  | OfFloating ObjectId.ObjectId Timestamp.Timestamp
   deriving (Eq, Ord, Show)

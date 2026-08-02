@@ -1,10 +1,10 @@
 module Pawl.Types.LastKnown where
 
-import Pawl.Types.PlayerId (PlayerId)
-import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
-import Pawl.Types.Source (Source)
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
+import qualified Pawl.Types.Source as Source
 
--- CR 608.2h: what an object WAS, filed under the id it had while it existed --
+-- | CR 608.2h: what an object WAS, filed under the id it had while it existed --
 -- "if it's no longer in that zone ... the effect uses the object's last known
 -- information". Written by the one zone-change funnel
 -- (Pawl.Engine.Event.changeZoneAttaching) as the object ceases, from the same
@@ -32,17 +32,17 @@ import Pawl.Types.Source (Source)
 -- thunk closing over the whole pre-move GameState, retained for the rest of the
 -- game instead of the one small value this record is meant to carry.
 data LastKnown = MkLastKnown
-  { characteristics :: !ProjectedCharacteristics,
-    -- CR 110.2 / 613.1b: the PROJECTED controller as the object left, which is
+  { characteristics :: !ProjectedCharacteristics.ProjectedCharacteristics,
+    -- | CR 110.2 / 613.1b: the PROJECTED controller as the object left, which is
     -- not its owner -- "a permanent's controller is, by default, the player
     -- under whose control it entered the battlefield", and layer 2 can move it
     -- since. A permanent stolen by Control Magic was controlled by the thief
     -- right up to the moment it died, and CR 603.3a hands that player its
     -- trigger.
-    controller :: !PlayerId,
-    -- CR 608.2h: what KIND of object it was and the card behind it -- the same
+    controller :: !PlayerId.PlayerId,
+    -- | CR 608.2h: what KIND of object it was and the card behind it -- the same
     -- Object.source the live object carried, copied as it ceased. Strict for the
     -- reason the other two are.
-    source :: !Source
+    source :: !Source.Source
   }
   deriving (Eq, Show)

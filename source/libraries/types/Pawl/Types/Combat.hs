@@ -1,12 +1,12 @@
 module Pawl.Types.Combat where
 
-import Data.Map.Strict (Map)
-import Data.Set (Set)
-import Pawl.Types.AttackTarget (AttackTarget)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 
--- The current combat (CR 508/509). Cleared as the end of combat step ENDS
+-- | The current combat (CR 508/509). Cleared as the end of combat step ENDS
 -- (CR 511.3), not as it begins -- so every field here reads live for the whole of
 -- that step, which is what "target attacking creature" (Kill Shot) cast at
 -- CR 511.1's priority depends on.
@@ -15,8 +15,8 @@ import Pawl.Types.PlayerId (PlayerId)
 -- LIFETIME the other fields do not -- one combat phase -- and something has to
 -- reset it as a unit.
 data Combat = MkCombat
-  { attackers :: Map ObjectId AttackTarget,
-    -- A Set per attacker, and never a single blocker: multi-blocking is legal
+  { attackers :: Map.Map ObjectId.ObjectId AttackTarget.AttackTarget,
+    -- | A Set per attacker, and never a single blocker: multi-blocking is legal
     -- from day one, and fixed arity is the recurring root cause (design doc
     -- §2.11).
     --
@@ -28,8 +28,8 @@ data Combat = MkCombat
     -- exist and invite code enforcing a constraint the game does not have.
     -- Lethal-in-order survives only inside trample (CR 702.19b), where it
     -- belongs to that keyword, and arrives with M2.
-    blockers :: Map ObjectId (Set ObjectId),
-    -- CR 510.4: which attackers and blockers had first strike or double strike as
+    blockers :: Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId),
+    -- | CR 510.4: which attackers and blockers had first strike or double strike as
     -- the FIRST combat damage step began. Nothing while that step has not
     -- happened; Just once it has, so the second combat damage step knows who is
     -- excluded ("had neither...") and the step router knows a second step already
@@ -40,8 +40,8 @@ data Combat = MkCombat
     -- Damage.dealCombatDamage reads this snapshot for CR 510.4's "had neither ...
     -- as the first step began" and reads DOUBLE strike live, which is what CR
     -- 510.4 says verbatim.
-    struckFirst :: Maybe (Set ObjectId),
-    -- CR 506.4: who controlled each combatant AS IT JOINED combat -- the
+    struckFirst :: Maybe (Set.Set ObjectId.ObjectId),
+    -- | CR 506.4: who controlled each combatant AS IT JOINED combat -- the
     -- comparand Pawl.Engine.Combat.removeChanged needs to answer "if its
     -- controller changes". Keyed by the creature, so one map covers attackers
     -- and blockers alike; written by declareAttackers and declareBlockers, the
@@ -61,8 +61,8 @@ data Combat = MkCombat
     -- pawl has no options concept to read it from (#175). CR 506.4 asks about the
     -- permanent's own controller either way, so the snapshot states the rule the
     -- rule states, for one map.
-    joinedUnder :: Map ObjectId PlayerId,
-    -- CR 508.8: whether one or more creatures have joined this combat as
+    joinedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- | CR 508.8: whether one or more creatures have joined this combat as
     -- attackers -- "declared as attackers or put onto the battlefield attacking".
     -- Written by Pawl.Engine.Combat.declareAttackers and
     -- Pawl.Engine.Combat.putOntoBattlefieldAttacking, the two things that can do either,
@@ -88,7 +88,7 @@ data Combat = MkCombat
     -- end of combat step ends (CR 511.3), so a CR 500.8 additional combat phase
     -- asks the question again from False.
     attackersJoined :: Bool,
-    -- CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
+    -- | CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
     -- a turn-based action immediately after the beginning of combat step begins
     -- (CR 703.4h, CR 507.1) by Pawl.Engine.Combat.chooseDefender.
     --
@@ -124,6 +124,6 @@ data Combat = MkCombat
     -- them declare blockers in APNAP order; neither is available here, because
     -- pawl has no options concept to read one from (#175). This field becomes a
     -- set when that arrives.
-    defender :: Maybe PlayerId
+    defender :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

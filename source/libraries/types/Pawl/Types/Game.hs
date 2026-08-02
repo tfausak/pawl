@@ -1,8 +1,8 @@
 module Pawl.Types.Game where
 
-import Control.Monad.Trans.State.Strict (StateT)
-import Pawl.Types.GameState (GameState)
-import Pawl.Types.Program (Program)
-import Pawl.Types.Prompt (Prompt)
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
 
-type Game a = StateT GameState (Program Prompt) a
+type Game a = State.StateT GameState.GameState (Program.Program Prompt.Prompt) a

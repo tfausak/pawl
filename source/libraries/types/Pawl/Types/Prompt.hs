@@ -2,33 +2,33 @@
 
 module Pawl.Types.Prompt where
 
-import Data.List.NonEmpty (NonEmpty)
-import Data.Map.Strict (Map)
-import Data.Set (Set)
-import Numeric.Natural (Natural)
-import Pawl.Types.Action (Action)
-import Pawl.Types.Color (Color)
-import Pawl.Types.Concession (Concession)
-import Pawl.Types.Cost (Cost)
-import Pawl.Types.Decider (Decider)
-import Pawl.Types.EntryOption (EntryOption)
-import Pawl.Types.EntwineDecision (EntwineDecision)
-import Pawl.Types.Mana (Mana)
-import Pawl.Types.ModeIndex (ModeIndex)
-import Pawl.Types.MulliganDecision (MulliganDecision)
-import Pawl.Types.MulliganOffer (MulliganOffer)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.OptionalDecision (OptionalDecision)
-import Pawl.Types.PhyrexianPayment (PhyrexianPayment)
-import Pawl.Types.PlayerId (PlayerId)
-import Pawl.Types.Recipient (Recipient)
-import Pawl.Types.SlotName (SlotName)
-import Pawl.Types.Subtype (Subtype)
-import Pawl.Types.TriggerSource (TriggerSource)
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.MulliganOffer as MulliganOffer
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TriggerSource as TriggerSource
 
 data Prompt r where
-  ChooseAction :: Decider -> PlayerId -> [Action] -> Prompt Action
-  -- CR 104.3a: "A player can concede the game at any time. A player who concedes
+  ChooseAction :: Decider.Decider -> PlayerId.PlayerId -> [Action.Action] -> Prompt Action.Action
+  -- | CR 104.3a: "A player can concede the game at any time. A player who concedes
   -- leaves the game immediately." Asked before ChooseAction wherever a player
   -- would receive priority.
   --
@@ -46,9 +46,9 @@ data Prompt r where
   -- subgame is running this asks about the SUBGAME rather than the main game
   -- (#144, #397). Pawl.GameSpec's "conceding before the settle window and after
   -- it name different winners" pins what the first narrowing costs.
-  Concede :: PlayerId -> Prompt Concession
-  Shuffle :: [ObjectId] -> Prompt [ObjectId]
-  -- CR 729.2: "Randomly determine which player goes first." The NonEmpty is the
+  Concede :: PlayerId.PlayerId -> Prompt Concession.Concession
+  Shuffle :: [ObjectId.ObjectId] -> Prompt [ObjectId.ObjectId]
+  -- | CR 729.2: "Randomly determine which player goes first." The NonEmpty is the
   -- turn order; the answer is the starting player, and the order is then rotated
   -- to begin with them (CR 103.1: "the game's default turn order begins with the
   -- starting player and proceeds clockwise").
@@ -64,10 +64,10 @@ data Prompt r where
   --
   -- NonEmpty, not [], for the same reason Setup.emptyGame takes one: the answer
   -- has to come from somewhere, and a fallback must be total.
-  RandomFirstPlayer :: NonEmpty PlayerId -> Prompt PlayerId
-  -- CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
-  ChooseDiscard :: Decider -> PlayerId -> [ObjectId] -> Natural -> Prompt [ObjectId]
-  -- CR 507.1 / 703.4h: immediately after the beginning of combat step begins, the
+  RandomFirstPlayer :: NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
+  ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
+  -- | CR 507.1 / 703.4h: immediately after the beginning of combat step begins, the
   -- active player chooses one of their opponents, and that player becomes the
   -- defending player. The NonEmpty is the candidates (Combat.attackableOpponents);
   -- the answer is the one chosen.
@@ -85,8 +85,8 @@ data Prompt r where
   -- Not asked when there is exactly one candidate (#169). CR 507.1 makes the
   -- choice exist only in a multiplayer game; a two-player game gets its defending
   -- player from CR 506.2's second sentence with nothing to ask.
-  ChooseDefender :: Decider -> PlayerId -> NonEmpty PlayerId -> Prompt PlayerId
-  -- CR 601.2g (and CR 602.2b for an ability): which mana source to activate next
+  ChooseDefender :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | CR 601.2g (and CR 602.2b for an ability): which mana source to activate next
   -- while paying a cost.
   --
   -- Asked once per source TAPPED, against a shrinking candidate list, which is
@@ -97,8 +97,8 @@ data Prompt r where
   -- Same-card candidates are NOT treated as interchangeable: two Llanowar Elves
   -- can differ by an Equipment, an Aura, counters or borrowed control, and none of
   -- that is visible in the printed card (#12, #217).
-  ChooseManaSource :: Decider -> PlayerId -> NonEmpty ObjectId -> Prompt ObjectId
-  -- CR 605.3b: which mana the source (the ObjectId) produces, asked as the mana
+  ChooseManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 605.3b: which mana the source (the ObjectId) produces, asked as the mana
   -- ability resolves -- immediately, since a mana ability never uses the stack.
   -- The answer is a YIELD, the whole mana one activation adds, so Sol Ring's
   -- "{T}: Add {C}{C}" is one candidate of two units rather than two candidates of
@@ -123,8 +123,8 @@ data Prompt r where
   -- The candidates are deduplicated by the WHOLE yield, which is the one elision
   -- needing no judgement: two ways to produce black mana add the same mana either
   -- way.
-  ChooseManaYield :: Decider -> PlayerId -> ObjectId -> NonEmpty Mana -> Prompt Mana
-  -- CR 701.34a: which permanents and players a proliferating player gives another
+  ChooseManaYield :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Mana.Mana -> Prompt Mana.Mana
+  -- | CR 701.34a: which permanents and players a proliferating player gives another
   -- counter to. The [ObjectId] is every permanent holding at least one counter and
   -- the [PlayerId] every player holding at least one; the answer is the subset of
   -- each that gets one more of every kind it already has.
@@ -140,8 +140,8 @@ data Prompt r where
   -- number" (CR 701.34a) includes none, so even one candidate is a real yes or no
   -- -- proliferating a -1/-1 counter onto your own creature is a choice a player
   -- may well decline.
-  ChooseProliferate :: Decider -> PlayerId -> [ObjectId] -> [PlayerId] -> Prompt (Set ObjectId, Set PlayerId)
-  -- CR 704.5j: which of two or more same-named legendary permanents its
+  ChooseProliferate :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [PlayerId.PlayerId] -> Prompt (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
+  -- | CR 704.5j: which of two or more same-named legendary permanents its
   -- controller keeps. The NonEmpty is the whole same-named group; the answer is
   -- the ONE that survives, and every other member is put into its owner's
   -- graveyard.
@@ -158,40 +158,40 @@ data Prompt r where
   -- always a real choice. The permanents may differ in counters, Auras, damage or
   -- summoning sickness, none of which the shared name can see -- the same reason
   -- ChooseManaSource refuses to treat same-card candidates as interchangeable.
-  ChooseLegend :: Decider -> PlayerId -> NonEmpty ObjectId -> Prompt ObjectId
-  -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
+  ChooseLegend :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
   -- attack. WHOM they attack is not asked here: the defending player was already
   -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b
   -- calls for a per-creature announcement only if that player controls a
   -- planeswalker, protects a battle, or the game lets the active player attack
   -- multiple other players. A defending player can control a planeswalker now
   -- (Jace Beleren), but AttackTarget has no arm to name one (#493, #59).
-  DeclareAttackers :: Decider -> PlayerId -> [ObjectId] -> Prompt [ObjectId]
-  -- CR 509.1. The legal blockers, then the attackers they may block. The answer
+  DeclareAttackers :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [ObjectId.ObjectId]
+  -- | CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attacker it blocks.
-  DeclareBlockers :: Decider -> PlayerId -> [ObjectId] -> [ObjectId] -> Prompt (Map ObjectId ObjectId)
-  -- CR 510.1 / 702.19b: the attacker divides its power among the legal recipients.
+  DeclareBlockers :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [ObjectId.ObjectId] -> Prompt (Map.Map ObjectId.ObjectId ObjectId.ObjectId)
+  -- | CR 510.1 / 702.19b: the attacker divides its power among the legal recipients.
   -- The Map is recipient -> lethal threshold (blockers -> lethal, the defender ->
   -- 0); trample-ness is entirely in whether the defender is a key and what the
   -- thresholds are. Not asked when the division is forced (single blocker, no
   -- excess). Validation is Damage.legalAssignment. See the M2c spec, section 4.
-  AssignCombatDamage :: Decider -> PlayerId -> ObjectId -> Map Recipient Natural -> Natural -> Prompt (Map Recipient Natural)
-  -- CR 601.2c. One legal-recipient set per named slot of the spell being cast
+  AssignCombatDamage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Prompt (Map.Map Recipient.Recipient Natural.Natural)
+  -- | CR 601.2c. One legal-recipient set per named slot of the spell being cast
   -- (the ObjectId); the answer fills every slot. Slots agree by NAME, never by
   -- position. Not asked when the spell has no slots: zero slots is no choice
   -- at all, and where the rules leave nothing to ask, don't prompt.
-  ChooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName (Set Recipient) -> Prompt (Map SlotName Recipient)
-  -- CR 612 / the D4 binding: choose the two basic land types for a text-changing
+  ChooseTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName Recipient.Recipient)
+  -- | CR 612 / the D4 binding: choose the two basic land types for a text-changing
   -- spell's slot (Magical Hack: "one basic land type" -> "another"). Bound at cast
   -- alongside ChooseTargets; the legal set is always the five basics, so unlike a
   -- target it never gates castability, which is what makes cast-vs-resolution
   -- timing indistinguishable here (#60).
-  ChooseBasicLandTypes :: Decider -> PlayerId -> ObjectId -> SlotName -> Prompt (Subtype, Subtype)
-  -- CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
+  ChooseBasicLandTypes :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Prompt (Subtype.Subtype, Subtype.Subtype)
+  -- | CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
   -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
   -- find," always permitted for a search of one's own library for a quality.
-  SearchLibrary :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
-  -- CR 608.2g: the re-entrant cast opportunity during a library search (Panglacial
+  SearchLibrary :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- | CR 608.2g: the re-entrant cast opportunity during a library search (Panglacial
   -- Wurm) -- an effect that "specifically instructs or allows a player to cast a
   -- spell during resolution", following CR 601.2a-i except that no player receives
   -- priority after it is cast. The [ObjectId] is the searcher's library cards
@@ -199,8 +199,8 @@ data Prompt r where
   -- fillable). Nothing = decline / done. Offered in a loop before the search finds
   -- (per the ruling), so multiple copies may be cast. CR 605.3a permits mana
   -- activation to pay.
-  CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
-  -- CR 601.2b: choose the value of X while casting (the ObjectId is the spell).
+  CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- | CR 601.2b: choose the value of X while casting (the ObjectId is the spell).
   -- The Natural is the greatest value this player could actually PAY for right
   -- now: the largest X at which the cost being cast, totalled at CR 601.2f, is
   -- still payable (Cast.affordableX, which climbs the very predicate
@@ -234,8 +234,8 @@ data Prompt r where
   -- Prompted before targets (CR 601.2b precedes 601.2c), and only when the cost
   -- contains a Variable symbol -- a spell with no {X} is not asked (where the
   -- rules leave nothing to choose, don't prompt).
-  ChooseX :: Decider -> PlayerId -> ObjectId -> Natural -> Prompt Natural
-  -- CR 702.42a: whether this player uses the entwine ability of the modal spell
+  ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
+  -- | CR 702.42a: whether this player uses the entwine ability of the modal spell
   -- they are casting -- "You may choose all modes of this spell instead of just
   -- the number specified. If you do, you pay an additional [cost]." The ObjectId
   -- is the spell; the Cost is the ADDITIONAL cost entwining would add on top of
@@ -252,15 +252,15 @@ data Prompt r where
   -- when one of them can't be chosen), and some candidate cost plus this one is
   -- payable. Where the rules leave nothing to ask, don't prompt; where they do,
   -- the engine never decides to pay on the player's behalf.
-  ChooseEntwine :: Decider -> PlayerId -> ObjectId -> Cost -> Prompt EntwineDecision
-  -- CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
+  ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost -> Prompt EntwineDecision.EntwineDecision
+  -- | CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.
   -- The answer is the chosen subset. Prompted before X and targets, and ONLY when
   -- #legal > count; a forced selection is not asked -- which is every entwined
   -- cast, where CR 702.42a's "all modes" leaves no subset to pick.
-  ChooseModes :: Decider -> PlayerId -> ObjectId -> Set ModeIndex -> Natural -> Prompt (Set ModeIndex)
-  -- CR 707.5 / 614.1c / 614.12a: as an object enters AS A COPY (Clone), its
+  ChooseModes :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Set.Set ModeIndex.ModeIndex -> Natural.Natural -> Prompt (Set.Set ModeIndex.ModeIndex)
+  -- | CR 707.5 / 614.1c / 614.12a: as an object enters AS A COPY (Clone), its
   -- controller chooses which permanent to copy. The ObjectId is the entering
   -- object; the [ObjectId] is the legal copy targets (battlefield creatures other
   -- than itself; the engine pre-filters). Nothing is the "may" decline (Clone's
@@ -270,8 +270,8 @@ data Prompt r where
   -- excludes anything entering in the same batch (CR 614.12a: a sibling
   -- entering at the same time is not yet "on the battlefield" when the choice
   -- is made; see Pawl.Engine.Replacement's applyReplacementsIn).
-  ChooseCopyTarget :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Prompt (Maybe ObjectId)
-  -- CR 208.2b / 614.1c: as an object enters, its controller chooses among the
+  ChooseCopyTarget :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- | CR 208.2b / 614.1c: as an object enters, its controller chooses among the
   -- shapes an "as this creature enters, it becomes your choice of ..." ability
   -- offers (Primal Plasma). The ObjectId is the entering object; the answer is an
   -- index into the offered list.
@@ -281,8 +281,8 @@ data Prompt r where
   -- it copied the ABILITY too, makes its own choice on top (CR 616.2).
   --
   -- Asked only when two or more options are offered; one option is not a choice.
-  ChooseEntryOption :: Decider -> PlayerId -> ObjectId -> [EntryOption] -> Prompt Natural
-  -- CR 603.3b: "each player, in APNAP order, puts each triggered ability they
+  ChooseEntryOption :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [EntryOption.EntryOption] -> Prompt Natural.Natural
+  -- | CR 603.3b: "each player, in APNAP order, puts each triggered ability they
   -- control ... on the stack in any order they choose." The [TriggerSource]
   -- is that player's pending triggers, each entry naming what the ability hangs
   -- on, in the engine's canonical order; the answer is a permutation of the entry
@@ -321,8 +321,8 @@ data Prompt r where
   -- triggers whose condition is not another ability triggering, then the rest)
   -- is vacuous while no condition triggers on another ability triggering; this
   -- carries the note, not the machinery.
-  OrderTriggers :: Decider -> PlayerId -> [TriggerSource] -> Prompt [Natural]
-  -- CR 616.1: with two or more applicable replacement or prevention effects in
+  OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerSource.TriggerSource] -> Prompt [Natural.Natural]
+  -- | CR 616.1: with two or more applicable replacement or prevention effects in
   -- the highest non-empty bucket, the affected object's controller (or its owner,
   -- or the affected player) chooses which to apply NEXT -- and then the process
   -- repeats over what is applicable now (616.1f), so this is asked once per
@@ -341,8 +341,8 @@ data Prompt r where
   -- Asked ONLY when the bucket holds two or more candidates that are not all equal
   -- as values: with one there is nothing to choose, and among equal values every
   -- order yields the same board (each still gets its own CR 614.5 opportunity).
-  ChooseReplacement :: Decider -> PlayerId -> [ObjectId] -> Prompt Natural
-  -- CR 603.7c: which of several minted tokens a Create's slot binds -- the "it"
+  ChooseReplacement :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt Natural.Natural
+  -- | CR 603.7c: which of several minted tokens a Create's slot binds -- the "it"
   -- that a delayed triggered ability armed in the same resolution will name
   -- ("Sacrifice it at the beginning of the next end step"). The ObjectId is the
   -- resolving source holding the binding; the NonEmpty is the tokens that were
@@ -370,8 +370,8 @@ data Prompt r where
   --
   -- Asked ONLY when two or more tokens were minted. One token is the whole
   -- candidate set, and where the rules leave nothing to ask, don't prompt.
-  ChooseBoundToken :: Decider -> PlayerId -> ObjectId -> NonEmpty ObjectId -> Prompt ObjectId
-  -- CR 701.21a: which permanents to sacrifice to pay a cost. The ObjectId is the
+  ChooseBoundToken :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 701.21a: which permanents to sacrifice to pay a cost. The ObjectId is the
   -- spell being cast or the permanent whose ability is being activated; the
   -- [ObjectId] is the payer's permanents matching the component's criterion (the
   -- engine pre-filters, in ascending order); the Natural is how many. The answer
@@ -389,8 +389,8 @@ data Prompt r where
   -- Issued once per component and carries no record of what an earlier component
   -- already consumed, so two Sacrifice components of one cost each see the full
   -- candidate list (#112).
-  ChooseSacrifices :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Natural -> Prompt (Set ObjectId)
-  -- CR 701.3a: where an effect that moves an already-attached permanent puts it.
+  ChooseSacrifices :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 701.3a: where an effect that moves an already-attached permanent puts it.
   -- The first ObjectId is the permanent being moved (Crown of the Ages' targeted
   -- Aura); the NonEmpty is the destinations its card text admits.
   --
@@ -412,8 +412,8 @@ data Prompt r where
   --
   -- NonEmpty, not []: the caller does not raise this at all when no destination
   -- exists, and a fallback must be total.
-  ChooseAttachment :: Decider -> PlayerId -> ObjectId -> NonEmpty ObjectId -> Prompt ObjectId
-  -- CR 601.2b: "If the spell has alternative or additional costs that will be
+  ChooseAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 601.2b: "If the spell has alternative or additional costs that will be
   -- paid as it's being cast ... the player announces their intentions to pay any
   -- or all of those costs." Issued after the modes and before X and targets, at
   -- 601.2b's own position. The ObjectId is the spell; the [Cost] is the PAYABLE
@@ -423,8 +423,8 @@ data Prompt r where
   -- CR 118.9b makes an alternative cost optional, so a player who can afford both
   -- is genuinely choosing. Asked ONLY when two or more candidates are payable;
   -- one is forced, and where the rules leave nothing to ask, don't prompt.
-  ChooseCost :: Decider -> PlayerId -> ObjectId -> [Cost] -> Prompt Cost
-  -- CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
+  ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost] -> Prompt Cost.Cost
+  -- | CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
   -- both halves of what a player at a table can see -- how many mulligans they
   -- have already taken, and how many cards taking another would bottom. Those
   -- diverge under CR 103.5c's free first mulligan, which is why the payload is
@@ -436,8 +436,8 @@ data Prompt r where
   -- Carries a Decider like every other player-facing prompt; at game setup
   -- activeControl is Nothing, so it is the player themselves (CR 723 satisfied
   -- for free).
-  DeclareMulligan :: Decider -> PlayerId -> MulliganOffer -> Prompt MulliganDecision
-  -- CR 103.5: after redrawing, put `count` cards from `hand` on the bottom of the
+  DeclareMulligan :: Decider.Decider -> PlayerId.PlayerId -> MulliganOffer.MulliganOffer -> Prompt MulliganDecision.MulliganDecision
+  -- | CR 103.5: after redrawing, put `count` cards from `hand` on the bottom of the
   -- library, in the player's chosen order. The [ObjectId] is the redrawn hand;
   -- the answer is an ordered list of exactly `count` of those ids (first-listed
   -- ends up higher in the library, drawn sooner). Bottom order IS future draw
@@ -445,8 +445,8 @@ data Prompt r where
   -- size), which is why the answer is an ordered list, never a Set. Asked only
   -- when the hand has >= 2 cards; with 0 or 1 there is one possible outcome, and
   -- where the rules leave nothing to ask, don't prompt.
-  Bottom :: Decider -> PlayerId -> [ObjectId] -> Natural -> Prompt [ObjectId]
-  -- CR 103.5b: "If an effect allows a player to perform an action 'any time
+  Bottom :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
+  -- | CR 103.5b: "If an effect allows a player to perform an action 'any time
   -- [that player] could mulligan,' the player may perform that action at a time
   -- they would declare whether they will take a mulligan." The [ObjectId] is the
   -- cards in this player's hand that grant such an action; the answer is which
@@ -466,8 +466,8 @@ data Prompt r where
   --
   -- Not asked when the list is empty; where the rules leave nothing to ask,
   -- don't prompt. Carries a Decider like every other player-facing prompt.
-  MulliganAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
-  -- CR 103.6: an action a card in this player's opening hand lets them take once
+  MulliganAction :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- | CR 103.6: an action a card in this player's opening hand lets them take once
   -- the mulligan process is complete -- "begin the game with it on the
   -- battlefield" (CR 103.6a). The [ObjectId] is the cards in hand offering one;
   -- the answer is which to take, or Nothing to decline.
@@ -481,8 +481,8 @@ data Prompt r where
   -- complete, so an interpreter that could not tell them apart could not answer
   -- either well. Not asked when the list is empty; where the rules leave nothing
   -- to ask, don't prompt.
-  OpeningHandAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
-  -- CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
+  OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- | CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
   -- exercises a printed "may". The ObjectId is the object RESOLVING (the spell,
   -- or the ability object on the stack -- not its source, since two triggers off
   -- one source resolve as two distinct stack objects); the ModeIndex is which of
@@ -506,8 +506,8 @@ data Prompt r where
   -- every optional card in the pool, all of which are single-mode; a MODAL
   -- payload mixing a live mode with a dead optional one would reach this prompt
   -- with nothing to decide (#336).
-  ChooseOptional :: Decider -> PlayerId -> ObjectId -> ModeIndex -> Prompt OptionalDecision
-  -- CR 601.2b: "If a cost that will be paid as the spell is being cast includes
+  ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 601.2b: "If a cost that will be paid as the spell is being cast includes
   -- Phyrexian mana symbols, the player announces whether they intend to pay 2
   -- life or a corresponding colored mana cost for each of those symbols." CR
   -- 118.13a is the rule that puts the choice HERE rather than at payment: it "is
@@ -531,4 +531,4 @@ data Prompt r where
   --
   -- Elided when only one route is payable, where no choice exists -- no source of
   -- the symbol's colour at all, or a life total below CR 119.4's floor.
-  AnnouncePhyrexianPayment :: Decider -> PlayerId -> ObjectId -> Color -> NonEmpty PhyrexianPayment -> Prompt PhyrexianPayment
+  AnnouncePhyrexianPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Color.Color -> NonEmpty.NonEmpty PhyrexianPayment.PhyrexianPayment -> Prompt PhyrexianPayment.PhyrexianPayment

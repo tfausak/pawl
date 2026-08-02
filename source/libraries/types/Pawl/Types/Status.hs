@@ -1,8 +1,8 @@
 module Pawl.Types.Status where
 
-import Pawl.Types.Departure (Departure)
+import qualified Pawl.Types.Departure as Departure
 
 data Status
   = Playing
-  | Departed Departure
+  | Departed Departure.Departure
   deriving (Eq, Ord, Show)

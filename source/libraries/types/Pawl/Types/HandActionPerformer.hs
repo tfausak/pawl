@@ -1,12 +1,12 @@
 module Pawl.Types.HandActionPerformer where
 
-import Pawl.Types.Card (Card)
-import Pawl.Types.Effect (Effect)
-import Pawl.Types.Game (Game)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Game as Game
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 
--- CR 103.5b / CR 103.6: how the closed half performs the effects of an action a
+-- | CR 103.5b / CR 103.6: how the closed half performs the effects of an action a
 -- card grants from a player's HAND before the game begins -- the card that
 -- granted it, the player taking it, and the effects themselves.
 --
@@ -25,4 +25,4 @@ import Pawl.Types.PlayerId (PlayerId)
 -- Deliberately has NO default: "no subgame runner" is a real state of the world
 -- (Resolve.noSubgame), but "no mulligan performer" is not -- it would silently
 -- disable every CR 103.5b card at whichever call site forgot one.
-type HandActionPerformer = ObjectId -> PlayerId -> [Effect Card] -> Game ()
+type HandActionPerformer = ObjectId.ObjectId -> PlayerId.PlayerId -> [Effect.Effect Card.Card] -> Game.Game ()

@@ -1,8 +1,8 @@
 module Pawl.Types.Result where
 
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerId as PlayerId
 
 data Result
-  = Won PlayerId
+  = Won PlayerId.PlayerId
   | Drawn
   deriving (Eq, Ord, Show)

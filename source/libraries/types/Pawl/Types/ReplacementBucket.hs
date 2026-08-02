@@ -1,6 +1,6 @@
 module Pawl.Types.ReplacementBucket where
 
--- CR 616.1a-e: the five ordered buckets the affected player picks from. The
+-- | CR 616.1a-e: the five ordered buckets the affected player picks from. The
 -- HIGHEST non-empty bucket wins, and Ord here is ascending in the CR's own order,
 -- so "highest non-empty" is the minimum present.
 --

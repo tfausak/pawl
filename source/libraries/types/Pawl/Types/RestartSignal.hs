@@ -1,6 +1,6 @@
 module Pawl.Types.RestartSignal where
 
--- CR 727.4: whether a restart has replaced the game underneath the control flow
+-- | CR 727.4: whether a restart has replaced the game underneath the control flow
 -- that is still running.
 --
 -- A restart resolves from the stack, which means it happens several frames deep:

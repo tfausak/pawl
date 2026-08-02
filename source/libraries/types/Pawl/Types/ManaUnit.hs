@@ -1,10 +1,10 @@
 module Pawl.Types.ManaUnit where
 
-import Data.Set (Set)
-import Pawl.Types.ManaType (ManaType)
-import Pawl.Types.ProductionTag (ProductionTag)
+import qualified Data.Set as Set
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ProductionTag as ProductionTag
 
--- One unit of mana in a pool.
+-- | One unit of mana in a pool.
 --
 -- Grows TWO separate collections, and conflating them would be a mistake:
 --
@@ -32,7 +32,7 @@ import Pawl.Types.ProductionTag (ProductionTag)
 -- stamps them, because it is the one place that knows both the source and the
 -- mana.
 data ManaUnit = MkManaUnit
-  { manaType :: ManaType,
-    tags :: Set ProductionTag
+  { manaType :: ManaType.ManaType,
+    tags :: Set.Set ProductionTag.ProductionTag
   }
   deriving (Eq, Ord, Show)

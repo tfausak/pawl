@@ -1,6 +1,6 @@
 module Pawl.Types.EntwineDecision where
 
--- CR 702.42a: a player's answer to "You may choose all modes of this spell
+-- | CR 702.42a: a player's answer to "You may choose all modes of this spell
 -- instead of just the number specified. If you do, you pay an additional
 -- [cost]." One decision, not two: rule 702.42a states the widened mode choice
 -- and the extra payment in a single sentence, so a player who entwines has
