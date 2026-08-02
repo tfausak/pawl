@@ -512,6 +512,38 @@ cardOffendsSharedZoneScope :: Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
   any (\(Count.Type.MkCount scope _ _) -> scopeOffends scope) (cardCounts card)
 
+-- The shared shape of all three ability read lints: every slot an effect of ONE
+-- MODE reads must be bound for that mode, given `abilityBound` -- the slots the
+-- ABILITY binds whichever mode is chosen, which is the only part that differs
+-- between the three.
+--
+-- PER MODE, never through Modal.allEffects and Modal.allTargetSpecs. Those are
+-- unions across every mode, and comparing one union against the other lets a
+-- mode read a slot only ANOTHER mode declares -- unbound at runtime, because
+-- Pawl.Engine.Activate.activateAbility and Pawl.Engine.Engine's trigger placement
+-- both stamp Modal.modesTargetSpecs, the CHOSEN modes' specs alone. CR 700.2c is
+-- the rule: "If a spell or ability targets one or more targets only if a
+-- particular mode is chosen for it, its controller will need to choose those
+-- targets only if they chose that mode" (#570).
+--
+-- Resolve.definedSlots is per mode for the mirror reason: under a ChooseExactly
+-- 1 selection mode B is never resolved alongside mode A, so a token mode A mints
+-- is not there for mode B to read. This is the shape the spell lint's modeOffends
+-- has had all along; these three now match it.
+modalReadOffends :: Set.Set SlotName.SlotName -> Modal.Modal Card.Type.Card -> Bool
+modalReadOffends abilityBound modal =
+  let modeOffends mode =
+        let effects = Foldable.toList (Mode.effects mode)
+            available =
+              Set.unions
+                [ abilityBound,
+                  Resolve.definedSlots effects,
+                  Map.keysSet (Mode.targetSpecs mode)
+                ]
+            wanted = Set.unions (fmap Resolve.slotsOf effects)
+         in not (Set.isSubsetOf wanted available)
+   in any modeOffends (Modal.modes modal)
+
 -- The TRIGGERED-ability half of the D4 dataflow lint: every slot one of a
 -- triggered ability's effects READS must be a slot something binds for that
 -- ability. Without it, an effect naming CR 400.7e's `became` under a condition
@@ -538,20 +570,20 @@ cardOffendsSharedZoneScope card =
 --     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's loser.
 --     The same exemption both existing lints take.
 --   * the ability's own declared target specs (CR 601.2c / 700.2c) are the
---     ordinary chosen targets, unioned across its modes exactly as the
---     delayed-ability lint unions across a card.
+--     ordinary chosen targets -- contributed by modalReadOffends, one MODE's at
+--     a time, so a mode reading a slot only another mode declares is caught.
+--
+-- The first two are what this passes to modalReadOffends as `abilityBound`: they
+-- are stamped for the ability, not for a mode, so every mode gets them.
 triggeredAbilityOffends :: TriggeredAbility.TriggeredAbility Card.Type.Card -> Bool
 triggeredAbilityOffends ability =
-  let effects = Modal.allEffects (TriggeredAbility.modal ability)
-      available =
-        Set.unions
-          [ Set.fromList [Binding.triggerSource, Binding.you],
-            Event.eventBindingSlots (TriggeredAbility.condition ability),
-            Resolve.definedSlots effects,
-            Map.keysSet (Modal.allTargetSpecs (TriggeredAbility.modal ability))
-          ]
-      wanted = Set.unions (fmap Resolve.slotsOf effects)
-   in not (Set.isSubsetOf wanted available)
+  modalReadOffends
+    ( Set.unions
+        [ Set.fromList [Binding.triggerSource, Binding.you],
+          Event.eventBindingSlots (TriggeredAbility.condition ability)
+        ]
+    )
+    (TriggeredAbility.modal ability)
 
 -- The ACTIVATED-ability half of the same lint: every slot one of an
 -- activated ability's effects READS must be a slot the ACTIVATION binds. Without
@@ -569,11 +601,12 @@ triggeredAbilityOffends ability =
 --     the stack is the object whose ability was activated" -- stamped for every
 --     activation, so Longtusk Cub's "put a +1/+1 counter on Longtusk Cub" is a
 --     slot read.
---   * the ability's own declared target specs, unioned across its modes. CR
---     602.2b: "The remainder of the process for activating an ability is
---     identical to the process for casting a spell listed in rules 601.2b-i",
---     which is what routes an activation through CR 601.2c's target
---     announcement.
+--   * the ability's own declared target specs, one MODE's at a time
+--     (modalReadOffends). CR 602.2b: "The remainder of the process for
+--     activating an ability is identical to the process for casting a spell
+--     listed in rules 601.2b-i", which is what routes an activation through CR
+--     601.2c's target announcement -- and CR 700.2c scopes it to the chosen
+--     mode.
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
@@ -602,10 +635,6 @@ triggeredAbilityOffends ability =
 --     Nothing there. Admitting it would exempt a read that silently no-ops,
 --     which is the failure this lint exists to catch.
 --
--- Unions the specs across every mode (Modal.allTargetSpecs) rather than pairing
--- each mode's reads with its own specs, so a mode reading a slot only ANOTHER
--- mode declares passes. The two lints above have the same hole (#570).
---
 -- SCOPE: the abilities that reach Activate. CR 605.3b's mana abilities do not --
 -- one "doesn't go on the stack, so it can't be targeted, countered, or otherwise
 -- responded to. Rather, it resolves immediately after it is activated" -- and
@@ -615,20 +644,11 @@ triggeredAbilityOffends ability =
 -- available side to one is uniformity rather than a claim.
 activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
 activatedAbilityOffends ability =
-  let effects = Modal.allEffects (ActivatedAbility.modal ability)
-      announcedX =
+  let announcedX =
         if declaresVariable (Cost.Type.mana (ActivatedAbility.cost ability))
           then Set.singleton Binding.variableX
           else Set.empty
-      available =
-        Set.unions
-          [ Set.singleton Binding.triggerSource,
-            announcedX,
-            Resolve.definedSlots effects,
-            Map.keysSet (Modal.allTargetSpecs (ActivatedAbility.modal ability))
-          ]
-      wanted = Set.unions (fmap Resolve.slotsOf effects)
-   in not (Set.isSubsetOf wanted available)
+   in modalReadOffends (Set.insert Binding.triggerSource announcedX) (ActivatedAbility.modal ability)
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
@@ -698,6 +718,42 @@ oneEffectActivated mana effect =
           (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.timing = ActivationTiming.AnyTime
+    }
+
+-- One CR 700.2 mode for the fixtures below: the effects it runs and the target
+-- slots it declares. Always mandatory -- no read lint asks about optionality.
+lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card
+lintMode effects slots =
+  Mode.MkMode
+    (Seq.fromList effects)
+    (Map.fromList (fmap (\slot -> (slot, TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) slots))
+    Optionality.Mandatory
+
+-- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
+-- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
+-- helpers cannot express: only a multi-mode ability can have a mode read a slot
+-- that only another mode declares (#570). Kept out of data/cards for the same
+-- reason they are -- a card that offends a lint must not be loadable.
+modalActivated :: [Mode.Mode Card.Type.Card] -> ActivatedAbility.ActivatedAbility Card.Type.Card
+modalActivated modes =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
+      ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.timing = ActivationTiming.AnyTime
+    }
+
+-- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
+-- `abilityBound` -- the condition's event slots and CR 109.5's `you` -- to EVERY
+-- mode rather than only the first.
+modalTrigger ::
+  TriggerCondition.TriggerCondition ->
+  [Mode.Mode Card.Type.Card] ->
+  TriggeredAbility.TriggeredAbility Card.Type.Card
+modalTrigger condition modes =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = condition,
+      TriggeredAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
     }
 
 -- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
@@ -1409,15 +1465,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, a token bound by a Create, or the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
-  -- exiled card). The available side is `cardResolutionEffects` for the reason
-  -- the lint above takes it: the binding effect can live in the ability that
-  -- arms, not only in a spell mode.
+  -- exiled card). The `abilityBound` side is `cardResolutionEffects` for the
+  -- reason the lint above takes it: the binding effect can live in the ability
+  -- that arms, not only in a spell mode.
+  --
+  -- Through modalReadOffends, so a delayed ability with modes is read PER MODE
+  -- (#570) -- and so a mode's own declared target specs count, which this lint
+  -- omitted entirely. CR 603.3d puts a delayed ability on the stack "identical
+  -- to the process for casting a spell listed in rules 601.2c-d", so a slot it
+  -- declares really is announced; declaredTargetSlots already counts delayed
+  -- abilities' specs on the DECLARING side, and this is the matching read side.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
     let cardOffends card =
-          let available = Set.insert Binding.triggerSource (Resolve.definedSlots (cardResolutionEffects card))
-              wanted = Set.unions (fmap Resolve.slotsOf (Card.delayedEffects card))
-           in not (Set.isSubsetOf wanted available)
+          let bound = Set.insert Binding.triggerSource (Resolve.definedSlots (cardResolutionEffects card))
+           in any (modalReadOffends bound . TriggeredAbility.modal) (Map.elems (Card.Type.delayedAbilities card))
         offenders = filter (cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (Card.Type.name . Printing.card) offenders) []
   -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
@@ -1581,6 +1643,49 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Longtusk Cub, Prodigal Sorcerer and Cinder Elemental are all accepted"
       (fmap (any activatedAbilityOffends . Card.Type.activatedAbilities . Printing.card) [longtuskCub, sorcerer, cinderElemental])
       [False, False, False]
+  -- The PER-MODE half of all three read lints (#570), which no sweep above can
+  -- reach: a one-mode ability cannot have a mode read another mode's slot, and
+  -- the pool's only multi-mode ability (Synthetic Modal Activator) has both
+  -- modes declaring the same slot, so per-mode and the old union shape agree on
+  -- every card committed today. Proven here against hand-built offenders.
+  --
+  -- Both halves of the union, because closing one and leaving the other would
+  -- pass this: the declared TARGET slots (CR 700.2c) and the slots an effect
+  -- MINTS (Resolve.definedSlots).
+  Spec.it s "the lint itself catches a mode reading a slot only another mode declares" $ do
+    let creature = SlotName.MkSlotName (Text.pack "creature")
+        victim = SlotName.MkSlotName (Text.pack "victim")
+        exiled = SlotName.MkSlotName (Text.pack "exiled")
+        tap slot = Effect.Tap (ObjectRef.InSlot slot)
+        -- Mode 0 declares `creature` and reads it; mode 1 reads it and declares
+        -- nothing. Under ChooseExactly 1, choosing mode 1 alone stamps mode 1's
+        -- specs -- which is nothing -- so the read is unbound at runtime.
+        crossDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap creature] []]
+        -- The same two reads, each mode declaring the slot it reads.
+        ownDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
+        -- Mode 0 MINTS `exiled` at a MoveToZone's destination; mode 1 reads it.
+        -- The two never resolve together, so mode 1's read is dangling.
+        exileIt = Effect.MoveToZone creature Zone.Exile EntryRiders.defaultValue (Just exiled)
+        crossMinted = modalActivated [lintMode [exileIt] [creature], lintMode [tap exiled] []]
+        ownMinted = modalActivated [lintMode [exileIt, tap exiled] [creature], lintMode [tap victim] [victim]]
+    Spec.assertBool s (activatedAbilityOffends crossDeclared) "a mode reading a slot only another mode declares is rejected"
+    Spec.assertBool s (not (activatedAbilityOffends ownDeclared)) "and each mode reading only what it declares is accepted"
+    Spec.assertBool s (activatedAbilityOffends crossMinted) "a mode reading a slot only another mode mints is rejected"
+    Spec.assertBool s (not (activatedAbilityOffends ownMinted)) "and a mode reading what it mints itself is accepted"
+    -- The ABILITY-scoped side must still reach every mode, not just the first:
+    -- CR 400.7e's `became` is bound by the condition for the whole ability, so a
+    -- SECOND mode reading it is accepted, and a mode reading it under a
+    -- condition that never binds it is rejected however late the mode sits.
+    let returnBecame = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing
+        secondModeReads condition = modalTrigger condition [lintMode [] [], lintMode [returnBecame] []]
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (secondModeReads TriggerCondition.SelfDies)))
+      "the condition's event slots reach a later mode too"
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (secondModeReads TriggerCondition.SelfEnters))
+      "and a later mode is still rejected when the condition binds nothing"
   -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
   -- of them. Rejected rather than guessed (#53).
   Spec.it s "no Create binds a slot while making more than one token" $ do
