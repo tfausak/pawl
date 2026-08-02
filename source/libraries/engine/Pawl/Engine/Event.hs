@@ -657,10 +657,11 @@ sacrifice pid oid = do
 -- not that one is created and then removed, so nothing may be minted and nothing
 -- may be spent getting there -- resolveTokens consumes replacement use counts (CR
 -- 614.3), and burning one on a token that the rules say never existed would be a
--- second, quieter violation. Guarding the parameter rather than the resolved
--- owner is exact today because no producer can move a token's controller as it is
--- created (#69); if CR 616.1b's control-modifying entry replacements ever gain
--- one, this check has to move after them and become a re-check.
+-- second, quieter violation.
+--
+-- Not implemented: the guard reads the PARAMETER, so a CR 616.1b control rewrite
+-- applied by the entry loop below can still hand the finished token to a player
+-- who has left the game (#592). Nothing re-checks after the loop.
 --
 -- Inline rather than a guard delegating to a `createTokensFor` body: the project
 -- writes no export lists, so a second top-level name would be a public door

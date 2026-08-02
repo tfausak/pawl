@@ -829,6 +829,9 @@ apply batch candidate event =
       -- No prompt, and none is owed: CR 616.1b's rewrite has no choice in it,
       -- and the choice the rule DOES describe -- which of several
       -- control-modifying effects to apply -- is `choose`'s, one level up.
+      --
+      -- Not implemented: `you` is not checked against CR 800.4a, so this can
+      -- hand a permanent to a player who has left the game (#592).
       EntryRewrite.UnderSourceControl -> do
         consume (ReplacementCandidate.identity candidate)
         case ReplacementCandidate.controller candidate of
