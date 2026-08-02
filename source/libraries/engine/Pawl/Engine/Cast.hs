@@ -335,8 +335,8 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- card, never through the projection. CR 113.6e is the rule -- "an object's
 -- ability that restricts or modifies how that particular object can be played or
 -- cast functions in any zone from which it could be played or cast and also on
--- the stack" -- which for this pool means a hand, where the CR 613 layer system
--- does not reach. ALL of them must hold, which is what CR 601.3's "no ...
+-- the stack" -- which for this pool means a hand, which pawl's projection does
+-- not reach (#160). ALL of them must hold, which is what CR 601.3's "no ...
 -- prohibits" means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity: Pawl.Engine.Cast is

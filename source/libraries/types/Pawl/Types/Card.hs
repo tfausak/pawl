@@ -58,8 +58,8 @@ data Card = MkCard
     --
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3. The exception is a
-    -- keyword whose ability functions in a zone the CR 613 layer system does not
-    -- reach -- rule 702.34a's flashback, read here by Pawl.Engine.Cast and Pawl.Engine.Cost
+    -- keyword whose ability functions in a zone pawl's projection does not reach
+    -- (#160) -- rule 702.34a's flashback, read here by Pawl.Engine.Cast and Pawl.Engine.Cost
     -- via Pawl.Engine.Keyword while the card sits in a graveyard -- which is the same
     -- carve-out castingPermissions and additionalCosts below already take.
     keywords :: Set.Set Keyword.Keyword,
@@ -143,8 +143,8 @@ data Card = MkCard
     -- castingPermissions precedent. CR 113.6e is the rule that says so in as many
     -- words: "an object's ability that restricts or modifies how that particular
     -- object can be played or cast functions in any zone from which it could be
-    -- played or cast and also on the stack" -- a hand, where the CR 613 layer
-    -- system does not reach.
+    -- played or cast and also on the stack" -- a hand, which pawl's projection
+    -- does not reach (#160).
     --
     -- SELF-scoped and printed-only, which is the whole difference between this
     -- and the other producer CR 601.3's "rule or effect" names. A prohibition

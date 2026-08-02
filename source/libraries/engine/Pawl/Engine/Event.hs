@@ -1535,8 +1535,9 @@ eventTriggers events gs =
       -- it's cycled", the graveyard for every printing today.
       --
       -- Its abilities come from the PRINTED card, not from a projection, for the
-      -- reason Keyword.handAbilitiesOf gives about a hand: CR 613's layer system
-      -- reaches the battlefield, so there is nothing in a graveyard to project.
+      -- reason Keyword.handAbilitiesOf gives about a hand: pawl's projection
+      -- reaches the battlefield only, so there is nothing in a graveyard to
+      -- project (#160).
       -- Rule 702's own minted triggered abilities are not consulted either --
       -- rule 702.70a's poisonous is a permanent's ability, and no keyword mints
       -- one that functions from a graveyard.

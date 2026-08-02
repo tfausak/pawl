@@ -72,8 +72,8 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 --
 -- These three are derived from a card's PRINTED keywords rather than a
 -- projection's post-layer ones, unlike triggeredAbilitiesOf: all three abilities
--- function in the graveyard or on the stack (CR 113.6), where the CR 613 layer
--- system does not reach. entwineCost is read the same way and for the same
+-- function in the graveyard or on the stack (CR 113.6), neither of which pawl's
+-- projection reaches (#160). entwineCost is read the same way and for the same
 -- reason: rule 702.42a says entwine "functions while the spell is on the stack",
 -- and Pawl.Engine.Cast reads it one step earlier still, off a card in a hand.
 

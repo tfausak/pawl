@@ -1409,9 +1409,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ps
     Spec.assertEqWith s "no dangling or unused slots" (fmap (Card.Type.name . Printing.card) offenders) []
   -- The D4 lint above is strictly per mode, so two modes of one card sharing a
-  -- slot NAME pass it. This is the missing half: the promise Modal.allTargetSpecs
-  -- and Modal.modesTargetSpecs make in their own comments -- "slot names unique
-  -- by authoring discipline" -- with something finally checking it (#475). See
+  -- slot NAME pass it. This is the missing half, and the check both
+  -- Modal.allTargetSpecs and Modal.modesTargetSpecs now name in their own
+  -- comments as the thing that lets them union safely (#475). See
   -- cardSlotNamesCollide for what a shared name silently does.
   Spec.it s "no card's modes share a target slot name" $ do
     ps <- S.allPrintings s
@@ -1824,10 +1824,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (fmap (any activatedAbilityOffends . Card.Type.activatedAbilities . Printing.card) [longtuskCub, sorcerer, cinderElemental])
       [False, False, False]
   -- The PER-MODE half of all three read lints (#570), which no sweep above can
-  -- reach: a one-mode ability cannot have a mode read another mode's slot, and
-  -- the pool's only multi-mode ability (Synthetic Modal Activator) has both
-  -- modes declaring the same slot, so per-mode and the old union shape agree on
-  -- every card committed today. Proven here against hand-built offenders.
+  -- reach: a one-mode ability cannot have a mode read another mode's slot at
+  -- all, and every multi-mode ability in the pool (Synthetic Modal Activator's,
+  -- Synthetic Modal Trigger's) has each mode reading only what that mode
+  -- declares, so per-mode and the old union shape agree on every card committed
+  -- today. Proven here against hand-built offenders instead.
   --
   -- Both halves of the union, because closing one and leaving the other would
   -- pass this: the declared TARGET slots (CR 700.2c) and the slots an effect
