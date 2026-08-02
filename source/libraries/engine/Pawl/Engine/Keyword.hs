@@ -50,10 +50,10 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 -- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
 -- matter -- Projection.hasKeyword for an evasion or combat bit, Pawl.Engine.Damage for
 -- infect's and toxic's damage riders -- because the rule states them as static
--- abilities that some rules-core reader already asks about. Rule 702.70 does
--- not: it spells poisonous out as a TRIGGERED ability, in the same words a card
--- would print, so it has to be MINTED and handed to the ordinary CR 603
--- machinery rather than merely consulted.
+-- abilities that some rules-core reader already asks about. Rules 702.70 and
+-- 702.91 do not: they spell poisonous and battle cry out as TRIGGERED abilities,
+-- in the same words a card would print, so those have to be MINTED and handed to
+-- the ordinary CR 603 machinery rather than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -61,16 +61,16 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 --
 -- The abilities are derived from a projection's POST-LAYER keyword counts, so
 -- Humility (LoseAllAbilities, which empties PC.keywords at layer 6) takes rule
--- 702.70a's ability away for free, and an Aura's layer-6 grant adds it for free
--- -- neither needs an arm here.
+-- 702.70a's and rule 702.91a's abilities away for free, and an Aura's layer-6
+-- grant adds them for free -- neither needs an arm here.
 --
 -- triggeredAbilitiesOf's one caller is Pawl.Engine.Event's EVENT scan (eventTriggers).
 -- Rule 702 has no state-triggered (CR 603.8) or delayed (CR 603.7) keyword
 -- ability, so stateTriggers and delayedPending do not consult this; the first
 -- keyword that needs them to is the one that must widen those two scans.
 --
--- Rule 702.34a's flashback is the second minting customer, and the one that
--- shows how wide this voice is: ONE keyword becomes a cost
+-- Rule 702.34a's flashback is the minting customer that shows how wide this
+-- voice is: ONE keyword becomes a cost
 -- (flashbackCost, read by Pawl.Engine.Cost), a casting permission
 -- (castingPermissionsOf, read by Pawl.Engine.Cast) and a replacement effect
 -- (flashbackExile, installed by Pawl.Engine.Cast). Those three readers get ordinary

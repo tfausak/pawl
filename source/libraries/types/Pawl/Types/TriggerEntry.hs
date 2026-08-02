@@ -18,7 +18,8 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- creature each remembers -- and those two really are interchangeable, since
 -- either order gains the same life. Carrying the bindings would make them
 -- distinct on the wire and raise a question with no answer, which is the engine
--- making a player's choice from the other direction.
+-- making a player's choice from the other direction. Such a batch is still
+-- ASKED about rather than elided (#590).
 --
 -- `source` is what the ability hangs on (CR 113.7), or CR 725.2's absence of one.
 -- `ability` is the DISCRIMINATOR (#61): a source with two DISTINCT triggered

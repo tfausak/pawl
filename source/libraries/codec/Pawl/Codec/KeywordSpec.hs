@@ -147,6 +147,11 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       "poisonous 3 is not toxic 3"
   Spec.it s "Infect" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Infect "{\"type\":\"Infect\"}"
+  -- CR 702.91a's battle cry is a triggered ability, but it takes no parameter,
+  -- so it encodes as a bare tag like every other nullary keyword -- what CR
+  -- 702.91b makes multiple is the COUNT the projection keeps, never the value.
+  Spec.it s "BattleCry" $
+    Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.BattleCry "{\"type\":\"BattleCry\"}"
   Spec.it s "Menace" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Menace "{\"type\":\"Menace\"}"
   Spec.it s "Devoid" $

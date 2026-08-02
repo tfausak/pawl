@@ -354,7 +354,7 @@ data Prompt r where
   -- Asked ONLY when the player controls two or more -- with one there is nothing
   -- to choose, and where the rules leave nothing to ask, don't prompt. It is
   -- still asked when the two or more are ALL EQUAL, which ChooseReplacement
-  -- elides (#607): the equality that makes two entries interchangeable holds up
+  -- elides (#590): the equality that makes two entries interchangeable holds up
   -- to their bindings, and nothing here has read those to check.
   --
   -- CR 603.3b's TWO-PART process (first the

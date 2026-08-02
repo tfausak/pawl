@@ -15,6 +15,11 @@
 -- `interveningSpec`. Also Pawl.Engine.Keyword: CR
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousSpec`. CR
+-- 702.91 battle cry, the second such keyword, and with it the CR 603.3b
+-- ordering payload's ability discriminator -- two DISTINCT abilities of one
+-- source, ordered both ways with different boards, and two triggers of the SAME
+-- ability staying indistinguishable, with Hero of Bladehold -- `battleCrySpec`.
+-- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`. CR 400.7e's OTHER reference inside a
 -- look-back trigger, the card it became in the first zone it went to, with
@@ -1452,6 +1457,24 @@ battleCrySpec s registry =
           State.modify' (<> [entries])
           pure (zipWith const [0 ..] entries)
         _ -> pure (S.aggressiveAnswer p)
+      -- Names one of the two entries by WHICH ABILITY it is and puts it first or
+      -- last in the permutation. `cryFirst` is about RESOLUTION: the answer is
+      -- the order the abilities are PUT ON the stack, and the stack is LIFO, so
+      -- the entry named LAST resolves FIRST.
+      --
+      -- This answerer is the discriminator's whole point (#61). Both entries hang
+      -- on the one Hero, so under the source-only payload this replaced there was
+      -- nothing to select on but a blind index -- and an index is not something a
+      -- player can be asked to mean.
+      resolvingFirst :: Bool -> Prompt.Prompt r -> r
+      resolvingFirst cryFirst p = case p of
+        Prompt.OrderTriggers _ _ entries ->
+          let indexed = zip [0 ..] entries
+              isCry entry = TriggerEntry.ability (snd entry) == Keyword.battleCry
+              pick keep = fmap fst (filter ((==) keep . isCry) indexed)
+           in if cryFirst then pick False <> pick True else pick True <> pick False
+        _ -> S.aggressiveAnswer p
+      powersOf oids gs = fmap (`Projection.powerOf` gs) oids
    in Spec.describe s "BattleCry" $ do
         -- CR 702.91b: "If a creature has multiple instances of battle cry, each
         -- triggers separately." So the count is a MULTIPLICITY, exactly as CR
@@ -1478,6 +1501,63 @@ battleCrySpec s registry =
               Spec.assertEqWith s "both hang on the one Hero" (TriggerEntry.source a) (TriggerEntry.source b)
               Spec.assertEqWith s "and exactly one of them is rule 702.91a's battle cry" (length (filter ((==) Keyword.battleCry . TriggerEntry.ability) [a, b])) 1
             other -> Spec.assertFailure s ("expected one ordering payload of two entries, got " <> show (fmap length other))
+        -- The other half of #61: two triggers of the SAME ability must stay
+        -- INDISTINGUISHABLE, or the engine would be asking a question with no
+        -- answer. CR 603.6a fires Soul Warden's ability once per entering
+        -- creature, and Hero of Bladehold's token-maker puts two Soldiers onto
+        -- the battlefield at once, so the second ordering choice of the same
+        -- combat is a pair of entries differing only in which token each
+        -- remembers -- a difference the entry deliberately does not carry.
+        Spec.it s "CR 603.6a two triggers of the SAME ability stay indistinguishable" $ do
+          hero <- S.printingOf s registry "Hero of Bladehold"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          let (gs, _, _) = S.combatBoardOf [hero, soulWarden] []
+              (_, payloads) = State.runState (Engine.runGame recordEntries gs Engine.runStep) []
+          case payloads of
+            [[a, b], [w1, w2]] -> do
+              Spec.assertBool s (a /= b) "the Hero's two abilities are still distinguishable"
+              Spec.assertEqWith s "but the Warden's two triggers are the same ability from the same source" w1 w2
+            other -> Spec.assertFailure s ("expected two ordering payloads of two entries each, got " <> show (fmap length other))
+        -- CR 702.91a's "each OTHER attacking creature", read one word at a time.
+        -- The Piker is another attacking creature and gets +1/+0; the Hero is
+        -- attacking but is not OTHER; the Wall is neither pumped nor an attacker
+        -- at all (CR 702.3b's defender keeps it home), so it fixes that the set
+        -- is attackers rather than "creatures you control".
+        Spec.it s "CR 702.91a each OTHER attacking creature, and nothing else" $ do
+          hero <- S.printingOf s registry "Hero of Bladehold"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wallOfStone <- S.printingOf s registry "Wall of Stone"
+          case S.combatBoardOf [hero, piker, wallOfStone] [] of
+            (gs, [heroId, pikerId, wallId], _) -> do
+              let declared = S.runPure S.aggressiveAnswer gs Engine.runStep
+              Spec.assertEqWith s "the other attacker is +1/+0" (Projection.powerOf pikerId declared) (Just 3)
+              Spec.assertEqWith s "+1/+0 leaves toughness alone" (Projection.toughnessOf pikerId declared) (Just 1)
+              Spec.assertEqWith s "the Hero does not pump itself" (Projection.powerOf heroId declared) (Just 3)
+              Spec.assertEqWith s "and a creature that is not attacking is not pumped" (Projection.powerOf wallId declared) (Just 0)
+            _ -> Spec.assertFailure s "fixture should give alice a Hero, a Piker and a Wall of Stone"
+        -- THE order-matters pair, and the card's own ruling (2011-06-01): "If the
+        -- token-creating ability resolves first, the tokens each get +1/+0 until
+        -- end of turn from the battle cry ability."
+        --
+        -- CR 611.2c is why: "the set of objects it affects is determined when
+        -- that continuous effect begins. After that point, the set won't change."
+        -- So a Soldier that arrives after battle cry has begun is never in the
+        -- set, and one that arrives before it is.
+        Spec.it s "CR 603.3b/702.91a resolving the token-maker first pumps the Soldiers" $ do
+          hero <- S.printingOf s registry "Hero of Bladehold"
+          let (gs, _, _) = S.combatBoardOf [hero] []
+              after = S.runCombat (resolvingFirst False) gs
+          Spec.assertEqWith s "two 2/1 Soldiers" (powersOf (S.tokensOf after) after) [Just 2, Just 2]
+          Spec.assertEqWith s "so bob takes 3 + 2 + 2" (S.lifeOf S.bob after) (Just 13)
+        -- The same board, the same cards, the opposite answer: battle cry
+        -- resolves while the Hero is the only attacker, finds no other attacking
+        -- creature, and the Soldiers arrive afterwards at their printed 1/1.
+        Spec.it s "CR 603.3b/702.91a resolving battle cry first leaves the Soldiers unpumped" $ do
+          hero <- S.printingOf s registry "Hero of Bladehold"
+          let (gs, _, _) = S.combatBoardOf [hero] []
+              after = S.runCombat (resolvingFirst True) gs
+          Spec.assertEqWith s "two 1/1 Soldiers" (powersOf (S.tokensOf after) after) [Just 1, Just 1]
+          Spec.assertEqWith s "so bob takes 3 + 1 + 1" (S.lifeOf S.bob after) (Just 15)
 
 -- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
 -- pay an activation cost of a cycling ability.' These abilities trigger from

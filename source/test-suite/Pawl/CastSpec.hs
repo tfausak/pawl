@@ -439,7 +439,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
@@ -1556,7 +1556,7 @@ castFirstOption p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
@@ -1615,7 +1615,7 @@ castPanglacial p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
