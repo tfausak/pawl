@@ -9,7 +9,6 @@
 module Pawl.Support where
 
 import qualified Control.Exception as Exception
-import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -39,7 +38,6 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
-import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
@@ -104,7 +102,6 @@ import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified System.Directory as Directory
-import qualified System.Random as Random
 
 alice, bob, carol, dave :: PlayerId.PlayerId
 alice = PlayerId.MkPlayerId 0
@@ -176,17 +173,6 @@ cardOf s registry name = do
     Left err -> Spec.assertFailure s (show err)
     Right card -> pure card
 
--- How Pawl.PropertySpec fetches a card. It is tasty-based and QuickCheck-shaped,
--- so it has no spec record to fold a failure into -- but it is also at m ~ IO,
--- where an exception is the ordinary way to fail. That is why the deck loaders
--- take a fetch function rather than a registry: one deck list, two adapters.
-orThrow :: Registry.Registry IO -> String -> IO Printing.Printing
-orThrow registry name = do
-  result <- Registry.named registry name
-  case result of
-    Left err -> Exception.throwIO (userError (show err))
-    Right card -> pure (Printing.MkPrinting card)
-
 redRed :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed fetch = do
   deck <- Cards.redDeck fetch
@@ -198,26 +184,8 @@ greenBlack fetch = do
   black <- Cards.blackDeck fetch
   pure ((alice, green) NonEmpty.:| [(bob, black)])
 
-blueBlack :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
-blueBlack fetch = do
-  blue <- Cards.blueDeck fetch
-  black <- Cards.blackDeck fetch
-  pure ((alice, blue) NonEmpty.:| [(bob, black)])
-
-matchups :: (Monad m) => Cards.Fetch m -> m [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
-matchups fetch = do
-  rr <- redRed fetch
-  gb <- greenBlack fetch
-  bb <- blueBlack fetch
-  -- CR 800.1: the three-seat matchup. Every invariant that holds at two seats
-  -- must hold at three, and this is the cheapest possible broad falsifier for
-  -- that -- one list entry buys a whole played-out three-player game per seed.
-  tw <- threeWayMirror fetch
-  pure [rr, gb, bb, tw]
-
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
--- only loss condition reachable is CR 704.5b deck-out. Used by the durable
--- lands-only-decks property.
+-- only loss condition reachable is CR 704.5b deck-out. EngineSpec plays it out.
 landsOnly :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 landsOnly fetch = do
   mountain <- fetch "Mountain"
@@ -414,6 +382,21 @@ aggressiveAnswer p = case p of
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
+-- castAnswer's actions with aggressiveAnswer's combat: plays lands and casts
+-- what it can afford, then attacks with everything and blocks with everything.
+-- Neither half drives a game through combat on its own -- castAnswer never
+-- declares an attacker, and aggressiveAnswer never takes an action, so it never
+-- puts a creature onto the battlefield to attack with.
+--
+-- The two agree on every other prompt, so castAnswer is this answerer's exact
+-- paired control: the same game with combat switched off, and the only
+-- difference between the two is CR 508/509's declarations. EngineSpec's
+-- whole-game combat case is that pair.
+fightAnswer :: Prompt.Prompt r -> r
+fightAnswer p = case p of
+  Prompt.ChooseAction {} -> castAnswer p
+  _ -> aggressiveAnswer p
+
 -- Answers Prompt.ChooseDefender with `who` and everything else with
 -- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
 -- defending-player fixtures. Its own type is the ordinary rank-1 `forall r.
@@ -485,194 +468,6 @@ playLandAnswer p = case p of
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
-
--- A StdGen-driven interpreter: random shuffle and random legal action.
-randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
-randomAnswer p = case p of
-  Prompt.Concede _ -> pure Concession.Continues
-  -- CR 507.1: the one interpreter with a real generator, so the defending-player
-  -- choice is a genuine draw rather than the head of the list. S.pickFrom keeps
-  -- an out-of-range draw total.
-  Prompt.ChooseDefender _ _ candidates -> do
-    g <- State.get
-    let players = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length players - 1) g
-    State.put g'
-    pure (pickFrom candidates i)
-  -- Same shape for mana sources: a random legal source, so a random game that
-  -- mixes a creature mana source with lands really does explore both (#12).
-  Prompt.ChooseManaSource _ _ candidates -> do
-    g <- State.get
-    let sources = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length sources - 1) g
-    State.put g'
-    pure (pickFrom candidates i)
-  -- And the same for WHICH yield a source with several makes, so a random game
-  -- exercises every colour an any-colour source can produce.
-  Prompt.ChooseManaYield _ _ _ candidates -> do
-    g <- State.get
-    let yields = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length yields - 1) g
-    State.put g'
-    pure (pickFrom candidates i)
-  -- CR 701.34a: a random subset of each offered list, so a random game explores
-  -- proliferating and declining alike -- "any number" includes none and all.
-  Prompt.ChooseProliferate _ _ oids pids -> do
-    g <- State.get
-    let (howManyObjects, g') = Random.uniformR (0, length oids) g
-        (howManyPlayers, g'') = Random.uniformR (0, length pids) g'
-    State.put g''
-    pure (Set.fromList (take howManyObjects oids), Set.fromList (take howManyPlayers pids))
-  -- CR 704.5j: a random survivor, so a random game does not always keep the
-  -- oldest legend.
-  Prompt.ChooseLegend _ _ candidates -> do
-    g <- State.get
-    let legends = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length legends - 1) g
-    State.put g'
-    pure (pickFrom candidates i)
-  Prompt.DeclareAttackers _ _ ids -> do
-    g <- State.get
-    let (keep, g') = Random.uniformR (0, length ids) g
-    State.put g'
-    pure (take keep ids)
-  -- CR 508.1b: a random target, so a random game with a planeswalker on the
-  -- defending side explores attacking it as well as its controller (the
-  -- ChooseDefender posture).
-  Prompt.ChooseAttackTarget _ _ _ options -> do
-    g <- State.get
-    let targets = NonEmpty.toList options
-        (i, g') = Random.uniformR (0, length targets - 1) g
-    State.put g'
-    pure (pickFrom options i)
-  Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
-    [] -> pure Map.empty
-    a : _ -> do
-      g <- State.get
-      let (keep, g') = Random.uniformR (0, length mine) g
-      State.put g'
-      pure (Map.fromList (fmap (\b -> (b, a)) (take keep mine)))
-  -- The damage division stays canonical rather than random: a random division
-  -- would usually be illegal (it must total the attacker's power), and this
-  -- property suite is not the place to test the rejection path.
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    pure $ case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.Shuffle ids -> do
-    g <- State.get
-    let (g1, g2) = Random.splitGen g
-    State.put g2
-    pure (shuffleWith g1 ids)
-  -- CR 729.2: the one interpreter that carries actual randomness, so this is the
-  -- one that answers the first-player roll with a real draw rather than the head
-  -- of the order.
-  Prompt.RandomFirstPlayer order -> do
-    g <- State.get
-    let players = NonEmpty.toList order
-        (i, g') = Random.uniformR (0, length players - 1) g
-    State.put g'
-    pure (pickFrom order i)
-  Prompt.ChooseDiscard _ _ ids n -> pure (List.genericTake n ids)
-  Prompt.ChooseAction _ _ actions -> do
-    g <- State.get
-    let n = length actions
-        (i, g') = Random.uniformR (0, max 0 (n - 1)) g
-    State.put g'
-    pure (pick actions (min (n - 1) (max 0 i)))
-  Prompt.ChooseTargets _ _ _ sets ->
-    let pickFromSet s = do
-          g <- State.get
-          let xs = Set.toList s
-              (i, g') = Random.uniformR (0, max 0 (length xs - 1)) g
-          State.put g'
-          pure $ case drop (min (max 0 i) (max 0 (length xs - 1))) xs of
-            h : _ -> Just h
-            [] -> Nothing
-     in fmap (Map.mapMaybe id) (traverse pickFromSet sets)
-  Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
-  Prompt.SearchLibrary {} -> pure Nothing
-  Prompt.CastWhileSearching {} -> pure Nothing
-  -- A small bounded X (0..3) so a variable-cost spell sometimes chooses nonzero,
-  -- exercising substituteX under random play; payment rejects an unaffordable draw.
-  Prompt.ChooseX {} -> do
-    g <- State.get
-    let (i, g') = Random.uniformR (0 :: Int, 3) g
-    State.put g'
-    pure (Int.toNaturalSaturating i)
-  -- A deterministic prefix of the legal modes, keeping replay simple (the
-  -- brief permits this in place of a genuinely random size-`count` subset).
-  Prompt.ChooseModes _ _ _ legal count ->
-    pure (Set.fromList (List.genericTake count (Set.toAscList legal)))
-  Prompt.ChooseCopyTarget {} -> pure Nothing
-  Prompt.ChooseEntryOption {} -> pure 0
-  Prompt.OrderTriggers _ _ sources -> pure (zipWith const [0 ..] sources)
-  Prompt.ChooseReplacement {} -> pure 0
-  -- CR 603.7c: a random minted token, so a random game does not always bind the
-  -- first one a doubled Create produced.
-  Prompt.ChooseBoundToken _ _ _ candidates -> do
-    g <- State.get
-    let tokens = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length tokens - 1) g
-    State.put g'
-    pure (pickFrom candidates i)
-  -- CR 701.3a: a random destination, so a random game does not always move an
-  -- Aura onto the first permanent offered.
-  Prompt.ChooseAttachment _ _ _ candidates -> do
-    g <- State.get
-    let destinations = NonEmpty.toList candidates
-        (i, g') = Random.uniformR (0, length destinations - 1) g
-    State.put g'
-    pure (pickFrom candidates i)
-  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (List.genericTake count candidates))
-  Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
-  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> pure (List.genericTake count hand)
-  Prompt.MulliganAction {} -> pure Nothing
-  Prompt.OpeningHandAction {} -> pure Nothing
-  -- CR 603.5: a random answer, so a random game exercises both taking and
-  -- declining a printed "may" (the ChooseProliferate posture).
-  Prompt.ChooseOptional {} -> do
-    g <- State.get
-    let (takeIt, g') = Random.uniform g
-    State.put g'
-    pure (if takeIt then OptionalDecision.Exercises else OptionalDecision.Declines)
-  -- CR 118.13a: deterministic rather than random, the ChooseSacrifices and
-  -- ChooseCost posture -- no Phyrexian card is in any deck Pawl.Cards builds, so
-  -- a random draw here would explore nothing and only complicate replay.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> pure EntwineDecision.Declines
-
--- Total index into a non-empty run of candidates -- a turn order, the tokens one
--- Create minted: an out-of-range draw falls back to the head, which the NonEmpty
--- guarantees exists (no partial functions).
-pickFrom :: NonEmpty.NonEmpty a -> Int -> a
-pickFrom order i = case drop i (NonEmpty.toList order) of
-  h : _ -> h
-  [] -> NonEmpty.head order
-
--- Total index into a list; the engine always offers at least Pass, so the
--- fallback is unreachable in practice but keeps this free of partial functions.
-pick :: [A.Action] -> Int -> A.Action
-pick actions i = case drop i actions of
-  h : _ -> h
-  [] -> A.Pass
-
-shuffleWith :: Random.StdGen -> [a] -> [a]
-shuffleWith g xs =
-  let unfoldInts :: Random.StdGen -> [Int]
-      unfoldInts gen = let (v, gen') = Random.uniform gen in v : unfoldInts gen'
-      insertByKey y ys = case ys of
-        [] -> [y]
-        z : zs -> if fst y <= fst z then y : z : zs else z : insertByKey y zs
-      keys = zipWith const (unfoldInts g) xs
-   in fmap snd (foldr insertByKey [] (zip keys xs))
-
-runRandomGame :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> Int -> GameState.GameState
-runRandomGame matchup s =
-  snd (State.evalState (Engine.runMatch randomAnswer matchup) (Random.mkStdGen s))
 
 -- Any printing, on the battlefield under pid's control, untapped and Settled.
 addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)

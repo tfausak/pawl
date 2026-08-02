@@ -625,10 +625,8 @@ test-suite pawl-test-suite
     pawl:slug,
     pawl:spec,
     pawl:types,
-    random ^>=1.3.1,
     tasty ^>=1.5.4,
     tasty-hunit ^>=0.10.2,
-    tasty-quickcheck ^>=0.11.1,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
@@ -656,6 +654,7 @@ test-suite pawl-test-suite
     Pawl.DamageSpec
     Pawl.DecideSpec
     Pawl.DepartureSpec
+    Pawl.EngineSpec
     Pawl.EventSpec
     Pawl.ExpirySpec
     Pawl.FilterSpec
@@ -667,7 +666,6 @@ test-suite pawl-test-suite
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec
-    Pawl.PropertySpec
     Pawl.RegistrySpec
     Pawl.ReplacementSpec
     Pawl.ReplaySpec

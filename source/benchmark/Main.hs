@@ -237,9 +237,9 @@ fighting deck n =
 
 -- The redDeck recipe (name -> count), loaded from the registry -- the proof
 -- that files -> parse -> a real game works end-to-end.
--- The benchmark is at IO and has no spec record, so an unloadable card is an
--- exception -- the same posture Pawl.Support.orThrow takes for the property
--- tests.
+-- The benchmark is at IO and has no spec record to fold a failure into, so an
+-- unloadable card is an exception. Pawl.Support.printingOf is the spec-side
+-- adapter for the same Pawl.Cards deck lists.
 fetchOrThrow :: Registry.Registry IO -> String -> IO Printing.Printing
 fetchOrThrow registry name = do
   result <- Registry.named registry name
