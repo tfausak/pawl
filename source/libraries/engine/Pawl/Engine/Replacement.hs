@@ -1203,10 +1203,11 @@ installTurnSkips entry gs =
                   ActiveReplacement.source = ExtraTurn.source entry,
                   -- CR 109.5's "you" for this row. Nothing reads it: a PhaseR
                   -- names its player outright (PhasePattern.whosePhase) and has
-                  -- no ControllerRelation to resolve. The taker is the honest
-                  -- answer anyway -- CR 500.7's skips belong to the turn, and
-                  -- the effect that created it is long gone by the time the turn
-                  -- begins (see applyReplacementsIn on why that matters).
+                  -- no ControllerRelation to resolve. The TAKER rather than the
+                  -- effect's controller, because these skips ride the turn (see
+                  -- Pawl.Types.ExtraTurn) and the effect that created it is long
+                  -- gone by the time the turn begins -- Projection.controllerOf
+                  -- on ExtraTurn.source would answer Nothing here.
                   ActiveReplacement.controller = ExtraTurn.taker entry,
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.AtCleanup,
