@@ -1479,10 +1479,11 @@ battleCrySpec s registry =
         -- CR 702.91b: "If a creature has multiple instances of battle cry, each
         -- triggers separately." So the count is a MULTIPLICITY, exactly as CR
         -- 702.70b makes poisonous' one -- the falsifier is a mint that collapses
-        -- the count to a single ability. No card in the pool prints battle cry
-        -- twice and nothing grants it, so this is where the rule is reachable
-        -- (#61 covers the ORDERING of the pair, which two equal abilities leave
-        -- with nothing to distinguish and nothing to ask).
+        -- the count to a single ability. Asked of the mint directly rather than
+        -- of a board, unlike poisonous' own gameplay-level pair: no card in this
+        -- pool prints battle cry twice, and nothing here grants it, so a second
+        -- instance is not reachable through play (Snake Cult Initiation is what
+        -- makes it reachable for poisonous).
         Spec.it s "CR 702.91b each instance of battle cry is its own ability" $ do
           Spec.assertEqWith s "battle cry held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.BattleCry 2)) [Keyword.battleCry, Keyword.battleCry]
           Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.BattleCry 1)) [Keyword.battleCry]
@@ -1511,13 +1512,14 @@ battleCrySpec s registry =
         Spec.it s "CR 603.6a two triggers of the SAME ability stay indistinguishable" $ do
           hero <- S.printingOf s registry "Hero of Bladehold"
           soulWarden <- S.printingOf s registry "Soul Warden"
-          let (gs, _, _) = S.combatBoardOf [hero, soulWarden] []
-              (_, payloads) = State.runState (Engine.runGame recordEntries gs Engine.runStep) []
-          case payloads of
-            [[a, b], [w1, w2]] -> do
-              Spec.assertBool s (a /= b) "the Hero's two abilities are still distinguishable"
-              Spec.assertEqWith s "but the Warden's two triggers are the same ability from the same source" w1 w2
-            other -> Spec.assertFailure s ("expected two ordering payloads of two entries each, got " <> show (fmap length other))
+          case S.combatBoardOf [hero, soulWarden] [] of
+            (gs, [_, wardenId], _) -> case snd (State.runState (Engine.runGame recordEntries gs Engine.runStep) []) of
+              [[a, b], [w1, w2]] -> do
+                Spec.assertBool s (a /= b) "the Hero's two abilities are still distinguishable"
+                Spec.assertEqWith s "the second choice is the Warden's" (TriggerEntry.source w1) (TriggerSource.OfObject wardenId)
+                Spec.assertEqWith s "and its two triggers are the same ability from the same source" w1 w2
+              other -> Spec.assertFailure s ("expected two ordering payloads of two entries each, got " <> show (fmap length other))
+            _ -> Spec.assertFailure s "fixture should give alice a Hero and a Soul Warden"
         -- CR 702.91a's "each OTHER attacking creature", read one word at a time.
         -- The Piker is another attacking creature and gets +1/+0; the Hero is
         -- attacking but is not OTHER; the Wall is neither pumped nor an attacker

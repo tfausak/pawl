@@ -341,10 +341,11 @@ data Prompt r where
   -- Hero of Bladehold's battle cry (CR 702.91a) and its printed token-maker both
   -- fire on one CR 508.1 declaration, and the order decides whether the tokens
   -- are pumped -- and the two entries differ. Two triggers of the SAME ability
-  -- (a Soul Warden watching two creatures enter, CR 603.6a) stay equal, which is
-  -- right: any permutation among them gives the same board, so there would be
-  -- nothing to ask. See Pawl.Types.TriggerEntry for why the ability VALUE is the
-  -- discriminator rather than an ordinal, and why the bindings are left out.
+  -- (a Soul Warden watching two creatures enter, CR 603.6a) stay EQUAL, which is
+  -- the other half of the same requirement: over-discriminating them would raise
+  -- a question whose answers name the same abilities in the same roles. See
+  -- Pawl.Types.TriggerEntry for why the ability VALUE is the discriminator
+  -- rather than an ordinal, and why the bindings are left out.
   --
   -- CR 725.2's pair is covered by the same field: its two abilities share one
   -- controller and one (absent) source, and differ as values. Unreachable today
@@ -565,14 +566,14 @@ data Prompt r where
   -- measured at CR 601.2f's TOTAL and not at the printed cost, which is what keeps
   -- that promise in the presence of a cost increase or reduction (ManaSpec's
   -- "CR 601.2f a reduction opens the coloured-mana route, so the announcement is
-  -- asked"). Two symbols of the SAME colour ask two identical questions, which is
-  -- sound where it would not be for OrderTriggers (#61): the answers are
-  -- interchangeable, since both symbols demand the same mana and the same 2 life,
-  -- so the pair of answers is all that is observable and which prompt got which is
-  -- not. That is what OrderTriggers could NOT say of two entries from one source
-  -- until it carried an ability (#61), and what ChooseReplacement still cannot
-  -- say of two entries from one source (#74). Dismember ({1}{B/P}{B/P}) is the
-  -- card that asks them.
+  -- asked"). Two symbols of the SAME colour ask two identical questions, and that
+  -- is sound HERE for a reason the identical-looking entries elsewhere have to
+  -- earn: the answers are interchangeable, since both symbols demand the same
+  -- mana and the same 2 life, so the pair of answers is all that is observable
+  -- and which prompt got which is not. OrderTriggers could not say that of two
+  -- entries from one source until its entry carried an ability (#61), and
+  -- ChooseReplacement still cannot (#74). Dismember ({1}{B/P}{B/P}) is the card
+  -- that asks them.
   --
   -- Elided when only one route is payable, where no choice exists -- no source of
   -- the symbol's colour at all, or a life total below CR 119.4's floor.

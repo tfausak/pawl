@@ -457,9 +457,9 @@ poisonous n =
 -- The tokens Hero of Bladehold's SECOND ability puts onto the battlefield
 -- attacking are in the set or not according to WHEN this resolves, and that is
 -- the whole of CR 603.3b's ordering choice: CR 611.2c fixes the affected set as
--- the effect begins, so a token that arrives afterwards is not pumped. Pawl.TriggerSpec's
--- "CR 603.3b/702.91a resolving the token-maker first pumps the Soldiers"
--- is the pair of tests that proves both directions.
+-- the effect begins, so a token that arrives afterwards is not pumped.
+-- Pawl.TriggerSpec's two "CR 603.3b/702.91a resolving ..." cases prove both
+-- directions, and they differ in the board they leave behind.
 --
 -- Single mode, no targets, ChooseExactly 1 -- so nothing is asked as the ability
 -- is placed, which is right because rule 702.91a leaves nothing to choose.
