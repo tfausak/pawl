@@ -1,6 +1,9 @@
--- CR 605.1a's classification of an EFFECT: does it add mana, and how is its type
--- decided? One function, extracted from Pawl.Engine.Resolve so that
--- Pawl.Engine.Mana no longer has to import the resolver to ask it.
+-- One of CR 605.1a's three criteria, asked of an EFFECT: could it add mana, and
+-- how is its type decided? The ABILITY-level classification that rule actually
+-- defines is Pawl.Engine.Mana.isManaAbility, which folds this over an ability's
+-- effects and adds the no-target and not-a-loyalty-ability clauses. Extracted from
+-- Pawl.Engine.Resolve so that Pawl.Engine.Mana no longer has to import the
+-- resolver to ask it.
 --
 -- That import was an INVERTED edge, and removing it is what lets
 -- Pawl.Engine.Combat pay CR 508.1j's cost to attack: Pawl.Engine.Resolve is a

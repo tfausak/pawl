@@ -1,13 +1,17 @@
--- CR 508.1d / 508.1h / 613.11: the continuous effects that make ATTACKING COST
+-- CR 508.1c / 508.1h / 613.11: the continuous effects that make ATTACKING COST
 -- something. The fifth module on the axis CR 613.11 reaches past the layer system
 -- -- Pawl.Engine.PlayerEffect answers rules questions about a PLAYER,
 -- Pawl.Engine.BlockRequirement the one CR 509.1c asks about a pair of CREATURES,
 -- Pawl.Engine.AttackRequirement the one CR 508.1d asks about a single one,
 -- Pawl.Engine.CombatRestriction the two CR 508.1c and CR 509.1b ask about a single
--- one, and this the one CR 508.1d's cost clause asks about a creature AND what it
--- is attacking. None is a layer, and Pawl.Engine.Projection sees none of them --
--- CR 613.11 applies all five "after all other continuous effects have been
--- applied".
+-- one, and this the one CR 508.1h asks about a creature AND what it is attacking.
+-- None is a layer, and Pawl.Engine.Projection sees none of them -- CR 613.11
+-- applies all five "after all other continuous effects have been applied".
+--
+-- The second argument is what makes this module's question wider than its
+-- siblings', and it comes from the CARD read through CR 508.1b's announcement --
+-- Ghostly Prison says "attacking YOU" -- rather than from any rule about costs.
+-- CR 508.1h prices a declaration; which attacks are in it is 508.1b's answer.
 --
 -- This module is the only reader of Pawl.Types.AttackCost. Pawl.Engine.Combat asks
 -- for an AMOUNT OF MANA -- what does this declaration owe, and could this creature
@@ -28,8 +32,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import Pawl.Types.ObjectId (ObjectId)
 
--- CR 508.1d's cost clause read for ONE announced attack: what must this
--- creature's controller pay for it to attack THAT target? One entry per printed
+-- CR 508.1h read for ONE announced attack: what must this creature's controller
+-- pay for it to attack THAT target? One entry per printed
 -- cost in force, unpooled, because CR 508.1h totals them and this is what it
 -- totals.
 --

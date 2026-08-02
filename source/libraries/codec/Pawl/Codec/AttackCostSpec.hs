@@ -14,8 +14,8 @@ spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   -- Ghostly Prison's shape: the subject is every creature (Affected.Matching over
   -- a bare card type, since only a creature can be declared as an attacker), and
-  -- the cost is ONE attacker's share -- CR 508.1h multiplies it by how many taxed
-  -- attackers the declaration holds.
+  -- the cost is ONE attacker's share -- Ghostly Prison's "for each" repeats it per
+  -- taxed attacker, and CR 508.1h totals what that comes to.
   Spec.describe s "Pawl.Codec.AttackCost" . Spec.it s "MkAttackCost" $
     Common.assertJsonCodec
       s

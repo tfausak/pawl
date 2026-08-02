@@ -225,7 +225,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
     Spec.it s "combatRestrictions (CR 508.1c/509.1b) defaults to the empty list" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.combatRestrictions <$> Card.fromJson v) (Right [])
-    Spec.it s "attackCosts (CR 508.1d) defaults to the empty list" $ do
+    Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.attackCosts <$> Card.fromJson v) (Right [])
     Spec.it s "additionalCosts (CR 118.8) defaults to the empty list" $ do

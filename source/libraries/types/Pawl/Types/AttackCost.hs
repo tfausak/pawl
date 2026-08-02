@@ -3,12 +3,15 @@ module Pawl.Types.AttackCost where
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.ManaCost as ManaCost
 
--- | CR 508.1d's cost clause: one printed COST TO ATTACK -- the thing that rule
--- means by "if a creature can't attack unless a player pays a cost, that player
--- is not required to pay that cost, even if attacking with that creature would
--- increase the number of requirements being obeyed". Ghostly Prison's "creatures
+-- | CR 508.1c / CR 508.1h: one printed COST TO ATTACK. Ghostly Prison's "creatures
 -- can't attack you unless their controller pays {2} for each creature they
--- control that's attacking you".
+-- control that's attacking you" -- which CR 508.1c classifies as a RESTRICTION,
+-- the second arm of its parenthetical ("effects that say a creature can't attack,
+-- OR THAT IT CAN'T ATTACK UNLESS SOME CONDITION IS MET"), whose condition CR
+-- 508.1h-508.1j then determine and pay. It is also the thing CR 508.1d's cost
+-- clause is about: "if a creature can't attack unless a player pays a cost, that
+-- player is not required to pay that cost, even if attacking with that creature
+-- would increase the number of requirements being obeyed".
 --
 -- The SIXTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
@@ -20,18 +23,21 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- PlayerScope names PLAYERS, where this names a creature. That argument is not
 -- repeated; only what is different is.
 --
--- What is different is that this is NOT an arm of Pawl.Types.CombatRestriction,
--- which is the carrier it reads most like. Pawl.Engine.CombatRestriction.cantAttack
--- answers "which of these creatures may not attack AT ALL", and
--- Pawl.Engine.Combat.canAttackGiven drops every such creature from CR 508.1a's
--- candidate list. A creature under a Ghostly Prison is not one of them: it CAN
--- attack, and does so the moment CR 508.1j's payment is made. Folding this into
--- that type would either strike a payable attacker off the candidate list or
--- teach that type's set-shaped answer a cost it has nowhere to put.
+-- What is different is that this is a SECOND carrier for one rule.
+-- Pawl.Types.CombatRestriction holds CR 508.1c's first arm and states outright
+-- that "neither arm carries a condition, so the second clause is unrepresentable
+-- (#534)"; this type is that second clause, narrowed to the one condition CR
+-- 508.1h can price. The split is pawl's and not the rules': at the CR's own level
+-- Ghostly Prison is a 508.1c restriction like Pacifism, and 508.1g-508.1j is the
+-- machinery for meeting its condition rather than a category beside it.
 --
--- The rules keep them apart in the same place: CR 508.1c's restrictions are
--- checked, and then CR 508.1h-508.1j determine and pay "the total cost to attack"
--- as steps of their own.
+-- The split is forced by what the other carrier's ANSWER is.
+-- Pawl.Engine.CombatRestriction.cantAttack returns "which of these creatures may
+-- not attack AT ALL", and Pawl.Engine.Combat.canAttackGiven drops every such
+-- creature from CR 508.1a's candidate list. A creature under a Ghostly Prison is
+-- not one of them: it CAN attack, and does so the moment CR 508.1j's payment is
+-- made. Folding this into that type would either strike a payable attacker off
+-- the candidate list or teach a set of ids a cost it has nowhere to put.
 --
 -- The "YOU" is IMPLICIT and is the source's controller, CR 109.5 ("the words
 -- 'you' and 'your' on an object refer to the object's controller ... For a static
@@ -69,9 +75,9 @@ data AttackCost = MkAttackCost
     -- | What ONE taxed attacker costs -- Ghostly Prison's "{2} for each creature
     -- they control that's attacking you". The rule's own multiplication: CR
     -- 508.1h's total cost to attack is this repeated once per taxed attacker, so
-    -- a declaration of three creatures owes {6}. Ghostly Prison's Two-Headed
-    -- Giant ruling states the same arithmetic from the other end ("you still only
-    -- have to pay once per creature").
+    -- a declaration of three creatures owes {6}. CR 508.1h itself only TOTALS
+    -- ("the active player determines the total cost to attack"); the multiplying
+    -- is the card's own "for each", and this field is the thing being multiplied.
     --
     -- FIXED, so a share that counts the board is unrepresentable: Collective
     -- Restraint's "{X} ... where X is the number of basic land types among lands

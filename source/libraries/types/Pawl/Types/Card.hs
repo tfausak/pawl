@@ -243,7 +243,7 @@ data Card = MkCard
     -- fields: Pawl.Types.CombatRestriction argues why the axis that split those is
     -- absent here.
     combatRestrictions :: [CombatRestriction.CombatRestriction],
-    -- | CR 604.1/604.2 / 508.1d: this card's printed COSTS TO ATTACK --
+    -- | CR 604.1/604.2 / 508.1c / 508.1h: this card's printed COSTS TO ATTACK --
     -- "creatures can't attack you unless their controller pays {2} for each
     -- creature they control that's attacking you" (Ghostly Prison). The SIXTH
     -- printed-static-ability field; read by Pawl.Engine.AttackCost and never by

@@ -28,12 +28,14 @@ import qualified Pawl.Types.Affected as Affected
 -- distinguishes them is which declaration they forbid. Splitting them into two
 -- carriers would copy the requirements' shape without the reason for it.
 --
--- A restriction a player may PAY THROUGH is not one of these at all. Ghostly
--- Prison's "creatures can't attack you unless their controller pays {2} ..." is
--- CR 508.1d's cost clause and rides Pawl.Types.AttackCost, the SIXTH carrier,
--- whose header argues the split: this type's answer is a set of creatures that
--- may not attack, and CantAttack takes its subject off CR 508.1a's candidate list
--- entirely, where a taxed creature has to stay on it.
+-- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same --
+-- Ghostly Prison's "creatures can't attack you unless their controller pays
+-- {2} ..." is the second arm of the parenthetical below -- but it rides
+-- Pawl.Types.AttackCost, the SIXTH carrier, rather than this type. The split is
+-- pawl's, not the rules': this type's answer is a SET OF CREATURES that may not
+-- attack, and CantAttack takes its subject off CR 508.1a's candidate list
+-- entirely, where a taxed creature has to stay on it. That carrier's header
+-- argues it in full.
 --
 -- The axis is missing rather than collapsed, and the missing capabilities are
 -- named: an attacking restriction with an object (Crown-Hunter Hireling's "can't
@@ -48,7 +50,9 @@ import qualified Pawl.Types.Affected as Affected
 -- Only the FIRST half of each rule's parenthetical is stated. CR 508.1c and CR
 -- 509.1b each read "effects that say a creature can't attack, or that it can't
 -- attack unless some condition is met", and neither arm carries a condition, so
--- the second clause is unrepresentable (#534).
+-- the second clause is unrepresentable HERE (#534). The one shape of it that has
+-- a carrier is the condition "unless a player pays a cost", on
+-- Pawl.Types.AttackCost.
 --
 -- Open-half card data, classified rather than identified: Pawl.Engine.CombatRestriction
 -- is the only module that may case on it, exactly as Pawl.Engine.Cast is the only
@@ -57,7 +61,7 @@ import qualified Pawl.Types.Affected as Affected
 -- -- and not on an effect's identity.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, the
--- posture all four siblings take -- so a Pacifism leaving the battlefield lifts
+-- posture all five siblings take -- so a Pacifism leaving the battlefield lifts
 -- its restriction with nothing to unwind.
 data CombatRestriction
   = -- | CR 508.1c: these creatures can't attack. Pacifism's first half, and the
