@@ -526,6 +526,84 @@ lifelinkSpec s registry =
       Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice after) (Just 20)
       Spec.assertEqWith s "and the 1/1 dealt just one" (S.lifeOf S.bob after) (Just 19)
 
+-- CR 608.2h / 702.2e / 702.15c / 702.90d: a source that has already CEASED still
+-- deals damage with the riders it last had. All three keyword rules carry the
+-- same sentence -- "If an object is no longer in the zone it's expected to be in
+-- as an effect causes it to deal damage, its last known information is used to
+-- determine whether it had [the keyword]" -- and CR 608.2h is the general form.
+--
+-- Ghitu Fire-Eater is the producer: "{T}, Sacrifice this creature: It deals
+-- damage equal to its power to any target" pays a cost that removes the very
+-- object the riders are read off, so by resolution its id names nothing.
+-- Pawl.ActivateSpec's LastKnownInformation group proves the AMOUNT already
+-- survives that (Quantity.Power goes through Projection.viewWithLastKnown); this
+-- group is the riders, which did not.
+--
+-- Basilisk Collar is what gives it riders to lose -- "Equipped creature has
+-- deathtouch and lifelink" is two of the four in one card, and neither is
+-- printed on the Fire-Eater, so an implementation reading the printed card
+-- rather than last known information fails these too.
+lastKnownRiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownRiderSpec s registry =
+  Spec.describe s "LastKnownRiders" $ do
+    -- Both riders at once, because they are read at one site and a fix that
+    -- reached only the keyword half (or only the controller half) would pass
+    -- whichever test was written alone.
+    Spec.it s "CR 702.15c/702.2e a sacrificed Basilisk Collar'd Fire-Eater still deals lifelink deathtouch damage" $ do
+      ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
+      basiliskCollar <- S.printingOf s registry "Basilisk Collar"
+      case Card.Type.activatedAbilities (Printing.card ghituFireEater) of
+        [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
+        ability : _ -> do
+          let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
+              (collarId, g1) = S.addCreature basiliskCollar S.alice g0
+              equipped = (S.attach collarId srcId g1) {GameState.priority = Just S.alice}
+              bare = g1 {GameState.priority = Just S.alice}
+              fire board = S.runPure pingsBob board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+              withCollar = fire equipped
+              without = fire bare
+              eventOf board = List.find (\ev -> DamageEvent.source ev == srcId) (S.damageEventsOf board)
+          -- The premise: the Collar really grants both while it is still there,
+          -- and the cost really takes the source away before resolution.
+          Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink srcId equipped) "the Collar grants lifelink on the battlefield"
+          Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch srcId equipped) "and deathtouch"
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId withCollar)) "and by resolution the source's id names nothing"
+          -- CR 702.15c: the life is gained even though nothing on the board has
+          -- lifelink by the time the damage is dealt.
+          Spec.assertEqWith s "alice gained the 2 it dealt" (S.lifeOf S.alice withCollar) (Just 22)
+          Spec.assertEqWith s "the rider names alice, not nobody" (fmap DamageEvent.dealtByLifelink (eventOf withCollar)) (Just (Just S.alice))
+          -- CR 702.2e: the same for deathtouch, which CR 704.5h then reads.
+          Spec.assertEqWith s "and the damage is flagged deathtouch" (fmap DamageEvent.dealtByDeathtouch (eventOf withCollar)) (Just True)
+          Spec.assertEqWith s "bob took it either way" (S.lifeOf S.bob withCollar) (Just 18)
+          -- The control twin: the same sacrifice with no Collar carries neither
+          -- rider, so the two above came from last known information rather than
+          -- from a fallback that flags everything.
+          Spec.assertEqWith s "no Collar, no life" (S.lifeOf S.alice without) (Just 20)
+          Spec.assertEqWith s "no Collar, no lifelink rider" (fmap DamageEvent.dealtByLifelink (eventOf without)) (Just Nothing)
+          Spec.assertEqWith s "no Collar, no deathtouch rider" (fmap DamageEvent.dealtByDeathtouch (eventOf without)) (Just False)
+
+    -- The fallback is only a fallback (CR 608.2h's first clause: the effect uses
+    -- CURRENT information while the source is where it is expected to be). The
+    -- falsifier is a reader that consults the last-known map first: Humility
+    -- strips the Collar's grant off a source that is STILL THERE, and a
+    -- pre-Humility snapshot filed under that id must not resurrect it.
+    Spec.it s "CR 608.2h a source still on the battlefield reads LIVE, not its last known information" $ do
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      basiliskCollar <- S.printingOf s registry "Basilisk Collar"
+      humility <- S.printingOf s registry "Humility"
+      case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
+        [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+        ability : _ -> do
+          let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+              (collarId, g1) = S.addCreature basiliskCollar S.alice g0
+              equipped = S.attach collarId srcId g1
+              humbled = (S.withHumility humility equipped) {GameState.priority = Just S.alice}
+              after = S.runPure pingsBob humbled (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+          Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink srcId humbled)) "Humility strips the Collar's lifelink"
+          Spec.assertBool s (Maybe.isJust (Game.lookupObject srcId after)) "and the Sorcerer is still there to be read live"
+          Spec.assertEqWith s "so alice gains nothing" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and bob took the ping" (S.lifeOf S.bob after) (Just 19)
+
 sbaBase :: GameState.GameState
 sbaBase = Setup.emptyGame S.bothPlayers
 
@@ -1692,4 +1770,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   infectSpec s registry
   toxicSpec s registry
   lifelinkSpec s registry
+  lastKnownRiderSpec s registry
   m2cPropertySpec s registry

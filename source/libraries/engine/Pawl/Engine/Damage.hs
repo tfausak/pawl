@@ -120,10 +120,21 @@ blockerThreshold gs attacker blocker =
 -- controller". Projection.controllerOf is both of those clauses at once -- it
 -- returns a control effect's player when one applies and the object's own owner
 -- when none does, in any zone, which is what CR 702.15d ("no matter what zone")
--- needs. It returns Nothing only when the id names nothing at all, so a source
--- that has already ceased to exist gains nobody life; CR 702.15c would have
--- last-known information answer that, and no rider on this path consults it
--- (#562).
+-- needs.
+--
+-- Read through the ...WithLastKnown pair rather than the plain readers, because
+-- the source may already have CEASED by the time it deals damage -- Ghitu
+-- Fire-Eater sacrifices itself to pay for the ability that then deals its
+-- damage, so the id names nothing at resolution. The plain readers answer False,
+-- 0 and Nothing for an id that names nothing, which would silently report every
+-- rider absent rather than as it last was. CR 702.2e, CR 702.15c and CR 702.90d
+-- each say the opposite in the same words ("its last known information is used
+-- to determine whether it had" the keyword), and CR 608.2h is the general rule.
+--
+-- One fallback for all four riders, not four: they are read here at a single
+-- site off two readers that share one liveness test
+-- (Projection.lastKnownOf), so deathtouch and lifelink cannot come to disagree
+-- about whether the source is still there.
 --
 -- Every damage the engine deals is built here -- the only other constructor call
 -- in the library is Pawl.Codec's decoder, which rebuilds an event rather than
@@ -131,19 +142,25 @@ blockerThreshold gs attacker blocker =
 -- third.
 damageEvent :: GameState -> DamageKind.DamageKind -> ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
 damageEvent gs kind source target amount =
-  DamageEvent.MkDamageEvent
-    { DamageEvent.source = source,
-      DamageEvent.target = target,
-      DamageEvent.amount = amount,
-      DamageEvent.dealtByDeathtouch = Projection.hasKeyword Keyword.Deathtouch source gs,
-      DamageEvent.dealtByInfect = Projection.hasKeyword Keyword.Infect source gs,
-      DamageEvent.dealtByToxic = Projection.totalToxic source gs,
-      DamageEvent.dealtByLifelink =
-        if Projection.hasKeyword Keyword.Lifelink source gs
-          then Projection.controllerOf source gs
-          else Nothing,
-      DamageEvent.kind = kind
-    }
+  let keywords = Projection.keywordsWithLastKnown source gs
+      has keyword = Map.member keyword keywords
+      -- CR 702.164b: toxic is parameterized, so its rider is the SUM of every
+      -- instance's N rather than a membership test -- Projection.totalToxic's
+      -- fold, taken over the same map so it shares the fallback.
+      toxic = Projection.toxicIn keywords
+   in DamageEvent.MkDamageEvent
+        { DamageEvent.source = source,
+          DamageEvent.target = target,
+          DamageEvent.amount = amount,
+          DamageEvent.dealtByDeathtouch = has Keyword.Deathtouch,
+          DamageEvent.dealtByInfect = has Keyword.Infect,
+          DamageEvent.dealtByToxic = toxic,
+          DamageEvent.dealtByLifelink =
+            if has Keyword.Lifelink
+              then Projection.controllerWithLastKnown source gs
+              else Nothing,
+          DamageEvent.kind = kind
+        }
 
 -- CR 510.1b: what an attacking creature assigns its combat damage TO -- "the
 -- player, planeswalker, or battle it's attacking" -- or Nothing for that rule's

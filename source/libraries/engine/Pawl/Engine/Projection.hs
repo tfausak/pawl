@@ -462,6 +462,56 @@ viewWithLastKnown src gs oid =
         (Map.lookup oid (GameState.lastKnown gs))
     else fullView gs oid
 
+-- CR 608.2h: this object's last known information, and ONLY when the id names
+-- nothing -- "the effect uses the current information of that object if it's in
+-- the public zone it was expected to be in; if it's no longer in that zone ...
+-- the effect uses the object's last known information". Nothing while the object
+-- is still there, so a caller falls through to its ordinary live reader: last
+-- known information is the fallback, never the default.
+--
+-- The shared liveness test for the two readers below, so a rule that says "use
+-- last known information" cannot come to mean one thing for keywords and another
+-- for control. viewWithLastKnown above makes the same test inline rather than
+-- through this, deliberately: it wants Nothing when the object is gone and
+-- nothing was filed, where fullView would hand back a Just over an empty
+-- projection, so it cannot share the fall-through shape these two want.
+lastKnownOf :: ObjectId -> GameState -> Maybe LastKnown.LastKnown
+lastKnownOf oid gs =
+  if Map.member oid (GameState.objects gs)
+    then Nothing
+    else Map.lookup oid (GameState.lastKnown gs)
+
+-- keywordsOf with CR 608.2h's fallback: the post-layer keywords the object has,
+-- or the ones it last had once its id names nothing.
+--
+-- The reader CR 702.2e, CR 702.15c and CR 702.90d ask for. All three carry the
+-- same sentence -- "If an object is no longer in the zone it's expected to be in
+-- as an effect causes it to deal damage, its last known information is used to
+-- determine whether it had [deathtouch / lifelink / infect]" -- and rule 702.164
+-- has no such clause, so toxic rides this by uniformity, exactly as it rides the
+-- deal-time capture itself (Pawl.Engine.Damage.damageEvent). Falling back to the
+-- WHOLE keyword map rather than to one keyword is what keeps the four answers
+-- from drifting.
+keywordsWithLastKnown :: ObjectId -> GameState -> Map Keyword Natural
+keywordsWithLastKnown oid gs = case lastKnownOf oid gs of
+  Just lk -> PC.keywords (LastKnown.characteristics lk)
+  Nothing -> keywordsOf oid gs
+
+-- controllerOf with the same fallback, and it needs one for the same rule: CR
+-- 702.15b's answer is "that source's controller, or its owner if it has no
+-- controller", which CR 702.15c then says to read from last known information
+-- once the source has ceased.
+--
+-- LastKnown.controller is a PlayerId rather than a Maybe -- CR 613.1b control is
+-- recorded for the object as it left, which is why that record keeps it
+-- separately from the characteristics CR 109.3 says it is not among -- so this
+-- answers Just wherever the live reader would have answered Nothing for a gone
+-- source. Nothing survives only for an id nothing was ever filed under.
+controllerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
+controllerWithLastKnown oid gs = case lastKnownOf oid gs of
+  Just lk -> Just (LastKnown.controller lk)
+  Nothing -> controllerOf oid gs
+
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. Off-battlefield
 -- candidates have no projection at all (gather walks the battlefield only), so
@@ -2108,11 +2158,18 @@ hasKeywordGiven pcs keyword oid gs = Map.member keyword (keywordsGiven pcs oid g
 -- counts it twice -- rule 702.164 has no redundancy clause. That is why the
 -- projection counts keywords instead of setting them.
 totalToxic :: ObjectId -> GameState -> Natural
-totalToxic oid gs =
+totalToxic oid gs = toxicIn (keywordsOf oid gs)
+
+-- totalToxic's fold, over a keyword map the caller already has. Split out so a
+-- reader that has taken the map through a different route -- CR 608.2h's
+-- last-known fallback, which Pawl.Engine.Damage.damageEvent needs -- sums it the
+-- same way instead of restating rule 702.164b's arithmetic.
+toxicIn :: Map Keyword Natural -> Natural
+toxicIn keywords =
   let value keyword count = case keyword of
         Keyword.Toxic n -> n * count
         _ -> 0
-   in sum (Map.elems (Map.mapWithKey value (keywordsOf oid gs)))
+   in sum (Map.elems (Map.mapWithKey value keywords))
 
 -- One control-granting static ability, flattened: the source that carries it and
 -- the timestamp its effect takes (CR 613.7a: a static ability's continuous effect
