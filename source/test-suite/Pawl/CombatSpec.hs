@@ -1414,8 +1414,15 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
 cursing :: Printing.Printing -> PlayerId.PlayerId -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 cursing curse who mine theirs =
   let (gs, ours, yours) = S.combatBoardOf mine theirs
-      (aura, withAura) = S.addCreature curse S.alice gs
-   in (S.attachTo aura (Recipient.ToPlayer who) withAura, ours, yours)
+   in (cursingBoard curse who gs, ours, yours)
+
+-- The same Curse, attached to a board that already exists. What `cursing` is
+-- built from, and what a board it cannot build -- `jaceBoard`'s, which needs its
+-- planeswalker's loyalty counters placed first -- reaches for instead.
+cursingBoard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+cursingBoard curse who gs =
+  let (aura, withAura) = S.addCreature curse S.alice gs
+   in S.attachTo aura (Recipient.ToPlayer who) withAura
 
 -- CR 508.1d, proved by Curse of the Nightly Hunt ("Creatures enchanted player
 -- controls attack each combat if able") -- the pool's first attacking REQUIREMENT,
@@ -3042,7 +3049,7 @@ runToTurnStep turn phase answer gs0 =
 -- taxed at all.
 --
 -- The Forests are real Forests, so CR 305.6's intrinsic ability is what pays --
--- a fixture that seeded a mana pool would not survive CR 500.4's emptying and
+-- a fixture that seeded a mana pool would not survive CR 500.5's emptying and
 -- would prove nothing about CR 508.1i's window. Their ids come back so a test
 -- can read the payment off the board rather than off a pool.
 imprisoning :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> [Printing.Printing] -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
@@ -3180,6 +3187,26 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     case mine of
       a : _ -> Spec.assertBool s (Combat.legalAttackDeclaration S.alice [a] taxed) "and attacking anyway is still legal"
       _ -> Spec.assertFailure s "fixture should have a creature"
+  Spec.it s "CR 508.1d the cost clause excuses a requirement only when EVERY attack costs" $ do
+    -- ANY free attack, not ALL attacks free. A creature that could attack Jace for
+    -- nothing is not one that "can't attack unless a player pays a cost", so the
+    -- Curse still forces it onto the battlefield's other side -- and it is the
+    -- player's own CR 508.1b announcement, never the engine's, that then decides
+    -- whether they end up paying Ghostly Prison.
+    --
+    -- The two boards differ ONLY by the planeswalker, which is what makes this the
+    -- test for `attacksFreely`'s quantifier: with no planeswalker every target is
+    -- taxed and the answers coincide.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    prison <- S.printingOf s registry "Ghostly Prison"
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (withJace, _, _) = jaceBoard jace [piker]
+        (plain, _, _) = S.combatBoardOf [piker] []
+        taxedWithJace = snd (S.addCreature prison S.bob (cursingBoard curse S.alice withJace))
+        taxedPlain = snd (S.addCreature prison S.bob (cursingBoard curse S.alice plain))
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] taxedWithJace)) "the free attack on Jace keeps the requirement"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] taxedPlain) "with no planeswalker every attack costs, so declining is legal"
   Spec.it s "CR 508.1d whole cards: the Curse forces the attack, and the Prison unforces it" $ do
     -- The gameplay-level case, run through Engine.runStep -- the priority loop and
     -- the CR 703.4i turn-based action, not a direct call -- with an interpreter

@@ -1141,10 +1141,10 @@ declareAttackers pid = do
         --
         -- LOCKED IN is this `let`, and nothing more elaborate is needed: the total
         -- is computed once from the finished declaration and from the board as of
-        -- CR 508.1f, and the only thing that runs between here and the payment is
-        -- the payment. Nothing recomputes it, so no effect can change it. The
-        -- alternative -- asking AttackCost.totalCost again at payment time -- is
-        -- exactly what the rule forbids.
+        -- CR 508.1f, and nothing at all runs between that determination and the
+        -- payment it is handed to. Asking AttackCost.totalCost a second time, at
+        -- payment time or after it, is exactly what the rule forbids -- which is
+        -- why that function's own haddock says the locking is the caller's.
         let owed = AttackCost.totalCost recorded gs1
         -- CR 508.1i ("if any of the costs require mana, the active player then has
         -- a chance to activate mana abilities") and CR 508.1j ("once the player has
@@ -1158,13 +1158,20 @@ declareAttackers pid = do
         -- cost without tapping anything -- but a statement that a combat with no
         -- Ghostly Prison in it reaches no mana code at all.
         --
-        -- Declining to pay is not asked here, and CR 508.1j is why: at this point
-        -- the creatures are chosen and the cost is owed. CR 508.1d's "that player
-        -- is not required to pay that cost" is exercised one step earlier, by NOT
-        -- DECLARING the creature -- which attackCeiling's cost clause is what keeps
-        -- legal, even under an attacking requirement. The same shape a cast has:
-        -- Cast.castSpell does not ask whether the caster wants to pay after they
-        -- have announced the spell.
+        -- NO "will you pay?" PROMPT, and that is a rules reading rather than an
+        -- elision. CR 508.1j is unconditional once the creatures are chosen -- "they
+        -- pay all costs" -- and CR 508.1d's "that player is not required to pay that
+        -- cost" is exercised one step earlier, by NOT DECLARING the creature, which
+        -- is what attackCeiling's cost clause keeps legal even under an attacking
+        -- requirement. So declining IS reachable, at the CR 508.1a prompt where the
+        -- rules put it, and CombatSpec's "a Curse of the Nightly Hunt does not force
+        -- an attack a Ghostly Prison taxes" is the case that proves it.
+        --
+        -- The same shape a cast has, and the precedent is exact: Cast.castSpell does
+        -- not ask whether the caster wants to pay after they have announced the
+        -- spell, because announcing it was the choosing. What the player is still
+        -- asked here is WHICH sources to tap -- Mana.payCost's own prompt, CR
+        -- 508.1i's window -- so no source is committed for them either.
         paid <-
           if null (ManaCost.unwrap owed)
             then pure True

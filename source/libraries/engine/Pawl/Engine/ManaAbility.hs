@@ -10,12 +10,13 @@
 -- ones.
 --
 -- Casing on Effect here rather than in Pawl.Engine.Resolve is not a breach of that
--- module's charter. design.md section 1 names this classification outright as one
--- the closed half is entitled to -- "the closed half depends on a CLASSIFICATION
--- of effects (which layer, is-it-a-mana-ability, does-it-target), never on the
--- IDENTITY of an effect" -- and reading whether an effect is a mana ability is
--- exactly that. What stays forbidden, here as everywhere, is a case that acts on
--- which effect it is.
+-- module's charter. design.md section 1 is what the charter enforces -- "the
+-- closed half depends on a CLASSIFICATION of effects, never on the IDENTITY of
+-- effects" -- and this function IS one of those classifications; design.md's risk
+-- register names it by that name, as the `manaProduced()` bit whose absence grew
+-- Argentum's mana subsystem 37 `is AddMana*Effect ->` branches. What stays
+-- forbidden, here as everywhere, is a case that acts on WHICH effect it is, and
+-- every arm below answers the one question in the type.
 module Pawl.Engine.ManaAbility where
 
 import qualified Pawl.Types.Card as Card.Type

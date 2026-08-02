@@ -33,15 +33,20 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- checked, and then CR 508.1h-508.1j determine and pay "the total cost to attack"
 -- as steps of their own.
 --
--- The "YOU" is IMPLICIT and is the source's controller, CR 109.5 ("the text of an
--- ability of an object that isn't a spell ... uses 'you' to refer to the object's
--- controller"). It is not a field because the alternative shape is not in the
--- pool: Archangel of Tithes prints the same sentence with no object at all
--- ("creatures can't attack unless their controller pays {1} for each of those
--- creatures"), which would tax every attack rather than only the ones aimed at
--- one player, and nothing here can say that (#598). Every printing of Ghostly
--- Prison's own family -- Propaganda, Windborn Muse, Baird, Collective Restraint
--- -- says "you".
+-- The "YOU" is IMPLICIT and is the source's controller, CR 109.5 ("the words
+-- 'you' and 'your' on an object refer to the object's controller ... For a static
+-- ability, this is the current controller of the object it's on"), and the thing
+-- it names is the PLAYER. Pawl.Engine.AttackCost therefore charges an attack
+-- exactly when its CR 508.1b announcement names that player, which is Ghostly
+-- Prison's own ruling: "a creature that can't attack you can still attack a
+-- planeswalker you control."
+--
+-- That is the whole object axis this type has, and the wider one is not
+-- representable: Baird, Steward of Argive, Norn's Annex, Sphere of Safety and
+-- Archangel of Tithes all print "creatures can't attack you OR PLANESWALKERS YOU
+-- CONTROL", which charges an attack Ghostly Prison lets through (#598). Ghostly
+-- Prison's own family -- Propaganda, Windborn Muse, Collective Restraint -- says
+-- "you" and stops there. Checked against Scryfall 2026-08-02.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, the
 -- posture all five siblings take -- so a Ghostly Prison leaving the battlefield
@@ -57,8 +62,9 @@ data AttackCost = MkAttackCost
     -- Vacuous for the one printing that has it -- every creature matches, since
     -- only a creature can be declared as an attacker (CR 508.1a) -- and carried
     -- anyway, so that the sentence stays card DATA rather than a fact the engine
-    -- knows about Ghostly Prison. A narrowing printing (Norn's Annex taxes with
-    -- Phyrexian mana; Sphere of Safety scales instead) would fill it in.
+    -- knows about Ghostly Prison. No printing of this family narrows it -- every
+    -- one of them says "creatures" -- so the field is where a narrowing one would
+    -- go rather than a distinction any card draws today.
     subject :: Affected.Affected,
     -- | What ONE taxed attacker costs -- Ghostly Prison's "{2} for each creature
     -- they control that's attacking you". The rule's own multiplication: CR
@@ -66,6 +72,11 @@ data AttackCost = MkAttackCost
     -- a declaration of three creatures owes {6}. Ghostly Prison's Two-Headed
     -- Giant ruling states the same arithmetic from the other end ("you still only
     -- have to pay once per creature").
+    --
+    -- FIXED, so a share that counts the board is unrepresentable: Collective
+    -- Restraint's "{X} ... where X is the number of basic land types among lands
+    -- you control" and Sphere of Safety's enchantment count are the same sentence
+    -- with a Pawl.Types.Quantity where this has a constant (#601).
     --
     -- A ManaCost and not a Pawl.Types.Cost, so it carries no components. CR
     -- 508.1h's list is wider than mana -- "costs may include paying mana, tapping
