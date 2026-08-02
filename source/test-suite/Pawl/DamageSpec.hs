@@ -45,6 +45,7 @@ import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -52,12 +53,14 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -525,6 +528,136 @@ lifelinkSpec s registry =
           after = S.fightWith S.aggressiveAnswer gs
       Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice after) (Just 20)
       Spec.assertEqWith s "and the 1/1 dealt just one" (S.lifeOf S.bob after) (Just 19)
+
+-- CR 608.2h / 702.2e / 702.15c / 702.90d: a source that has already CEASED still
+-- deals damage with the riders it last had. All three keyword rules carry the
+-- same sentence -- "If an object is no longer in the zone it's expected to be in
+-- as an effect causes it to deal damage, its last known information is used to
+-- determine whether it had [the keyword]" -- and CR 608.2h is the general form.
+--
+-- Ghitu Fire-Eater is the producer: "{T}, Sacrifice this creature: It deals
+-- damage equal to its power to any target" pays a cost that removes the very
+-- object the riders are read off, so by resolution its id names nothing.
+-- Pawl.ActivateSpec's LastKnownInformation group proves the AMOUNT already
+-- survives that (Quantity.Power goes through Projection.viewWithLastKnown); this
+-- group is the riders, which did not.
+--
+-- Basilisk Collar is what gives it riders to lose -- "Equipped creature has
+-- deathtouch and lifelink" is two of the four in one card, and neither is
+-- printed on the Fire-Eater, so an implementation reading the printed card
+-- rather than last known information fails these too.
+lastKnownRiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownRiderSpec s registry =
+  Spec.describe s "LastKnownRiders" $ do
+    -- Both riders at once, because they are read at one site and a fix that
+    -- reached only the keyword half (or only the controller half) would pass
+    -- whichever test was written alone.
+    Spec.it s "CR 702.15c/702.2e a sacrificed Basilisk Collar'd Fire-Eater still deals lifelink deathtouch damage" $ do
+      ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
+      basiliskCollar <- S.printingOf s registry "Basilisk Collar"
+      case Card.Type.activatedAbilities (Printing.card ghituFireEater) of
+        [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
+        ability : _ -> do
+          let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
+              (collarId, g1) = S.addCreature basiliskCollar S.alice g0
+              equipped = (S.attach collarId srcId g1) {GameState.priority = Just S.alice}
+              bare = g1 {GameState.priority = Just S.alice}
+              fire board = S.runPure pingsBob board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+              withCollar = fire equipped
+              without = fire bare
+              eventOf board = List.find (\ev -> DamageEvent.source ev == srcId) (S.damageEventsOf board)
+          -- The premise: the Collar really grants both while it is still there,
+          -- and the cost really takes the source away before resolution.
+          Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink srcId equipped) "the Collar grants lifelink on the battlefield"
+          Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch srcId equipped) "and deathtouch"
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId withCollar)) "and by resolution the source's id names nothing"
+          -- CR 702.15c: the life is gained even though nothing on the board has
+          -- lifelink by the time the damage is dealt.
+          Spec.assertEqWith s "alice gained the 2 it dealt" (S.lifeOf S.alice withCollar) (Just 22)
+          Spec.assertEqWith s "the rider names alice, not nobody" (fmap DamageEvent.dealtByLifelink (eventOf withCollar)) (Just (Just S.alice))
+          -- CR 702.2e: the same for deathtouch, which CR 704.5h then reads.
+          Spec.assertEqWith s "and the damage is flagged deathtouch" (fmap DamageEvent.dealtByDeathtouch (eventOf withCollar)) (Just True)
+          Spec.assertEqWith s "bob took it either way" (S.lifeOf S.bob withCollar) (Just 18)
+          -- The control twin: the same sacrifice with no Collar carries neither
+          -- rider, so the two above came from last known information rather than
+          -- from a fallback that flags everything.
+          Spec.assertEqWith s "no Collar, no life" (S.lifeOf S.alice without) (Just 20)
+          Spec.assertEqWith s "no Collar, no lifelink rider" (fmap DamageEvent.dealtByLifelink (eventOf without)) (Just Nothing)
+          Spec.assertEqWith s "no Collar, no deathtouch rider" (fmap DamageEvent.dealtByDeathtouch (eventOf without)) (Just False)
+
+    -- CR 613.1b, the half the test above cannot see: alice both OWNS and
+    -- controls her Fire-Eater, so LastKnown.controller and Object.owner give the
+    -- same answer there and a reader that took the owner would pass. Here bob
+    -- owns it and alice has stolen it, so CR 702.15b's "that source's
+    -- CONTROLLER" pays the thief -- and the record has to keep control
+    -- separately from the characteristics, which is why LastKnown does (CR 109.3
+    -- says control is not a characteristic).
+    Spec.it s "CR 702.15b/613.1b a stolen Fire-Eater's lifelink pays the THIEF, not its owner" $ do
+      ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
+      basiliskCollar <- S.printingOf s registry "Basilisk Collar"
+      case Card.Type.activatedAbilities (Printing.card ghituFireEater) of
+        [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
+        ability : _ -> do
+          let (srcId, g0) = S.addCreature ghituFireEater S.bob (Setup.emptyGame S.bothPlayers)
+              (collarId, g1) = S.addCreature basiliskCollar S.alice g0
+              equipped = S.attach collarId srcId g1
+              stolen = (S.giveControl srcId S.alice equipped) {GameState.priority = Just S.alice}
+              after = S.runPure pingsBob stolen (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+              rider = fmap DamageEvent.dealtByLifelink (List.find (\ev -> DamageEvent.source ev == srcId) (S.damageEventsOf after))
+          Spec.assertEqWith s "bob owns it" (fmap Object.owner (Game.lookupObject srcId stolen)) (Just S.bob)
+          Spec.assertEqWith s "but alice controls it as it is sacrificed" (Projection.controllerOf srcId stolen) (Just S.alice)
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId after)) "and by resolution its id names nothing"
+          Spec.assertEqWith s "the rider names the thief" rider (Just (Just S.alice))
+          Spec.assertEqWith s "so alice gained the 2" (S.lifeOf S.alice after) (Just 22)
+          Spec.assertEqWith s "and its owner gained nothing" (S.lifeOf S.bob after) (Just 18)
+
+    -- The fallback is only a fallback: CR 608.2h's FIRST clause uses current
+    -- information while the source is where it is expected to be, and only its
+    -- second reaches for last known information.
+    --
+    -- The falsifier is a reader that consults the last-known map first, and
+    -- reaching it needs a state the engine cannot build: Event.changeZone files
+    -- a lastKnown entry in the same modify' that deletes the object, so `objects`
+    -- and `lastKnown` are disjoint by construction and no real board has an entry
+    -- for a LIVE id. So the entry is planted by hand -- a snapshot saying the
+    -- Sorcerer had lifelink, filed under the id of a Sorcerer that is still on
+    -- the battlefield and has just had the grant stripped by Humility.
+    --
+    -- Without lastKnownOf's liveness guard this test gains alice a life; with it,
+    -- the live projection wins and she gains nothing. That guard is otherwise
+    -- unfalsifiable, which is exactly why it is worth planting the state to
+    -- falsify it -- the invariant it defends is an invariant of the CALLERS, not
+    -- of the type.
+    Spec.it s "CR 608.2h a live source reads LIVE, even with a last-known entry filed under its id" $ do
+      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      basiliskCollar <- S.printingOf s registry "Basilisk Collar"
+      humility <- S.printingOf s registry "Humility"
+      case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
+        [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+        ability : _ -> do
+          let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+              (collarId, g1) = S.addCreature basiliskCollar S.alice g0
+              equipped = S.attach collarId srcId g1
+              -- The snapshot the guard must ignore, taken while the Collar's
+              -- grant is still live, then filed under the still-live id.
+              snapshot =
+                LastKnown.MkLastKnown
+                  { LastKnown.characteristics = Projection.project srcId equipped,
+                    LastKnown.controller = S.alice,
+                    LastKnown.source = Source.OfCard prodigalSorcerer
+                  }
+              humbled = S.withHumility humility equipped
+              planted =
+                humbled
+                  { GameState.lastKnown = Map.insert srcId snapshot (GameState.lastKnown humbled),
+                    GameState.priority = Just S.alice
+                  }
+              after = S.runPure pingsBob planted (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+          Spec.assertBool s (Map.member Keyword.Lifelink (PC.keywords (LastKnown.characteristics snapshot))) "the planted snapshot really says lifelink"
+          Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink srcId planted)) "while Humility has stripped it live"
+          Spec.assertBool s (Maybe.isJust (Game.lookupObject srcId after)) "and the Sorcerer is still there to be read live"
+          Spec.assertEqWith s "so alice gains nothing -- the live read won" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and bob took the ping" (S.lifeOf S.bob after) (Just 19)
 
 sbaBase :: GameState.GameState
 sbaBase = Setup.emptyGame S.bothPlayers
@@ -1692,4 +1825,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   infectSpec s registry
   toxicSpec s registry
   lifelinkSpec s registry
+  lastKnownRiderSpec s registry
   m2cPropertySpec s registry

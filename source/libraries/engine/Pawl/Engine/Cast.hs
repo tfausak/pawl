@@ -120,8 +120,10 @@ instantSpeed card = Card.isInstant card || Keyword.hasFlash (Card.Type.keywords 
 
 -- CR 601.2c / 700.2a: castable when at least as many modes are fillable as the
 -- selection demands ("choose one" / ChooseExactly 1, the only selection so
--- far). Unobservable for Bolt (AnyTarget always holds a living player); first
--- falsified for a single-mode card by Giant Growth at M3b, and for a modal
+-- far). Was unobservable for Bolt while AnyTarget always held a living player,
+-- which stopped being true with Ivory Mask: CR 702.18a's player half can empty
+-- the slot, and then a Bolt is uncastable rather than castable-and-fizzling.
+-- First falsified for a single-mode card by Giant Growth at M3b, and for a modal
 -- card by Chaos Charm at M4g (castable via its damage/haste mode with no Wall
 -- in play). For a non-modal card (one mode, count 1) this is identical to
 -- "every slot fillable": the single mode fillable = all its slots fillable =

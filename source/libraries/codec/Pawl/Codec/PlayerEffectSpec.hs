@@ -10,6 +10,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -59,3 +60,21 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
   -- CR 500.5 / 703.4q / Upwelling.
   Spec.it s "DontLoseUnspentMana" $
     Common.assertJsonCodec s PlayerEffect.toJson PlayerEffect.fromJson PlayerEffect.DontLoseUnspentMana "{\"type\":\"DontLoseUnspentMana\"}"
+  -- CR 702.18a / Ivory Mask: shroud names no player, so the scope is everybody.
+  Spec.it s "CantBeTargetedBy, shroud's EachPlayer" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CantBeTargetedBy PlayerScope.EachPlayer)
+      "{\"type\":\"CantBeTargetedBy\",\"value\":{\"type\":\"EachPlayer\"}}"
+  -- CR 702.11c / Leyline of Sanctity: the OTHER scope, which is the whole
+  -- difference between the two keywords -- so a codec that dropped the payload
+  -- would round-trip one of these and not both.
+  Spec.it s "CantBeTargetedBy, hexproof's Opponents" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CantBeTargetedBy PlayerScope.Opponents)
+      "{\"type\":\"CantBeTargetedBy\",\"value\":{\"type\":\"Opponents\"}}"

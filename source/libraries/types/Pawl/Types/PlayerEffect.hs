@@ -4,6 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.PlayerScope as PlayerScope
 
 -- | CR 611.1's third clause: a continuous effect that "affects players or the
 -- rules of the game" rather than the characteristics of an object. The player
@@ -61,4 +62,46 @@ data PlayerEffect
     -- (#351). Shizuko and Karn, Legacy Reforged keep only the mana they just
     -- added, which is not a player-axis property at all (#352).
     DontLoseUnspentMana
+  | -- | CR 702.18a / 702.11c: this player can't be the target of spells or
+    -- abilities controlled by the players the scope names. Ivory Mask ("You have
+    -- shroud") and Leyline of Sanctity ("You have hexproof") are the two
+    -- producers.
+    --
+    -- The PLAYER halves of two keywords, which is why they are here and not in
+    -- Pawl.Types.Keyword: rule 702's keywords live on objects, gathered off the
+    -- battlefield and folded through the CR 613.1-613.7 layers, and a player has
+    -- no characteristics for that machine to compute. CR 613.10/613.11 is the
+    -- player axis, and this is a rules-modifying continuous effect on it.
+    --
+    -- ONE constructor carrying a PlayerScope rather than a HasShroud and a
+    -- HasHexproof, because the two rules differ in exactly the set of players
+    -- whose spells are stopped and in nothing else:
+    --
+    --   * CR 702.18a -- "'Shroud' means 'This permanent or player can't be the
+    --     target of spells or abilities.'" No player is named, so the protected
+    --     player's own spells are stopped too: EachPlayer.
+    --   * CR 702.11c -- "'Hexproof' on a player means 'You can't be the target of
+    --     spells or abilities your opponents control.'" Opponents.
+    --
+    -- The scope is read against the PROTECTED player -- the one this effect
+    -- applies to, which is CR 702.11c's "you" -- and NOT against the effect's
+    -- controller, which is the anchor PlayerStaticAbility.scope uses. The two
+    -- coincide for both cards in the pool (each says "You have ...", so the
+    -- ability's scope is You and the protected player IS its controller) and
+    -- would come apart for a card that gave an opponent hexproof. Naming the
+    -- anchor here is what keeps that card from being read wrongly.
+    --
+    -- Both scopes have a producer, so neither is speculative. PlayerScope.You is
+    -- the third value and has none: it would mean "only your OWN spells can't
+    -- target you", which no rule 702 keyword states.
+    --
+    -- Redundancy is not counted, and both rules say so outright for the PLAYER
+    -- case and not only the permanent one: CR 702.18b ("multiple instances of
+    -- shroud on the same permanent or player are redundant") and CR 702.11h
+    -- ("multiple instances of THE SAME hexproof ability on the same permanent or
+    -- player are redundant" -- the qualifier is 702.11d's, for hexproof from a
+    -- quality, and does not bear on the player half). A membership question,
+    -- never a tally -- the same posture Pawl.Engine.Target.targetable takes for the
+    -- permanent halves.
+    CantBeTargetedBy PlayerScope.PlayerScope
   deriving (Eq, Ord, Show)
