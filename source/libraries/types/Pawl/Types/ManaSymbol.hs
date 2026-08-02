@@ -85,14 +85,19 @@ data ManaSymbol
     -- would add mana represented by one or more snow mana symbols ... that much
     -- colorless mana is added" -- is about PRODUCING mana, which is
     -- Pawl.Types.ManaProduction's business, and nothing there can say {S}
-    -- (#514).
+    -- (#514). That rule appears to be INERT rather than merely unimplemented:
+    -- no printed card adds mana represented by {S}. Checked against Scryfall
+    -- 2026-08-02 -- 44 cards carry {S} in their oracle text and every one of
+    -- them is a COST, with `oracle:"add {S}"` returning none.
     --
     -- CR 118.7g's reduction BY {S} is a third thing again, and the rule turns it
     -- back into a plain generic one: "the cost is reduced by that much generic
     -- mana." The SYMBOL is not generic and the REDUCTION it names is, which is
     -- why that does not contradict CR 107.4h's second sentence -- and why
     -- Pawl.Engine.Cost.applyAdjustments, which answers one question for both
-    -- sides, gets the reduction side wrong (#516).
+    -- sides, gets the reduction side wrong (#516). That rule looks inert too:
+    -- no printed card states a reduction in {S} (same Scryfall check, `costs
+    -- {S} less` and `{S} less to cast` both return none).
     --
     -- CR 107.4h's own third sentence is not implemented either: "The {S} symbol
     -- can also be used to refer to mana of any type produced by a snow source

@@ -779,7 +779,12 @@ applyAdjustments adjustments cost =
         -- out an {S} the way it singles out a {W}. In a REDUCTION it is right
         -- too, but for a different reason -- CR 118.7g makes an {S} there a
         -- GENERIC reduction rather than a typed one, so it belongs to genericOf
-        -- above and not to this cancellation at all (#516).
+        -- above and not to this cancellation at all (#516) -- where genericOf's
+        -- own Snow arm answers 0, which is right for the cost and wrong for the
+        -- reduction. That gap looks INERT rather than merely unreached: no
+        -- printed card states a reduction in {S}. Checked against Scryfall
+        -- 2026-08-02 -- 44 cards carry {S} in oracle text and every one is a
+        -- cost.
         ManaSymbol.Snow -> Nothing
         -- Unreachable for the reason genericOf's Variable arm gives; {X} names
         -- no mana type either way.

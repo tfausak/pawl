@@ -2852,6 +2852,55 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
     -- combat-damage read filters it out by zone instead (Damage.onBattlefield).
     let afterDamage = runToTurnStep 1 Phase.PostcombatMain S.aggressiveAnswer gs
     Spec.assertEqWith s "a 5/9 that left combat deals nobody 5" (S.lifeOf S.bob afterDamage) (Just 20)
+  -- CR 110.2's "under your control", the clause the card prints and the engine
+  -- used to drop. It differs from the owner's control only when the player who
+  -- attacked with the Towershell does not own it, which the card's own ruling
+  -- calls out: "If you attack with a Meandering Towershell that you don't own,
+  -- you'll control it when it returns."
+  --
+  -- bob OWNS it; alice steals it and attacks. The steal is Expiry.AtCleanup, so
+  -- it is long gone by the return turn -- and it never applied to the returning
+  -- incarnation anyway, since CR 400.7 mints a fresh id. So alice controlling
+  -- what comes back can only be the entry rider.
+  Spec.it s "CR 110.2 a Towershell its attacker does not own returns under the ATTACKER's control" $ do
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    island <- S.printingOf s registry "Island"
+    let (base, _, theirs) = S.combatBoardOf [] [towershell]
+        stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 6]
+        stocked = stock S.bob (stock S.alice base)
+    case theirs of
+      [] -> Spec.assertFailure s "fixture should have given bob a Towershell"
+      oid : _ -> do
+        let stolen = S.giveControl oid S.alice stocked
+            atReturn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer stolen
+            isTowershell g o = case Game.cardOf o g of
+              Nothing -> False
+              Just card -> Card.Type.name card == towershellName
+            towershells g = filter (isTowershell g) (Set.toList (GameState.battlefield g))
+        -- The premise: bob owns it and alice is the one attacking with it.
+        Spec.assertEqWith s "bob owns it" (fmap Object.owner (Game.lookupObject oid stolen)) (Just S.bob)
+        Spec.assertEqWith s "alice controls it as it attacks" (Projection.controllerOf oid stolen) (Just S.alice)
+        Spec.assertEqWith s "the return turn is alice's" (GameState.activePlayer atReturn) S.alice
+        case towershells atReturn of
+          [back] -> do
+            -- CR 400.7: a different id from the one that attacked, so nothing
+            -- from before the exile carries over on its own.
+            Spec.assertBool s (back /= oid) "a fresh incarnation returned"
+            Spec.assertEqWith s "still owned by bob" (fmap Object.owner (Game.lookupObject back atReturn)) (Just S.bob)
+            Spec.assertEqWith s "but controlled by alice, who attacked with it" (Projection.controllerOf back atReturn) (Just S.alice)
+            -- And CR 506.3b's consequence: a permanent put onto the battlefield
+            -- attacking must be the ACTIVE player's, so getting the control
+            -- wrong would also have left it not attacking at all.
+            Spec.assertBool s (Map.member back (Combat.Type.attackers (GameState.combat atReturn))) "and it is attacking"
+            -- CR 611.2a: the control has no stated end, so it is Expiry.Never
+            -- and survives the cleanup step. Read a turn later, which is what
+            -- separates it from the AtCleanup the test fixture's own steal uses:
+            -- with any turn-scoped expiry the Towershell would revert to bob
+            -- here, and every assertion above would still have passed.
+            let laterTurn = runToTurnStep 4 Phase.PostcombatMain S.aggressiveAnswer atReturn
+            Spec.assertEqWith s "and alice still controls it a turn later" (Projection.controllerOf back laterTurn) (Just S.alice)
+          other -> Spec.assertFailure s ("expected one returned Towershell, got " <> show (length other))
+
   Spec.it s "CR 508.8 whole card: it returns attacking with NOTHING declared, and the two steps stay" $ do
     -- The reason this card was worth adding: the rule's SECOND clause standing
     -- alone, at gameplay level. alice declares no attacker on the return
