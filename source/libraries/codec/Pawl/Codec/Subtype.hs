@@ -42,6 +42,7 @@ toJson s = Common.nullary $ case s of
   Subtype.Phyrexian -> "Phyrexian"
   Subtype.Elf -> "Elf"
   Subtype.Dryad -> "Dryad"
+  Subtype.Knight -> "Knight"
   Subtype.Nightmare -> "Nightmare"
   Subtype.Horse -> "Horse"
   Subtype.Aura -> "Aura"
@@ -111,6 +112,7 @@ fromJson =
       ("Phyrexian", Subtype.Phyrexian),
       ("Elf", Subtype.Elf),
       ("Dryad", Subtype.Dryad),
+      ("Knight", Subtype.Knight),
       ("Nightmare", Subtype.Nightmare),
       ("Horse", Subtype.Horse),
       ("Aura", Subtype.Aura),

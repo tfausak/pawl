@@ -26,7 +26,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggerEntry as TriggerEntry
 
 data Prompt r where
   ChooseAction :: Decider.Decider -> PlayerId.PlayerId -> [Action.Action] -> Prompt Action.Action
@@ -321,45 +321,47 @@ data Prompt r where
   -- Asked only when two or more options are offered; one option is not a choice.
   ChooseEntryOption :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [EntryOption.EntryOption] -> Prompt Natural.Natural
   -- | CR 603.3b: "each player, in APNAP order, puts each triggered ability they
-  -- control ... on the stack in any order they choose." The [TriggerSource]
+  -- control ... on the stack in any order they choose." The [TriggerEntry]
   -- is that player's pending triggers, each entry naming what the ability hangs
-  -- on, in the engine's canonical order; the answer is a permutation of the entry
-  -- INDICES, giving the order they are PUT ON THE STACK (so the last named
-  -- resolves first).
+  -- on AND which ability it is, in the engine's canonical order; the answer is a
+  -- permutation of the entry INDICES, giving the order they are PUT ON THE STACK
+  -- (so the last named resolves first).
   --
-  -- TriggerSource rather than ObjectId because CR 725.2's inherent monarch
-  -- abilities "have no source" and are ordinary triggered abilities in every
-  -- other respect, so they are in this batch with everything else and have no id
-  -- to put on the wire. An interpreter reading TriggerSource.Sourceless knows it
-  -- is looking at one of those two abilities rather than at a missing object.
+  -- A TriggerSource rather than an ObjectId inside the entry because CR 725.2's
+  -- inherent monarch abilities "have no source" and are ordinary triggered
+  -- abilities in every other respect, so they are in this batch with everything
+  -- else and have no id to put on the wire. An interpreter reading
+  -- TriggerSource.Sourceless knows it is looking at one of those two abilities
+  -- rather than at a missing object.
   --
-  -- Positional by necessity, unlike a target slot: each entry carries only its
-  -- SOURCE, no ability discriminator. That is CONTINGENT, not a rules property:
-  -- it holds only while no single source can have two DISTINCT abilities
-  -- triggered in the same batch (two triggers from the SAME ability on one
-  -- source really are indistinguishable, and any permutation among those is
-  -- equivalent). It holds today only as an accident of the settle schedule --
-  -- Sarcomancy already carries two triggered abilities (an ETB and an upkeep
-  -- trigger), but they cannot co-trigger because the step event that would fire
-  -- the upkeep trigger is always scanned before any spell can resolve to place
-  -- Sarcomancy and fire its ETB in the same batch. A source with two distinct
-  -- abilities triggered together makes two different abilities identical entries
-  -- on the wire while their order genuinely matters, and the payload would need
-  -- an ability discriminator alongside the source (#61). Sourceless is that same
-  -- gap in a second place: CR 725.2's two abilities share one controller and one
-  -- (absent) source, so two Sourceless entries would be indistinguishable too.
-  -- Unreachable, because one triggers on a step beginning and the other on combat
-  -- damage and a settle always separates the two events; the discriminator #61
-  -- asks for would cover both.
+  -- Positional, like every other index-answered prompt, but no longer positional
+  -- BY NECESSITY: the entry carries the ability alongside the source (#61), so
+  -- two entries are equal exactly when they are interchangeable. A source with
+  -- two DISTINCT abilities triggered by one event is real and in the pool --
+  -- Hero of Bladehold's battle cry (CR 702.91a) and its printed token-maker both
+  -- fire on one CR 508.1 declaration, and the order decides whether the tokens
+  -- are pumped -- and the two entries differ. Two triggers of the SAME ability
+  -- (a Soul Warden watching two creatures enter, CR 603.6a) stay equal, which is
+  -- right: any permutation among them gives the same board, so there would be
+  -- nothing to ask. See Pawl.Types.TriggerEntry for why the ability VALUE is the
+  -- discriminator rather than an ordinal, and why the bindings are left out.
+  --
+  -- CR 725.2's pair is covered by the same field: its two abilities share one
+  -- controller and one (absent) source, and differ as values. Unreachable today
+  -- anyway -- one triggers on a step beginning and the other on combat damage,
+  -- and a settle always separates the two events.
   --
   -- Asked ONLY when the player controls two or more -- with one there is nothing
-  -- to choose, and where the rules leave nothing to ask, don't prompt.
+  -- to choose, and where the rules leave nothing to ask, don't prompt. It is
+  -- still asked when the two or more are ALL EQUAL, which ChooseReplacement
+  -- elides (#607): the equality that makes two entries interchangeable holds up
+  -- to their bindings, and nothing here has read those to check.
   --
   -- CR 603.3b's TWO-PART process (first the
   -- triggers whose condition is not another ability triggering, then the rest)
   -- is vacuous while no condition triggers on another ability triggering; this
   -- carries the note, not the machinery.
-  OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerSource.TriggerSource] -> Prompt [Natural.Natural]
+  OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerEntry.TriggerEntry] -> Prompt [Natural.Natural]
   -- | CR 616.1: with two or more applicable replacement or prevention effects in
   -- the highest non-empty bucket, the affected object's controller (or its owner,
   -- or the affected player) chooses which to apply NEXT -- and then the process
@@ -368,13 +370,14 @@ data Prompt r where
   -- the engine's canonical order (battlefield ascending, then the floating
   -- store); the answer is an index into it.
   --
-  -- Positional, and carrying exactly the caveat #61 records for OrderTriggers: a
+  -- Positional, and carrying the hole OrderTriggers above no longer has: a
   -- source with two DISTINCT applicable replacement abilities would put two
-  -- different effects on the wire as identical entries. That is reachable in a way
-  -- it is not for triggers -- Doubling Season has two replacement abilities -- but
-  -- they are in different EVENT CLASSES and so are never candidates for the same
-  -- event. A single source with two same-class applicable replacements needs a
-  -- discriminator alongside the source (#74).
+  -- different effects on the wire as identical entries. Doubling Season has two
+  -- replacement abilities, but they are in different EVENT CLASSES and so are
+  -- never candidates for the same event; the trigger side's equivalent accident
+  -- did fall (Hero of Bladehold, #61), and the fix there is the shape this one
+  -- wants -- an entry carrying the applicable EFFECT alongside its source, so
+  -- that two entries are equal exactly when they are interchangeable (#74).
   --
   -- Asked ONLY when the bucket holds two or more candidates that are not all equal
   -- as values: with one there is nothing to choose, and among equal values every
@@ -525,8 +528,9 @@ data Prompt r where
   -- or the ability object on the stack -- not its source, since two triggers off
   -- one source resolve as two distinct stack objects); the ModeIndex is which of
   -- its chosen modes is asking, so a modal payload with two optional modes puts
-  -- two DISTINGUISHABLE questions on the wire -- the discriminator OrderTriggers
-  -- (#61) and ChooseReplacement (#74) had to do without.
+  -- two DISTINGUISHABLE questions on the wire -- the discriminator
+  -- ChooseReplacement (#74) still does without, and the one OrderTriggers gained
+  -- with its TriggerEntry (#61).
   --
   -- CR 603.5 is what makes this a resolution-time prompt rather than a
   -- cast-time one: an optional ability "goes on the stack when it triggers,
@@ -565,7 +569,10 @@ data Prompt r where
   -- sound where it would not be for OrderTriggers (#61): the answers are
   -- interchangeable, since both symbols demand the same mana and the same 2 life,
   -- so the pair of answers is all that is observable and which prompt got which is
-  -- not. Dismember ({1}{B/P}{B/P}) is the card that asks them.
+  -- not. That is what OrderTriggers could NOT say of two entries from one source
+  -- until it carried an ability (#61), and what ChooseReplacement still cannot
+  -- say of two entries from one source (#74). Dismember ({1}{B/P}{B/P}) is the
+  -- card that asks them.
   --
   -- Elided when only one route is payable, where no choice exists -- no source of
   -- the symbol's colour at all, or a life total below CR 119.4's floor.
