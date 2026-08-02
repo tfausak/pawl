@@ -139,6 +139,97 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) legal) "alice may target her own Piker"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature mongooseId) legal)) "but not her own Mongoose"
 
+  -- CR 702.18a's OTHER half: "This permanent OR PLAYER can't be the target of
+  -- spells or abilities." Ivory Mask ("You have shroud") is the producer, and a
+  -- player has no keywords to carry it -- rule 702's keywords live on objects
+  -- and go through the CR 613.1-613.7 layers, which compute an object's
+  -- characteristics and nothing else. It rides the CR 613.10/613.11 player axis
+  -- instead, as PlayerEffect.CantBeTargetedBy.
+  --
+  -- Lightning Bolt's "any target" is CR 115.4, which is what puts a player in a
+  -- target slot's candidate set at all.
+  Spec.it s "CR 702.18a Ivory Mask's controller cannot be targeted, by anyone" $ do
+    ivoryMask <- S.printingOf s registry "Ivory Mask"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let bare = Setup.emptyGame S.bothPlayers
+        (_, masked) = S.addCreature ivoryMask S.bob bare
+    case S.spellTargetSpec bolt of
+      Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
+      Just theSpec -> do
+        let legalFor who = Target.legalRecipients (Just who) S.noSource theSpec
+        -- The control twin first: without the Mask on the board, bob is an
+        -- ordinary CR 115.4 candidate, so the Mask is what removes him.
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice bare)) "without the Mask, alice may bolt bob"
+        Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice masked))) "with it, she may not"
+        -- Shroud, not hexproof: CR 702.18a names no player, so it stops bob too.
+        -- This is the assertion that an Opponents-scoped implementation fails.
+        Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob masked))) "and bob cannot bolt himself either"
+        -- Scoped to its controller: the Mask says "YOU have shroud", so alice is
+        -- untouched. A whole-table implementation fails here.
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob masked)) "alice, with no Mask, is still a legal target"
+
+  -- THE DISCRIMINATOR for the player halves, the twin of the Mongoose pair
+  -- above. CR 702.11c: "'Hexproof' on a player means 'You can't be the target of
+  -- spells or abilities your opponents control.'" Leyline of Sanctity is the
+  -- producer, and the ONLY thing that differs from Ivory Mask is the scope --
+  -- which is why the two share one constructor carrying a PlayerScope rather
+  -- than getting one apiece. An implementation that ignored the payload would
+  -- pass one of these two tests and fail the other, whichever way it defaulted.
+  Spec.it s "CR 702.11c Leyline of Sanctity stops an opponent, but not its own controller" $ do
+    leyline <- S.printingOf s registry "Leyline of Sanctity"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, warded) = S.addCreature leyline S.bob (Setup.emptyGame S.bothPlayers)
+    case S.spellTargetSpec bolt of
+      Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
+      Just theSpec -> do
+        let legalFor who = Target.legalRecipients (Just who) S.noSource theSpec warded
+        Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice))) "alice, his opponent, may not bolt bob"
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob)) "but bob may bolt himself -- hexproof names only opponents"
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob)) "and alice is targetable as ever"
+
+  -- The GAMEPLAY-level proof for both cards, which the legality reads above are
+  -- not: a Lightning Bolt actually cast, with an answerer that aims at bob
+  -- whenever the engine offers him. Under the Mask he is never offered, so the
+  -- answer falls to alice and SHE takes the 3 -- the second invariant holding,
+  -- since the engine is not choosing a target so much as never presenting an
+  -- illegal one. The Leyline half is the same cast with the same answerer and the
+  -- opposite outcome, because alice IS bob's opponent.
+  Spec.it s "CR 702.18a/702.11c a Bolt aimed at a protected player lands elsewhere" $ do
+    ivoryMask <- S.printingOf s registry "Ivory Mask"
+    leyline <- S.printingOf s registry "Leyline of Sanctity"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let -- Prefers bob for every slot he is offered in, and falls back to the
+        -- lowest candidate otherwise -- so "bob was not offered" is the only way
+        -- the damage can land anywhere else.
+        prefersBob p = case p of
+          Prompt.ChooseTargets _ _ _ sets ->
+            let aim candidates =
+                  if Set.member (Recipient.ToPlayer S.bob) candidates
+                    then Just (Recipient.ToPlayer S.bob)
+                    else Set.lookupMin candidates
+             in Map.mapMaybe aim sets
+          _ -> S.identityAnswer p
+        castAt guard =
+          let base = S.landsInPlay mountain 1
+              withGuard = maybe base (\g -> snd (S.addCreature g S.bob base)) guard
+              (ready, boltId) = S.handOne bolt withGuard
+              board = ready {GameState.priority = Just S.alice}
+           in S.runPure prefersBob board (Cast.castSpell S.alice boltId >> Stack.resolveTop)
+        unguarded = castAt Nothing
+        masked = castAt (Just ivoryMask)
+        warded = castAt (Just leyline)
+    -- The control: with nothing protecting him, the answerer gets what it asked
+    -- for, so the fixture really does aim at bob.
+    Spec.assertEqWith s "unguarded, bob takes the Bolt" (S.lifeOf S.bob unguarded) (Just 17)
+    Spec.assertEqWith s "and alice is untouched" (S.lifeOf S.alice unguarded) (Just 20)
+    -- CR 702.18a: bob was never offered, so the Bolt landed on alice instead.
+    Spec.assertEqWith s "under Ivory Mask, bob takes nothing" (S.lifeOf S.bob masked) (Just 20)
+    Spec.assertEqWith s "and alice, the only candidate left, takes it" (S.lifeOf S.alice masked) (Just 17)
+    -- CR 702.11c: same cast, same answerer, and alice is his opponent.
+    Spec.assertEqWith s "under Leyline of Sanctity, bob takes nothing from his opponent" (S.lifeOf S.bob warded) (Just 20)
+    Spec.assertEqWith s "and alice takes it instead" (S.lifeOf S.alice warded) (Just 17)
+
   -- CR 702.18a says "spells OR ABILITIES", so the gate cannot live on the cast
   -- path. Prodigal Sorcerer's "{T}: This creature deals 1 damage to any target"
   -- is an activated ability with a Pool.AnyTarget slot (CR 115.4), and the same

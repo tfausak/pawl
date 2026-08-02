@@ -58,8 +58,11 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
@@ -664,6 +667,45 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
           (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents ZoneChangeSubject.AnyObject)
           Zone.Exile
       ]
+  -- CR 702.18a's player half. Ivory Mask {2}{W}{W} Enchantment: "You have
+  -- shroud." (Name, cost, type line and oracle text checked against Scryfall.)
+  --
+  -- The whole card is one player ability, and its keyword is NOT in
+  -- CardT.keywords: rule 702's keywords go on objects and through the CR
+  -- 613.1-613.7 layers, and this one is on a PLAYER. That is the correction this
+  -- entry records.
+  Spec.it s "ivory-mask.json loads as a {2}{W}{W} enchantment granting its controller shroud" $ do
+    c <- S.cardOf s registry "Ivory Mask"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Ivory Mask")
+    Spec.assertEqWith s "{2}{W}{W}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.White)]))
+    Spec.assertEqWith s "no object keyword carries it" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "CR 702.18a names no player, so the scope is EachPlayer"
+      (CardT.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.CantBeTargetedBy PlayerScope.EachPlayer)]
+  -- CR 702.11c's player half, and the CR 103.6a action Leyline of the Void
+  -- already established. Leyline of Sanctity {2}{W}{W} Enchantment: "If this
+  -- card is in your opening hand, you may begin the game with it on the
+  -- battlefield. You have hexproof." (Checked against Scryfall.)
+  --
+  -- The PAIR with Ivory Mask above is the point: same cost, same type, same
+  -- ability shape, and the two differ in exactly the PlayerScope the effect
+  -- carries -- which is why one constructor serves both keywords.
+  Spec.it s "leyline-of-sanctity.json loads with a CR 103.6a action and hexproof for its controller" $ do
+    c <- S.cardOf s registry "Leyline of Sanctity"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Leyline of Sanctity")
+    Spec.assertEqWith s "{2}{W}{W}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.White)]))
+    Spec.assertEqWith
+      s
+      "the CR 103.6a action puts itself onto the battlefield"
+      (CardT.openingHandAction c)
+      [Effect.MoveToZone Binding.triggerSource Zone.Battlefield EntryRiders.defaultValue Nothing]
+    Spec.assertEqWith
+      s
+      "CR 702.11c names your opponents, so the scope is Opponents"
+      (CardT.playerAbilities c)
+      [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.CantBeTargetedBy PlayerScope.Opponents)]
   -- CR 614.1b: the first card in the pool whose replacement effect is a
   -- SKIP. Nothing about Eon Hub is a static ability -- the whole card is one
   -- replacement -- which is the correction this file's presence records.

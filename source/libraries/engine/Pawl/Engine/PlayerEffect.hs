@@ -197,6 +197,10 @@ prohibitsCasting pid gs =
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana -> False
+        -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
+        -- shroud may cast anything, and Pawl.Engine.Target.targetable is where the
+        -- restriction lands (CR 115.4's "any target" and CR 601.2c's choosing).
+        PlayerEffect.CantBeTargetedBy _ -> False
    in any prohibits (applying pid gs)
 
 -- Does this spell match the cost-adjustment Filter? Evaluated against the
@@ -235,6 +239,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -242,8 +247,52 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
       effects = applying pid gs
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
+
+-- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
+-- ability controlled by `caster`?
+--
+-- The typed question Pawl.Engine.Target.targetable asks for its
+-- Recipient.ToPlayer arm, so that module never sees a PlayerEffect constructor.
+-- It answers the PLAYER halves of shroud and hexproof; the permanent halves are
+-- keywords and stay where the other keyword reads are.
+--
+-- The scope is read against `pid`, the PROTECTED player: CR 702.11c's "you" is
+-- the player who has hexproof, and "your opponents" are theirs. That is a
+-- DIFFERENT anchor from the one PlayerStaticAbility.scope uses (the effect's
+-- controller), which is why the argument order here is (caster, protected) and
+-- inScope's is (asked-about, controller). See
+-- Pawl.Types.PlayerEffect.CantBeTargetedBy for why the two coincide on both
+-- cards in the pool and where they would come apart.
+--
+-- A Nothing caster is a question with no CR 109.5 "you" in it. Hexproof does not
+-- stop it -- nobody's opponent, the vacuous posture Target.opponentOfController
+-- and every player-referencing Filter atom take -- while shroud stops it anyway,
+-- because EachPlayer never asks the caster a question. That is exactly the
+-- carve-out playersInScope above already makes for the same constructor, and it
+-- is the rules answer too: CR 702.18a names no player at all.
+--
+-- MEMBERSHIP, never a tally: CR 702.18b ("multiple instances of shroud on the
+-- same permanent or player are redundant") and CR 702.11h say so for the player
+-- half in the same breath as the permanent half.
+protectedFromTargeting :: Maybe PlayerId -> PlayerId -> GameState -> Bool
+protectedFromTargeting caster pid gs =
+  let stops effect = case effect of
+        PlayerEffect.CantBeTargetedBy scope -> case caster of
+          Just who -> inScope who pid scope
+          Nothing -> case scope of
+            PlayerScope.EachPlayer -> True
+            PlayerScope.Opponents -> False
+            PlayerScope.You -> False
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana -> False
+   in any stops (applying pid gs)
 
 -- CR 402.2: "each player has a maximum hand size, which is normally seven
 -- cards." This is NOT CR 103.5's starting hand size, which is a different seven
@@ -264,6 +313,7 @@ maximumHandSize pid gs =
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.DontLoseUnspentMana -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
    in if any removes (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
@@ -292,4 +342,5 @@ keepsUnspentMana pid gs =
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
    in any keeps (applying pid gs)

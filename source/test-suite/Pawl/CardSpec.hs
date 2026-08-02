@@ -1171,6 +1171,9 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.CantCastMoreThan _ -> []
   PlayerEffect.NoMaximumHandSize -> []
   PlayerEffect.DontLoseUnspentMana -> []
+  -- CR 702.18a / 702.11c carry a PlayerScope, not a Filter: the set they name is
+  -- players, and this traversal is about the spells a cost modifier matches.
+  PlayerEffect.CantBeTargetedBy _ -> []
 
 -- CR 614.1: only the counter-placement pattern narrows by a Filter
 -- (CounterPattern.onWhat -- "one or more counters would be put on a creature

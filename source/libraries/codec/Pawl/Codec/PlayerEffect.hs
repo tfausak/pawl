@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaCost as ManaCost
+import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -17,6 +18,7 @@ toJson e = case e of
   PlayerEffect.ReduceSpellCost c m -> Common.tagged "ReduceSpellCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m]
   PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
   PlayerEffect.DontLoseUnspentMana -> Common.nullary "DontLoseUnspentMana"
+  PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ PlayerScope.toJson sc
 
 fromJson :: Value.Value -> Either Text.Text PlayerEffect.PlayerEffect
 fromJson value = do
@@ -28,4 +30,5 @@ fromJson value = do
     ("ReduceSpellCost", Just (Value.Array (Array.MkArray [c, m]))) -> PlayerEffect.ReduceSpellCost <$> Filter.fromJson Keyword.fromJson c <*> ManaCost.fromJson m
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     ("DontLoseUnspentMana", _) -> Right PlayerEffect.DontLoseUnspentMana
+    ("CantBeTargetedBy", Just v) -> PlayerEffect.CantBeTargetedBy <$> PlayerScope.fromJson v
     _ -> Left . Text.pack $ "unknown PlayerEffect: " <> t

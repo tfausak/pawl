@@ -176,19 +176,31 @@ admittedGiven pcs perspective source spec gs =
 -- characteristics, which legalRecipients already holds; CR 702.11d's "hexproof
 -- from [quality]" is that same reader rather than a payload on this arm (#555).
 --
--- CR 702.18a's "or player" half is NOT implemented, and neither is CR 702.11c's
--- ("'Hexproof' on a player means 'You can't be the target of spells or abilities
--- your opponents control'"): a player in this engine has no keywords to read, so
--- a player candidate is always targetable (#518).
+-- CR 702.18a's "or player" half, and CR 702.11c's ("'Hexproof' on a player means
+-- 'You can't be the target of spells or abilities your opponents control'"), come
+-- in through a DIFFERENT reader. A player has no keywords: rule 702's keywords
+-- live on objects and are folded by the CR 613.1-613.7 layers, which compute an
+-- object's characteristics and nothing else, so the player halves ride the CR
+-- 613.10/613.11 player axis as PlayerEffect.CantBeTargetedBy. Ivory Mask and
+-- Leyline of Sanctity are the producers. PlayerEffect.protectedFromTargeting is
+-- the typed question; this module never sees the constructor.
+--
+-- The two halves stay apart on purpose rather than being unified: the object
+-- half's answer comes from a projection this function already holds `pcs` for,
+-- and the player half's from a live battlefield walk that has no projection in
+-- it at all. One reader over both would have to do the worse of the two for
+-- every candidate.
 targetable :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> GameState -> Recipient -> Bool
-targetable pcs perspective gs recipient = case Recipient.objectOf recipient of
-  Nothing -> True
-  Just oid ->
-    let has keyword = Projection.hasKeywordGiven pcs keyword oid gs
-        restricted =
-          has Keyword.Shroud
-            || (has Keyword.Hexproof && opponentOfController perspective oid gs)
-     in not (Set.member oid (GameState.battlefield gs) && restricted)
+targetable pcs perspective gs recipient = case recipient of
+  Recipient.ToPlayer pid -> not (PlayerEffect.protectedFromTargeting perspective pid gs)
+  _ -> case Recipient.objectOf recipient of
+    Nothing -> True
+    Just oid ->
+      let has keyword = Projection.hasKeywordGiven pcs keyword oid gs
+          restricted =
+            has Keyword.Shroud
+              || (has Keyword.Hexproof && opponentOfController perspective oid gs)
+       in not (Set.member oid (GameState.battlefield gs) && restricted)
 
 -- CR 702.11b's "your opponents": is `perspective` -- CR 109.5's "you" for the
 -- spell or ability being aimed -- someone other than `oid`'s controller?
