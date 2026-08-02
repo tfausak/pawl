@@ -834,11 +834,17 @@ keywordFilters keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.FirstStrike -> []
+  -- CR 702.8a: flash is a static ability with no payload -- it changes WHEN the
+  -- card may be cast, and names nothing to filter.
+  Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
   Keyword.Hexproof -> []
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
+  -- CR 702.15a: lifelink is a static ability with no payload -- its rider rides
+  -- the damage event, not the keyword.
+  Keyword.Lifelink -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
