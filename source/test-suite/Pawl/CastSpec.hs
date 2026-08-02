@@ -1306,6 +1306,46 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     Spec.assertBool s (not (Cast.castable S.bob bobsRally later)) "not castable"
     Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob later)) "and not offered"
     Spec.assertBool s (elem (A.Cast boltId) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
+  -- CR 508.4's last-but-one sentence: "Such creatures are 'attacking' but, for
+  -- the purposes of trigger events and effects, they never 'attacked.'" The
+  -- words that reach a printed casting restriction are "AND EFFECTS" -- a
+  -- restriction is an effect, not a trigger. CR 508.3b works the same principle
+  -- out for the trigger case ("Whenever [a player, planeswalker, or battle] is
+  -- attacked" "won't trigger if a creature is put onto the battlefield attacking
+  -- that player or permanent"), so it corroborates rather than governs.
+  --
+  -- So Rally's "only if you've been attacked this step" must NOT be satisfied by
+  -- a creature that arrived attacking. A DIRECT call, the shape TurnSpec's CR
+  -- 508.8 case takes for the same clause, so the rule is stated with no card in
+  -- the way; the pool reaches it through Meandering Towershell, whose delayed
+  -- ability returns it attacking on a turn its controller declares nothing.
+  --
+  -- The two records this separates are both live: CR 508.8's skip counts a
+  -- creature put onto the battlefield attacking ("or put onto the battlefield
+  -- attacking"), and this rule does not. Asserting both here is what keeps a fix
+  -- from collapsing them again.
+  Spec.it s "CR 508.4 a creature put onto the battlefield attacking never attacked, so Rally stays uncastable" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
+    let (bobsRally, _, _, board) = rallyBoard piker plains rally
+        mine = Projection.controls S.alice board
+        joined = S.runPure S.identityAnswer board (Foldable.traverse_ Combat.putOntoBattlefieldAttacking mine)
+        combat = GameState.combat joined
+    Spec.assertEqWith s "nothing was DECLARED" (S.attackerDeclarationsOf joined) []
+    -- CR 508.8's record does count it -- that is the rule's second clause, and
+    -- the skip depends on it.
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked combat)) "CR 508.8 counts it: something is attacking bob"
+    -- CR 508.3b/508.4's record does not.
+    Spec.assertBool s (not (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked combat))) "but bob was never DECLARED-attacked"
+    Spec.assertBool s (not (Cast.castable S.bob bobsRally joined)) "so Rally is not castable"
+    Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob joined)) "and not offered"
+    -- The control twin: the SAME board with a real declaration makes it
+    -- castable, so what the assertions above measure is the declaration and not
+    -- something else about the fixture.
+    let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+    Spec.assertBool s (Cast.castable S.bob bobsRally declared) "declared instead, it IS castable"
+
   -- CR 117.1a is not what is stopping it: an unrestricted instant with the
   -- same cost, in the same hand, in the same step, is castable. Without this
   -- the negatives above would also pass on an engine that refused every cast

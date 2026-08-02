@@ -75,9 +75,11 @@ woundedByDeathtouch gs oid =
 -- ungated by indestructible and NOT saved by regeneration (CR 701.19a).
 --
 -- The isCreature guard is not redundant. Only creatures have printed toughness
--- today, so toughnessOf already implies it -- but a Vehicle (CR 301.7) has P/T
--- while not being a creature, and 704.5f/g must not touch it. Ask the
--- classification, never the identity.
+-- today, so toughnessOf already implies it -- but CR 301.7a is why the two are
+-- not the same question: "Each Vehicle has a printed power and toughness, but it
+-- has these characteristics only if it's also a creature." A noncreature Vehicle
+-- has the printed numbers and not the characteristic, and 704.5f/g must not
+-- touch it. Ask the classification, never the identity.
 -- Takes the object's already-projected characteristics (checkStateBasedActions
 -- projects the whole board once, per CR 704.3 simultaneity, rather than
 -- re-projecting per object).
@@ -118,7 +120,7 @@ zeroLoyalty gs pc oid =
       Just obj -> Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj) == 0
 
 -- CR 704.5g/h: a creature destroyed by lethal marked damage or by a deathtouch
--- source. A DESTRUCTION -- indestructible-gated (CR 700.4) and regeneration-
+-- source. A DESTRUCTION -- indestructible-gated (CR 702.12b) and regeneration-
 -- interceptable (CR 701.19a via the Pawl.Engine.Event destroy funnel). Excludes 704.5f
 -- (that is zeroToughness), so toughness here is > 0.
 destroyedBySba :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool

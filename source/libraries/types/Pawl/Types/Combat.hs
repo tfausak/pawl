@@ -78,22 +78,18 @@ data Combat = MkCombat
     -- that regenerated (CR 701.19a) during the declare attackers step -- both of
     -- which delete the entry, and neither of which un-declares anything.
     --
-    -- The two readers:
+    -- ONE reader: CR 508.8's skip -- "If no creatures are declared as attackers
+    -- or put onto the battlefield attacking, skip the declare blockers and combat
+    -- damage steps" -- as EMPTINESS (Pawl.Engine.Combat.skipEmptyCombat). That is
+    -- the same question as "did any creature join", not a weaker one: CR 508.1b
+    -- gives every joining creature exactly one target, and both writers add it in
+    -- the same update that puts the creature into `attackers`, so this is
+    -- non-empty exactly when one joined.
     --
-    --   * CR 508.8's skip -- "If no creatures are declared as attackers or put
-    --     onto the battlefield attacking, skip the declare blockers and combat
-    --     damage steps" -- is EMPTINESS (Pawl.Engine.Combat.skipEmptyCombat). That is the
-    --     same question as "did any creature join", not a weaker one: CR 508.1b
-    --     gives every joining creature exactly one target, and both writers add
-    --     it in the same update that puts the creature into `attackers`, so this
-    --     is non-empty exactly when one joined.
-    --   * "only if you've been attacked this step" (Rally the Troops) is
-    --     MEMBERSHIP of OfPlayer (Pawl.Engine.Cast.attackedThisStep). Eightfold Maze's
-    --     ruling is why that one cannot be emptiness: "If all the attacking
-    --     creatures attack your planeswalkers, you can't cast Eightfold Maze. To
-    --     cast it, a creature needs to have attacked _you_."
+    -- "Only if you've been attacked this step" (Rally the Troops) used to read
+    -- this field too, and must not: see `declaredAttacked` below.
     --
-    -- A set of TARGETS and not of attacker ids: neither reader asks WHICH
+    -- A set of TARGETS and not of attacker ids: the reader does not ask WHICH
     -- creature, and keying by the creature would shadow `attackers`' key set and
     -- invite the two to be confused.
     --
@@ -103,6 +99,37 @@ data Combat = MkCombat
     -- end of combat step ends (CR 511.3), so a CR 500.8 additional combat phase
     -- asks the question again from empty.
     attacked :: Set.Set AttackTarget.AttackTarget,
+    -- | CR 508.3b / 508.4: the targets a creature was DECLARED attacking.
+    --
+    -- A SUBSET of `attacked` above but not a difference from it -- both fields
+    -- are unions, and a target attacked BOTH ways in one step is in both. What
+    -- separates them is the writer: declareAttackers adds to both,
+    -- putOntoBattlefieldAttacking adds only to `attacked`.
+    --
+    -- The two are different questions and the rules answer them differently,
+    -- which is the whole reason this field exists beside the one above. CR 508.8
+    -- counts both ("if no creatures are declared as attackers OR PUT ONTO THE
+    -- BATTLEFIELD ATTACKING, skip ..."), so the skip reads `attacked`. But CR
+    -- 508.4's last-but-one sentence is emphatic that the second kind never
+    -- attacked: "Such creatures are 'attacking' but, for the purposes of trigger
+    -- events and effects, they never 'attacked.'" That is the load-bearing rule
+    -- here, and the words that carry it are "AND EFFECTS": a printed casting
+    -- restriction is an effect, not a trigger. CR 508.3b is the same principle
+    -- worked out for the trigger case only -- an ability reading "Whenever [a
+    -- player, planeswalker, or battle] is attacked" "won't trigger if a creature
+    -- is put onto the battlefield attacking that player or permanent" -- so it
+    -- is corroboration rather than authority.
+    --
+    -- So anything asking whether a PLAYER was attacked reads this one:
+    -- Pawl.Engine.Cast.attackedThisStep, for Rally the Troops' "only if you've
+    -- been attacked this step". Reading `attacked` there let a Meandering
+    -- Towershell that returned attacking -- on a turn its controller declared
+    -- nothing -- make the defending player "attacked", which CR 508.4 denies.
+    --
+    -- Written only by Pawl.Engine.Combat.declareAttackers, never by
+    -- putOntoBattlefieldAttacking; same lifetime and same never-cleared posture
+    -- as `attacked`, for that field's reasons.
+    declaredAttacked :: Set.Set AttackTarget.AttackTarget,
     -- | CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
     -- a turn-based action immediately after the beginning of combat step begins
     -- (CR 703.4h, CR 507.1) by Pawl.Engine.Combat.chooseDefender.

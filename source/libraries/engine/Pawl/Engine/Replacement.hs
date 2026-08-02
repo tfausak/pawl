@@ -334,7 +334,7 @@ applies gs event candidate =
             -- CR 109.5: "under YOUR control" -- the tokens' controller is the
             -- effect source's controller.
             ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
-            -- CR 102.1: no producer today -- tokens created under an opponent's
+            -- CR 102.2: no producer today -- tokens created under an opponent's
             -- control.
             ControllerRelation.Opponents -> case Projection.controllerOf src gs of
               Just you -> pid /= you
@@ -386,7 +386,7 @@ matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> 
 matchesController gs src rel oid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
-  -- CR 102.1: no producer today -- a counter or token pattern scoped to an
+  -- CR 102.2: no producer today -- a counter or token pattern scoped to an
   -- opponent's permanents. Controller-based, unlike matchesZoneOwner below.
   ControllerRelation.Opponents -> case (Projection.controllerOf oid gs, Projection.controllerOf src gs) of
     (Just theirs, Just yours) -> theirs /= yours

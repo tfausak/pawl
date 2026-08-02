@@ -1831,6 +1831,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.struckFirst = Nothing,
                       Combat.Type.joinedUnder = Map.singleton oid S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.defender = Just S.bob
                     }
               }

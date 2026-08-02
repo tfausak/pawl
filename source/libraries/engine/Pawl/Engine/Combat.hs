@@ -47,6 +47,7 @@ emptyCombat =
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
       Combat.attacked = Set.empty,
+      Combat.declaredAttacked = Set.empty,
       Combat.defender = Nothing
     }
 
@@ -117,7 +118,9 @@ skipEmptyCombat gs =
 -- carries no such note and is deliberately not cited here as though it did.
 --
 -- SEATING order (Game.stillPlayingInOrder), not player-id order: the seating
--- roster is the game's own ordering for anything player-shaped (CR 800.5), and
+-- roster is the game's own ordering for anything player-shaped (CR 103.1: "the
+-- game's default turn order begins with the starting player and proceeds
+-- clockwise"; CR 800.5 only says the seating itself is agreed at the table), and
 -- Game.stillPlaying's order is an artifact of reading the players map. It
 -- makes the first candidate the next seat rather than the lowest id, which is
 -- what an interpreter that takes the head should get.
@@ -1064,9 +1067,15 @@ declareAttackers pid = do
                         -- CR 506.4 removal later in the step cannot un-declare
                         -- these creatures, and never narrowed to the targets still
                         -- being attacked -- Pawl.Types.Combat's `attacked` field
-                        -- says why both readers want the historical answer.
+                        -- says why its reader wants the historical answer.
                         Combat.attacked =
-                          Set.union (Set.fromList (Map.elems recorded)) (Combat.attacked (GameState.combat g))
+                          Set.union (Set.fromList (Map.elems recorded)) (Combat.attacked (GameState.combat g)),
+                        -- CR 508.3b / 508.4's narrower record, written HERE and
+                        -- only here: these creatures were DECLARED, which is
+                        -- exactly what those two rules distinguish from being put
+                        -- onto the battlefield attacking.
+                        Combat.declaredAttacked =
+                          Set.union (Set.fromList (Map.elems recorded)) (Combat.declaredAttacked (GameState.combat g))
                       }
                 }
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
