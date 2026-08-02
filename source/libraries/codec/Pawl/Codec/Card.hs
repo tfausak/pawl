@@ -5,7 +5,11 @@
 --
 -- Every @Pawl.Types.*@ module stays JSON-free. Casing on an effect's identity
 -- anywhere under @Pawl.Codec@ is open-half machinery, not the rules core --
--- mirroring 'Pawl.Engine.Resolve', the sole @case@-on-@Effect@ home.
+-- mirroring 'Pawl.Engine.Resolve', which executes every @Effect@ and is the only
+-- module allowed to case on one to decide WHAT IT DOES. The one other
+-- @case@-on-@Effect@ in the engine is 'Pawl.Engine.ManaAbility', which answers CR
+-- 605.1a's classification and executes nothing; its header says why it is not a
+-- breach.
 module Pawl.Codec.Card where
 
 import qualified Data.Map.Strict as Map
