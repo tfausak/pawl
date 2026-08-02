@@ -7,11 +7,11 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 
 -- | One replacement effect instance as the CR 616.1 loop sees it: what it does,
--- whose it is (CR 109.5's "you", which every ControllerRelation pattern reads),
--- which instance it is (CR 614.5), and whether it is one of CR 614.15's
--- self-replacement effects (CR 616.1a's step). `source` is derivable from
--- `identity` but is kept explicit -- every applicability test and the
--- ChooseReplacement payload read it directly.
+-- where it comes from and whose it is (CR 109.5's "you", which every
+-- ControllerRelation pattern reads), which instance it is (CR 614.5), and
+-- whether it is one of CR 614.15's self-replacement effects (CR 616.1a's step).
+-- `source` is derivable from `identity` but is kept explicit -- every
+-- applicability test and the ChooseReplacement payload read it directly.
 --
 -- `origin` rides here rather than on ReplacementEffect because CR 614.15 is about
 -- which ability CREATED an effect, not about what the effect does; see

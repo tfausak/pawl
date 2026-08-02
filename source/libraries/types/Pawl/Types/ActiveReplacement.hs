@@ -55,7 +55,7 @@ data ActiveReplacement = MkActiveReplacement
     -- | CR 109.5's "you", BAKED as the row is installed rather than re-derived
     -- from `source`. The same posture Pawl.Types.ContinuousEffect and
     -- Pawl.Types.PlayerEffect already take, and for the same reason: the source
-    -- of a floating replacement is a resolving spell, and CR 608.2m has put it
+    -- of a floating replacement is a resolving spell, and CR 608.2n has put it
     -- in its owner's graveyard -- as a NEW object with a NEW id (CR 400.7) --
     -- long before the row is ever consulted, so there is nothing left on the
     -- board to ask. Gather Specimens is the card that makes this observable:

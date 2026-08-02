@@ -236,17 +236,25 @@ controlEffectsEnd pid gs =
 -- and left with the first clause.
 --
 -- Empty by construction once the first two clauses have run, and the proof is
--- worth writing down rather than trusting -- it is stated once here and
--- remainingControlledExiled leans on the same statement, because the two
--- clauses ask the same question of different zones.
+-- worth writing down rather than trusting. It is stated once here, and
+-- remainingControlledExiled reads it for the STACK half of its own search --
+-- but only that half, because source 1 below is where the two clauses stop
+-- asking the same question.
 --
 -- Projection.controllerOf has THREE sources, and the claim is that after
--- clauses 1 and 2 none of them can answer `pid` for any surviving object,
--- anywhere:
+-- clauses 1 and 2 none of them can answer `pid` for any surviving object ON THE
+-- STACK:
 --
---   1. the object's OWNER, the default. Object.owner is baked at creation and
---      never mutated, and the first clause deleted every object `pid` owned, so
---      no surviving object has this answer.
+--   1. the object's CR 110.2 DEFAULT controller
+--      (Projection.defaultControllerOf): Object.enteredUnder where a CR 616.1b
+--      replacement recorded one, and otherwise CR 108.4a's Object.owner.
+--      Object.owner is baked at creation and never mutated, and the first
+--      clause deleted every object `pid` owned. Object.enteredUnder is written
+--      only by Pawl.Engine.Replacement's entry loop and only for a BATTLEFIELD
+--      entry, and Event.changeZone clears it on every move -- so no STACK
+--      object can carry one, and this clause's search finds nothing. A
+--      BATTLEFIELD permanent can (Gather Specimens takes an opponent's creature
+--      and the taker then leaves), which is exactly what clause 4 is for.
 --   2. a stored layer-2 SetController, whose PlayerId is BAKED at resolution
 --      (CR 611.2c). The second clause deleted every stored effect whose payload
 --      is `pid`, whichever object it affects, so no surviving effect has this
@@ -301,10 +309,18 @@ nonCardStackObjectsCease pid gs =
 -- "the stack was just swept, so the battlefield is the whole search" --
 -- nonCardStackObjectsCease's sweep explicitly skips cards, so a controlled
 -- SPELL would still be sitting on the stack if that were the only reason. The
--- real reason is nonCardStackObjectsCease's induction, which is unconditional
--- over Projection.controllerOf's three sources and therefore says the same
--- thing about a stack object as about a battlefield one. The stack contributes
--- nothing to this clause's search either way.
+-- real reason is nonCardStackObjectsCease's induction, which closes over the
+-- stack: none of Projection.controllerOf's three sources can answer `pid` for a
+-- surviving stack object, spell or not. The stack contributes nothing to this
+-- clause's search.
+--
+-- The BATTLEFIELD is a different matter, and this clause has real work to do
+-- there: source 1 is CR 110.2's default controller, and Object.enteredUnder can
+-- carry `pid` for a permanent `pid` neither owns nor holds by any stored effect
+-- -- Gather Specimens' victim, once its taker leaves. Clause 1 does not delete
+-- it (the owner is someone else) and clause 2 ends no effect (there is none),
+-- so it arrives here still controlled by the departing player, which is CR
+-- 800.4a's "any objects still controlled by that player" exactly.
 --
 -- Two premises of that induction live here, at the sites that would break them:
 --
@@ -315,7 +331,9 @@ nonCardStackObjectsCease pid gs =
 --     inherent monarch trigger's controller the same way, and a spell's owner
 --     is fixed when it is cast. No later write can turn an object `pid` does
 --     not own into one they do, so clause 1's deletion is exhaustive and stays
---     so.
+--     so. Object.enteredUnder is the one thing that can make an object read as
+--     controlled by someone who does not own it without a stored effect saying
+--     so, and it is unreachable on the stack for the reason given there.
 --   * Clause 2 recognizes a control-granting effect by its PAYLOAD, not by
 --     where it was built: Projection.givesControlTo asks whether a stored
 --     SetController names `pid`, so the NUMBER of construction sites is
@@ -329,10 +347,14 @@ nonCardStackObjectsCease pid gs =
 --     card JSON could reach through Effect.ModifyTarget; no card does, and
 --     Pawl.CardSpec lints the pool to keep it that way (#199).
 --
--- Empty by construction, for the reason just given -- which is also why
--- nonCardStackObjectsCease is empty. Written anyway, so a fourth source of
--- control could not silently skip a clause of this rule -- nothing would
--- warn. The exile is a direct move rather than an
+-- NOT empty by construction, unlike nonCardStackObjectsCease: it was until
+-- Object.enteredUnder existed, and the comment that said so was the reason to
+-- write the clause anyway rather than assume it away -- a further source of
+-- control could not silently skip a clause of this rule, and nothing would have
+-- warned. No card reaches it yet, since the only board that produces one needs
+-- three or more seats (at two, CR 104.2a ends the game the moment a player
+-- leaves and continuesAfterDeparture skips all of CR 800.4a) and a Gather
+-- Specimens whose controller then leaves (#582). The exile is a direct move rather than an
 -- Event.changeZone: this function is pure, so it cannot funnel, and a
 -- leaves-the-battlefield trigger on this move is therefore not emitted (#179).
 remainingControlledExiled :: PlayerId -> GameState -> GameState

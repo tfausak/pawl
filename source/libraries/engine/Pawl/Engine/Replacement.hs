@@ -186,10 +186,16 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- A simultaneously-entering sibling can reach a later token's entry loop
 -- through three channels; only the first needs this explicit exclusion:
 --   1. Copy targets -- excluded by `batch`, above.
---   2. Candidate collection -- impossible regardless of `batch`: the entry loop
---      only ever raises a WouldEnter event, and `applies` gates every EntryR
---      candidate to `src == oid` (its OWN source), so a sibling's replacement
---      effect can never even become a candidate for another sibling's loop.
+--   2. Candidate collection -- unreachable regardless of `batch`, though no
+--      longer impossible by construction. The entry loop only ever raises a
+--      WouldEnter event, and `applies` gates each EntryR candidate by its own
+--      Filter; every entry replacement a PERMANENT carries in this pool is CR
+--      614.1c's self-only `IsSource` (Clone, Primal Plasma, CR 306.5b's
+--      loyalty), which no sibling can satisfy. CR 614.1d's other-objects form
+--      exists now -- Gather Specimens -- but it is a FLOATING row rather than a
+--      sibling's ability, so it is not what this channel is about. A permanent
+--      printing a 614.1d entry replacement (Essence of the Wild) would reach a
+--      sibling here, correctly and by the card's own text.
 --   3. Projection -- a sibling's STATIC ABILITIES would be visible to a later
 --      token's projection (this module's own reads of Projection.controllerOf,
 --      Projection.copiableCharacteristics and Projection.isCreatureOf, the last
@@ -279,7 +285,7 @@ collect sources floating =
             ReplacementCandidate.effect = ActiveReplacement.effect active,
             ReplacementCandidate.source = ActiveReplacement.source active,
             -- CR 109.5, BAKED at installation rather than derived: this row's
-            -- source is a spell CR 608.2m has already put in its owner's
+            -- source is a spell CR 608.2n has already put in its owner's
             -- graveyard as a new object with a new id, so `source` names nothing
             -- the board can answer about. See Pawl.Types.ActiveReplacement.
             ReplacementCandidate.controller = Just (ActiveReplacement.controller active),

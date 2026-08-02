@@ -21,6 +21,15 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- ("one effect may apply to an event, and another to an event contained within
 -- the first"), expressed as call nesting rather than as a field.
 --
+-- It carries an ObjectId and NOTHING ELSE, including no would-be controller for
+-- CR 616.1b to rewrite, because the engine materializes the entering permanent
+-- before the loop runs (CR 614.12's "as it would exist on the battlefield", see
+-- Pawl.Engine.Replacement.runEntry). Every property of the entry that a
+-- replacement can modify therefore lives on the OBJECT -- the copy snapshot, the
+-- entry choice, the counters, and CR 110.2's default controller -- and each
+-- rewrite writes there, which is also what makes CR 616.2 fall out: the loop's
+-- next iteration re-collects against a board that already shows the change.
+--
 -- WouldBeginPhase is the one arm that is not about an OBJECT: CR 614.1b's skips
 -- replace a step, a phase or a turn, none of which any object owns. Its PlayerId
 -- is the active player -- the player whose step it is, and so CR 616.1's
