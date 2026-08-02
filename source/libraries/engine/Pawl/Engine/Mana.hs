@@ -919,36 +919,55 @@ canPay pid = canPayCommitting pid 0
 canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
 canPayCommitting pid committed cost gs = not (null (payableResolutions pid committed cost gs))
 
--- One untapped source's contribution to the supply side, as a supply per mana it
--- would add: the Nth supply is every type the Nth mana of any of its yields
--- could be. `transpose` is exactly that read, and its ragged case -- yields of
--- different LENGTHS -- takes the longest, so a source is counted for the most
--- mana any one activation of it adds.
+-- One untapped source's contribution to the supply side, as the OPTIONS it
+-- offers: one option per yield, and each option is that yield read as one supply
+-- per mana it adds. payableResolutions picks exactly ONE option per source.
 --
--- EXACT wherever the pool reaches it, and the two cases are worth separating. A
--- source with ONE yield (Sol Ring, Birds of Paradise, a Forest) has nothing to
--- mix, and a source whose yields are all ONE mana (an Urborg'd Mountain) has one
--- supply carrying their union, which is what the whole model was before Sol Ring.
--- What it OVER-counts is a source offering several multi-mana yields: transposing
--- lets the first mana come from one yield and the second from another, and
--- letting the longest yield set the count credits a source with mana the yield
--- the player actually picks may not add. Over-permissive, deliberately -- an
--- unpayable payment fails and rolls back (CR 601.2h, payCost), while
--- under-counting would withhold an action the player was entitled to. No card in
--- the pool has two yields of which either adds more than one mana (#450).
+-- One and not several, because CR 106.12 makes "tap for mana" an activation of a
+-- mana ability "that includes the {T} symbol in its activation cost", and CR
+-- 107.5 says "a permanent that's already tapped can't be tapped again to pay the
+-- cost". Every mana ability in this pool costs exactly {T} (manaSourcesGiven
+-- leans on the same fact for CR 302.6), so an untapped source is tapped for mana
+-- at most once and adds what exactly one activation adds. Mixing its yields --
+-- the first mana from one, the second from another -- describes a board no
+-- sequence of activations reaches.
 --
--- The TAGS mix by union, and there the mixing is exact rather than
--- over-permissive: manaYieldsOfGiven stamps one tag set on every unit of every
--- yield of a source, because CR 106.3 makes them all facts about that one
--- source. So the union is the value each of them already had.
-sourceSupplies :: [Mana] -> [Supply]
-sourceSupplies yields = fmap asSupply (List.transpose (fmap unitsOf yields))
+-- The COLLAPSE is the one place several yields become one option, and it is
+-- exact rather than a shortcut. Where every yield adds at most one mana, each
+-- option is at most one supply, and one supply is already "one mana that could be
+-- any of these types": the union over the yields is precisely what an Urborg'd
+-- Mountain or a Birds of Paradise puts on the table. A yield adding NO mana is
+-- dropped by the same union, and dropping it changes no answer -- both of
+-- payableResolutions' board clauses only ever grow as supplies are added, so an
+-- option offering fewer supplies than another can never be the one that pays.
+-- Outside the collapse such a yield is offered as an empty option and never
+-- taken, for that same reason.
+--
+-- It is also what keeps the search below small. Birds of Paradise offers CR
+-- 105.4's five yields; collapsed it is one option, so five Birds are one board
+-- rather than 5^5. A source with ONE yield needs no collapse to be one option,
+-- so Sol Ring's "{T}: Add {C}{C}" takes the other branch and is one option there.
+--
+-- The TAGS mix by union, and there too the union is exact: manaYieldsOfGiven
+-- stamps one tag set on every unit of every yield of a source, because CR 106.3
+-- makes them all facts about that one source. So the union is the value each of
+-- them already had.
+sourceOptions :: [Mana] -> [[Supply]]
+sourceOptions yields =
+  let unitLists = fmap unitsOf yields
+   in if all (\units -> length units <= 1) unitLists
+        then [collapsed (concat unitLists)]
+        else fmap (fmap supplyOf) unitLists
   where
-    asSupply units =
-      MkSupply
-        { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
-          supplyTags = Set.unions (fmap ManaUnit.tags units)
-        }
+    collapsed units =
+      if null units
+        then []
+        else
+          [ MkSupply
+              { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
+                supplyTags = Set.unions (fmap ManaUnit.tags units)
+              }
+          ]
 
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
@@ -966,12 +985,16 @@ sourceSupplies yields = fmap asSupply (List.transpose (fmap unitsOf yields))
 -- So it is an assignment question, and it is answered exactly. Model each
 -- available mana as a SUPPLY carrying the set of types it could be and the
 -- production-time tags it would carry (CR 106.3) -- a pool unit is its own type
--- and its own tags; an untapped source contributes ONE SUPPLY PER MANA IT ADDS,
--- which is what sourceSupplies below reads off its yields. Each typed symbol of
--- the cost is a DEMAND, which `serves` matches against a supply; generic symbols
--- demand a count and nothing more.
+-- and its own tags. An untapped source is a CHOICE among such supplies, one
+-- option per yield it could add (sourceOptions above), because CR 107.5 lets it
+-- be tapped for mana once. Each typed symbol of the cost is a DEMAND, which
+-- `serves` matches against a supply; generic symbols demand a count and nothing
+-- more.
 --
--- A RESOLVED cost is payable exactly when all three hold:
+-- A BOARD is the pool plus one option taken from every source -- the mana the
+-- player would actually have in front of them after tapping everything. A
+-- RESOLVED cost is payable when clause 3 holds and SOME board satisfies clauses
+-- 1 and 2:
 --
 --   1. every typed demand can be met at once -- a matching of demands into
 --      supplies that saturates the demand side;
@@ -986,6 +1009,29 @@ sourceSupplies yields = fmap asSupply (List.transpose (fmap unitsOf yields))
 --      never fail: every resolution of such a cost costs 0 life, and CR 119.4b
 --      lets anyone pay that -- see canPayLife, which answers 0 without a lookup
 --      precisely so that this holds for a player the map does not hold either.
+--
+-- Clauses 1 and 2 are asked of ONE board at a time, and that is the whole of
+-- #450's fix. Asking them of a per-source union instead -- the Nth supply being
+-- every type the Nth mana of ANY of a source's yields could be -- lets one
+-- source's first mana come from one yield and its second from another, which is
+-- not a board any sequence of activations reaches. Ashaya, Soul of the Wild makes
+-- a Palladium Myr ({T}: Add {C}{C}) a Forest as well, so it adds {G} or {C}{C};
+-- the union read it as {G}-or-{C} plus {C}, and so as able to make two mana one
+-- of which is green.
+--
+-- The SEARCH over boards is the product of the sources' options, and it is
+-- exponential in the number of sources offering more than one -- a real change
+-- from the single supply list this used to build, and the reason sourceOptions'
+-- collapse matters. After it, a source offers more than one option only if it has
+-- several yields AND one of them adds more than one mana. Nothing in this pool is
+-- that on its own: it takes a permanent with a multi-mana ability that some
+-- effect has ALSO given a basic land type, which is Palladium Myr under Ashaya
+-- (or under Urborg, once Ashaya has made it a land). Every land, every mana
+-- creature and every Sol Ring is one option, so the ordinary board is one board
+-- and the product costs nothing. `any` short-circuits, so a payable cost stops at
+-- the first board that pays it; an unpayable one walks every board, and neither a
+-- domination prune over a source's options nor a cheap necessary-condition
+-- prefilter is implemented (#595).
 --
 -- Clause 1 is Hall's condition: a saturating matching exists iff no set of
 -- demands outruns the supplies that could serve it. Checked directly rather than
@@ -1021,18 +1067,24 @@ payableResolutions pid committed cost gs =
       -- (#200); see manaSources above for the hoist and its snapshot argument.
       grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
-      supplies =
-        fmap supplyOf units
-          <> concatMap (\oid -> sourceSupplies (manaYieldsOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
+      pooled = fmap supplyOf units
+      options = fmap (\oid -> sourceOptions (manaYieldsOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
+      -- One option taken from each source, appended to the pool: `sequenceA` over
+      -- the list applicative is that product, and it is [[]] -- one board, the
+      -- pool alone -- when the player controls no source at all.
+      boards = fmap (\taken -> pooled <> concat taken) (sequenceA options)
       payable (demands, generic, life) =
-        let -- "The supplies that could serve this set of demands" and "the
-            -- demands in it", the two sides of Hall's condition for one subset.
-            couldServe wanted = length (filter (\supply -> any (serves supply) wanted) supplies)
-            demandedIn wanted = length (filter (`elem` wanted) demands)
-            hallHolds wanted = demandedIn wanted <= couldServe wanted
-         in canPayLife pid (committed + life) gs
-              && Natural.length supplies >= Natural.length demands + generic
-              && all hallHolds (List.subsequences (List.nub demands))
+        let subsets = List.subsequences (List.nub demands)
+            fits supplies =
+              let -- "The supplies that could serve this set of demands" and "the
+                  -- demands in it", the two sides of Hall's condition for one
+                  -- subset.
+                  couldServe wanted = length (filter (\supply -> any (serves supply) wanted) supplies)
+                  demandedIn wanted = length (filter (`elem` wanted) demands)
+                  hallHolds wanted = demandedIn wanted <= couldServe wanted
+               in Natural.length supplies >= Natural.length demands + generic
+                    && all hallHolds subsets
+         in canPayLife pid (committed + life) gs && any fits boards
    in filter payable (resolutions cost)
 
 -- The least life any payable resolution of this cost costs, or Nothing when none
