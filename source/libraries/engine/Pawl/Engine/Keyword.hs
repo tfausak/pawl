@@ -132,7 +132,7 @@ abilitiesFor keyword count = case keyword of
 -- Printed keywords rather than a projection's post-layer ones, the same rules
 -- fact castingPermissionsOf records: CR 113.6b says "an ability that states
 -- which zones it functions in functions only from those zones", and rule 702.29a
--- states the hand -- which the CR 613 layer system does not reach.
+-- states the hand -- which pawl's projection does not reach (#160).
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -223,8 +223,8 @@ cycling cost searchFor =
 --
 -- Taken over the card's PRINTED keywords rather than a projection's post-layer
 -- ones, and that is the same rules fact Card.castingPermissions' own comment
--- records: this permission functions in the GRAVEYARD (CR 113.6), where the CR
--- 613 layer system does not reach.
+-- records: this permission functions in the GRAVEYARD (CR 113.6), which pawl's
+-- projection does not reach (#160).
 castingPermissionsOf :: Set Keyword -> [CastingPermission]
 castingPermissionsOf = concatMap permissionsFor . Set.toAscList
 

@@ -440,7 +440,7 @@ permitsCastFromGraveyard card =
 -- the ones rule 702 gives it for a keyword it holds (flashback). Read off the
 -- card and never through the projection, which is what Card.castingPermissions'
 -- own comment already argues: these permissions function in the library and the
--- graveyard (CR 113.6), where the CR 613 layer system does not reach.
+-- graveyard (CR 113.6), which pawl's projection does not reach (#160).
 permissionsOf :: Card.Type.Card -> [CastingPermission.CastingPermission]
 permissionsOf card =
   Card.Type.castingPermissions card <> Keyword.castingPermissionsOf (Card.Type.keywords card)
