@@ -1269,6 +1269,21 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
             -- is nothing to join to combat and nothing to bind.
             Nothing -> pure ()
             Just newId -> do
+              -- CR 110.2a: "If an effect instructs a player to put an object
+              -- onto the battlefield, that object enters the battlefield under
+              -- THAT PLAYER's control unless the effect states otherwise." This
+              -- effect is exactly such an instruction, so its controller is who
+              -- the permanent enters under -- Meandering Towershell's "return it
+              -- to the battlefield under your control" is that rule restated on
+              -- the card rather than an exception to it.
+              --
+              -- BEFORE the combat join below, and that order is load-bearing:
+              -- Combat.putOntoBattlefieldAttacking reads the new permanent's
+              -- controller and CR 506.3b refuses one who is not the active
+              -- player. Installed the other way round, a Towershell its
+              -- attacker does not own would return to its owner and then fail to
+              -- be attacking at all.
+              applyEntryControl controller source zone newId
               -- CR 508.4: "if a creature is put onto the battlefield attacking,
               -- its controller chooses which defending player ... it's
               -- attacking". The rules for that live in Pawl.Engine.Combat, which
@@ -2169,6 +2184,81 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     -- rather than being a "next occurrence" replacement installed here).
     let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
+
+-- CR 110.2a: "If an effect instructs a player to put an object onto the
+-- battlefield, that object enters the battlefield under that player's control
+-- unless the effect states otherwise." `controller` is that player -- the
+-- resolving effect's controller (CR 109.5) -- and this is what makes it so.
+--
+-- A stored CR 613.1b layer-2 effect over the ONE incarnation CR 400.7 just
+-- minted, because pawl has no per-object controller field:
+-- Projection.controllerOf derives control from layer-2 effects over a base of
+-- Object.owner, so storing one IS "entered under that player's control" here.
+-- Effect.GainControl's arm builds the same shape for the other producer; the
+-- difference is only that this names an id minted a moment ago rather than a
+-- chosen target.
+--
+-- Indefinite (Expiry.Never), CR 611.2a's "lasts until the end of the game":
+-- entering under someone's control is not a duration a card states an end for.
+--
+-- BATTLEFIELD ONLY, which is the rule's own scope -- CR 110.2 is about
+-- permanents, and CR 110.5d says an object outside the battlefield has no
+-- status at all. The two sibling riders are inert elsewhere for the same reason
+-- (Combat.putOntoBattlefieldAttacking gates on battlefield membership; a tap
+-- state off the battlefield means nothing), and control is the one that would
+-- NOT have been inert: Projection.controllerOf answers for an object in any
+-- zone, so an ungated store would give a graveyard card a controller.
+--
+-- NOTHING STORED when the effect's controller already owns it, which is the
+-- overwhelming majority: every self-move in the pool (Leyline of the Void,
+-- Leyline of Sanctity, Narcomoeba) has owner == controller, so the base
+-- Object.owner already answers and a stored effect would be a no-op that the
+-- controllerOf fold pays for on every projection thereafter.
+--
+-- NOT re-Sicked, where Effect.GainControl's arm is. CR 302.6 asks whether
+-- control has been CONTINUOUS since the controller's most recent turn began,
+-- and a permanent that has just ENTERED has no earlier span to interrupt --
+-- Event.changeZoneAttaching already gives the fresh id Sickness.Sick, which
+-- names no player and so is not keyed to owner or controller either way.
+--
+-- No CR 800.4b guard, unlike Effect.GainControl's arm. That guard is defence in
+-- depth rather than a reachable case (Event.createTokens' is described the same
+-- way): CR 800.4d keeps a departed player's triggered ability off the stack in
+-- the first place (Engine.apnapPlayers), and Departure.nonCardStackObjectsCease
+-- removes one already on it, so no resolution reaches here with a controller who
+-- has left.
+--
+-- Modelling this as a stored effect diverges from CR 800.4a at three or more
+-- seats, and there is no way around it while control is derived rather than
+-- stored on the object: if this controller later leaves,
+-- Departure.controlEffectsEnd ends the effect by payload player and the
+-- permanent reverts to its owner, where the rules would leave it controlled by
+-- the departing player -- CR 110.2a's control is base state, not "an effect
+-- which gives that player control" -- and exile it by that rule's fourth clause
+-- (#582).
+--
+-- The store lands AFTER Event.changeZoneEntering returns, so during CR 614.1c's
+-- entry-replacement loop and at the GameEvent.Moved snapshot the permanent still
+-- reads as its owner's -- the one moment "enters under that player's control"
+-- describes. Unobservable: ReplacementEffect.EntryR is self-only and no
+-- EntryRewrite reads control, and a trigger re-derives the controller at the CR
+-- 117.5 scan boundary.
+applyEntryControl :: PlayerId -> ObjectId -> Zone.Zone -> ObjectId -> Game ()
+applyEntryControl controller source zone newId =
+  Monad.when (zone == Zone.Battlefield) . State.modify' $ \gs ->
+    if fmap Object.owner (Game.lookupObject newId gs) == Just controller
+      then gs
+      else
+        let (ts, gs1) = Game.freshTimestamp gs
+            eff =
+              ContinuousEffect.MkContinuousEffect
+                { ContinuousEffect.source = source,
+                  ContinuousEffect.timestamp = ts,
+                  ContinuousEffect.expiry = Expiry.Type.Never,
+                  ContinuousEffect.modification = Modification.SetController controller,
+                  ContinuousEffect.affected = Affected.TheseObjects (Set.singleton newId)
+                }
+         in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).

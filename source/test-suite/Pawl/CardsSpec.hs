@@ -129,9 +129,13 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
   -- your control tapped and attacking at the beginning of the declare attackers
   -- step on your next turn."
   --
-  -- "Under your control" is NOT in this file: the effect DSL has no way to say
-  -- it, so the card returns under its owner's control, which differs only when
-  -- the attacking player does not own it (#508).
+  -- "Under your control" is NOT a rider in this file, and does not need to be:
+  -- CR 110.2a already says "if an effect instructs a player to put an object
+  -- onto the battlefield, that object enters the battlefield under THAT
+  -- PLAYER's control unless the effect states otherwise", so the card's clause
+  -- restates the default rather than overriding it. Resolve applies that rule to
+  -- every battlefield MoveToZone; CombatSpec's MeanderingTowershell group proves
+  -- it at gameplay level, where the attacker does not own the Towershell.
   Spec.it s "meandering-towershell.json loads as a {3}{G}{G} 5/9 islandwalking Turtle that exiles and returns itself" $ do
     c <- S.cardOf s registry "Meandering Towershell"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Meandering Towershell")
