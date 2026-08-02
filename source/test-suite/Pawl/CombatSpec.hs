@@ -893,19 +893,39 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
+  -- The OTHER conjunct of snow swampwalk. The pair above is satisfied by an
+  -- implementation that evaluated HasSupertype Snow alone and dropped
+  -- HasSubtype Swamp -- both its lands are Swamps, so the subtype never
+  -- discriminates. A Snow-Covered Mountain is snow and not a Swamp, which
+  -- closes that half.
+  Spec.it s "CR 702.14c a snow swampwalker does NOT walk on a Snow-Covered Mountain" $ do
+    legions <- S.printingOf s registry "Legions of Lim-Dûl"
+    piker <- S.printingOf s registry "Goblin Piker"
+    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    let (gs0, mine, theirs) = attacking [legions] [piker]
+        gs = withLands [snowMountain] gs0
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
   -- CR 702.14c's THIRD clause: "without the specified type or supertype (as in
   -- 'nonbasic landwalk')". Dryad Sophisticate is the printing, and this is the
   -- clause NO positive subtype test can express -- the criterion is a negation.
   Spec.it s "CR 702.14c a nonbasic landwalker walks on a nonbasic land" $ do
     dryad <- S.printingOf s registry "Dryad Sophisticate"
     piker <- S.printingOf s registry "Goblin Piker"
-    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    -- Ash Barrens is a plain nonbasic land: no Basic supertype, and no text
+    -- that touches types. Deliberately NOT Urborg, whose land-type rewriting
+    -- would drag a CR 613 layer-4 subtype change into a test about a SUPERTYPE,
+    -- where it is inert and only obscures what is being asked.
+    ashBarrens <- S.printingOf s registry "Ash Barrens"
     let (gs0, mine, theirs) = attacking [dryad] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        -- Urborg is a nonbasic land, so bob controls exactly what the negation
-        -- names. It is BOB's here, unlike the Urborg case above.
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [urborg] gs0))) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [ashBarrens] gs0))) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   Spec.it s "CR 702.14c a nonbasic landwalker is blocked normally when every land is basic" $ do

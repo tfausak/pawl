@@ -37,7 +37,8 @@ import qualified Pawl.Types.Filter as Filter
 --
 -- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
 -- Filter has a HasKeyword arm (Plummet's "target creature with flying") and this
--- type carries a Filter (702.29e typecycling) and a Cost (702.29a/702.34a/702.42a)
+-- type carries a Filter (702.29e typecycling, 702.14c landwalk) and a Cost
+-- (702.29a/702.34a/702.42a)
 -- whose components carry one too, so the three of them would be a module cycle if
 -- any were concrete. They are parametric and this one is not, which makes
 -- `Filter Keyword` and `Cost Keyword` the only instantiations anywhere.

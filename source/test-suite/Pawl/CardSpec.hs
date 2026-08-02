@@ -1030,9 +1030,16 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsAttachedToPermanent -> 0
   Filter.Type.IsToken -> 0
 
--- Every Filter a keyword carries: CR 702.29e's typecycling predicate, plus the
--- components of any Cost a keyword names (CR 702.29a cycling, 702.34a flashback,
--- 702.42a entwine), since CostComponent.Sacrifice carries one.
+-- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
+-- 702.14c's landwalk criterion, plus the components of any Cost a keyword names
+-- (CR 702.29a cycling, 702.34a flashback, 702.42a entwine), since
+-- CostComponent.Sacrifice carries one.
+--
+-- The exhaustiveness guard that protects the Filter traversal is on the FILTER
+-- case, not on this one, so a keyword that grows a Filter payload compiles here
+-- silently and drops it -- which is exactly what happened when landwalk's
+-- Subtype became a Filter (#499). A new Filter-bearing keyword needs its arm
+-- added here by hand.
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
   Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
@@ -1049,7 +1056,8 @@ keywordFilters keyword = case keyword of
   Keyword.Haste -> []
   Keyword.Hexproof -> []
   Keyword.Indestructible -> []
-  Keyword.Landwalk _ -> []
+  -- CR 702.14c's criterion, which is a Filter since #499.
+  Keyword.Landwalk criterion -> [criterion]
   -- CR 702.15a: lifelink is a static ability with no payload -- its rider rides
   -- the damage event, not the keyword.
   Keyword.Lifelink -> []

@@ -35,7 +35,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.14a's "[type]" rides the constructor, so swampwalk and islandwalk are
   -- DIFFERENT keywords and must encode differently -- a Bog Wraith that decoded
   -- as an islandwalker would be blockable exactly when it should not be.
-  Spec.it s "Landwalk carries its land type" $ do
+  Spec.it s "Landwalk carries a land-type criterion" $ do
     Common.assertJsonCodec
       s
       Keyword.toJson
@@ -53,9 +53,9 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) /= Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Island)))
       "swampwalk and islandwalk encode differently"
   -- The other three shapes CR 702.14c names, which a bare Subtype could not say.
-  -- Each is a printing (or, for artifact landwalk, a rule with no printing), and
-  -- each has to survive the trip intact -- a codec that flattened the criterion
-  -- back to a subtype would round-trip the swampwalk above and lose all three.
+  -- Each has a printing in the pool, and each has to survive the trip intact --
+  -- a codec that flattened the criterion back to a subtype would round-trip the
+  -- swampwalk above and lose all three.
   Spec.it s "Landwalk carries CR 702.14c's other three shapes" $ do
     -- Dryad Sophisticate: "without the specified type or supertype".
     Common.assertJsonCodec
@@ -72,8 +72,9 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       (Keyword.Landwalk (Filter.And [Filter.HasSupertype Supertype.Snow, Filter.HasSubtype Subtype.Swamp]))
       "{\"type\":\"Landwalk\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Snow\"}},{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}]}}"
-    -- "With the specified type or supertype" -- artifact landwalk, which CR
-    -- 702.14c names and no paper printing has.
+    -- "With the specified type or supertype" -- artifact landwalk, whose one
+    -- paper source is Vectis Gloves (an Equipment that GRANTS it; no creature
+    -- prints it).
     Common.assertJsonCodec
       s
       Keyword.toJson

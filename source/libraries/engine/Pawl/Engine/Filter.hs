@@ -291,9 +291,15 @@ rewrite pairs predicate = case predicate of
   -- (Keyword.Landwalk (HasSubtype Swamp)), so a text-changing effect could in
   -- principle reach the word inside this atom. Since #499 made that payload a
   -- Filter, the fix is no longer a new traversal -- it is this very function,
-  -- called on the keyword's own criterion -- but the trigger is unchanged and
-  -- unmet: no card in the pool GRANTS a landwalk or FILTERS by one, so there is
-  -- still nothing to rewrite. Matches
+  -- called on the keyword's own criterion.
+  --
+  -- Still nothing to rewrite, but the reason is narrower than it was. Vectis
+  -- Gloves now GRANTS a landwalk, so "no card grants one" is no longer why; its
+  -- criterion is HasCardType Artifact, which names no land type for CR 612.1's
+  -- basic-land-type swap to reach. Nothing in the pool filters by a landwalk
+  -- either. Note the separate half: Projection.project's ChangeSubtypeWord arm
+  -- rewrites PC.subtypes and never PC.keywords, so a Magical Hack on Bog Wraith
+  -- would not make islandwalk even if this arm recursed. Matches
   -- Pawl.Engine.Projection.rewriteModification's identical silence on
   -- Modification.GainKeyword (#523).
   Filter.HasKeyword _ -> predicate
