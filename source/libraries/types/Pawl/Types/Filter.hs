@@ -33,7 +33,8 @@ import qualified Pawl.Types.Supertype as Supertype
 --
 -- PARAMETRIC in the keyword, and only to break a module cycle: HasKeyword below
 -- has to name Pawl.Types.Keyword, and that module already names this one
--- (CR 702.29e typecycling carries its "[type]" as a Filter). Pawl.Types.Keyword
+-- (CR 702.29e typecycling and CR 702.14c landwalk each carry their "[type]" as
+-- a Filter). Pawl.Types.Keyword
 -- ties the knot by instantiating `Filter Keyword`, which is the single
 -- application every other module in the project writes -- the same shape
 -- Pawl.Types.Effect's `card` parameter takes for the Card/Effect cycle. Nothing

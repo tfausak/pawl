@@ -10,6 +10,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
@@ -34,23 +35,52 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.14a's "[type]" rides the constructor, so swampwalk and islandwalk are
   -- DIFFERENT keywords and must encode differently -- a Bog Wraith that decoded
   -- as an islandwalker would be blockable exactly when it should not be.
-  Spec.it s "Landwalk carries its land type" $ do
+  Spec.it s "Landwalk carries a land-type criterion" $ do
     Common.assertJsonCodec
       s
       Keyword.toJson
       Keyword.fromJson
-      (Keyword.Landwalk Subtype.Swamp)
-      "{\"type\":\"Landwalk\",\"value\":{\"type\":\"Swamp\"}}"
+      (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp))
+      "{\"type\":\"Landwalk\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}"
     Common.assertJsonCodec
       s
       Keyword.toJson
       Keyword.fromJson
-      (Keyword.Landwalk Subtype.Island)
-      "{\"type\":\"Landwalk\",\"value\":{\"type\":\"Island\"}}"
+      (Keyword.Landwalk (Filter.HasSubtype Subtype.Island))
+      "{\"type\":\"Landwalk\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Island\"}}}"
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Landwalk Subtype.Swamp) /= Keyword.toJson (Keyword.Landwalk Subtype.Island))
+      (Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) /= Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Island)))
       "swampwalk and islandwalk encode differently"
+  -- The other three shapes CR 702.14c names, which a bare Subtype could not say.
+  -- Each has a printing in the pool, and each has to survive the trip intact --
+  -- a codec that flattened the criterion back to a subtype would round-trip the
+  -- swampwalk above and lose all three.
+  Spec.it s "Landwalk carries CR 702.14c's other three shapes" $ do
+    -- Dryad Sophisticate: "without the specified type or supertype".
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Landwalk (Filter.Not (Filter.HasSupertype Supertype.Basic)))
+      "{\"type\":\"Landwalk\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Basic\"}}}}"
+    -- Legions of Lim-Dûl: "with both the specified type or supertype and the
+    -- specified subtype".
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Landwalk (Filter.And [Filter.HasSupertype Supertype.Snow, Filter.HasSubtype Subtype.Swamp]))
+      "{\"type\":\"Landwalk\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Snow\"}},{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}]}}"
+    -- "With the specified type or supertype" -- artifact landwalk, whose one
+    -- paper source is Vectis Gloves (an Equipment that GRANTS it; no creature
+    -- prints it).
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Landwalk (Filter.HasCardType CardType.Artifact))
+      "{\"type\":\"Landwalk\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}}"
   Spec.it s "Lifelink" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Lifelink "{\"type\":\"Lifelink\"}"
   Spec.it s "Reach" $

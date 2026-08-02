@@ -5,17 +5,37 @@
     {
       "type": "Landwalk",
       "value": {
-        "type": "HasSubtype",
-        "value": {
-          "type": "Swamp"
-        }
+        "type": "And",
+        "value": [
+          {
+            "type": "HasSupertype",
+            "value": {
+              "type": "Snow"
+            }
+          },
+          {
+            "type": "HasSubtype",
+            "value": {
+              "type": "Swamp"
+            }
+          }
+        ]
       }
     }
   ],
   "manaCost": [
     {
       "type": "Generic",
-      "value": 3
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
     },
     {
       "type": "OfType",
@@ -27,10 +47,10 @@
       }
     }
   ],
-  "name": "Bog Wraith",
+  "name": "Legions of Lim-Dûl",
   "power": {
     "type": "Literal",
-    "value": 3
+    "value": 2
   },
   "replacementEffects": [],
   "spell": {
@@ -54,7 +74,7 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Wraith"
+        "type": "Zombie"
       }
     ],
     "supertypes": [],

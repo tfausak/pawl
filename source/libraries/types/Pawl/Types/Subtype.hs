@@ -118,4 +118,6 @@ data Subtype
     Frog
   | -- | CR 205.3m (a creature type; Child of Night's).
     Vampire
+  | -- | CR 205.3m (a creature type; Dryad Sophisticate's).
+    Dryad
   deriving (Eq, Ord, Show)

@@ -54,7 +54,10 @@
     {
       "type": "Landwalk",
       "value": {
-        "type": "Island"
+        "type": "HasSubtype",
+        "value": {
+          "type": "Island"
+        }
       }
     }
   ],

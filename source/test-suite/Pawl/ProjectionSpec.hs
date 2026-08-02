@@ -636,10 +636,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
         after = turnToFrogAt wraithId turnToFrog board
     Spec.assertEqWith s "before: black" (Projection.colorsOf wraithId board) (Set.singleton Color.Black)
-    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk Subtype.Type.Swamp) wraithId board) "before: swampwalk"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)) wraithId board) "before: swampwalk"
     Spec.assertEqWith s "before: 3/3" (Projection.powerOf wraithId board, Projection.toughnessOf wraithId board) (Just 3, Just 3)
     Spec.assertEqWith s "after: blue only (CR 105.3, a set)" (Projection.colorsOf wraithId after) (Set.singleton Color.Blue)
-    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk Subtype.Type.Swamp) wraithId after)) "after: no swampwalk"
+    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)) wraithId after)) "after: no swampwalk"
     Spec.assertEqWith s "after: base 1/1" (Projection.powerOf wraithId after, Projection.toughnessOf wraithId after) (Just 1, Just 1)
 
   Spec.it s "CR 514.2 Turn to Frog wears off at cleanup and the Wraith is a Wraith again" $ do
@@ -652,7 +652,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "all four effects dropped" (GameState.continuousEffects afterCleanup) []
     Spec.assertEqWith s "Creature -- Wraith again" (Projection.subtypesOf wraithId afterCleanup) (Set.singleton Subtype.Type.Wraith)
     Spec.assertEqWith s "black again" (Projection.colorsOf wraithId afterCleanup) (Set.singleton Color.Black)
-    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk Subtype.Type.Swamp) wraithId afterCleanup) "swampwalk again"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)) wraithId afterCleanup) "swampwalk again"
     Spec.assertEqWith s "3/3 again" (Projection.powerOf wraithId afterCleanup, Projection.toughnessOf wraithId afterCleanup) (Just 3, Just 3)
 
   Spec.it s "CR 613.1d AddCardType makes a land a creature" $ do

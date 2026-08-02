@@ -15,6 +15,7 @@ import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Summoning as Summoning
@@ -461,9 +462,15 @@ fearAllowsGiven pcs blocker attacker gs =
 -- rides the constructor -- there is no single Keyword value to ask about, which
 -- is Projection.totalToxic's situation and takes its shape.
 --
--- Only CR 702.14a's "usually a land type" case is implemented: a Subtype cannot
--- say "nonbasic land", "artifact land" or "snow Swamp", so the other three
--- clauses of CR 702.14c are unrepresentable (#499).
+-- All four of CR 702.14c's clauses, because the keyword carries a Filter: "with
+-- the specified land type (as in 'islandwalk'), with the specified type or
+-- supertype (as in 'artifact landwalk'), without the specified type or supertype
+-- (as in 'nonbasic landwalk'), or with both the specified type or supertype and
+-- the specified subtype (as in 'snow swampwalk')". All four have a printing in
+-- the pool: Bog Wraith the first, Vectis Gloves the second -- the only paper
+-- source of artifact landwalk, and it GRANTS the keyword rather than printing it
+-- on a creature -- Dryad Sophisticate the third and Legions of Lim-Dûl the
+-- fourth.
 landwalkAllows :: ObjectId -> GameState -> Bool
 landwalkAllows attacker gs = landwalkAllowsGiven (Projection.controlGrants gs) Map.empty attacker gs
 
@@ -472,10 +479,10 @@ landwalkAllowsGiven grants pcs attacker gs =
   let -- A wildcard rather than an exhaustive case, the Keyword.flashbackCost
       -- precedent: this asks about ONE named constructor rather than classifying
       -- every keyword, so a new arm has nothing to say here.
-      landTypeOf keyword = case keyword of
-        Keyword.Landwalk subtype -> Just subtype
+      landCriterionOf keyword = case keyword of
+        Keyword.Landwalk criterion -> Just criterion
         _ -> Nothing
-      walked = Maybe.mapMaybe landTypeOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
+      walked = Maybe.mapMaybe landCriterionOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
       -- CR 508.5: "If an ability of an attacking creature refers to a defending
       -- player ... the defending player it's referring to is the player that
       -- creature is attacking, the controller of the planeswalker that creature
@@ -497,22 +504,41 @@ landwalkAllowsGiven grants pcs attacker gs =
         AttackTarget.OfPlayer pid -> Just pid
         AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
       defendingPlayer = defenderOf =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
-      -- CR 702.14c's "at least one land with the specified land type" -- both
-      -- halves of that phrase, because the rule states both. CR 205.3d ("an
-      -- object can't gain a subtype that doesn't correspond to one of that
-      -- object's types") is what makes the card-type half all but redundant, and
-      -- "all but" is why it is still asked: nothing in the projection enforces
-      -- 205.3d, so a Modification.AddLandSubtype aimed at a non-land would
-      -- otherwise be walked on.
+      -- CR 702.14c's "the defending player controls at least one land ...".
       --
       -- Lazy, and load-bearing: this walks the whole battlefield, and `any` below
       -- never forces it for an attacker without landwalk, which is every attacker
       -- in almost every combat (#200).
       defendersLands = foldMap (\pid -> Projection.controlsGiven grants pid gs) defendingPlayer
-      isLandOfType subtype oid =
-        Set.member CardType.Land (Projection.cardTypesGiven pcs oid gs)
-          && Set.member subtype (Projection.subtypesGiven pcs oid gs)
-   in not (any (\subtype -> any (isLandOfType subtype) defendersLands) walked)
+      -- The land-ness is asked HERE and never by the criterion: every clause of
+      -- CR 702.14c reads "at least one LAND with/without ...", so it belongs to
+      -- the rule rather than to the card's parameter, and a printing cannot omit
+      -- it. The criterion answers the "[type]" half alone.
+      --
+      -- CR 205.3d ("an object can't gain a subtype that doesn't correspond to
+      -- one of that object's types") is what makes the card-type test all but
+      -- redundant for the two clauses whose criterion NAMES a land type --
+      -- islandwalk's and snow swampwalk's -- and "all but" is why it is still
+      -- asked even for them: nothing in the projection enforces 205.3d, so a
+      -- Modification.AddLandSubtype aimed at a non-land would otherwise be walked
+      -- on. For the other two it is not redundant at all: their criteria name no
+      -- land type, so "nonbasic landwalk" would match every nonbasic PERMANENT
+      -- and "artifact landwalk" every artifact.
+      --
+      -- CR 109.5's "you" for the criterion is the ATTACKER's controller, and the
+      -- source is the attacker -- the same pairing every keyword-borne Filter
+      -- takes. No landwalk in the pool reads either (all four clauses are type,
+      -- supertype and subtype tests), so the context is well-defined rather than
+      -- exercised. Hoisted, since it does not vary per candidate.
+      context = Filter.MkContext (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
+      -- ONE projection per candidate: Filter.cardTypes is the very set
+      -- Projection.cardTypesGiven would rebuild, so the land test reads it off
+      -- the view rather than projecting the object a second time. The comment
+      -- above about walking the whole battlefield is why that matters (#200).
+      matchesCriterion criterion oid =
+        let view = Projection.viewOfObjectGiven pcs grants oid gs
+         in Set.member CardType.Land (Filter.cardTypes view) && Filter.matches context view criterion
+   in not (any (\criterion -> any (matchesCriterion criterion) defendersLands) walked)
 
 -- CR 702.111b: "A creature with menace can't be blocked except by two or more
 -- creatures."
