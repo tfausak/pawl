@@ -823,8 +823,9 @@ apply batch candidate event =
       -- live board and the object IS the event's payload. Keeping it there is
       -- also what makes CR 616.2 fall out: the loop's next iteration re-collects
       -- and re-matches against a board where the control has already changed,
-      -- which a value parked on the event would not show it. The two arms above
-      -- write to the object for the same reason.
+      -- which a value parked on the event would not show it. All three arms
+      -- above land on the object for the same reason -- AsCopy and ChoiceOf in
+      -- the copiable snapshot, WithCounters through the CR 122.6 funnel.
       --
       -- No prompt, and none is owed: CR 616.1b's rewrite has no choice in it,
       -- and the choice the rule DOES describe -- which of several
