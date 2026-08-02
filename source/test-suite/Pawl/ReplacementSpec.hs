@@ -53,6 +53,8 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -78,8 +80,10 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -212,7 +216,8 @@ leylineShape src ts =
       ActiveReplacement.source = src,
       ActiveReplacement.timestamp = ts,
       ActiveReplacement.expiry = Expiry.Never,
-      ActiveReplacement.uses = Uses.Unlimited
+      ActiveReplacement.uses = Uses.Unlimited,
+      ActiveReplacement.origin = ReplacementOrigin.Other
     }
 
 -- Eon Hub {5} Artifact: "Players skip their upkeep steps."
@@ -1124,7 +1129,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               ActiveReplacement.source = piker,
               ActiveReplacement.timestamp = ts,
               ActiveReplacement.expiry = Expiry.AtCleanup,
-              ActiveReplacement.uses = Uses.Once
+              ActiveReplacement.uses = Uses.Once,
+              ActiveReplacement.origin = ReplacementOrigin.Other
             }
         g3 = S.addReplacement active g2
         asked = answersFor S.identityAnswer g3 (Replacement.runEntry Set.empty piker)
@@ -1197,3 +1203,164 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   stepSkipSpec s registry
   fatigueSpec s registry
   stonehornSpec s registry
+  galvanicBlastSpec s registry
+
+-- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
+-- Galvanic Blast; `others` are her further permanents, added after the Myr.
+-- Returns the state and the Blast's hand id.
+--
+-- Darksteel Myr because it is an artifact with nothing else going on -- no
+-- static ability, no mana ability of its own to be tapped for, and CR 702.12b's
+-- indestructibility never comes up because nothing here destroys anything. Three
+-- copies of one card, since "three or more artifacts" counts artifacts and not
+-- distinct names.
+metalcraftBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId)
+metalcraftBoard mountain myr galvanicBlast artifacts others =
+  let addAll ps gs = List.foldl' (\g p -> snd (S.addCreature p S.alice g)) gs ps
+      gs1 = addAll (replicate artifacts myr <> others) (S.landsInPlay mountain 1)
+      (gs2, spellId) = S.handOne galvanicBlast gs1
+   in (gs2, spellId)
+
+-- Aim every target slot at bob himself. CR 115.4's "any target" admits a player,
+-- and a life total is the cleanest readout of an amount: 2, 4 and 8 are three
+-- distinct answers with no toughness or state-based action in the way.
+atBob :: Prompt.Prompt r -> r
+atBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
+
+-- CR 614.15's self-replacement effects and CR 616.1a's bucket, through the one
+-- card in the pool that prints one.
+--
+-- Galvanic Blast is CR 614.15's own description almost word for word -- "the text
+-- creating a self-replacement effect is usually part of the ability whose effect
+-- is being replaced, but the text can be a separate ability, particularly when
+-- preceded by an ability word." Metalcraft is the ability word (CR 207.2c: an
+-- ability word "has no rules meaning"), the clause replaces the damage the
+-- spell's own first line deals, and the whole thing is one instant.
+--
+-- The card's two lines resolve as two effects in the ISA, and in the opposite
+-- order from the printing: the Replace comes first so the replacement exists
+-- before the DealDamage proposes the event it replaces (CR 614.4, "replacement
+-- effects must exist before the appropriate event occurs"). Nothing observes the
+-- gap -- no player gets priority inside a resolution (CR 608.2) -- so the printed
+-- reading and this one agree on every board.
+galvanicBlastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+galvanicBlastSpec s registry =
+  Spec.describe s "Galvanic Blast (CR 614.15)" $ do
+    Spec.it s "CR 614.15 with two artifacts metalcraft is off, so the Blast deals its printed 2" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      myr <- S.printingOf s registry "Darksteel Myr"
+      galvanicBlast <- S.printingOf s registry "Galvanic Blast"
+      let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 2 []
+          after = castAndResolve atBob gs spellId
+      Spec.assertEqWith s "bob takes 2" (S.lifeOf S.bob after) (Just 18)
+      -- The condition was false, so the clause created NOTHING -- not a floating
+      -- row that failed to apply. An unspent row would be the visible difference.
+      Spec.assertEqWith s "and no replacement was installed at all" (GameState.replacements after) []
+    -- The discriminating twin: one more artifact, everything else identical.
+    Spec.it s "CR 614.15 with three artifacts the self-replacement applies: 4 instead of 2" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      myr <- S.printingOf s registry "Darksteel Myr"
+      galvanicBlast <- S.printingOf s registry "Galvanic Blast"
+      let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 3 []
+          after = castAndResolve atBob gs spellId
+      Spec.assertEqWith s "bob takes 4" (S.lifeOf S.bob after) (Just 16)
+      -- CR 614.3's "until they're used up": the row applied, so Uses.Once spent
+      -- it. Nothing is left to replace a later damage event this turn.
+      Spec.assertEqWith s "and the one-shot was consumed" (GameState.replacements after) []
+    Spec.it s "CR 614.15 the metalcraft count is artifacts YOU control, not everyone's" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      myr <- S.printingOf s registry "Darksteel Myr"
+      galvanicBlast <- S.printingOf s registry "Galvanic Blast"
+      -- alice has two; bob has three. CR 109.5's "you" is the spell's
+      -- controller, so hers is the count that matters and metalcraft is off.
+      let (gs0, spellId) = metalcraftBoard mountain myr galvanicBlast 2 []
+          gs = List.foldl' (\g _ -> snd (S.addCreature myr S.bob g)) gs0 [1 :: Int, 2, 3]
+          after = castAndResolve atBob gs spellId
+      Spec.assertEqWith s "bob takes 2, not 4" (S.lifeOf S.bob after) (Just 18)
+    -- CR 616.1a, and the reason the SelfReplacement bucket exists: "if any of
+    -- the replacement and/or prevention effects are self-replacement effects
+    -- (see rule 614.15), one of them must be chosen."
+    --
+    -- Furnace of Rath is the other applicable damage replacement, and the two
+    -- ORDERS DISAGREE, which is what makes this an assertion rather than a
+    -- coincidence:
+    --
+    --   * CR 616.1a's order -- metalcraft first (2 becomes 4), then the Furnace
+    --     doubles it: 8.
+    --   * the other order -- the Furnace first (2 becomes 4), then metalcraft
+    --     sets it to 4: 4.
+    --
+    -- Furnace of Rath's own ruling states the general rule this is an instance
+    -- of: "if multiple effects modify how damage will be dealt, the player who
+    -- would be dealt damage ... chooses the order to apply the effects." CR
+    -- 616.1a is the exception that takes that choice away here.
+    Spec.it s "CR 616.1a the self-replacement is applied BEFORE Furnace of Rath: 2 -> 4 -> 8" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      myr <- S.printingOf s registry "Darksteel Myr"
+      furnaceOfRath <- S.printingOf s registry "Furnace of Rath"
+      galvanicBlast <- S.printingOf s registry "Galvanic Blast"
+      let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 3 [furnaceOfRath]
+          after = castAndResolve atBob gs spellId
+          asked = answersFor atBob gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+      Spec.assertEqWith s "bob takes 8, not the 4 the other order gives" (S.lifeOf S.bob after) (Just 12)
+      -- The second half of CR 616.1a: because the self-replacement is alone in
+      -- the highest non-empty bucket, there is nothing to choose and the engine
+      -- must not ask. The Hardened-Scales-versus-Corpsejack race above, whose
+      -- two candidates share CR 616.1e's bucket, DOES ask -- so this is the
+      -- bucket ordering being observed, not prompts being suppressed in general.
+      Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
+    -- The control leg for the Furnace: with metalcraft OFF there is no
+    -- self-replacement at all, so the Furnace doubles the printed 2. Without
+    -- this, an engine that ignored the metalcraft clause entirely and simply
+    -- doubled twice would also reach 8.
+    Spec.it s "CR 614.1a Furnace of Rath alone doubles the printed 2, not 4" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      myr <- S.printingOf s registry "Darksteel Myr"
+      furnaceOfRath <- S.printingOf s registry "Furnace of Rath"
+      galvanicBlast <- S.printingOf s registry "Galvanic Blast"
+      -- Two Myr, so the Furnace is the ONLY artifact short of metalcraft's three
+      -- -- an enchantment, so it cannot make up the count itself.
+      let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 2 [furnaceOfRath]
+          after = castAndResolve atBob gs spellId
+      Spec.assertEqWith s "bob takes 4" (S.lifeOf S.bob after) (Just 16)
+    -- CR 614.15's "this way": the clause replaces the damage ITS OWN SOURCE is
+    -- dealing and nothing else.
+    --
+    -- The row is seeded rather than cast, and its use count is widened to
+    -- Unlimited, because Galvanic Blast cannot show this on any board: the
+    -- Blast's own damage event is the first one the row is ever offered, and
+    -- Uses.Once spends it there (CR 614.3), so a second event would be untouched
+    -- whatever the pattern said. Widening the count is what lets both events
+    -- reach the same row, which is what isolates the PATTERN. Everything else --
+    -- the funnel, the CR 616.1 loop, the rewrite -- is the real machinery, and
+    -- the shape seeded is the one data/cards/galvanic-blast.json carries.
+    Spec.it s "CR 614.15 a source-scoped rewrite takes its own source's damage and no one else's" $ do
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      let base = Setup.emptyGame S.bothPlayers
+          (mine, g1) = S.addCreature pikerPrinting S.alice base
+          (theirs, g2) = S.addCreature pikerPrinting S.bob g1
+          (victim, g3) = S.addCreature pikerPrinting S.bob g2
+          (ts, g4) = Game.freshTimestamp g3
+          armed = S.addReplacement (blastShape mine ts) g4
+          hit src = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Noncombat])
+      Spec.assertEqWith s "its own source's 2 becomes 4" (S.damageOf victim (hit mine)) (Just 4)
+      Spec.assertEqWith s "another source's 2 stays 2" (S.damageOf victim (hit theirs)) (Just 2)
+
+-- Galvanic Blast's metalcraft clause as a floating row: the damage THIS source is
+-- dealing, whatever its kind, becomes 4 (CR 614.15 / 614.1a). Uses.Unlimited
+-- rather than the card's Once, for the reason its one caller gives.
+blastShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.ActiveReplacement
+blastShape src ts =
+  ActiveReplacement.MkActiveReplacement
+    { ActiveReplacement.effect =
+        ReplacementEffect.DamageR
+          (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource)
+          (DamageRewrite.SetAmount 4),
+      ActiveReplacement.source = src,
+      ActiveReplacement.timestamp = ts,
+      ActiveReplacement.expiry = Expiry.Never,
+      ActiveReplacement.uses = Uses.Unlimited,
+      ActiveReplacement.origin = ReplacementOrigin.SelfReplacement
+    }

@@ -89,6 +89,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Sickness as Sickness
@@ -1142,7 +1143,8 @@ addRegenShield oid gs =
             ActiveReplacement.source = oid,
             ActiveReplacement.timestamp = ts,
             ActiveReplacement.expiry = Expiry.AtCleanup,
-            ActiveReplacement.uses = Uses.Once
+            ActiveReplacement.uses = Uses.Once,
+            ActiveReplacement.origin = ReplacementOrigin.Other
           }
    in addReplacement active gs1
 

@@ -41,6 +41,7 @@ import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -747,7 +748,8 @@ armCastFromGraveyard card top =
                   ActiveReplacement.source = top,
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.Never,
-                  ActiveReplacement.uses = Uses.Once
+                  ActiveReplacement.uses = Uses.Once,
+                  ActiveReplacement.origin = ReplacementOrigin.Other
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
    in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf (Card.Type.keywords card))

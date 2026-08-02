@@ -56,6 +56,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -235,7 +236,8 @@ whileReplacement src you gs =
             ActiveReplacement.source = src,
             ActiveReplacement.timestamp = ts,
             ActiveReplacement.expiry = Expiry.Type.While you S.youControlSource,
-            ActiveReplacement.uses = Uses.Unlimited
+            ActiveReplacement.uses = Uses.Unlimited,
+            ActiveReplacement.origin = ReplacementOrigin.Other
           }
    in S.addReplacement active gs1
 

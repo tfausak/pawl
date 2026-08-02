@@ -29,6 +29,10 @@
                     "type": "Once"
                   },
                   {
+                    "type": "Other"
+                  },
+                  null,
+                  {
                     "type": "DestructionR",
                     "value": {
                       "type": "Regenerate"

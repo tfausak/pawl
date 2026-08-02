@@ -8,10 +8,16 @@ import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
@@ -35,8 +41,11 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -299,8 +308,25 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Replace Duration.UntilEndOfTurn Uses.Once (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))
-      "{\"type\":\"Replace\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"Once\"},{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}]}"
+      (Effect.Replace Duration.UntilEndOfTurn Uses.Once ReplacementOrigin.Other Nothing (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))
+      "{\"type\":\"Replace\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"Once\"},{\"type\":\"Other\"},null,{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}]}"
+  -- CR 614.15 / 616.1a: Galvanic Blast's metalcraft clause -- a self-replacement
+  -- gated on a nonzero threshold (CR 702's ability words have no rules meaning,
+  -- so "Metalcraft" itself encodes nothing). Both new fields carry payloads here,
+  -- so a codec that dropped either is caught.
+  Spec.it s "Replace (a conditional self-replacement)" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.Replace
+          Duration.UntilEndOfTurn
+          Uses.Once
+          ReplacementOrigin.SelfReplacement
+          (Just (Condition.MkCondition (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3)))
+          (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource) (DamageRewrite.SetAmount 4))
+      )
+      "{\"type\":\"Replace\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"Once\"},{\"type\":\"SelfReplacement\"},{\"type\":\"Condition\",\"value\":[{\"type\":\"Count\",\"value\":[{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},{\"type\":\"Objects\"}]},{\"type\":\"AtLeast\"},{\"type\":\"Literal\",\"value\":3}]},{\"type\":\"DamageR\",\"value\":[{\"whichKind\":null,\"whichSource\":{\"type\":\"TheSource\"}},{\"type\":\"SetAmount\",\"value\":4}]}]}"
   -- CR 614.10a: Fatigue's slot read, plus Stonehorn Dignitary's whole-phase
   -- selector -- the arm a Phase alone cannot spell (CR 500.1, "a turn consists
   -- of five phases").
@@ -536,3 +562,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
 -- any Value at all, so long as both instantiations are given the same one.
 sentinel :: Value.Value
 sentinel = Common.text (Text.pack "SENTINEL")
+
+-- CR 614.15 / 616.1a: "three or more artifacts" -- the pool's first nonzero
+-- Comparison threshold, and the count Galvanic Blast's metalcraft clause reads.
+threeArtifacts :: Count.Count Quantity.Quantity
+threeArtifacts =
+  Count.MkCount
+    (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+    (Filter.And [Filter.HasCardType CardType.Artifact, Filter.ControlledBy PlayerRelation.You])
+    Aggregation.Objects

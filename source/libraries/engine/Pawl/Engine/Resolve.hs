@@ -14,6 +14,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -77,6 +78,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -1669,26 +1671,42 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                   DelayedTrigger.expiry = duration >>= \d -> Expiry.arm controller source d gs
                 }
          in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
-  Effect.Replace duration uses re ->
+  Effect.Replace duration uses origin condition re ->
     -- CR 614.3 / 615.3: install the floating replacement; Pawl.Engine.Replacement
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
     -- source, which is what CR 615.13's "prevented" triggers will read (#58).
-    State.modify' $ \gs -> case Expiry.arm controller source duration gs of
-      -- CR 611.2b: the duration never started, so no floating replacement is
-      -- installed.
-      Nothing -> gs
-      Just expiry ->
-        let (ts, gs1) = Game.freshTimestamp gs
-            active =
-              ActiveReplacement.MkActiveReplacement
-                { ActiveReplacement.effect = re,
-                  ActiveReplacement.source = source,
-                  ActiveReplacement.timestamp = ts,
-                  ActiveReplacement.expiry = expiry,
-                  ActiveReplacement.uses = uses
-                }
-         in gs1 {GameState.replacements = active : GameState.replacements gs1}
+    --
+    -- CR 614.15: the ORIGIN travels with the row rather than being re-derived,
+    -- because it is a fact about the ability that wrote it and nothing on the
+    -- board still says so once the resolution is over.
+    State.modify' $ \gs ->
+      -- The clause's own "if" -- Galvanic Blast's "if you control three or more
+      -- artifacts". Read with the resolution's controller as CR 109.5's "you"
+      -- and this effect's source as the object, the same pair
+      -- Pawl.Engine.Expiry.arm reads a CR 611.2b duration with. The full view,
+      -- not viewWithLastKnown: a spell creating a self-replacement is on the
+      -- stack and the board is live, unlike CR 603.4's intervening "if" on a
+      -- leaves-the-battlefield trigger.
+      let met = maybe True (Condition.holds (Projection.fullView gs) (Filter.MkContext (Just controller) (Just source)) gs source) condition
+       in case (met, Expiry.arm controller source duration gs) of
+            -- The stated condition is false, so the clause creates nothing.
+            (False, _) -> gs
+            -- CR 611.2b: the duration never started, so no floating replacement
+            -- is installed.
+            (_, Nothing) -> gs
+            (True, Just expiry) ->
+              let (ts, gs1) = Game.freshTimestamp gs
+                  active =
+                    ActiveReplacement.MkActiveReplacement
+                      { ActiveReplacement.effect = re,
+                        ActiveReplacement.source = source,
+                        ActiveReplacement.timestamp = ts,
+                        ActiveReplacement.expiry = expiry,
+                        ActiveReplacement.uses = uses,
+                        ActiveReplacement.origin = origin
+                      }
+               in gs1 {GameState.replacements = active : GameState.replacements gs1}
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the
@@ -1730,7 +1748,8 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                     ActiveReplacement.source = source,
                     ActiveReplacement.timestamp = ts,
                     ActiveReplacement.expiry = Expiry.Type.Never,
-                    ActiveReplacement.uses = Uses.Once
+                    ActiveReplacement.uses = Uses.Once,
+                    ActiveReplacement.origin = ReplacementOrigin.Other
                   }
            in g1 {GameState.replacements = active : GameState.replacements g1}
     State.modify' (\g -> List.foldl' (flip install) g named)
