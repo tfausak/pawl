@@ -3048,10 +3048,11 @@ runToTurnStep turn phase answer gs0 =
 -- Prison's controller is the only thing that decides whether her attacks are
 -- taxed at all.
 --
--- The Forests are real Forests, so CR 305.6's intrinsic ability is what pays --
--- a fixture that seeded a mana pool would not survive CR 500.5's emptying and
--- would prove nothing about CR 508.1i's window. Their ids come back so a test
--- can read the payment off the board rather than off a pool.
+-- The Forests are real Forests, so CR 305.6's intrinsic ability is what pays. A
+-- fixture that seeded a mana pool instead would prove nothing about CR 508.1i's
+-- window -- the whole of what that rule gives the player is the chance to make
+-- the mana -- and would not survive the step boundary in the gameplay-level case
+-- (CR 500.5). Their ids come back so a test can read the payment off the board.
 imprisoning :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> [Printing.Printing] -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 imprisoning prison forest who mine lands =
   let (gs, ours, _) = S.combatBoardOf mine []
@@ -3066,8 +3067,8 @@ addForests forest n gs =
    in List.foldl' add ([], gs) [1 .. n]
 
 -- Are all of these permanents tapped? What a test asks of the Forests to see CR
--- 508.1j's payment: the mana pool is empty again by the time anything can look at
--- it, so the tapped lands are the payment's only trace.
+-- 508.1j's payment: it spends exactly what tapping them produced, so the pool is
+-- empty again afterwards and the tapped lands are the payment's only trace.
 allTapped :: [ObjectId.ObjectId] -> GameState.GameState -> Bool
 allTapped oids gs = all (\oid -> tapStateOf oid gs == Just TapState.Tapped) oids
 
