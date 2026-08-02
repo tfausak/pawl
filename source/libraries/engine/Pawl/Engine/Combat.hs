@@ -466,9 +466,11 @@ fearAllowsGiven pcs blocker attacker gs =
 -- the specified land type (as in 'islandwalk'), with the specified type or
 -- supertype (as in 'artifact landwalk'), without the specified type or supertype
 -- (as in 'nonbasic landwalk'), or with both the specified type or supertype and
--- the specified subtype (as in 'snow swampwalk')". Bog Wraith is the first,
--- Dryad Sophisticate the third and Legions of Lim-Dûl the fourth; the second has
--- no paper printing, so it is reachable rather than exercised.
+-- the specified subtype (as in 'snow swampwalk')". All four have a printing in
+-- the pool: Bog Wraith the first, Vectis Gloves the second -- the only paper
+-- source of artifact landwalk, and it GRANTS the keyword rather than printing it
+-- on a creature -- Dryad Sophisticate the third and Legions of Lim-Dûl the
+-- fourth.
 landwalkAllows :: ObjectId -> GameState -> Bool
 landwalkAllows attacker gs = landwalkAllowsGiven (Projection.controlGrants gs) Map.empty attacker gs
 
@@ -515,24 +517,27 @@ landwalkAllowsGiven grants pcs attacker gs =
       --
       -- CR 205.3d ("an object can't gain a subtype that doesn't correspond to
       -- one of that object's types") is what makes the card-type test all but
-      -- redundant for the subtype clauses, and "all but" is why it is still
-      -- asked: nothing in the projection enforces 205.3d, so a
+      -- redundant for the two clauses whose criterion NAMES a land type --
+      -- islandwalk's and snow swampwalk's -- and "all but" is why it is still
+      -- asked even for them: nothing in the projection enforces 205.3d, so a
       -- Modification.AddLandSubtype aimed at a non-land would otherwise be walked
-      -- on. It is not redundant at all for the other three clauses, whose
-      -- criteria never mention a land type -- "nonbasic landwalk" would match
-      -- every nonbasic PERMANENT without it.
+      -- on. For the other two it is not redundant at all: their criteria name no
+      -- land type, so "nonbasic landwalk" would match every nonbasic PERMANENT
+      -- and "artifact landwalk" every artifact.
       --
       -- CR 109.5's "you" for the criterion is the ATTACKER's controller, and the
       -- source is the attacker -- the same pairing every keyword-borne Filter
       -- takes. No landwalk in the pool reads either (all four clauses are type,
       -- supertype and subtype tests), so the context is well-defined rather than
-      -- exercised.
+      -- exercised. Hoisted, since it does not vary per candidate.
+      context = Filter.MkContext (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
+      -- ONE projection per candidate: Filter.cardTypes is the very set
+      -- Projection.cardTypesGiven would rebuild, so the land test reads it off
+      -- the view rather than projecting the object a second time. The comment
+      -- above about walking the whole battlefield is why that matters (#200).
       matchesCriterion criterion oid =
-        Set.member CardType.Land (Projection.cardTypesGiven pcs oid gs)
-          && Filter.matches
-            (Filter.MkContext (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker))
-            (Projection.viewOfObjectGiven pcs grants oid gs)
-            criterion
+        let view = Projection.viewOfObjectGiven pcs grants oid gs
+         in Set.member CardType.Land (Filter.cardTypes view) && Filter.matches context view criterion
    in not (any (\criterion -> any (matchesCriterion criterion) defendersLands) walked)
 
 -- CR 702.111b: "A creature with menace can't be blocked except by two or more

@@ -931,6 +931,45 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
+  -- CR 702.14c's SECOND clause: "with the specified type or supertype (as in
+  -- 'artifact landwalk')". Vectis Gloves is the only paper source, and it is the
+  -- pool's first GRANTED landwalk -- every other printing carries the keyword on
+  -- its own type line -- so this is also the first case where the criterion
+  -- arrives through a CR 613.1f layer-6 GainKeyword rather than off the card.
+  Spec.it s "CR 702.14c an artifact landwalker granted by Vectis Gloves walks on an artifact land" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    gloves <- S.printingOf s registry "Vectis Gloves"
+    seat <- S.printingOf s registry "Seat of the Synod"
+    let (gs0, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        let (glovesId, equipped) = S.addCreature gloves S.alice (withLands [seat] gs0)
+            armed = S.attach glovesId a equipped
+        -- The premise: the Gloves really grant it, and the Piker prints none.
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) armed)) "illegal while equipped"
+        -- THE FALSIFIER, and what makes this a granted-keyword test rather than
+        -- a repeat of the printed ones: the SAME board with the Gloves
+        -- unattached. A bare Piker has no landwalk, so the block is legal.
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) equipped) "legal once nothing is equipped"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+  Spec.it s "CR 702.14c an artifact landwalker does NOT walk on a plain land" $ do
+    -- The other discriminator: Seat of the Synod is an Artifact Land, and an
+    -- ordinary Swamp is not. An implementation that dropped the criterion and
+    -- matched any land would call this illegal.
+    piker <- S.printingOf s registry "Goblin Piker"
+    gloves <- S.printingOf s registry "Vectis Gloves"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gs0, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        let (glovesId, board) = S.addCreature gloves S.alice (withLands [swamp] gs0)
+            armed = S.attach glovesId a board
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) armed) "legal"
+        let after = S.runPure S.aggressiveAnswer armed Combat.declareBlockers
+        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
   Spec.it s "CR 702.14d swampwalk on the BLOCKER cancels nothing" $ do
     -- CR 702.14d's own example, in swamps: the defending player controls the
     -- named land AND a creature with the same landwalk, and still may not

@@ -249,6 +249,39 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "Land" (TypeLine.types (CardT.typeLine c)) (Set.singleton CardType.Land)
     Spec.assertEqWith s "Basic and Snow" (TypeLine.supertypes (CardT.typeLine c)) (Set.fromList [Supertype.Basic, Supertype.Snow])
     Spec.assertEqWith s "-- Swamp" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Swamp)
+  -- CR 702.14c's SECOND clause, and the pool's only source of artifact landwalk:
+  -- Vectis Gloves {2} Artifact -- Equipment, "Equipped creature gets +2/+0 and
+  -- has artifact landwalk. Equip {2}." (Checked against Scryfall.)
+  --
+  -- The keyword is GRANTED, not printed -- CardT.keywords is empty and the
+  -- criterion lives in a layer-6 GainKeyword -- which is what makes it the first
+  -- landwalk in the pool to arrive through the projection rather than off a type
+  -- line. That, and the criterion itself, are what this pins; the cost and the
+  -- equip ability are transcription the codec already covers.
+  Spec.it s "vectis-gloves.json grants artifact landwalk rather than printing it" $ do
+    c <- S.cardOf s registry "Vectis Gloves"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Vectis Gloves")
+    Spec.assertEqWith s "no PRINTED keyword" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "one Attached static ability, +2/+0 and artifact landwalk"
+      (fmap (\sa -> (StaticAbility.affected sa, NonEmpty.toList (StaticAbility.modifications sa))) (CardT.staticAbilities c))
+      [ ( Affected.Attached,
+          [ Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0),
+            Modification.GainKeyword (Keyword.Landwalk (Filter.HasCardType CardType.Artifact))
+          ]
+        )
+      ]
+  -- The artifact land the Gloves need something to walk on. Seat of the Synod is
+  -- "Artifact Land" (checked against Scryfall) -- BOTH card types and no land
+  -- subtype at all, which is why its mana ability is printed rather than derived
+  -- from a subtype the way a basic's is.
+  Spec.it s "seat-of-the-synod.json loads as an Artifact Land with a printed mana ability" $ do
+    c <- S.cardOf s registry "Seat of the Synod"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Seat of the Synod")
+    Spec.assertEqWith s "Artifact AND Land" (TypeLine.types (CardT.typeLine c)) (Set.fromList [CardType.Artifact, CardType.Land])
+    Spec.assertEqWith s "no land subtype to derive mana from" (TypeLine.subtypes (CardT.typeLine c)) Set.empty
+    Spec.assertEqWith s "so it prints one ability" (length (CardT.activatedAbilities c)) 1
   -- The first card file with menace (CR 702.111), and so the first carrying a
   -- restriction on a SET of blockers rather than on each blocker independently
   -- (#533). Its entire printed rules text is the keyword, so a menace case in
