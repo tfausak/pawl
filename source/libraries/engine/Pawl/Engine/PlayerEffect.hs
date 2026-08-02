@@ -30,6 +30,7 @@ import qualified Pawl.Types.Card as Card
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.ManaCost (ManaCost)
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerEffect (PlayerEffect)
@@ -60,6 +61,32 @@ inScope pid controller scope = case scope of
   PlayerScope.Opponents -> pid /= controller
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True
+
+-- The same scope as a SET rather than as a membership test -- CR 400.1's "each
+-- player has their own library, hand, and graveyard" asked in the direction a
+-- zone fold needs it (Pawl.Engine.Target.graveyardRecipients). Built ON inScope
+-- rather than beside it, so there is exactly one reading of what a PlayerScope
+-- names; Pawl.Engine.Count.playersFor's own haddock is where the cost of two
+-- readings disagreeing is written down.
+--
+-- CR 102.1: "A player is one of the people in the game." A player who has left
+-- keeps their row in GameState.players -- Player.status turns Departed, the key
+-- stays -- so the fold is over Game.stillPlaying rather than the map's keys, and
+-- no scope names a departed seat. That is playersFor's rule, honoured here for
+-- the same reason.
+--
+-- Nothing is an ABSENT perspective, which is CR 109.5's "you" with nobody to be
+-- -- the vacuous posture every player-referencing Filter atom takes. EachPlayer
+-- is answerable anyway, because it never asks the perspective a question: "target
+-- card in a graveyard" names the whole table whoever is reading it.
+playersInScope :: Maybe PlayerId -> GameState -> PlayerScope -> Maybe [PlayerId]
+playersInScope perspective gs scope =
+  let everyone = Game.stillPlaying gs
+      relative = fmap (\you -> filter (\pid -> inScope pid you scope) everyone) perspective
+   in case scope of
+        PlayerScope.You -> relative
+        PlayerScope.Opponents -> relative
+        PlayerScope.EachPlayer -> Just everyone
 
 -- CR 604.2: every player effect applying to `pid` right now. Gathered LIVE from
 -- the battlefield on every read and never captured, the same posture
@@ -179,7 +206,7 @@ prohibitsCasting pid gs =
 -- harmless to today's card-type/colour filters and well-defined for a future
 -- ControlledBy filter. Runs through the identity-blind Filter.matches: this
 -- module never learns which spell produced the Filter.
-matchesSpell :: Filter -> ObjectId -> GameState -> Bool
+matchesSpell :: Filter Keyword -> ObjectId -> GameState -> Bool
 matchesSpell filter_ oid gs =
   -- No source in scope at this site: `oid` is the AFFECTED object, not a source.
   Filter.matches (Filter.MkContext (Projection.controllerOf oid gs) Nothing) (Projection.viewOfObject oid gs) filter_
@@ -199,7 +226,7 @@ matchesSpell filter_ oid gs =
 -- projections at all.
 costAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [ManaCost])
 costAdjustments pid oid gs =
-  let matching :: Filter -> a -> Maybe a
+  let matching :: Filter Keyword -> a -> Maybe a
       matching criterion amount = if matchesSpell criterion oid gs then Just amount else Nothing
       increaseOf effect = case effect of
         PlayerEffect.IncreaseSpellCost criterion amount -> matching criterion amount

@@ -69,6 +69,8 @@ toJson s = Common.nullary $ case s of
   Subtype.Golem -> "Golem"
   Subtype.Turtle -> "Turtle"
   Subtype.Mongoose -> "Mongoose"
+  Subtype.Frog -> "Frog"
+  Subtype.Vampire -> "Vampire"
 
 fromJson :: Value.Value -> Either Text.Text Subtype.Subtype
 fromJson =
@@ -134,7 +136,9 @@ fromJson =
       ("Wraith", Subtype.Wraith),
       ("Golem", Subtype.Golem),
       ("Turtle", Subtype.Turtle),
-      ("Mongoose", Subtype.Mongoose)
+      ("Mongoose", Subtype.Mongoose),
+      ("Frog", Subtype.Frog),
+      ("Vampire", Subtype.Vampire)
     ]
 
 fromJsonPair :: Value.Value -> Either Text.Text (Subtype.Subtype, Subtype.Subtype)

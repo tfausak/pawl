@@ -19,6 +19,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
@@ -71,7 +72,7 @@ minimalTriggeredAbility =
 
 -- | Every required field set to a simple value, and every defaulted/elided
 -- field at its Haskell default (Nothing, empty, or Counterable). Its JSON has
--- none of the fourteen optional keys -- 'baseCardJson' below -- which is what
+-- none of the fifteen optional keys -- 'baseCardJson' below -- which is what
 -- lets the single round-trip assertion in the first test prove BOTH halves of
 -- every one of those fields' elision at once: 'Card.toJson' would emit an
 -- extra key if any field's encoder mis-omitted its default, and
@@ -101,6 +102,7 @@ baseCard =
       Card.playerAbilities = [],
       Card.blockRequirements = [],
       Card.attackRequirements = [],
+      Card.combatRestrictions = [],
       Card.additionalCosts = [],
       Card.alternativeCosts = [],
       Card.mulliganAction = [],
@@ -118,10 +120,10 @@ baseCardJson =
     <> "\"spell\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}},"
     <> "\"activatedAbilities\":[],\"replacementEffects\":[],\"triggeredAbilities\":[],\"castingPermissions\":[]}"
 
--- | 'baseCard' with every field populated at once, including the fourteen
+-- | 'baseCard' with every field populated at once, including the fifteen
 -- defaulted/elided ones and the recursive card-in-card fields (spell,
 -- activatedAbilities, triggeredAbilities, delayedAbilities) -- the shape a
--- reviewer would otherwise have to piece together from fourteen separate single-
+-- reviewer would otherwise have to piece together from fifteen separate single-
 -- field cases. Its JSON, 'populatedCardJson', was produced by running
 -- 'Card.toJson' on this exact value (not transcribed by hand) and pasted back in,
 -- per the recipe's "derive every JSON literal by reading the encoder" rule.
@@ -141,6 +143,7 @@ populatedCard =
       Card.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells],
       Card.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached],
       Card.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
+      Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached],
       Card.additionalCosts = [CostComponent.TapThis],
       Card.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []],
       Card.counterability = Counterability.CantBeCountered,
@@ -170,6 +173,7 @@ populatedCardJson =
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
+    <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"type\":\"Attached\"}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"alternativeCosts\":[{\"mana\":[],\"components\":[]}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
@@ -181,7 +185,7 @@ populatedCardJson =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Card" $ do
   -- R7's one case for MkCard's single constructor, and simultaneously the
-  -- absent-key proof for all fourteen defaulted/elided fields at once: see
+  -- absent-key proof for all fifteen defaulted/elided fields at once: see
   -- 'baseCard's haddock for why one round trip suffices for both.
   Spec.it s "MkCard, every required field present and every optional field absent" $
     Common.assertJsonCodec s Card.toJson Card.fromJson baseCard baseCardJson
@@ -213,6 +217,9 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
     Spec.it s "attackRequirements (CR 508.1d) defaults to the empty list" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.attackRequirements <$> Card.fromJson v) (Right [])
+    Spec.it s "combatRestrictions (CR 508.1c/509.1b) defaults to the empty list" $ do
+      v <- Common.assertJson s baseCardJson
+      Spec.assertEq s (Card.combatRestrictions <$> Card.fromJson v) (Right [])
     Spec.it s "additionalCosts (CR 118.8) defaults to the empty list" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.additionalCosts <$> Card.fromJson v) (Right [])
@@ -297,6 +304,13 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
         Card.fromJson
         baseCard {Card.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached]}
         (init baseCardJson <> ",\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}]}")
+    Spec.it s "combatRestrictions" $
+      Common.assertJsonCodec
+        s
+        Card.toJson
+        Card.fromJson
+        baseCard {Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached]}
+        (init baseCardJson <> ",\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"type\":\"Attached\"}}]}")
     Spec.it s "additionalCosts" $
       Common.assertJsonCodec
         s

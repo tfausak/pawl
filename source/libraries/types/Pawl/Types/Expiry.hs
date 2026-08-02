@@ -1,6 +1,7 @@
 module Pawl.Types.Expiry where
 
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 611.2: how long a STORED effect lasts, as the game remembers it. The
@@ -31,4 +32,23 @@ data Expiry
   | -- | CR 611.2a: "until your next turn", as a concrete player. Ends as that
     -- player's turn begins.
     AtTurnOf PlayerId.PlayerId
+  | -- | CR 500.5: "As a step or phase ends, if there are effects that last until
+    -- the end of that step or phase, those effects expire." The window is a
+    -- Pawl.Types.PhaseSelector because CR 500.5 names BOTH grains in one
+    -- sentence and that type already spans both -- `Step` for one schedule
+    -- entry, the other three arms for CR 500.1's stepped phases.
+    --
+    -- Matched by EQUALITY against the window that is ending, which is the same
+    -- comparison Pawl.Engine.Replacement makes for a skip (CR 614.1b): a
+    -- selector naming the combat phase can never be confused with one naming a
+    -- step of it. That is exactly what CR 500.5a demands -- "effects that last
+    -- 'until end of combat' expire at the end of the combat PHASE, not at the
+    -- beginning of the end of combat step" -- so the step's own end does not
+    -- reach an AtEndOf CombatPhase entry.
+    --
+    -- Only the CombatPhase arm has a printed producer today
+    -- (Duration.UntilEndOfCombat, Jade Statue). The others cost nothing: this
+    -- is one payload of a type Pawl.Engine.Expiry already had to case on, and
+    -- the sweep is one equality either way.
+    AtEndOf PhaseSelector.PhaseSelector
   deriving (Eq, Ord, Show)

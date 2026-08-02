@@ -106,3 +106,101 @@ isLandType subtype = case subtype of
   Subtype.Turtle -> False
   -- CR 205.3m: a creature type (Blurred Mongoose's).
   Subtype.Mongoose -> False
+  -- CR 205.3m: a creature type (the one Turn to Frog sets). Not a land type,
+  -- which is exactly what isCreatureType below is for: setting a creature type
+  -- must leave an animated permanent's land type standing.
+  Subtype.Frog -> False
+  -- CR 205.3m: a creature type (Child of Night's). Not a land type.
+  Subtype.Vampire -> False
+
+-- CR 205.3m: "Creatures and kindreds share their lists of subtypes; these
+-- subtypes are called creature types." The rulebook owns that list by name, so
+-- this is the same kind of classification isLandType is, and it answers CR
+-- 205.1a's question for the layer-4 arm that SETS one: "when an effect sets one
+-- or more of an object's subtypes, the new subtype(s) replaces any existing
+-- subtypes from the appropriate set (creature types, land types, artifact types,
+-- enchantment types, planeswalker types, or spell types)". The appropriate set
+-- for Modification.SetCreatureSubtype is the True arms below, and nothing else
+-- may be swept away with them.
+--
+-- CR 205.3c/205.3d make the families disjoint, exactly as isLandType's comment
+-- says, so this is the complement of the five non-creature families rather than
+-- an independent judgement -- and it is total, with no wildcard, so a new
+-- subtype has to decide.
+--
+-- CR 308.2 makes the KINDRED subtypes the same set, which is why a Kindred
+-- Enchantment -- Faerie answers True here: Faerie is a creature type wherever it
+-- appears.
+isCreatureType :: Subtype.Subtype -> Bool
+isCreatureType subtype = case subtype of
+  -- CR 205.3i: land types.
+  Subtype.Mountain -> False
+  Subtype.Swamp -> False
+  Subtype.Forest -> False
+  Subtype.Island -> False
+  Subtype.Plains -> False
+  Subtype.Desert -> False
+  -- CR 205.3k: a spell type.
+  Subtype.Arcane -> False
+  -- CR 205.3h: enchantment types.
+  Subtype.Aura -> False
+  Subtype.Curse -> False
+  -- CR 205.3g: an artifact type.
+  Subtype.Equipment -> False
+  -- CR 205.3j: a planeswalker type.
+  Subtype.Jace -> False
+  -- CR 205.3m: creature types, every one of them named in that rule's list.
+  Subtype.Goblin -> True
+  Subtype.Warrior -> True
+  Subtype.Human -> True
+  Subtype.Bird -> True
+  Subtype.Ogre -> True
+  Subtype.Centaur -> True
+  Subtype.Cat -> True
+  Subtype.Dinosaur -> True
+  Subtype.Beast -> True
+  Subtype.Rat -> True
+  Subtype.Elephant -> True
+  Subtype.Myr -> True
+  Subtype.Skeleton -> True
+  Subtype.Wall -> True
+  Subtype.Wizard -> True
+  Subtype.Shapeshifter -> True
+  Subtype.Lhurgoyf -> True
+  Subtype.Barbarian -> True
+  Subtype.Zombie -> True
+  Subtype.Fungus -> True
+  Subtype.Elemental -> True
+  Subtype.Rogue -> True
+  Subtype.Hag -> True
+  Subtype.Warlock -> True
+  Subtype.Soldier -> True
+  Subtype.Phyrexian -> True
+  Subtype.Elf -> True
+  Subtype.Nightmare -> True
+  Subtype.Horse -> True
+  Subtype.Scout -> True
+  Subtype.Artificer -> True
+  Subtype.Troll -> True
+  Subtype.Nomad -> True
+  Subtype.Shaman -> True
+  Subtype.Demon -> True
+  Subtype.Cleric -> True
+  Subtype.Illusion -> True
+  Subtype.Spirit -> True
+  Subtype.Angel -> True
+  Subtype.Insect -> True
+  Subtype.Berserker -> True
+  Subtype.Thopter -> True
+  Subtype.Dragon -> True
+  Subtype.Unicorn -> True
+  Subtype.Faerie -> True
+  Subtype.Rhino -> True
+  Subtype.Wraith -> True
+  -- CR 205.3m lists Golem, and CR 205.3g's artifact types do not -- so Icehide
+  -- Golem's subtype is a creature type even though the card is an artifact too.
+  Subtype.Golem -> True
+  Subtype.Turtle -> True
+  Subtype.Mongoose -> True
+  Subtype.Frog -> True
+  Subtype.Vampire -> True

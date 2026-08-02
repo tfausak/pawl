@@ -1,6 +1,6 @@
 module Pawl.Types.ActivationTiming where
 
-import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | CR 307.5: when an activated ability may be activated.
@@ -58,11 +58,16 @@ data ActivationTiming
     -- PrintedActivationTurnScope group is what proves the two axes are read
     -- independently.
     --
-    -- Pawl.Types.Phase is one type over the CR 500.1 phases and their steps, so
-    -- naming a step and naming a STEPLESS phase (the two main phases) are the
-    -- same act here. A phase that HAS steps is not nameable -- "Activate only
-    -- during combat" (Najeela, the Blade-Blossom, Jade Statue) would have to
-    -- name five steps at once (#455).
+    -- A Pawl.Types.PhaseSelector rather than a bare Pawl.Types.Phase, because
+    -- CR 500.1 breaks three of the five phases into steps and a Phase value is
+    -- one SCHEDULE ENTRY -- so it names a step, or a stepless main phase (CR
+    -- 505.2), and can never name the combat phase as a whole. Jade Statue's
+    -- "Activate only during combat" is PhaseSelector.CombatPhase; Desert's
+    -- "Activate only during the end of combat step" is PhaseSelector.Step, and
+    -- means exactly what it meant when this arm carried the Phase directly.
+    -- Pawl.Engine.Turn.inWindow is the reader, and it is a containment test
+    -- rather than an equality -- which is the whole difference between the two
+    -- kinds of arm. The casting side still carries a bare Phase (#527).
     --
     -- The TurnScope is the same type Pawl.Types.TriggerCondition.StepBegins
     -- carries, and means the same thing on the same axis: CR 109.5 is what makes
@@ -73,6 +78,6 @@ data ActivationTiming
     --
     -- Neither "an opponent's turn" (Trade Caravan, Nettling Imp) nor a turn named
     -- with no phase at all (Lavinia, Foil to Conspiracy) is sayable: TurnScope has
-    -- two arms, and this one requires a Phase (#520).
-    DuringPhase Phase.Phase TurnScope.TurnScope
+    -- two arms, and this one requires a window (#520).
+    DuringPhase PhaseSelector.PhaseSelector TurnScope.TurnScope
   deriving (Eq, Ord, Show)

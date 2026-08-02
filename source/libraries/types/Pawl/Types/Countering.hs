@@ -13,11 +13,16 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- ObjectIds, and `spell` and `source` are the two ends of the same act, so a
 -- caller that swapped them would still typecheck.
 --
--- Only the SPELL half of rule 701.6a is here. That rule covers countering an
--- ABILITY too, and nothing in this pool counters one: CR 113.9's first sentence
--- says an ability on the stack "can't be countered by anything that counters
--- only spells", and Pawl.Types.Pool has no constructor admitting one as a target
--- either -- so a countered ability records nothing today (#486).
+-- Only the SPELL half of rule 701.6a is here, and that is the printed word
+-- rather than an omission: the one reader is Baral, Chief of Compliance's
+-- "whenever a spell or ability you control counters A SPELL". Stifle counters an
+-- ABILITY, which CR 113.9 keeps a separate object -- "activated and triggered
+-- abilities on the stack aren't spells, and therefore can't be countered by
+-- anything that counters only spells" -- and Pawl.Engine.Event.counter ceases it
+-- (CR 608.2n) without recording anything at all, so Baral cannot see it. A
+-- countered ability therefore has no look-back record (#541); the sibling that
+-- would carry one is not this type widened, since widening it is exactly what
+-- would make Baral fire.
 data Countering = MkCountering
   { -- | CR 701.6a: the spell that was countered, as it was on the stack. The id is
     -- already dead by the time any reader sees this: countering removes it from

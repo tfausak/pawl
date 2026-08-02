@@ -83,7 +83,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn,
             TriggeredAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.DealDamage (SlotName.MkSlotName (Text.pack "you")) (Quantity.Literal 1))) Map.empty Optionality.Mandatory))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Quantity.Literal 1))) Map.empty Optionality.Mandatory))
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening =
               Just

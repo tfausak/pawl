@@ -70,6 +70,7 @@ layer m = case m of
   Modification.ModifyPowerToughness _ _ -> Layer.ModifyPT
   Modification.SetLandSubtype _ -> Layer.Type
   Modification.AddLandSubtype _ -> Layer.Type
+  Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
@@ -135,6 +136,31 @@ applyModification lyr src cands gs oid m pc =
             }
         Modification.AddLandSubtype s ->
           pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+        -- CR 205.1a: "when an effect sets one or more of an object's subtypes,
+        -- the new subtype(s) replaces any existing subtypes from the appropriate
+        -- set (creature types, land types, artifact types, enchantment types,
+        -- planeswalker types, or spell types)". The appropriate set here is the
+        -- CREATURE types (CR 205.3m, Pawl.Engine.Subtype.isCreatureType) and only
+        -- those -- CR 205.1b's last sentence says the object keeps "all of its
+        -- prior card types and subtypes other than creature types". So an
+        -- animated permanent's land type survives becoming a Frog, and so would
+        -- an artifact's or an enchantment's.
+        --
+        -- Nothing else moves. Unlike SetLandSubtype this strips no abilities:
+        -- CR 305.7's ability clause is a rule about LANDS, not about setting a
+        -- subtype, and Turn to Frog's own ability loss is a separate layer-6
+        -- modification (CR 613.1f). And CR 205.1a's last sentence -- "Removing
+        -- an object's subtype doesn't affect its card types at all" -- is why no
+        -- card type is touched: "becomes a blue Frog" leaves the object a
+        -- creature because it already was one, and Jade Statue's "becomes a
+        -- Golem artifact creature" says the card-type half separately with
+        -- AddCardType.
+        --
+        -- Not checked: CR 205.3d's "an object can't gain a subtype that doesn't
+        -- correspond to one of that object's types", which none of the layer-4
+        -- subtype arms asks (#530).
+        Modification.SetCreatureSubtype s ->
+          pc {PC.subtypes = Set.insert s (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 305.7, second sentence: "It loses all abilities generated from its
@@ -417,7 +443,7 @@ fullView gs oid = Just (viewOfObject oid gs)
 --
 -- Nothing when the source is gone AND nothing was recorded for it -- an object
 -- that ceased without a zone change ever running over it, which is what
--- Resolve.cease does to an ability and what Departure.objectsLeaveWith does to a
+-- Game.cease does to an ability and what Departure.objectsLeaveWith does to a
 -- departing player's objects. Honest Nothing rather than a zero, and it lands on
 -- the no-op every caller already gives an unevaluable quantity.
 --
@@ -462,6 +488,11 @@ viewOfCard card =
           Filter.supertypes = TypeLine.supertypes typeLine,
           Filter.colors = baseColorsOf card,
           Filter.subtypes = TypeLine.subtypes typeLine,
+          -- CR 702: read straight off the printed card, like the type line above
+          -- it and for the same reason -- no projection exists off the
+          -- battlefield, so a search that asks for a card with flying
+          -- (CR 702.29e typecycling) is answered from the printing.
+          Filter.keywords = Card.Type.keywords card,
           Filter.power = Nothing,
           Filter.controller = Nothing,
           -- A printed card off the battlefield is not an object, so it has no
@@ -511,6 +542,12 @@ viewOfCharacteristics oid pc controller gs =
       Filter.supertypes = printedSupertypes oid gs,
       Filter.colors = PC.colors pc,
       Filter.subtypes = PC.subtypes pc,
+      -- CR 109.3 / 613.1f: abilities are characteristics and layer 6 writes them,
+      -- so this comes off the PROJECTION alongside cardTypes and colors -- a
+      -- creature that gained flying matches, and one under Humility does not.
+      -- Map.keysSet because PC.keywords counts instances (CR 702) and
+      -- Filter.HasKeyword asks only membership.
+      Filter.keywords = Map.keysSet (PC.keywords pc),
       Filter.power = PC.power pc,
       Filter.controller = controller,
       Filter.identity = Just oid,
@@ -804,9 +841,13 @@ affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) 
 -- effect -- "if an effect requires information from the game ... the answer is
 -- determined only once, when the effect is applied."
 --
--- `oid` is the SOURCE (the resolving spell), not the affected object: the source
--- is what holds a chosen X in its bindings, and `you` is the source's controller,
--- whose hand a player-scoped count counts.
+-- `oid` is the SOURCE (the resolving spell), not the affected object: for a
+-- spell that object is also the one CR 601.2b's chosen X was stamped on, and
+-- `you` is its controller, whose hand a player-scoped count counts.
+--
+-- Not the announcing object for an ACTIVATED ability, where the two differ
+-- (Quantity.evaluateFor); an X-cost activation that stored a continuous effect
+-- measured by its X would freeze nothing here. No card in the pool does (#550).
 --
 -- Deliberately NOT applied to a static ability's effect: CR 611.2 scopes 611.2a-d
 -- to "a continuous effect generated by the resolution of a spell or ability", and
@@ -845,6 +886,7 @@ freezeQuantities gs oid you m =
         Modification.LoseAllAbilities -> Just m
         Modification.SetLandSubtype _ -> Just m
         Modification.AddLandSubtype _ -> Just m
+        Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.ChangeSubtypeWord _ _ -> Just m
         Modification.SetController _ -> Just m
@@ -868,6 +910,7 @@ quantitiesOf m = case m of
   Modification.LoseAllAbilities -> []
   Modification.SetLandSubtype _ -> []
   Modification.AddLandSubtype _ -> []
+  Modification.SetCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
@@ -887,6 +930,12 @@ setLandSubtypeEffects gs =
         -- named explicitly per Modification's exhaustiveness discipline.
         Modification.SetController _ -> False
         Modification.SetControllerToSource -> False
+        -- The OTHER subtype set, and the arm most at risk of being read as this
+        -- one. CR 305.7's ability strip is a rule about a LAND whose subtype is
+        -- set; CR 205.1a/205.1b's creature-type set carries no such clause, so a
+        -- Turn to Frog must not take its target's rules text. The existing
+        -- wildcard already covers it, but the confusion is worth naming.
+        Modification.SetCreatureSubtype _ -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -972,15 +1021,27 @@ textChangesAffecting oid gs =
    in Maybe.mapMaybe pairOf (GameState.continuousEffects gs)
 
 -- Apply text-changes to a modification's basic-land-type words (CR 612.1/612.2):
--- SetLandSubtype/AddLandSubtype carry a land-type word; every other modification
--- has none to rewrite here. Projection's charter (it cases on Modification); it is
--- delegated to by Resolve.rewriteEffect for the inner modification of ModifyTarget.
+-- SetLandSubtype/AddLandSubtype carry a land-type word. SetCreatureSubtype
+-- carries a subtype word too and is deliberately NOT rewritten -- see its arm --
+-- and every other modification carries none at all. Projection's charter (it cases
+-- on Modification); it is delegated to by Resolve.rewriteEffect for the inner
+-- modification of ModifyTarget.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
 rewriteModification pairs m =
   let swap from to s = if s == from then to else s
       apply1 acc (from, to) = case acc of
         Modification.SetLandSubtype s -> Modification.SetLandSubtype (swap from to s)
         Modification.AddLandSubtype s -> Modification.AddLandSubtype (swap from to s)
+        -- Carries a subtype word, and CR 612.2 does contemplate rewriting one --
+        -- it names "a creature type word used as a creature type" beside the
+        -- land-type case. What cannot reach it is the PAIR: the pool's only
+        -- ChangeSubtypeWord producer is Magical Hack, whose text replaces one
+        -- basic land type with another and whose pair is answered by
+        -- Prompt.ChooseBasicLandTypes. So `from` is never a creature type and a
+        -- swap here would be the identity on every board pawl can reach. The
+        -- card that would make the difference visible, Artificial Evolution, has
+        -- no producer in the pool (#529).
+        Modification.SetCreatureSubtype _ -> acc
         -- A control op carries no subtype word for CR 612 to rewrite: identity.
         Modification.SetController _ -> acc
         _ -> acc
@@ -1129,6 +1190,10 @@ removesAbilities m = case m of
   -- Answering True here would double-count it into a layer whose ordering it does
   -- not have.
   Modification.SetLandSubtype _ -> False
+  -- CR 205.1a/205.1b's creature-type set has no ability clause at all -- CR
+  -- 305.7's strip belongs to the LAND arm above, not to setting a subtype -- so
+  -- this removes nothing in any layer.
+  Modification.SetCreatureSubtype _ -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
   Modification.SwitchPowerToughness -> False
@@ -1184,9 +1249,12 @@ removesAbilities m = case m of
 -- decision layer, while the fold decides an effect's set against the state its
 -- SAME-LAYER predecessors have already produced (CR 613.7 timestamp order, CR
 -- 613.8 dependency). The two disagree only when another effect in that same layer
--- moves the remover's set, which no layer-6 remover can suffer -- every layer-6
--- arm of modificationWrites is empty, so nothing there moves anything -- and which
--- Titania's Song would suffer only beside a second layer-4 effect (#510).
+-- moves the remover's set. A layer-6 remover CAN now suffer that in principle --
+-- GainKeyword and LoseAllAbilities both write the Keywords aspect, so a remover
+-- whose affected set named a keyword would be decided here without the same-layer
+-- grants -- but no such remover exists: Humility, the pool's only layer-6 one,
+-- selects by card type. Titania's Song would suffer it only beside a second
+-- layer-4 effect (#510).
 --
 -- NOT asked of the remover's own source: whether a stripper was itself stripped
 -- is a question about ORDER WITHIN layer 6, which the fold settles by CR 613.7
@@ -1312,6 +1380,11 @@ data Aspect
   = Types
   | Subtypes
   | Colors
+  | -- CR 109.3 counts abilities among an object's characteristics, and CR 613.1f
+    -- is the layer that writes them, so a keyword is an aspect exactly as a
+    -- subtype is. Coarse like the rest: "the keywords changed" is enough to make
+    -- two effects worth comparing exactly.
+    Keywords
   | PowerA
   | Controller
   deriving (Eq, Ord)
@@ -1344,18 +1417,25 @@ data Aspect
 -- Effect.RemoveFromCombat edits the same record from Resolve.applyEffect, which
 -- is a RESOLUTION and so between projections just as squarely as a settle is. The
 -- clauses that remain unbuilt -- phasing (#154), and the ones about an attacked
--- planeswalker or battle (#493, #302) -- arrive by one of those two doors as well.
+-- battle (#302) -- arrive by one of those two doors as well. The clauses about an
+-- attacked PLANESWALKER take a third door that disturbs this even less: they are
+-- answered where the attack target is read (Combat.stillAttacked), so they never
+-- edit the record at all, and this arm's input is untouched by them.
 --
 -- What that costs is TIMING, not dependency: the rules remove the permanent the
 -- instant control or creature-ness changes, and pawl removes it at the next
 -- settle. That window is argued where the sampling happens. The effect clause has
 -- no such window at all, because a resolving effect edits the record on the spot.
-filterReads :: Filter.Type.Filter -> Set Aspect
+filterReads :: Filter.Type.Filter Keyword.Keyword -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
   Filter.Type.HasSupertype _ -> Set.empty
   Filter.Type.HasColor _ -> Set.singleton Colors
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
+  -- CR 613.1f: layer 6 adds and removes abilities, so what this atom answers
+  -- moves under the fold exactly as HasCardType's answer moves under layer 4 --
+  -- see modificationWrites' three keyword writers below.
+  Filter.Type.HasKeyword _ -> Set.singleton Keywords
   Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   Filter.Type.IsSource -> Set.empty
@@ -1404,7 +1484,7 @@ filterReads f = case f of
   -- direction -- and no card in the pool puts this atom in an affected set at all,
   -- because it is a destination filter, so nothing observable turns on the choice.
   -- The same limitation IsAttachedToCreature's arm above records (#357).
-  Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, PowerA, Controller]
+  Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
   -- Reads nothing, and for a stronger reason than the three empty arms above:
   -- CR 111.3 makes a token's effect-defined values "functionally equivalent" to
   -- printed ones rather than a separate kind of characteristic, and no
@@ -1419,24 +1499,28 @@ filterReads f = case f of
 -- Which aspects a Modification writes -- the other half of the pair above, and
 -- another legitimate case-on-Modification that Projection is the sole home of.
 --
--- The two layer-6 arms write nothing here: no Filter reads abilities, so losing
--- or gaining one cannot change what any affected set matches. That is not the
--- same as saying an ability change cannot matter to CR 613.8 at all -- it can
--- change an effect's EXISTENCE, which is a different clause of CR 613.8a and
--- lives in staticAbilitiesLive (CR 305.7).
+-- THREE arms write Keywords, and each of them writes PC.keywords in
+-- applyModification above: GainKeyword adds one (CR 613.1f), LoseAllAbilities
+-- empties the map (CR 613.1f again -- Humility), and SetLandSubtype empties it
+-- too, because CR 305.7's second sentence says a land whose subtype is set "loses
+-- all abilities generated from its rules text". Filter.HasKeyword reads that map,
+-- so all three can move an affected set and CR 613.8a has to see them. Keyword
+-- COUNTERS need no arm of their own: counterGathered mints CounterKind.Keyword as
+-- a synthetic GainKeyword candidate, so it arrives here as one.
 --
--- SetLandSubtype writes abilities too, and declares only Subtypes for the same
--- reason: the abilities it empties are unreadable by any Filter, so the only part
--- of it CR 613.8a can see is the subtype it sets.
+-- An ability change can also matter to CR 613.8 by changing an effect's
+-- EXISTENCE, which is a different clause of CR 613.8a and still lives in
+-- staticAbilitiesLive (CR 305.7) rather than here.
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
-  Modification.GainKeyword _ -> Set.empty
-  Modification.LoseAllAbilities -> Set.empty
+  Modification.GainKeyword _ -> Set.singleton Keywords
+  Modification.LoseAllAbilities -> Set.singleton Keywords
   Modification.SetBasePowerToughness _ _ -> Set.singleton PowerA
   Modification.ModifyPowerToughness _ _ -> Set.singleton PowerA
   Modification.SwitchPowerToughness -> Set.singleton PowerA
-  Modification.SetLandSubtype _ -> Set.singleton Subtypes
+  Modification.SetLandSubtype _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
+  Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.singleton Subtypes
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors

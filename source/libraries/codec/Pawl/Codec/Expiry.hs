@@ -3,6 +3,7 @@ module Pawl.Codec.Expiry where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
+import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
@@ -18,6 +19,7 @@ toJson e = case e of
   Expiry.Never -> Common.nullary "Never"
   Expiry.While p c -> Common.tagged "While" . Just . Common.array $ [PlayerId.toJson p, Condition.toJson c]
   Expiry.AtTurnOf p -> Common.tagged "AtTurnOf" . Just $ PlayerId.toJson p
+  Expiry.AtEndOf sel -> Common.tagged "AtEndOf" . Just $ PhaseSelector.toJson sel
 
 fromJson :: Value.Value -> Either Text.Text Expiry.Expiry
 fromJson value = do
@@ -27,4 +29,5 @@ fromJson value = do
     ("Never", _) -> Right Expiry.Never
     ("While", Just (Value.Array (Array.MkArray [p, c]))) -> Expiry.While <$> PlayerId.fromJson p <*> Condition.fromJson c
     ("AtTurnOf", Just v) -> Expiry.AtTurnOf <$> PlayerId.fromJson v
+    ("AtEndOf", Just v) -> Expiry.AtEndOf <$> PhaseSelector.fromJson v
     _ -> Left . Text.pack $ "unknown Expiry: " <> t

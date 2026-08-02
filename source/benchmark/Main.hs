@@ -76,6 +76,7 @@ alwaysPass p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter isCreatureRecipient (Map.keys thresholds) of
@@ -123,6 +124,7 @@ castAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter isCreatureRecipient (Map.keys thresholds) of
@@ -170,6 +172,7 @@ fightAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
     a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)

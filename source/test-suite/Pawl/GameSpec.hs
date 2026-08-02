@@ -338,6 +338,7 @@ recordingAnswer p = case p of
   Prompt.ChooseProliferate {} -> pure (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
+  Prompt.ChooseAttackTarget _ _ _ options -> pure (NonEmpty.head options)
   Prompt.DeclareBlockers {} -> pure Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     pure $ case filter S.isCreatureRecipient (Map.keys thresholds) of
@@ -1491,6 +1492,7 @@ slaveAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter S.isCreatureRecipient (Map.keys thresholds) of

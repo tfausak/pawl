@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
@@ -118,7 +119,7 @@ objectRefSlots ref = case ref of
 -- says why); Resolve.readsX below is X's own half of the contract.
 slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
-  Effect.DealDamage slot quantity -> Set.insert slot (Quantity.slots quantity)
+  Effect.DealDamage ref quantity -> Set.union (objectRefSlots ref) (Quantity.slots quantity)
   -- The modification's own quantities read slots too (Projection.quantitiesOf
   -- reaches inside it, since casing on a Modification is Projection's charter);
   -- no card in the pool reads a slot there, but a dangling one would otherwise
@@ -171,6 +172,7 @@ slotsOf effect = case effect of
   Effect.PlaySubgame _ -> Set.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
+  Effect.ShuffleIntoLibrary slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -226,6 +228,7 @@ readsX = any effectReadsX
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
       Effect.TakeExtraTurn {} -> False
+      Effect.ShuffleIntoLibrary _ -> False
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
 -- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
@@ -277,6 +280,7 @@ manaProduced effect = case effect of
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
+  Effect.ShuffleIntoLibrary _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -321,6 +325,10 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
+  -- CR 701.24 shuffles a library; it never LOOKS at one, which is what CR
+  -- 701.23a's search is ("to search for a card in a zone, look at all cards in
+  -- that zone"), so Panglacial Wurm gets no window here.
+  Effect.ShuffleIntoLibrary _ -> False
   Effect.TakeExtraTurn {} -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
@@ -392,8 +400,8 @@ bindsSeveralTokens effects =
 -- CR 612's basic-land-type word swap, over an effect's AST. Cases on Effect
 -- (Resolve's charter); delegates the inner Modification of ModifyTarget to
 -- Projection.rewriteModification and every carried Filter to Filter.rewrite, so
--- no module touches another's constructors. DealDamage and ChangeText carry no
--- rewritable land-type word.
+-- no module touches another's constructors. ChangeText carries no rewritable
+-- land-type word.
 --
 -- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
 -- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
@@ -412,7 +420,7 @@ rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Ty
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification ref ->
     Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) (rewriteObjectRef pairs ref)
-  Effect.DealDamage _ _ -> effect
+  Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
   Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
@@ -464,6 +472,8 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
   Effect.TakeExtraTurn {} -> effect
+  -- No rewritable land-type word.
+  Effect.ShuffleIntoLibrary _ -> effect
 
 -- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
 -- an unchosen mode's effects never resolve), with every text-change affecting it
@@ -661,7 +671,7 @@ resolveModes stackId srcId modes = do
             Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
-            State.modify' (cease stackId)
+            State.modify' (Game.cease stackId)
 
 -- CR 603.5 / 608.2d: does this mode's instruction list happen at all? A
 -- mandatory mode always does. An OPTIONAL one -- a printed "may" -- is its
@@ -702,14 +712,6 @@ resolveAbility abilId srcId ability = do
     Just obj ->
       let chosen = Binding.modesOf (Object.bindings obj)
        in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
-
--- CR 608.2n: an ability leaves the stack and ceases to exist (no graveyard).
-cease :: ObjectId -> GameState -> GameState
-cease abilId gs =
-  gs
-    { GameState.stack = filter (/= abilId) (GameState.stack gs),
-      GameState.objects = Map.delete abilId (GameState.objects gs)
-    }
 
 -- One effect, applied. The case on the constructor is THIS module's charter.
 -- `controller` is the controller of the resolving spell/ability -- who searches
@@ -916,6 +918,28 @@ objectRefObjects legality chosen controller source gs ref = case ref of
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
 
+-- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
+-- as RECIPIENTS, before the objects are picked out of them.
+--
+-- It exists because CR 115.4's "any target" includes a player and CR 120.1a lets
+-- damage go to one, so Effect.DealDamage's InSlot arm must be able to name
+-- something no ObjectId can -- Lightning Bolt at a player's face. Every other
+-- ObjectRef-taking opcode affects permanents only and reads objectRefObjects,
+-- which is this answer with the players dropped (Recipient.objectOf).
+--
+-- EachMatching names permanents, so its members arrive as Recipient.ToObject:
+-- CR 109.2 draws the set from the battlefield with no claim about card types
+-- beyond the Filter's own, and classifying each one is the OPCODE's job
+-- (Damage.damageRecipient sorts them into CR 120.3c's planeswalkers and CR
+-- 120.3e's creatures). Order, timing and CR 608.2f are objectRefObjects'
+-- haddock above, unchanged.
+objectRefRecipients :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [Recipient]
+objectRefRecipients legality chosen controller source gs ref = case ref of
+  ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    (Just recipient, True) -> [recipient]
+    _ -> []
+  ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen controller source gs ref)
+
 -- `resolving` is the object ON THE STACK whose resolution this is -- the spell
 -- itself for a spell, the ABILITY object for an activated or triggered one --
 -- and is where every slot this fold DEFINES is bound, and where
@@ -927,31 +951,50 @@ objectRefObjects legality chosen controller source gs ref = case ref of
 -- permanent would find nothing to capture. The stack object outlives its own
 -- effect list by construction (CR 608.2n removes it afterwards), so it is the
 -- one holder that is always there to write to.
+--
+-- It is where CR 601.2b's announced X is READ from for the same reason, which is
+-- why every Quantity below goes through Quantity.evaluateFor with both ids rather
+-- than through Quantity.evaluate with `source` alone: Cinder Elemental's "{X}{R},
+-- {T}, Sacrifice this creature: It deals X damage to any target" sacrifices the
+-- source to pay, so the announced value survives only on the ability object
+-- (#544).
 applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame resolving source controller bound legality chosen effect = case effect of
-  Effect.DealDamage slot quantity -> do
+  Effect.DealDamage ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-    -- CR 120.1a: a slot may name something damage cannot be dealt to at all. A
-    -- slot bound by Pawl.Engine.Event.eventBindings names a permanent GENERICALLY --
-    -- Aether Flash's entrant under Pawl.Engine.Binding.became, tagged from a trigger
-    -- condition that said nothing about card types -- so what it names is
-    -- classified by Damage.damageRecipient before any event is built, and an
-    -- entrant that is no longer a creature (gone by resolution, CR 608.2h) makes
-    -- this a no-op rather than a damage event nothing can apply. This is the
-    -- only site that can hand applyDamage a generically named recipient.
-    case (Map.lookup slot chosen >>= Damage.damageRecipient gs, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Quantity.evaluate viewOf context gs source quantity of
-        -- An unevaluable quantity is a no-op, the powerOf posture.
-        Nothing -> pure ()
-        Just n ->
-          Monad.when (n > 0) $
-            -- The applied effect IS the event (the M3a spec, section 4):
-            -- constructing this DamageEvent and funneling it is the whole
-            -- application. CR 120.3e / 120.3a live in applyDamage.
-            Damage.applyDamage [Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)]
-      _ -> pure ()
+        -- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
+        -- creature, or a planeswalker." Both arms of the ObjectRef can name
+        -- something that is not one of those, so both go through
+        -- Damage.damageRecipient and neither is trusted:
+        --
+        --   * a SLOT bound by Pawl.Engine.Event.eventBindings names a permanent
+        --     GENERICALLY -- Aether Flash's entrant under
+        --     Pawl.Engine.Binding.became, tagged from a trigger condition that
+        --     said nothing about card types -- and an entrant that is no longer
+        --     a creature (gone by resolution, CR 608.2h) drops out here rather
+        --     than becoming a damage event nothing can apply.
+        --   * a SET's members are permanents matching the Filter, which is card
+        --     text and need not mention a card type at all.
+        --
+        -- A player recipient survives it untouched: CR 115.4's "any target"
+        -- includes one and CR 120.3a is what damage to it does.
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      -- An unevaluable quantity is a no-op, the powerOf posture.
+      Nothing -> pure ()
+      Just n ->
+        Monad.when (n > 0) $
+          -- The applied effect IS the event (the M3a spec, section 4):
+          -- constructing these DamageEvents and funneling them is the whole
+          -- application. CR 120.3e / 120.3a live in applyDamage.
+          --
+          -- ONE batch, not one call per recipient: CR 608.2f's "each such action
+          -- is processed simultaneously" is what Corrosive Gale's "each creature
+          -- with flying" needs, and applyDamage is the funnel that keeps it (its
+          -- haddock carries the CR 615/616 reading of a batch).
+          Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)) recipients)
   Effect.ModifyTarget duration modification ref ->
     State.modify' $ \gs ->
       -- The affected objects are enumerated ONCE, here, by the same sweep every
@@ -1213,7 +1256,8 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
-        -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
+        -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
+        -- (CR 400.3 for a library, graveyard or hand destination).
         -- CR 110.5b: the funnel is handed the riders' tap state, so a permanent
         -- an effect says enters tapped is never untapped for an instant.
         Just target -> do
@@ -1241,6 +1285,53 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
               -- exactly one object and it is the whole candidate set.
               Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
       _ -> pure ()
+  -- CR 701.24: shuffle the slot's target into its OWNER's library --
+  -- Riftsweeper's "its owner shuffles it into their library". Two steps, in this
+  -- order and with the owner read BEFORE either:
+  --
+  --   * CR 400.7's move, through the same changeZone funnel every other
+  --     destination uses, so a replacement watching a library entry gets its CR
+  --     616.1 opportunity. Game.insertIntoZone files a library arrival under
+  --     Object.owner, which is CR 400.3 ("if an object would go to any library,
+  --     graveyard, or hand other than its owner's, it goes to its owner's
+  --     corresponding zone") -- so the card lands in the owner's library without
+  --     this arm naming a player.
+  --   * CR 701.24a's randomisation of that library, through
+  --     Mulligan.shuffleLibrary -- the same call CR 103.3's opening shuffle
+  --     makes. NOT the only shuffle in this module: the Search arm above still
+  --     spells the prompt out inline against Game.honourShuffle, which is the
+  --     identical three steps and could be folded into that function.
+  --
+  -- The shuffle runs whether or not the move did, which is CR 701.24c: "if an
+  -- effect would cause a player to shuffle one or more specific objects into a
+  -- library, that library is shuffled even if none of those objects are in the
+  -- zone they're expected to be in or an effect causes all of those objects to
+  -- be moved to another zone or remain in their current zone." That is the whole
+  -- reason the owner is read from the PRE-MOVE object rather than from the
+  -- incarnation the funnel mints: a cancelled move leaves no incarnation, and
+  -- the library still has to be shuffled.
+  --
+  -- An id that no longer resolves at all shuffles NOTHING, which is the one
+  -- place this falls short of rule 701.24c -- there is no object left to read an
+  -- owner off (#558). Unreachable from this card: Riftsweeper names one target,
+  -- so CR 608.2b already fizzles the whole ability when that target is gone.
+  --
+  -- CR 701.24a's "so that no player knows their order" makes WHO shuffles
+  -- unobservable, which is why the card's "its owner shuffles" needs nothing
+  -- here: Prompt.Shuffle deliberately carries no Decider (randomness is not a
+  -- choice), so there is no player for it to be asked of.
+  Effect.ShuffleIntoLibrary slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
+        Nothing -> pure () -- a player recipient is not a card to shuffle
+        Just target -> do
+          gs <- State.get
+          case Game.lookupObject target gs of
+            Nothing -> pure ()
+            Just obj -> do
+              Monad.void (Event.changeZoneReturning target Zone.Library)
+              Mulligan.shuffleLibrary (Object.owner obj)
+      _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.Draw ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -1272,7 +1363,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         -- so Event.drawCard would record them in GameState.drewFromEmpty,
         -- writing engine state for someone who is not in the game.
         drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             -- CR 121.2: draw n one at a time, folding the shared primitive so each
@@ -1287,7 +1378,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluate viewOf context gs source quantity of
+        case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 ->
                 -- CR 701.17/701.17b: top min(n, library) of the target's library to
@@ -1303,7 +1394,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluate viewOf context gs source quantity of
+        case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
@@ -1359,7 +1450,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         -- state-based actions only as a player would get priority, so no life
         -- total is observable between one adjustment and the next.
         losers = playerRefPlayers chosen legality controller gs ref
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             -- CR 119.3: the life total is simply adjusted, directly on the
@@ -1391,7 +1482,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
         gainers = playerRefPlayers chosen legality controller gs ref
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             Monad.forM_ gainers $ \pid ->
@@ -1419,7 +1510,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer victim), True) ->
-        case Quantity.evaluate viewOf context gs source quantity of
+        case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 -> do
                 -- Candidates are what the VICTIM controls, ascending, so both the
@@ -1463,7 +1554,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 -> do
             -- CR 111: create n tokens with these characteristics under the
@@ -1828,8 +1919,10 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
       _ -> pure ()
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      -- CR 701.6a: the slot's target is a spell on the stack; counter it through
-      -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
+      -- CR 701.6a: the slot's target is a spell or an ability on the stack;
+      -- counter it through the single funnel, which picks that rule's ending
+      -- from the object's own kind (the graveyard for a spell, CR 608.2n's cease
+      -- for an ability). A player recipient / illegal slot (CR 608.2b): no-op.
       --
       -- The funnel is handed THIS effect's source and controller, which is what
       -- Baral, Chief of Compliance's "whenever a spell or ability you control
@@ -1847,7 +1940,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient takes no counters
-        Just target -> case Quantity.evaluate viewOf context gs source quantity of
+        Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
@@ -1925,7 +2018,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
         recipients = playerRefPlayers chosen legality controller gs ref
-    case Quantity.evaluate viewOf context gs source quantity of
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             -- CR 122 / 107.14: each recipient gets n counters of kind, directly

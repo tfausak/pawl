@@ -7,6 +7,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
@@ -39,7 +40,22 @@ import qualified Pawl.Types.Zone as Zone
 -- is structural, not a recursive CALL -- resolving a maker never evaluates the
 -- embedded card's effects, so the control-flow non-recursion above still holds.
 data Effect card
-  = DealDamage SlotName.SlotName Quantity.Quantity
+  = -- | CR 120.1: "Objects can deal damage to battles, creatures, planeswalkers,
+    -- and players." Deal this much of it to what the ObjectRef names.
+    --
+    -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
+    -- gives at length -- one opcode for both the chosen recipient (Lightning
+    -- Bolt's InSlot, filled by targeting) and the named set (Corrosive Gale's
+    -- "each creature with flying", an EachMatching swept at resolution) rather
+    -- than a sibling DamageAll to keep in step with it -- and with one wrinkle
+    -- the other ObjectRef-taking opcodes do not have: CR 120.1a lets damage go to
+    -- a PLAYER as well ("any target", CR 115.4), which no ObjectRef can name.
+    -- That asymmetry is Resolve's to reconcile, and it is why the InSlot arm
+    -- still reads a Recipient rather than an ObjectId.
+    --
+    -- A one-shot under CR 608.2c/608.2f: nothing is stored, so unlike
+    -- ModifyTarget and GainControl this arm owes CR 611.2c no frozen set.
+    DealDamage ObjectRef.ObjectRef Quantity.Quantity
   | -- | CR 611: create a continuous effect on the objects the ObjectRef names, for
     -- a duration. Giant Growth and Serpent's Gift are this one opcode, differing
     -- only in the Modification (layer 7c vs 6). Resolve stores it -- or, when a
@@ -87,7 +103,7 @@ data Effect card
     --
     -- Finds at most one card, always: no card in the pool searches for two
     -- (#283).
-    Search Filter.Filter SearchDestination.SearchDestination
+    Search (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards
@@ -117,11 +133,11 @@ data Effect card
     -- DestroyAll opcode was the alternative, and it would have had to carry its
     -- own copy of the CR 702.12b gate, the CR 616.1 funnel and the CR 701.19c
     -- rider -- the duplication PlayerRef already exists to avoid on the player
-    -- side (Draw's comment). Untap, ModifyTarget and GainControl have since
-    -- taken the same parameter for the same reason -- the last two additionally
-    -- owing CR 611.2c a frozen set, since they STORE what they build; the other
-    -- object-affecting opcodes still take a bare SlotName, none of them having a
-    -- card that names a set (#378).
+    -- side (Draw's comment). Tap, Untap, ModifyTarget, GainControl and DealDamage
+    -- have since taken the same parameter for the same reason -- ModifyTarget and
+    -- GainControl additionally owing CR 611.2c a frozen set, since they STORE
+    -- what they build; the other object-affecting opcodes still take a bare
+    -- SlotName, none of them having a card that names a set (#378).
     --
     -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
     -- destroyed into the effect SOURCE's live bindings -- the resolving spell
@@ -195,7 +211,7 @@ data Effect card
     -- ability resolves normally. Only a card whose text does NOT already exclude
     -- such a destination can reach it -- Crown of the Ages can, Aura Graft cannot
     -- -- which is why the rule and the atom are not the same thing.
-    AttachTarget SlotName.SlotName Filter.Filter
+    AttachTarget SlotName.SlotName (Filter.Filter Keyword.Keyword)
   | -- | CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
     -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is
@@ -337,11 +353,20 @@ data Effect card
     -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
     -- "target player", but nothing here demands it.
     SkipNextPhase PlayerRef.PlayerRef PhaseSelector.PhaseSelector
-  | -- | CR 701.6: counter the slot's target spell -- remove it from the stack and
-    -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
-    -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way
-    -- Destroy is (M4b): Counter is a keyword action on rule 701's list, and this is
-    -- the future home of "can't be countered" and a distinct "was countered" event.
+  | -- | CR 701.6: counter the slot's target -- "cancel it, removing it from the
+    -- stack. It doesn't resolve and none of its effects occur" (CR 701.6a) --
+    -- via the Event.counter funnel. ONE opcode for both of rule 701.6a's
+    -- subjects: Cancel's slot is a Pool.Spells one and Stifle's a
+    -- Pool.Abilities one, and which ending the countering has (the owner's
+    -- graveyard for a spell, CR 608.2n's cease for an ability) is the funnel's
+    -- own classification of the object it is handed, not a second opcode. CR
+    -- 113.9 keeps the two apart where it belongs, in the target pool: an effect
+    -- that counters only spells cannot reach an ability.
+    --
+    -- Distinct from MoveToZone slot Graveyard the way Destroy is (M4b): Counter
+    -- is a keyword action on rule 701's list, it carries the CR 113.6g "can't be
+    -- countered" gate, and countering a SPELL records a distinct "was countered"
+    -- event that the zone change alone could not be told apart from.
     Counter SlotName.SlotName
   | -- | CR 122.6: put this many counters of this kind on the slot's target permanent.
     -- Battlegrowth = PutCounters PlusOnePlusOne (Literal 1) slot; Instill Infection
@@ -538,7 +563,7 @@ data Effect card
     -- CR 609.3: a player with fewer matching permanents than the count sacrifices
     -- all of them, and one with none sacrifices nothing -- "as much as possible",
     -- and forced, so neither case is prompted.
-    PlayerSacrifices SlotName.SlotName Filter.Filter Quantity.Quantity
+    PlayerSacrifices SlotName.SlotName (Filter.Filter Keyword.Keyword) Quantity.Quantity
   | -- | CR 500.7: "Some effects can give a player extra turns. They do this by
     -- adding the turns directly after the specified turn." The players the
     -- PlayerRef names each get one extra turn, added directly after the turn
@@ -572,4 +597,40 @@ data Effect card
     -- resolves afterwards. Carried on the turn, the scoping cannot be got wrong:
     -- the skips go wherever CR 500.7's stack puts the turn.
     TakeExtraTurn PlayerRef.PlayerRef (Set.Set PhaseSelector.PhaseSelector)
+  | -- | CR 701.24: the slot's target object is shuffled into its OWNER's library --
+    -- Riftsweeper's "choose target face-up exiled card. Its owner shuffles it
+    -- into their library." The move goes through the changeZone funnel (CR
+    -- 400.7's new incarnation), landing in the OWNER's library by CR 400.3 --
+    -- "if an object would go to any library, graveyard, or hand other than its
+    -- owner's, it goes to its owner's corresponding zone" -- which is the rule
+    -- the card's own "its owner" is restating. Then that library is shuffled
+    -- (CR 701.24a: "randomize the cards within it so that no player knows their
+    -- order").
+    --
+    -- NOT MoveToZone slot Library, and Counter's own comment gives the template
+    -- -- the three reasons it is not MoveToZone slot Graveyard line up one for
+    -- one here:
+    --
+    --   * Shuffle is a KEYWORD ACTION in its own right, on rule 701's list
+    --     (701.24), beside counter (701.6) and destroy (701.8).
+    --   * It carries a gate the bare move does not. CR 701.24c: "if an effect
+    --     would cause a player to shuffle one or more specific objects into a
+    --     library, that library is shuffled EVEN IF none of those objects are in
+    --     the zone they're expected to be in or an effect causes all of those
+    --     objects to be moved to another zone or remain in their current zone."
+    --     So a CR 616.1 replacement that cancels the move must not cancel the
+    --     shuffle -- which a rider read off the move's own result would.
+    --   * A shuffle is its own observable event, the way "was countered" is: CR
+    --     701.24e and CR 701.24f are both about "abilities that trigger when a
+    --     library is shuffled", which a library move alone does not fire.
+    --
+    -- No PlayerRef saying whose library, and none is expressible: the answer is
+    -- the OWNER of the object the slot names, and PlayerRef's three arms are
+    -- every player, a relation to the perspective, and a player bound in a slot
+    -- -- none of which can read an owner off a bound OBJECT. Derived rather than
+    -- named is also what the card says ("its owner"), and it is what makes this
+    -- one opcode rather than a move plus a shuffle: Resolve.resolveModes fixes a
+    -- resolving ABILITY's bindings before its effect fold begins, so a later
+    -- effect could not read an incarnation this one had just bound anyway.
+    ShuffleIntoLibrary SlotName.SlotName
   deriving (Eq, Ord, Show)

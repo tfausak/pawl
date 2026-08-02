@@ -118,7 +118,11 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- Combat.attackers loses only the departing player's OWN entry, because a
 -- deleted object cannot itself still be attacking. That much is cleanliness
 -- rather than correctness: Damage.attackerAssignment's Projection.powerOf
--- already falls through to nothing for a missing id.
+-- already falls through to nothing for a missing id. An entry naming a deleted
+-- PLANESWALKER as its target (CR 306.6) is left alone for the same reason and
+-- read the same way -- Combat.stillAttacked asks the battlefield, so a
+-- planeswalker that left the game with its owner stops being attacked without
+-- this function touching the value (CR 506.4).
 --
 -- Three more things it deliberately does NOT touch, each because CR 800.4a
 -- does not reach them:

@@ -26,3 +26,6 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.fromJson
       (Duration.ForAsLongAs (Condition.MkCondition (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
       "{\"type\":\"ForAsLongAs\",\"value\":{\"type\":\"Condition\",\"value\":[{\"type\":\"Literal\",\"value\":0},{\"type\":\"Exactly\"},{\"type\":\"Literal\",\"value\":0}]}}"
+  -- CR 500.5a: "until end of combat" (Jade Statue).
+  Spec.it s "UntilEndOfCombat" $
+    Common.assertJsonCodec s Duration.toJson Duration.fromJson Duration.UntilEndOfCombat "{\"type\":\"UntilEndOfCombat\"}"

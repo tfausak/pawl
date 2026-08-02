@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
@@ -33,15 +34,15 @@ import qualified Pawl.Types.Onset as Onset
 
 toJson :: (card -> Value.Value) -> Effect.Effect card -> Value.Value
 toJson codec e = case e of
-  Effect.DealDamage s q -> Common.tagged "DealDamage" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
+  Effect.DealDamage r q -> Common.tagged "DealDamage" (Just (Common.array [ObjectRef.toJson r, Quantity.toJson q]))
   Effect.ModifyTarget d m r -> Common.tagged "ModifyTarget" (Just (Common.array [Duration.toJson d, Modification.toJson m, ObjectRef.toJson r]))
   Effect.ChangeText s -> Common.tagged "ChangeText" (Just (SlotName.toJson s))
   Effect.AddMana production -> Common.tagged "AddMana" (Just (ManaProduction.toJson production))
-  Effect.Search f d -> Common.tagged "Search" (Just (Common.array [Filter.toJson f, SearchDestination.toJson d]))
+  Effect.Search f d -> Common.tagged "Search" (Just (Common.array [Filter.toJson Keyword.toJson f, SearchDestination.toJson d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
   Effect.Proliferate -> Common.nullary "Proliferate"
   Effect.ExileHandThenDraw -> Common.nullary "ExileHandThenDraw"
-  Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Common.array [SlotName.toJson slot, Filter.toJson f, Quantity.toJson q]))
+  Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Common.array [SlotName.toJson slot, Filter.toJson Keyword.toJson f, Quantity.toJson q]))
   Effect.RestartGame -> Common.nullary "RestartGame"
   Effect.ControlPlayerNextTurn s -> Common.tagged "ControlPlayerNextTurn" (Just (SlotName.toJson s))
   -- The bound-count slot is ELIDED when absent, the posture Create's EntryRiders
@@ -106,30 +107,34 @@ toJson codec e = case e of
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
   Effect.ExileUntilMonarch s -> Common.tagged "ExileUntilMonarch" (Just (SlotName.toJson s))
   Effect.Attach s -> Common.tagged "Attach" (Just (SlotName.toJson s))
-  Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Common.array [SlotName.toJson s, Filter.toJson f]))
+  Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Common.array [SlotName.toJson s, Filter.toJson Keyword.toJson f]))
   Effect.PlaySubgame s -> Common.tagged "PlaySubgame" (Just (SlotName.toJson s))
   Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Common.array [PlayerRef.toJson r, Common.encodeSet PhaseSelector.toJson skips]))
+  -- A bare slot name, not an array: whose library is DERIVED from the object
+  -- that slot names (CR 701.24 / "its owner"), so there is no second field for
+  -- a card file to write. The Counter and Sacrifice shape.
+  Effect.ShuffleIntoLibrary s -> Common.tagged "ShuffleIntoLibrary" (Just (SlotName.toJson s))
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Effect.Effect card)
 fromJson decode value = do
   (t, mv) <- Common.asTagged value
   case t of
     "DealDamage" -> case mv of
-      Just (Value.Array (Array.MkArray [s, q])) -> Effect.DealDamage <$> SlotName.fromJson s <*> Quantity.fromJson q
-      _ -> Left . Text.pack $ "DealDamage expects [slot, quantity]"
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.DealDamage <$> ObjectRef.fromJson r <*> Quantity.fromJson q
+      _ -> Left . Text.pack $ "DealDamage expects [objectRef, quantity]"
     "ModifyTarget" -> case mv of
       Just (Value.Array (Array.MkArray [d, m, r])) -> Effect.ModifyTarget <$> Duration.fromJson d <*> Modification.fromJson m <*> ObjectRef.fromJson r
       _ -> Left . Text.pack $ "ModifyTarget expects [duration, modification, objectRef]"
     "ChangeText" -> Common.withValue mv (fmap Effect.ChangeText . SlotName.fromJson)
     "AddMana" -> Common.withValue mv (fmap Effect.AddMana . ManaProduction.fromJson)
     "Search" -> case mv of
-      Just (Value.Array (Array.MkArray [f, d])) -> Effect.Search <$> Filter.fromJson f <*> SearchDestination.fromJson d
+      Just (Value.Array (Array.MkArray [f, d])) -> Effect.Search <$> Filter.fromJson Keyword.fromJson f <*> SearchDestination.fromJson d
       _ -> Left . Text.pack $ "Search expects [filter, destination]"
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
-      Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> SlotName.fromJson sv <*> Filter.fromJson fv <*> Quantity.fromJson qv
+      Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> SlotName.fromJson sv <*> Filter.fromJson Keyword.fromJson fv <*> Quantity.fromJson qv
       _ -> Left . Text.pack $ "PlayerSacrifices expects [slot, filter, quantity]"
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> Common.withValue mv (fmap Effect.ControlPlayerNextTurn . SlotName.fromJson)
@@ -213,10 +218,11 @@ fromJson decode value = do
     "ExileUntilMonarch" -> Common.withValue mv (fmap Effect.ExileUntilMonarch . SlotName.fromJson)
     "Attach" -> Common.withValue mv (fmap Effect.Attach . SlotName.fromJson)
     "AttachTarget" -> case mv of
-      Just (Value.Array (Array.MkArray [s, f])) -> Effect.AttachTarget <$> SlotName.fromJson s <*> Filter.fromJson f
+      Just (Value.Array (Array.MkArray [s, f])) -> Effect.AttachTarget <$> SlotName.fromJson s <*> Filter.fromJson Keyword.fromJson f
       _ -> Left . Text.pack $ "AttachTarget expects [slot, filter]"
     "PlaySubgame" -> Common.withValue mv (fmap Effect.PlaySubgame . SlotName.fromJson)
     "TakeExtraTurn" -> case mv of
       Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Common.decodeSet PhaseSelector.fromJson skips
       _ -> Left . Text.pack $ "TakeExtraTurn expects [playerRef, phaseSelectors]"
+    "ShuffleIntoLibrary" -> Common.withValue mv (fmap Effect.ShuffleIntoLibrary . SlotName.fromJson)
     _ -> Left . Text.pack $ "unknown Effect: " <> t

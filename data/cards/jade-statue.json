@@ -1,0 +1,126 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 2
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfCombat"
+                  },
+                  {
+                    "type": "AddCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  "self"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfCombat"
+                  },
+                  {
+                    "type": "SetCreatureSubtype",
+                    "value": {
+                      "type": "Golem"
+                    }
+                  },
+                  "self"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfCombat"
+                  },
+                  {
+                    "type": "SetBasePowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 6
+                      }
+                    ]
+                  },
+                  "self"
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      },
+      "timing": {
+        "type": "DuringPhase",
+        "value": [
+          {
+            "type": "CombatPhase"
+          },
+          {
+            "type": "EachTurn"
+          }
+        ]
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 4
+    }
+  ],
+  "name": "Jade Statue",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}

@@ -263,9 +263,9 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- computed once for every other CR 704.4 classification. (A spec carrying a
 -- Filter still reaches stillAdmitted, by that function's own fallthrough; see
 -- its haddock.)
--- stillAdmitted reaches Target.admittedRecipients -> basePool Pool.Creatures ->
--- creatureRecipients -> Projection.isCreatureOf, and THAT is `project oid gs` --
--- a fresh `gather` PER Aura. Every other classify here shares one `gather`
+-- stillAdmitted reaches Target.admittedRecipients -> basePoolGiven Pool.Creatures
+-- -> creatureRecipients -> Projection.isCreatureOf, and THAT is `project oid gs`
+-- -- a fresh `gather` PER Aura. Every other classify here shares one `gather`
 -- precisely because gather's neighbouring lesson (Projection.hs's `liveGiven`
 -- comment) is that recomputing it inside a per-object loop makes project
 -- O(permanents^3) per SBA sweep; calling stillLegal here reintroduced that same

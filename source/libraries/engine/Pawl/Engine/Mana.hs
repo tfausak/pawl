@@ -156,6 +156,8 @@ subtypeMana subtype = case subtype of
   Subtype.Golem -> Nothing
   Subtype.Turtle -> Nothing
   Subtype.Mongoose -> Nothing
+  Subtype.Frog -> Nothing
+  Subtype.Vampire -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an
@@ -848,17 +850,22 @@ announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
                 <> [PhyrexianPayment.PaysLife | stillPayable (committed + phyrexianLife) []]
         announced <- case offers of
           -- Neither route pays, so the cost is unpayable and there is nothing to
-          -- announce: the printed symbol stands and the payment fails (CR 118.6,
-          -- CR 601.2h).
+          -- announce: the payment fails (CR 118.6, CR 601.2h). PaysMana is
+          -- returned only because this function must return SOMETHING; it is not
+          -- a choice, because there is no payable option for it to choose
+          -- between.
           --
-          -- Reachable only from a caller announcing on a cost Cast.castable and
-          -- Activate.activatable never admitted, and it is `total` above that makes
-          -- that true rather than merely plausible: both gates measure payability
-          -- through the same totalling, so no completion payable here can be one
-          -- they refused, and none they admitted can be missing here. The one
-          -- remaining wedge is {X}: Cast.payableCost gates at X=0 while the
-          -- announcement runs on the value the player named, and no card in the
-          -- pool prints {X} beside a Phyrexian symbol (#417).
+          -- UNREACHABLE from a caller that gated on payability first, and it is
+          -- `total` above that makes that true rather than merely plausible: the
+          -- gate and this offer measure payability through the same totalling, so
+          -- no completion payable here can be one the gate refused, and none it
+          -- admitted can be missing here. {X} used to be the one wedge in that --
+          -- a gate at X=0 while this runs on the value the player named, so a
+          -- large X on a {X}{G/P} (Corrosive Gale) could empty the offers -- and
+          -- BOTH callers now close it the same way, by re-asking their own
+          -- payability predicate at the announced value before calling
+          -- Cost.announce at all: Cast.castSpell (#417) and Activate.activateAbility
+          -- (#544, Cinder Elemental's "{X}{R}, {T}, Sacrifice this creature").
           [] -> pure PhyrexianPayment.PaysMana
           [only] -> pure only
           first : others -> do

@@ -13,18 +13,25 @@ import qualified Pawl.Types.Filter as Filter
 
 -- | CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
 -- omitted key, because this rides inside a positional pair.
-optional :: Value.Value -> Either Text.Text (Maybe Filter.Filter)
-optional = Common.decodeMaybe fromJson
+optional :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Maybe (Filter.Filter keyword))
+optional decode = Common.decodeMaybe (fromJson decode)
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their operands
 -- as a JSON Array, Not as a single nested object, and each atom delegates to the
 -- leaf-enum codec for the characteristic it cases on.
-toJson :: Filter.Filter -> Value.Value
-toJson filter_ = case filter_ of
+--
+-- The keyword codec is a PARAMETER, mirroring Effect's card codec and for the
+-- same kind of reason: Pawl.Codec.Keyword imports this module for 702.29e's
+-- typecycling filter, so a direct call to Keyword.toJson here would close a
+-- module cycle exactly as the two data types do. Every caller passes
+-- Pawl.Codec.Keyword.toJson.
+toJson :: (keyword -> Value.Value) -> Filter.Filter keyword -> Value.Value
+toJson encode filter_ = case filter_ of
   Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ CardType.toJson t
   Filter.HasSupertype sup -> Common.tagged "HasSupertype" . Just $ Supertype.toJson sup
   Filter.HasColor c -> Common.tagged "HasColor" . Just $ Color.toJson c
   Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Subtype.toJson sub
+  Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ encode k
   Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Common.integer n
   Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ PlayerRelation.toJson r
   Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ PlayerRelation.toJson r
@@ -36,18 +43,19 @@ toJson filter_ = case filter_ of
   Filter.IsAttachedToPermanent -> Common.nullary "IsAttachedToPermanent"
   Filter.CanHostSubject -> Common.nullary "CanHostSubject"
   Filter.IsToken -> Common.nullary "IsToken"
-  Filter.And fs -> Common.tagged "And" . Just . Common.array $ fmap toJson fs
-  Filter.Or fs -> Common.tagged "Or" . Just . Common.array $ fmap toJson fs
-  Filter.Not f -> Common.tagged "Not" . Just $ toJson f
+  Filter.And fs -> Common.tagged "And" . Just . Common.array $ fmap (toJson encode) fs
+  Filter.Or fs -> Common.tagged "Or" . Just . Common.array $ fmap (toJson encode) fs
+  Filter.Not f -> Common.tagged "Not" . Just $ toJson encode f
 
-fromJson :: Value.Value -> Either Text.Text Filter.Filter
-fromJson value = do
+fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Filter.Filter keyword)
+fromJson decode value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
     ("HasCardType", Just v) -> Filter.HasCardType <$> CardType.fromJson v
     ("HasSupertype", Just v) -> Filter.HasSupertype <$> Supertype.fromJson v
     ("HasColor", Just v) -> Filter.HasColor <$> Color.fromJson v
     ("HasSubtype", Just v) -> Filter.HasSubtype <$> Subtype.fromJson v
+    ("HasKeyword", Just v) -> Filter.HasKeyword <$> decode v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Common.asInteger v
     ("ControlledBy", Just v) -> Filter.ControlledBy <$> PlayerRelation.fromJson v
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> PlayerRelation.fromJson v
@@ -59,7 +67,7 @@ fromJson value = do
     ("IsAttachedToPermanent", _) -> Right Filter.IsAttachedToPermanent
     ("CanHostSubject", _) -> Right Filter.CanHostSubject
     ("IsToken", _) -> Right Filter.IsToken
-    ("And", Just (Value.Array (Array.MkArray vs))) -> Filter.And <$> traverse fromJson vs
-    ("Or", Just (Value.Array (Array.MkArray vs))) -> Filter.Or <$> traverse fromJson vs
-    ("Not", Just v) -> Filter.Not <$> fromJson v
+    ("And", Just (Value.Array (Array.MkArray vs))) -> Filter.And <$> traverse (fromJson decode) vs
+    ("Or", Just (Value.Array (Array.MkArray vs))) -> Filter.Or <$> traverse (fromJson decode) vs
+    ("Not", Just v) -> Filter.Not <$> fromJson decode v
     _ -> Left . Text.pack $ "unknown Filter: " <> t

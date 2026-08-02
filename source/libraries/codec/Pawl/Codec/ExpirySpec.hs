@@ -3,9 +3,12 @@ module Pawl.Codec.ExpirySpec where
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Quantity as Quantity
 
@@ -30,3 +33,20 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
   -- CR 611.2a: "until your next turn", as a concrete player.
   Spec.it s "AtTurnOf carries its player" $
     Common.assertJsonCodec s Expiry.toJson Expiry.fromJson (Expiry.AtTurnOf (PlayerId.MkPlayerId 1)) "{\"type\":\"AtTurnOf\",\"value\":1}"
+  -- CR 500.5: "as a step or phase ends", carrying the PhaseSelector window --
+  -- Duration.UntilEndOfCombat's stored form. Both of CR 500.5's grains, a
+  -- stepless phase and a step of one, because Pawl.Engine.Expiry.dropAtEndOf
+  -- tells them apart by EQUALITY -- a codec that collapsed them would let the
+  -- end of combat step end an effect stored against the whole combat phase.
+  Spec.it s "AtEndOf carries its window" $ do
+    Common.assertJsonCodec s Expiry.toJson Expiry.fromJson (Expiry.AtEndOf PhaseSelector.CombatPhase) "{\"type\":\"AtEndOf\",\"value\":{\"type\":\"CombatPhase\"}}"
+    Common.assertJsonCodec
+      s
+      Expiry.toJson
+      Expiry.fromJson
+      (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)))
+      "{\"type\":\"AtEndOf\",\"value\":{\"type\":\"Step\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"EndOfCombat\"}}}}"
+    Spec.assertBool
+      s
+      (Expiry.toJson (Expiry.AtEndOf PhaseSelector.CombatPhase) /= Expiry.toJson (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))))
+      "the phase and its own end-of-combat step encode differently"

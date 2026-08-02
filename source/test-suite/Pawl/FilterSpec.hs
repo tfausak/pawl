@@ -10,6 +10,7 @@ import qualified Pawl.Types.Color as Color
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -23,6 +24,7 @@ blackCreature =
       Filter.supertypes = Set.empty,
       Filter.colors = Set.singleton Color.Black,
       Filter.subtypes = Set.singleton Subtype.Zombie,
+      Filter.keywords = Set.singleton Keyword.Flying,
       Filter.power = Just 2,
       Filter.controller = Just (PlayerId.MkPlayerId 0),
       Filter.identity = Just (ObjectId.MkObjectId 7),
@@ -44,6 +46,7 @@ devoidBigCreature =
       Filter.supertypes = Set.empty,
       Filter.colors = Set.empty,
       Filter.subtypes = Set.empty,
+      Filter.keywords = Set.empty,
       Filter.power = Just 5,
       Filter.controller = Nothing,
       Filter.identity = Nothing,

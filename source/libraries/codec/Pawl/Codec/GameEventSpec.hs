@@ -36,14 +36,16 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> "]}"
       )
+  -- A NONZERO toxic value and a PRESENT lifelink payee, so the CR 702.164b and
+  -- CR 702.15b riders round-trip rather than getting defaulted past.
   Spec.it s "DamageDealt" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 2 True False 3 DamageKind.Combat))
+      (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 2 True False 3 (Just (PlayerId.MkPlayerId 2)) DamageKind.Combat))
       ( "{\"type\":\"DamageDealt\",\"value\":{\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":1},\"amount\":2,"
-          <> "\"dealtByDeathtouch\":true,\"dealtByInfect\":false,\"dealtByToxic\":3,\"kind\":{\"type\":\"Combat\"}}}"
+          <> "\"dealtByDeathtouch\":true,\"dealtByInfect\":false,\"dealtByToxic\":3,\"dealtByLifelink\":2,\"kind\":{\"type\":\"Combat\"}}}"
       )
   Spec.it s "StepBegan" $
     Common.assertJsonCodec

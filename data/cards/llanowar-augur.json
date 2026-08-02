@@ -72,9 +72,12 @@
         "type": "DuringPhase",
         "value": [
           {
-            "type": "Beginning",
+            "type": "Step",
             "value": {
-              "type": "Upkeep"
+              "type": "Beginning",
+              "value": {
+                "type": "Upkeep"
+              }
             }
           },
           {

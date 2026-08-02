@@ -6,6 +6,7 @@
 module Pawl.ResolveSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -577,6 +578,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.playerAbilities = [],
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
+              Card.Type.combatRestrictions = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],
@@ -589,7 +591,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (Resolve.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (Resolve.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
-    Spec.assertEqWith s "damage produces no mana" (Resolve.manaProduced (Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1))) Nothing
+    Spec.assertEqWith s "damage produces no mana" (Resolve.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
   Spec.it s "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
     -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
     -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
@@ -985,7 +987,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.staticAbilities = [],
               Card.Type.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                   (ModeSelection.ChooseExactly 1),
               Card.Type.activatedAbilities = [],
               Card.Type.replacementEffects = [],
@@ -997,6 +999,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.playerAbilities = [],
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
+              Card.Type.combatRestrictions = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],
@@ -1047,7 +1050,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.staticAbilities = [],
               Card.Type.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                   (ModeSelection.ChooseExactly 1),
               Card.Type.activatedAbilities = [],
               Card.Type.replacementEffects = [],
@@ -1059,6 +1062,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Card.Type.playerAbilities = [],
               Card.Type.blockRequirements = [],
               Card.Type.attackRequirements = [],
+              Card.Type.combatRestrictions = [],
               Card.Type.mulliganAction = [],
               Card.Type.openingHandAction = [],
               Card.Type.additionalCosts = [],
@@ -1112,8 +1116,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (gs1, fogId) = S.handOne fog gs0
         cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Combat])
-        spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Noncombat])
+        combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Combat])
+        spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Noncombat])
     Spec.assertEqWith s "Fog installed one replacement" (length (GameState.replacements resolved)) 1
     Spec.assertEqWith s "combat damage prevented (the cancel shape)" (S.damageOf victim combat) (Just 0)
     -- The falsifier: a tag-blind Fog would also blunt this spell damage.
@@ -1282,7 +1286,7 @@ installControlBy mindslaver controller target gs0 =
 -- CR 205.4c / 701.23a: a basic land card is one with the Land card type and the
 -- Basic supertype -- Evolving Wilds' search filter, the printed-card predicate
 -- that replaced CardCriterion.BasicLandCard.
-basicLandFilter :: Filter.Type.Filter
+basicLandFilter :: Filter.Type.Filter Keyword.Keyword
 basicLandFilter =
   Filter.Type.And
     [ Filter.Type.HasCardType CardType.Land,
@@ -1443,6 +1447,159 @@ counterSpec s registry = Spec.describe s "Counter" $ do
     Spec.assertEqWith s "the countered spell is not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
     Spec.assertEqWith s "the countered spell is exiled" (length (Game.zoneMembers Zone.Exile S.bob resolved)) 1
 
+-- The one activated ability of a printing that declares exactly one -- Prodigal
+-- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
+-- printing, so a card that grew a second ability fails the case that names it
+-- rather than silently picking whichever came first (Pawl.TargetSpec's
+-- soleTargetSpec is the same shape for the same reason).
+soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleActivatedAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+  [only] -> Just only
+  _ -> Nothing
+
+-- bob has a settled Prodigal Sorcerer ("{T}: This creature deals 1 damage to any
+-- target"); alice has `lands` Islands and `stifles` Stifles in hand. bob
+-- activates the Sorcerer at ALICE, so the ability's effect is observable as her
+-- life total, and the returned state is the one where the ability is on the
+-- stack, waiting.
+stifleBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> Maybe ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+stifleBoard island stifle sorcerer lands stifles = case soleActivatedAbility sorcerer of
+  Nothing -> Nothing
+  Just ability ->
+    let (srcId, withSorcerer) = S.addCreature sorcerer S.bob (Setup.emptyGame S.bothPlayers)
+        -- CR 302.6: the Sorcerer must have settled under bob before its {T} may
+        -- be activated at all.
+        settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.bob)
+        withLands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) settled [1 .. lands]
+        (stifleIds, withStifles) =
+          List.foldl'
+            (\(ids, g) _ -> let (i, g') = S.addHandCard stifle S.alice g in (ids <> [i], g'))
+            ([], withLands)
+            [1 .. stifles]
+        atAlice :: Prompt.Prompt r -> r
+        atAlice p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+          _ -> S.identityAnswer p
+        activated = S.runPure atAlice (withStifles {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob srcId ability)
+     in Just (stifleIds, srcId, activated)
+
+-- CR 701.6a covers "a spell or ability", and Stifle ({U} Instant, "Counter
+-- target activated or triggered ability. (Mana abilities can't be targeted.)")
+-- is the first card in the pool that reaches the second half. Cancel proved the
+-- spell half above; these cases are the ability half, and what makes them a
+-- different test rather than the same one twice is rule 701.6a's LAST sentence:
+-- "a countered spell is put into its owner's graveyard." Only a spell. CR 608.2n
+-- says how an ability leaves instead -- "the ability is removed from the stack
+-- and ceases to exist" -- so the graveyard assertions here are the load-bearing
+-- ones, and they are stated as counts of what did NOT arrive.
+--
+-- CR 113.9 is why one card cannot do both: "activated and triggered abilities on
+-- the stack aren't spells, and therefore can't be countered by anything that
+-- counters only spells. Activated and triggered abilities on the stack can be
+-- countered by effects that specifically counter abilities." Pawl.TargetSpec
+-- holds that half, as the two disjoint pools.
+--
+-- Stifle's parenthetical needs nothing implemented and is not tested for: CR
+-- 605.3b ("an activated mana ability doesn't go on the stack, so it can't be
+-- targeted, countered, or otherwise responded to") and CR 605.4a keep a mana
+-- ability off the stack in the first place, so it is never a candidate. See
+-- Pawl.Types.Pool.Abilities.
+stifleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stifleSpec s registry = Spec.describe s "Stifle" $ do
+  -- The ACTIVATED half (CR 113.3b). The discriminating assertions are alice's
+  -- untouched life -- rule 701.6a's "it doesn't resolve and none of its effects
+  -- occur" -- and bob's EMPTY graveyard, which is what tells a cease (CR 608.2n)
+  -- apart from the graveyard move Cancel makes.
+  Spec.it s "CR 701.6a whole cards: Stifle counters Prodigal Sorcerer's activated ability, which ceases (CR 608.2n)" $ do
+    island <- S.printingOf s registry "Island"
+    stifle <- S.printingOf s registry "Stifle"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case stifleBoard island stifle sorcerer 1 1 of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (stifleIds, srcId, activated) -> do
+        let abilIds = GameState.stack activated
+            cast = List.foldl' (\g oid -> S.runPure S.identityAnswer g (Cast.castSpell S.alice oid)) activated stifleIds
+            countered = S.runPure S.identityAnswer cast Stack.resolveTop
+        Spec.assertEqWith s "the activation put exactly one ability on the stack" (length abilIds) 1
+        Spec.assertEqWith s "and both it and the Stifle are gone from the stack" (GameState.stack countered) []
+        -- CR 701.6a: "it doesn't resolve and none of its effects occur."
+        Spec.assertEqWith s "alice took no damage: the ability never resolved" (S.lifeOf S.alice countered) (Just 20)
+        -- CR 608.2n: the ability ceased. It is not in a graveyard -- an ability
+        -- is not a card and has no owner's graveyard to be put into -- and it is
+        -- not an object at all any more.
+        Spec.assertEqWith s "nothing arrived in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob countered)) 0
+        Spec.assertEqWith s "alice's graveyard holds the spent Stifle and nothing else" (length (Game.zoneMembers Zone.Graveyard S.alice countered)) 1
+        Spec.assertEqWith s "the ability object ceased to exist" (fmap (\oid -> Game.lookupObject oid countered) abilIds) [Nothing]
+        -- CR 113.7a: the ability was its own object, so countering it leaves the
+        -- SOURCE alone -- and CR 701.6b gives no refund, so the Sorcerer stays
+        -- tapped for a {T} that bought nothing.
+        Spec.assertBool s (Set.member srcId (GameState.battlefield countered)) "the Prodigal Sorcerer is untouched on the battlefield"
+        Spec.assertEqWith s "still tapped: CR 701.6b refunds no cost" (fmap Object.tapped (Game.lookupObject srcId countered)) (Just TapState.Tapped)
+  -- The TRIGGERED half (CR 113.3c), and a different observation: Aether Flash's
+  -- trigger is what kills a Goblin Piker in Pawl.TriggerSpec's own case, so the
+  -- Piker being ALIVE with no damage marked is the same effect not occurring.
+  Spec.it s "CR 701.6a whole cards: Stifle counters Aether Flash's triggered ability, so the Piker lives" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    aetherFlash <- S.printingOf s registry "Aether Flash"
+    piker <- S.printingOf s registry "Goblin Piker"
+    stifle <- S.printingOf s registry "Stifle"
+    let (flashId, withFlash) = S.addCreature aetherFlash S.alice (Setup.emptyGame S.bothPlayers)
+        withMountains = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) withFlash [1 .. (2 :: Int)]
+        (_, withIsland) = S.addCreature island S.bob withMountains
+        (stifleId, withStifle) = S.addHandCard stifle S.bob withIsland
+        (pikerId, gs) = S.addHandCard piker S.alice withStifle
+        cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice pikerId)
+        -- The Piker resolves and enters; CR 603.3 then puts Aether Flash's
+        -- trigger on the stack the next time a player would receive priority.
+        entered = S.runPure S.identityAnswer cast Stack.resolveTop
+        placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+        stifled = S.runPure S.identityAnswer placed (Cast.castSpell S.bob stifleId)
+        countered = S.runPure S.identityAnswer stifled Stack.resolveTop
+        after = S.runPure S.identityAnswer countered Engine.settleForPriority
+        entrantId = case filter (\oid -> fmap Card.Type.name (Game.cardOf oid after) == Just (Text.pack "Goblin Piker")) (Set.toList (GameState.battlefield after)) of
+          [only] -> Just only
+          _ -> Nothing
+    Spec.assertEqWith s "the trigger is the only thing on the stack before the Stifle" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "the stack is empty afterwards" (GameState.stack after) []
+    -- The falsifier is Pawl.TriggerSpec's aetherFlashSpec, where the same
+    -- Aether Flash's 2 damage kills the same 2/1 (CR 704.5g): a Piker alive with
+    -- NO damage marked is rule 701.6a's "none of its effects occur".
+    Spec.assertEqWith s "the Piker survived" (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "with no damage marked on it at all" (fmap (\oid -> fmap Object.damage (Game.lookupObject oid after)) entrantId) (Just (Just 0))
+    Spec.assertEqWith s "no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events after)))) []
+    -- CR 608.2n again: the countered trigger went nowhere. alice's graveyard is
+    -- empty (no Piker corpse, and no residue of the trigger), and bob's holds
+    -- only the Stifle that did the countering.
+    Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "bob's holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertBool s (Set.member flashId (GameState.battlefield after)) "and Aether Flash itself is untouched"
+  -- CR 608.2b, for a target that CEASED rather than moved: "a target that's no
+  -- longer in the zone it was in when it was targeted is illegal ... If all its
+  -- targets ... are now illegal, the spell or ability doesn't resolve. It's
+  -- removed from the stack and, IF IT'S A SPELL, put into its owner's
+  -- graveyard." Stifle is a spell, so the fizzled one is buried; the ability it
+  -- was aimed at left by ceasing, which is not a zone change at all.
+  --
+  -- The twin of the racing Cancels above, one card over.
+  Spec.it s "CR 608.2b a Stifle whose ability already ceased fizzles" $ do
+    island <- S.printingOf s registry "Island"
+    stifle <- S.printingOf s registry "Stifle"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case stifleBoard island stifle sorcerer 2 2 of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (stifleIds, _, activated) -> do
+        let castAll g oid = S.runPure S.identityAnswer g (Cast.castSpell S.alice oid)
+            bothCast = List.foldl' castAll activated stifleIds
+            first' = S.runPure S.identityAnswer bothCast Stack.resolveTop
+            second' = S.runPure S.identityAnswer first' Stack.resolveTop
+        Spec.assertEqWith s "two Stifles were cast onto the ability" (length (GameState.stack bothCast)) 3
+        Spec.assertEqWith s "the first counters the ability" (length (GameState.stack first')) 1
+        Spec.assertEqWith s "and the second fizzles off the stack" (GameState.stack second') []
+        Spec.assertEqWith s "both Stifles are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice second')) 2
+        Spec.assertEqWith s "bob's graveyard stayed empty throughout" (length (Game.zoneMembers Zone.Graveyard S.bob second')) 0
+        Spec.assertEqWith s "and alice never took the damage" (S.lifeOf S.alice second') (Just 20)
+
 fizzleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
   Spec.it s "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $ do
@@ -1525,7 +1682,7 @@ indestructibleSpec s registry = Spec.describe s "Indestructible" $ do
     let (myrId, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
         -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
         -- the 704.5h path; indestructible must guard it too (CR 700.4).
-        wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False 0 DamageKind.Combat)] gs
+        wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False 0 Nothing DamageKind.Combat)] gs
         after = S.settleSba wounded
     Spec.assertEqWith s "Myr survives deathtouch" (S.creaturesInPlay S.bob after) 1
   Spec.it s "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $ do
@@ -2462,7 +2619,7 @@ slotTarget :: SlotName.SlotName
 slotTarget = SlotName.MkSlotName (Text.pack "target")
 
 -- Diabolic Edict's "a creature of their choice".
-creatureFilter :: Filter.Type.Filter
+creatureFilter :: Filter.Type.Filter Keyword.Keyword
 creatureFilter = Filter.Type.HasCardType CardType.Creature
 
 -- Targets `victim` with every slot that offers them, deferring the rest to
@@ -3430,9 +3587,154 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     Spec.assertEqWith s "no counters" (plusOnePlusOnesOn entered resolved) 0
     Spec.assertEqWith s "so Bane is the printed 2/2" (entered >>= \oid -> Projection.powerOf oid resolved) (Just 2)
 
+-- Plummet ({1}{G} Instant, "Destroy target creature with flying"), the pool's
+-- first card whose Filter names a KEYWORD (Filter.HasKeyword, CR 702.9).
+--
+-- The negative half of every pair here is the one that carries the claim: a
+-- Filter that admitted everything would pass the positive assertions unchanged.
+plummetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+plummetSpec s registry = Spec.describe s "Plummet" $ do
+  -- CR 702.9b: "A creature with flying can't be blocked except by creatures with
+  -- flying and/or reach" -- the ability Bird Maiden prints and Goblin Piker does
+  -- not. Nothing else separates the two here, so only the keyword can be what
+  -- decides the offer.
+  Spec.it s "CR 702.9 HasKeyword Flying admits the flier and rejects the ground creature" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case S.spellTargetSpec plummet of
+      Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
+      Just theSpec -> do
+        let (flierId, gs1) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+            (groundId, gs) = S.addCreature piker S.bob gs1
+            legal = Target.legalRecipients Nothing S.noSource theSpec gs
+        Spec.assertBool s (Set.member (Recipient.ToCreature flierId) legal) "the flier is a legal target"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) legal)) "the creature without flying is not"
+  -- CR 613.1f: layer 6 is where abilities are added, so the read has to go
+  -- through the PROJECTION rather than the printed card. Spontaneous Flight
+  -- ({2}{W}, "+2/+2 and a flying counter") is the pool's grant, and the Piker it
+  -- lands on printed no flying at all.
+  Spec.it s "CR 613.1f a Piker that GAINS flying becomes a legal target" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
+    case S.spellTargetSpec plummet of
+      Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
+      Just theSpec -> do
+        let (groundId, before) = S.addCreature piker S.alice (S.landsInPlay plains 3)
+            (withSpell, spellId) = S.handOne spontaneousFlight before
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) (Target.legalRecipients Nothing S.noSource theSpec before))) "no flying, no offer"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying groundId after) "the grant landed"
+        Spec.assertBool s (Set.member (Recipient.ToCreature groundId) (Target.legalRecipients Nothing S.noSource theSpec after)) "and the grant makes it a legal target"
+  -- The other direction, and the one that proves the read is not of the printed
+  -- card: Humility (CR 613.1f, "all creatures lose all abilities") takes the
+  -- flying off a creature that PRINTS it, and the offer goes with it.
+  Spec.it s "CR 613.1f Humility strips the printed flying, and the offer goes with it" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    humility <- S.printingOf s registry "Humility"
+    case S.spellTargetSpec plummet of
+      Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
+      Just theSpec -> do
+        let (flierId, before) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+            after = S.withHumility humility before
+        Spec.assertBool s (Set.member (Recipient.ToCreature flierId) (Target.legalRecipients Nothing S.noSource theSpec before)) "legal while it flies"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying flierId after)) "Humility took the flying"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature flierId) (Target.legalRecipients Nothing S.noSource theSpec after))) "so it is no longer a legal target"
+  -- CR 701.8: the whole card, cast and resolved. The Piker beside the flier is
+  -- the control: it survives because Plummet could never have been aimed at it.
+  Spec.it s "CR 701.8 Plummet destroys the flier it targets, and leaves the ground creature standing" $ do
+    plummet <- S.printingOf s registry "Plummet"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    let (flierId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 2)
+        (groundId, g2) = S.addCreature piker S.bob g1
+        (gs, spellId) = S.handOne plummet g2
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+    Spec.assertBool s (not (S.onBattlefield flierId after)) "the flier was destroyed"
+    Spec.assertBool s (S.onBattlefield groundId after) "the creature without flying was never a candidate"
+    Spec.assertEqWith s "and the flier is in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+
+-- Announces X=2 and takes the identity fallback everywhere else -- which answers
+-- CR 601.2b's Phyrexian question with the FIRST offer, the mana route, so the
+-- {G/P} is paid with a Forest rather than with life.
+answerXTwo :: Prompt.Prompt r -> r
+answerXTwo p = case p of
+  Prompt.ChooseX {} -> 2
+  _ -> S.identityAnswer p
+
+-- The damage marked on a permanent (CR 120.3e), or Nothing if it is gone.
+markedOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
+markedOn oid gs = fmap Object.damage (Game.lookupObject oid gs)
+
+-- Corrosive Gale ({X}{G/P} Sorcery, "Corrosive Gale deals X damage to each
+-- creature with flying") -- the pool's first Effect.DealDamage over a SET rather
+-- than a slot, and the first producer of ObjectRef.EachMatching at all whose
+-- filter names a keyword.
+--
+-- One board throughout: bob's Bird Maiden (1/2, prints flying), alice's
+-- Narcomoeba (1/1, prints flying) and bob's Goblin Piker (2/1, prints none),
+-- beside three of alice's Forests. The fliers are split between the two players
+-- on purpose: "each creature with flying" is not "each creature your opponents
+-- control", and alice burning her own Narcomoeba is what says so. The Piker is
+-- the other half of the claim: CR 109.2 hands an EachMatching the WHOLE
+-- battlefield, so a filter missing its HasKeyword half would burn it too.
+--
+-- The Forests are not a third control and could not be: CR 120.1a takes a land
+-- out of the batch at Damage.damageRecipient whatever the filter said. The
+-- HasCardType half of the filter is pinned by CardsSpec instead.
+corrosiveGaleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
+  Spec.it s "CR 109.2 Corrosive Gale deals X to each creature with flying, and none to the one without" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    narcomoeba <- S.printingOf s registry "Narcomoeba"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (maidenId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 3)
+        (moebaId, g2) = S.addCreature narcomoeba S.alice g1
+        (pikerId, g3) = S.addCreature piker S.bob g2
+        (gs, spellId) = S.handOne gale g3
+        cast = snd (Engine.runGamePure answerXTwo gs (Cast.castSpell S.alice spellId))
+        resolved = snd (Engine.runGamePure answerXTwo cast Stack.resolveTop)
+        after = S.settleSba resolved
+    Spec.assertEqWith s "three Forests paid {2}{G}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "CR 120.3e: 2 marked on the Bird Maiden" (markedOn maidenId resolved) (Just 2)
+    Spec.assertEqWith s "CR 120.3e: 2 marked on the Narcomoeba, an opponent's flier is no different" (markedOn moebaId resolved) (Just 2)
+    Spec.assertEqWith s "and nothing at all on the Goblin Piker" (markedOn pikerId resolved) (Just 0)
+    Spec.assertBool s (not (S.onBattlefield maidenId after)) "CR 704.5g buried the 1/2"
+    Spec.assertBool s (not (S.onBattlefield moebaId after)) "and the 1/1"
+    Spec.assertBool s (S.onBattlefield pikerId after) "the creature without flying was never in the set"
+  -- CR 613.1f: layer 6 is where abilities are removed, so the sweep reads the
+  -- PROJECTION and not the printed card. Humility ("all creatures lose all
+  -- abilities and have base power and toughness 1/1") takes the flying off the
+  -- Bird Maiden that prints it, and the set the Gale sweeps goes empty -- the
+  -- cast and the payment being unaffected is what separates "found nobody" from
+  -- "never happened".
+  Spec.it s "CR 613.1f Humility strips the printed flying, and the Gale finds nobody" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    humility <- S.printingOf s registry "Humility"
+    let (maidenId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 3)
+        (gs, spellId) = S.handOne gale (S.withHumility humility g1)
+        cast = snd (Engine.runGamePure answerXTwo gs (Cast.castSpell S.alice spellId))
+        after = S.settleSba (snd (Engine.runGamePure answerXTwo cast Stack.resolveTop))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying maidenId after)) "Humility took the flying"
+    Spec.assertEqWith s "three Forests paid {2}{G} all the same" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "no damage marked on the grounded Bird Maiden" (markedOn maidenId after) (Just 0)
+    Spec.assertBool s (S.onBattlefield maidenId after) "so it survives"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
+  plummetSpec s registry
+  corrosiveGaleSpec s registry
   resolveSpec s registry
   fizzleSpec s registry
   indestructibleSpec s registry
@@ -3441,6 +3743,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   loseLifeSpec s registry
   greatestSpec s registry
   counterSpec s registry
+  stifleSpec s registry
   countersSpec s registry
   untapSpec s registry
   gainControlSpec s registry

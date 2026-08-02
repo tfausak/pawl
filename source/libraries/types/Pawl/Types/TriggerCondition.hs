@@ -2,6 +2,7 @@ module Pawl.Types.TriggerCondition where
 
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -36,7 +37,7 @@ data TriggerCondition
     -- `Not IsSource` -- the one spelling Filter.IsSource's own haddock already
     -- fixes for "another" (#163) -- rather than into a parallel exclusion flag
     -- here.
-    PermanentEnters Filter.Filter
+    PermanentEnters (Filter.Filter Keyword.Keyword)
   | -- | CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
     StepBegins Phase.Phase TurnScope.TurnScope
@@ -214,7 +215,11 @@ data TriggerCondition
     --
     -- Only a countered SPELL fires this, which is the printed word rather than
     -- an omission: rule 701.6a's subject is "a spell or ability", and Baral's
-    -- own object is "counters a spell". No effect in this pool can target an
-    -- ability on the stack, so nothing can counter one either (#486).
+    -- own object is "counters a spell". Stifle counters an ABILITY, and Baral
+    -- stays silent for it -- CR 113.9 says an ability on the stack is not a
+    -- spell, so Pawl.Engine.Event.counter ceases it (CR 608.2n) and records no
+    -- event for this condition to match. The countered-ability sibling of that
+    -- record does not exist, and no card in the pool wants one (#541); it would
+    -- be a new event and a new condition, never a widening of these two.
     SpellOrAbilityCounters PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

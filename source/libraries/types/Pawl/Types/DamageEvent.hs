@@ -3,17 +3,18 @@ module Pawl.Types.DamageEvent where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 
 -- | One instance of damage: a source dealt `amount` to `target`. The first reader
 -- is deathtouch's CR 704.5h SBA, which asks `dealtByDeathtouch`. Started minimal
 -- (CR 702.2 needs only source + creature target + nonzero amount) on the bet
 -- that it would GROW rather than be reshaped, and it has: a kind tag, then
--- infect (P10), then toxic. The M2c spec's §2 named lifelink and M4's
--- combat-damage triggers as the growth vectors; the actual ones have all been
--- deal-time RIDERS -- a fact about the source, captured as the damage is dealt
--- because it may be unaskable later. Pawl.Engine.Damage.damageEvent is where they are
--- read.
+-- infect (P10), then toxic, then lifelink. The M2c spec's §2 named lifelink and
+-- M4's combat-damage triggers as the growth vectors; every one that has actually
+-- arrived is a deal-time RIDER -- a fact about the source, captured as the
+-- damage is dealt because it may be unaskable later. Pawl.Engine.Damage.damageEvent is
+-- where they are read.
 data DamageEvent = MkDamageEvent
   { source :: ObjectId.ObjectId,
     target :: Recipient.Recipient,
@@ -35,6 +36,24 @@ data DamageEvent = MkDamageEvent
     -- CR 120.3g scopes toxic to that alone, so a noncombat event carries the
     -- value and ignores it.
     dealtByToxic :: Natural.Natural,
+    -- | CR 702.15b: WHO this damage's lifelink pays -- "that source's controller,
+    -- or its owner if it has no controller" -- and Nothing when the source had
+    -- no lifelink at all.
+    --
+    -- The rule's WHOLE answer, resolved at deal time, rather than a bare bit
+    -- plus a controller lookup when the life is handed over. Both halves are
+    -- facts about the source AS THE DAMAGE WAS DEALT: CR 702.15c says the first
+    -- is last-known information outright ("its last known information is used
+    -- to determine whether it had lifelink"), and re-asking the second later
+    -- would read a board that the CR 616.1 replacement loop has already moved.
+    -- Sized for the answer the way dealtByToxic is (a value, not a bit, because
+    -- CR 702.164b's answer is a number); CR 702.15f's redundancy clause is why
+    -- there is no count here.
+    --
+    -- Read by Pawl.Engine.Damage.applyDamage, for EVERY damage event and not just
+    -- combat ones -- CR 702.15d: "the lifelink rules function no matter what
+    -- zone an object with lifelink deals damage from."
+    dealtByLifelink :: Maybe PlayerId.PlayerId,
     -- | CR 510 vs CR 608: combat damage or not. Set at deal time -- Damage tags
     -- Combat, Resolve's DealDamage tags Noncombat. Read by Replacement.applies's
     -- DamageR arm (CR 615.1's damage pattern).

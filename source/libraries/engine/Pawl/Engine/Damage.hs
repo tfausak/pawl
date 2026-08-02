@@ -72,11 +72,16 @@ legalAssignment thresholds power answer =
       isDefender r = case r of
         Recipient.ToPlayer _ -> True
         Recipient.ToCreature _ -> False
-        -- CR 702.19b's excess goes to "the player or planeswalker it's
-        -- attacking", so an attacked planeswalker WOULD be a defender here --
-        -- but nothing declares an attack on one yet (#493), so no threshold map
-        -- can hold this tag and answering False is not a claim about trample.
-        Recipient.ToPlaneswalker _ -> False
+        -- CR 702.19b: the excess is assigned "among those blocking creatures and
+        -- the player, planeswalker, or battle the creature is attacking", so an
+        -- attacked planeswalker is on THIS side of the split, not the blockers'.
+        -- CR 702.19f is why it is the only non-blocker recipient the map can hold
+        -- for such an attacker: "If a creature without trample over planeswalkers
+        -- is attacking a planeswalker, none of its combat damage can be assigned
+        -- to the defending player" -- so attackerAssignment never offers the
+        -- player alongside it, and the gate below reads the whole non-blocker
+        -- share either way.
+        Recipient.ToPlaneswalker _ -> True
         Recipient.ToObject _ -> False
       defenderAmount = sum (Map.elems (Map.filterWithKey (\r _ -> isDefender r) answer))
       blockerThresholds = Map.filterWithKey (\r _ -> not (isDefender r)) thresholds
@@ -104,10 +109,21 @@ blockerThreshold gs attacker blocker =
 -- AS THE DAMAGE IS DEALT, and the source may be gone by the time the CR 704.5h
 -- SBA or a later reader asks. CR 702.2e and CR 702.90d say so outright for
 -- deathtouch and infect ("its last known information is used to determine
--- whether it had" the keyword). Rule 702.164 has NO such clause, so toxic's
--- total value (CR 702.164b) is captured by analogy rather than by citation --
--- observably the same today, since applyDamage runs in the same instant, and it
--- keeps the CR 608.2i record self-contained.
+-- whether it had" the keyword), and CR 702.15c says it for lifelink. Rule
+-- 702.164 has NO such clause, so toxic's total value (CR 702.164b) is captured
+-- by analogy rather than by citation -- observably the same today, since
+-- applyDamage runs in the same instant, and it keeps the CR 608.2i record
+-- self-contained.
+--
+-- Lifelink's rider carries WHO rather than WHETHER, because CR 702.15b's answer
+-- is a player: "that source's controller, or its owner if it has no
+-- controller". Projection.controllerOf is both of those clauses at once -- it
+-- returns a control effect's player when one applies and the object's own owner
+-- when none does, in any zone, which is what CR 702.15d ("no matter what zone")
+-- needs. It returns Nothing only when the id names nothing at all, so a source
+-- that has already ceased to exist gains nobody life; CR 702.15c would have
+-- last-known information answer that, and no rider on this path consults it
+-- (#562).
 --
 -- Every damage the engine deals is built here -- the only other constructor call
 -- in the library is Pawl.Codec's decoder, which rebuilds an event rather than
@@ -122,8 +138,48 @@ damageEvent gs kind source target amount =
       DamageEvent.dealtByDeathtouch = Projection.hasKeyword Keyword.Deathtouch source gs,
       DamageEvent.dealtByInfect = Projection.hasKeyword Keyword.Infect source gs,
       DamageEvent.dealtByToxic = Projection.totalToxic source gs,
+      DamageEvent.dealtByLifelink =
+        if Projection.hasKeyword Keyword.Lifelink source gs
+          then Projection.controllerOf source gs
+          else Nothing,
       DamageEvent.kind = kind
     }
+
+-- CR 510.1b: what an attacking creature assigns its combat damage TO -- "the
+-- player, planeswalker, or battle it's attacking" -- or Nothing for that rule's
+-- second sentence, "If it isn't currently attacking anything (if, for example, it
+-- was attacking a planeswalker that has left the battlefield), it assigns no
+-- combat damage."
+--
+-- The two arms answer to different rules, which is why this is a case and not one
+-- liveness test:
+--
+--   * a player leaving is CR 800.4e, "If combat damage would be assigned to a
+--     player who has left the game, that damage isn't assigned" -- the creature
+--     is still attacking them, and the damage is what goes missing.
+--   * a planeswalker's is CR 506.4: it is REMOVED FROM COMBAT and "stops being
+--     attacked", so by CR 506.4c the creature "continues to be an attacking
+--     creature, although it is not attacking any player, planeswalker, or
+--     battle" -- and CR 510.1b then gives it nothing to assign to.
+--     Combat.stillAttacked is that rule, and its haddock argues why re-asking is
+--     the removal.
+--
+-- Read at ASSIGNMENT and at every place assignment can name a recipient (the
+-- unblocked/trample-through event and the CR 702.19b threshold map the prompt
+-- offers), never as a filter over the finished batch: filtering afterwards would
+-- let the attacker's controller legally assign trample excess to something that
+-- cannot take it and then lose that damage, rather than never offering the
+-- choice.
+combatRecipient :: GameState -> AttackTarget -> Maybe Recipient.Recipient
+combatRecipient gs target = case target of
+  AttackTarget.OfPlayer defender ->
+    if List.elem defender (Game.stillPlaying gs)
+      then Just (Recipient.ToPlayer defender)
+      else Nothing
+  AttackTarget.OfPlaneswalker oid ->
+    if Combat.stillAttacked oid gs
+      then Just (Recipient.ToPlaneswalker oid)
+      else Nothing
 
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
@@ -138,18 +194,12 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
         let power :: Natural
             power = Integer.toNaturalSaturating p
             trample = Projection.hasKeyword Keyword.Trample attacker gs
-            -- CR 800.4e: "If combat damage would be assigned to a player who has
-            -- left the game, that damage isn't assigned." Reachable in a
-            -- multiplayer game: a defending player can concede between the
-            -- declare-attackers step and the combat damage step. Read HERE, at
-            -- assignment, and at both places the defender can receive damage --
-            -- the unblocked/trample-through list and the CR 702.19b threshold map
-            -- the prompt offers. Filtering the finished batch instead would let
-            -- the attacker's controller legally assign trample excess to a player
-            -- who cannot take it and then lose that damage, rather than never
-            -- offering the choice.
-            defenderIsPlaying = case target of
-              AttackTarget.OfPlayer defender -> List.elem defender (Game.stillPlaying gs)
+            -- CR 510.1b: what this creature is attacking, if it is still
+            -- attacking anything. Reachable both ways in the pool -- a defending
+            -- player can concede between the declare attackers step and the
+            -- combat damage step (CR 800.4e), and an attacked planeswalker can be
+            -- burned off the battlefield in the same window (CR 506.4).
+            attacked = combatRecipient gs target
         -- Whether it is BLOCKED and WHO is blocking it are two questions, and the
         -- branch below asks each of the reader that answers it. CR 509.1h makes
         -- blocked-ness a status the declaration confers (Combat.isBlocked, the
@@ -165,11 +215,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
         let recorded = Combat.blockersOf attacker gs
             toDefender :: [DamageEvent.DamageEvent]
             toDefender =
-              if defenderIsPlaying
-                then case target of
-                  AttackTarget.OfPlayer defender ->
-                    [damageEvent gs DamageKind.Combat attacker (Recipient.ToPlayer defender) power]
-                else []
+              fmap (\recipient -> damageEvent gs DamageKind.Combat attacker recipient power) (Maybe.maybeToList attacked)
         if not (Combat.isBlocked attacker gs)
           then -- CR 510.1b: never blocked, so it hits what it is attacking.
             pure toDefender
@@ -197,9 +243,17 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                 let decider = Decide.deciderFor pid gs
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
                     blockerEntries = fmap (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
-                    defenderEntry = case target of
-                      AttackTarget.OfPlayer defender ->
-                        if trample && defenderIsPlaying then [(Recipient.ToPlayer defender, 0 :: Natural)] else []
+                    -- CR 702.19b: the trample-through recipient is whatever the
+                    -- creature is attacking, at threshold 0 -- there is no
+                    -- minimum to assign to it. CR 702.19c's larger threshold (a
+                    -- planeswalker's loyalty) belongs to trample OVER
+                    -- PLANESWALKERS, which is not a keyword pawl has (#539), and
+                    -- CR 702.19f is what keeps plain trample from ever putting
+                    -- the defending PLAYER here alongside a planeswalker.
+                    defenderEntry =
+                      if trample
+                        then fmap (\recipient -> (recipient, 0 :: Natural)) (Maybe.maybeToList attacked)
+                        else []
                     thresholds = Map.fromList (blockerEntries <> defenderEntry)
                 chosen <-
                   Trans.lift
@@ -269,11 +323,11 @@ gatherCombatDamage assigns = do
 --
 -- ToCreature, ToPlaneswalker and ToPlayer pass through untouched. Each is
 -- produced either by combat (CR 510.1b-d, which name the blocking creature or
--- the attacked player outright -- so ToCreature and ToPlayer only) or by a CR
--- 601.2c target chosen out of a typed Pool, so what any of them names was
--- already classified when the recipient was built; re-asking here would be a
--- second, later reading of the same question, which is what CR 608.2b's target
--- re-validation is for and this is not.
+-- the player or planeswalker being attacked outright) or by a CR 601.2c target
+-- chosen out of a typed Pool, so what any of them names was already classified
+-- when the recipient was built; re-asking here would be a second, later reading
+-- of the same question, which is what CR 608.2b's target re-validation is for and
+-- this is not.
 --
 -- Only battles are missing from the classification, and only because no card type
 -- for one exists yet (#302); CR 120.3h is what it would need.
@@ -381,16 +435,48 @@ applyDamage events = do
                   else givePoison toxic (drain player)
            in g {GameState.players = Map.adjust hit pid (GameState.players g)}
         -- CR 120.1a, and defensive: combat never builds this shape (CR 510.1b-d
-        -- name a creature or a player), and the one producer that can --
-        -- Resolve's DealDamage arm, reading a slot that names a permanent
-        -- generically -- runs it through damageRecipient above first, which
-        -- turns it into ToCreature or ToPlaneswalker, or into no event at all.
+        -- name a creature, a player or a planeswalker), and the one producer
+        -- that can -- Resolve's DealDamage arm, naming a permanent generically
+        -- through a bound slot or sweeping a set of them out of an
+        -- ObjectRef.EachMatching -- runs every recipient through damageRecipient
+        -- above first, which turns each into ToCreature or ToPlaneswalker, or
+        -- into no event at all.
         -- Doing anything here would be the wrong answer if anything did reach
         -- it: nothing has said which of CR 120.3's results applies.
         Recipient.ToObject _ -> g
+      -- CR 120.3f: "Damage dealt by a source with lifelink causes that source's
+      -- controller to gain that much life, IN ADDITION to the damage's other
+      -- results." A second pass over the same survivors, deliberately not a
+      -- branch inside markOne: "in addition" is then structural, and no arm of
+      -- CR 120.3 above can be turned into "instead" by an edit here.
+      --
+      -- Every survivor, whatever it was dealt to. CR 702.15b hangs the gain off
+      -- the SOURCE ("that source's controller, or its owner if it has no
+      -- controller"), so which of CR 120.3's results the damage had -- marked
+      -- damage, loyalty counters, life loss, poison -- is none of this pass's
+      -- business.
+      --
+      -- One adjustment per event rather than one per player: CR 702.15e, "if
+      -- multiple sources with lifelink deal damage at the same time, they cause
+      -- SEPARATE life gain events (see rules 119.9-10)". Summing them first would
+      -- be one event, which is the thing that rule says it is not.
+      --
+      -- Over `survivors`, so CR 615.6's prevented event ("the event never
+      -- happens") gains nobody anything -- the same reading toxic's arm above
+      -- takes.
+      gainOne g ev = case DamageEvent.dealtByLifelink ev of
+        Nothing -> g
+        Just pid ->
+          let gain player = player {Player.life = Player.life player + toInteger (DamageEvent.amount ev)}
+           in g {GameState.players = Map.adjust gain pid (GameState.players g)}
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
-  State.modify' (\gs -> List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) (List.foldl' markOne gs survivors) survivors)
+  State.modify'
+    ( \gs ->
+        let marked = List.foldl' markOne gs survivors
+            gained = List.foldl' gainOne marked survivors
+         in List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) gained survivors
+    )
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).

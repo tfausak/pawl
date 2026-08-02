@@ -3,6 +3,7 @@ module Pawl.Types.CounterPattern where
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 
 -- | CR 122.6 / 614.1: which counter placements a scaling replacement intercepts.
 -- Hardened Scales is (Just PlusOnePlusOne, Yours, "HasCardType Creature");
@@ -12,6 +13,6 @@ import qualified Pawl.Types.Filter as Filter
 data CounterPattern = MkCounterPattern
   { whichKind :: Maybe CounterKind.CounterKind,
     whose :: ControllerRelation.ControllerRelation,
-    onWhat :: Filter.Filter
+    onWhat :: Filter.Filter Keyword.Keyword
   }
   deriving (Eq, Ord, Show)

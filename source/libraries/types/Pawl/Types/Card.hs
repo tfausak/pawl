@@ -10,6 +10,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
@@ -176,7 +177,7 @@ data Card = MkCard
     --
     -- CR 118.8d: this does not change the card's mana cost. Card.manaCost, and
     -- every reader of mana value, is unaffected.
-    additionalCosts :: [CostComponent.CostComponent],
+    additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
     -- | CR 118.9: this card's printed alternative costs -- "a cost listed in a
     -- spell's text ... that its controller MAY pay rather than paying the
     -- spell's mana cost" (Fireblast). Empty for every other printing.
@@ -202,7 +203,7 @@ data Card = MkCard
     -- NOT one of these: a cost here is payable wherever the card can be cast
     -- from, and flashback's may be paid only from the graveyard. It rides its
     -- keyword instead, and Pawl.Engine.Cost.costsFor offers it by zone.
-    alternativeCosts :: [Cost.Cost],
+    alternativeCosts :: [Cost.Cost Keyword.Keyword],
     -- | CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary
     -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put
@@ -225,6 +226,16 @@ data Card = MkCard
     -- these after the layer system rather than inside it. Empty for every other
     -- printing.
     attackRequirements :: [AttackRequirement.AttackRequirement],
+    -- | CR 604.1/604.2 / 508.1c / 509.1b: this card's printed COMBAT RESTRICTIONS
+    -- -- "enchanted creature can't attack or block" (Pacifism). The FIFTH
+    -- printed-static-ability field; read by Pawl.Engine.CombatRestriction and never by
+    -- Pawl.Engine.Projection, since CR 613.11 applies these after the layer system
+    -- rather than inside it. Empty for every other printing.
+    --
+    -- ONE list for both of Pacifism's halves, where the requirements take two
+    -- fields: Pawl.Types.CombatRestriction argues why the axis that split those is
+    -- absent here.
+    combatRestrictions :: [CombatRestriction.CombatRestriction],
     -- | CR 103.5b: the effects of this card's "any time you could mulligan"
     -- action, in written order. Empty for every printing but Serum Powder.
     --

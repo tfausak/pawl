@@ -3,9 +3,9 @@ module Pawl.Types.Recipient where
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
--- | CR 510.1: combat damage is assigned to a blocking creature or to the player
--- being attacked. Grows toward battles (#302), the remaining attack target. Ord
--- because it is a Map key.
+-- | CR 510.1: combat damage is assigned to a blocking creature, or to the player
+-- or planeswalker being attacked. Grows toward battles (#302), the remaining
+-- attack target. Ord because it is a Map key.
 --
 -- Bolt targeting a player is the second consumer (M3a): "defender" was combat's
 -- name for this recipient, not the type's meaning, so ToPlayer names the object.
@@ -18,8 +18,9 @@ data Recipient
     -- Pawl.Engine.Damage.applyDamage reads it off the tag rather than
     -- re-projecting the object's card types at the moment it applies.
     --
-    -- Nothing declares an attack on one yet (CR 306.6, #493), so today this is a
-    -- noncombat-damage tag only.
+    -- Combat produces this tag too (CR 306.6, CR 510.1b): an unblocked creature
+    -- attacking a planeswalker assigns its damage to it, and CR 306.8's loyalty
+    -- removal is what applyDamage then does with it.
     ToPlaneswalker ObjectId.ObjectId
   | ToPlayer PlayerId.PlayerId
   | -- | A spell on the stack or a permanent, named generically (Magical Hack's

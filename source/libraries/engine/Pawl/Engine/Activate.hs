@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
@@ -22,10 +23,12 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
+import Pawl.Types.Cost (Cost)
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -179,11 +182,15 @@ timingOk :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState
 timingOk pid ability gs = case ActivatedAbility.timing ability of
   ActivationTiming.AnyTime -> True
   ActivationTiming.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
-  -- CR 500.1's phases and steps, compared for equality: GameState.phase is the
-  -- one the game is in, and Pawl.Types.Phase spans both kinds. That comparison is
-  -- the one Pawl.Engine.Cast makes for CastingRestriction.DuringPhase, deliberately
-  -- duplicated rather than shared -- the two gates differ in what else they may
-  -- read, which is the whole of the paragraph above.
+  -- CR 500.1's phases and steps: GameState.phase is the schedule entry the game
+  -- is in, and Turn.inWindow asks whether it falls inside the window the rider
+  -- names. CONTAINMENT rather than equality, because a rider may name a phase
+  -- that has steps -- Jade Statue's "Activate only during combat" is live in all
+  -- five of CR 506.1's combat steps, while Desert's names one of them and
+  -- matches only there. Pawl.Engine.Cast makes the equality comparison for
+  -- CastingRestriction.DuringPhase, whose arm still carries a bare Phase (#527);
+  -- deliberately duplicated rather than shared -- the two gates differ in what
+  -- else they may read, which is the whole of the paragraph above.
   --
   -- CR 102.1 supplies the second conjunct, and it is a genuinely separate fact:
   -- "A player is one of the people in the game. The active player is the player
@@ -197,8 +204,8 @@ timingOk pid ability gs = case ActivatedAbility.timing ability of
   -- above has already pinned it to Activate.activatorOf, CR 602.2's controller --
   -- so no separate controller lookup is needed here, and a stolen permanent's
   -- rider follows the thief the way CR 109.5 says it must.
-  ActivationTiming.DuringPhase phase scope ->
-    GameState.phase gs == phase
+  ActivationTiming.DuringPhase window scope ->
+    Turn.inWindow window (GameState.phase gs)
       && case scope of
         TurnScope.EachTurn -> True
         TurnScope.ControllersTurn -> GameState.activePlayer gs == pid
@@ -232,11 +239,42 @@ loyaltyOk pid srcId ability gs =
 loyaltyActivatedThisTurn :: ObjectId -> GameState -> Bool
 loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (GameState.events gs)
 
+-- CR 602.2b's routing of an activation cost through CR 601.2b, at the X=0 FLOOR:
+-- an ability is affordable when its activation cost is payable with X=0, since
+-- the activating player may always choose 0. The gate `activatable` conjoins, and
+-- the predicate `affordableX` climbs -- one predicate, so what activatability
+-- measures and what the bound reports cannot drift apart.
+--
+-- The substitution is not decoration. A ManaSymbol.Variable that reaches payment
+-- demands nothing at all (Mana.waysOf), so leaving it in place would answer the
+-- same as X=0 by accident rather than by rule -- and would then be the same
+-- accident that made the {X} free (#544). Substituting states CR 601.2b's floor.
+payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCost = payableCostAt 0
+
+-- The same question asked at some OTHER value of X -- `payableCost` is this at
+-- the floor and `affordableX` is this climbed, the shape Cast.payableCostAt has.
+--
+-- NO CR 601.2f TOTALLING, which is the one place this parts company with the
+-- spell's version: an activation cost is deliberately not routed through
+-- Cost.total anywhere (#90), so the printed cost is what is measured and what
+-- will be paid. When #90 lands, this is the site that changes.
+payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAt x pid srcId gs cost = Cost.canPay pid srcId (Cost.substituteX x cost) gs
+
+-- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
+-- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
+-- shared with Cast.affordableX; only the predicate differs, and only by CR
+-- 601.2f's totalling (#90). Advisory, never a clamp -- see Prompt.ChooseX.
+affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid srcId gs cost) cost
+
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability (mana abilities are handled at
--- payment, not the stack), the whole activation cost is payable (CR 118.3), the
--- {T} sickness gate holds, the ability's timing rider permits it now (CR 307.5),
--- and enough modes are fillable to satisfy the selection (CR 700.2a/602.2b).
+-- payment, not the stack), the whole activation cost is payable at CR 601.2b's
+-- X=0 floor (CR 118.3, `payableCost` above), the {T} sickness gate holds, the
+-- ability's timing rider permits it now (CR 307.5), and enough modes are fillable
+-- to satisfy the selection (CR 700.2a/602.2b).
 --
 -- The cost is the PRINTED one: an activated ability's cost is deliberately not
 -- routed through Cost.total (#90).
@@ -265,7 +303,7 @@ activatableGiven grants pcs pid srcId ability gs =
     && loyaltyOk pid srcId ability gs
     && Natural.length (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
       >= Modal.selectionCount (ActivatedAbility.modal ability)
-    && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
+    && payableCost pid srcId gs (ActivatedAbility.cost ability)
 
 -- CR 602.2a: "If an activated ability is being activated from a hidden zone, the
 -- card that has that ability is revealed (see rule 701.20a)." Note what the rule
@@ -303,10 +341,14 @@ revealIfHidden pid srcId = do
 
 -- CR 602.2: announce the activation, revealing the card if it is coming from a
 -- hidden zone (602.2a), put the ability on the stack (a fresh OfAbility object),
--- choose modes (602.2b) then stamp targets, pay the additional costs, keep
--- priority (117.3c). Reject-not-repair on an illegal mode or target answer;
--- enumeration guarantees costs are payable, so payment cannot fail after the
--- prompt.
+-- then walk CR 601.2b-i as CR 602.2b sends it -- choose modes, announce the value
+-- of X, announce the Phyrexian symbols (CR 118.13a), stamp targets, pay -- and
+-- keep priority (117.3c). Reject-not-repair on an illegal mode or target answer.
+--
+-- An announced X can lose the activation all by itself, and that is not a
+-- contradiction of "enumeration guarantees the cost is payable": enumeration
+-- measures the cost at CR 601.2b's X=0 floor, and the value the player names is
+-- theirs to name freely. See the gate below.
 --
 -- `before` is the pre-announcement state and is the ONLY thing the rejection
 -- paths restore to, which is what puts CR 602.2a's reveal inside the rollback:
@@ -358,57 +400,115 @@ activateAbility pid srcId ability = do
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
     then State.put before
     else do
-      -- CR 602.2b: "the remainder of the process for activating an ability is
-      -- identical to the process for casting a spell listed in rules 601.2b-i",
-      -- so CR 118.13a's announcement -- which names "the activation cost of an
-      -- activated ability" in its own words -- happens here, at 601.2b's
-      -- position, and not when the cost is paid. Moltensteel Dragon's "{R/P}: This
-      -- creature gets +1/+0 until end of turn" is what exercises it, and the rule's
-      -- other two clauses -- a cost paid during a resolution, or for a special
-      -- action -- are the ones still unreached (#373).
+      -- CR 602.2b: "The remainder of the process for activating an ability is
+      -- identical to the process for casting a spell listed in rules 601.2b-i.
+      -- Those rules apply to activating an ability just as they apply to casting
+      -- a spell. An activated ability's analog to a spell's mana cost (as
+      -- referenced in rule 601.2f) is its activation cost." So CR 601.2b's "If
+      -- the spell has a variable cost that will be paid as it's being cast (such
+      -- as an {X} in its mana cost; see rule 107.3), the player announces the
+      -- value of that variable" governs an activation cost's {X} too, and it is
+      -- asked HERE -- after the modes, before the Phyrexian announcement and
+      -- before CR 601.2c's targets, which is 601.2b's own order.
       --
-      -- `id` rather than Cost.totalMana, and that is #90 rather than an oversight:
-      -- an activation cost is not routed through Cost.total anywhere, so
-      -- `activatable` above checked the PRINTED cost and the printed cost is what
-      -- will be paid. Measuring the announcement through anything else would
-      -- offer routes against a total this engine never computes.
-      announcedCost <- Cost.announce pid srcId id (ActivatedAbility.cost ability)
-      let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
-      chosen <-
-        if Map.null sets
-          then pure Map.empty
-          else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid abilId sets))
-      let keysAgree = Map.keysSet chosen == Map.keysSet sets
-          eachLegal = and (Map.intersectionWith Set.member chosen sets)
-      if not (keysAgree && eachLegal)
+      -- Cinder Elemental's "{X}{R}, {T}, Sacrifice this creature" is what
+      -- exercises it. Not asking was not a missing question but a free {X}: a
+      -- ManaSymbol.Variable that survives to payment demands nothing (Mana.waysOf),
+      -- so the engine was announcing 0 on the player's behalf (#544).
+      --
+      -- The bound rides the PRINTED cost, which for an activation is the cost
+      -- `activatable` gated on and the cost that will be paid (#90); nothing
+      -- filters the answer against it (see Prompt.ChooseX).
+      let printedCost = ActivatedAbility.cost ability
+      mAmount <-
+        if Cost.hasVariable printedCost
+          then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost))))
+          else pure Nothing
+      let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
+      -- CR 602.2: "If, at any point during the activation of an ability, a player
+      -- is unable to comply with any of those steps, the activation is illegal;
+      -- the game returns to the moment before that ability started to be
+      -- activated." The X just named is where that can first become true, and this
+      -- is the step it becomes true in: `activatable` measured the cost at CR
+      -- 601.2b's X=0 floor, the only value it can know before an announcement
+      -- exists.
+      --
+      -- Asked with the same predicate that floor was asked with, so a gate and an
+      -- announcement cannot disagree about what a cost is. That matters beyond
+      -- tidiness, for the reason Cast.castSpell's twin of this gate does: CR
+      -- 118.13a's Phyrexian announcement below runs on this cost, and an X large
+      -- enough to leave neither of CR 107.4f's routes payable would leave
+      -- Mana.announcePhyrexian with no offer to make. This gate is what keeps that
+      -- arm out of reach from here (#417 closed the casting half).
+      --
+      -- Reject-not-repair, the posture every other step here takes: the
+      -- announcement is NOT clamped to affordableX -- CR 601.2b lets the player
+      -- announce the value of the variable freely -- it is honoured and then loses
+      -- the ability. Asked unconditionally rather than only when there is an {X}:
+      -- for a cost with none, `announcedAtX` IS the printed cost and this re-asks a
+      -- question `activatable` already answered, which buys one predicate over one
+      -- cost instead of two spellings of when the gate applies.
+      if not (payableCost pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
-          -- CR 113.7: bind the source permanent under the reserved self slot, so
-          -- an activated ability that refers to "this creature" (e.g. Longtusk
-          -- Cub's "put a +1/+1 counter on Longtusk Cub") resolves the reference
-          -- as a slot read -- exactly as Engine.placeOne does for a TRIGGERED
-          -- ability's source. srcId is the source permanent (Source.OfAbility),
-          -- which is what "this permanent" names. Additive: no existing activated
-          -- ability reads the self slot, so this cannot disturb them.
-          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty Nothing chosenModes)}) abilId (GameState.objects g)})
-          -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the components.
-          -- activatable pre-checks payability (Cost.canPay, which is pure), so an
-          -- ability offered here is one SOME sequence of choices pays for -- but
-          -- Unpaid is reachable all the same, because the mana window then asks the
-          -- player to make those choices and a mis-tapped colour is a choice the
-          -- engine must honour (Mana.payCost's haddock, and ManaSpec's "a Birds
-          -- tapped for green does not pay {B}"). Reject-not-repair restores the
-          -- whole activation -- including the ability object this function put on
-          -- the stack -- when it happens.
-          payment <- Cost.pay pid srcId announcedCost
-          case payment of
-            -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
-            -- activated, which is the whole of the once-per-turn limit's storage
-            -- (see loyaltyOk above). Every path that rejects the activation
-            -- restores `before`, and the log lives in that state, so no rejected
-            -- activation can leave a record behind wherever this sits.
-            Payment.Paid ->
-              Monad.when
-                (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
-                (State.modify' (Event.recordEvent (GameEvent.LoyaltyAbilityActivated srcId)))
-            Payment.Unpaid -> State.put before
+          -- CR 118.13a's announcement -- which names "the activation cost of an
+          -- activated ability" in its own words -- happens here, at 601.2b's
+          -- position, and not when the cost is paid. Moltensteel Dragon's "{R/P}: This
+          -- creature gets +1/+0 until end of turn" is what exercises it, and the rule's
+          -- other two clauses -- a cost paid during a resolution, or for a special
+          -- action -- are the ones still unreached (#373).
+          --
+          -- `id` rather than Cost.totalMana, and that is #90 rather than an oversight:
+          -- an activation cost is not routed through Cost.total anywhere, so
+          -- `activatable` above checked the PRINTED cost and the printed cost is what
+          -- will be paid. Measuring the announcement through anything else would
+          -- offer routes against a total this engine never computes.
+          --
+          -- Run on the cost carrying the ANNOUNCED value, which is CR 601.2b's own
+          -- order (the value of X precedes the Phyrexian announcement).
+          announcedCost <- Cost.announce pid srcId id announcedAtX
+          let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
+          chosen <-
+            if Map.null sets
+              then pure Map.empty
+              else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid abilId sets))
+          let keysAgree = Map.keysSet chosen == Map.keysSet sets
+              eachLegal = and (Map.intersectionWith Set.member chosen sets)
+          if not (keysAgree && eachLegal)
+            then State.put before -- reject: the whole activation is a no-op
+            else do
+              -- CR 113.7: bind the source permanent under the reserved self slot, so
+              -- an activated ability that refers to "this creature" (e.g. Longtusk
+              -- Cub's "put a +1/+1 counter on Longtusk Cub") resolves the reference
+              -- as a slot read -- exactly as Engine.placeOne does for a TRIGGERED
+              -- ability's source. srcId is the source permanent (Source.OfAbility),
+              -- which is what "this permanent" names. Additive: no existing activated
+              -- ability reads the self slot, so this cannot disturb them.
+              --
+              -- CR 601.2b's announced X is stamped alongside, onto the ABILITY object
+              -- and not the source permanent -- Cinder Elemental sacrifices that
+              -- permanent to pay, so it is the only holder still there to read at
+              -- resolution (Quantity.evaluateFor).
+              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty mAmount chosenModes)}) abilId (GameState.objects g)})
+              -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the components.
+              -- activatable pre-checks payability (payableCost, which is pure) and the
+              -- gate above re-checks it at the announced X, so an ability that reaches
+              -- here is one SOME sequence of choices pays for -- but
+              -- Unpaid is reachable all the same, because the mana window then asks the
+              -- player to make those choices and a mis-tapped colour is a choice the
+              -- engine must honour (Mana.payCost's haddock, and ManaSpec's "a Birds
+              -- tapped for green does not pay {B}"). Reject-not-repair restores the
+              -- whole activation -- including the ability object this function put on
+              -- the stack -- when it happens.
+              payment <- Cost.pay pid srcId announcedCost
+              case payment of
+                -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
+                -- activated, which is the whole of the once-per-turn limit's storage
+                -- (see loyaltyOk above). Every path that rejects the activation
+                -- restores `before`, and the log lives in that state, so no rejected
+                -- activation can leave a record behind wherever this sits.
+                Payment.Paid ->
+                  Monad.when
+                    (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
+                    (State.modify' (Event.recordEvent (GameEvent.LoyaltyAbilityActivated srcId)))
+                Payment.Unpaid -> State.put before

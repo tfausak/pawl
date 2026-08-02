@@ -59,13 +59,21 @@ fromJson = Effect.fromJson cardFromJson
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Effect" $ do
-  Spec.it s "DealDamage" $
+  -- ObjectRef is untagged, so both arms have to survive: Lightning Bolt's
+  -- chosen slot and Corrosive Gale's swept "each creature with flying".
+  Spec.it s "DealDamage round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3))
+      (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3))
       "{\"type\":\"DealDamage\",\"value\":[\"target\",{\"type\":\"Literal\",\"value\":3}]}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.DealDamage (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) (Quantity.Literal 1))
+      "{\"type\":\"DealDamage\",\"value\":[{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}},{\"type\":\"Literal\",\"value\":1}]}"
   -- ModifyTarget's ObjectRef is untagged, so both arms have to survive: Giant
   -- Growth's chosen slot and Trumpet Blast's swept "attacking creatures".
   Spec.it s "ModifyTarget round-trips both ObjectRef arms" $ do
@@ -309,6 +317,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase)
       "{\"type\":\"SkipNextPhase\",\"value\":[{\"type\":\"InSlot\",\"value\":\"target\"},{\"type\":\"CombatPhase\"}]}"
+  -- CR 113.9: this same opcode now also counters an ABILITY (Stifle), not only
+  -- a spell (Cancel) -- the type is unchanged, so the wire shape is too.
   Spec.it s "Counter" $
     Common.assertJsonCodec
       s
@@ -316,6 +326,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Counter (SlotName.MkSlotName (Text.pack "spell")))
       "{\"type\":\"Counter\",\"value\":\"spell\"}"
+  -- CR 701.24: a bare slot name, not an array -- whose library is DERIVED from
+  -- the object the slot names (CR 400.3's "its owner"), so there is no second
+  -- field for a card file to write.
+  Spec.it s "ShuffleIntoLibrary" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ShuffleIntoLibrary (SlotName.MkSlotName (Text.pack "target")))
+      "{\"type\":\"ShuffleIntoLibrary\",\"value\":\"target\"}"
   Spec.it s "PutCounters" $
     Common.assertJsonCodec
       s

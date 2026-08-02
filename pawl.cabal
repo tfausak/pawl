@@ -92,6 +92,8 @@ library codec
     Pawl.Codec.CastingRestrictionSpec
     Pawl.Codec.Color
     Pawl.Codec.ColorSpec
+    Pawl.Codec.CombatRestriction
+    Pawl.Codec.CombatRestrictionSpec
     Pawl.Codec.CombatStep
     Pawl.Codec.CombatStepSpec
     Pawl.Codec.Common
@@ -297,6 +299,7 @@ library engine
     Pawl.Engine.Card
     Pawl.Engine.Cast
     Pawl.Engine.Combat
+    Pawl.Engine.CombatRestriction
     Pawl.Engine.Condition
     Pawl.Engine.Cost
     Pawl.Engine.Count
@@ -475,6 +478,7 @@ library types
     Pawl.Types.CastingRestriction
     Pawl.Types.Color
     Pawl.Types.Combat
+    Pawl.Types.CombatRestriction
     Pawl.Types.CombatStep
     Pawl.Types.Comparison
     Pawl.Types.Concession

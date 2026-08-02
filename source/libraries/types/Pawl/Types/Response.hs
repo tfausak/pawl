@@ -4,9 +4,11 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -54,6 +56,14 @@ data Response
     -- prompts sharing a constructor cannot do that.
     ChoseLegend ObjectId.ObjectId
   | DeclaredAttackers [ObjectId.ObjectId]
+  | -- | CR 508.1b / CR 508.4: what one attacking creature was announced as
+    -- attacking, serialized so a DecisionLog replays an attack on a planeswalker
+    -- deterministically. Its own constructor rather than a reuse of
+    -- ChoseDefender: decode must return Nothing for a response that does not
+    -- match the prompt being asked, and two prompts sharing a constructor cannot
+    -- do that -- and the payloads differ anyway, since a defending player is
+    -- always a player and this may name a permanent.
+    ChoseAttackTarget AttackTarget.AttackTarget
   | DeclaredBlockers (Map.Map ObjectId.ObjectId ObjectId.ObjectId)
   | AssignedCombatDamage (Map.Map Recipient.Recipient Natural.Natural)
   | ChoseTargets (Map.Map SlotName.SlotName Recipient.Recipient)
@@ -103,7 +113,7 @@ data Response
     ChoseAttachment ObjectId.ObjectId
   | -- | CR 601.2b: the cost a caster announced they would pay, serialized so a
     -- DecisionLog replays an alternative-cost cast deterministically.
-    ChoseCost Cost.Cost
+    ChoseCost (Cost.Cost Keyword.Keyword)
   | -- | CR 103.5: a player's mulligan declaration, serialized so a DecisionLog
     -- replays the mulligan round deterministically.
     DeclaredMulligan MulliganDecision.MulliganDecision

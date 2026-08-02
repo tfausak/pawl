@@ -80,9 +80,12 @@
         "type": "DuringPhase",
         "value": [
           {
-            "type": "Combat",
+            "type": "Step",
             "value": {
-              "type": "EndOfCombat"
+              "type": "Combat",
+              "value": {
+                "type": "EndOfCombat"
+              }
             }
           },
           {

@@ -35,13 +35,57 @@ import qualified Pawl.Types.Subtype as Subtype
 -- ability twice, which Pawl.Types.ProjectedCharacteristics.keywords carries as a
 -- count. This type says only WHICH ability, so a card's printed keywords stay a
 -- Set (each printed once) -- see Pawl.Types.Card.keywords.
+--
+-- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
+-- Filter has a HasKeyword arm (Plummet's "target creature with flying") and this
+-- type carries a Filter (702.29e typecycling) and a Cost (702.29a/702.34a/702.42a)
+-- whose components carry one too, so the three of them would be a module cycle if
+-- any were concrete. They are parametric and this one is not, which makes
+-- `Filter Keyword` and `Cost Keyword` the only instantiations anywhere.
 data Keyword
   = Deathtouch -- 702.2
   | Defender -- 702.3
   | DoubleStrike -- 702.4
   | FirstStrike -- 702.7
+  | -- | 702.8a: "Flash is a static ability that functions in any zone from which
+    -- you could play the card it's on. 'Flash' means 'You may play this card any
+    -- time you could cast an instant.'"
+    --
+    -- The first keyword here about WHEN a card may be cast. Rule 702's other
+    -- casting keywords in this pool move a different axis: flashback (702.34a)
+    -- moves the zone and the cost, cycling (702.29a) is an activated ability
+    -- rather than a cast at all, and entwine (702.42a) moves the modes and the
+    -- cost. This one moves only the window, and nothing reads it once the spell
+    -- is on the stack. Read by Pawl.Engine.Cast.instantSpeed.
+    --
+    -- Nullary, because rule 702.8a takes no parameter, and CR 702.8b makes
+    -- multiple instances redundant -- so its reader takes membership rather than
+    -- the per-keyword count Pawl.Types.ProjectedCharacteristics.keywords carries.
+    --
+    -- Not a Pawl.Types.CastingPermission. That type's arms name a ZONE a card may
+    -- be cast from (CR 601.3); rule 702.8a's second sentence names a TIME and no
+    -- zone at all, and its first sentence is about where the ability functions
+    -- rather than where the card may be cast from. A Pouncing Cheetah in a
+    -- graveyard is as uncastable as a War Mammoth there.
+    Flash
   | Flying -- 702.9
   | Haste -- 702.10
+  | -- | 702.11a: "Hexproof is a static ability." 702.11b: "'Hexproof' on a
+    -- permanent means 'This permanent can't be the target of spells or abilities
+    -- your opponents control.'"
+    --
+    -- Shroud's sibling (702.18a) and deliberately NOT the same constructor: the
+    -- CONTROLLER AXIS is the whole difference between them. Shroud names no
+    -- player, so it stops the permanent's own controller as readily as anyone
+    -- else; hexproof's "your opponents control" makes the answer depend on WHO
+    -- is aiming the spell. That is why Pawl.Engine.Target.targetable reads CR
+    -- 109.5's "you" -- the targeting player -- and not only the candidate.
+    --
+    -- Nullary, because rule 702.11b takes no parameter. Rule 702.11d's "hexproof
+    -- from [quality]" is the parameterized variant and is not this constructor
+    -- (#555): it reads the SOURCE's characteristics, which is protection's shape
+    -- (702.16) rather than this one's.
+    Hexproof
   | Indestructible -- 702.12
   | -- | 702.14a: "Landwalk is a generic term that appears within an object's rules
     -- text as '[type]walk,' where [type] is usually a land type, but it can also
@@ -61,13 +105,30 @@ data Keyword
     -- Only rule 702.14a's "usually a land type" case is represented. A Subtype
     -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
     Landwalk Subtype.Subtype
+  | -- | 702.15a: "Lifelink is a static ability." 702.15b: "Damage dealt by a
+    -- source with lifelink causes that source's controller, or its owner if it
+    -- has no controller, to gain that much life (in addition to any other
+    -- results that damage causes)."
+    --
+    -- Nullary, because rule 702.15b takes no parameter, and CR 702.15f
+    -- ("multiple instances of lifelink on the same object are redundant") is why
+    -- its reader takes membership rather than the per-keyword count
+    -- Pawl.Types.ProjectedCharacteristics.keywords carries -- flying's shape,
+    -- not toxic's.
+    --
+    -- Read ONCE, at deal time, into Pawl.Types.DamageEvent.dealtByLifelink:
+    -- CR 702.15c says the source's last known information decides whether it had
+    -- lifelink, and CR 702.15d says the rules "function no matter what zone an
+    -- object with lifelink deals damage from", so this is never a question asked
+    -- of a live board when the life is handed over. See Pawl.Engine.Damage.damageEvent.
+    Lifelink
   | Reach -- 702.17
   | -- | 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
     -- player can't be the target of spells or abilities.'"
     --
-    -- The pool's first TARGETING RESTRICTION, and so far the only keyword the CR
-    -- 115 target-legality gate reads -- Pawl.Engine.Target.targetable, which is
-    -- where every restriction rule 702 states lands.
+    -- The pool's first TARGETING RESTRICTION, read by the CR 115
+    -- target-legality gate -- Pawl.Engine.Target.targetable, which is where
+    -- every restriction rule 702 states lands. Hexproof (702.11b) is the second.
     --
     -- Nullary, because rule 702.18a takes no parameter. It is neither hexproof's
     -- "your opponents control" (702.11b) nor protection's stated quality
@@ -106,7 +167,7 @@ data Keyword
     -- type is usually a subtype (as in 'mountaincycling') but can be any card
     -- type, subtype, supertype, or combination thereof (as in 'basic
     -- landcycling')" -- which is a Filter's whole job.
-    Cycling Cost.Cost (Maybe Filter.Filter)
+    Cycling (Cost.Cost Keyword) (Maybe (Filter.Filter Keyword))
   | -- | 702.34a: "Flashback appears on some instants and sorceries. It represents
     -- two static abilities: one that functions while the card is in a player's
     -- graveyard and another that functions while the card is on the stack.
@@ -125,7 +186,7 @@ data Keyword
     -- Pawl.Engine.Cost.costsFor only in the graveyard), the permission
     -- (Keyword.castingPermissionsOf) and the exile replacement
     -- (Keyword.flashbackExile).
-    Flashback Cost.Cost
+    Flashback (Cost.Cost Keyword)
   | Fear -- 702.36
   | -- | 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
     -- that functions while the spell is on the stack. 'Entwine [cost]' means
@@ -145,7 +206,7 @@ data Keyword
     -- completely -- "all modes", never some other number -- so Pawl.Engine.Cast reads
     -- the payload's own mode count (Modal.modeCount) rather than a number
     -- restated here, and Pawl.Types.ModeSelection stays what the card PRINTS.
-    Entwine Cost.Cost
+    Entwine (Cost.Cost Keyword)
   | -- | 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
     -- this creature deals combat damage to a player, that player gets N poison
     -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the
@@ -155,6 +216,21 @@ data Keyword
     -- projection's per-keyword count.
     Poisonous Natural.Natural
   | Infect -- 702.90
+  | -- | 702.111b: "A creature with menace can't be blocked except by two or more
+    -- creatures."
+    --
+    -- Nullary like fear (702.36) and unlike landwalk, because 702.111b names no
+    -- parameter -- the number two is written into the rule.
+    --
+    -- The first restriction of the SET shape #533 named, and its blocking half.
+    -- Every other evasion ability
+    -- here is a question about one (blocker, attacker) pair or less: flying asks
+    -- about the blocker, fear asks about the blocker, landwalk asks about neither.
+    -- Menace asks how MANY creatures are blocking, which no pairwise predicate can
+    -- answer, so it is read by Pawl.Engine.Combat.menaceAllowsGiven -- a
+    -- whole-declaration function -- rather than beside the other three in
+    -- pairAllowedGiven.
+    Menace
   | Devoid -- 702.114
   | -- | 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
     -- a number." N rides the constructor, so `Toxic 1` and `Toxic 2` are

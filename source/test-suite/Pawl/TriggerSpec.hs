@@ -70,7 +70,6 @@ import qualified Pawl.Engine.Projection as Projection
 -- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
 -- and must not collide.
 
-import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -509,7 +508,7 @@ stateTriggerSpec s registry =
           let (_, gs) = outcastBoard barbarianOutcast swamp 0
               settled = settle gs
               removed = case triggerIds settled of
-                abilId : _ -> Resolve.cease abilId settled
+                abilId : _ -> Game.cease abilId settled
                 [] -> settled
               again = settle removed
           Spec.assertEqWith s "a fresh instance" (length (triggerIds again)) 1
@@ -1303,7 +1302,7 @@ poisonousSpec s registry =
         -- falsifier is an implementation that hands the poison to the ability's
         -- controller (Binding.you) instead.
         Spec.it s "CR 603.2 the damaged player rides the trigger in the reserved slot" $ do
-          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
+          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
               bindings = Event.eventBindings TriggerCondition.SelfDealsCombatDamageToPlayer ev
           Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.bob))
         -- The proving test. CR 702.70a: "Whenever this creature deals combat
@@ -1745,6 +1744,81 @@ counterTriggerSpec s registry =
           Spec.assertEqWith s "and the Piker never reached the battlefield" (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.bob countered) 0
           Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
           Spec.assertEqWith s "so bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
+        -- THE discriminating case for rule 701.6a's OTHER subject. That rule is
+        -- about "a spell or ability", and Stifle ({U} Instant, "Counter target
+        -- activated or triggered ability") counters the second -- but Baral's
+        -- printed object is "counters A SPELL", so Baral must stay silent. CR
+        -- 113.9 is the rule that keeps the two apart: "activated and triggered
+        -- abilities on the stack aren't spells."
+        --
+        -- ONE board, run two ways, because either half alone proves nothing: a
+        -- silent Baral could be a Baral that never worked, and a firing one
+        -- could be a condition that ignores what was countered. The Cancel run
+        -- fires it and the Stifle run does not, from the same starting state,
+        -- with the same interpreter answering `Exercises` to CR 603.5's "may" --
+        -- so the silence is not a declined option either.
+        --
+        -- bob's LIBRARY is the readout, not his hand: Baral draws then discards,
+        -- which leaves the hand the size it was.
+        Spec.it s "CR 113.9 the same Baral: a countered SPELL fires it, a countered ABILITY does not" $ do
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          stifle <- S.printingOf s registry "Stifle"
+          baral <- S.printingOf s registry "Baral, Chief of Compliance"
+          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
+          case Card.Type.activatedAbilities (Printing.card sorcerer) of
+            [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+            ability : _ -> do
+              -- bob: Baral, three Islands, one library card, and both a Cancel
+              -- and a Stifle in hand. alice: a settled Prodigal Sorcerer (CR
+              -- 302.6, so its {T} may be activated) and a Goblin Piker spell on
+              -- the stack -- one victim of each kind, standing side by side.
+              let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
+                  withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) withBaral [1 .. (3 :: Int)]
+                  (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
+                  (srcId, withSorcerer) = S.addCreature sorcerer S.alice withLibrary
+                  settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
+                  (victimId, onStack) = S.spellOnStack piker S.alice settled
+                  (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
+                  (stifleId, gs) = S.addHandCard stifle S.bob withCancel
+                  -- The SPELL run: bob's Cancel at alice's Piker spell.
+                  spellRun = S.runPure (answerWith victimId) gs (Cast.castSpell S.bob cancelId)
+                  spellCountered = S.runPure (answerWith victimId) spellRun Stack.resolveTop
+                  spellPlaced = S.runPure (answerWith victimId) spellCountered Engine.settleForPriority
+                  spellAfter = S.runPure (answerWith victimId) spellPlaced Stack.resolveTop
+                  -- The ABILITY run: alice activates her Sorcerer at herself,
+                  -- and bob's Stifle counters the ability. Aimed at alice so the
+                  -- effect that must NOT occur is her own life total.
+                  atAlice :: Prompt.Prompt r -> r
+                  atAlice p = case p of
+                    Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+                    Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                    _ -> S.identityAnswer p
+                  -- Stifle's only legal target is the ability -- the Pool.Abilities
+                  -- set holds nothing else -- so the default interpreter picks it,
+                  -- and its `Exercises` is what would take Baral's "may".
+                  atAbility :: Prompt.Prompt r -> r
+                  atAbility p = case p of
+                    Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                    _ -> S.identityAnswer p
+                  activated = S.runPure atAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
+                  abilityRun = S.runPure atAbility activated (Cast.castSpell S.bob stifleId)
+                  abilityCountered = S.runPure atAbility abilityRun Stack.resolveTop
+                  abilityPlaced = S.runPure atAbility abilityCountered Engine.settleForPriority
+              -- Half one: a countered SPELL. Baral fires, and lands.
+              Spec.assertEqWith s "the Piker spell was countered into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice spellCountered)) 1
+              Spec.assertEqWith s "Baral's trigger is the only thing on the stack" (length (GameState.stack spellPlaced)) 1
+              Spec.assertEqWith s "and bob drew his only library card" (length (Game.zoneMembers Zone.Library S.bob spellAfter)) 0
+              -- Half two: a countered ABILITY. The countering really happened --
+              -- the ability is off the stack and alice took no damage -- and
+              -- Baral saw nothing.
+              Spec.assertEqWith s "the ability is gone, leaving only the untouched Piker spell" (GameState.stack abilityPlaced) [victimId]
+              Spec.assertEqWith s "alice took no damage, so the ability never resolved" (S.lifeOf S.alice abilityPlaced) (Just 20)
+              Spec.assertEqWith s "no ability went to a graveyard: alice's is empty" (length (Game.zoneMembers Zone.Graveyard S.alice abilityPlaced)) 0
+              Spec.assertEqWith s "bob's holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob abilityPlaced)) 1
+              Spec.assertEqWith s "and Baral never fired: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob abilityPlaced)) 1
         -- Baral's OTHER half, and the reason the board above gives bob exactly
         -- three Islands: "instant and sorcery spells you cast cost {1} less to
         -- cast" (CR 601.2f's cost reductions) turns Cancel's {1}{U}{U} into
@@ -2286,7 +2360,7 @@ representativeEvents cond =
       moved from to = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics
       combatDamage =
         GameEvent.DamageDealt
-          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
+          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
       one e = e NonEmpty.:| []
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)

@@ -4,6 +4,7 @@
 -- gating, and the CR 605 mana-ability exclusion from stack activations.
 module Pawl.ActivateSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -11,8 +12,11 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -36,6 +40,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -95,7 +100,9 @@ singleModeAbility effects specs =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationTimingSpec s registry
+  printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
+  variableActivationCostSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -173,6 +180,37 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
         gs = g2 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
     Spec.assertBool s (elem spellId (GameState.stack gs)) "the stack really is occupied"
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no equip with a spell on the stack"
+
+  -- CR 702.8a's window is the SPELL's, not an ability's. Rule 307.5's window is
+  -- shared between Pawl.Engine.Cast.sorcerySpeed and this module's timingOk, so
+  -- the way to lift it for a flash spell and not for an activated ability is to
+  -- lift it in Cast's disjunction and leave Turn.sorcerySpeedWindow alone; this
+  -- is the case that says the shared window really did stay put.
+  --
+  -- ONE state, two questions, and the state is chosen so that only ONE of rule
+  -- 307.5's three conjuncts is doing the refusing. alice is the active player,
+  -- in her own precombat main phase, with a Pouncing Cheetah on the battlefield
+  -- (the equip target), a Bonesplitter, a second Cheetah in hand -- and a spell
+  -- on the stack. So the turn and the phase are right for both questions, the
+  -- Cheetah in hand is castable because flash lifts the empty-stack requirement,
+  -- and the equip is refused because nothing lifted it there.
+  --
+  -- The four cases above make the same refusal from an EMPTY board, so what this
+  -- one adds is a flash permanent in play, one of them the equip's own target:
+  -- an implementation that read the keyword off the ability's source, or off the
+  -- board at all, would offer the equip here.
+  Spec.it s "CR 307.5 flash does not make an activated ability instant-speed" $ do
+    forest <- S.printingOf s registry "Forest"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature pouncingCheetah S.alice (S.landsInPlay forest 4)
+        (_, g1) = S.addCreature bonesplitter S.alice g0
+        (g2, inHand) = S.handOne pouncingCheetah g1
+        (spellId, gs) = S.spellOnStack piker S.alice g2
+    Spec.assertBool s (elem spellId (GameState.stack gs)) "the stack really is occupied"
+    Spec.assertBool s (Cast.castable S.alice inHand gs) "the flash spell is castable in response"
+    Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "but equip is not offered"
 
   -- The control: an UNRESTRICTED ability is unaffected by all three, so the
   -- gate cannot pass by refusing everything outside a main phase.
@@ -863,7 +901,7 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
     let (desertId, _, board) = desertBoard piker desert
         attacked = desertAttacked board
         later = attacked {GameState.phase = Phase.PostcombatMain}
-    Spec.assertBool s (Combat.Type.attackersJoined (GameState.combat later)) "the attack is still on the record"
+    Spec.assertBool s (not (Set.null (Combat.Type.attacked (GameState.combat later)))) "the attack is still on the record"
     Spec.assertEqWith s "still offered in the step it names" (length (activationsOf desertId (Action.legalActions S.bob (attacked {GameState.phase = Phase.Combat CombatStep.EndOfCombat})))) 1
     Spec.assertEqWith s "and not one phase later" (activationsOf desertId (Action.legalActions S.bob later)) []
 
@@ -902,6 +940,80 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
         after = S.runCombat S.aggressiveAnswer board
     Spec.assertEqWith s "the Piker still connected" (S.lifeOf S.bob after) (Just 18)
     Spec.assertBool s (Set.member attackerId (GameState.battlefield after)) "and is still on the battlefield"
+
+-- alice controls a Jade Statue and two Mountains, and holds priority. The {2} is
+-- payable exactly once, which is all any of these tests needs.
+statueBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+statueBoard statue mountain =
+  let (statueId, gs1) = S.addCreature statue S.alice (Setup.emptyGame S.bothPlayers)
+      (_, gs2) = S.addCreature mountain S.alice gs1
+      (_, gs3) = S.addCreature mountain S.alice gs2
+   in (statueId, gs3 {GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+
+-- CR 307.5's rider naming a phase that HAS steps, which no Pawl.Types.Phase value
+-- can say: Jade Statue (Arabian Nights) prints "{2}: This artifact becomes a 3/6
+-- Golem artifact creature until end of combat. Activate only during combat."
+--
+-- The third axis of the arm, after Desert's step and Llanowar Augur's turn. CR
+-- 500.1 -- "The beginning, combat, and ending phases are further broken down
+-- into steps, which proceed in order" -- and CR 506.1 lists combat's five, so
+-- "during combat" is one window over five schedule entries. Pawl.Types.PhaseSelector
+-- is what says it, and Pawl.Engine.Turn.inWindow is the containment test that
+-- reads it.
+--
+-- Desert's group above is the other half of the pair: it names ONE of these five
+-- steps, and its tests must go on refusing the other four. Between them they
+-- prove the reader did not simply become permissive.
+printedActivationWholePhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationWholePhaseSpec s registry = Spec.describe s "PrintedActivationWholePhase" $ do
+  -- Every one of CR 506.1's five steps, in one assertion: a rider naming the
+  -- combat phase is live in all of them. An arm that could only name a step
+  -- would have to pick one, and would fail four of these five.
+  Spec.it s "CR 500.1/506.1 the Statue's animation is offered in EVERY combat step" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    let (statueId, board) = statueBoard statue mountain
+        offeredIn step = length (activationsOf statueId (Action.legalActions S.alice (board {GameState.phase = Phase.Combat step})))
+    Spec.assertEqWith
+      s
+      "one activation in each of the five"
+      (fmap offeredIn [CombatStep.BeginningOfCombat, CombatStep.DeclareAttackers, CombatStep.DeclareBlockers, CombatStep.CombatDamage, CombatStep.EndOfCombat])
+      [1, 1, 1, 1, 1]
+
+  -- The discriminating half. CR 505.1 makes the two main phases their own
+  -- phases, so "during combat" excludes both -- and the postcombat main phase is
+  -- the sharp one, since it is adjacent to the window and shares its turn.
+  --
+  -- Carries its own control in the same test, on the same board and for the same
+  -- player: alice's Prodigal Sorcerer ("{T}: This creature deals 1 damage to any
+  -- target", CR 602.2 and no rider) IS offered, so what withholds the Statue is
+  -- the rider and not the phase being closed to alice altogether.
+  Spec.it s "CR 505.1 the Statue's animation is NOT offered in either main phase" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (statueId, board) = statueBoard statue mountain
+        (sorcererId, withSorcerer) = S.addCreature prodigalSorcerer S.alice board
+        offeredIn phase = activationsOf statueId (Action.legalActions S.alice (withSorcerer {GameState.phase = phase}))
+    Spec.assertEqWith s "not before combat" (offeredIn Phase.PrecombatMain) []
+    Spec.assertEqWith s "not after it" (offeredIn Phase.PostcombatMain) []
+    Spec.assertEqWith s "not in the upkeep either" (offeredIn (Phase.Beginning BeginningStep.Upkeep)) []
+    Spec.assertEqWith s "and not in the end step" (offeredIn (Phase.Ending EndingStep.EndStep)) []
+    Spec.assertBool
+      s
+      (not (null (activationsOf sorcererId (Action.legalActions S.alice (withSorcerer {GameState.phase = Phase.PostcombatMain})))))
+      "but alice's unrestricted ability is offered in the same phase"
+
+  -- CR 102.1's axis, unchanged by the widening: Jade Statue prints no "your", so
+  -- its TurnScope is EachTurn and bob's combat phase is a window for it too.
+  -- Asked of alice, who controls it -- CR 602.2 restricts activation to the
+  -- controller -- on a turn that is not hers.
+  Spec.it s "CR 102.1 the window is EachTurn, so an opponent's combat phase qualifies" $ do
+    statue <- S.printingOf s registry "Jade Statue"
+    mountain <- S.printingOf s registry "Mountain"
+    let (statueId, board) = statueBoard statue mountain
+        bobsCombat = board {GameState.activePlayer = S.bob, GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
+    Spec.assertEqWith s "still offered on bob's turn" (length (activationsOf statueId (Action.legalActions S.alice bobsCombat))) 1
 
 -- CR 307.5's rider narrowed by TURN as well as by step: Llanowar Augur
 -- (Future Sight) prints "Sacrifice this creature: Target creature gets +3/+3 and
@@ -1022,3 +1134,186 @@ printedActivationTurnScopeSpec s registry = Spec.describe s "PrintedActivationTu
     Spec.assertEqWith s "the Piker is still a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Trample pikerId after)) "and has no trample"
     Spec.assertBool s (Set.member augurId (GameState.battlefield after)) "and the Augur is still on the battlefield"
+
+-- Alice with `n` untapped Mountains and a settled Cinder Elemental, holding
+-- priority. `n` is the whole of what the {X} is measured against: the activation
+-- cost is {X}{R}, so n Mountains pay every X up to n-1 and nothing above it.
+cinderBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Int ->
+  m (Printing.Printing, ObjectId.ObjectId, GameState.GameState)
+cinderBoard s registry n = do
+  cinder <- S.printingOf s registry "Cinder Elemental"
+  mountain <- S.printingOf s registry "Mountain"
+  let (srcId, g0) = S.addCreature cinder S.alice (S.landsInPlay mountain n)
+  pure (cinder, srcId, g0 {GameState.priority = Just S.alice})
+
+-- Announces X and aims every target slot at `who`.
+answerXAt :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+answerXAt x who p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> aimAt who p
+
+-- Answers Prompt.ChooseX with the affordability bound the prompt carries, and
+-- records that bound in the State -- the CastSpec answerer, aimed at a player.
+-- The log is how a test sees a payload nothing on the board records; answering
+-- WITH it is what proves the bound is payable rather than merely reported.
+answerAtBound :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [Natural] r
+answerAtBound who p = case p of
+  Prompt.ChooseX _ _ _ bound -> do
+    State.modify' (\seen -> seen <> [bound])
+    pure bound
+  _ -> pure (aimAt who p)
+
+-- Announces ONE MORE than the bound -- legal under CR 601.2b and unaffordable by
+-- construction, whatever the board is.
+answerAboveBound :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+answerAboveBound who p = case p of
+  Prompt.ChooseX _ _ _ bound -> bound + 1
+  _ -> aimAt who p
+
+-- answerAtBound and answerAboveBound in one, COUNTING the CR 601.2c target
+-- questions the activation asks: `offset` 0 announces the bound and 1 announces
+-- one past it. The count is the only way a test can see a step the activation did
+-- NOT take, since an activation reversed at CR 601.2h leaves a board identical to
+-- one reversed earlier.
+answerAtBoundOffsetCounting :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> State.State Int r
+answerAtBoundOffsetCounting offset who p = case p of
+  Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
+  Prompt.ChooseTargets {} -> do
+    State.modify' (+ 1)
+    pure (aimAt who p)
+  _ -> pure (aimAt who p)
+
+-- Counts the CR 601.2b value-of-X questions asked, so a test can assert one was
+-- put to the player -- and that none is put where the cost has no {X}.
+countingX :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State Int r
+countingX who p = case p of
+  Prompt.ChooseX {} -> do
+    State.modify' (+ 1)
+    pure (aimAt who p)
+  _ -> pure (aimAt who p)
+
+-- CR 602.2b: "The remainder of the process for activating an ability is identical
+-- to the process for casting a spell listed in rules 601.2b-i. Those rules apply
+-- to activating an ability just as they apply to casting a spell. An activated
+-- ability's analog to a spell's mana cost (as referenced in rule 601.2f) is its
+-- activation cost." So CR 601.2b's "If the spell has a variable cost that will be
+-- paid as it's being cast (such as an {X} in its mana cost; see rule 107.3), the
+-- player announces the value of that variable" reaches an ACTIVATION cost's {X}
+-- exactly as it reaches a spell's.
+--
+-- Cinder Elemental -- "{X}{R}, {T}, Sacrifice this creature: It deals X damage to
+-- any target" -- is the pool's first card with one (#544), and it exercises both
+-- halves at once: the X is paid AND read, so an engine that dropped it would
+-- both undercharge and underdeal.
+--
+-- THE FALSIFIER for the whole group is the engine answering 0 on the player's
+-- behalf. An unannounced ManaSymbol.Variable demands nothing at payment
+-- (Mana.waysOf's Variable arm is [(Nothing, 0, 0)]), so a missing announcement is
+-- not a missing question but a free {X}: Cinder Elemental would cost {R} and deal
+-- nothing, and every mana assertion below would read 1 instead of n.
+variableActivationCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost" $ do
+  Spec.it s "CR 601.2b/602.2b whole card: Cinder Elemental at X=2 pays {2}{R} and deals 2" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 3
+    let after =
+          snd
+            ( Engine.runGamePure
+                (answerXAt 2 S.bob)
+                g1
+                (do Activate.activateAbility S.alice srcId (theAbility cinder); Stack.resolveTop)
+            )
+    Spec.assertEqWith s "bob took the announced 2, not 0" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "all three Mountains paid the {2}{R}" (S.tappedCount S.alice after) 3
+    Spec.assertBool s (not (Set.member srcId (GameState.battlefield after))) "and the cost really sacrificed it"
+    Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
+
+  -- CR 601.2b's announced value is STAMPED, and this is the read half of #544's
+  -- gap: the value reaches the effect through the ABILITY object's bindings, and
+  -- the source permanent it names is in a graveyard by then, sacrificed to pay.
+  Spec.it s "CR 601.2b the announced X is stamped on the ability object, not the source" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let after = snd (Engine.runGamePure (answerXAt 3 S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder)))
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId after)) "the source id names nothing"
+    case GameState.stack after of
+      [] -> Spec.assertFailure s "expected the ability on the stack"
+      top : _ -> case Game.lookupObject top after of
+        Nothing -> Spec.assertFailure s "stack id should resolve"
+        Just obj -> Spec.assertEqWith s "amount bound" (Binding.amountOf Binding.variableX (Object.bindings obj)) (Just 3)
+
+  -- The bound is what the BOARD can pay, so it moves with the board: {X}{R} off
+  -- four Mountains admits X=3, off six admits X=5, and off the one Mountain that
+  -- only just makes the ability activatable admits nothing but CR 601.2b's floor.
+  -- No constant, and nothing read off the printed cost, satisfies all three.
+  Spec.it s "CR 601.2b the ChooseX bound is the greatest X the board can pay" $ do
+    let boundsOff n = do
+          (cinder, srcId, g1) <- cinderBoard s registry n
+          pure (State.execState (Engine.runGame (answerAtBound S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder))) [])
+    four <- boundsOff 4
+    six <- boundsOff 6
+    one <- boundsOff 1
+    Spec.assertEqWith s "four Mountains bound X at 3" four [3]
+    Spec.assertEqWith s "six Mountains bound X at 5" six [5]
+    Spec.assertEqWith s "one Mountain bounds X at 0" one [0]
+
+  -- The bound is PAYABLE and not merely reported: announcing exactly it activates
+  -- the ability, taps every Mountain, and resolves. An off-by-one bound would
+  -- reverse the activation here (CR 602.2) and leave bob at 20.
+  Spec.it s "CR 601.2b announcing X at the bound activates the ability and resolves it" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let act = do Activate.activateAbility S.alice srcId (theAbility cinder); Stack.resolveTop
+        after = snd (State.evalState (Engine.runGame (answerAtBound S.bob) g1 act) [])
+    Spec.assertEqWith s "bob at 17, so the bound of 3 was announced and paid" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "all four Mountains paid the {3}{R}" (S.tappedCount S.alice after) 4
+
+  -- The assertion that keeps the bound honest. It is ADVISORY: CR 601.2b lets the
+  -- player announce the value of the variable freely, so one more than the bound
+  -- is announced, is unaffordable, and reverses the whole activation -- CR 602.2's
+  -- "the activation is illegal; the game returns to the moment before that ability
+  -- started to be activated". A bound quietly turned into a clamp would deal 3
+  -- damage and tap four Mountains here.
+  Spec.it s "CR 602.2 the bound does not clamp: X one above it is a no-op" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let after = snd (Engine.runGamePure (answerAboveBound S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder)))
+    Spec.assertBool s (Set.member srcId (GameState.battlefield after)) "the Elemental was not sacrificed"
+    Spec.assertEqWith s "and not tapped" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Untapped)
+    Spec.assertEqWith s "no mana spent" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "bob unharmed" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
+
+  -- WHERE the reversal happens, which the no-op above cannot see. CR 602.2 puts it
+  -- at the step the player is unable to comply with, and the announced value of X
+  -- is the first step that can be one -- activatability measured the cost at CR
+  -- 601.2b's X=0 floor, the only value it can know before the announcement exists.
+  -- So the activation ends there, and CR 601.2c's target question is never put to a
+  -- player whose ability is already lost.
+  Spec.it s "CR 602.2 an unaffordable X ends the activation before CR 601.2c's targets are asked for" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    let asked offset = State.execState (Engine.runGame (answerAtBoundOffsetCounting offset S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility cinder))) 0
+    Spec.assertEqWith s "at the bound the activation goes on and asks for its target" (asked 0) 1
+    Spec.assertEqWith s "one above it, there is nothing left to target for" (asked 1) 0
+
+  -- The question is asked exactly where the rules leave something to ask. Ghitu
+  -- Fire-Eater's "{T}, Sacrifice this creature" has no variable in it, so no value
+  -- is announced for it (CR 601.2b's clause is conditional on one).
+  Spec.it s "CR 601.2b the value of X is asked for once, and only for a cost that has one" $ do
+    (cinder, srcId, g1) <- cinderBoard s registry 4
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    let (ghituId, g2) = S.addCreature ghitu S.alice g1
+        asks oid ability = State.execState (Engine.runGame (countingX S.bob) g2 (Activate.activateAbility S.alice oid ability)) 0
+    Spec.assertEqWith s "Cinder Elemental's {X}{R} is announced" (asks srcId (theAbility cinder)) 1
+    Spec.assertEqWith s "the Fire-Eater's costs nothing to announce" (asks ghituId (theAbility ghitu)) 0
+
+  -- CR 601.2b's X=0 FLOOR, which is what activatability can measure before any
+  -- value exists: one Mountain pays {X}{R} at X=0 and the ability is on offer,
+  -- while no Mountain pays the {R} and it is not. A floor that demanded {X} > 0
+  -- would refuse the first board; a cost that never demanded the {X} at all would
+  -- still accept the second.
+  Spec.it s "CR 601.2b activatability is measured at the X=0 floor" $ do
+    (cinder, srcId, one) <- cinderBoard s registry 1
+    (_, noneId, none) <- cinderBoard s registry 0
+    Spec.assertBool s (Activate.activatable S.alice srcId (theAbility cinder) one) "one Mountain admits X=0"
+    Spec.assertBool s (not (Activate.activatable S.alice noneId (theAbility cinder) none)) "no Mountain pays even the {R}"

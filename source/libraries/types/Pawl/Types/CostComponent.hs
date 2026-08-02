@@ -16,7 +16,11 @@ import qualified Pawl.Types.Filter as Filter
 -- Open-half card data. Pawl.Engine.Cost is the ONLY module that may case on it: the
 -- rules core reads the classification (can this be paid? does it require the tap
 -- symbol?) and never the identity of a component.
-data CostComponent
+--
+-- PARAMETRIC in the keyword for the Filter it carries, and for that type's
+-- reason alone -- see Pawl.Types.Filter. Every caller writes
+-- `CostComponent Keyword.Keyword`.
+data CostComponent keyword
   = -- | CR 107.5: "The tap symbol in an activation cost means 'Tap this
     -- permanent.' A permanent that's already tapped can't be tapped again to pay
     -- the cost." CR 302.6 gates it on summoning sickness.
@@ -56,7 +60,7 @@ data CostComponent
     -- The Filter is matched against the PROJECTION, never a printed
     -- characteristic: Blood Moon makes a nonbasic land a Mountain, and it may be
     -- sacrificed as one.
-    Sacrifice Natural.Natural Filter.Filter
+    Sacrifice Natural.Natural (Filter.Filter keyword)
   | -- | CR 601.2f's "discarding cards", one of the cost kinds that rule names
     -- outright: discard this many cards from hand (Cathartic Reunion's two).
     -- CR 701.9b gives the choice to the discarding player, so this is a prompt

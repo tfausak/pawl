@@ -12,6 +12,7 @@ toJson d = case d of
   Duration.Indefinite -> Common.nullary "Indefinite"
   Duration.UntilYourNextTurn -> Common.nullary "UntilYourNextTurn"
   Duration.ForAsLongAs c -> Common.tagged "ForAsLongAs" . Just $ Condition.toJson c
+  Duration.UntilEndOfCombat -> Common.nullary "UntilEndOfCombat"
 
 fromJson :: Value.Value -> Either Text.Text Duration.Duration
 fromJson value = do
@@ -21,4 +22,5 @@ fromJson value = do
     ("Indefinite", _) -> Right Duration.Indefinite
     ("UntilYourNextTurn", _) -> Right Duration.UntilYourNextTurn
     ("ForAsLongAs", Just v) -> Duration.ForAsLongAs <$> Condition.fromJson v
+    ("UntilEndOfCombat", _) -> Right Duration.UntilEndOfCombat
     _ -> Left . Text.pack $ "unknown Duration: " <> t

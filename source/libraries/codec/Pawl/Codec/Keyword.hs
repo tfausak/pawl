@@ -9,7 +9,13 @@ import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Keyword as Keyword
 
--- | Not Common.decodeNullary's table shape any more: CR 702.164a's toxic and CR
+-- | This module TIES THE CODEC KNOT that Pawl.Codec.Filter's keyword parameter
+-- opens, exactly as Pawl.Types.Keyword ties the data-type one: 702.29e's
+-- typecycling filter is decoded here by passing this module's own codec back into
+-- the parametric one, which is legal in a single module and would be a cycle
+-- across two.
+--
+-- Not Common.decodeNullary's table shape any more: CR 702.164a's toxic and CR
 -- 702.70a's poisonous each carry an N, so this is the tagged-with-an-optional-
 -- payload case Quantity.toJson uses.
 toJson :: Keyword.Keyword -> Value.Value
@@ -18,20 +24,24 @@ toJson k = case k of
   Keyword.Defender -> Common.nullary "Defender"
   Keyword.DoubleStrike -> Common.nullary "DoubleStrike"
   Keyword.FirstStrike -> Common.nullary "FirstStrike"
+  Keyword.Flash -> Common.nullary "Flash"
   Keyword.Flying -> Common.nullary "Flying"
   Keyword.Haste -> Common.nullary "Haste"
+  Keyword.Hexproof -> Common.nullary "Hexproof"
   Keyword.Indestructible -> Common.nullary "Indestructible"
   Keyword.Landwalk subtype -> Common.tagged "Landwalk" . Just $ Subtype.toJson subtype
+  Keyword.Lifelink -> Common.nullary "Lifelink"
   Keyword.Reach -> Common.nullary "Reach"
   Keyword.Shroud -> Common.nullary "Shroud"
   Keyword.Trample -> Common.nullary "Trample"
   Keyword.Vigilance -> Common.nullary "Vigilance"
-  Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson cost, Common.encodeMaybe Filter.toJson searchFor]
-  Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Cost.toJson cost
+  Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
+  Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Cost.toJson toJson cost
   Keyword.Fear -> Common.nullary "Fear"
-  Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson cost
+  Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
   Keyword.Infect -> Common.nullary "Infect"
+  Keyword.Menace -> Common.nullary "Menace"
   Keyword.Devoid -> Common.nullary "Devoid"
   Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
 
@@ -43,20 +53,24 @@ fromJson value = do
     ("Defender", _) -> Right Keyword.Defender
     ("DoubleStrike", _) -> Right Keyword.DoubleStrike
     ("FirstStrike", _) -> Right Keyword.FirstStrike
+    ("Flash", _) -> Right Keyword.Flash
     ("Flying", _) -> Right Keyword.Flying
     ("Haste", _) -> Right Keyword.Haste
+    ("Hexproof", _) -> Right Keyword.Hexproof
     ("Indestructible", _) -> Right Keyword.Indestructible
     ("Landwalk", Just v) -> Keyword.Landwalk <$> Subtype.fromJson v
+    ("Lifelink", _) -> Right Keyword.Lifelink
     ("Reach", _) -> Right Keyword.Reach
     ("Shroud", _) -> Right Keyword.Shroud
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
-    ("Cycling", Just (Value.Array (Array.MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson c <*> Filter.optional f
-    ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson v
+    ("Cycling", Just (Value.Array (Array.MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson fromJson c <*> Filter.optional fromJson f
+    ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson fromJson v
     ("Fear", _) -> Right Keyword.Fear
-    ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson v
+    ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
     ("Infect", _) -> Right Keyword.Infect
+    ("Menace", _) -> Right Keyword.Menace
     ("Devoid", _) -> Right Keyword.Devoid
     ("Toxic", Just v) -> Keyword.Toxic <$> Common.decodeNatural v
     _ -> Left . Text.pack $ "unknown Keyword: " <> t

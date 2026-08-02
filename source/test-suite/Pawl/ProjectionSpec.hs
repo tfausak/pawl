@@ -5,8 +5,9 @@
 -- within-layer timestamp order, and the CR 613.8 dependency reorder that
 -- overrides it. Mostly directly-constructed continuous effects, so the engine is
 -- proven independently of any card wiring; the card-level proofs live alongside.
--- Also Pawl.Engine.Subtype, the CR 205.3i land-type classification the layer-4
--- SetLandSubtype arm folds with.
+-- Also Pawl.Engine.Subtype, the CR 205.3i land-type and CR 205.3m creature-type
+-- classifications the layer-4 SetLandSubtype and SetCreatureSubtype arms fold
+-- with.
 module Pawl.ProjectionSpec where
 
 import qualified Data.Map.Strict as Map
@@ -34,6 +35,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -114,6 +116,22 @@ aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtObject oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   _ -> S.identityAnswer p
+
+-- aimAtObject for a Pool.Creatures slot, whose recipients are ToCreature.
+aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  _ -> S.identityAnswer p
+
+-- Put Turn to Frog into alice's hand, cast it AT `victimId`, and resolve it.
+-- `board` must already hold enough untapped lands for {1}{U}. The target is
+-- answered rather than forced by construction, because the boards below hold
+-- more than one creature.
+turnToFrogAt :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> GameState.GameState
+turnToFrogAt victimId turnToFrog board =
+  let (gs, ttfId) = S.handOne turnToFrog board
+      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (Cast.castSpell S.alice ttfId))
+   in snd (Engine.runGamePure (aimAtCreature victimId) cast Stack.resolveTop)
 
 -- The object timestamp of the (single) Humility on the battlefield.
 humilityTimestamp :: Printing.Printing -> GameState.GameState -> Timestamp.Timestamp
@@ -501,9 +519,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (not (Projection.isCreatureOf landId gs)) "not a creature"
     Spec.assertEqWith s "subtypes" (Projection.subtypesOf landId gs) (Set.singleton Subtype.Type.Mountain)
 
-  Spec.it s "CR 613.1d layer 4: the three type-changing modifications are Type" $ do
+  Spec.it s "CR 613.1d layer 4: the four type-changing modifications are Type" $ do
     Spec.assertEqWith s "set land subtype" (Projection.layer (Modification.SetLandSubtype Subtype.Type.Mountain)) Layer.Type
     Spec.assertEqWith s "add land subtype" (Projection.layer (Modification.AddLandSubtype Subtype.Type.Swamp)) Layer.Type
+    Spec.assertEqWith s "set creature subtype" (Projection.layer (Modification.SetCreatureSubtype Subtype.Type.Frog)) Layer.Type
     Spec.assertEqWith s "add card type" (Projection.layer (Modification.AddCardType CardType.Creature)) Layer.Type
 
   Spec.it s "CR 613.1c layer 3: ChangeSubtypeWord is Text" $
@@ -544,6 +563,97 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
           [] -> ObjectId.MkObjectId 999
         gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.SetLandSubtype Subtype.Type.Mountain) gs0
     Spec.assertEqWith s "only Mountain" (Projection.subtypesOf landId gs) (Set.singleton Subtype.Type.Mountain)
+
+  -- Turn to Frog {1}{U}: "Until end of turn, target creature loses all
+  -- abilities and becomes a blue Frog with base power and toughness 1/1."
+  -- Four layers at once -- 4 (Frog), 5 (blue), 6 (loses all abilities) and 7b
+  -- (base 1/1) -- and the pool's first producer of the layer-4 arm that SETS a
+  -- creature type.
+  --
+  -- Jade Statue is the other, and the degenerate one: "becomes a 3/6 Golem
+  -- artifact creature" sets a creature type over a permanent that prints none,
+  -- so the arm's filter runs over an empty set and the only thing left for CR
+  -- 205.1b to say is that the ARTIFACT card type is retained. Pawl.ExpirySpec
+  -- proves that one end to end; the case with a creature type standing is here.
+  Spec.it s "CR 205.1b Turn to Frog replaces Bog Wraith's creature type: a Frog, and no longer a Wraith" $ do
+    island <- S.printingOf s registry "Island"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    turnToFrog <- S.printingOf s registry "Turn to Frog"
+    let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+        after = turnToFrogAt wraithId turnToFrog board
+    Spec.assertEqWith s "before: Creature -- Wraith" (Projection.subtypesOf wraithId board) (Set.singleton Subtype.Type.Wraith)
+    -- CR 205.1b's last sentence: an effect making an object a "[creature type]
+    -- artifact creature" lets it keep every prior subtype "other than creature
+    -- types, but replace any existing creature types". So this is a SET over
+    -- the creature types, and an ADD would leave Wraith standing.
+    Spec.assertEqWith s "after: Creature -- Frog, the Wraith replaced" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Type.Frog)
+
+  -- THE REPLACE-ONLY-CREATURE-TYPES FALSIFIER. Ashaya, Soul of the Wild makes
+  -- each nontoken creature alice controls a Forest land in addition to its other
+  -- types, so the Bog Wraith carries a LAND type and a CREATURE type at once.
+  -- CR 205.1a: "when an effect sets one or more of an object's subtypes, the new
+  -- subtype(s) replaces any existing subtypes from the appropriate set (creature
+  -- types, land types, artifact types, enchantment types, planeswalker types, or
+  -- spell types)" -- the appropriate set here is the creature types alone, so
+  -- Forest has to survive. Replacing ALL subtypes leaves {Frog}; adding leaves
+  -- {Forest, Wraith, Frog}; only the rule's answer is {Forest, Frog}.
+  --
+  -- Neither effect depends on the other under CR 613.8a -- Turn to Frog's set is
+  -- a CR 611.2c TheseObjects, and Ashaya's reads card types and controller,
+  -- which no layer-4 subtype arm writes -- so this holds in timestamp order, and
+  -- both orders give the same answer anyway.
+  Spec.it s "CR 205.1a Turn to Frog replaces only the CREATURE types: Ashaya's Forest survives" $ do
+    island <- S.printingOf s registry "Island"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    turnToFrog <- S.printingOf s registry "Turn to Frog"
+    let (_, withAshaya) = S.addCreature ashaya S.alice (S.landsInPlay island 3)
+        (wraithId, board) = S.addCreature bogWraith S.alice withAshaya
+        after = turnToFrogAt wraithId turnToFrog board
+    Spec.assertEqWith
+      s
+      "before: animated into a Forest land, still a Wraith"
+      (Projection.subtypesOf wraithId board)
+      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Wraith])
+    Spec.assertEqWith
+      s
+      "after: the creature type moved and the land type did not"
+      (Projection.subtypesOf wraithId after)
+      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Frog])
+    -- CR 205.1a's last sentence -- "Removing an object's subtype doesn't affect
+    -- its card types at all" -- and CR 305.7's fourth, which the land-subtype
+    -- arm cites: setting a subtype moves no card type either way.
+    Spec.assertBool s (Projection.isCreatureOf wraithId after) "still a creature"
+    Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf wraithId after)) "still a land"
+
+  -- The other three of Turn to Frog's four layers, on the same board: CR 613.1e
+  -- (blue), CR 613.1f (loses all abilities) and CR 613.4b (base 1/1). Bog Wraith
+  -- is printed black, 3/3 and with swampwalk, so every one of them moves.
+  Spec.it s "CR 613.1e/613.1f/613.4b Turn to Frog also makes the Wraith blue, ability-less and 1/1" $ do
+    island <- S.printingOf s registry "Island"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    turnToFrog <- S.printingOf s registry "Turn to Frog"
+    let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+        after = turnToFrogAt wraithId turnToFrog board
+    Spec.assertEqWith s "before: black" (Projection.colorsOf wraithId board) (Set.singleton Color.Black)
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk Subtype.Type.Swamp) wraithId board) "before: swampwalk"
+    Spec.assertEqWith s "before: 3/3" (Projection.powerOf wraithId board, Projection.toughnessOf wraithId board) (Just 3, Just 3)
+    Spec.assertEqWith s "after: blue only (CR 105.3, a set)" (Projection.colorsOf wraithId after) (Set.singleton Color.Blue)
+    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk Subtype.Type.Swamp) wraithId after)) "after: no swampwalk"
+    Spec.assertEqWith s "after: base 1/1" (Projection.powerOf wraithId after, Projection.toughnessOf wraithId after) (Just 1, Just 1)
+
+  Spec.it s "CR 514.2 Turn to Frog wears off at cleanup and the Wraith is a Wraith again" $ do
+    island <- S.printingOf s registry "Island"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    turnToFrog <- S.printingOf s registry "Turn to Frog"
+    let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+        after = turnToFrogAt wraithId turnToFrog board
+        afterCleanup = snd (Engine.runGamePure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
+    Spec.assertEqWith s "all four effects dropped" (GameState.continuousEffects afterCleanup) []
+    Spec.assertEqWith s "Creature -- Wraith again" (Projection.subtypesOf wraithId afterCleanup) (Set.singleton Subtype.Type.Wraith)
+    Spec.assertEqWith s "black again" (Projection.colorsOf wraithId afterCleanup) (Set.singleton Color.Black)
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk Subtype.Type.Swamp) wraithId afterCleanup) "swampwalk again"
+    Spec.assertEqWith s "3/3 again" (Projection.powerOf wraithId afterCleanup, Projection.toughnessOf wraithId afterCleanup) (Just 3, Just 3)
 
   Spec.it s "CR 613.1d AddCardType makes a land a creature" $ do
     forest <- S.printingOf s registry "Forest"
@@ -712,6 +822,25 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- other half of that pair.
   Spec.it s "CR 205.3i a land type is a land type and a creature type is not" $
     Spec.assertEqWith s "Forest, Mountain and Desert in, Goblin and Wall out" (fmap Subtype.isLandType [Subtype.Type.Forest, Subtype.Type.Mountain, Subtype.Type.Desert, Subtype.Type.Goblin, Subtype.Type.Wall]) [True, True, True, False, False]
+
+  -- CR 205.3m's list, the other half of the pair, and the classification the
+  -- layer-4 SetCreatureSubtype arm folds with. The two are complements, not
+  -- independent judgements, because CR 205.3c/205.3d make the families disjoint
+  -- -- so the interesting arms are the ones in NEITHER: Aura is an enchantment
+  -- type (CR 205.3h), Equipment an artifact type (CR 205.3g), Jace a
+  -- planeswalker type (CR 205.3j) and Arcane a spell type (CR 205.3k), and a
+  -- creature-type set must leave every one of them alone.
+  Spec.it s "CR 205.3m a creature type is a creature type, and nothing in another family is" $ do
+    Spec.assertEqWith
+      s
+      "Frog, Wraith and Elemental in; Forest and Desert out"
+      (fmap Subtype.isCreatureType [Subtype.Type.Frog, Subtype.Type.Wraith, Subtype.Type.Elemental, Subtype.Type.Forest, Subtype.Type.Desert])
+      [True, True, True, False, False]
+    Spec.assertEqWith
+      s
+      "and the four other families are out too"
+      (fmap Subtype.isCreatureType [Subtype.Type.Aura, Subtype.Type.Equipment, Subtype.Type.Jace, Subtype.Type.Arcane])
+      [False, False, False, False]
 
   Spec.it s "CR 305.7 a Blood Moon'd creature-land keeps its creature types" $ do
     forest <- S.printingOf s registry "Forest"
@@ -1211,6 +1340,60 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         Spec.assertEqWith s "at its mana value, which for a land is 0" (Projection.powerOf landId coated) (Just 0)
         let settled = snd (Engine.runGamePure (aimAtObject landId) coated Engine.settleForPriority)
         Spec.assertBool s (not (Set.member landId (GameState.battlefield settled))) "so CR 704.5f buries it"
+
+  -- CR 613.8a through a KEYWORD, which Filter.HasKeyword made a real question:
+  -- filterReads maps that atom to the Keywords aspect and modificationWrites maps
+  -- GainKeyword to it, so a keyword grant can move an affected set exactly as a
+  -- type change can. Two layer-6 effects on one Piker:
+  --
+  --   A (t=10) "each creature with flying gains deathtouch"  reads Keywords
+  --   B (t=20) grant flying to THIS Piker                    writes Keywords
+  --
+  -- A depends on B by clause (b) -- applying B changes whether A applies to the
+  -- Piker -- so B goes first despite its later timestamp, and the deathtouch
+  -- lands. Timestamp order alone would ask A about a Piker that does not fly yet
+  -- and grant nothing, which is exactly what this asserted before the Keywords
+  -- aspect existed. B's set names an object id (CR 611.2c), so B does not depend
+  -- on A and there is no loop.
+  Spec.it s "CR 613.8b within layer 6, a keyword grant reorders a keyword-reading effect" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, gs0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasKeyword Keyword.Flying)) (Timestamp.MkTimestamp 10) (Modification.GainKeyword Keyword.Deathtouch) gs0
+        gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.GainKeyword Keyword.Flying) gsA
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "the grant itself landed"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch pikerId gs) "the newer flying-granter applied first, so the deathtouch lands"
+
+  -- The same rule with a real ability-REMOVING card, which is the other half of
+  -- what modificationWrites now declares: Humility (CR 613.1f, "all creatures
+  -- lose all abilities and have base power and toughness 1/1") writes Keywords
+  -- too, because applyModification's LoseAllAbilities arm empties PC.keywords.
+  --
+  --   A (older than Humility) "each creature WITHOUT flying gains deathtouch"
+  --   Humility                 strips every creature's abilities
+  --
+  -- Bird Maiden prints flying, so A does not apply to it while Humility is
+  -- unapplied. A depends on Humility, so Humility goes first, the flying goes,
+  -- and A then applies -- and because A applied AFTER Humility, its grant is not
+  -- one of the abilities Humility erased (the pair pinned by "a grant older than
+  -- Humility is erased; newer survives" above). Timestamp order alone would ask A
+  -- first, get "it flies, skip it", and leave the Maiden with nothing.
+  --
+  -- Asserted about the FLIER only. Goblin Piker beside it never flew, so applying
+  -- Humility does not change A's answer for the Piker, and pawl decides the
+  -- dependency per projected object rather than over the whole affected set
+  -- (#236) -- which is where the two would diverge.
+  Spec.it s "CR 613.8b Humility reorders an effect whose set reads a keyword" $ do
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    humility <- S.printingOf s registry "Humility"
+    let (flierId, gs0) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+        withHum = S.withHumility humility gs0
+        Timestamp.MkTimestamp h = humilityTimestamp humility withHum
+        groundling = Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.HasKeyword Keyword.Flying)])
+        withA = withDynamicEffect groundling (Timestamp.MkTimestamp (h - 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
+        withoutHumility = withDynamicEffect groundling (Timestamp.MkTimestamp (h - 1)) (Modification.GainKeyword Keyword.Deathtouch) gs0
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch flierId withoutHumility)) "with no Humility the Maiden flies, so the set excludes it"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying flierId withA)) "Humility took the flying"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch flierId withA) "so the older effect waited for Humility, applied after it, and its grant survives"
 
   Spec.it s "CR 614: Rest in Peace projects its graveyard->exile replacement" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"

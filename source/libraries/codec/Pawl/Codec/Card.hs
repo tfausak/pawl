@@ -17,6 +17,7 @@ import qualified Pawl.Codec.BlockRequirement as BlockRequirement
 import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CostComponent as CostComponent
@@ -88,13 +89,17 @@ toJson c =
                then []
                else [Common.pair "attackRequirements" (Common.encodeList AttackRequirement.toJson (Card.attackRequirements c))]
            )
+        <> ( if null (Card.combatRestrictions c)
+               then []
+               else [Common.pair "combatRestrictions" (Common.encodeList CombatRestriction.toJson (Card.combatRestrictions c))]
+           )
         <> ( if null (Card.additionalCosts c)
                then []
-               else [Common.pair "additionalCosts" (Common.encodeList CostComponent.toJson (Card.additionalCosts c))]
+               else [Common.pair "additionalCosts" (Common.encodeList (CostComponent.toJson Keyword.toJson) (Card.additionalCosts c))]
            )
         <> ( if null (Card.alternativeCosts c)
                then []
-               else [Common.pair "alternativeCosts" (Common.encodeList Cost.toJson (Card.alternativeCosts c))]
+               else [Common.pair "alternativeCosts" (Common.encodeList (Cost.toJson Keyword.toJson) (Card.alternativeCosts c))]
            )
         -- Omitted when Counterable, the posture every other defaulted key here
         -- takes: one card in the pool prints "this spell can't be countered", and
@@ -149,8 +154,9 @@ fromJson value = do
   playerAbilities <- Common.decodeListDefault PlayerStaticAbility.fromJson (Common.nullableField "playerAbilities" ps)
   blockRequirements <- Common.decodeListDefault BlockRequirement.fromJson (Common.nullableField "blockRequirements" ps)
   attackRequirements <- Common.decodeListDefault AttackRequirement.fromJson (Common.nullableField "attackRequirements" ps)
-  additionalCosts <- Common.decodeListDefault CostComponent.fromJson (Common.nullableField "additionalCosts" ps)
-  alternativeCosts <- Common.decodeListDefault Cost.fromJson (Common.nullableField "alternativeCosts" ps)
+  combatRestrictions <- Common.decodeListDefault CombatRestriction.fromJson (Common.nullableField "combatRestrictions" ps)
+  additionalCosts <- Common.decodeListDefault (CostComponent.fromJson Keyword.fromJson) (Common.nullableField "additionalCosts" ps)
+  alternativeCosts <- Common.decodeListDefault (Cost.fromJson Keyword.fromJson) (Common.nullableField "alternativeCosts" ps)
   mulliganAction <- Common.decodeListDefault (Effect.fromJson fromJson) (Common.nullableField "mulliganAction" ps)
   openingHandAction <- Common.decodeListDefault (Effect.fromJson fromJson) (Common.nullableField "openingHandAction" ps)
   enchant <- Common.decodeMaybe TargetSpec.fromJson (Common.nullableField "enchant" ps)
@@ -177,6 +183,7 @@ fromJson value = do
         Card.playerAbilities = playerAbilities,
         Card.blockRequirements = blockRequirements,
         Card.attackRequirements = attackRequirements,
+        Card.combatRestrictions = combatRestrictions,
         Card.additionalCosts = additionalCosts,
         Card.alternativeCosts = alternativeCosts,
         Card.mulliganAction = mulliganAction,

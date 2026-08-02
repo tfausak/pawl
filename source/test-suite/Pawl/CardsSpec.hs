@@ -3,6 +3,7 @@ module Pawl.CardsSpec where
 
 import qualified Data.ByteString as ByteString
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -11,6 +12,7 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Printing as Printing
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
@@ -19,6 +21,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as CardT
@@ -65,6 +68,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
@@ -189,12 +193,74 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "one keyword: swampwalk" (CardT.keywords c) (Set.singleton (Keyword.Landwalk Subtype.Swamp))
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file with menace (CR 702.111), and so the first carrying a
+  -- restriction on a SET of blockers rather than on each blocker independently
+  -- (#533). Its entire printed rules text is the keyword, so a menace case in
+  -- Pawl.CombatSpec that uses this printing is asking about 702.111b and nothing
+  -- else.
+  Spec.it s "boggart-brute.json loads as a {2}{R} 3/2 Goblin Warrior whose only keyword is menace" $ do
+    c <- S.cardOf s registry "Boggart Brute"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Boggart Brute")
+    Spec.assertEqWith
+      s
+      "{2}{R}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 3)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 2)))
+    Spec.assertEqWith s "Creature -- Goblin Warrior" (TypeLine.subtypes (CardT.typeLine c)) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+    Spec.assertEqWith s "one keyword: menace" (CardT.keywords c) (Set.singleton Keyword.Menace)
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file with flash (CR 702.8), and so the first whose keyword
+  -- moves the CR 302.1 window the card may be CAST in rather than anything
+  -- about it once it is a permanent. Its entire printed rules text is the
+  -- keyword, so a flash case in Pawl.CastSpec that uses this printing is asking
+  -- about 702.8a and nothing else.
+  Spec.it s "pouncing-cheetah.json loads as a {2}{G} 3/2 Cat whose only keyword is flash" $ do
+    c <- S.cardOf s registry "Pouncing Cheetah"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Pouncing Cheetah")
+    Spec.assertEqWith
+      s
+      "{2}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 3)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 2)))
+    Spec.assertEqWith s "Creature -- Cat" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Cat)
+    Spec.assertEqWith s "one keyword: flash" (CardT.keywords c) (Set.singleton Keyword.Flash)
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+    -- CR 601.3: flash is a TIMING ability, so it grants no zone permission.
+    -- Asked of Cast.castableZones and not of CardT.castingPermissions, because
+    -- the printed list is empty on a flashback card too -- rule 702.34a's
+    -- permission arrives through Keyword.castingPermissionsOf, and only the
+    -- union of the two discriminates. Firebolt answers [Hand, Graveyard] here.
+    Spec.assertEqWith s "castable from the hand and nowhere else" (Cast.castableZones c) [Zone.Hand]
   -- The first card file to carry BOTH a keyword and a counterability, and the
   -- first whose CR 113.6g clause sits on a creature rather than an instant
   -- (Rending Volley's). The two clauses are separate fields because they are
   -- separate rules: CR 113.6g's "can't be countered" functions on the stack and
   -- grants no targeting immunity, while CR 702.18a's shroud functions on the
   -- battlefield and grants nothing else.
+  -- The pool's first card whose target Filter names a KEYWORD (#434). Everything
+  -- else about it is Doom Blade's shape, so the HasKeyword atom is the only thing
+  -- this file adds -- which is why the filter is what the assertion is about.
+  Spec.it s "plummet.json loads as a {1}{G} Instant whose target filter is HasKeyword Flying" $ do
+    c <- S.cardOf s registry "Plummet"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Plummet")
+    Spec.assertEqWith
+      s
+      "{1}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "Instant" (TypeLine.types (CardT.typeLine c)) (Set.singleton CardType.Instant)
+    Spec.assertEqWith s "no keywords of its own" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "CR 702.9: target creature with flying"
+      [Map.toList (Mode.targetSpecs m) | m <- Foldable.toList (Modal.modes (CardT.spell c))]
+      [[(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.HasKeyword Keyword.Flying)))]]
   Spec.it s "blurred-mongoose.json loads as a {1}{G} 2/1 Mongoose that is uncounterable and has shroud" $ do
     c <- S.cardOf s registry "Blurred Mongoose"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Blurred Mongoose")
@@ -208,6 +274,31 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "Creature -- Mongoose" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Mongoose)
     Spec.assertEqWith s "one keyword: shroud" (CardT.keywords c) (Set.singleton Keyword.Shroud)
     Spec.assertEqWith s "CR 113.6g: this spell can't be countered" (CardT.counterability c) Counterability.CantBeCountered
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file with hexproof (CR 702.11), the second rule-702 TARGETING
+  -- restriction after the Mongoose's shroud above and the one that reads WHO is
+  -- targeting. Its entire printed rules text is the keyword, so a hexproof case
+  -- in Pawl.TargetSpec that uses this printing is asking about 702.11b and
+  -- nothing else -- unlike the Mongoose, which also carries CR 113.6g.
+  --
+  -- Its whole cost is one hybrid symbol (CR 107.4e), which is why the mana cost
+  -- is asserted here rather than taken for granted: the Bogle is a legal Doom
+  -- Blade target in Pawl.TargetSpec only because that symbol makes it green and
+  -- blue rather than black (CR 107.4e's "a hybrid mana symbol is all of its
+  -- component colors", CR 202.2).
+  Spec.it s "slippery-bogle.json loads as a {G/U} 1/1 Beast whose only keyword is hexproof" $ do
+    c <- S.cardOf s registry "Slippery Bogle"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Slippery Bogle")
+    Spec.assertEqWith
+      s
+      "{G/U}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Hybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 1)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 1)))
+    Spec.assertEqWith s "Creature -- Beast" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Beast)
+    Spec.assertEqWith s "one keyword: hexproof" (CardT.keywords c) (Set.singleton Keyword.Hexproof)
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
   -- The first card file whose keyword carries a payload that is not a
@@ -679,7 +770,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "the mana ability is unrestricted and the ping is not"
       (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
-      [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn]
+      [ActivationTiming.AnyTime, ActivationTiming.DuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)) TurnScope.EachTurn]
     -- CR 605.1a: "An activated ability is a mana ability if it meets all of
     -- the following criteria: it doesn't require a target ..., it could add
     -- mana to a player's mana pool when it resolves, and it's not a loyalty
@@ -695,7 +786,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "one adds {C}, the other deals 1 to its target"
       (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
       [ [(Optionality.Mandatory, [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)])],
-        [(Optionality.Mandatory, [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)])]
+        [(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 1)])]
       ]
     -- CR 601.2c reaches an activation through CR 602.2b, and this is the
     -- pool it announces from: creatures, narrowed to the attacking ones.
@@ -732,7 +823,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "one ability, gated to the controller's upkeep"
       (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
-      [ActivationTiming.DuringPhase (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn]
+      [ActivationTiming.DuringPhase (PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep)) TurnScope.ControllersTurn]
     -- CR 602.1a: "The activation cost is everything before the colon (:)." The
     -- sacrifice is on that side, so it is SacrificeThis in the cost and not an
     -- effect. There is no mana in it at all -- the printed cost is the sacrifice
@@ -761,6 +852,85 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       "targeting any creature, unfiltered"
       [Map.toList (Mode.targetSpecs m) | ab <- CardT.activatedAbilities c, m <- Foldable.toList (Modal.modes (ActivatedAbility.modal ab))]
       [[(SlotName.MkSlotName (Text.pack "target"), TargetSpec.MkTargetSpec Pool.Creatures Nothing)]]
+  -- CR 307.5 a third time, with the axis neither Desert nor Llanowar Augur can
+  -- print: the pool's first card whose timing rider names a PHASE THAT HAS STEPS
+  -- (CR 500.1, CR 506.1's five combat steps), and the first to print an
+  -- end-of-window duration at all (CR 500.5a). "{2}: This artifact becomes a 3/6
+  -- Golem artifact creature until end of combat. Activate only during combat."
+  --
+  -- The three files together pin the whole arm: Desert's window decodes to a
+  -- PhaseSelector.Step, Llanowar Augur's adds TurnScope.ControllersTurn, and
+  -- this one is the whole-phase arm no Pawl.Types.Phase value can spell.
+  Spec.it s "jade-statue.json loads as a {4} artifact whose animation is gated to the whole combat phase" $ do
+    c <- S.cardOf s registry "Jade Statue"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Jade Statue")
+    Spec.assertEqWith
+      s
+      "{4}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
+    -- CR 205.1b: "these effects also allow the object to retain all of its prior
+    -- card types and subtypes other than creature types" -- so the printed type
+    -- line stays a bare Artifact, and both the Creature card type and the Golem
+    -- creature type arrive in layer 4.
+    Spec.assertEqWith
+      s
+      "Artifact"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Artifact) Set.empty)
+    -- No printed power or toughness: it is not a creature until the ability
+    -- resolves, and the 3/6 arrives as a layer-7b base-setting modification the
+    -- way Titania's Song's does.
+    Spec.assertEqWith s "no printed P/T" (CardT.power c, CardT.toughness c) (Nothing, Nothing)
+    -- The whole point of the file. PhaseSelector.CombatPhase, not
+    -- PhaseSelector.Step -- and TurnScope.EachTurn, because the card prints no
+    -- "your".
+    Spec.assertEqWith
+      s
+      "one ability, gated to the whole combat phase on any turn"
+      (fmap ActivatedAbility.timing (CardT.activatedAbilities c))
+      [ActivationTiming.DuringPhase PhaseSelector.CombatPhase TurnScope.EachTurn]
+    -- CR 602.1a: "The activation cost is everything before the colon (:)." {2}
+    -- and nothing else -- no {T}, which is what lets the Statue attack in the
+    -- same combat it was animated in.
+    Spec.assertEqWith
+      s
+      "{2} is the whole cost"
+      (fmap (\ab -> (Cost.mana (ActivatedAbility.cost ab), Cost.components (ActivatedAbility.cost ab))) (CardT.activatedAbilities c))
+      [(Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]), [])]
+    -- Three ModifyTarget effects on the reserved "self" slot rather than one:
+    -- Pawl.Types.Modification is one modification per effect, and CR 613.1d's
+    -- layer 4 (the card type and the Golem) and CR 613.4b's layer 7b (the base
+    -- P/T) are different layers in any case. All three carry
+    -- Duration.UntilEndOfCombat.
+    --
+    -- The Golem is a SET and not an add, and it is CR 205.1b's last sentence
+    -- that says so, in Jade Statue's own words: "Some effects state that an
+    -- object becomes a '[creature type or types] artifact creature'; these
+    -- effects also allow the object to retain all of its prior card types and
+    -- subtypes other than creature types, but replace any existing creature
+    -- types." The Statue is the DEGENERATE case of that arm -- it prints no
+    -- creature type for the set to replace -- where turn-to-frog.json is the
+    -- case with one. CR 205.3m lists Golem among the creature types.
+    Spec.assertEqWith
+      s
+      "becomes an artifact creature -- Golem with base 3/6, until end of combat"
+      (fmap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
+      [ [ ( Optionality.Mandatory,
+            [ Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.AddCardType CardType.Creature) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))),
+              Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.SetCreatureSubtype Subtype.Golem) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))),
+              Effect.ModifyTarget Duration.UntilEndOfCombat (Modification.SetBasePowerToughness (Quantity.Literal 3) (Quantity.Literal 6)) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")))
+            ]
+          )
+        ]
+      ]
+    -- CR 115.10a: nothing here is a target. The ability names its own source
+    -- through the reserved slot, so there is no TargetSpec to announce.
+    Spec.assertEqWith
+      s
+      "and targets nothing"
+      [Map.toList (Mode.targetSpecs m) | ab <- CardT.activatedAbilities c, m <- Foldable.toList (Modal.modes (ActivatedAbility.modal ab))]
+      [[]]
   -- The pool's first card whose ENTERS trigger acts on the permanent that
   -- entered. Soul Warden shares the condition and names nothing about the
   -- entrant; endless-cockroaches.json shares the slot but reads it from a
@@ -794,7 +964,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "dealing 2 damage to the became slot"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Mandatory, [Effect.DealDamage Binding.became (Quantity.Literal 2)])]]
+      [[(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot Binding.became) (Quantity.Literal 2)])]]
     Spec.assertEqWith
       s
       "and it targets nothing"
@@ -849,7 +1019,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "CR 205.4g: damage equal to the snow permanents you control"
       (modeShapes (CardT.spell c))
-      [(Optionality.Mandatory, [Effect.DealDamage target (Quantity.Count snowPermanentsYouControl)])]
+      [(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot target) (Quantity.Count snowPermanentsYouControl)])]
   -- The pool's first {S} (CR 107.4h). Exactly two cards print one in a MANA cost
   -- -- this and Arcum's Astrolabe, which costs the same {S} and prints real text
   -- on top of it -- so this is the minimal card the symbol has, and the whole
@@ -1012,7 +1182,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "dealing 2 damage to the that-player slot"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Mandatory, [Effect.DealDamage Binding.triggerPlayer (Quantity.Literal 2)])]]
+      [[(Optionality.Mandatory, [Effect.DealDamage (ObjectRef.InSlot Binding.triggerPlayer) (Quantity.Literal 2)])]]
     Spec.assertEqWith
       s
       "and it targets nothing"
@@ -1052,6 +1222,40 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       ]
     -- CR 115.10a: no "target" anywhere on the card, so no target spec and
     -- nothing for CR 608.2b to fizzle.
+    Spec.assertEqWith s "and it targets nothing" (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c)))) [Map.empty]
+  -- The pool's first DealDamage over a SET rather than a slot, and the first
+  -- producer of ObjectRef.EachMatching whose filter names a keyword. The mana
+  -- cost is the other half of what this card is here for: CR 107.3's {X} beside
+  -- CR 107.4f's Phyrexian symbol, which no other card in the pool prints
+  -- together (#417).
+  --
+  -- The filter is And [HasCardType Creature, HasKeyword Flying] for the reason
+  -- trumpet-blast.json's comment gives: an EachMatching has no Pool to narrow
+  -- it, so the card type the printed text names ("each creature with flying")
+  -- has to be written into the filter.
+  Spec.it s "corrosive-gale.json loads as an {X}{G/P} sorcery damaging every creature with flying" $ do
+    c <- S.cardOf s registry "Corrosive Gale"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Corrosive Gale")
+    Spec.assertEqWith s "{X}{G/P}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Variable, ManaSymbol.Phyrexian Color.Green]))
+    Spec.assertEqWith
+      s
+      "Sorcery"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Sorcery) Set.empty)
+    Spec.assertEqWith s "no keywords of its own" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "X damage to each creature with flying"
+      (modeShapes (CardT.spell c))
+      [ ( Optionality.Mandatory,
+          [ Effect.DealDamage
+              (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.HasKeyword Keyword.Flying]))
+              Quantity.X
+          ]
+        )
+      ]
+    -- CR 115.10a again: "each creature with flying" is not "target", so there
+    -- is no target spec and nothing for CR 608.2b to fizzle.
     Spec.assertEqWith s "and it targets nothing" (fmap Mode.targetSpecs (Foldable.toList (Modal.modes (CardT.spell c)))) [Map.empty]
   -- The control-side twin of trumpet-blast.json, and the other half of what
   -- CR 611.2c names: a resolution effect that CHANGES THE CONTROLLER of a
@@ -1174,6 +1378,113 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       (fmap (fmap Mode.targetSpecs . Foldable.toList . Modal.modes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
       [[Map.empty]]
     Spec.assertEqWith s "nothing of it is a static or a replacement" (CardT.staticAbilities c, CardT.replacementEffects c) ([], [])
+  -- The pool's first producer of Modification.SetCreatureSubtype, and the first
+  -- card whose one sentence lands in FOUR layers at once: 4 (Frog), 5 (blue), 6
+  -- (loses all abilities) and 7b (base 1/1). Titania's Song is the pool's next
+  -- widest at three. One ModifyTarget per modification, for the reason
+  -- llanowar-augur.json states -- Pawl.Types.Modification is one modification per
+  -- effect -- and here the four are in four different layers besides.
+  --
+  -- The Frog is a SET, not an add: CR 205.1b's last sentence says such an effect
+  -- lets the object "retain all of its prior card types and subtypes other than
+  -- creature types, but replace any existing creature types". Pawl.ProjectionSpec
+  -- proves that end to end, including that a land type Ashaya gave the target
+  -- survives it.
+  --
+  -- No AddCardType Creature beside it: the target is already a creature (the
+  -- spell targets one), and CR 205.1a's last sentence -- "Removing an object's
+  -- subtype doesn't affect its card types at all" -- is why the subtype set
+  -- carries no card-type change of its own.
+  Spec.it s "turn-to-frog.json loads as a {1}{U} instant whose four modifications sit in four layers" $ do
+    c <- S.cardOf s registry "Turn to Frog"
+    let target = SlotName.MkSlotName (Text.pack "target")
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Turn to Frog")
+    Spec.assertEqWith
+      s
+      "{1}{U}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
+    Spec.assertEqWith
+      s
+      "Instant, with no subtype of its own"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty)
+    Spec.assertEqWith s "no P/T" (CardT.power c, CardT.toughness c) (Nothing, Nothing)
+    Spec.assertEqWith
+      s
+      "four ModifyTargets on one slot, all until end of turn"
+      (modeShapes (CardT.spell c))
+      [ ( Optionality.Mandatory,
+          [ Effect.ModifyTarget Duration.UntilEndOfTurn Modification.LoseAllAbilities (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetColor (Set.singleton Color.Blue)) (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetCreatureSubtype Subtype.Frog) (ObjectRef.InSlot target),
+            Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)) (ObjectRef.InSlot target)
+          ]
+        )
+      ]
+    Spec.assertEqWith
+      s
+      "targeting any creature, unfiltered"
+      (fmap (Map.toList . Mode.targetSpecs) (Foldable.toList (Modal.modes (CardT.spell c))))
+      [[(target, TargetSpec.MkTargetSpec Pool.Creatures Nothing)]]
+    Spec.assertEqWith s "no permanent text at all" (CardT.staticAbilities c, CardT.triggeredAbilities c, CardT.replacementEffects c) ([], [], [])
+  -- The first card file with lifelink (CR 702.15), and a vanilla one otherwise:
+  -- its entire printed rules text is the keyword, so a lifelink case in
+  -- Pawl.DamageSpec that uses this printing is asking about 702.15b and nothing
+  -- else.
+  Spec.it s "child-of-night.json loads as a {1}{B} 2/1 Vampire whose only keyword is lifelink" $ do
+    c <- S.cardOf s registry "Child of Night"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Child of Night")
+    Spec.assertEqWith
+      s
+      "{1}{B}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 2)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 1)))
+    Spec.assertEqWith s "Creature -- Vampire" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Vampire)
+    Spec.assertEqWith s "one keyword: lifelink" (CardT.keywords c) (Set.singleton Keyword.Lifelink)
+    Spec.assertEqWith s "no other text at all" (CardT.staticAbilities c, CardT.triggeredAbilities c, CardT.activatedAbilities c) ([], [], [])
+  -- "Equipped creature has deathtouch and lifelink", so both keywords are on the
+  -- Equipment's layer-6 GRANT and neither is in its own printed keyword set --
+  -- the distinction the assertions below draw, and the one that makes this
+  -- printing the pool's proof that lifelink is read off the CR 613 layer-6
+  -- PROJECTION rather than off a printed card. Two modifications on ONE static ability, because both are
+  -- granted to the same Affected.Attached -- the Setessan Training shape, not
+  -- two abilities that could be affected separately.
+  Spec.it s "basilisk-collar.json loads as a {1} Equipment granting deathtouch and lifelink for {2}" $ do
+    c <- S.cardOf s registry "Basilisk Collar"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Basilisk Collar")
+    Spec.assertEqWith s "{1}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "Artifact -- Equipment"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Artifact) (Set.singleton Subtype.Equipment))
+    Spec.assertEqWith s "no P/T" (CardT.power c, CardT.toughness c) (Nothing, Nothing)
+    Spec.assertEqWith s "no printed keywords of its own" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "one static ability: the equipped creature gains deathtouch and lifelink"
+      (CardT.staticAbilities c)
+      [ StaticAbility.MkStaticAbility
+          Affected.Attached
+          (Modification.GainKeyword Keyword.Deathtouch NonEmpty.:| [Modification.GainKeyword Keyword.Lifelink])
+      ]
+    -- CR 702.6a: "'Equip [cost]' means '[Cost]: Attach this permanent to target
+    -- creature you control. Activate only as a sorcery.'" The timing rider is
+    -- the last clause, and it is what keeps the Collar out of combat.
+    Spec.assertEqWith
+      s
+      "one activated ability, {2} at sorcery speed"
+      (fmap (\ab -> (Cost.mana (ActivatedAbility.cost ab), Cost.components (ActivatedAbility.cost ab), ActivatedAbility.timing ab)) (CardT.activatedAbilities c))
+      [(Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]), [], ActivationTiming.SorcerySpeed)]
+    Spec.assertEqWith
+      s
+      "which attaches this Equipment to the chosen creature"
+      (concatMap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
+      [(Optionality.Mandatory, [Effect.Attach (SlotName.MkSlotName (Text.pack "target"))])]
+    Spec.assertEqWith s "and no triggered ability" (CardT.triggeredAbilities c) []
 
 checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
 checkFile s root p = do

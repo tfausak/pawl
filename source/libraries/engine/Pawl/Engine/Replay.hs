@@ -43,6 +43,7 @@ encode p answer = case p of
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
+  Prompt.ChooseAttackTarget {} -> Response.ChoseAttackTarget answer
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
   Prompt.ChooseTargets {} -> Response.ChoseTargets answer
@@ -109,6 +110,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.DeclareAttackers {} -> case response of
     Response.DeclaredAttackers ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseAttackTarget {} -> case response of
+    Response.ChoseAttackTarget target -> Just target
     _ -> Nothing
   Prompt.DeclareBlockers {} -> case response of
     Response.DeclaredBlockers assignment -> Just assignment
@@ -229,6 +233,12 @@ defaultAnswer p = case p of
   -- Declining to attack is always legal, and is the least eventful thing a
   -- fallback can do.
   Prompt.DeclareAttackers {} -> []
+  -- CR 508.1b: the head is the defending player (Combat.attackTargets orders it
+  -- first), which is always a legal thing to attack and is what every attack in a
+  -- planeswalker-less pool announces anyway. The same value
+  -- Combat.announceAttackTarget degrades an out-of-list answer to, which the two
+  -- must agree on: neither path can observe the other.
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   -- Declining to BLOCK is not always legal -- a CR 509.1c requirement (Lure) can
   -- make the empty declaration the one illegal answer. Still the least eventful
   -- fallback, and still total: Combat.declareBlockers repairs an illegal

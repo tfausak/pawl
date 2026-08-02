@@ -20,6 +20,7 @@ import qualified Pawl.Codec.CardTypeSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
 import qualified Pawl.Codec.ColorSpec
+import qualified Pawl.Codec.CombatRestrictionSpec
 import qualified Pawl.Codec.CombatStepSpec
 import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
@@ -216,6 +217,7 @@ spec s registry = do
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
   Pawl.Codec.ColorSpec.spec s
+  Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatStepSpec.spec s
   Pawl.Codec.CommonSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s

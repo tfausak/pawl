@@ -11,8 +11,8 @@ import qualified Pawl.Types.Supertype as Supertype
 -- target may be either -- expressed as data and evaluated by one generic
 -- matcher (Pawl.Engine.Filter.matches) that never learns which effect produced it. Its
 -- atoms case on CHARACTERISTICS (card type, supertype, colour, subtype, power,
--- controller, and for a player candidate its identity) -- exactly as the rules
--- already case on a CardType -- and on a handful of things CR 109.3 says are NOT
+-- abilities, controller, and for a player candidate its identity) -- exactly as
+-- the rules already case on a CardType -- and on a handful of things CR 109.3 says are NOT
 -- characteristics but that the closed half owns just as squarely: combat status
 -- (IsAttacking, IsBlocking), attachment (IsAttachedToCreature,
 -- IsAttachedToPermanent, and CanHostSubject for the attachment an effect is about
@@ -30,11 +30,39 @@ import qualified Pawl.Types.Supertype as Supertype
 --
 -- `And []` is the trivial predicate -- the identity that matches everything -- so
 -- a bare "target creature" (no narrowing) needs no separate "always" arm.
-data Filter
+--
+-- PARAMETRIC in the keyword, and only to break a module cycle: HasKeyword below
+-- has to name Pawl.Types.Keyword, and that module already names this one
+-- (CR 702.29e typecycling carries its "[type]" as a Filter). Pawl.Types.Keyword
+-- ties the knot by instantiating `Filter Keyword`, which is the single
+-- application every other module in the project writes -- the same shape
+-- Pawl.Types.Effect's `card` parameter takes for the Card/Effect cycle. Nothing
+-- else is ever substituted for it, so read `Filter keyword` as `Filter Keyword.Keyword`
+-- everywhere but here, in Pawl.Types.Cost and in Pawl.Types.CostComponent.
+data Filter keyword
   = HasCardType CardType.CardType -- CR 205 / 300: the object's card types include this one.
   | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
   | HasColor Color.Color -- CR 105.2: the object's colours include this one.
   | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
+  | -- | The object HAS this keyword ability (CR 702.1: an object "lists only the
+    -- name of the ability as a 'keyword'") -- Plummet's "target creature with
+    -- flying" (CR 702.9). Unlike the five uncharacteristic atoms below, this one
+    -- needs no defence at all: CR 109.3 lists "abilities" among an object's
+    -- characteristics outright, so it sits with HasCardType and HasColor rather
+    -- than with IsAttacking.
+    --
+    -- MEMBERSHIP, not equality of an ability list: the projection stores keywords
+    -- as a Map Keyword Natural (ProjectedCharacteristics.keywords) because CR 702
+    -- instances stack, and this asks only whether the key is present. For a
+    -- parameterized keyword that makes `HasKeyword (Toxic 2)` ask about toxic 2
+    -- specifically rather than about toxic in general, which no card in the pool
+    -- needs either way (#522).
+    --
+    -- Read through the PROJECTION wherever one exists, so a creature that gains
+    -- flying at CR 613.1f layer 6 matches and a Humility'd one stops matching --
+    -- see Pawl.Engine.Projection.viewOfCharacteristics, and the printed-card
+    -- fallback in viewOfCard for a candidate off the battlefield.
+    HasKeyword keyword
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | The candidate IS the evaluation's source object. Context-relative in the
@@ -178,8 +206,13 @@ data Filter
     -- the offer instead, and the two are only the same when the player would have
     -- picked a legal destination anyway.
     --
-    -- Answerable only where an attach frames the match, and silently False in any
-    -- other Filter position (#471). Reads the subject's enchant ability and not
+    -- Answerable only where an attach frames the match, and vacuously False in
+    -- any other Filter position -- which is why writing it into one is a FAILING
+    -- TEST rather than a quiet False: Pawl.CardSpec's "CR 701.3a no card asks
+    -- CanHostSubject outside an attach's destination" walks every Filter position
+    -- a card has and rejects the atom in all of them but that one. Widening the
+    -- subject so every evaluation could see it is #572, and needs a card that asks
+    -- the question outside an attach. Reads the subject's enchant ability and not
     -- CR 303.4's "other effects can limit what a permanent can be enchanted by"
     -- (#472).
     CanHostSubject
@@ -200,7 +233,7 @@ data Filter
     -- ones, so nothing in CR 613 can turn a card into a token or back. That is
     -- what lets Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsToken
-  | And [Filter]
-  | Or [Filter]
-  | Not Filter
+  | And [Filter keyword]
+  | Or [Filter keyword]
+  | Not (Filter keyword)
   deriving (Eq, Ord, Show)

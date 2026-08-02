@@ -129,6 +129,10 @@ spec s = Spec.describe s "Pawl.Codec.Subtype" $ do
     Common.assertJsonCodec s Subtype.toJson Subtype.fromJson Subtype.Turtle "{\"type\":\"Turtle\"}"
   Spec.it s "Mongoose" $
     Common.assertJsonCodec s Subtype.toJson Subtype.fromJson Subtype.Mongoose "{\"type\":\"Mongoose\"}"
+  Spec.it s "Frog" $
+    Common.assertJsonCodec s Subtype.toJson Subtype.fromJson Subtype.Frog "{\"type\":\"Frog\"}"
+  Spec.it s "Vampire" $
+    Common.assertJsonCodec s Subtype.toJson Subtype.fromJson Subtype.Vampire "{\"type\":\"Vampire\"}"
   Spec.it s "fromJsonPair round-trips a [from, to] pair" $ do
     v <- Common.assertJson s "[{\"type\":\"Mountain\"}, {\"type\":\"Island\"}]"
     Spec.assertEq s (Subtype.fromJsonPair v) (Right (Subtype.Mountain, Subtype.Island))

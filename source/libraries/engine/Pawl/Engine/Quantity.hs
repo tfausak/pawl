@@ -31,8 +31,35 @@ import Pawl.Types.SlotName (SlotName)
 -- applyCharacteristicPT builds its from the OBJECT's own controller (a
 -- characteristic-defining ability, which never affects another object);
 -- Resolve builds its from the resolving spell/ability's controller and source.
+--
+-- The ONE-OBJECT case, where CR 601.2b's announced X was stamped on the very
+-- object every other arm reads. True of a spell, whose stack incarnation holds
+-- both, and of every caller outside a resolution; evaluateFor below is the case
+-- where the two objects part company.
 evaluate :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Quantity -> Maybe Integer
-evaluate viewOf context gs oid quantity = case quantity of
+evaluate viewOf context gs oid = evaluateFor viewOf context gs oid oid
+
+-- The same fold with CR 601.2b's X taken from `announcedOn` instead of from
+-- `oid`, because for an ACTIVATED ability they are different objects:
+--
+--   * `announcedOn` is the object ON THE STACK. That is where the announced value
+--     is stamped -- Cast.castSpell stamps the spell's new incarnation,
+--     Activate.activateAbility stamps the ability object -- so it is the only
+--     place the value can be read back from.
+--   * `oid` is the ability's SOURCE -- CR 113.7's "the object whose ability was
+--     activated" -- which every other arm reads and which an activation cost may
+--     well have destroyed: Cinder Elemental's "{X}{R}, {T}, Sacrifice this
+--     creature: It deals X damage to any target" pays with the very permanent the
+--     ability names, so by resolution CR 400.7 has left its id naming nothing at
+--     all, and CR 113.7a is what lets the ability resolve regardless (#544).
+--
+-- Quantity.InSlot deliberately stays on `oid`: that value is written mid-
+-- resolution by Resolve.bindAmountSlot, which writes it to the effect's source --
+-- see its haddock, and Bane of Progress, which binds and reads one inside a
+-- TRIGGERED ability where the two ids differ. Each amount is read where it was
+-- written.
+evaluateFor :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> ObjectId -> Quantity -> Maybe Integer
+evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Literal n -> Just n
   Quantity.ManaValue -> fmap manaValueOf (Game.cardOf oid gs)
   -- CR 208.1 read through the injected view, so this arm never learns whether it
@@ -41,13 +68,15 @@ evaluate viewOf context gs oid quantity = case quantity of
   -- Projection.viewWithLastKnown). Nothing when the object has no power: it is
   -- not a creature, or it is gone and no last known information was kept.
   Quantity.Power -> viewOf oid >>= Filter.power
-  -- CR 601.2b: read the chosen X from the source object's binding environment.
-  Quantity.X -> case Game.lookupObject oid gs of
+  -- CR 601.2b: read the chosen X from the announcing object's binding environment.
+  Quantity.X -> case Game.lookupObject announcedOn gs of
     Nothing -> Nothing
     Just obj -> fmap toInteger (Binding.amountOf Binding.variableX (Object.bindings obj))
   -- A value an earlier effect of this resolution bound into the slot, read off
-  -- the same object and the same binding field X is read from. Nothing when the
-  -- slot holds no amount: the producing effect has not run, or bound nothing.
+  -- the effect's SOURCE and the same binding field X is read from -- a different
+  -- object from X's, for the reason this function's own haddock gives. Nothing
+  -- when the slot holds no amount: the producing effect has not run, or bound
+  -- nothing.
   Quantity.InSlot slot -> case Game.lookupObject oid gs of
     Nothing -> Nothing
     Just obj -> fmap toInteger (Binding.amountOf slot (Object.bindings obj))
@@ -56,7 +85,7 @@ evaluate viewOf context gs oid quantity = case quantity of
   -- (Projection.baseCharacteristics), so reaching this arm means the star was
   -- never resolved -- honestly Nothing, not a hole.
   Quantity.Star -> Nothing
-  Quantity.Plus a b -> case (evaluate viewOf context gs oid a, evaluate viewOf context gs oid b) of
+  Quantity.Plus a b -> case (evaluateFor viewOf context gs announcedOn oid a, evaluateFor viewOf context gs announcedOn oid b) of
     (Just x, Just y) -> Just (x + y)
     _ -> Nothing
   -- CR 208.2a / 608.2h: delegate to the general Count fold (Pawl.Engine.Count),
@@ -65,10 +94,12 @@ evaluate viewOf context gs oid quantity = case quantity of
   -- The second injection is this function itself, aimed at whichever CANDIDATE
   -- the fold is looking at rather than at `oid`: that is how
   -- Aggregation.Greatest reads a per-member quantity without Pawl.Engine.Count
-  -- importing this module. Terminating, though the two functions call each
-  -- other: a Greatest's payload is a strictly smaller subterm of `quantity`,
-  -- and the value came from finite card data.
-  Quantity.Count c -> Count.evaluate viewOf (evaluate viewOf context gs) context gs c
+  -- importing this module. `announcedOn` stays FIXED across the candidates -- CR
+  -- 601.2b's X belongs to the resolving object, not to whichever permanent the
+  -- count is looking at. Terminating, though the two functions call each other: a
+  -- Greatest's payload is a strictly smaller subterm of `quantity`, and the value
+  -- came from finite card data.
+  Quantity.Count c -> Count.evaluate viewOf (evaluateFor viewOf context gs announcedOn) context gs c
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
 -- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.

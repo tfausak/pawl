@@ -35,6 +35,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
@@ -42,9 +43,11 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -416,6 +419,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter S.isCreatureRecipient (Map.keys thresholds) of
@@ -575,9 +579,23 @@ answerAboveBound p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
--- How many Blazes sit in alice's hand (the reject-not-repair no-op check).
-blazeInHand :: GameState.GameState -> Int
-blazeInHand gs = length (filter (nameOnStack (Text.pack "Blaze") gs) (Game.zoneMembers Zone.Hand S.alice gs))
+-- answerAtBound and answerAboveBound in one, COUNTING the CR 601.2c target
+-- questions the cast asks: `offset` 0 announces the bound and 1 announces one
+-- past it. The count is the only way a test can see a step the cast did NOT
+-- take, since a cast reversed at CR 601.2h leaves a board identical to one
+-- reversed earlier.
+answerAtBoundOffsetCounting :: Natural -> Prompt.Prompt r -> State.State Int r
+answerAtBoundOffsetCounting offset p = case p of
+  Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
+  Prompt.ChooseTargets _ _ _ sets -> do
+    State.modify' (+ 1)
+    pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+  _ -> pure (S.identityAnswer p)
+
+-- How many cards of this name sit in alice's hand (the reject-not-repair no-op
+-- check: a cast that reverses leaves the card exactly where it was).
+inHandNamed :: String -> GameState.GameState -> Int
+inHandNamed name gs = length (filter (nameOnStack (Text.pack name) gs) (Game.zoneMembers Zone.Hand S.alice gs))
 
 blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
@@ -599,13 +617,13 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
         after = snd (Engine.runGamePure answerX0 gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop))
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "one Mountain paid {R}" (S.tappedCount S.alice after) 1
-    Spec.assertEqWith s "Blaze resolved out of hand" (blazeInHand after) 0
+    Spec.assertEqWith s "Blaze resolved out of hand" (inHandNamed "Blaze" after) 0
   Spec.it s "Blaze at an unaffordable X is a no-op (reject-not-repair)" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 1)
         after = snd (Engine.runGamePure answerX3 gs0 (Cast.castSpell S.alice oid))
-    Spec.assertEqWith s "still in hand" (blazeInHand after) 1
+    Spec.assertEqWith s "still in hand" (inHandNamed "Blaze" after) 1
     Spec.assertEqWith s "no mana spent" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
   -- The bound is what the BOARD can pay, so it moves with the board: {X}{R}
@@ -632,7 +650,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
         after = snd (State.evalState (Engine.runGame answerAtBound gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop)) [])
     Spec.assertEqWith s "Bob at 17, so the bound of 3 was announced and paid" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "all four Mountains paid {3}{R}" (S.tappedCount S.alice after) 4
-    Spec.assertEqWith s "Blaze resolved out of hand" (blazeInHand after) 0
+    Spec.assertEqWith s "Blaze resolved out of hand" (inHandNamed "Blaze" after) 0
   -- The assertion that keeps the bound honest. It is ADVISORY: CR 601.2b lets
   -- the player announce the value of the variable freely, so one more than the
   -- bound is announced, is unaffordable, and reverses the whole casting (CR
@@ -643,9 +661,28 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
         after = snd (Engine.runGamePure answerAboveBound gs0 (Cast.castSpell S.alice oid))
-    Spec.assertEqWith s "still in hand" (blazeInHand after) 1
+    Spec.assertEqWith s "still in hand" (inHandNamed "Blaze" after) 1
     Spec.assertEqWith s "no mana spent" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
+  -- WHERE the reversal happens, which the no-op above cannot see. CR 601.2 puts
+  -- the reversal at the step the player "is unable to comply with", and the
+  -- announced value of X is the first step that can be one -- every candidate
+  -- cost was measured at CR 601.2b's X=0 floor, since that is the only value
+  -- castability can know before the announcement exists. So the cast ends there,
+  -- and CR 601.2c's target question is never put to a player whose spell is
+  -- already lost.
+  --
+  -- That is the posture castability itself takes -- pawl refuses to propose a
+  -- cast it cannot pay rather than proposing and reversing at CR 601.2h -- and
+  -- carrying it through to the announced X is what leaves Mana.announcePhyrexian
+  -- with no cost it has no offer for (#417).
+  Spec.it s "CR 601.2 an unaffordable X ends the cast before CR 601.2c's targets are asked for" $ do
+    blaze <- S.printingOf s registry "Blaze"
+    mountain <- S.printingOf s registry "Mountain"
+    let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
+        asked offset = State.execState (Engine.runGame (answerAtBoundOffsetCounting offset) gs0 (Cast.castSpell S.alice oid)) 0
+    Spec.assertEqWith s "at the bound the cast goes on and asks for its target" (asked 0) 1
+    Spec.assertEqWith s "one above it, there is nothing left to target for" (asked 1) 0
   -- The bound is measured at CR 601.2f's TOTAL, not on the printed cost:
   -- Thalia's "noncreature spells cost {1} more" (EachPlayer-scoped, so her own
   -- controller pays it too) eats one of the four Mountains, and the board that
@@ -661,6 +698,61 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     Spec.assertEqWith s "the taxed bound is 2" bounds [2]
     Spec.assertEqWith s "Bob at 18" (S.lifeOf S.bob after) (Just 18)
     Spec.assertEqWith s "four Mountains paid {2}{R} plus Thalia's {1}" (S.tappedCount S.alice after) 4
+
+-- Corrosive Gale ({X}{G/P} Sorcery, "Corrosive Gale deals X damage to each
+-- creature with flying"), the only card in the pool -- and one of only two ever
+-- printed, the other being Postmortem Lunge -- carrying CR 107.3's {X} beside
+-- CR 107.4f's Phyrexian symbol. That pairing is what makes CR 601.2b's two
+-- announcements measure the same cost or visibly disagree, and #417 was the
+-- disagreement: castability was gated at X=0 while the Phyrexian announcement
+-- ran on the value the player named.
+--
+-- THE ARITHMETIC, stated once because every board below is Forests and nothing
+-- else. At the announced X the total is {X}{G/P}, and CR 601.2b's two nonhybrid
+-- equivalents of that are X+1 mana (paying the {G}) or X mana plus 2 life. Off n
+-- untapped Forests at 20 life the mana route therefore admits X <= n-1 and the
+-- life route X <= n, so the greatest payable X is n. A bound that counted only
+-- mana -- the obvious wrong implementation -- would answer n-1 on every one of
+-- them.
+corrosiveGaleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
+  Spec.it s "CR 601.2b the ChooseX bound counts CR 107.4f's 2-life route" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    let boundsOff n =
+          let (gs0, oid) = S.handOne gale (S.landsInPlay forest n)
+           in State.execState (Engine.runGame answerAtBound gs0 (Cast.castSpell S.alice oid)) []
+    Spec.assertEqWith s "three Forests bound X at 3, not the 2 the mana alone buys" (boundsOff 3) [3]
+    Spec.assertEqWith s "two Forests bound X at 2, not 1" (boundsOff 2) [2]
+  -- The bound is PAYABLE and not merely reported, and at the bound the life route
+  -- is the ONLY one left -- CR 601.2b's announcement has exactly one offer, so
+  -- there is no prompt and no choice to make. Alice paying 2 life is what proves
+  -- the bound was not an off-by-one dressed up as a life route.
+  Spec.it s "CR 107.4f announcing X at the bound pays 2 life, the only route left" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    let (gs0, oid) = S.handOne gale (S.landsInPlay forest 3)
+        after = snd (State.evalState (Engine.runGame answerAtBound gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop)) [])
+    Spec.assertEqWith s "all three Forests paid the {3}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "and CR 119.4 took the 2 life for the {G/P}" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "Corrosive Gale resolved out of hand" (inHandNamed "Corrosive Gale" after) 0
+  -- The CR 118.13a half of #417. One above the bound leaves NEITHER of CR
+  -- 601.2b's two resolutions payable, so there is nothing to announce and the
+  -- whole casting reverses (CR 601.2). Announcing it is legal all the same --
+  -- CR 601.2b lets the player announce the value of the variable, and the bound
+  -- is information rather than a clamp.
+  --
+  -- The life assertion is the one that carries the CR 118.13a claim: an engine
+  -- that answered the unpayable announcement for the player would have committed
+  -- one of the two routes, and the reversal has to give it back.
+  Spec.it s "CR 118.13a X one above the bound announces nothing and reverses the cast" $ do
+    gale <- S.printingOf s registry "Corrosive Gale"
+    forest <- S.printingOf s registry "Forest"
+    let (gs0, oid) = S.handOne gale (S.landsInPlay forest 3)
+        after = snd (Engine.runGamePure answerAboveBound gs0 (Cast.castSpell S.alice oid))
+    Spec.assertEqWith s "still in hand" (inHandNamed "Corrosive Gale" after) 1
+    Spec.assertEqWith s "no Forest tapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "and no life paid for the {G/P}" (S.lifeOf S.alice after) (Just 20)
 
 -- CR 700.2a: an illegal mode can't be chosen, so a modal spell is castable when
 -- at least `count` of its modes are fillable -- not when every mode's slots are.
@@ -1122,6 +1214,14 @@ rallyBoard piker plains rally =
         -- unreachable; a bogus id fails the assertions rather than the suite.
         [] -> (bobsRally, alicesRally, S.noSource, tapped)
 
+-- CR 508.1b: is this offered attack target a planeswalker? The predicate the
+-- Rally case picks its announcement with; CombatSpec carries the same one for
+-- the combat side of this rule.
+isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
+isPlaneswalkerTarget target = case target of
+  AttackTarget.OfPlaneswalker _ -> True
+  AttackTarget.OfPlayer _ -> False
+
 printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
   -- Both clauses satisfied: bob is the defending player (CR 506.2), attackers
@@ -1134,6 +1234,37 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (Cast.castable S.bob bobsRally attacked) "castable"
     Spec.assertBool s (elem (A.Cast bobsRally) (Action.legalActions S.bob attacked)) "and offered as a legal action"
+  -- CR 306.6 / CR 508.1b: the same board, with the attack aimed at bob's
+  -- planeswalker instead of at bob. Eightfold Maze's ruling is the reading being
+  -- pinned -- "If all the attacking creatures attack your planeswalkers, you
+  -- can't cast Eightfold Maze. To cast it, a creature needs to have attacked
+  -- _you_" -- so this is the case that says "you've been attacked" is a question
+  -- about the ATTACK TARGET and not about whether a declaration happened.
+  --
+  -- Its own control is the test above: one Piker, one step, one declaration; the
+  -- only difference is what it was announced as attacking.
+  Spec.it s "CR 601.3 not castable when the only attacker attacked bob's planeswalker instead" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (bobsRally, _, _, board) = rallyBoard piker plains rally
+        (jaceId, withJace) = S.addCreature jace S.bob board
+        loyal = S.addCounter CounterKind.Loyalty 3 jaceId withJace
+        atPlaneswalker :: Prompt.Prompt r -> r
+        atPlaneswalker p = case p of
+          Prompt.ChooseAttackTarget _ _ _ options -> case filter isPlaneswalkerTarget (NonEmpty.toList options) of
+            target : _ -> target
+            [] -> NonEmpty.head options
+          _ -> S.aggressiveAnswer p
+        attacked = S.runPure atPlaneswalker loyal (Combat.declareAttackers S.alice)
+    Spec.assertEqWith
+      s
+      "the Piker really was declared, attacking the planeswalker"
+      (Map.elems (Combat.Type.attackers (GameState.combat attacked)))
+      [AttackTarget.OfPlaneswalker jaceId]
+    Spec.assertBool s (not (Cast.castable S.bob bobsRally attacked)) "not castable"
+    Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob attacked)) "and not offered"
   -- The "only if you've been attacked this step" clause, isolated: the step is
   -- right and nobody has attacked yet.
   Spec.it s "CR 601.3 not castable in the declare attackers step before attackers are declared" $ do
@@ -1171,7 +1302,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
         (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
         attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
         later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
-    Spec.assertBool s (Combat.Type.attackersJoined (GameState.combat later)) "still attacked"
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
     Spec.assertBool s (not (Cast.castable S.bob bobsRally later)) "not castable"
     Spec.assertBool s (notElem (A.Cast bobsRally) (Action.legalActions S.bob later)) "and not offered"
     Spec.assertBool s (elem (A.Cast boltId) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
@@ -1211,6 +1342,131 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
+-- alice holds one Pouncing Cheetah and one War Mammoth, with four untapped
+-- Forests -- enough for either one alone ({2}{G} and {3}{G}), so nothing below
+-- turns on affordability. Returns the Cheetah's hand id and the Mammoth's.
+--
+-- The Mammoth is the CONTROL, and it is in the same hand and the same state on
+-- purpose: it is a green creature spell whose only difference from the Cheetah
+-- is the keyword, so a case that passed for both would be the timing gate
+-- opening for every creature rather than for flash.
+cheetahAndMammothInHand ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+cheetahAndMammothInHand forest cheetah warMammoth =
+  let (gs0, cheetahId) = S.handOne cheetah (S.landsInPlay forest 4)
+      (mammothId, gs1) = S.addHandCard warMammoth S.alice gs0
+   in (gs1, cheetahId, mammothId)
+
+-- CR 702.8a: "Flash is a static ability that functions in any zone from which
+-- you could play the card it's on. 'Flash' means 'You may play this card any
+-- time you could cast an instant.'"
+--
+-- Pouncing Cheetah is the whole producer: a {2}{G} 3/2 Cat whose entire rules
+-- text is the keyword, so every case here is the keyword and nothing else.
+flashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flashSpec s registry = Spec.describe s "Flash" $ do
+  -- The baseline both halves start from: with no flash in the question at all,
+  -- alice's own main phase and an empty stack is a window BOTH creatures pass.
+  -- Without this the negatives below would also hold on an engine that refused
+  -- the Mammoth everywhere.
+  Spec.it s "CR 302.1 the control: in alice's own main phase with an empty stack, both are castable" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+    Spec.assertBool s (Cast.castable S.alice cheetahId gs) "the Cheetah"
+    Spec.assertBool s (Cast.castable S.alice mammothId gs) "and the Mammoth"
+  -- CR 302.1's "during a main phase of THEIR turn", lifted for the Cheetah and
+  -- not for the Mammoth.
+  Spec.it s "CR 702.8a castable on an opponent's turn, where a creature without flash is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        bobsTurn = gs {GameState.activePlayer = S.bob}
+    Spec.assertBool s (Cast.castable S.alice cheetahId bobsTurn) "the Cheetah is castable"
+    Spec.assertBool s (elem (A.Cast cheetahId) (Action.legalActions S.alice bobsTurn)) "and offered as a legal action"
+    Spec.assertBool s (not (Cast.castable S.alice mammothId bobsTurn)) "the Mammoth is not"
+    Spec.assertBool s (notElem (A.Cast mammothId) (Action.legalActions S.alice bobsTurn)) "and is not offered"
+  -- CR 302.1's "when the stack is empty", same pair.
+  Spec.it s "CR 702.8a castable with a non-empty stack, where a creature without flash is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
+    Spec.assertBool s (Cast.castable S.alice cheetahId busy) "the Cheetah is castable"
+    Spec.assertBool s (not (Cast.castable S.alice mammothId busy)) "the Mammoth is not"
+  -- CR 302.1's "during a MAIN PHASE", same pair.
+  Spec.it s "CR 702.8a castable in the upkeep, where a creature without flash is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        upkeep = gs {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+    Spec.assertBool s (Cast.castable S.alice cheetahId upkeep) "the Cheetah is castable"
+    Spec.assertBool s (not (Cast.castable S.alice mammothId upkeep)) "the Mammoth is not"
+  -- Rule 702.8a's second sentence is about WHEN, and says nothing about WHERE:
+  -- it lets a player play the card any time they could cast an instant, not
+  -- from anywhere they could not already. A graveyard needs a CR 601.3
+  -- permission (flashback's), which flash is not.
+  Spec.it s "CR 601.3 flash is a timing window and not a zone permission: a buried Cheetah is uncastable" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    let (gs, cheetahId) = S.handOne pouncingCheetah (S.landsInPlay forest 4)
+        buried = S.runPure S.identityAnswer gs (Event.changeZone cheetahId Zone.Graveyard)
+    Spec.assertBool s (Cast.castable S.alice cheetahId gs) "castable from the hand"
+    Spec.assertEqWith s "and nothing castable once it is in the graveyard" (Cast.castableSpells S.alice buried) []
+  -- Flash moves the window the cast is PROPOSED in and nothing else. Two rules
+  -- say what is left untouched, and they are two:
+  --
+  --   * CR 601.2a, the stack half: "To propose the casting of a spell, a player
+  --     first moves that card ... from where it is to the stack. It becomes the
+  --     topmost object on the stack." So the Cheetah is a spell before it is a
+  --     permanent, exactly as a sorcery-speed creature spell is.
+  --   * CR 117.3c, the response half: "If a player has priority when they cast a
+  --     spell ... that player receives priority afterward" -- and then CR 117.1a
+  --     lets the opponent cast an instant when priority reaches them.
+  Spec.it s "CR 601.2a / 117.3c an instant-speed creature spell still uses the stack and can be responded to" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (gs0, cheetahId) = S.handOne pouncingCheetah (S.landsInPlay forest 4)
+        (boltId, gs1) = S.addHandCard lightningBolt S.bob (snd (S.addCreature mountain S.bob gs0))
+        bobsTurn = gs1 {GameState.activePlayer = S.bob}
+        cast = S.runPure S.identityAnswer bobsTurn (Cast.castSpell S.alice cheetahId)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "one object on the stack" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "and not on the battlefield yet" (S.creaturesInPlay S.alice cast) 0
+    Spec.assertBool s (Cast.castable S.bob boltId cast) "bob may respond to it"
+    Spec.assertEqWith s "it resolves into a creature like any other" (S.creaturesInPlay S.alice resolved) 1
+  -- Pawl.Engine.Cast reads the PRINTED keyword. This is the case that says the
+  -- CR 613 projection agrees with it for a card in a hand, so the reading is not
+  -- a shortcut that a projected read would have caught.
+  --
+  -- Humility is why that agreement is the RIGHT answer rather than a
+  -- coincidence: CR 109.2 makes its "all creatures" mean permanents on the
+  -- battlefield, and a card in a hand is not one of them, so the window stays
+  -- open and the projection says so.
+  --
+  -- Nothing in the pool could close it either way -- no effect can put a
+  -- keyword-changing modification on a card in a hand at all (#160).
+  -- Pawl.Engine.Keyword.hasFlash carries that argument in full.
+  Spec.it s "CR 702.8a the projection of a card in hand carries flash, and Humility does not reach it" $ do
+    forest <- S.printingOf s registry "Forest"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    humility <- S.printingOf s registry "Humility"
+    let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
+        humbled = (S.withHumility humility gs) {GameState.activePlayer = S.bob}
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flash cheetahId humbled) "the Cheetah projects flash"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash mammothId humbled)) "the Mammoth does not"
+    Spec.assertBool s (Cast.castable S.alice cheetahId humbled) "and it is still castable on bob's turn"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
@@ -1220,12 +1476,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   sicknessSpec s registry
   magicalHackSpec s registry
   blazeSpec s registry
+  corrosiveGaleSpec s registry
   modalCastSpec s registry
   entwineSpec s registry
   auraTargetSpec s registry
   fireboltSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry
+  flashSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r
@@ -1245,6 +1503,7 @@ castFirstOption p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter S.isCreatureRecipient (Map.keys thresholds) of
@@ -1304,6 +1563,7 @@ castPanglacial p = case p of
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
+  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter S.isCreatureRecipient (Map.keys thresholds) of

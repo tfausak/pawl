@@ -7,12 +7,14 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -159,14 +161,36 @@ data Prompt r where
   -- summoning sickness, none of which the shared name can see -- the same reason
   -- ChooseManaSource refuses to treat same-card candidates as interchangeable.
   ChooseLegend :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
-  -- | CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
-  -- attack. WHOM they attack is not asked here: the defending player was already
-  -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b
-  -- calls for a per-creature announcement only if that player controls a
-  -- planeswalker, protects a battle, or the game lets the active player attack
-  -- multiple other players. A defending player can control a planeswalker now
-  -- (Jace Beleren), but AttackTarget has no arm to name one (#493, #59).
+  -- | CR 508.1a. The [ObjectId] is the legal attackers; the answer is which of them
+  -- attack. WHAT each one attacks is a SEPARATE question, asked once per chosen
+  -- creature by ChooseAttackTarget below, because CR 508.1b is a separate step of
+  -- the declaration and asks per creature rather than per declaration.
   DeclareAttackers :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [ObjectId.ObjectId]
+  -- | CR 508.1b: "If the defending player controls any planeswalkers, is the
+  -- protector of any battles, or the game allows the active player to attack
+  -- multiple other players, the active player announces which player,
+  -- planeswalker, or battle each of the chosen creatures is attacking." The
+  -- ObjectId is the one creature being announced; the NonEmpty is what it may
+  -- attack (Combat.attackTargets), the defending player first.
+  --
+  -- ONE PROMPT PER CREATURE, which is what the rule asks for and not a
+  -- convenience: Hanweir Garrison's ruling spells out the same freedom for
+  -- CR 508.4's twin -- "the tokens don't both have to attack the same one" --
+  -- so a per-declaration answer would collapse a choice the rules keep apart.
+  --
+  -- CR 508.4 reaches this prompt too, for a creature PUT onto the battlefield
+  -- attacking: same question, same candidates, same chooser (the rule says "its
+  -- controller", and the controller of a creature entering attacking is the
+  -- attacking player by CR 506.3b). One prompt and not two, because an
+  -- interpreter that could tell them apart would still answer them identically:
+  -- both name the creature and offer the same set, and neither the rules nor any
+  -- ruling distinguishes what may be attacked in the two cases.
+  --
+  -- Elided at exactly one candidate, which is CR 508.1b's own condition read
+  -- backwards: with no planeswalker, no battle and one defending player, the
+  -- rule does not call for an announcement at all, and where the rules leave
+  -- nothing to ask, don't prompt.
+  ChooseAttackTarget :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty AttackTarget.AttackTarget -> Prompt AttackTarget.AttackTarget
   -- | CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attacker it blocks.
   DeclareBlockers :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [ObjectId.ObjectId] -> Prompt (Map.Map ObjectId.ObjectId ObjectId.ObjectId)
@@ -200,20 +224,34 @@ data Prompt r where
   -- (per the ruling), so multiple copies may be cast. CR 605.3a permits mana
   -- activation to pay.
   CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
-  -- | CR 601.2b: choose the value of X while casting (the ObjectId is the spell).
+  -- | CR 601.2b: choose the value of X while casting a spell -- or, through CR
+  -- 602.2b, while activating an ability, which is the same rule reached by "the
+  -- remainder of the process for activating an ability is identical to the
+  -- process for casting a spell listed in rules 601.2b-i". The ObjectId is
+  -- whichever object is on the stack: the spell, or the ability object
+  -- (Activate.activateAbility, #544).
+  --
   -- The Natural is the greatest value this player could actually PAY for right
-  -- now: the largest X at which the cost being cast, totalled at CR 601.2f, is
-  -- still payable (Cast.affordableX, which climbs the very predicate
-  -- Cast.payableCost gated this cast on at CR 601.2b's X=0 floor).
+  -- now: the largest X at which the cost being announced is still payable
+  -- (Cast.affordableX and Activate.affordableX, each climbing the very predicate
+  -- its own castability / activatability gate asked at CR 601.2b's X=0 floor).
+  -- The two measure different costs -- a spell's is totalled at CR 601.2f, an
+  -- activation cost is not routed through `total` at all (#90) -- so the bound is
+  -- the greatest payable X of the cost that will really be paid, whichever that
+  -- is.
   --
   -- ADVISORY, not a limit, and emphatically not a clamp. The answer is filtered
   -- against it nowhere: CR 601.2b lets the player announce the value of the
   -- variable freely, and an announcement the total cost cannot pay is answered by
-  -- CR 601.2 reversing the whole casting -- "the game returns to the moment
-  -- before the casting of that spell was proposed" -- which is pawl's no-op,
-  -- minus the prompts (#56). What the bound adds is the INFORMATION a player at a
-  -- table has and an answerer, which sees only this payload and never the
-  -- GameState, did not (#417) -- the shape #176 gave DeclareMulligan.
+  -- a reversal -- CR 601.2's "the game returns to the moment before the casting of
+  -- that spell was proposed", and CR 602.2's "the game returns to the moment
+  -- before that ability started to be activated" -- which is pawl's no-op, minus
+  -- the prompts (#56). Both callers take that reversal at THIS step, the one the
+  -- player was unable to comply with, rather than carrying an already lost spell
+  -- or ability as far as CR 601.2h's payment. What the bound adds is the
+  -- INFORMATION a player at a table has and an answerer, which sees only this
+  -- payload and never the GameState, did not (#417) -- the shape #176 gave
+  -- DeclareMulligan.
   --
   -- COUNTS LIFE, not only mana: Cost.canPay measures CR 601.2b's nonhybrid
   -- resolutions, so a Phyrexian symbol's 2 life (CR 107.4f) is one of the routes
@@ -226,14 +264,14 @@ data Prompt r where
   -- player being asked.
   --
   -- A bare Natural rather than a Maybe: this prompt is issued only for a
-  -- candidate cost that already passed the X=0 floor, so a greatest payable X
-  -- always exists, and 0 is a real answer (cast the spell for its X-free
-  -- remainder) rather than an absent one. There is no "unbounded" case to
+  -- cost that already passed the X=0 floor, so a greatest payable X
+  -- always exists, and 0 is a real answer (cast the spell, or activate the
+  -- ability, for its X-free remainder) rather than an absent one. There is no "unbounded" case to
   -- represent -- a player's mana is finite, and every {X} spends it.
   --
   -- Prompted before targets (CR 601.2b precedes 601.2c), and only when the cost
-  -- contains a Variable symbol -- a spell with no {X} is not asked (where the
-  -- rules leave nothing to choose, don't prompt).
+  -- contains a Variable symbol -- a spell or ability with no {X} is not asked
+  -- (where the rules leave nothing to choose, don't prompt).
   ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.42a: whether this player uses the entwine ability of the modal spell
   -- they are casting -- "You may choose all modes of this spell instead of just
@@ -252,7 +290,7 @@ data Prompt r where
   -- when one of them can't be chosen), and some candidate cost plus this one is
   -- payable. Where the rules leave nothing to ask, don't prompt; where they do,
   -- the engine never decides to pay on the player's behalf.
-  ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost -> Prompt EntwineDecision.EntwineDecision
+  ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt EntwineDecision.EntwineDecision
   -- | CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.
@@ -423,7 +461,7 @@ data Prompt r where
   -- CR 118.9b makes an alternative cost optional, so a player who can afford both
   -- is genuinely choosing. Asked ONLY when two or more candidates are payable;
   -- one is forced, and where the rules leave nothing to ask, don't prompt.
-  ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost] -> Prompt Cost.Cost
+  ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost Keyword.Keyword] -> Prompt (Cost.Cost Keyword.Keyword)
   -- | CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
   -- both halves of what a player at a table can see -- how many mulligans they
   -- have already taken, and how many cards taking another would bottom. Those

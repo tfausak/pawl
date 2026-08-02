@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Value as Value
@@ -19,7 +20,7 @@ toJson (TargetSpec.MkTargetSpec pool restriction) =
   Common.object $
     Common.pair "pool" (Pool.toJson pool) : case restriction of
       Nothing -> []
-      Just f -> [Common.pair "filter" (Filter.toJson f)]
+      Just f -> [Common.pair "filter" (Filter.toJson Keyword.toJson f)]
 
 fromJson :: Value.Value -> Either Text.Text TargetSpec.TargetSpec
 fromJson value = do
@@ -27,7 +28,7 @@ fromJson value = do
   pool <- Common.field "pool" ps >>= Pool.fromJson
   restriction <- case Common.optionalField "filter" ps of
     Nothing -> Right Nothing
-    Just v -> Just <$> Filter.fromJson v
+    Just v -> Just <$> Filter.fromJson Keyword.fromJson v
   pure (TargetSpec.MkTargetSpec pool restriction)
 
 -- A name-keyed map as a sorted array of entries, so the render is deterministic

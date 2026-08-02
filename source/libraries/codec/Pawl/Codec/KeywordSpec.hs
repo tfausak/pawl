@@ -21,10 +21,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.DoubleStrike "{\"type\":\"DoubleStrike\"}"
   Spec.it s "FirstStrike" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.FirstStrike "{\"type\":\"FirstStrike\"}"
+  Spec.it s "Flash" $
+    Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Flash "{\"type\":\"Flash\"}"
   Spec.it s "Flying" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Flying "{\"type\":\"Flying\"}"
   Spec.it s "Haste" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Haste "{\"type\":\"Haste\"}"
+  Spec.it s "Hexproof" $
+    Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Hexproof "{\"type\":\"Hexproof\"}"
   Spec.it s "Indestructible" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Indestructible "{\"type\":\"Indestructible\"}"
   -- CR 702.14a's "[type]" rides the constructor, so swampwalk and islandwalk are
@@ -47,6 +51,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Landwalk Subtype.Swamp) /= Keyword.toJson (Keyword.Landwalk Subtype.Island))
       "swampwalk and islandwalk encode differently"
+  Spec.it s "Lifelink" $
+    Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Lifelink "{\"type\":\"Lifelink\"}"
   Spec.it s "Reach" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Reach "{\"type\":\"Reach\"}"
   -- CR 702.18a's shroud is nullary, so what this pins is the TAG: a Blurred
@@ -111,6 +117,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       "poisonous 3 is not toxic 3"
   Spec.it s "Infect" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Infect "{\"type\":\"Infect\"}"
+  Spec.it s "Menace" $
+    Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Menace "{\"type\":\"Menace\"}"
   Spec.it s "Devoid" $
     Common.assertJsonCodec s Keyword.toJson Keyword.fromJson Keyword.Devoid "{\"type\":\"Devoid\"}"
   -- CR 702.164a's N rides the constructor, so this is the first keyword that is
