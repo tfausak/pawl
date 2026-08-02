@@ -208,6 +208,13 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       roundTrip s "kw" keywordToJson jsonToKeyword Keyword.Trample
     Spec.it s "Keyword.Infect" $
       roundTrip s "infect" keywordToJson jsonToKeyword Keyword.Infect
+    -- CR 702.8a's flash is nullary, and the tag it must not share is FLYING's:
+    -- the two encodings differ by one letter, and a Pouncing Cheetah that
+    -- decoded as flying would still be a 3/2 Cat that every other assertion
+    -- about it holds for -- it would just be uncastable on an opponent's turn.
+    Spec.it s "Keyword.Flash" $ do
+      roundTrip s "flash" keywordToJson jsonToKeyword Keyword.Flash
+      Spec.assertBool s (keywordToJson Keyword.Flash /= keywordToJson Keyword.Flying) "flash is not flying"
     -- CR 702.111b's menace is nullary too, and what this pins is again the TAG:
     -- a Boggart Brute that decoded as fear would be blockable by one black
     -- creature, and one that decoded as nothing at all by any one creature.

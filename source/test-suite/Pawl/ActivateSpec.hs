@@ -16,6 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -179,6 +180,37 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
         gs = g2 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
     Spec.assertBool s (elem spellId (GameState.stack gs)) "the stack really is occupied"
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no equip with a spell on the stack"
+
+  -- CR 702.8a's window is the SPELL's, not an ability's. Rule 307.5's window is
+  -- shared between Pawl.Engine.Cast.sorcerySpeed and this module's timingOk, so
+  -- the way to lift it for a flash spell and not for an activated ability is to
+  -- lift it in Cast's disjunction and leave Turn.sorcerySpeedWindow alone; this
+  -- is the case that says the shared window really did stay put.
+  --
+  -- ONE state, two questions, and the state is chosen so that only ONE of rule
+  -- 307.5's three conjuncts is doing the refusing. alice is the active player,
+  -- in her own precombat main phase, with a Pouncing Cheetah on the battlefield
+  -- (the equip target), a Bonesplitter, a second Cheetah in hand -- and a spell
+  -- on the stack. So the turn and the phase are right for both questions, the
+  -- Cheetah in hand is castable because flash lifts the empty-stack requirement,
+  -- and the equip is refused because nothing lifted it there.
+  --
+  -- The four cases above make the same refusal from an EMPTY board, so what this
+  -- one adds is a flash permanent in play, one of them the equip's own target:
+  -- an implementation that read the keyword off the ability's source, or off the
+  -- board at all, would offer the equip here.
+  Spec.it s "CR 307.5 flash does not make an activated ability instant-speed" $ do
+    forest <- S.printingOf s registry "Forest"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature pouncingCheetah S.alice (S.landsInPlay forest 4)
+        (_, g1) = S.addCreature bonesplitter S.alice g0
+        (g2, inHand) = S.handOne pouncingCheetah g1
+        (spellId, gs) = S.spellOnStack piker S.alice g2
+    Spec.assertBool s (elem spellId (GameState.stack gs)) "the stack really is occupied"
+    Spec.assertBool s (Cast.castable S.alice inHand gs) "the flash spell is castable in response"
+    Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "but equip is not offered"
 
   -- The control: an UNRESTRICTED ability is unaffected by all three, so the
   -- gate cannot pass by refusing everything outside a main phase.

@@ -26,6 +26,7 @@ keywordToJson k = case k of
   Keyword.Defender -> Json.nullary (Text.pack "Defender")
   Keyword.DoubleStrike -> Json.nullary (Text.pack "DoubleStrike")
   Keyword.FirstStrike -> Json.nullary (Text.pack "FirstStrike")
+  Keyword.Flash -> Json.nullary (Text.pack "Flash")
   Keyword.Flying -> Json.nullary (Text.pack "Flying")
   Keyword.Haste -> Json.nullary (Text.pack "Haste")
   Keyword.Hexproof -> Json.nullary (Text.pack "Hexproof")
@@ -54,6 +55,7 @@ jsonToKeyword value = do
     ("Defender", _) -> Right Keyword.Defender
     ("DoubleStrike", _) -> Right Keyword.DoubleStrike
     ("FirstStrike", _) -> Right Keyword.FirstStrike
+    ("Flash", _) -> Right Keyword.Flash
     ("Flying", _) -> Right Keyword.Flying
     ("Haste", _) -> Right Keyword.Haste
     ("Hexproof", _) -> Right Keyword.Hexproof

@@ -45,21 +45,36 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
--- CR 302.1 / 307.1: a creature spell may be cast only when its controller could
--- cast a sorcery -- a main phase of their own turn, with an empty stack. Both
--- rules spell that window out in the same words; "sorcery speed" is the
--- colloquial name for it and appears nowhere in the rules. (The
--- priority requirement is implicit: the engine only offers actions to the player
--- who holds priority.)
+-- CR 117.1a's second sentence: the window a NONINSTANT spell is cast in -- a
+-- main phase of its controller's own turn, with an empty stack. Every noninstant
+-- card type restates it in the same words -- CR 301.1 artifact, CR 302.1
+-- creature, CR 303.1 enchantment, CR 306.1 planeswalker, CR 307.1 sorcery -- and
+-- this one predicate is all five of them. "Sorcery speed" is the colloquial name
+-- for the window and appears nowhere in the rules. (The priority requirement is
+-- implicit: the engine only offers actions to the player who holds priority.)
+--
+-- The window the CARD TYPE gets, which is not always the window the card gets:
+-- rule 702.8a's flash lifts a card out of it (instantSpeed below). This function
+-- is only the window itself.
 --
 -- CR 307.1's window, shared with the CR 307.5 one an ability can carry
 -- (Activate.timingOk) -- see Turn.sorcerySpeedWindow for why there is one copy.
 sorcerySpeed :: PlayerId -> GameState -> Bool
 sorcerySpeed = Turn.sorcerySpeedWindow
 
--- CR 117.1a / 304.1: an instant is castable whenever its controller has
--- priority; anything else needs sorcery speed (CR 302.1 / 307.1). Priority is
--- implicit: the engine only offers actions to the priority holder.
+-- CR 117.1a is the default this implements: "A player may cast an instant spell
+-- any time they have priority. A player may cast a noninstant spell during their
+-- main phase any time they have priority and the stack is empty." Priority is
+-- implicit -- the engine only offers actions to the priority holder -- so what
+-- is left is the first sentence for an instant (CR 304.1) and the second for
+-- everything else (CR 302.1 / 307.1).
+--
+-- Flash is that second sentence being OVERRIDDEN rather than restated, which is
+-- CR 101.1: "Whenever a card's text directly contradicts these rules, the card
+-- takes precedence. The card overrides only the rule that applies to that
+-- specific situation." Rule 702.8a is the card's text and it contradicts rule
+-- 117.1a's second sentence flatly, so instantSpeed's disjunction is CR 101.1
+-- resolved, not CR 117.1a read generously.
 --
 -- The window the RULES give a spell, and not the whole of when it may be cast: a
 -- card may narrow this further with a printed restriction (CR 601.3), which
@@ -67,7 +82,41 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 timingOk :: PlayerId -> ObjectId -> GameState -> Bool
 timingOk pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
-  Just card -> Card.isInstant card || sorcerySpeed pid gs
+  Just card -> instantSpeed card || sorcerySpeed pid gs
+
+-- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
+-- they have priority, rather than only in the sorcery-speed window? Two ways in,
+-- and they are two because one is a CARD TYPE and the other is a KEYWORD.
+--
+-- Rule 702.8a: "'Flash' means 'You may play this card any time you could cast an
+-- instant.'" -- this predicate's second disjunct in the rule's own words, and
+-- the first thing in the engine to WIDEN the rules' own window from the card.
+-- Narrowing it from the card is older: printedRestrictionsOk has read CR 601.3
+-- clauses like Rally the Troops' "only during the declare attackers step" since
+-- before this, which is why timingOk's haddock says the window here is not the
+-- whole of when a spell may be cast.
+--
+-- Lifted HERE, in Cast's disjunction, and emphatically not inside
+-- Turn.sorcerySpeedWindow: that window has one copy because CR 307.1 (a spell)
+-- and CR 307.5 (an "activate only as a sorcery" ability, Activate.timingOk) are
+-- the same three conjuncts, and rule 702.8a is about neither. Flash is a
+-- permission a CARD carries about casting ITSELF, so widening the shared window
+-- would make an equip ability on the same board instant-speed, which no rule
+-- says. Pawl.ActivateSpec's "flash does not make an activated ability
+-- instant-speed" is what proves it did not.
+--
+-- Read off the PRINTED keywords rather than through the CR 613 projection --
+-- Keyword.hasFlash carries that argument, which is CR 113.6e for the zones and
+-- #160 for why printed and projected agree in them -- and read wherever the cast
+-- is being proposed from, since Game.cardOf is zone-agnostic and `castable` asks
+-- this of every zone in castZones. Rule 702.8a's "functions in any zone from
+-- which you could play the card it's on" is that.
+--
+-- The PLAYER-scoped sibling is not this and is not built: an effect that lets a
+-- player cast OTHER spells as though they had flash (CR 601.3b, Vedalken Orrery)
+-- would be read here beside this predicate, never folded into it (#565).
+instantSpeed :: Card.Type.Card -> Bool
+instantSpeed card = Card.isInstant card || Keyword.hasFlash (Card.Type.keywords card)
 
 -- CR 601.2c / 700.2a: castable when at least as many modes are fillable as the
 -- selection demands ("choose one" / ChooseExactly 1, the only selection so

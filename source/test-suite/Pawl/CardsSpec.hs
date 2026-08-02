@@ -12,6 +12,7 @@ import Pawl.Codec.EntryRiders (defaultEntryRiders)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Printing (printingToJson)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
@@ -211,6 +212,31 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "one keyword: menace" (CardT.keywords c) (Set.singleton Keyword.Menace)
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file with flash (CR 702.8), and so the first whose keyword
+  -- moves the CR 302.1 window the card may be CAST in rather than anything
+  -- about it once it is a permanent. Its entire printed rules text is the
+  -- keyword, so a flash case in Pawl.CastSpec that uses this printing is asking
+  -- about 702.8a and nothing else.
+  Spec.it s "pouncing-cheetah.json loads as a {2}{G} 3/2 Cat whose only keyword is flash" $ do
+    c <- S.cardOf s registry "Pouncing Cheetah"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Pouncing Cheetah")
+    Spec.assertEqWith
+      s
+      "{2}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 3)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 2)))
+    Spec.assertEqWith s "Creature -- Cat" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Cat)
+    Spec.assertEqWith s "one keyword: flash" (CardT.keywords c) (Set.singleton Keyword.Flash)
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+    -- CR 601.3: flash is a TIMING ability, so it grants no zone permission.
+    -- Asked of Cast.castableZones and not of CardT.castingPermissions, because
+    -- the printed list is empty on a flashback card too -- rule 702.34a's
+    -- permission arrives through Keyword.castingPermissionsOf, and only the
+    -- union of the two discriminates. Firebolt answers [Hand, Graveyard] here.
+    Spec.assertEqWith s "castable from the hand and nowhere else" (Cast.castableZones c) [Zone.Hand]
   -- The first card file to carry BOTH a keyword and a counterability, and the
   -- first whose CR 113.6g clause sits on a creature rather than an instant
   -- (Rending Volley's). The two clauses are separate fields because they are

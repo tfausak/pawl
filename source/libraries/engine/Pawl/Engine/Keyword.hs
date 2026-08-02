@@ -97,6 +97,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.FirstStrike -> []
+  Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
   Keyword.Hexproof -> []
@@ -145,6 +146,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.FirstStrike -> []
+  Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
   Keyword.Hexproof -> []
@@ -243,6 +245,13 @@ permissionsFor keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.FirstStrike -> []
+  -- CR 702.8a grants no permission either, and it is the near miss flashback's
+  -- neighbour makes worth stating: rule 702.8a's SECOND sentence widens the TIME
+  -- a cast may be proposed at (Pawl.Engine.Cast.instantSpeed) and names no zone,
+  -- while its first names the zones the ABILITY functions in rather than the
+  -- zones the card may be cast from. So a card with flash is castable from
+  -- exactly the zones it was castable from without it.
+  Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
   Keyword.Hexproof -> []
@@ -262,6 +271,58 @@ permissionsFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
+
+-- CR 702.8a: "'Flash' means 'You may play this card any time you could cast an
+-- instant.'" Does this card's keyword set say so? Its one reader is
+-- Pawl.Engine.Cast.instantSpeed, which turns it into the CR 302.1 / 307.1 window
+-- being lifted for that one card.
+--
+-- MEMBERSHIP, not a count: CR 702.8b says "Multiple instances of flash on the
+-- same object are redundant," so a second one has nothing left to widen.
+--
+-- Two separate facts make reading a Set of PRINTED keywords right here, and
+-- neither of them is the other.
+--
+-- WHERE the ability functions is the rules half, and rule 702.8a states it in
+-- its first sentence -- flash "functions in any zone from which you could play
+-- the card it's on" -- which CR 113.6e states generally: "An object's ability
+-- that restricts or modifies how that particular object can be played or cast
+-- functions in any zone from which it could be played or cast and also on the
+-- stack." So a hand and a graveyard are zones this must be readable in at all,
+-- which is why the caller asks a card rather than a permanent.
+--
+-- WHETHER printed is the right source is the engine half, and the rules do NOT
+-- say it is: CR 613.1 names no zone, and CR 122.1b's keyword counter reaches "a
+-- card in a zone other than the battlefield" explicitly. What makes the printed
+-- read safe is that it is INDISTINGUISHABLE from a projected one today, which is
+-- a claim about what pawl CANNOT EXPRESS rather than about Magic. Nothing can
+-- put a keyword-changing effect on a card in a hand, and that takes all four of
+-- Pawl.Types.Affected:
+--
+--   * Matching and AttachedPlayerControls are gated on battlefield membership,
+--     structurally, inside Projection.affects.
+--   * Attached names the object the SOURCE is attached to, which an Aura only
+--     ever has while both are on the battlefield.
+--   * TheseObjects is the one that could in principle reach elsewhere -- it is
+--     CR 611.2c's frozen set, and Magical Hack's ChangeText already stores one
+--     naming a spell on the STACK. What stops it here is the pool: no
+--     Pawl.Types.Pool arm names a card in a hand at all (the nearest are
+--     CardsInGraveyard and CardsInExile), and every Modification.GainKeyword
+--     producer in the pool is aimed at creatures on the battlefield.
+--
+-- So a card in a hand projects exactly its printed keywords, and nothing can
+-- grant or remove flash there (#160). The first effect that changes a
+-- non-battlefield card's characteristics is what parts the two, and this becomes
+-- a projected read then.
+--
+-- The same posture castingPermissionsOf and handAbilitiesOf above take, whose
+-- comments state the rules half only (#567).
+--
+-- A membership test rather than an exhaustive case, the flashbackCost and
+-- entwineCost precedent: this asks about ONE named constructor rather than
+-- classifying every keyword, so a new arm has nothing to say here.
+hasFlash :: Set Keyword -> Bool
+hasFlash = Set.member Keyword.Flash
 
 -- CR 702.34a's "... by paying [cost] rather than paying its mana cost": the cost
 -- this card may be cast from the graveyard for, or Nothing when it has no
