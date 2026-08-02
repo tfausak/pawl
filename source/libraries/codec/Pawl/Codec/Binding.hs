@@ -1,41 +1,38 @@
--- | The @Binding ⇆ Json@ codec (#481).
 module Pawl.Codec.Binding where
 
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ModeIndex as ModeIndex
-import Pawl.Codec.ProjectedCharacteristics (jsonToProjectedCharacteristics, projectedCharacteristicsToJson)
+import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Subtype as Subtype
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.SlotName as SlotName
 
 -- Runtime-only, never in card JSON -- covered for the same reason SetController's
 -- PlayerId is: the codec must stay total over the transitive closure of what the
 -- game state carries.
-bindingToJson :: Binding.Binding -> Value
-bindingToJson b =
-  Json.jObject
-    [ (Text.pack "target", Json.maybeTo Recipient.toJson (Binding.target b)),
-      (Text.pack "subtypes", Json.maybeTo (\(f, t) -> Array (MkArray [Subtype.toJson f, Subtype.toJson t])) (Binding.subtypes b)),
-      (Text.pack "amount", Json.maybeTo Json.natTo (Binding.amount b)),
-      (Text.pack "modes", Json.maybeTo (Json.setTo ModeIndex.toJson) (Binding.modes b)),
-      (Text.pack "copy", Json.maybeTo projectedCharacteristicsToJson (Binding.copy b))
+toJson :: Binding.Binding -> Value.Value
+toJson b =
+  Common.object
+    [ Common.pair "target" . Common.encodeMaybe Recipient.toJson $ Binding.target b,
+      Common.pair "subtypes" . Common.encodeMaybe (\(f, t) -> Common.array [Subtype.toJson f, Subtype.toJson t]) $ Binding.subtypes b,
+      Common.pair "amount" . Common.encodeMaybe Common.encodeNatural $ Binding.amount b,
+      Common.pair "modes" . Common.encodeMaybe (Common.encodeSet ModeIndex.toJson) $ Binding.modes b,
+      Common.pair "copy" . Common.encodeMaybe ProjectedCharacteristics.toJson $ Binding.copy b
     ]
 
-jsonToBinding :: Value -> Either Text Binding.Binding
-jsonToBinding value = do
-  ps <- Json.asObject value
-  t <- Json.maybeFrom Recipient.fromJson (Json.getOpt (Text.pack "target") ps)
-  s <- Json.maybeFrom Subtype.fromJsonPair (Json.getOpt (Text.pack "subtypes") ps)
-  a <- Json.maybeFrom Json.natFrom (Json.getOpt (Text.pack "amount") ps)
-  m <- Json.maybeFrom (Json.setFrom ModeIndex.fromJson) (Json.getOpt (Text.pack "modes") ps)
-  c <- Json.maybeFrom jsonToProjectedCharacteristics (Json.getOpt (Text.pack "copy") ps)
+fromJson :: Value.Value -> Either Text.Text Binding.Binding
+fromJson value = do
+  ps <- Common.asObject value
+  t <- Common.decodeMaybe Recipient.fromJson (Common.nullableField "target" ps)
+  s <- Common.decodeMaybe Subtype.fromJsonPair (Common.nullableField "subtypes" ps)
+  a <- Common.decodeMaybe Common.decodeNatural (Common.nullableField "amount" ps)
+  m <- Common.decodeMaybe (Common.decodeSet ModeIndex.fromJson) (Common.nullableField "modes" ps)
+  c <- Common.decodeMaybe ProjectedCharacteristics.fromJson (Common.nullableField "copy" ps)
   pure
     Binding.MkBinding
       { Binding.target = t,
@@ -45,17 +42,20 @@ jsonToBinding value = do
         Binding.copy = c
       }
 
-bindingsToJson :: Map.Map SlotName.SlotName Binding.Binding -> Value
-bindingsToJson m =
-  Json.listTo
-    (\(k, v) -> Json.jObject [(Text.pack "slot", SlotName.toJson k), (Text.pack "binding", bindingToJson v)])
+-- A name-keyed map as a sorted array of entries, so the render is deterministic
+-- and the file byte-stable (Pawl.Codec.TriggeredAbility.toJsonDelayed's own
+-- comment).
+toJsonMap :: Map.Map SlotName.SlotName Binding.Binding -> Value.Value
+toJsonMap m =
+  Common.encodeList
+    (\(k, v) -> Common.object [Common.pair "slot" (SlotName.toJson k), Common.pair "binding" (toJson v)])
     (Map.toAscList m)
 
-jsonToBindings :: Value -> Either Text (Map.Map SlotName.SlotName Binding.Binding)
-jsonToBindings value =
+fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName Binding.Binding)
+fromJsonMap value =
   let decodeEntry v = do
-        ps <- Json.asObject v
-        k <- Json.field (Text.pack "slot") ps >>= SlotName.fromJson
-        b <- Json.field (Text.pack "binding") ps >>= jsonToBinding
+        ps <- Common.asObject v
+        k <- Common.field "slot" ps >>= SlotName.fromJson
+        b <- Common.field "binding" ps >>= fromJson
         pure (k, b)
-   in Map.fromList <$> Json.listFrom decodeEntry value
+   in Map.fromList <$> Common.decodeList decodeEntry value

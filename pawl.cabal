@@ -79,6 +79,7 @@ library codec
     Pawl.Codec.BeginningStep
     Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
+    Pawl.Codec.BindingSpec
     Pawl.Codec.BlockRequirement
     Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.Card
@@ -124,6 +125,7 @@ library codec
     Pawl.Codec.DamageRewrite
     Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.DelayedTrigger
+    Pawl.Codec.DelayedTriggerSpec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.DiscardCause
@@ -149,6 +151,7 @@ library codec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
     Pawl.Codec.GameEvent
+    Pawl.Codec.GameEventSpec
     Pawl.Codec.Json
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordSpec
@@ -207,7 +210,9 @@ library codec
     Pawl.Codec.Power
     Pawl.Codec.PowerSpec
     Pawl.Codec.Printing
+    Pawl.Codec.PrintingSpec
     Pawl.Codec.ProjectedCharacteristics
+    Pawl.Codec.ProjectedCharacteristicsSpec
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient

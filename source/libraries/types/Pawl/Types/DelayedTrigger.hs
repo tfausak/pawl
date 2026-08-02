@@ -10,7 +10,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.SlotName (SlotName)
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 
--- CR 603.7: a delayed triggered ability that has been created and is waiting for
+-- | CR 603.7: a delayed triggered ability that has been created and is waiting for
 -- its trigger event. A concrete `TriggeredAbility Card`, exactly as
 -- Source.OfTrigger already carries one.
 --
@@ -40,7 +40,7 @@ data DelayedTrigger = MkDelayedTrigger
     source :: ObjectId,
     controller :: PlayerId,
     bindings :: Map SlotName Binding,
-    -- Pawl.Types.Onset as the game remembers it: the earliest
+    -- | Pawl.Types.Onset as the game remembers it: the earliest
     -- GameState.turnNumber at which this entry may fire. Nothing is the ordinary
     -- case -- an ability watches for its event from the moment it is created,
     -- which is CR 603.7a's floor and all those abilities ask. Just n is

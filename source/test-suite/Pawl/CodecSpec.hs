@@ -2,18 +2,13 @@
 module Pawl.CodecSpec where
 
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
-import Pawl.Codec.Binding (bindingToJson, jsonToBinding)
 import qualified Pawl.Codec.Condition as Condition
-import Pawl.Codec.DelayedTrigger (delayedTriggerToJson, jsonToDelayedTrigger)
-import Pawl.Codec.GameEvent (gameEventToJson, jsonToGameEvent)
+import qualified Pawl.Codec.GameEvent as GameEvent.Codec
 import qualified Pawl.Codec.Json as J
-import Pawl.Codec.Printing (jsonToPrinting, printingToJson)
-import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Codec.Printing as Printing.Codec
 import qualified Pawl.Engine.Card as Card
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Engine.Filter is not imported here today, but the alias
@@ -27,45 +22,26 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Aggregation as Aggregation
-import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counterability as Counterability
-import qualified Pawl.Types.Countering as Countering
-import qualified Pawl.Types.DamageEvent as DamageEvent
-import qualified Pawl.Types.DamageKind as DamageKind
-import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
-import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Optionality as Optionality
-import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
-import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -103,12 +79,10 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   -- and the Not IsSource conjunct that carries CR 601.2c's "another", #163)
   -- lives in Pawl.Codec.TargetSpecSpec now; Filter's own per-constructor and
   -- nested-And/Or/Not coverage lives in Pawl.Codec.FilterSpec.
-  Spec.describe s "records" $ do
-    -- EntryRewrite's own per-constructor coverage lives in
-    -- Pawl.Codec.EntryRewriteSpec now.
-    -- CR 606.3's record.
-    Spec.it s "GameEvent (loyalty ability activated)" $
-      roundTrip s "loyalty-activated" gameEventToJson jsonToGameEvent (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7))
+  -- EntryRewrite's own per-constructor coverage lives in
+  -- Pawl.Codec.EntryRewriteSpec now. GameEvent's own per-constructor
+  -- coverage -- including LoyaltyAbilityActivated's CR 606.3 record --
+  -- lives in Pawl.Codec.GameEventSpec now.
   -- Cost's own per-constructor coverage, including the CR 118.6 absent-mana
   -- and CR 118.5a {0} behavior, lives in Pawl.Codec.CostSpec now. The
   -- additionalCosts/alternativeCosts round-trip-plus-byte-stability pairs
@@ -125,13 +99,13 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
   -- coverage, including the empty-modes decode failure, lives in
   -- Pawl.Codec.ModalSpec.
   Spec.describe s "honesty round-trip over allPrintings" $ do
-    Spec.it s "P1: jsonToPrinting . printingToJson == Right" $ do
+    Spec.it s "P1: Printing.Codec.fromJson . Printing.Codec.toJson == Right" $ do
       ps <- S.allPrintings s
-      mapM_ (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (jsonToPrinting (printingToJson p)) (Right p)) ps
+      mapM_ (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (Printing.Codec.fromJson (Printing.Codec.toJson p)) (Right p)) ps
     Spec.it s "P2: through text" $ do
       ps <- S.allPrintings s
       mapM_
-        (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (J.parse (J.render (printingToJson p)) >>= jsonToPrinting) (Right p))
+        (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (J.parse (J.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
         ps
     Spec.it s "M4e Cancel loads as a single Counter effect targeting a spell" $ do
       cancel <- S.printingOf s registry "Cancel"
@@ -174,7 +148,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       let (ratId, gs) = S.addCreature typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
           zc = ZoneChange.MkZoneChange ratId ratId Zone.Battlefield Zone.Graveyard
           snapshot = Projection.project ratId gs
-      roundTrip s "moved" gameEventToJson jsonToGameEvent (GameEvent.Moved zc snapshot)
+      roundTrip s "moved" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Moved zc snapshot)
     -- The snapshot's keywords are counted per keyword (CR 702.164b), so a
     -- COUNT has to survive the wire and not just a membership: the
     -- array-with-repeats encoding is what carries it. A Set-shaped encoder
@@ -188,41 +162,13 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
           snapshot = Projection.project oid (grant 101 (grant 100 gs0))
           zc = ZoneChange.MkZoneChange oid oid Zone.Battlefield Zone.Graveyard
       Spec.assertEqWith s "the fixture really does carry toxic 1 twice" (Map.lookup (Keyword.Toxic 1) (PC.keywords snapshot)) (Just 2)
-      roundTrip s "moved" gameEventToJson jsonToGameEvent (GameEvent.Moved zc snapshot)
-    Spec.it s "GameEvent.DamageDealt round-trips" $
-      roundTrip
-        s
-        "damage"
-        gameEventToJson
-        jsonToGameEvent
-        -- A NONZERO toxic value, so the CR 702.164b rider is round-tripped
-        -- rather than defaulted past.
-        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 3 DamageKind.Combat))
-    -- CR 120.3c's recipient tag is a different arm of Recipient from the one
-    -- above, and a CR 608.2i record the codec cannot write is one no replay can
-    -- read back.
-    Spec.it s "GameEvent.DamageDealt to a planeswalker round-trips" $
-      roundTrip
-        s
-        "damage"
-        gameEventToJson
-        jsonToGameEvent
-        (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2)) 3 False False 0 DamageKind.Noncombat))
-    Spec.it s "GameEvent.StepBegan round-trips" $
-      roundTrip s "step" gameEventToJson jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
-    Spec.it s "GameEvent.SpellCast round-trips" $
-      roundTrip s "ev" gameEventToJson jsonToGameEvent (GameEvent.SpellCast S.alice)
-    Spec.it s "GameEvent.BecameMonarch" $
-      roundTrip s "bm" gameEventToJson jsonToGameEvent (GameEvent.BecameMonarch S.alice)
-    -- Keyword.Cycling's own round trip, with and without a typecycling
-    -- filter, lives in Pawl.Codec.KeywordSpec now.
-    -- CR 701.9a's event, carrying the incarnation the discarded card
-    -- became. Both causes, because the cause is what tells a cycle from an
-    -- ordinary discard (CR 702.29c) and a trip that flattened it would
-    -- leave the two indistinguishable.
-    Spec.it s "GameEvent.Discarded round-trips with either cause" $ do
-      roundTrip s "disc" gameEventToJson jsonToGameEvent (GameEvent.Discarded S.alice (ObjectId.MkObjectId 7) DiscardCause.Ordinary)
-      roundTrip s "cyc" gameEventToJson jsonToGameEvent (GameEvent.Discarded S.bob (ObjectId.MkObjectId 7) DiscardCause.ToPayCyclingCost)
+      roundTrip s "moved" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Moved zc snapshot)
+    -- GameEvent's own per-constructor coverage (DamageDealt, both a player
+    -- and a CR 120.3c planeswalker Recipient; StepBegan; SpellCast;
+    -- BecameMonarch; Discarded, both causes; AttackerDeclared;
+    -- SpellCountered; LoyaltyAbilityActivated) needed no registry fixture --
+    -- a synthetic stand-in snapshot proves Moved/Revealed just as well as a
+    -- real one proves the shape -- so it moved to Pawl.Codec.GameEventSpec.
     -- CR 701.20a: the reveal's whole payload IS the snapshot, so it is the
     -- one GameEvent whose round-trip failing would silently erase what the
     -- players were shown rather than merely mislabel it. Typhoid Rats for
@@ -230,73 +176,27 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "GameEvent.Revealed round-trips with its snapshot" $ do
       typhoidRats <- S.printingOf s registry "Typhoid Rats"
       let (ratId, gs) = S.addLibraryCard typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
-      roundTrip s "revealed" gameEventToJson jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs))
+      roundTrip s "revealed" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Revealed S.alice (Projection.project ratId gs))
     -- TriggerCondition's own per-constructor coverage lives in
     -- Pawl.Codec.TriggerConditionSpec now.
-    Spec.it s "GameEvent.AttackerDeclared round-trips" $
-      roundTrip s "ad" gameEventToJson jsonToGameEvent (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3))
-    -- CR 701.6a's event. Three DISTINCT payload values, two of them
-    -- ObjectIds: a trip that swapped the countered spell for the countering
-    -- source would survive equal ids and fail here.
-    Spec.it s "GameEvent.SpellCountered round-trips" $
-      roundTrip
-        s
-        "countered"
-        gameEventToJson
-        jsonToGameEvent
-        (GameEvent.SpellCountered (Countering.MkCountering (ObjectId.MkObjectId 4) (ObjectId.MkObjectId 5) S.bob))
     Spec.it s "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $
       mapM_
         (roundTrip s "condition" Condition.toJson Condition.fromJson)
         [S.youControlNoSwamps, noZombiesOnBattlefield]
     Spec.it s "AbilityName round-trips" $
       roundTrip s "name" AbilityName.toJson AbilityName.fromJson (AbilityName.MkAbilityName (Text.pack "sacrifice it"))
-    -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
-    -- only a Binding's `target` field via Binding.toObject. The codec is
-    -- meant to be total over every Binding field -- subtypes, amount, modes,
-    -- and copy too -- so round-trip a Binding with all five populated at
-    -- once, exercising Subtype.fromJsonPair along the way. No real slot ever
-    -- carries all five together (copy lives only under the dedicated
-    -- copySource slot in practice); this is a codec totality check, not a
-    -- claim about a reachable game state.
-    Spec.it s "a Binding with every field populated round-trips" $
-      let binding =
-            Binding.Type.MkBinding
-              { Binding.Type.target = Just (Recipient.ToPlayer S.alice),
-                Binding.Type.subtypes = Just (Subtype.Mountain, Subtype.Island),
-                Binding.Type.amount = Just 3,
-                Binding.Type.modes = Just (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]),
-                Binding.Type.copy = Just S.emptyCharacteristics
-              }
-       in roundTrip s "binding" bindingToJson jsonToBinding binding
-    Spec.it s "DelayedTrigger round-trips with its captured bindings" $
-      let ability =
-            TriggeredAbility.MkTriggeredAbility
-              { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn,
-                TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
-                TriggeredAbility.intervening = Nothing
-              }
-          entry =
-            DelayedTrigger.MkDelayedTrigger
-              { DelayedTrigger.ability = ability,
-                DelayedTrigger.source = ObjectId.MkObjectId 4,
-                DelayedTrigger.controller = S.alice,
-                DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9)),
-                DelayedTrigger.notBefore = Nothing,
-                DelayedTrigger.expiry = Nothing
-              }
-       in do
-            -- CR 603.7b's default and its stated-duration exception both
-            -- have to survive: the absent expiry is elided to null, and a
-            -- present one must come back as itself. CR 603.7a's arming gate is
-            -- the same pair of cases on the other end of the envelope.
-            roundTrip s "delayed" delayedTriggerToJson jsonToDelayedTrigger entry
-            roundTrip s "delayed1" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
-            roundTrip s "delayed2" delayedTriggerToJson jsonToDelayedTrigger entry {DelayedTrigger.notBefore = Just 7}
 
 -- TriggeredAbility's own per-constructor coverage, including both states of
 -- the CR 603.4 intervening "if" and the CR 603.7 toJsonDelayed/fromJsonDelayed
 -- sort order, lives in Pawl.Codec.TriggeredAbilitySpec now.
+
+-- Binding's own per-constructor coverage (the empty binding, and every field
+-- populated at once, exercising Subtype.fromJsonPair) and its toJsonMap/
+-- fromJsonMap sort-by-slot-name proof live in Pawl.Codec.BindingSpec now.
+-- DelayedTrigger's own per-constructor coverage (CR 603.7a/603.7b's default,
+-- and each of notBefore/expiry present) lives in Pawl.Codec.DelayedTriggerSpec
+-- now. Neither needed a registry fixture -- a synthetic Binding/Card stand-in
+-- proves the shape just as well.
 
 -- Count's own per-constructor coverage (in a zone, over the event history,
 -- and scoped to a slot) lives in Pawl.Codec.CountSpec now; Quantity's Count

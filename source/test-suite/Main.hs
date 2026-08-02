@@ -13,6 +13,7 @@ import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.BeginningStepSpec
+import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
@@ -35,6 +36,7 @@ import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
+import qualified Pawl.Codec.DelayedTriggerSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DurationSpec
@@ -47,6 +49,7 @@ import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FilterSpec
+import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
@@ -75,6 +78,8 @@ import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
+import qualified Pawl.Codec.PrintingSpec
+import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
@@ -205,6 +210,7 @@ spec s registry = do
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
+  Pawl.Codec.BindingSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
@@ -227,6 +233,7 @@ spec s registry = do
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
+  Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.DurationSpec.spec s
@@ -239,6 +246,7 @@ spec s registry = do
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FilterSpec.spec s
+  Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
@@ -267,6 +275,8 @@ spec s registry = do
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
   Pawl.Codec.PoolSpec.spec s
   Pawl.Codec.PowerSpec.spec s
+  Pawl.Codec.PrintingSpec.spec s
+  Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s

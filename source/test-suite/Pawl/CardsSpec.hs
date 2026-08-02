@@ -9,7 +9,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Printing (printingToJson)
+import qualified Pawl.Codec.Printing as Printing
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Registry as Registry
@@ -1197,4 +1197,4 @@ checkFile s root p = do
           -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
           -- this can never quietly regress into a byte comparison: every file would
           -- fail at once.
-          Spec.assertEqWith s path (Json.sortKeys (printingToJson p)) (Json.sortKeys value)
+          Spec.assertEqWith s path (Json.sortKeys (Printing.toJson p)) (Json.sortKeys value)

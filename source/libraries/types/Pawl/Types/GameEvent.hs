@@ -9,14 +9,14 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import Pawl.Types.ZoneChange (ZoneChange)
 
--- CR 608.2i: one entry of the turn-scoped record of what happened. "Some effects
+-- | CR 608.2i: one entry of the turn-scoped record of what happened. "Some effects
 -- look back in time and require information about previous game states and
 -- actions rather than considering the current game state" -- so entries are
 -- APPENDED by the change-and-emit funnels and never removed by a reader. Each
 -- reader keeps its own watermark into GameState.events; the log itself is cleared
 -- only at turn handoff.
 data GameEvent
-  = -- CR 400.7: an object moved between zones. The ZoneChange is the RESOLVED
+  = -- | CR 400.7: an object moved between zones. The ZoneChange is the RESOLVED
     -- (post-replacement) event, carrying the RESULTING object's id.
     --
     -- The ProjectedCharacteristics is the moved object as it last existed in the
@@ -31,16 +31,16 @@ data GameEvent
     -- for a whole turn -- retaining a turn's worth of superseded states instead
     -- of the one small value this constructor is meant to carry.
     Moved ZoneChange !ProjectedCharacteristics
-  | -- CR 120 / 510: damage was dealt. The record the CR 704.5h deathtouch
+  | -- | CR 120 / 510: damage was dealt. The record the CR 704.5h deathtouch
     -- state-based action reads, watermarked rather than drained.
     DamageDealt DamageEvent
-  | -- CR 603.2b: a phase or step began, on whose turn (the active player). What
+  | -- | CR 603.2b: a phase or step began, on whose turn (the active player). What
     -- both an "at the beginning of each end step" step trigger and a CR 603.7
     -- delayed ability match against -- the second consumer is
     -- Pawl.Engine.Event.delayedPending (Tidal Wave's "sacrifice it at the beginning of
     -- the next end step" depends on it).
     StepBegan Phase PlayerId
-  | -- CR 601.2i: a player cast a spell. The event Rule of Law counts, and the
+  | -- | CR 601.2i: a player cast a spell. The event Rule of Law counts, and the
     -- reason the count is a fold over P4's whole turn log rather than a
     -- per-effect watermark: its ruling looks at "the entire turn ... even if
     -- Rule of Law wasn't on the battlefield when that spell was cast".
@@ -49,11 +49,11 @@ data GameEvent
     -- cast a spell that was countered, you can't cast another spell during the
     -- same turn") is what fixes that.
     SpellCast PlayerId
-  | -- CR 725.1: a player became the monarch. What Palace Jailer's exile duration
+  | -- | CR 725.1: a player became the monarch. What Palace Jailer's exile duration
     -- keys off, and the substrate for any future "whenever a player becomes the
     -- monarch" trigger.
     BecameMonarch PlayerId
-  | -- CR 701.9a: a card was DISCARDED -- "to discard a card, move it from its
+  | -- | CR 701.9a: a card was DISCARDED -- "to discard a card, move it from its
     -- owner's hand to that player's graveyard". Emitted by Pawl.Engine.Event.discard,
     -- the one funnel every discard in the engine goes through, alongside the
     -- Moved event that same move records.
@@ -87,7 +87,7 @@ data GameEvent
     -- been discarded, so a reader matching the hand-to-graveyard zone pair would
     -- lose exactly the case Rest in Peace creates.
     Discarded PlayerId ObjectId DiscardCause
-  | -- CR 508.2b: an attacker was DECLARED -- one entry per creature the active
+  | -- | CR 508.2b: an attacker was DECLARED -- one entry per creature the active
     -- player chose in CR 508.1's turn-based action. What "whenever this creature
     -- attacks" matches (CR 508.3a).
     --
@@ -98,7 +98,7 @@ data GameEvent
     -- distinct here: only Pawl.Engine.Combat.declareAttackers appends this, and
     -- Pawl.Engine.Combat.putOntoBattlefieldAttacking deliberately does not.
     AttackerDeclared ObjectId
-  | -- CR 701.20a: a player revealed a card -- "show that card to all players for
+  | -- | CR 701.20a: a player revealed a card -- "show that card to all players for
     -- a brief time."
     --
     -- A reveal is the one game action whose entire content is INFORMATION, so
@@ -127,7 +127,7 @@ data GameEvent
     -- ability it caused is on the stack -- need a per-object flag that no card
     -- in the pool asks for (#185, #282).
     Revealed PlayerId !ProjectedCharacteristics
-  | -- CR 701.6a: a spell was COUNTERED -- "to counter a spell or ability means to
+  | -- | CR 701.6a: a spell was COUNTERED -- "to counter a spell or ability means to
     -- cancel it, removing it from the stack. It doesn't resolve and none of its
     -- effects occur." Emitted by Pawl.Engine.Event.counter, the one funnel every
     -- countering in the engine goes through, alongside the Moved event that same
@@ -148,7 +148,7 @@ data GameEvent
     -- returns before this is recorded, and CR 603.2g is the rule that makes that
     -- mandatory: "an event that's prevented or replaced won't trigger anything."
     SpellCountered Countering
-  | -- CR 606.3: a LOYALTY ability of this permanent was activated. The record CR
+  | -- | CR 606.3: a LOYALTY ability of this permanent was activated. The record CR
     -- 606.3's once-per-permanent-per-turn limit is read out of -- "A player may
     -- activate a loyalty ability of a permanent they control ... only if no
     -- player has previously activated a loyalty ability of that permanent that
