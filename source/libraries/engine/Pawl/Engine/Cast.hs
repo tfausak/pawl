@@ -714,7 +714,7 @@ castSpell pid oid = do
                                   top
                                   (GameState.objects moved)
                             }
-                        Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard card top)
+                        Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid card top)
 
 -- CR 702.34a's SECOND static ability -- "exile this card instead of putting it
 -- anywhere else any time it would leave the stack" -- installed onto the spell's
@@ -736,8 +736,8 @@ castSpell pid oid = do
 -- CR 614.3's `uses` is Once and its expiry is Never: a spell leaves the stack
 -- exactly once, and the ability has no duration -- it stops mattering because its
 -- subject is gone, which is what the store spells Uses.Once.
-armCastFromGraveyard :: Card.Type.Card -> ObjectId -> Game ()
-armCastFromGraveyard card top =
+armCastFromGraveyard :: PlayerId -> Card.Type.Card -> ObjectId -> Game ()
+armCastFromGraveyard caster card top =
   let arm re = State.modify' $ \gs ->
         let (ts, gs1) = Game.freshTimestamp gs
             active =
@@ -746,6 +746,11 @@ armCastFromGraveyard card top =
                   -- CR 113.7: the source is the spell itself, which is also what
                   -- the pattern's TheSource subject is compared against.
                   ActiveReplacement.source = top,
+                  -- CR 109.5: the caster. Nothing reads it -- rule 702.34a's
+                  -- exile is a ZoneChangeR whose subject is TheSource, an
+                  -- identity test with no relation to resolve -- but the row
+                  -- carries it for the same reason every other row does.
+                  ActiveReplacement.controller = caster,
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.Never,
                   ActiveReplacement.uses = Uses.Once,

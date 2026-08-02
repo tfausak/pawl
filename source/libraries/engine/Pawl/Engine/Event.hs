@@ -304,7 +304,12 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- destination -- CR 110.5a makes status a property of permanents
               -- -- and every other door passes the default, so nothing else can
               -- put a tapped card in a graveyard.
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
+              -- CR 110.2 / 400.7: `enteredUnder` is reset like every other
+              -- per-incarnation field, so the new object enters under its
+              -- owner's control until a CR 616.1b replacement says otherwise --
+              -- Replacement.runEntry's loop, below, is the only thing that ever
+              -- writes it.
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.timestamp = ts}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -674,6 +679,7 @@ createTokens controller card n tapped = do
           let mkObj ts =
                 Object.MkObject
                   { Object.owner = owner,
+                    Object.enteredUnder = Nothing,
                     Object.source = Source.OfToken tokenCard,
                     Object.zone = Zone.Battlefield,
                     -- CR 110.5b: "permanents enter the battlefield untapped ...

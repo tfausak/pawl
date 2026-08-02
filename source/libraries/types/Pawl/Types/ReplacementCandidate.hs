@@ -2,6 +2,7 @@ module Pawl.Types.ReplacementCandidate where
 
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 
@@ -20,6 +21,16 @@ data ReplacementCandidate = MkReplacementCandidate
   { identity :: CandidateId.CandidateId,
     effect :: ReplacementEffect.ReplacementEffect,
     source :: ObjectId.ObjectId,
+    -- | CR 109.5's "you" for this instance, from whichever of the two segments
+    -- can answer it: a permanent's static ability derives it from `source`'s
+    -- current controller, and a floating row carries it baked (see
+    -- Pawl.Types.ActiveReplacement). Nothing only where a permanent-sourced
+    -- instance's source has left the board, which every pattern reading it then
+    -- treats as matching nothing rather than everything.
+    --
+    -- NOT derivable from `source` at the point of use, which is the whole reason
+    -- it is a field: Gather Specimens' row outlives the spell that installed it.
+    controller :: Maybe PlayerId.PlayerId,
     origin :: ReplacementOrigin.ReplacementOrigin
   }
   deriving (Eq, Ord, Show)

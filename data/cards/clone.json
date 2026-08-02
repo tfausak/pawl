@@ -25,9 +25,14 @@
   "replacementEffects": [
     {
       "type": "EntryR",
-      "value": {
-        "type": "AsCopy"
-      }
+      "value": [
+        {
+          "type": "IsSource"
+        },
+        {
+          "type": "AsCopy"
+        }
+      ]
     }
   ],
   "spell": {

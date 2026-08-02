@@ -234,6 +234,7 @@ whileReplacement src you gs =
         ActiveReplacement.MkActiveReplacement
           { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
             ActiveReplacement.source = src,
+            ActiveReplacement.controller = you,
             ActiveReplacement.timestamp = ts,
             ActiveReplacement.expiry = Expiry.Type.While you S.youControlSource,
             ActiveReplacement.uses = Uses.Unlimited,

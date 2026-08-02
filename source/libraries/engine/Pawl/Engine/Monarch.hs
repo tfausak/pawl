@@ -160,6 +160,7 @@ placeInherent pending = do
       obj =
         Object.MkObject
           { Object.owner = controller,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfInherentTrigger controller ability,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,

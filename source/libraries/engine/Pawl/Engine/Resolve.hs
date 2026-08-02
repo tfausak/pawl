@@ -1723,6 +1723,12 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                     ActiveReplacement.MkActiveReplacement
                       { ActiveReplacement.effect = re,
                         ActiveReplacement.source = source,
+                        -- CR 109.5: the resolution's controller, BAKED now --
+                        -- the source is a spell CR 608.2m is about to put in a
+                        -- graveyard, so it will have no controller to project
+                        -- by the time the row is consulted. Gather Specimens'
+                        -- "an opponent's" and "your" are both read off this.
+                        ActiveReplacement.controller = controller,
                         ActiveReplacement.timestamp = ts,
                         ActiveReplacement.expiry = expiry,
                         ActiveReplacement.uses = uses,
@@ -1768,6 +1774,11 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                             PhasePattern.whosePhase = Just pid
                           },
                     ActiveReplacement.source = source,
+                    -- CR 109.5: the resolution's controller. Not the same
+                    -- player as `pid` above, which the effect NAMED (Fatigue's
+                    -- "target player"); nothing reads this, since a PhaseR
+                    -- resolves no ControllerRelation.
+                    ActiveReplacement.controller = controller,
                     ActiveReplacement.timestamp = ts,
                     ActiveReplacement.expiry = Expiry.Type.Never,
                     ActiveReplacement.uses = Uses.Once,
@@ -1805,6 +1816,7 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
     let mkObj ts =
           Object.MkObject
             { Object.owner = controller,
+              Object.enteredUnder = Nothing,
               Object.source = Source.OfEmblem card,
               Object.zone = Zone.Command,
               Object.tapped = TapState.Untapped,

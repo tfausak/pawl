@@ -26,6 +26,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -134,7 +135,7 @@ populatedCard =
     { Card.keywords = Set.singleton Keyword.Deathtouch,
       Card.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton Modification.LoseAllAbilities)],
       Card.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal ActivationTiming.AnyTime],
-      Card.replacementEffects = [ReplacementEffect.EntryR EntryRewrite.AsCopy],
+      Card.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy],
       Card.triggeredAbilities = [minimalTriggeredAbility],
       Card.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       Card.loyalty = Just (Loyalty.MkLoyalty 3),
@@ -164,7 +165,7 @@ populatedCardJson =
     <> "\"spell\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}},"
     <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[],\"components\":[]},"
     <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}],"
-    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":{\"type\":\"AsCopy\"}}],"
+    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"

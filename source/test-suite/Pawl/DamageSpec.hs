@@ -204,6 +204,7 @@ damageSpec s registry =
             ActiveReplacement.MkActiveReplacement
               { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = victim,
+                ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
@@ -222,6 +223,7 @@ damageSpec s registry =
             ActiveReplacement.MkActiveReplacement
               { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = ObjectId.MkObjectId 900,
+                ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
@@ -384,6 +386,7 @@ toxicSpec s registry =
             ActiveReplacement.MkActiveReplacement
               { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = oid,
+                ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
@@ -514,6 +517,7 @@ lifelinkSpec s registry =
             ActiveReplacement.MkActiveReplacement
               { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = oid,
+                ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,

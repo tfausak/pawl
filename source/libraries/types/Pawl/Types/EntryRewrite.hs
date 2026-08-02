@@ -4,9 +4,10 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
 
--- | CR 614.1c: how an "as this permanent enters" replacement modifies the entry.
+-- | CR 614.1c-d: how an entry replacement modifies the entry.
 -- AsCopy is Clone (CR 707.5, and a real "may" -- declining is legal); ChoiceOf
--- is Primal Plasma (CR 208.2b); WithCounters is CR 306.5b's intrinsic loyalty.
+-- is Primal Plasma (CR 208.2b); WithCounters is CR 306.5b's intrinsic loyalty;
+-- UnderSourceControl is Gather Specimens (CR 616.1b).
 -- The first two write into the object's COPIABLE snapshot,
 -- which is what makes CR 707.2 fall out with no further machinery: the rule says
 -- copiable values are the printed values as modified by copy effects and by
@@ -48,4 +49,22 @@ data EntryRewrite
     -- (Pawl.Engine.Projection.intrinsicReplacementsOf) and the number is settled
     -- there, where CR 707.2's copiable loyalty is visible.
     WithCounters CounterKind.CounterKind Natural.Natural
+  | -- | CR 616.1b's shape: "if any of the replacement and/or prevention effects
+    -- would modify UNDER WHOSE CONTROL an object would enter the battlefield".
+    -- Gather Specimens' "it enters under your control instead" is the one
+    -- producer, and the whole of its text is this rewrite.
+    --
+    -- NULLARY, carrying no PlayerId, because CR 109.5 derives one: "you" is the
+    -- controller of the effect's source, which for a floating row is baked at
+    -- installation (Pawl.Types.ActiveReplacement's `controller`) and for a
+    -- permanent's static ability is read live. A card cannot write a PlayerId
+    -- anyway -- the reason Effect.SkipNextPhase is its own opcode -- and here it
+    -- does not have to.
+    --
+    -- Written to the entering object's CR 110.2 default controller
+    -- (Object.enteredUnder), not to a CR 613.1b layer-2 continuous effect: CR
+    -- 800.4c distinguishes "an effect that gives a player control of an object"
+    -- from "the player who controlled that object by default", and a permanent
+    -- that ENTERED under your control is the second of those.
+    UnderSourceControl
   deriving (Eq, Ord, Show)

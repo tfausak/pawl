@@ -262,6 +262,10 @@ collect sources floating =
           { ReplacementCandidate.identity = CandidateId.OfPermanent src re,
             ReplacementCandidate.effect = re,
             ReplacementCandidate.source = src,
+            -- CR 109.5: "you" is the SOURCE's controller, read live off the
+            -- board this segment was gathered from -- a stolen Furnace of Rath's
+            -- "you" is whoever holds it now, not whoever printed it.
+            ReplacementCandidate.controller = Projection.controllerOf src sources,
             -- CR 614.15: a permanent's replacement ability is a STATIC ability,
             -- and the rule's first sentence puts self-replacement effects
             -- outside that class ("some replacement effects are not continuous
@@ -274,6 +278,11 @@ collect sources floating =
           { ReplacementCandidate.identity = CandidateId.OfFloating (ActiveReplacement.source active) (ActiveReplacement.timestamp active),
             ReplacementCandidate.effect = ActiveReplacement.effect active,
             ReplacementCandidate.source = ActiveReplacement.source active,
+            -- CR 109.5, BAKED at installation rather than derived: this row's
+            -- source is a spell CR 608.2m has already put in its owner's
+            -- graveyard as a new object with a new id, so `source` names nothing
+            -- the board can answer about. See Pawl.Types.ActiveReplacement.
+            ReplacementCandidate.controller = Just (ActiveReplacement.controller active),
             -- CR 614.15: "an effect of a resolving spell or ability", which is
             -- what a floating row IS -- so this is the one segment that can
             -- carry a self-replacement, and the row itself says whether it does
@@ -382,12 +391,13 @@ applies gs event candidate =
         -- MISMATCHED class (e.g. a DestructionR candidate offered a
         -- WouldChangeZone event), where False is simply the correct answer, not
         -- a stand-in for "not yet implemented".
-        -- CR 614.1c: "as [this permanent] enters" is the entering object's OWN
-        -- ability, so an entry replacement is self-only. CR 614.1d's
-        -- other-objects form (Essence of the Wild) has no producer.
-        (ReplacementEffect.EntryR _, ProposedEvent.WouldEnter oid) -> src == oid
+        -- CR 614.1c-d: which entering permanents this replacement watches, as a
+        -- Filter over the entering object (see Pawl.Types.ReplacementEffect).
+        -- 614.1c's "as [THIS PERMANENT] enters" is Filter.IsSource, and 614.1d's
+        -- "[Objects] enter [the battlefield] . . ." is a characteristic filter.
+        (ReplacementEffect.EntryR pat _, ProposedEvent.WouldEnter oid) -> matchesEntering gs candidate pat oid
         (ReplacementEffect.ZoneChangeR _ _, _) -> False
-        (ReplacementEffect.EntryR _, _) -> False
+        (ReplacementEffect.EntryR _ _, _) -> False
         (ReplacementEffect.DamageR _ _, _) -> False
         (ReplacementEffect.DestructionR _, _) -> False
         (ReplacementEffect.CounterR _ _, _) -> False
@@ -478,6 +488,29 @@ matchesPermanent gs filter_ oid =
   -- No source in scope at this site.
   Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
 
+-- CR 614.1c-d: does the entering object satisfy this entry replacement's Filter?
+--
+-- The same evaluator matchesPermanent uses, over the same projected view, but
+-- with a FRAMED Context rather than an empty one, because both of the entry
+-- filters in the pool read it: CR 614.1c's `IsSource` asks whether the candidate
+-- IS the effect's source (Clone, Primal Plasma, CR 306.5b's loyalty), and CR
+-- 614.1d's `ControlledBy Opponent` asks who the candidate's controller is
+-- relative to CR 109.5's "you" (Gather Specimens). The perspective is the
+-- CANDIDATE's controller, which for a floating row is the baked one -- deriving
+-- it from `src` here would answer Nothing for every row whose spell has
+-- resolved, and a Nothing perspective makes ControlledBy vacuously False.
+--
+-- CR 614.12 is why the view is the LIVE projection of the materialized object
+-- rather than of the card it came from: "check the characteristics of the
+-- permanent AS IT WOULD EXIST ON THE BATTLEFIELD, taking into account
+-- replacement effects that have already modified how it enters" -- so a
+-- previous iteration's rewrite is visible to this one, including CR 616.1b's own
+-- change to who would control it.
+matchesEntering :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesEntering gs candidate filter_ oid =
+  let context = Filter.MkContext (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
+   in Filter.matches context (Projection.viewOfObject oid gs) filter_
+
 -- CR 614.1a: apply a scaling to a number. "That many plus one" and "twice that
 -- many" are the same operation with different data, and so is Furnace of Rath's
 -- "double that damage" -- which is why CounterR, TokenR (CR 614.16's two shapes)
@@ -524,17 +557,29 @@ bucketOfEffect re = case re of
   -- iteration (so the loop finds the ChoiceOf the object did not have before)
   -- together with CR 614.5's identity being keyed on the effect VALUE, which
   -- keeps the newly-acquired ChoiceOf distinct from the already-applied
-  -- AsCopy. The split this arm encodes only becomes observable for an object
-  -- with an AsCopy AND another entry replacement applicable in the SAME
-  -- iteration, which no card in the pool produces, so THIS bucket's ordering is
-  -- unexercised by any test (#73). CR 616.1a's, above, is not: Galvanic Blast
-  -- racing Furnace of Rath is a real board where the order changes the answer.
-  ReplacementEffect.EntryR EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
-  ReplacementEffect.EntryR (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
+  -- AsCopy. The split this arm encodes only becomes observable where an AsCopy
+  -- races another entry replacement OF NO HIGHER BUCKET in the SAME iteration,
+  -- which no card in the pool produces, so THIS bucket's ordering is unexercised
+  -- by any test (#73). Gather Specimens racing an entering Clone is a real
+  -- same-iteration race, but it does not exercise this arm: CR 616.1b's bucket
+  -- outranks this one, so mapping this arm to Other would not change its answer.
+  -- CR 616.1a's bucket and CR 616.1b's are both exercised -- Galvanic Blast
+  -- racing Furnace of Rath, and that Gather Specimens board.
+  ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
+  ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   -- CR 616.1a-d name self-replacement, entering under a control effect,
   -- entering as a copy and entering with the back face up; entering with
   -- counters is none of those, so CR 616.1e is what applies.
-  ReplacementEffect.EntryR (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
+  -- CR 616.1b: "if any of the replacement and/or prevention effects would modify
+  -- under whose control an object would enter the battlefield, one of them must
+  -- be chosen." One step ABOVE the copy bucket, and Gather Specimens racing an
+  -- entering Clone is the board where the two orders disagree: taking the
+  -- control rewrite first hands CR 707.5's copy choice to the NEW controller,
+  -- and taking the copy first hands it to the old one. ReplacementSpec's
+  -- "CR 616.1b before CR 616.1c: the NEW controller chooses the copy" is the
+  -- test that pins it, and unlike the copy bucket below this one is exercised.
+  ReplacementEffect.EntryR _ EntryRewrite.UnderSourceControl -> ReplacementBucket.ControlOnEntry
   ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
   ReplacementEffect.CounterR _ _ -> ReplacementBucket.Other
@@ -612,6 +657,11 @@ at xs i fallback = case List.genericDrop i xs of
 chooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 chooserOf gs event = case event of
   ProposedEvent.WouldChangeZone zc -> Projection.controllerOf (ZoneChange.object zc) gs
+  -- CR 616.1's "affected object's controller", read LIVE off the materialized
+  -- permanent -- which for an entry is the player it WOULD enter under, and
+  -- which a CR 616.1b rewrite may already have changed on an earlier iteration.
+  -- So an opponent's entering creature is that opponent's to choose about until
+  -- Gather Specimens takes it, and the Gather Specimens controller's afterwards.
   ProposedEvent.WouldEnter oid -> Projection.controllerOf oid gs
   ProposedEvent.WouldDealDamage de -> case DamageEvent.target de of
     Recipient.ToPlayer pid -> Just pid
@@ -674,7 +724,7 @@ apply batch candidate event =
     -- carries the exhaustiveness obligation -- not a wildcard-bound `_` on the
     -- outer pattern, which would let a third EntryRewrite constructor fall through
     -- silently whenever it happened to pair with WouldEnter.
-    (ReplacementEffect.EntryR rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
+    (ReplacementEffect.EntryR _ rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
       EntryRewrite.AsCopy -> do
         consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -751,8 +801,43 @@ apply batch candidate event =
         consume (ReplacementCandidate.identity candidate)
         putCounters oid kind n
         pure (Just event)
+      -- CR 616.1b / 110.2: Gather Specimens' "it enters under your control
+      -- instead". The entering object's CR 110.2 DEFAULT controller becomes CR
+      -- 109.5's "you" -- the candidate's controller, baked when the row was
+      -- installed -- and that is a permanent change to the permanent, not a
+      -- duration-scoped one: the card's "this turn" bounds how long the
+      -- REPLACEMENT is around to catch entries, never how long the creature
+      -- stays yours.
+      --
+      -- Written to the object rather than to the surviving ProposedEvent, which
+      -- is why ProposedEvent.WouldEnter still carries only an ObjectId. This
+      -- engine materializes the entering permanent BEFORE running the entry loop
+      -- (see runEntry, and CR 614.12's "as it would exist on the battlefield"),
+      -- so the would-be controller is exactly Projection.controllerOf on the
+      -- live board and the object IS the event's payload. Keeping it there is
+      -- also what makes CR 616.2 fall out: the loop's next iteration re-collects
+      -- and re-matches against a board where the control has already changed,
+      -- which a value parked on the event would not show it. The two arms above
+      -- write to the object for the same reason.
+      --
+      -- No prompt, and none is owed: CR 616.1b's rewrite has no choice in it,
+      -- and the choice the rule DOES describe -- which of several
+      -- control-modifying effects to apply -- is `choose`'s, one level up.
+      EntryRewrite.UnderSourceControl -> do
+        consume (ReplacementCandidate.identity candidate)
+        case ReplacementCandidate.controller candidate of
+          -- CR 109.5 has no answer: a permanent-sourced instance whose source
+          -- has left the board. Defensive -- no producer, since the one card
+          -- with this rewrite is a floating row carrying a baked controller --
+          -- and it leaves the entry alone rather than guessing at a player.
+          Nothing -> pure (Just event)
+          Just you -> do
+            State.modify' $ \gs ->
+              let claim obj = obj {Object.enteredUnder = Just you}
+               in gs {GameState.objects = Map.adjust claim oid (GameState.objects gs)}
+            pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
-    (ReplacementEffect.EntryR _, _) -> pure (Just event)
+    (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
     (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of
       -- CR 615.6: a prevented event never happens -- it is not marked, not
       -- drained, and never recorded, so no deathtouch bit exists for the CR
@@ -904,9 +989,10 @@ legalCopyTargets batch self gs =
 -- strictly stronger than P2's drain, whose observable-equivalence argument this
 -- discharges.
 -- `Monad.void` discards the `Nothing` case `apply`'s doc warns means "the event
--- does not happen." Safe here: both EntryR arms (AsCopy, ChoiceOf) always
--- return `Just`; only DamageR/DestructionR ever return `Nothing`, and neither
--- pairs with WouldEnter, the only event this loop ever proposes.
+-- does not happen." Safe here: every EntryR arm (AsCopy, ChoiceOf, WithCounters,
+-- UnderSourceControl) always returns `Just`; only DamageR/DestructionR ever
+-- return `Nothing`, and neither pairs with WouldEnter, the only event this loop
+-- ever proposes.
 --
 -- Always the LIVE board (`Nothing`), even when the zone change containing this
 -- entry belongs to a CR 608.2f batch. Two reasons, both CR: the entering object
@@ -1106,6 +1192,13 @@ installTurnSkips entry gs =
                         },
                   -- CR 113.7: the source of the effect that created the turn.
                   ActiveReplacement.source = ExtraTurn.source entry,
+                  -- CR 109.5's "you" for this row. Nothing reads it: a PhaseR
+                  -- names its player outright (PhasePattern.whosePhase) and has
+                  -- no ControllerRelation to resolve. The taker is the honest
+                  -- answer anyway -- CR 500.7's skips belong to the turn, and
+                  -- the effect that created it is long gone by the time the turn
+                  -- begins (see applyReplacementsIn on why that matters).
+                  ActiveReplacement.controller = ExtraTurn.taker entry,
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.AtCleanup,
                   ActiveReplacement.uses = Uses.Once,

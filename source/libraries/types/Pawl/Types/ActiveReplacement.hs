@@ -2,6 +2,7 @@ module Pawl.Types.ActiveReplacement where
 
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -51,6 +52,21 @@ import qualified Pawl.Types.Uses as Uses
 data ActiveReplacement = MkActiveReplacement
   { effect :: ReplacementEffect.ReplacementEffect,
     source :: ObjectId.ObjectId,
+    -- | CR 109.5's "you", BAKED as the row is installed rather than re-derived
+    -- from `source`. The same posture Pawl.Types.ContinuousEffect and
+    -- Pawl.Types.PlayerEffect already take, and for the same reason: the source
+    -- of a floating replacement is a resolving spell, and CR 608.2m has put it
+    -- in its owner's graveyard -- as a NEW object with a NEW id (CR 400.7) --
+    -- long before the row is ever consulted, so there is nothing left on the
+    -- board to ask. Gather Specimens is the card that makes this observable:
+    -- both halves of its text ("an OPPONENT's control", "YOUR control") are
+    -- relative to a player its own source can no longer name.
+    --
+    -- The projection's side of Pawl.Engine.Replacement.collect needs no such
+    -- field: a permanent's static replacement ability has its source sitting on
+    -- the battlefield, so CR 109.5's "you" is read live -- which is also the
+    -- rules' answer, since a stolen Furnace of Rath's "you" follows the theft.
+    controller :: PlayerId.PlayerId,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
     uses :: Uses.Uses,

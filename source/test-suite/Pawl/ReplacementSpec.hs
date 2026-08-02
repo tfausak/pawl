@@ -214,6 +214,7 @@ leylineShape src ts =
           (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents ZoneChangeSubject.AnyObject)
           Zone.Exile,
       ActiveReplacement.source = src,
+      ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,
@@ -1125,8 +1126,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         onlyOption = EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}
         active =
           ActiveReplacement.MkActiveReplacement
-            { ActiveReplacement.effect = ReplacementEffect.EntryR (EntryRewrite.ChoiceOf [onlyOption]),
+            { ActiveReplacement.effect = ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.ChoiceOf [onlyOption]),
               ActiveReplacement.source = piker,
+              ActiveReplacement.controller = S.alice,
               ActiveReplacement.timestamp = ts,
               ActiveReplacement.expiry = Expiry.AtCleanup,
               ActiveReplacement.uses = Uses.Once,
@@ -1204,6 +1206,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   fatigueSpec s registry
   stonehornSpec s registry
   galvanicBlastSpec s registry
+  gatherSpecimensSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -1356,6 +1359,160 @@ galvanicBlastSpec s registry =
       Spec.assertEqWith s "its own source's 2 becomes 4" (S.damageOf victim (hit mine)) (Just 4)
       Spec.assertEqWith s "another source's 2 stays 2" (S.damageOf victim (hit theirs)) (Just 2)
 
+-- How many battlefield permanents `pid` CONTROLS are printed with this name. NOT
+-- S.countOnBattlefieldByName, which counts by OWNER (Game.zoneMembers filters the
+-- shared battlefield by Object.owner) -- the whole point of a CR 616.1b rewrite
+-- is that the owner and the controller have come apart.
+controlledNamed :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
+controlledNamed wanted pid gs =
+  length (filter (\oid -> fmap Card.name (Game.cardOf oid gs) == Just wanted) (Projection.controls pid gs))
+
+-- alice controls six untapped Islands (Gather Specimens is {3}{U}{U}{U}) and one
+-- Goblin Piker for a Clone to copy; bob controls eight, enough for two Clones at
+-- {3}{U} with no untap step in between. alice holds one Gather Specimens, bob
+-- holds one of each printing in `bobsHand`. It is alice's precombat main phase,
+-- and she has priority. Returns the state, alice's spell id, bob's hand ids in
+-- order, and the Piker.
+specimenBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId)
+specimenBoard island pikerPrinting gatherSpecimens bobsHand =
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature island pid acc)) g [1 .. n :: Int]
+      base = addLands S.bob 8 (addLands S.alice 6 (Setup.emptyGame S.bothPlayers))
+      (piker, g1) = S.addCreature pikerPrinting S.alice base
+      (gatherId, g2) = S.addHandCard gatherSpecimens S.alice g1
+      addOne (ids, g) p = let (oid, g3) = S.addHandCard p S.bob g in (ids <> [oid], g3)
+      (bobs, g4) = List.foldl' addOne ([], g2) bobsHand
+   in ( g4
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        gatherId,
+        bobs,
+        piker
+      )
+
+-- Copy `wanted` if and only if the copy choice is offered to `who`, and decline
+-- otherwise. The readout for WHICH player CR 616.1 made the chooser: the copy
+-- lands (a 2/1) only when the engine asked the named player, and the Clone stays
+-- a 0/0 when it asked anyone else.
+copyIfAskedOf :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+copyIfAskedOf who wanted p = case p of
+  Prompt.ChooseCopyTarget _ asked _ legal ->
+    if asked == who && List.elem wanted legal then Just wanted else Nothing
+  _ -> S.identityAnswer p
+
+-- CR 616.1b's bucket, through the one card in the pool that produces one.
+--
+-- Gather Specimens ({3}{U}{U}{U} instant, Shards of Alara): "If a creature would
+-- enter the battlefield under an opponent's control this turn, it enters under
+-- your control instead." It is CR 614.1d's other-objects form ("[Objects] enter
+-- [the battlefield] . . ."), which is why EntryR carries a Filter at all, and its
+-- whole content is modifying under whose control an object enters -- CR 616.1b's
+-- description word for word.
+--
+-- Clone is the competing entry replacement. CR 616.1c's copy bucket sits one step
+-- BELOW 616.1b's, so on the entering Clone's first iteration the control rewrite
+-- is the only candidate in the highest non-empty bucket, and CR 616.1 hands the
+-- copy choice that follows to whoever controls the object THEN -- which the
+-- control rewrite has just changed.
+gatherSpecimensSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gatherSpecimensSpec s registry =
+  Spec.describe s "Gather Specimens (CR 616.1b)" $ do
+    Spec.it s "CR 616.1b an opponent's entering creature enters under YOUR control instead" $ do
+      island <- S.printingOf s registry "Island"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      clonePrinting <- S.printingOf s registry "Clone"
+      let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting]
+      case bobs of
+        cloneId : _ ->
+          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
+              after = S.runPure (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+              -- The DISCRIMINATING TWIN: the same cast on the same board with no
+              -- Gather Specimens resolved first.
+              alone = S.runPure (copyIfAskedOf S.alice piker) gs (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+           in case (newestNamed (CardName.MkCardName $ Text.pack "Clone") after, newestNamed (CardName.MkCardName $ Text.pack "Clone") alone) of
+                (Just taken, Just untaken) -> do
+                  Spec.assertEqWith s "bob's Clone entered under alice's control" (Projection.controllerOf taken after) (Just S.alice)
+                  Spec.assertEqWith s "without the Gather Specimens it is bob's" (Projection.controllerOf untaken alone) (Just S.bob)
+                _ -> Spec.assertFailure s "a Clone did not reach the battlefield"
+        _ -> Spec.assertFailure s "fixture did not deal bob a card"
+    -- CR 616.1b BEFORE CR 616.1c, and the two orders disagree about WHO IS ASKED
+    -- -- which is what makes this an assertion rather than a coincidence:
+    --
+    --   * CR 616.1b's order -- the control rewrite first, so the object is
+    --     alice's by the time CR 707.5's copy choice is offered, and ALICE
+    --     picks the copy target.
+    --   * the other order -- the copy first, while the object is still bob's,
+    --     so BOB picks.
+    --
+    -- CR 616.1 names the chooser as "the affected object's controller", which for
+    -- an opponent's entering creature is NOT the Gather Specimens controller
+    -- until CR 616.1b's rewrite has been applied. That is the whole point: the
+    -- bucket ordering decides who the second question goes to.
+    Spec.it s "CR 616.1b before CR 616.1c: the NEW controller chooses the copy" $ do
+      island <- S.printingOf s registry "Island"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      clonePrinting <- S.printingOf s registry "Clone"
+      let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting]
+      case bobs of
+        cloneId : _ ->
+          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
+              askedAlice = S.runPure (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+              askedBob = S.runPure (copyIfAskedOf S.bob piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+              asked = answersFor (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+           in case (newestNamed (CardName.MkCardName $ Text.pack "Clone") askedAlice, newestNamed (CardName.MkCardName $ Text.pack "Clone") askedBob) of
+                (Just toAlice, Just toBob) -> do
+                  Spec.assertEqWith s "alice was offered the copy, and took it" (Projection.powerOf toAlice askedAlice) (Just 2)
+                  Spec.assertEqWith s "bob was never offered it, so the Clone is still a 0/0" (Projection.powerOf toBob askedBob) (Just 0)
+                  -- CR 616.1b's "one of them must be chosen" with one member:
+                  -- the control rewrite is alone in the highest non-empty
+                  -- bucket, so there is nothing to choose and the engine must
+                  -- not ask. Were both candidates in CR 616.1e's bucket, this
+                  -- is the race that would be prompted.
+                  Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
+                _ -> Spec.assertFailure s "a Clone did not reach the battlefield"
+        _ -> Spec.assertFailure s "fixture did not deal bob a card"
+    -- CR 614.1d's filter is the card's own "a creature", and this is the leg that
+    -- holds it to that word. The other half of the filter -- "under an OPPONENT's
+    -- control" -- has no two-player readout at all: rewriting alice's own
+    -- entering creature to alice's control is a no-op, so a filter that dropped
+    -- the relation would produce an identical board. It is observable only at
+    -- three seats or on a board where the two differ, and neither is what this
+    -- card needs to be proved (#69's producer is the creature clause).
+    Spec.it s "CR 614.1d an opponent's entering NONcreature is not a specimen" $ do
+      island <- S.printingOf s registry "Island"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      coating <- S.printingOf s registry "Liquimetal Coating"
+      let (gs, gatherId, bobs, _) = specimenBoard island pikerPrinting gatherSpecimens [coating]
+      case bobs of
+        coatingId : _ ->
+          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
+              after = S.runPure S.identityAnswer armed (Cast.castSpell S.bob coatingId >> Stack.resolveTop)
+           in case newestNamed (CardName.MkCardName $ Text.pack "Liquimetal Coating") after of
+                Nothing -> Spec.assertFailure s "the Coating did not reach the battlefield"
+                Just coatingObj -> Spec.assertEqWith s "an artifact is not a creature" (Projection.controllerOf coatingObj after) (Just S.bob)
+        _ -> Spec.assertFailure s "fixture did not deal bob a card"
+    -- CR 614.3's "until they're used up": Gather Specimens states no count, so
+    -- its row is Uses.Unlimited and every creature an opponent plays for the rest
+    -- of the turn comes over. A Uses.Once row would take the first and leave the
+    -- second, which is the difference this pins.
+    Spec.it s "CR 614.3 the effect lasts the turn: bob's SECOND creature comes over too" $ do
+      island <- S.printingOf s registry "Island"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      clonePrinting <- S.printingOf s registry "Clone"
+      let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting, clonePrinting]
+      case bobs of
+        firstClone : secondClone : _ ->
+          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
+              one = S.runPure (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob firstClone >> Stack.resolveTop)
+              two = S.runPure (copyIfAskedOf S.alice piker) one (Cast.castSpell S.bob secondClone >> Stack.resolveTop)
+           in Spec.assertEqWith s "both of bob's Clones are alice's" (controlledNamed (CardName.MkCardName $ Text.pack "Clone") S.alice two) 2
+        _ -> Spec.assertFailure s "fixture did not deal bob two cards"
+
 -- Galvanic Blast's metalcraft clause as a floating row: the damage THIS source is
 -- dealing, whatever its kind, becomes 4 (CR 614.15 / 614.1a). Uses.Unlimited
 -- rather than the card's Once, for the reason its one caller gives.
@@ -1367,6 +1524,7 @@ blastShape src ts =
           (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource)
           (DamageRewrite.SetAmount 4),
       ActiveReplacement.source = src,
+      ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,

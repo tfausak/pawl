@@ -158,6 +158,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
       ( Just
           Object.MkObject
             { Object.owner = S.alice,
+              Object.enteredUnder = Nothing,
               Object.source = Source.OfCard mountain,
               Object.zone = Zone.Battlefield,
               Object.tapped = TapState.Untapped,
@@ -1440,6 +1441,7 @@ handBobBolt lightningBolt gs =
       obj =
         Object.MkObject
           { Object.owner = S.bob,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfCard lightningBolt,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
@@ -1749,6 +1751,7 @@ restartOnStack mountain =
       abilObj =
         Object.MkObject
           { Object.owner = S.bob,
+            Object.enteredUnder = Nothing,
             Object.source = Source.OfAbility (ObjectId.MkObjectId 0) ability,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
