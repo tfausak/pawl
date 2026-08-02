@@ -4,6 +4,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -23,6 +24,7 @@ import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.Regenerability as Regenerability
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Codec.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Codec.SearchDestination as SearchDestination
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Uses as Uses
@@ -82,7 +84,9 @@ toJson codec e = case e of
       [Quantity.toJson q, codec c]
         <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
-  Effect.Replace d u re -> Common.tagged "Replace" (Just (Common.array [Duration.toJson d, Uses.toJson u, ReplacementEffect.toJson re]))
+  Effect.Replace d u o c re ->
+    Common.tagged "Replace" . Just . Common.array $
+      [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
   Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Common.array [PlayerRef.toJson r, PhaseSelector.toJson sel]))
   Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
@@ -187,12 +191,14 @@ fromJson decode value = do
         Effect.ArmDelayedTrigger <$> AbilityName.fromJson n <*> pure Onset.Immediately <*> fmap Just (Duration.fromJson d)
       _ -> Common.withValue mv (fmap (\n -> Effect.ArmDelayedTrigger n Onset.Immediately Nothing) . AbilityName.fromJson)
     "Replace" -> case mv of
-      Just (Value.Array (Array.MkArray [d, u, re])) -> do
+      Just (Value.Array (Array.MkArray [d, u, o, c, re])) -> do
         duration <- Duration.fromJson d
         uses <- Uses.fromJson u
+        origin <- ReplacementOrigin.fromJson o
+        condition <- Common.decodeMaybe Condition.fromJson c
         effect <- ReplacementEffect.fromJson re
-        pure (Effect.Replace duration uses effect)
-      _ -> Left . Text.pack $ "Replace expects [Duration, Uses, ReplacementEffect]"
+        pure (Effect.Replace duration uses origin condition effect)
+      _ -> Left . Text.pack $ "Replace expects [Duration, Uses, ReplacementOrigin, Maybe Condition, ReplacementEffect]"
     "SkipNextPhase" -> case mv of
       Just (Value.Array (Array.MkArray [r, sel])) -> Effect.SkipNextPhase <$> PlayerRef.fromJson r <*> PhaseSelector.fromJson sel
       _ -> Left . Text.pack $ "SkipNextPhase expects [playerRef, phaseSelector]"

@@ -1,0 +1,140 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Galvanic Blast",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "Replace",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "Once"
+              },
+              {
+                "type": "SelfReplacement"
+              },
+              {
+                "type": "Condition",
+                "value": [
+                  {
+                    "type": "Count",
+                    "value": [
+                      {
+                        "type": "InZone",
+                        "value": [
+                          {
+                            "type": "Battlefield"
+                          },
+                          {
+                            "type": "EachPlayer"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Artifact"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "Objects"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "AtLeast"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 3
+                  }
+                ]
+              },
+              {
+                "type": "DamageR",
+                "value": [
+                  {
+                    "whichKind": null,
+                    "whichSource": {
+                      "type": "TheSource"
+                    }
+                  },
+                  {
+                    "type": "SetAmount",
+                    "value": 4
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "DealDamage",
+            "value": [
+              "target",
+              {
+                "type": "Literal",
+                "value": 2
+              }
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "pool": {
+                "type": "AnyTarget"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

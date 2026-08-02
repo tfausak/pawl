@@ -59,8 +59,10 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -200,11 +202,12 @@ damageSpec s registry =
           (victim, gs0) = S.addCreature piker S.alice base
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = victim,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
-                ActiveReplacement.uses = Uses.Unlimited
+                ActiveReplacement.uses = Uses.Unlimited,
+                ActiveReplacement.origin = ReplacementOrigin.Other
               }
           withShield = S.addReplacement shield gs0
           combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Combat])
@@ -217,11 +220,12 @@ damageSpec s registry =
       let base = Setup.emptyGame S.bothPlayers
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = ObjectId.MkObjectId 900,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
-                ActiveReplacement.uses = Uses.Unlimited
+                ActiveReplacement.uses = Uses.Unlimited,
+                ActiveReplacement.origin = ReplacementOrigin.Other
               }
           dropped = Expiry.dropAtCleanup (S.addReplacement shield base)
        in Spec.assertEqWith s "no replacements remain" (GameState.replacements dropped) []
@@ -378,11 +382,12 @@ toxicSpec s registry =
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = oid,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
-                ActiveReplacement.uses = Uses.Unlimited
+                ActiveReplacement.uses = Uses.Unlimited,
+                ActiveReplacement.origin = ReplacementOrigin.Other
               }
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])
@@ -507,11 +512,12 @@ lifelinkSpec s registry =
       let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource) DamageRewrite.PreventAll,
                 ActiveReplacement.source = oid,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
-                ActiveReplacement.uses = Uses.Unlimited
+                ActiveReplacement.uses = Uses.Unlimited,
+                ActiveReplacement.origin = ReplacementOrigin.Other
               }
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 2 False False 0 (Just S.alice) DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])

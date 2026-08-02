@@ -14,6 +14,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -36,6 +37,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
@@ -77,6 +79,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -124,8 +127,8 @@ slotsOf effect = case effect of
   -- reaches inside it, since casing on a Modification is Projection's charter);
   -- no card in the pool reads a slot there, but a dangling one would otherwise
   -- slip past the lint entirely.
-  Effect.ModifyTarget _ modification ref ->
-    Set.union (objectRefSlots ref) (foldMap Quantity.slots (Projection.quantitiesOf modification))
+  Effect.ModifyTarget duration modification ref ->
+    Set.unions [objectRefSlots ref, foldMap Quantity.slots (Projection.quantitiesOf modification), durationSlots duration]
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
   Effect.Search _ _ -> Set.empty
@@ -150,7 +153,13 @@ slotsOf effect = case effect of
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> Quantity.slots quantity
-  Effect.Replace {} -> Set.empty
+  -- The ReplacementEffect itself carries no Quantity, but the Duration and the
+  -- Condition each carry two, and a Quantity.InSlot inside either is a slot read
+  -- like any other. No card in the pool writes one -- Galvanic Blast's metalcraft
+  -- condition counts artifacts, which names no slot -- but a dangling one would
+  -- otherwise slip past the lint entirely, exactly as ModifyTarget's Modification
+  -- would.
+  Effect.Replace duration _ _ condition _ -> Set.union (durationSlots duration) (foldMap conditionSlots condition)
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
   Effect.Counter slot -> Set.singleton slot
@@ -180,6 +189,21 @@ slotsOf effect = case effect of
 -- charter. NOTE: when an opcode gains a Quantity field, add its arm here -- the
 -- compiler will not force it, since Quantity is compared by ==.
 --
+-- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
+-- Condition.
+durationSlots :: Duration.Duration -> Set SlotName
+durationSlots duration = case duration of
+  Duration.UntilEndOfTurn -> Set.empty
+  Duration.Indefinite -> Set.empty
+  Duration.UntilYourNextTurn -> Set.empty
+  Duration.ForAsLongAs condition -> conditionSlots condition
+  Duration.UntilEndOfCombat -> Set.empty
+
+-- Both sides of a Condition are a Quantity, and either may read a slot.
+conditionSlots :: Condition.Type.Condition -> Set SlotName
+conditionSlots (Condition.Type.MkCondition measured _ threshold) =
+  Set.union (Quantity.slots measured) (Quantity.slots threshold)
+
 -- The comparison is by == and so is shallow: an X nested inside a Plus or a
 -- Count is not detected, unlike slotsOf, which recurses through Quantity.slots
 -- (#482).
@@ -1669,26 +1693,42 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                   DelayedTrigger.expiry = duration >>= \d -> Expiry.arm controller source d gs
                 }
          in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
-  Effect.Replace duration uses re ->
+  Effect.Replace duration uses origin condition re ->
     -- CR 614.3 / 615.3: install the floating replacement; Pawl.Engine.Replacement
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
     -- source, which is what CR 615.13's "prevented" triggers will read (#58).
-    State.modify' $ \gs -> case Expiry.arm controller source duration gs of
-      -- CR 611.2b: the duration never started, so no floating replacement is
-      -- installed.
-      Nothing -> gs
-      Just expiry ->
-        let (ts, gs1) = Game.freshTimestamp gs
-            active =
-              ActiveReplacement.MkActiveReplacement
-                { ActiveReplacement.effect = re,
-                  ActiveReplacement.source = source,
-                  ActiveReplacement.timestamp = ts,
-                  ActiveReplacement.expiry = expiry,
-                  ActiveReplacement.uses = uses
-                }
-         in gs1 {GameState.replacements = active : GameState.replacements gs1}
+    --
+    -- CR 614.15: the ORIGIN travels with the row rather than being re-derived,
+    -- because it is a fact about the ability that wrote it and nothing on the
+    -- board still says so once the resolution is over.
+    State.modify' $ \gs ->
+      -- The clause's own "if" -- Galvanic Blast's "if you control three or more
+      -- artifacts". Read with the resolution's controller as CR 109.5's "you"
+      -- and this effect's source as the object, the same pair
+      -- Pawl.Engine.Expiry.arm reads a CR 611.2b duration with. The full view,
+      -- not viewWithLastKnown: a spell creating a self-replacement is on the
+      -- stack and the board is live, unlike CR 603.4's intervening "if" on a
+      -- leaves-the-battlefield trigger.
+      let met = maybe True (Condition.holds (Projection.fullView gs) (Filter.MkContext (Just controller) (Just source)) gs source) condition
+       in case (met, Expiry.arm controller source duration gs) of
+            -- The stated condition is false, so the clause creates nothing.
+            (False, _) -> gs
+            -- CR 611.2b: the duration never started, so no floating replacement
+            -- is installed.
+            (_, Nothing) -> gs
+            (True, Just expiry) ->
+              let (ts, gs1) = Game.freshTimestamp gs
+                  active =
+                    ActiveReplacement.MkActiveReplacement
+                      { ActiveReplacement.effect = re,
+                        ActiveReplacement.source = source,
+                        ActiveReplacement.timestamp = ts,
+                        ActiveReplacement.expiry = expiry,
+                        ActiveReplacement.uses = uses,
+                        ActiveReplacement.origin = origin
+                      }
+               in gs1 {GameState.replacements = active : GameState.replacements gs1}
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the
@@ -1730,7 +1770,8 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                     ActiveReplacement.source = source,
                     ActiveReplacement.timestamp = ts,
                     ActiveReplacement.expiry = Expiry.Type.Never,
-                    ActiveReplacement.uses = Uses.Once
+                    ActiveReplacement.uses = Uses.Once,
+                    ActiveReplacement.origin = ReplacementOrigin.Other
                   }
            in g1 {GameState.replacements = active : GameState.replacements g1}
     State.modify' (\g -> List.foldl' (flip install) g named)

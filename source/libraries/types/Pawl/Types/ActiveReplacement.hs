@@ -3,6 +3,7 @@ module Pawl.Types.ActiveReplacement where
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 
@@ -40,11 +41,19 @@ import qualified Pawl.Types.Uses as Uses
 --
 -- `timestamp` doubles as this instance's CR 614.5 identity (Pawl.Types.CandidateId):
 -- GameState.nextTimestamp is monotone, so no two floating replacements share one.
+--
+-- `origin` is CR 614.15's question, and this carrier is the only one that can be
+-- asked it: a self-replacement is "an effect of a resolving spell or ability",
+-- which is exactly what a floating, resolution-generated row is. The projection's
+-- side of `collect` -- a permanent's static replacement abilities -- has no such
+-- field and needs none, because CR 614.15 rules those out in its first sentence
+-- ("self-replacement effects ... are not continuous effects").
 data ActiveReplacement = MkActiveReplacement
   { effect :: ReplacementEffect.ReplacementEffect,
     source :: ObjectId.ObjectId,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
-    uses :: Uses.Uses
+    uses :: Uses.Uses,
+    origin :: ReplacementOrigin.ReplacementOrigin
   }
   deriving (Eq, Ord, Show)

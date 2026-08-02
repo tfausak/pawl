@@ -30,11 +30,18 @@
                 "type": "Unlimited"
               },
               {
+                "type": "Other"
+              },
+              null,
+              {
                 "type": "DamageR",
                 "value": [
                   {
                     "whichKind": {
                       "type": "Combat"
+                    },
+                    "whichSource": {
+                      "type": "AnySource"
                     }
                   },
                   {

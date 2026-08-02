@@ -72,7 +72,9 @@ import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.Uses as Uses
@@ -259,13 +261,24 @@ collect sources floating =
         ReplacementCandidate.MkReplacementCandidate
           { ReplacementCandidate.identity = CandidateId.OfPermanent src re,
             ReplacementCandidate.effect = re,
-            ReplacementCandidate.source = src
+            ReplacementCandidate.source = src,
+            -- CR 614.15: a permanent's replacement ability is a STATIC ability,
+            -- and the rule's first sentence puts self-replacement effects
+            -- outside that class ("some replacement effects are not continuous
+            -- effects"). So this segment is never CR 616.1a's, whatever it
+            -- replaces.
+            ReplacementCandidate.origin = ReplacementOrigin.Other
           }
       fromFloating active =
         ReplacementCandidate.MkReplacementCandidate
           { ReplacementCandidate.identity = CandidateId.OfFloating (ActiveReplacement.source active) (ActiveReplacement.timestamp active),
             ReplacementCandidate.effect = ActiveReplacement.effect active,
-            ReplacementCandidate.source = ActiveReplacement.source active
+            ReplacementCandidate.source = ActiveReplacement.source active,
+            -- CR 614.15: "an effect of a resolving spell or ability", which is
+            -- what a floating row IS -- so this is the one segment that can
+            -- carry a self-replacement, and the row itself says whether it does
+            -- (Pawl.Engine.Resolve's Replace arm, from the card).
+            ReplacementCandidate.origin = ActiveReplacement.origin active
           }
    in fmap fromPermanent (Projection.replacementsAffecting sources)
         <> fmap fromFloating floating
@@ -311,11 +324,12 @@ applies gs event candidate =
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
             && matchesZoneSubject src (ZoneChangePattern.whichObject pat) (ZoneChange.object zc)
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
+        -- CR 615.1: a pattern naming no kind admits every damage event. CR
+        -- 614.15: one naming TheSource admits only the damage its own source is
+        -- dealing.
         (ReplacementEffect.DamageR pat _, ProposedEvent.WouldDealDamage de) ->
-          case DamagePattern.whichKind pat of
-            -- CR 615.1: no kind named means every damage event.
-            Nothing -> True
-            Just kind -> DamageEvent.kind de == kind
+          maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
+            && matchesDamageSource src (DamagePattern.whichSource pat) de
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only.
         -- DestructionR carries no pattern because the only producer in the
@@ -392,6 +406,25 @@ matchesController gs src rel oid = case rel of
     (Just theirs, Just yours) -> theirs /= yours
     _ -> False
 
+-- CR 614.1 / 614.15: is this DAMAGE coming from the object the pattern names?
+-- AnySource always is; TheSource is the CR 614.15 keying -- the damage this
+-- effect's own source is dealing, which for Galvanic Blast's metalcraft clause is
+-- the very event its first line proposes.
+--
+-- The compared id is the DamageEvent's `source`, which Pawl.Engine.Damage.damageEvent
+-- sets to the object the damage comes from (CR 113.7a) -- for a resolving spell,
+-- the spell on the stack, which is also the object Resolve installs the floating
+-- row under. Board-free, so no GameState: an identity test, not a characteristic
+-- one, exactly like matchesZoneSubject.
+--
+-- Not implemented: CR 615.1's shields that name a source by CHARACTERISTIC
+-- ("a red source of your choice", Circle of Protection: Red) rather than by
+-- identity (#588).
+matchesDamageSource :: ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
+matchesDamageSource src relation de = case relation of
+  SourceRelation.AnySource -> True
+  SourceRelation.TheSource -> src == DamageEvent.source de
+
 -- CR 614.1: is this ZONE CHANGE about the object the pattern names? AnyObject
 -- always is; TheSource is CR 702.34a's "exile THIS card", the self-scoping EntryR
 -- (CR 614.1c) and DestructionR (CR 201.5) carry by having no pattern at all.
@@ -445,8 +478,10 @@ matchesPermanent gs filter_ oid =
   -- No source in scope at this site.
   Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
 
--- CR 614.16: apply a scaling to a count. "That many plus one" and "twice that
--- many" are the same operation with different data.
+-- CR 614.1a: apply a scaling to a number. "That many plus one" and "twice that
+-- many" are the same operation with different data, and so is Furnace of Rath's
+-- "double that damage" -- which is why CounterR, TokenR (CR 614.16's two shapes)
+-- and DamageR all rewrite through this one function.
 scale :: Scaling.Scaling -> Natural -> Natural
 scale s n = case s of
   Scaling.Multiply m -> n * m
@@ -457,13 +492,26 @@ scale s n = case s of
 -- from Other (the largest) so it needs no partial `minimum`.
 highestBucket :: [ReplacementCandidate] -> [ReplacementCandidate]
 highestBucket candidates =
-  let bucketed = fmap (\c -> (bucketOf (ReplacementCandidate.effect c), c)) candidates
+  let bucketed = fmap (\c -> (bucketOf c, c)) candidates
       best = List.foldl' min ReplacementBucket.Other (fmap fst bucketed)
    in fmap snd (filter (\entry -> fst entry == best) bucketed)
 
--- CR 616.1a-e: which bucket an effect falls in.
-bucketOf :: ReplacementEffect -> ReplacementBucket
-bucketOf re = case re of
+-- CR 616.1a-e: which bucket a candidate falls in.
+--
+-- CR 616.1a is asked FIRST and is answered by the candidate's ORIGIN, not by its
+-- payload: "if any of the replacement and/or prevention effects are
+-- self-replacement effects (see rule 614.15), one of them must be chosen." CR
+-- 614.15 defines that class by which ability created the effect, so no
+-- ReplacementEffect value could answer it -- see Pawl.Types.ReplacementOrigin.
+-- Every remaining step reads the payload's SHAPE, never its identity.
+bucketOf :: ReplacementCandidate -> ReplacementBucket
+bucketOf candidate = case ReplacementCandidate.origin candidate of
+  ReplacementOrigin.SelfReplacement -> ReplacementBucket.SelfReplacement
+  ReplacementOrigin.Other -> bucketOfEffect (ReplacementCandidate.effect candidate)
+
+-- CR 616.1b-e: which bucket an effect that is NOT CR 614.15's falls in.
+bucketOfEffect :: ReplacementEffect -> ReplacementBucket
+bucketOfEffect re = case re of
   ReplacementEffect.ZoneChangeR _ _ -> ReplacementBucket.Other
   -- CR 616.1c: "an effect that would cause an object to become a copy of another
   -- object as it enters" is its own, HIGHER bucket. This is NOT what makes the
@@ -478,8 +526,9 @@ bucketOf re = case re of
   -- keeps the newly-acquired ChoiceOf distinct from the already-applied
   -- AsCopy. The split this arm encodes only becomes observable for an object
   -- with an AsCopy AND another entry replacement applicable in the SAME
-  -- iteration, which no card in the pool produces, so the bucket ordering
-  -- itself is unexercised by any test (#73).
+  -- iteration, which no card in the pool produces, so THIS bucket's ordering is
+  -- unexercised by any test (#73). CR 616.1a's, above, is not: Galvanic Blast
+  -- racing Furnace of Rath is a real board where the order changes the answer.
   ReplacementEffect.EntryR EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   ReplacementEffect.EntryR (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   -- CR 616.1a-d name self-replacement, entering under a control effect,
@@ -519,6 +568,11 @@ bucketOf re = case re of
 -- Not implemented: the comparison reads `effect` alone, so two floating rows
 -- alike in it but differing in `expiry` or `uses` are treated as
 -- indistinguishable even though `consume` spends only the one that applied (#490).
+--
+-- `origin` is NOT such a hole. highestBucket has already partitioned by bucket
+-- before this runs, and CR 616.1a's bucket is exactly "origin is
+-- SelfReplacement", so every candidate reaching this comparison shares one
+-- origin and comparing `effect` alone can never conflate two that differ in it.
 --
 -- Anything else prompts. The pure fold has silently picked list order since M3f;
 -- that is the second-invariant violation this phase exists to retire, and unlike
@@ -699,13 +753,28 @@ apply batch candidate event =
         pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _, _) -> pure (Just event)
-    (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage _) -> case rewrite of
+    (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of
       -- CR 615.6: a prevented event never happens -- it is not marked, not
       -- drained, and never recorded, so no deathtouch bit exists for the CR
       -- 704.5h SBA to read.
       DamageRewrite.PreventAll -> do
         consume (ReplacementCandidate.identity candidate)
         pure Nothing
+      -- CR 614.1a's "instead" with a flat amount: Galvanic Blast's "deals 4
+      -- damage instead". Only the AMOUNT is rewritten, and that is the rule
+      -- rather than economy -- Furnace of Rath's own ruling ("the multiplied
+      -- damage counts in all ways as if it came from the original source")
+      -- states the general shape: a replaced damage event keeps its source, its
+      -- recipient and every deal-time rider it was proposed with.
+      DamageRewrite.SetAmount n -> do
+        consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = n}))
+      -- CR 614.1a: Furnace of Rath's "it deals double that damage ... instead".
+      -- Through the same `scale` the counter and token rewrites use, so a
+      -- doubling means one thing across every event class.
+      DamageRewrite.Scale scaling -> do
+        consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = scale scaling (DamageEvent.amount de)}))
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
     -- CR 701.19a: "The next time [permanent] would be destroyed this turn,
@@ -1039,7 +1108,8 @@ installTurnSkips entry gs =
                   ActiveReplacement.source = ExtraTurn.source entry,
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.AtCleanup,
-                  ActiveReplacement.uses = Uses.Once
+                  ActiveReplacement.uses = Uses.Once,
+                  ActiveReplacement.origin = ReplacementOrigin.Other
                 }
          in g1 {GameState.replacements = active : GameState.replacements g1}
    in List.foldl' install gs (Set.toAscList (ExtraTurn.skipped entry))

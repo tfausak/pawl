@@ -264,7 +264,9 @@ effectCounts effect = case effect of
   Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.GainLife _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> cardCounts card
-  Effect.Replace duration _ _ -> durationCounts duration
+  -- The Condition is Galvanic Blast's "if you control three or more
+  -- artifacts", and its Counts are as much card data as a Duration's.
+  Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase _ _ -> []
   Effect.RemoveFromCombat _ -> []
@@ -424,7 +426,7 @@ cardReplacementEffects card =
 -- the build breaks until it is.
 effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
 effectReplacements effect = case effect of
-  Effect.Replace _ _ replacement -> [replacement]
+  Effect.Replace _ _ _ _ replacement -> [replacement]
   Effect.Create _ token _ _ -> cardReplacementEffects token
   Effect.CreateEmblem emblem -> cardReplacementEffects emblem
   Effect.DealDamage _ _ -> []
@@ -1101,7 +1103,7 @@ effectFilters effect = case effect of
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> cardFilters card
-  Effect.Replace duration _ replacement -> unframed (durationFilters duration <> replacementEffectFilters replacement)
+  Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []

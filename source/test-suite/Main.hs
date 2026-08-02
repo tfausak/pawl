@@ -85,10 +85,12 @@ import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReplacementEffectSpec
+import qualified Pawl.Codec.ReplacementOriginSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
+import qualified Pawl.Codec.SourceRelationSpec
 import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
@@ -288,10 +290,12 @@ spec s registry = do
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
+  Pawl.Codec.ReplacementOriginSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
+  Pawl.Codec.SourceRelationSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s

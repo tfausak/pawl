@@ -2,6 +2,7 @@ module Pawl.Types.Effect where
 
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -21,6 +22,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Uses as Uses
@@ -314,19 +316,48 @@ data Effect card
     -- is rejected by the Pawl.CardSpec lint family rather than guessed at (#53).
     Create Quantity.Quantity card EntryRiders.EntryRiders (Maybe SlotName.SlotName)
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration, with
-    -- a use count. Fog is
-    -- `Replace UntilEndOfTurn Unlimited (DamageR (MkDamagePattern (Just Combat)) PreventAll)`;
+    -- a use count, an origin and an optional condition. Fog is
+    -- `Replace UntilEndOfTurn Unlimited Other Nothing (DamageR (MkDamagePattern (Just Combat) AnySource) PreventAll)`;
     -- Drudge Skeletons' ability is
-    -- `Replace UntilEndOfTurn Once (DestructionR Regenerate)`.
+    -- `Replace UntilEndOfTurn Once Other Nothing (DestructionR Regenerate)`.
     --
-    -- ONE opcode for both, where M3f/M4d had two separate opcodes -- a `Prevent`
-    -- and a one-shot self-regenerate -- because the difference between a Fog and
-    -- a regeneration shield is which event class the payload names, which is
-    -- data. Targetless (a floating replacement watches a CLASS of events, not a
-    -- chosen object) and unprompted. Resolve stores it into GameState.replacements
-    -- with this effect's SOURCE (CR 113.7) and a fresh timestamp; Pawl.Engine.Replacement
-    -- applies it.
-    Replace Duration.Duration Uses.Uses ReplacementEffect.ReplacementEffect
+    -- ONE opcode for all of them, where M3f/M4d had two separate opcodes -- a
+    -- `Prevent` and a one-shot self-regenerate -- because the difference between
+    -- a Fog and a regeneration shield is which event class the payload names,
+    -- which is data. Targetless (a floating replacement watches a CLASS of
+    -- events, not a chosen object) and unprompted. Resolve stores it into
+    -- GameState.replacements with this effect's SOURCE (CR 113.7) and a fresh
+    -- timestamp; Pawl.Engine.Replacement applies it.
+    --
+    -- The ReplacementOrigin is CR 614.15's self-replacement bit, and it is on
+    -- this opcode for the same reason: a self-replacement is created by "a
+    -- resolving spell or ability", which is precisely what installs one of these,
+    -- and nothing in the ReplacementEffect payload could say it (see
+    -- Pawl.Types.ReplacementOrigin). Galvanic Blast's metalcraft clause is the
+    -- one SelfReplacement in the pool.
+    --
+    -- The Condition is the "if" a replacement-creating clause may carry --
+    -- Galvanic Blast's "if you control three or more artifacts". Nothing is the
+    -- unconditional case, which is every other card. Resolve checks it as this
+    -- effect resolves and installs nothing when it fails, and that is exact for
+    -- the pool rather than a shortcut: the only producer is a CR 614.15
+    -- self-replacement, whose installation and whose application both happen
+    -- inside one resolution with no window between them for the board to change.
+    -- A conditional replacement that OUTLIVES its resolution -- where a
+    -- check-on-install and a check-on-apply would visibly differ -- has no
+    -- producer (#587).
+    --
+    -- A field on this opcode rather than a general conditional Effect arm, and
+    -- the difference is not cosmetic. This gates ONE opcode's own creation of
+    -- ONE object, so the effect list is still a straight-line sequence a static
+    -- analysis can read end to end -- Duration.ForAsLongAs is already gated the
+    -- same way, by CR 611.2b, and Resolve's arm below handles both in one
+    -- expression. An `If condition [Effect] [Effect]` arm would instead put a
+    -- BRANCH between two effect lists, which is the control flow design.md
+    -- section 1 keeps out of the ISA. What the card asks for is the narrow
+    -- shape: a base effect plus a conditional replacement of that effect, never
+    -- one effect or another.
+    Replace Duration.Duration Uses.Uses ReplacementOrigin.ReplacementOrigin (Maybe Condition.Condition) ReplacementEffect.ReplacementEffect
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue is
     -- `SkipNextPhase (InSlot "target") (Step (Beginning DrawStep))`; Stonehorn
