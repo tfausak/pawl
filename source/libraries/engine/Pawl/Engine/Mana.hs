@@ -1029,7 +1029,9 @@ sourceOptions yields =
 -- (or under Urborg, once Ashaya has made it a land). Every land, every mana
 -- creature and every Sol Ring is one option, so the ordinary board is one board
 -- and the product costs nothing. `any` short-circuits, so a payable cost stops at
--- the first board that pays it.
+-- the first board that pays it; an unpayable one walks every board, and neither a
+-- domination prune over a source's options nor a cheap necessary-condition
+-- prefilter is implemented (#595).
 --
 -- Clause 1 is Hall's condition: a saturating matching exists iff no set of
 -- demands outruns the supplies that could serve it. Checked directly rather than
