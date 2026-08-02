@@ -72,8 +72,8 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 --
 -- These three are derived from a card's PRINTED keywords rather than a
 -- projection's post-layer ones, unlike triggeredAbilitiesOf: all three abilities
--- function in the graveyard or on the stack (CR 113.6), where the CR 613 layer
--- system does not reach. entwineCost is read the same way and for the same
+-- function in the graveyard or on the stack (CR 113.6), neither of which pawl's
+-- projection reaches (#160). entwineCost is read the same way and for the same
 -- reason: rule 702.42a says entwine "functions while the spell is on the stack",
 -- and Pawl.Engine.Cast reads it one step earlier still, off a card in a hand.
 
@@ -132,7 +132,7 @@ abilitiesFor keyword count = case keyword of
 -- Printed keywords rather than a projection's post-layer ones, the same rules
 -- fact castingPermissionsOf records: CR 113.6b says "an ability that states
 -- which zones it functions in functions only from those zones", and rule 702.29a
--- states the hand -- which the CR 613 layer system does not reach.
+-- states the hand -- which pawl's projection does not reach (#160).
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -223,8 +223,8 @@ cycling cost searchFor =
 --
 -- Taken over the card's PRINTED keywords rather than a projection's post-layer
 -- ones, and that is the same rules fact Card.castingPermissions' own comment
--- records: this permission functions in the GRAVEYARD (CR 113.6), where the CR
--- 613 layer system does not reach.
+-- records: this permission functions in the GRAVEYARD (CR 113.6), which pawl's
+-- projection does not reach (#160).
 castingPermissionsOf :: Set Keyword -> [CastingPermission]
 castingPermissionsOf = concatMap permissionsFor . Set.toAscList
 

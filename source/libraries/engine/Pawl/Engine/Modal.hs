@@ -34,11 +34,11 @@ modeEffects m = fmap (Foldable.toList . Mode.effects) (Foldable.toList (Modal.mo
 allEffects :: Modal.Modal card -> [Effect card]
 allEffects m = concat (modeEffects m)
 
--- The union of every mode's target specs (slot names unique by authoring
--- discipline; the D4 lint enforces per-mode resolution).
---
--- Nothing rejects a card whose two modes declare the SAME slot name, which this
--- union would silently collapse into one (#475).
+-- The union of every mode's target specs. Slot names are unique across a card's
+-- modes, and that is CHECKED rather than merely intended: Pawl.CardSpec's "no
+-- card's modes share a target slot name" rejects the card whose two modes
+-- declare one name, which this union would otherwise collapse into a single
+-- entry. The D4 lint enforces per-mode resolution.
 allTargetSpecs :: Modal.Modal card -> Map SlotName TargetSpec
 allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.modes m)))
 
@@ -70,9 +70,10 @@ modesEffects :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
 modesEffects chosen m = concatMap (Foldable.toList . Mode.effects . snd) (chosenModes chosen m)
 
 -- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union). Two modes may
--- be chosen at once (CR 702.42a's entwine), and nothing rejects a card whose
--- modes declare the same slot name, which this union would silently collapse
--- into one (#475).
+-- be chosen at once (CR 702.42a's entwine), which is what makes the collapse
+-- this union would perform an observable wrong answer rather than a latent one
+-- -- so Pawl.CardSpec's "no card's modes share a target slot name" keeps a card
+-- whose modes declare one name out of the pool.
 modesTargetSpecs :: Set ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSpec
 modesTargetSpecs chosen m =
   let specsAt (ModeIndex.MkModeIndex n) =

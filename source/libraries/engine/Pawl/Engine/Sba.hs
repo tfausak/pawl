@@ -79,7 +79,7 @@ woundedByDeathtouch gs oid =
 -- while not being a creature, and 704.5f/g must not touch it. Ask the
 -- classification, never the identity.
 -- Takes the object's already-projected characteristics (checkStateBasedActions
--- projects the whole board once, per CR 704.4 simultaneity, rather than
+-- projects the whole board once, per CR 704.3 simultaneity, rather than
 -- re-projecting per object).
 zeroToughness :: PC.ProjectedCharacteristics -> Bool
 zeroToughness pc =
@@ -260,7 +260,7 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- The third clause goes through stillLegalEnchant below rather than calling
 -- Target.stillAdmitted directly, so that the common enchant spec is answered off
 -- `pcs` -- the SAME pre-pass Projection.projectAll performStateBasedActions
--- computed once for every other CR 704.4 classification. (A spec carrying a
+-- computed once for every other CR 704.3 classification. (A spec carrying a
 -- Filter still reaches stillAdmitted, by that function's own fallthrough; see
 -- its haddock.)
 -- stillAdmitted reaches Target.admittedRecipients -> basePoolGiven Pool.Creatures
@@ -298,7 +298,7 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 
 -- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s spec
 -- ADMITS? Answered off `pcs` -- the pre-pass projection every other
--- classification in performStateBasedActions shares (CR 704.4 simultaneity) --
+-- classification in performStateBasedActions shares (CR 704.3 simultaneity) --
 -- for the one spec shape that reduces to a lookup, and by the general
 -- Target.stillAdmitted for every other.
 --
@@ -340,7 +340,7 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 --
 -- So the fallthrough pays the per-Aura re-projection the reduction above exists to
 -- avoid -- but only for the Auras whose spec the reduction cannot serve, and `pcs`
--- remains the source of truth for every other CR 704.4 classification on the pass,
+-- remains the source of truth for every other CR 704.3 classification on the pass,
 -- so the simultaneity the pre-pass buys is untouched. Serving a filtered spec off
 -- `pcs` would mean answering Filter.matches against the pre-pass projection
 -- instead of a fresh one, which is #430.
@@ -513,7 +513,7 @@ checkStateBasedActions :: Game ()
 checkStateBasedActions = Monad.void performStateBasedActions
 
 -- One SBA pass, also reporting whether any state-based action was PERFORMED (a
--- creature buried or a player departed). CR 704.4: the caller repeats the check
+-- creature buried or a player departed). CR 704.3: the caller repeats the check
 -- while that flag is True. The flag lets the CR 117.5 settle loop (Engine) decide
 -- whether to repeat WITHOUT a deep GameState comparison.
 --
@@ -535,7 +535,7 @@ performStateBasedActions = do
           -- CR 704.5f wins when both apply: toughness <= 0 is a put-into-graveyard.
           | zeroToughness pc -> Just False
           -- CR 704.5i, the other put-into-graveyard, checked against the same
-          -- pre-pass board for the same CR 704.4 simultaneity reason.
+          -- pre-pass board for the same CR 704.3 simultaneity reason.
           | zeroLoyalty gs pc oid -> Just False
           | destroyedBySba gs pc oid -> Just True
           | otherwise -> Nothing
@@ -665,7 +665,7 @@ performStateBasedActions = do
       balanced = List.foldl' balance drained annihilations
       -- A state-based action was performed iff a permanent was buried (a creature
       -- at 0 toughness, CR 704.5f, or a planeswalker at 0 loyalty, CR 704.5i) or
-      -- destroyed (a regenerated creature still counts, which the CR 704.4 settle
+      -- destroyed (a regenerated creature still counts, which the CR 704.3 settle
       -- loop re-checks and -- because the regen healed the damage -- terminates), a
       -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), a
       -- permanent detached (CR 704.5n / 704.5p), the legend rule buried a

@@ -72,9 +72,9 @@ sicknessOkGiven pcs pid srcId ability gs =
 -- In a hand: the ones rule 702 mints for the card's printed keywords, which is
 -- cycling (CR 702.29a) and nothing else today. Read off the PRINTED card rather
 -- than a projection for the reason Keyword.handAbilitiesOf's own haddock gives:
--- CR 613's layer system does not reach a hand, so there is nothing there to
--- project and no Humility to respect. CR 113.6b is the rule that lets an ability
--- name its own zone this way.
+-- pawl's projection does not reach a hand, so there is nothing there to
+-- project and no Humility to respect (#160). CR 113.6b is the rule that lets an
+-- ability name its own zone this way.
 --
 -- Anywhere else: nothing. Flashback is not a counterexample -- CR 702.34a makes
 -- it a CASTING permission, so a card in a graveyard reaches Pawl.Engine.Cast and never
@@ -110,10 +110,10 @@ abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card
 abilitiesFor = abilitiesForGiven Map.empty
 
 -- The zone question -- asked in exactly ONE place, here, whichever board it is
--- answered against. Only the battlefield arm reads the board at all: CR 613's
--- layer system does not reach a hand, so a hand's abilities are minted from the
--- printed card and a hand object's absence from the board is not a miss (see
--- Projection.projectGiven).
+-- answered against. Only the battlefield arm reads the board at all: pawl's
+-- projection does not reach a hand, so a hand's abilities are minted from the
+-- printed card and a hand object's absence from the board is not a miss (#160;
+-- see Projection.projectGiven).
 --
 -- This carries the pragma too, and is what makes the wrapper's one effective: the
 -- wrapper is a partial application of this, so inlining it exposes nothing for

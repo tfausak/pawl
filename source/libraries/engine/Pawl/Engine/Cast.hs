@@ -335,8 +335,8 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- card, never through the projection. CR 113.6e is the rule -- "an object's
 -- ability that restricts or modifies how that particular object can be played or
 -- cast functions in any zone from which it could be played or cast and also on
--- the stack" -- which for this pool means a hand, where the CR 613 layer system
--- does not reach. ALL of them must hold, which is what CR 601.3's "no ...
+-- the stack" -- which for this pool means a hand, which pawl's projection does
+-- not reach (#160). ALL of them must hold, which is what CR 601.3's "no ...
 -- prohibits" means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity: Pawl.Engine.Cast is
@@ -440,7 +440,7 @@ permitsCastFromGraveyard card =
 -- the ones rule 702 gives it for a keyword it holds (flashback). Read off the
 -- card and never through the projection, which is what Card.castingPermissions'
 -- own comment already argues: these permissions function in the library and the
--- graveyard (CR 113.6), where the CR 613 layer system does not reach.
+-- graveyard (CR 113.6), which pawl's projection does not reach (#160).
 permissionsOf :: Card.Type.Card -> [CastingPermission.CastingPermission]
 permissionsOf card =
   Card.Type.castingPermissions card <> Keyword.castingPermissionsOf (Card.Type.keywords card)

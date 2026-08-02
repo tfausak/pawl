@@ -64,7 +64,7 @@ openingHands perform owners = do
 --
 -- Read straight off the card (Game.cardOf) and never through the projection --
 -- the Card.castingPermissions precedent: these abilities function in the HAND
--- (CR 113.6), where the CR 613 layer system does not reach.
+-- (CR 113.6), which pawl's projection does not reach (#160).
 actionsFor :: (Card.Card -> [Effect Card.Card]) -> PlayerId -> GameState.GameState -> [(ObjectId, [Effect Card.Card])]
 actionsFor field pid gs =
   let withAction oid = case Game.cardOf oid gs of

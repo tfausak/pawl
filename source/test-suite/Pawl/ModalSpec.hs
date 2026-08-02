@@ -142,7 +142,7 @@ falsifierSpec s registry = Spec.describe s "Falsifier" $ do
 -- on the stack object -- an unchosen mode's slot name never appears at all.
 onlyChosenModeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 onlyChosenModeSpec s registry = Spec.describe s "OnlyChosenModeTargets" $ do
-  Spec.it s "casting the damage mode binds the 'creature' slot, never 'wall'" $ do
+  Spec.it s "casting the damage mode binds the 'damaged' slot, never 'wall'" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -158,7 +158,7 @@ onlyChosenModeSpec s registry = Spec.describe s "OnlyChosenModeTargets" $ do
         Just obj ->
           let keys = Map.keysSet (Object.bindings obj)
            in do
-                Spec.assertBool s (Set.member (SlotName.MkSlotName (Text.pack "creature")) keys) "has the 'creature' slot"
+                Spec.assertBool s (Set.member (SlotName.MkSlotName (Text.pack "damaged")) keys) "has the 'damaged' slot"
                 Spec.assertBool s (not (Set.member (SlotName.MkSlotName (Text.pack "wall")) keys)) "does not have the 'wall' slot"
 
 fizzleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()

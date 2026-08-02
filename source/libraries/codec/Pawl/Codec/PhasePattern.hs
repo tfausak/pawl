@@ -7,10 +7,14 @@ import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.PhasePattern as PhasePattern
 
--- | `whosePhase` is meant to be runtime-only -- a player-scoped skip is baked by
--- Resolve's SkipNextPhase arm, not authored on a card -- but the codec must stay
--- total, so this accepts one from card JSON and a lint owes the pool the check
--- (#437). Same treatment, and same reason, as SetController's PlayerId above.
+-- | `whosePhase` is runtime-only -- a player-scoped skip is baked by Resolve's
+-- SkipNextPhase arm, not authored on a card -- but this codec is structural over
+-- the record and so accepts one from card JSON. NOT because anything needs a
+-- baked pattern to survive a round trip: a baked one lives in
+-- Pawl.Types.ActiveReplacement, which has no codec at all, and neither does
+-- GameState (#126). Pawl.CardSpec's "no card authors a player-scoped phase skip"
+-- is what keeps the pool honest. Same treatment, and same reason, as
+-- SetController's PlayerId above.
 toJson :: PhasePattern.PhasePattern -> Value.Value
 toJson p =
   Common.object
