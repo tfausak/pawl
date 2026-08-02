@@ -67,6 +67,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -589,8 +590,22 @@ orderFor gs pending pid = do
     then pure mine
     else do
       let decider = Decide.deciderFor pid gs
-      answer <- Trans.lift (Program.prompt (Prompt.OrderTriggers decider pid (fmap PendingTrigger.source mine)))
+      answer <- Trans.lift (Program.prompt (Prompt.OrderTriggers decider pid (fmap entryOf mine)))
       pure (permute mine answer)
+
+-- What one pending trigger looks like to the player being asked for CR 603.3b's
+-- order: its source and WHICH ABILITY it is (#61), and neither of the two fields
+-- that would say nothing or too much -- see Pawl.Types.TriggerEntry.
+--
+-- Passing the ability THROUGH is not the rules core reading it. Nothing here
+-- cases on what the ability does, and nothing may: the engine's own use of the
+-- answer is the index permutation below.
+entryOf :: PendingTrigger.PendingTrigger -> TriggerEntry.TriggerEntry
+entryOf pending =
+  TriggerEntry.MkTriggerEntry
+    { TriggerEntry.source = PendingTrigger.source pending,
+      TriggerEntry.ability = PendingTrigger.ability pending
+    }
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
 -- offered indices is honoured. Anything else -- a short answer, a duplicate, an

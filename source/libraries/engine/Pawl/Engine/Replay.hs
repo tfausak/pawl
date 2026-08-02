@@ -283,7 +283,7 @@ defaultAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   -- CR 603.3b: the canonical order is always a legal answer, and is the least
   -- eventful fallback when a transcript runs short.
-  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   -- CR 616.1: index 0 is always a legal answer (the bucket is non-empty when this
   -- is asked), and is the least eventful fallback when a transcript runs short.
   Prompt.ChooseReplacement {} -> 0

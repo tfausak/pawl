@@ -120,4 +120,6 @@ data Subtype
     Vampire
   | -- | CR 205.3m (a creature type; Dryad Sophisticate's).
     Dryad
+  | -- | CR 205.3m (a creature type; Hero of Bladehold's).
+    Knight
   deriving (Eq, Ord, Show)

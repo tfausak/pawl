@@ -40,6 +40,7 @@ toJson k = case k of
   Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
   Keyword.Infect -> Common.nullary "Infect"
+  Keyword.BattleCry -> Common.nullary "BattleCry"
   Keyword.Menace -> Common.nullary "Menace"
   Keyword.Devoid -> Common.nullary "Devoid"
   Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
@@ -69,6 +70,7 @@ fromJson value = do
     ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
     ("Infect", _) -> Right Keyword.Infect
+    ("BattleCry", _) -> Right Keyword.BattleCry
     ("Menace", _) -> Right Keyword.Menace
     ("Devoid", _) -> Right Keyword.Devoid
     ("Toxic", Just v) -> Keyword.Toxic <$> Common.decodeNatural v

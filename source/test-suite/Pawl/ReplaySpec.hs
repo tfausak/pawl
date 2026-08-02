@@ -11,6 +11,7 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
@@ -47,6 +48,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
@@ -63,6 +65,12 @@ combatReplaySpec s =
       attackPrompt = Prompt.DeclareAttackers decider S.alice [oid]
       blockPrompt = Prompt.DeclareBlockers decider S.bob [oid] [oid]
       damagePrompt = Prompt.AssignCombatDamage decider S.alice oid (Map.singleton (Recipient.ToCreature oid) 0) 2
+      -- CR 725.2's own pair, one borne and one sourceless: the crown steal hung
+      -- on an object and the inherent end-step draw hung on nothing.
+      orderEntries =
+        [ TriggerEntry.MkTriggerEntry (TriggerSource.OfObject oid) Monarch.crownSteal,
+          TriggerEntry.MkTriggerEntry TriggerSource.Sourceless Monarch.endStepDraw
+        ]
    in Spec.describe s "CombatReplay" $ do
         Spec.it s "attackers round-trip through the transcript" $
           Spec.assertEqWith s "round trip" (Replay.decode attackPrompt (Replay.encode attackPrompt [oid])) (Just [oid])
@@ -198,15 +206,17 @@ combatReplaySpec s =
         -- The payload mixes both kinds of entry (CR 113.7's borne trigger and
         -- CR 725.2's sourceless one), which is what the batch really looks like
         -- when the monarch controls a trigger of her own at the same moment.
+        -- Each entry carries the ABILITY as well as the source (#61), so the two
+        -- named here are CR 725.2's own pair.
         Spec.it s "OrderTriggers records and replays a permutation" $ do
-          let p = Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless]
+          let p = Prompt.OrderTriggers decider S.alice orderEntries
               answer = [1, 0] :: [Natural.Natural]
           Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         Spec.it s "defaultAnswer keeps the canonical order" $
           Spec.assertEqWith
             s
             "identity permutation"
-            (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless]))
+            (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice orderEntries))
             [0, 1 :: Natural.Natural]
         Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
           let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1

@@ -365,7 +365,7 @@ recordingAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (List.genericTake count (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
-  Prompt.OrderTriggers _ _ sources -> pure (zipWith const [0 ..] sources)
+  Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseBoundToken _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseAttachment _ _ _ candidates -> pure (NonEmpty.head candidates)
@@ -1508,7 +1508,7 @@ slaveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
