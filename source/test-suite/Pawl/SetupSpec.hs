@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameState as GameState
@@ -99,31 +100,31 @@ deckSpec s registry = Spec.describe s "Deck" $ do
 
   Spec.it s "36 Mountains per player after a red-red setup" $ do
     gs <- setupState s registry
-    Spec.assertEqWith s "mountains" (S.countByName (Text.pack "Mountain") S.alice gs) 36
+    Spec.assertEqWith s "mountains" (S.countByName (CardName.MkCardName $ Text.pack "Mountain") S.alice gs) 36
 
   Spec.it s "4 Bird Maidens per player after a red-red setup" $ do
     gs <- setupState s registry
-    Spec.assertEqWith s "maidens" (S.countByName (Text.pack "Bird Maiden") S.alice gs) 4
+    Spec.assertEqWith s "maidens" (S.countByName (CardName.MkCardName $ Text.pack "Bird Maiden") S.alice gs) 4
 
   Spec.it s "4 Pikers per player after a red-red setup" $ do
     gs <- setupState s registry
-    Spec.assertEqWith s "pikers" (S.countByName (Text.pack "Goblin Piker") S.bob gs) 4
+    Spec.assertEqWith s "pikers" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.bob gs) 4
 
   Spec.it s "4 Lightning Bolts per player after a red-red setup" $ do
     gs <- setupState s registry
-    Spec.assertEqWith s "bolts" (S.countByName (Text.pack "Lightning Bolt") S.alice gs) 4
+    Spec.assertEqWith s "bolts" (S.countByName (CardName.MkCardName $ Text.pack "Lightning Bolt") S.alice gs) 4
 
   Spec.it s "4 Blazes per player after a red-red setup" $ do
     gs <- setupState s registry
-    Spec.assertEqWith s "blazes" (S.countByName (Text.pack "Blaze") S.alice gs) 4
+    Spec.assertEqWith s "blazes" (S.countByName (CardName.MkCardName $ Text.pack "Blaze") S.alice gs) 4
 
   Spec.it s "4 Dragon Fodders per player after a red-red setup" $ do
     gs <- setupState s registry
-    Spec.assertEqWith s "dragon fodders" (S.countByName (Text.pack "Dragon Fodder") S.alice gs) 4
+    Spec.assertEqWith s "dragon fodders" (S.countByName (CardName.MkCardName $ Text.pack "Dragon Fodder") S.alice gs) 4
 
   Spec.it s "4 Chaos Charms per player after a red-red setup" $ do
     gs <- setupState s registry
-    Spec.assertEqWith s "chaos charms" (S.countByName (Text.pack "Chaos Charm") S.alice gs) 4
+    Spec.assertEqWith s "chaos charms" (S.countByName (CardName.MkCardName $ Text.pack "Chaos Charm") S.alice gs) 4
 
 setupState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 setupState s registry = do
@@ -184,11 +185,11 @@ greenBlackSetupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry 
 greenBlackSetupSpec s registry = Spec.describe s "GreenBlackSetup" $ do
   Spec.it s "alice's green deck deals 36 Forests" $ do
     gs <- greenBlackSetup s registry
-    Spec.assertEqWith s "forests" (S.countByName (Text.pack "Forest") S.alice gs) 36
+    Spec.assertEqWith s "forests" (S.countByName (CardName.MkCardName $ Text.pack "Forest") S.alice gs) 36
 
   Spec.it s "bob's black deck deals 36 Swamps" $ do
     gs <- greenBlackSetup s registry
-    Spec.assertEqWith s "swamps" (S.countByName (Text.pack "Swamp") S.bob gs) 36
+    Spec.assertEqWith s "swamps" (S.countByName (CardName.MkCardName $ Text.pack "Swamp") S.bob gs) 36
 
   Spec.it s "green-black setup conserves 120 objects" $ do
     gs <- greenBlackSetup s registry

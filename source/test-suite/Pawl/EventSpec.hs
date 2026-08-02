@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -138,7 +139,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
         -- placed (CR 117.5) and resolves, exiling the graveyard.
         settled = snd (Engine.runGamePure S.identityAnswer afterCast Engine.priorityLoop)
     Spec.assertEqWith s "alice's graveyard exiled by the ETB" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 0
-    Spec.assertEqWith s "Rest in Peace is on the battlefield" (S.countOnBattlefieldByName (Text.pack "Rest in Peace") S.alice settled) 1
+    Spec.assertEqWith s "Rest in Peace is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Rest in Peace") S.alice settled) 1
     Spec.assertEqWith s "stack empty" (GameState.stack settled) []
 
   -- CR 800.4b, sentence 2: "If a token would be created under the control of

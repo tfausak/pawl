@@ -8,7 +8,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
@@ -20,6 +19,7 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
@@ -699,7 +699,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
     PC.MkProjectedCharacteristics
       { -- No card behind this object (an ability or trigger on the stack): it has
         -- no printed name and no type line to seed from.
-        PC.name = Text.empty,
+        PC.name = CardName.MkCardName Text.empty,
         PC.supertypes = Set.empty,
         PC.keywords = Map.empty,
         PC.colors = Set.empty,
@@ -2156,8 +2156,8 @@ subtypesGiven pcs oid gs = PC.subtypes (projectGiven pcs oid gs)
 
 -- CR 201.1 / 707.2: the object's projected name -- a Clone's is the name it
 -- copied, not "Clone".
-nameOf :: ObjectId -> GameState -> Text
-nameOf oid gs = PC.name (project oid gs)
+nameOf :: ObjectId -> GameState -> CardName.CardName
+nameOf oid = PC.name . project oid
 
 -- CR 205.4: the object's projected supertypes, the sibling of subtypesOf.
 supertypesOf :: ObjectId -> GameState -> Set Supertype.Supertype

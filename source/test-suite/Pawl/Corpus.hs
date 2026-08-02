@@ -65,13 +65,13 @@ loadOne root slug =
           Right contents -> case Common.parse contents >>= Card.fromJson of
             Left err -> invalid (Text.unpack err)
             Right card ->
-              let actual = Slug.fromText (Card.name card)
+              let actual = Slug.fromText . CardName.unwrap $ Card.name card
                in if actual == slug
                     then Right card
                     else
                       invalid
                         ( "is named "
-                            <> Text.unpack (Card.name card)
+                            <> show (Card.name card)
                             <> ", which files under "
-                            <> Text.unpack (Slug.unwrap actual)
+                            <> show actual
                         )

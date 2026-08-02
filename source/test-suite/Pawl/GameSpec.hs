@@ -38,6 +38,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
@@ -476,7 +477,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         boltInBobGrave =
           length
             ( filter
-                (namedIs (Text.pack "Lightning Bolt"))
+                (namedIs (CardName.MkCardName $ Text.pack "Lightning Bolt"))
                 (fmap (\i -> Game.lookupObject i after) (Game.zoneMembers Zone.Graveyard S.bob after))
             )
     Spec.assertEqWith s "bob took 3 from his own Bolt" (S.lifeOf S.bob after) (Just 17)
@@ -520,7 +521,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         boltInBobGrave =
           length
             ( filter
-                (namedIs (Text.pack "Lightning Bolt"))
+                (namedIs (CardName.MkCardName $ Text.pack "Lightning Bolt"))
                 (fmap (\i -> Game.lookupObject i bobPlayed) (Game.zoneMembers Zone.Graveyard S.bob bobPlayed))
             )
     Spec.assertEqWith s "CR 723.1: control pending for bob after activation" (Map.lookup S.bob (GameState.pendingControl afterActivation)) (Just (Decider.MkDecider S.alice))
@@ -1451,7 +1452,7 @@ handBobBolt lightningBolt gs =
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
-namedIs :: Text.Text -> Maybe Object.Object -> Bool
+namedIs :: CardName.CardName -> Maybe Object.Object -> Bool
 namedIs wanted mo = case mo of
   Just o -> case Object.source o of
     Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
@@ -1934,7 +1935,7 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     -- graveyard, hence `any`.
     Spec.assertBool
       s
-      (any (\i -> namedIs (Text.pack "Goblin Piker") (Game.lookupObject i after)) (Game.zoneMembers Zone.Graveyard S.alice after))
+      (any (\i -> namedIs (CardName.MkCardName $ Text.pack "Goblin Piker") (Game.lookupObject i after)) (Game.zoneMembers Zone.Graveyard S.alice after))
       "CR 704.5f buried it once CR 514.2 ended the pump"
     Spec.assertEqWith s "nothing triggered, so the SBA alone bought the priority round" asked 2
     Spec.assertEqWith s "and another cleanup step began" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)

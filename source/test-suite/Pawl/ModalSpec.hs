@@ -27,6 +27,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -322,12 +323,12 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
         resolved = snd (Engine.runGamePure answer placed Stack.resolveTop)
         newObjs = Set.toList (Set.delete acId (GameState.battlefield resolved))
     Spec.assertEqWith s "alice's hand is still empty (nothing drawn)" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 0
-    Spec.assertEqWith s "Aether Channeler still on the battlefield (nothing bounced)" (S.countOnBattlefieldByName (Text.pack "Aether Channeler") S.alice resolved) 1
+    Spec.assertEqWith s "Aether Channeler still on the battlefield (nothing bounced)" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Aether Channeler") S.alice resolved) 1
     case newObjs of
       [tokId] -> do
         -- CR 111.4: Aether Channeler's first mode does not name the token,
         -- so its name is its subtype plus the word "Token".
-        Spec.assertEqWith s "the token is named Bird Token" (fmap Card.Type.name (Game.cardOf tokId resolved)) (Just (Text.pack "Bird Token"))
+        Spec.assertEqWith s "the token is named Bird Token" (fmap Card.Type.name (Game.cardOf tokId resolved)) (Just . CardName.MkCardName $ Text.pack "Bird Token")
         Spec.assertBool s (Projection.hasKeyword Keyword.Flying tokId resolved) "the Bird has flying (projected)"
       _ -> Spec.assertFailure s "expected exactly one new (Bird token) permanent"
 
@@ -420,7 +421,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
             )
             (GameState.stack placed)
     Spec.assertBool s (not stackHasTrigger) "the trigger was removed from the stack, not left lingering"
-    Spec.assertEqWith s "Synthetic Modal Trigger still on the battlefield (nothing bounced or exiled)" (S.countOnBattlefieldByName (Text.pack "Synthetic Modal Trigger") S.alice placed) 1
+    Spec.assertEqWith s "Synthetic Modal Trigger still on the battlefield (nothing bounced or exiled)" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Synthetic Modal Trigger") S.alice placed) 1
     Spec.assertEqWith s "alice's hand is still empty (nothing bounced)" (length (Game.zoneMembers Zone.Hand S.alice placed)) 0
     Spec.assertEqWith s "nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice placed)) 0
 

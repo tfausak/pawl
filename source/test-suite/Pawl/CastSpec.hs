@@ -38,6 +38,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -217,8 +218,8 @@ stackSpec s registry = Spec.describe s "Stack" $ do
               Stack.resolveTop -- Panglacial resolves onto the battlefield
             after = snd (Engine.runGamePure castPanglacial g4 action)
          in do
-              Spec.assertEqWith s "Panglacial is a 9/5 on the battlefield" (S.countOnBattlefieldByName (Text.pack "Panglacial Wurm") S.alice after) 1
-              Spec.assertEqWith s "Panglacial left the library" (S.countByName (Text.pack "Panglacial Wurm") S.alice after) 0
+              Spec.assertEqWith s "Panglacial is a 9/5 on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 1
+              Spec.assertEqWith s "Panglacial left the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
               Spec.assertEqWith s "seven Forests tapped for {5}{G}{G}" (S.tappedCount S.alice after) 7
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
   Spec.it s "declining the cast resolves the search normally, Panglacial stays" $ do
@@ -233,7 +234,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
     case Projection.abilitiesOf ewId g4 of
       ewAbility : _ ->
         let after = snd (Engine.runGamePure S.identityAnswer g4 (do Activate.activateAbility S.alice ewId ewAbility; Stack.resolveTop))
-         in Spec.assertEqWith s "Panglacial still in the library" (S.countByName (Text.pack "Panglacial Wurm") S.alice after) 1
+         in Spec.assertEqWith s "Panglacial still in the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 1
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -292,7 +293,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
           Spec.assertEqWith s "zone" (Object.zone obj) Zone.Stack
           case Object.source obj of
             Source.OfCard printing ->
-              Spec.assertEqWith s "name" (Card.Type.name (Printing.card printing)) (Text.pack "Goblin Piker")
+              Spec.assertEqWith s "name" (Card.Type.name (Printing.card printing)) (CardName.MkCardName $ Text.pack "Goblin Piker")
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
@@ -379,9 +380,9 @@ castSpec s registry = Spec.describe s "Cast" $ do
     let base = S.landsInPlay forest 7
         (_, gs) = S.addLibraryCard panglacialWurm S.alice base
         after = snd (Engine.runGamePure castFirstOption gs (Cast.castWhileSearching S.alice))
-        onStack = length (filter (nameOnStack (Text.pack "Panglacial Wurm") after) (GameState.stack after))
+        onStack = length (filter (nameOnStack (CardName.MkCardName $ Text.pack "Panglacial Wurm") after) (GameState.stack after))
     Spec.assertEqWith s "Panglacial is on the stack" onStack 1
-    Spec.assertEqWith s "Panglacial left the library" (S.countByName (Text.pack "Panglacial Wurm") S.alice after) 0
+    Spec.assertEqWith s "Panglacial left the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
     Spec.assertEqWith s "seven Forests tapped to pay {5}{G}{G}" (S.tappedCount S.alice after) 7
   Spec.it s "CR 601.2i casting a spell records a SpellCast event for the caster" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -595,7 +596,7 @@ answerAtBoundOffsetCounting offset p = case p of
 -- How many cards of this name sit in alice's hand (the reject-not-repair no-op
 -- check: a cast that reverses leaves the card exactly where it was).
 inHandNamed :: String -> GameState.GameState -> Int
-inHandNamed name gs = length (filter (nameOnStack (Text.pack name) gs) (Game.zoneMembers Zone.Hand S.alice gs))
+inHandNamed name gs = length (filter (nameOnStack (CardName.MkCardName $ Text.pack name) gs) (Game.zoneMembers Zone.Hand S.alice gs))
 
 blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
@@ -1574,7 +1575,7 @@ castFirstOption p = case p of
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
-nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
+nameOnStack :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
   Just o -> case Object.source o of
     Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted

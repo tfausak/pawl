@@ -49,6 +49,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
@@ -315,8 +316,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         -- object, and Event.changeZone mints it a fresh ObjectId.
         buried = Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid after)) (Game.zoneMembers Zone.Graveyard S.bob after)
     Spec.assertEqWith s "both of bob's creatures are gone" (S.creaturesInPlay S.bob after) 0
-    Spec.assertBool s (elem (Text.pack "Blurred Mongoose") buried) "the Mongoose itself is in bob's graveyard"
-    Spec.assertBool s (elem (Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
+    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Blurred Mongoose") buried) "the Mongoose itself is in bob's graveyard"
+    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
 
   -- CR 113.6: "Abilities of an instant or sorcery spell usually function only
   -- while that object is on the stack. Abilities of all other objects usually
@@ -459,7 +460,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         buried = Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid after)) (Game.zoneMembers Zone.Graveyard S.alice after)
     Spec.assertEqWith s "Doom Blade went on the stack" (length (GameState.stack cast)) 1
     Spec.assertEqWith s "alice's own creature is gone" (S.creaturesInPlay S.alice after) 0
-    Spec.assertBool s (elem (Text.pack "Slippery Bogle") buried) "the Bogle itself is in alice's graveyard"
+    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Slippery Bogle") buried) "the Bogle itself is in alice's graveyard"
 
   -- CR 115.10a: "Just because an object or player is being affected by a spell
   -- or ability doesn't make that object or player a target of that spell or
@@ -480,8 +481,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         buried = Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid after)) (Game.zoneMembers Zone.Graveyard S.bob after)
     Spec.assertEqWith s "both of bob's creatures are gone" (S.creaturesInPlay S.bob after) 0
-    Spec.assertBool s (elem (Text.pack "Slippery Bogle") buried) "the Bogle itself is in bob's graveyard"
-    Spec.assertBool s (elem (Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
+    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Slippery Bogle") buried) "the Bogle itself is in bob's graveyard"
+    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
 
   -- Hexproof is read off the PROJECTION and not off the printed card, so it
   -- lives in the CR 613 layer system like every other keyword. Humility is "All
@@ -628,7 +629,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice rdId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "Raise Dead went on the stack" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "the Piker card is in alice's hand" (S.countByName (Text.pack "Goblin Piker") S.alice resolved) 1
+    Spec.assertEqWith s "the Piker card is in alice's hand" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 1
     Spec.assertBool
       s
       (notElem mineId (Game.zoneMembers Zone.Graveyard S.alice resolved))
@@ -658,8 +659,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
         returned = resolve cast
         fizzled = resolve (S.runPure S.identityAnswer cast (Event.changeZone mineId Zone.Exile))
-    Spec.assertEqWith s "untouched, the Piker card comes back" (S.countByName (Text.pack "Goblin Piker") S.alice returned) 1
-    Spec.assertEqWith s "exiled in response, nothing comes back" (S.countByName (Text.pack "Goblin Piker") S.alice fizzled) 0
+    Spec.assertEqWith s "untouched, the Piker card comes back" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice returned) 1
+    Spec.assertEqWith s "exiled in response, nothing comes back" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice fizzled) 0
     Spec.assertEqWith s "and Raise Dead is in alice's graveyard either way" (length (Game.zoneMembers Zone.Graveyard S.alice fizzled)) 1
 
   -- CR 400.1's OTHER half. Raise Dead above says "in your graveyard"; Withered

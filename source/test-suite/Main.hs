@@ -207,7 +207,7 @@ spec s registry = do
   Pawl.AuraSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardSpec.spec s registry
-  Pawl.CardsSpec.spec s registry
+  Pawl.CardsSpec.spec s
   Pawl.CastSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.ActivatedAbilitySpec.spec s

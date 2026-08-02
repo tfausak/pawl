@@ -13,5 +13,7 @@ import qualified Numeric.Natural as Natural
 -- A dedicated newtype, not the object id reused: id is identity, this is
 -- entry-order. Both are monotone today, but conflating them is a pun this rule
 -- rejects.
-newtype Timestamp = MkTimestamp {unwrap :: Natural.Natural}
+newtype Timestamp = MkTimestamp
+  { unwrap :: Natural.Natural
+  }
   deriving (Eq, Ord, Show)

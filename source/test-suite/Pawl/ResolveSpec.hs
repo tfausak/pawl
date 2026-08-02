@@ -47,6 +47,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
@@ -319,7 +320,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
     Spec.assertEqWith s "bob discarded one" (S.handSize S.bob settled) (bobBefore - 1)
     Spec.assertEqWith s "alice lost only the Rats she cast" (S.handSize S.alice settled) (aliceBefore - 1)
-    Spec.assertEqWith s "the Rats resolved onto the battlefield" (S.countOnBattlefieldByName (Text.pack "Ravenous Rats") S.alice settled) 1
+    Spec.assertEqWith s "the Rats resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ravenous Rats") S.alice settled) 1
   Spec.it s "CR 806.1 at three seats a ControlledBy Opponent pool spans BOTH opponents' creatures" $ do
     -- Palace Jailer's second trigger targets a creature an opponent controls.
     -- At three seats that is a choice across two boards, and the engine must
@@ -555,7 +556,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         card =
           Card.Type.MkCard
-            { Card.Type.name = Text.pack "T",
+            { Card.Type.name = CardName.MkCardName $ Text.pack "T",
               Card.Type.manaCost = Nothing,
               Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
               Card.Type.power = Nothing,
@@ -791,7 +792,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
-    Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (Text.pack "Mountain") S.alice resolved) 1
+    Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
     Spec.assertBool s (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved)) "the nonland is not offered -- it remains in the library"
   -- #222: CR 701.23a's filter defines what the search may find. An
   -- interpreter that names a card the filter excluded must find nothing --
@@ -814,9 +815,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
-    Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.alice resolved) 0
+    Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
     Spec.assertBool s (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved)) "it is still in the library"
-    Spec.assertEqWith s "and nothing else was fetched either" (S.countOnBattlefieldByName (Text.pack "Mountain") S.alice resolved) 0
+    Spec.assertEqWith s "and nothing else was fetched either" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 0
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -976,7 +977,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         -- mirrors the file's existing synthetic-card idiom (CR 612 test above).
         card =
           Card.Type.MkCard
-            { Card.Type.name = Text.pack "Subgame Test Spell",
+            { Card.Type.name = CardName.MkCardName $ Text.pack "Subgame Test Spell",
               Card.Type.manaCost = Nothing,
               Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
               Card.Type.power = Nothing,
@@ -1039,7 +1040,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (ts, g2) = Game.freshTimestamp g1
         card =
           Card.Type.MkCard
-            { Card.Type.name = Text.pack "Subgame Test Spell (Three Seats, One Departed)",
+            { Card.Type.name = CardName.MkCardName $ Text.pack "Subgame Test Spell (Three Seats, One Departed)",
               Card.Type.manaCost = Nothing,
               Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
               Card.Type.power = Nothing,
@@ -1098,7 +1099,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
     -- CR 111.4: Dragon Fodder does not name its tokens, so each is named
     -- "Goblin Token" -- its subtype plus the word "Token".
-    Spec.assertEqWith s "two Goblin tokens on the battlefield" (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after) 2
+    Spec.assertEqWith s "two Goblin tokens on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 2
     Spec.assertEqWith s "alice controls two creatures (the tokens)" (S.creaturesInPlay S.alice after) 2
     Spec.assertEqWith s "Dragon Fodder went to the graveyard (CR 608.2n)" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     -- The control leg for Hanweir Garrison's "tapped and attacking" riders
@@ -1557,7 +1558,7 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
         stifled = S.runPure S.identityAnswer placed (Cast.castSpell S.bob stifleId)
         countered = S.runPure S.identityAnswer stifled Stack.resolveTop
         after = S.runPure S.identityAnswer countered Engine.settleForPriority
-        entrantId = case filter (\oid -> fmap Card.Type.name (Game.cardOf oid after) == Just (Text.pack "Goblin Piker")) (Set.toList (GameState.battlefield after)) of
+        entrantId = case filter (\oid -> fmap Card.Type.name (Game.cardOf oid after) == Just (CardName.MkCardName $ Text.pack "Goblin Piker")) (Set.toList (GameState.battlefield after)) of
           [only] -> Just only
           _ -> Nothing
     Spec.assertEqWith s "the trigger is the only thing on the stack before the Stifle" (length (GameState.stack placed)) 1
@@ -1565,7 +1566,7 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
     -- The falsifier is Pawl.TriggerSpec's aetherFlashSpec, where the same
     -- Aether Flash's 2 damage kills the same 2/1 (CR 704.5g): a Piker alive with
     -- NO damage marked is rule 701.6a's "none of its effects occur".
-    Spec.assertEqWith s "the Piker survived" (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "the Piker survived" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
     Spec.assertEqWith s "with no damage marked on it at all" (fmap (\oid -> fmap Object.damage (Game.lookupObject oid after)) entrantId) (Just (Just 0))
     Spec.assertEqWith s "no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events after)))) []
     -- CR 608.2n again: the countered trigger went nowhere. alice's graveyard is
@@ -3491,7 +3492,7 @@ castBaneOfProgress forest bane board =
 namedOnBattlefield :: String -> GameState.GameState -> Maybe ObjectId.ObjectId
 namedOnBattlefield name gs =
   List.find
-    (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack name))
+    (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack name))
     (Set.toList (GameState.battlefield gs))
 
 -- How many +1/+1 counters (CR 122.6) sit on a permanent, 0 for none.

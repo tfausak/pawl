@@ -9,5 +9,7 @@ import qualified Pawl.Types.ManaUnit as ManaUnit
 -- be a rewrite of every payment call site; units to richer-units is a field
 -- addition. The bet has since been collected: CR 107.4h's {S} added
 -- ManaUnit.tags and no call site here moved.
-newtype Mana = MkMana {unwrap :: [ManaUnit.ManaUnit]}
+newtype Mana = MkMana
+  { unwrap :: [ManaUnit.ManaUnit]
+  }
   deriving (Eq, Ord, Show)

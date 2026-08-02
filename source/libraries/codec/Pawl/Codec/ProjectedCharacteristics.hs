@@ -3,6 +3,7 @@ module Pawl.Codec.ProjectedCharacteristics where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Common as Common
@@ -19,7 +20,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 toJson :: PC.ProjectedCharacteristics -> Value.Value
 toJson pc =
   Common.object
-    [ Common.pair "name" . Common.text $ PC.name pc,
+    [ Common.pair "name" . CardName.toJson $ PC.name pc,
       Common.pair "supertypes" . Common.encodeSet Supertype.toJson $ PC.supertypes pc,
       Common.pair "keywords" . Common.encodeMultiset Keyword.toJson $ PC.keywords pc,
       Common.pair "colors" . Common.encodeSet Color.toJson $ PC.colors pc,
@@ -37,7 +38,7 @@ toJson pc =
 fromJson :: Value.Value -> Either Text.Text PC.ProjectedCharacteristics
 fromJson value = do
   ps <- Common.asObject value
-  nm <- Common.field "name" ps >>= Common.asText
+  nm <- Common.field "name" ps >>= CardName.fromJson
   sups <- Common.field "supertypes" ps >>= Common.decodeSet Supertype.fromJson
   kws <- Common.field "keywords" ps >>= Common.decodeMultiset Keyword.fromJson
   cols <- Common.field "colors" ps >>= Common.decodeSet Color.fromJson

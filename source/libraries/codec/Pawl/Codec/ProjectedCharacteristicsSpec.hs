@@ -7,6 +7,7 @@ import qualified Pawl.Codec.CardSpec as CardSpec
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ProjectedCharacteristics as PC
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
@@ -37,7 +38,7 @@ import qualified Pawl.Types.Supertype as Supertype
 testCharacteristics :: PC.ProjectedCharacteristics
 testCharacteristics =
   PC.MkProjectedCharacteristics
-    { PC.name = Text.pack "Test Creature",
+    { PC.name = CardName.MkCardName $ Text.pack "Test Creature",
       PC.supertypes = Set.singleton Supertype.Legendary,
       PC.keywords = Map.singleton Keyword.Flying 1,
       PC.colors = Set.singleton Color.Blue,

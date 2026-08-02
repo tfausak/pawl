@@ -15,6 +15,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
@@ -82,7 +83,7 @@ minimalTriggeredAbility =
 baseCard :: Card.Card
 baseCard =
   Card.MkCard
-    { Card.name = Text.pack "Test Card",
+    { Card.name = CardName.MkCardName $ Text.pack "Test Card",
       Card.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
       Card.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) Set.empty,
       Card.power = Just (Power.MkPower (Quantity.Literal 1)),

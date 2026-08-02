@@ -33,6 +33,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
@@ -740,7 +741,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
     sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
     let resolved = castOffBoard S.identityAnswer [solRing] sapphireMedallion
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Medallion resolved" (S.countOnBattlefieldByName (Text.pack "Sapphire Medallion") S.alice resolved) 1
+    Spec.assertEqWith s "the Medallion resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Sapphire Medallion") S.alice resolved) 1
     Spec.assertEqWith s "the Sol Ring is tapped" (S.tappedCount S.alice resolved) 1
     Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
 
@@ -816,7 +817,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
     icehideGolem <- S.printingOf s registry "Icehide Golem"
     let after = resolvedCreature snowMountain icehideGolem 1
-    Spec.assertEqWith s "the Golem is on the battlefield" (S.countOnBattlefieldByName (Text.pack "Icehide Golem") S.alice after) 1
+    Spec.assertEqWith s "the Golem is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Icehide Golem") S.alice after) 1
     Spec.assertEqWith s "the Snow-Covered Mountain paid for it" (S.tappedCount S.alice after) 1
     Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
 
@@ -1632,7 +1633,7 @@ dismemberBoard swamp piker dismember n =
 -- Piker would fail the assertion that reads it.
 pikerOn :: GameState.GameState -> ObjectId.ObjectId
 pikerOn gs =
-  let isPiker oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Goblin Piker")
+  let isPiker oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Goblin Piker")
    in case filter isPiker (Set.toAscList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> ObjectId.MkObjectId 0
@@ -1730,7 +1731,7 @@ dragonBoard mountain dragon n =
 -- a cast has just put there under a fresh CR 400.7 id.
 dragonOn :: GameState.GameState -> ObjectId.ObjectId
 dragonOn gs =
-  let isDragon oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Moltensteel Dragon")
+  let isDragon oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Moltensteel Dragon")
    in case filter isDragon (Set.toAscList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> ObjectId.MkObjectId 0

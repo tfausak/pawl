@@ -45,6 +45,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -193,7 +194,7 @@ enteringAs which p = case p of
   _ -> S.identityAnswer p
 
 -- The newest battlefield object whose printed card has this name.
-newestNamed :: Text.Text -> GameState.GameState -> Maybe ObjectId.ObjectId
+newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
 newestNamed wanted gs =
   let named oid = fmap Card.name (Game.cardOf oid gs) == Just wanted
    in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
@@ -988,7 +989,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (gs, cloneId) = S.handOne clone withPiker
         -- S.identityAnswer declines ChooseCopyTarget (Clone's own "may").
         resolved = S.runPure S.identityAnswer gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop >> Engine.settleForPriority)
-        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
+        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
     Spec.assertEqWith s "the 0/0 Clone is gone" named []
   Spec.it s "CR 614.12a the copy choice is locked in BEFORE the enters event exists" $ do
     island <- S.printingOf s registry "Island"
@@ -999,7 +1000,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (gs, cloneId) = S.handOne clonePrinting withPiker
         -- No settle: the choice must already be made when resolveTop returns.
         resolved = S.runPure (copyOf piker) gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop)
-        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
+        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
     case named of
       [] -> Spec.assertFailure s "Clone did not reach the battlefield"
       clone : _ -> Spec.assertEqWith s "already a 2/1, with no settle run" (Projection.powerOf clone resolved) (Just 2)
@@ -1010,7 +1011,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     case held of
       plasmaCard : _ ->
         let after = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
-         in case newestNamed (Text.pack "Primal Plasma") after of
+         in case newestNamed (CardName.MkCardName $ Text.pack "Primal Plasma") after of
               Nothing -> Spec.assertFailure s "Primal Plasma did not reach the battlefield"
               Just plasma -> do
                 Spec.assertEqWith s "power" (Projection.powerOf plasma after) (Just 2)
@@ -1030,7 +1031,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
       plasmaCard : cloneCard : _ ->
         let withPlasma = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
             after = S.runPure (enteringAs 2) withPlasma (Cast.castSpell S.alice cloneCard >> Stack.resolveTop)
-         in case newestNamed (Text.pack "Clone") after of
+         in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
               Nothing -> Spec.assertFailure s "Clone did not reach the battlefield"
               Just clone -> do
                 Spec.assertEqWith s "power is the CLONE's own choice" (Projection.powerOf clone after) (Just 1)
@@ -1047,7 +1048,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
       plasmaCard : cloneCard : _ ->
         let withPlasma = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
             after = S.runPure (enteringAs 0) withPlasma (Cast.castSpell S.alice cloneCard >> Stack.resolveTop)
-         in case newestNamed (Text.pack "Clone") after of
+         in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
               Nothing -> Spec.assertFailure s "Clone did not reach the battlefield"
               Just clone -> do
                 Spec.assertEqWith s "3/3" (Projection.powerOf clone after) (Just 3)
@@ -1065,7 +1066,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         let s1 = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
             s2 = S.runPure (enteringAs 2) s1 (Cast.castSpell S.alice cloneA >> Stack.resolveTop)
             s3 = S.runPure (enteringAs 0) s2 (Cast.castSpell S.alice cloneB >> Stack.resolveTop)
-         in case newestNamed (Text.pack "Clone") s3 of
+         in case newestNamed (CardName.MkCardName $ Text.pack "Clone") s3 of
               Nothing -> Spec.assertFailure s "the second Clone did not reach the battlefield"
               Just clone -> do
                 Spec.assertEqWith s "its OWN choice wins on P/T" (Projection.powerOf clone s3) (Just 3)
@@ -1138,7 +1139,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (_, g1) = S.addCreature doublingSeason S.alice base
         (g2, spellId) = S.handOne dragonFodder g1
         after = castAndResolve S.identityAnswer g2 spellId
-    Spec.assertEqWith s "twice that many" (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after) 4
+    Spec.assertEqWith s "twice that many" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 4
   Spec.it s "CR 614.5 two Doubling Seasons are two instances: eight Goblins" $ do
     mountain <- S.printingOf s registry "Mountain"
     doublingSeason <- S.printingOf s registry "Doubling Season"
@@ -1148,7 +1149,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (_, g2) = S.addCreature doublingSeason S.alice g1
         (g3, spellId) = S.handOne dragonFodder g2
         after = castAndResolve S.identityAnswer g3 spellId
-    Spec.assertEqWith s "2 -> 4 -> 8" (S.countOnBattlefieldByName (Text.pack "Goblin Token") S.alice after) 8
+    Spec.assertEqWith s "2 -> 4 -> 8" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 8
   Spec.it s "CR 614.1 Doubling Season's OTHER clause doubles counters, not tokens" $ do
     forest <- S.printingOf s registry "Forest"
     battlegrowth <- S.printingOf s registry "Battlegrowth"

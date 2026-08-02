@@ -2,11 +2,11 @@ module Pawl.Types.Card where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
@@ -30,7 +30,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 
 data Card = MkCard
-  { name :: Text.Text,
+  { name :: CardName.CardName,
     -- | Nothing, not a zero cost: CR 202.1, a land has no mana cost at all.
     manaCost :: Maybe ManaCost.ManaCost,
     typeLine :: TypeLine.TypeLine,

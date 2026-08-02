@@ -7,6 +7,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
@@ -16,7 +17,7 @@ import qualified Pawl.Types.Subtype as Subtype
 sampleSnapshot :: PC.ProjectedCharacteristics
 sampleSnapshot =
   PC.MkProjectedCharacteristics
-    { PC.name = Text.pack "Sample",
+    { PC.name = CardName.MkCardName $ Text.pack "Sample",
       PC.supertypes = Set.empty,
       PC.keywords = Map.empty,
       PC.colors = Set.empty,

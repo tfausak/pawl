@@ -8,5 +8,7 @@ import qualified Data.Text as Text
 -- and slugifying it is a registry's business rather than a caller's. A
 -- file-backed registry slugifies to find a path; a map-backed one need not
 -- slugify at all.
-newtype CardName = MkCardName {unwrap :: Text.Text}
+newtype CardName = MkCardName
+  { unwrap :: Text.Text
+  }
   deriving (Eq, Ord, Show)

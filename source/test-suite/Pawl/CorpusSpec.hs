@@ -10,6 +10,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 
 spec :: (Monad n) => Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Corpus" $ do
@@ -32,4 +33,4 @@ spec s = Spec.describe s "Pawl.Corpus" $ do
     piker <- S.pikerJson
     S.withCorpusDir "load-all" [("goblin-piker.json", piker)] $ \root -> do
       loaded <- Corpus.loadAll root
-      Spec.assertEqWith s "one card, by name" [Card.name c | (_, Right c) <- loaded] [Text.pack "Goblin Piker"]
+      Spec.assertEqWith s "one card, by name" [Card.name c | (_, Right c) <- loaded] [CardName.MkCardName $ Text.pack "Goblin Piker"]
