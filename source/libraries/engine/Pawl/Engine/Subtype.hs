@@ -113,6 +113,8 @@ isLandType subtype = case subtype of
   -- CR 205.3m: a creature type (Child of Night's). Not a land type.
   Subtype.Vampire -> False
   Subtype.Dryad -> False
+  -- CR 205.3m: a creature type (Hero of Bladehold's). Not a land type.
+  Subtype.Knight -> False
 
 -- CR 205.3m: "Creatures and kindreds share their lists of subtypes; these
 -- subtypes are called creature types." The rulebook owns that list by name, so
@@ -206,3 +208,4 @@ isCreatureType subtype = case subtype of
   Subtype.Frog -> True
   Subtype.Vampire -> True
   Subtype.Dryad -> True
+  Subtype.Knight -> True

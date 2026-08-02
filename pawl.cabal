@@ -601,6 +601,7 @@ library types
     Pawl.Types.Toughness
     Pawl.Types.TriggerCondition
     Pawl.Types.TriggeredAbility
+    Pawl.Types.TriggerEntry
     Pawl.Types.TriggerFrequency
     Pawl.Types.TriggerSource
     Pawl.Types.TurnScope

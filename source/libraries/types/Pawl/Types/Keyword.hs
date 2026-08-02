@@ -237,6 +237,18 @@ data Keyword
     -- projection's per-keyword count.
     Poisonous Natural.Natural
   | Infect -- 702.90
+  | -- | 702.91a: "Battle cry is a triggered ability. 'Battle cry' means 'Whenever
+    -- this creature attacks, each other attacking creature gets +1/+0 until end
+    -- of turn.'"
+    --
+    -- The SECOND keyword rule 702 states as a triggered ability, after poisonous
+    -- (702.70a), and so the second one Pawl.Engine.Keyword MINTS rather than
+    -- merely consults. Nullary, because rule 702.91a takes no parameter -- and
+    -- unlike flying's or lifelink's nullary siblings, its reader takes the
+    -- per-keyword count rather than membership: CR 702.91b says "if a creature
+    -- has multiple instances of battle cry, each triggers separately", the same
+    -- multiplicity CR 702.70b gives poisonous.
+    BattleCry
   | -- | 702.111b: "A creature with menace can't be blocked except by two or more
     -- creatures."
     --

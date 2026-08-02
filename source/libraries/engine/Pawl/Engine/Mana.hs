@@ -159,6 +159,7 @@ subtypeMana subtype = case subtype of
   Subtype.Frog -> Nothing
   Subtype.Vampire -> Nothing
   Subtype.Dryad -> Nothing
+  Subtype.Knight -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an

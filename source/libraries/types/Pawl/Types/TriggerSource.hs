@@ -19,6 +19,11 @@ import qualified Pawl.Types.ObjectId as ObjectId
 -- cannot express. Pawl.Types.Source is the on-the-stack counterpart, recording
 -- the same distinction (OfTrigger / OfInherentTrigger) once the ability has been
 -- placed.
+--
+-- This is HALF of what that ordering choice shows a player, not all of it:
+-- Pawl.Types.TriggerEntry pairs it with the ability, because one source can have
+-- two distinct abilities in one batch and CR 725.2's pair shares this type's one
+-- Sourceless value (#61).
 data TriggerSource
   = OfObject ObjectId.ObjectId
   | Sourceless

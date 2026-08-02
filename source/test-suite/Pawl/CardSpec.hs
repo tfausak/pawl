@@ -924,6 +924,10 @@ keywordFilters keyword = case keyword of
   Keyword.Vigilance -> []
   Keyword.Fear -> []
   Keyword.Poisonous _ -> []
+  -- CR 702.91a: battle cry names no quality either -- the "each other attacking
+  -- creature" set is written into the ability Pawl.Engine.Keyword mints, not
+  -- into the keyword.
+  Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []

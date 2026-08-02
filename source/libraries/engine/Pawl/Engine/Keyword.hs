@@ -13,19 +13,24 @@ import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import Pawl.Types.Filter (Filter)
+import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -35,6 +40,7 @@ import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -44,10 +50,10 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 -- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
 -- matter -- Projection.hasKeyword for an evasion or combat bit, Pawl.Engine.Damage for
 -- infect's and toxic's damage riders -- because the rule states them as static
--- abilities that some rules-core reader already asks about. Rule 702.70 does
--- not: it spells poisonous out as a TRIGGERED ability, in the same words a card
--- would print, so it has to be MINTED and handed to the ordinary CR 603
--- machinery rather than merely consulted.
+-- abilities that some rules-core reader already asks about. Rules 702.70 and
+-- 702.91 do not: they spell poisonous and battle cry out as TRIGGERED abilities,
+-- in the same words a card would print, so those have to be MINTED and handed to
+-- the ordinary CR 603 machinery rather than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -55,16 +61,16 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 --
 -- The abilities are derived from a projection's POST-LAYER keyword counts, so
 -- Humility (LoseAllAbilities, which empties PC.keywords at layer 6) takes rule
--- 702.70a's ability away for free, and an Aura's layer-6 grant adds it for free
--- -- neither needs an arm here.
+-- 702.70a's and rule 702.91a's abilities away for free, and an Aura's layer-6
+-- grant adds them for free -- neither needs an arm here.
 --
 -- triggeredAbilitiesOf's one caller is Pawl.Engine.Event's EVENT scan (eventTriggers).
 -- Rule 702 has no state-triggered (CR 603.8) or delayed (CR 603.7) keyword
 -- ability, so stateTriggers and delayedPending do not consult this; the first
 -- keyword that needs them to is the one that must widen those two scans.
 --
--- Rule 702.34a's flashback is the second minting customer, and the one that
--- shows how wide this voice is: ONE keyword becomes a cost
+-- Rule 702.34a's flashback is the minting customer that shows how wide this
+-- voice is: ONE keyword becomes a cost
 -- (flashbackCost, read by Pawl.Engine.Cost), a casting permission
 -- (castingPermissionsOf, read by Pawl.Engine.Cast) and a replacement effect
 -- (flashbackExile, installed by Pawl.Engine.Cast). Those three readers get ordinary
@@ -82,6 +88,8 @@ import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 -- the projection's per-keyword count says: `Poisonous 1` twice is two abilities
 -- and two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.)
+-- CR 702.91b says the same of battle cry, in the same words, so the two minting
+-- arms below are the same shape.
 --
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
 -- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
@@ -93,6 +101,7 @@ triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList co
 abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
+  Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -162,6 +171,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
+  Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
@@ -268,6 +278,7 @@ permissionsFor keyword = case keyword of
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
+  Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
@@ -423,3 +434,51 @@ poisonous n =
         (PlayerRef.InSlot Binding.triggerPlayer)
         PlayerCounterKind.Poison
         (Quantity.Literal (toInteger n))
+
+-- CR 702.91a: "Battle cry is a triggered ability. 'Battle cry' means 'Whenever
+-- this creature attacks, each other attacking creature gets +1/+0 until end of
+-- turn.'" Rule 702.70a's poisonous above is the only other keyword in this pool
+-- stated as a triggered ability, and this is built the same way: minted here and
+-- handed to the ordinary CR 603 machinery, which never learns a keyword produced
+-- it.
+--
+-- CR 508.3a is what "attacks" means -- "an ability that reads 'Whenever [a
+-- creature] attacks, . . .' triggers if that creature is declared as an
+-- attacker" -- so the condition is the self-scoped SelfAttacks, EveryTime: rule
+-- 702.91a states no "for the first time each turn" narrowing.
+--
+-- "EACH OTHER ATTACKING CREATURE" is a SET, swept at resolution and then frozen
+-- (CR 611.2c), which is exactly Trumpet Blast's ObjectRef.EachMatching -- so this
+-- needs no opcode of its own either. The three conjuncts are the three printed
+-- words: a creature (CR 109.2 draws the set from the battlefield), attacking,
+-- and OTHER, which is `Not IsSource` -- the spelling Filter.IsSource fixes for
+-- "another" (#163), and the reason a battle-crying creature never pumps itself.
+--
+-- The tokens Hero of Bladehold's SECOND ability puts onto the battlefield
+-- attacking are in the set or not according to WHEN this resolves, and that is
+-- the whole of CR 603.3b's ordering choice: CR 611.2c fixes the affected set as
+-- the effect begins, so a token that arrives afterwards is not pumped.
+-- Pawl.TriggerSpec's two "CR 603.3b/702.91a resolving ..." cases prove both
+-- directions, and they differ in the board they leave behind.
+--
+-- Single mode, no targets, ChooseExactly 1 -- so nothing is asked as the ability
+-- is placed, which is right because rule 702.91a leaves nothing to choose.
+-- intervening = Nothing: rule 702.91a has no "if" clause.
+battleCry :: TriggeredAbility Card
+battleCry =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 0))
+        ( ObjectRef.EachMatching
+            (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking, Filter.Not Filter.IsSource])
+        )
