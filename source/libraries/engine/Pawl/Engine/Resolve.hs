@@ -54,7 +54,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
-import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.Modification as Modification
@@ -253,58 +252,6 @@ readsX = any effectReadsX
       Effect.PlaySubgame _ -> False
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary _ -> False
-
--- CR 605: does this effect add mana, and how is its type decided? The "produces
--- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
--- to keep mana abilities off the stack, and by Mana.manaRoutesOfGiven to
--- enumerate what one activation of a source would add. Casing on Effect is
--- Resolve's charter.
---
--- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
--- asks whether the ability "could add mana", which an unresolved colour choice
--- answers yes to; WHICH colour is Mana.tapForMana's prompt, not a static fact.
-manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
-manaProduced effect = case effect of
-  Effect.AddMana production -> Just production
-  Effect.DealDamage _ _ -> Nothing
-  Effect.ModifyTarget {} -> Nothing
-  Effect.ChangeText _ -> Nothing
-  Effect.Search _ _ -> Nothing
-  Effect.ExileAllGraveyards -> Nothing
-  Effect.Proliferate -> Nothing
-  Effect.ExileHandThenDraw -> Nothing
-  Effect.PlayerSacrifices {} -> Nothing
-  Effect.RestartGame -> Nothing
-  Effect.ControlPlayerNextTurn _ -> Nothing
-  Effect.Destroy {} -> Nothing
-  Effect.Sacrifice _ -> Nothing
-  Effect.RemoveFromCombat _ -> Nothing
-  Effect.MoveToZone {} -> Nothing
-  Effect.Draw {} -> Nothing
-  Effect.Mill {} -> Nothing
-  Effect.Discard {} -> Nothing
-  Effect.LoseLife {} -> Nothing
-  Effect.GainLife {} -> Nothing
-  Effect.Create {} -> Nothing
-  Effect.Replace {} -> Nothing
-  Effect.SkipNextPhase {} -> Nothing
-  Effect.Counter _ -> Nothing
-  Effect.PutCounters {} -> Nothing
-  Effect.GainPlayerCounters {} -> Nothing
-  Effect.Tap _ -> Nothing
-  Effect.Untap _ -> Nothing
-  Effect.AddPhases _ -> Nothing
-  Effect.GainControl _ _ -> Nothing
-  Effect.ArmDelayedTrigger {} -> Nothing
-  Effect.AffectPlayers {} -> Nothing
-  Effect.CreateEmblem {} -> Nothing
-  Effect.BecomeMonarch {} -> Nothing
-  Effect.ExileUntilMonarch _ -> Nothing
-  Effect.Attach _ -> Nothing
-  Effect.AttachTarget {} -> Nothing
-  Effect.PlaySubgame _ -> Nothing
-  Effect.TakeExtraTurn {} -> Nothing
-  Effect.ShuffleIntoLibrary _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.

@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CardName as CardName
@@ -242,6 +243,18 @@ data Card = MkCard
     -- fields: Pawl.Types.CombatRestriction argues why the axis that split those is
     -- absent here.
     combatRestrictions :: [CombatRestriction.CombatRestriction],
+    -- | CR 604.1/604.2 / 508.1c / 508.1h: this card's printed COSTS TO ATTACK --
+    -- "creatures can't attack you unless their controller pays {2} for each
+    -- creature they control that's attacking you" (Ghostly Prison). The SIXTH
+    -- printed-static-ability field; read by Pawl.Engine.AttackCost and never by
+    -- Pawl.Engine.Projection, since CR 613.11 applies these after the layer system
+    -- rather than inside it. Empty for every other printing.
+    --
+    -- Its own field rather than an arm of combatRestrictions above, for the
+    -- reason Pawl.Types.AttackCost's header gives: a creature under one of these
+    -- CAN attack, so it must stay on CR 508.1a's candidate list, where a
+    -- CombatRestriction takes its subject off.
+    attackCosts :: [AttackCost.AttackCost],
     -- | CR 103.5b: the effects of this card's "any time you could mulligan"
     -- action, in written order. Empty for every printing but Serum Powder.
     --

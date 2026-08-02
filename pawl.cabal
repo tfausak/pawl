@@ -74,6 +74,8 @@ library codec
     Pawl.Codec.AffectedSpec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
+    Pawl.Codec.AttackCost
+    Pawl.Codec.AttackCostSpec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.AttackRequirementSpec
     Pawl.Codec.BeginningStep
@@ -299,6 +301,7 @@ library engine
   exposed-modules:
     Pawl.Engine.Action
     Pawl.Engine.Activate
+    Pawl.Engine.AttackCost
     Pawl.Engine.AttackRequirement
     Pawl.Engine.Binding
     Pawl.Engine.BlockRequirement
@@ -319,6 +322,7 @@ library engine
     Pawl.Engine.Game
     Pawl.Engine.Keyword
     Pawl.Engine.Mana
+    Pawl.Engine.ManaAbility
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.Mulligan
@@ -470,6 +474,7 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
     Pawl.Types.Aggregation
+    Pawl.Types.AttackCost
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.BeginningStep

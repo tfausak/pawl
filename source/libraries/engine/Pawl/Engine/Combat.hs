@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.Engine.AttackCost as AttackCost
 import qualified Pawl.Engine.AttackRequirement as AttackRequirement
 import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
@@ -17,6 +18,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
@@ -30,6 +32,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -269,10 +272,11 @@ legalAttackers pid gs =
 -- restrictions". blockCeiling's twin, and the pair is deliberately the same shape
 -- so the two rules read the same way at their call sites.
 --
--- The maximum is answered in CLOSED FORM -- the best declaration IS the instance
--- set -- where blockCeiling enumerates every candidate declaration and folds. That
--- is not an optimization of the blocking search; it is a different search, and it
--- is exact only because of what pawl cannot yet print:
+-- The maximum is answered in CLOSED FORM -- the best declaration is the instance
+-- set, minus whichever instances CR 508.1d's cost clause excuses (below) -- where
+-- blockCeiling enumerates every candidate declaration and folds. That is not an
+-- optimization of the blocking search; it is a different search, and it is exact
+-- only because of what pawl cannot yet print:
 --
 --   * every attacking RESTRICTION pawl models is per creature (CR 508.1a's own
 --     clauses, CR 702.3b's defender, and CR 508.1c's printed
@@ -281,7 +285,9 @@ legalAttackers pid gs =
 --     its instances by;
 --   * so declaring every required creature at once disobeys nothing -- attacking
 --     with one creature cannot make another's attack illegal -- which makes that
---     declaration legal AND maximal by construction.
+--     declaration legal AND maximal by construction. A cost to attack does not
+--     break this: CR 508.1h totals the whole declaration at once, so no creature's
+--     presence can make another's attack ILLEGAL, only dearer.
 --
 -- Both bullets fail the moment a set-shaped ATTACKING restriction lands (Silent
 -- Arbiter's "no more than one creature can attack each combat", Bonded
@@ -298,20 +304,51 @@ legalAttackers pid gs =
 -- rather than linear -- Projection.affects's AttachedPlayerControls arm takes a
 -- projection and a control-grant walk per candidate, which is #435's shape and is
 -- documented at that arm. Measured on a board of N Goblin Pikers under one Curse:
--- 5 MB allocated at N=100, 15 MB at N=200, 53 MB and 0.02s at N=400.
+-- 5 MB allocated at N=100, 15 MB at N=200, 53 MB and 0.02s at N=400. The cost
+-- filter below adds one more battlefield walk per REQUIRED creature per attack
+-- target, and each stops at the first permanent printing no cost to attack --
+-- which on a board with no Ghostly Prison is all of them.
 --
--- CR 508.1d's cost clause -- "if a creature can't attack unless a player pays a
--- cost, that player is not required to pay that cost, even if attacking with that
--- creature would increase the number of requirements being obeyed" -- is not
--- implemented: nothing in the pool makes attacking cost anything (#460).
+-- CR 508.1d's COST CLAUSE is the second component's filter, and it is a modifier
+-- on the maximization rather than a check of its own: "if a creature can't attack
+-- unless a player pays a cost, that player is not required to pay that cost, even
+-- if attacking with that creature would increase the number of requirements being
+-- obeyed". A requirement whose creature cannot attack anything without its
+-- controller paying is therefore not one the maximum reaches for, and declining
+-- to attack with it stays legal.
 --
--- (empty, empty) when no requirement is in force, which is every board without a
--- Curse on it: the maximum is zero, every declaration obeys zero, and CR 508.1d
--- has nothing to say.
+-- Which is why the two components come apart here for the first time. `required`
+-- stays every instance in force, because that is what a declaration's obedience
+-- is counted against -- attacking with a taxed creature obeys its requirement
+-- perfectly well, and paying is then mandatory (CR 508.1j). `best` is the
+-- untaxed subset, and it is what makes "no attacks" legal under a Curse of the
+-- Nightly Hunt while a Ghostly Prison is out. Both readings of the pair below
+-- (obeysAttackRequirements, forcedAttackDeclaration) want exactly that split.
+--
+-- AttackCost.attacksFreely is asked per required creature against CR 508.1b's
+-- whole candidate list of targets, so a creature that could attack a planeswalker
+-- for nothing keeps its requirement -- Ghostly Prison's own ruling ("a creature
+-- that can't attack you can still attack a planeswalker you control"), and the
+-- player's CR 508.1b announcement then decides whether they end up paying.
+--
+-- No defending player means no target at all, so nothing attacks freely and
+-- `best` is empty. Not a fallback: with no defender there is no attack to make
+-- (declareAttackers returns before ever prompting), so a requirement that cannot
+-- be obeyed is one CR 508.1d's "if able" never reaches.
+--
+-- Nothing is forced when `required` is empty, which is every board without a
+-- Curse on it: Set.filter never calls the predicate, so no cost walk and no
+-- target list is built.
+--
+-- (empty, empty) when no requirement is in force: the maximum is zero, every
+-- declaration obeys zero, and CR 508.1d has nothing to say.
 attackCeiling :: [ObjectId] -> GameState -> (Set ObjectId, Set ObjectId)
 attackCeiling candidates gs =
   let required = AttackRequirement.instances candidates gs
-   in (required, required)
+      targets = case Combat.defender (GameState.combat gs) of
+        Nothing -> []
+        Just defender -> NonEmpty.toList (attackTargets defender gs)
+   in (required, Set.filter (\oid -> AttackCost.attacksFreely oid targets gs) required)
 
 -- How many of `required` this declaration obeys -- CR 508.1d's "the number of
 -- requirements that are being obeyed". A requirement instance is obeyed exactly
@@ -969,9 +1006,18 @@ announceAttackTarget pid oid options = case options of
 -- minted from the candidate list, so with no candidate there is nothing to
 -- require.
 --
--- The steps run here are CR 508.1a, 508.1b, 508.1c, 508.1d, 508.1f and 508.1k, in
--- the rule's own order, plus the event CR 508.1m's triggers watch. CR
--- 508.1g-508.1j's costs to attack (#460) are not implemented.
+-- The steps run here are CR 508.1a, 508.1b, 508.1c, 508.1d, 508.1f, 508.1h,
+-- 508.1i, 508.1j and 508.1k, in the rule's own order, plus the event CR 508.1m's
+-- triggers watch. CR 508.1g's OPTIONAL costs to attack -- "costs a player may pay
+-- 'as' a creature attacks", which CR 701.43d and CR 702.154b name exert and
+-- enlist as -- are not implemented (#597).
+--
+-- CR 508.1's preamble is the one clause that costs this function its shape: "if
+-- at any point during the declaration of attackers, the active player is unable
+-- to comply with any of the steps listed below, the declaration is illegal; the
+-- game returns to the moment before the declaration". A cost to attack is the
+-- first step pawl can fail to comply with AFTER the board has been written to, so
+-- the entry state is captured and restored. See the payment below.
 declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
@@ -1078,18 +1124,88 @@ declareAttackers pid = do
                           Set.union (Set.fromList (Map.elems recorded)) (Combat.declaredAttacked (GameState.combat g))
                       }
                 }
-        State.modify' (\g -> attach (List.foldl' tapIt g attacking))
-        -- CR 508.2b: the declaration is what abilities trigger on, and CR 508.3a
-        -- scopes them to a creature that "is declared as an attacker" -- so one
-        -- event per creature chosen HERE, and none at all for a creature put onto
-        -- the battlefield attacking. Recorded after the record is written, so the
-        -- board a trigger's intervening-if clause reads (CR 603.4) already has
-        -- these creatures attacking.
+        -- CR 508.1's preamble, captured here: everything from this line on is
+        -- undone together if the payment below cannot be made.
+        before <- State.get
+        -- CR 508.1f, and ONLY 508.1f. Tapping is split from the record-writing it
+        -- used to share a modify' with, because the rules put a step between them:
+        -- 508.1f taps, 508.1h-j determine and pay, and only 508.1k makes the
+        -- creatures attacking. The order is observable rather than pedantic -- a
+        -- Birds of Paradise that was just declared as an attacker is tapped, so it
+        -- is no longer a mana source for the very cost its attack incurred.
+        State.modify' (\g -> List.foldl' tapIt g attacking)
+        gs1 <- State.get
+        -- CR 508.1h: "the active player determines the total cost to attack ...
+        -- Once the total cost is determined, it becomes 'locked in'. If effects
+        -- would change the total cost after this time, ignore this change."
         --
-        -- The event names the creature and not what it was announced as
-        -- attacking, so CR 508.3a's "attacks [a player, planeswalker, or
-        -- battle]", CR 508.3b and CR 508.3e are unavailable (#538).
-        State.modify' (\g -> List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid) h) g attacking)
+        -- LOCKED IN is this `let`, and nothing more elaborate is needed: the total
+        -- is computed once from the finished declaration and from the board as of
+        -- CR 508.1f, and nothing at all runs between that determination and the
+        -- payment it is handed to. Asking AttackCost.totalCost a second time, at
+        -- payment time or after it, is exactly what the rule forbids -- which is
+        -- why that function's own haddock says the locking is the caller's.
+        let owed = AttackCost.totalCost recorded gs1
+        -- CR 508.1i ("if any of the costs require mana, the active player then has
+        -- a chance to activate mana abilities") and CR 508.1j ("once the player has
+        -- enough mana in their mana pool, they pay all costs in any order. Partial
+        -- payments are not allowed") are Mana.payCost, which is both: it prompts
+        -- for which source to tap until the pool covers the cost, and restores the
+        -- entry state rather than spending half of it.
+        --
+        -- Skipped outright at {0}, which is every board with no cost to attack on
+        -- it. Not an optimization of Mana.payCost -- it answers True on an empty
+        -- cost without tapping anything -- but a statement that a combat with no
+        -- Ghostly Prison in it reaches no mana code at all.
+        --
+        -- NO "will you pay?" PROMPT, and that is a rules reading rather than an
+        -- elision. CR 508.1j is unconditional once the creatures are chosen -- "they
+        -- pay all costs" -- and CR 508.1d's "that player is not required to pay that
+        -- cost" is exercised one step earlier, by NOT DECLARING the creature, which
+        -- is what attackCeiling's cost clause keeps legal even under an attacking
+        -- requirement. So declining IS reachable, at the CR 508.1a prompt where the
+        -- rules put it, and CombatSpec's "a Curse of the Nightly Hunt does not force
+        -- an attack a Ghostly Prison taxes" is the case that proves it.
+        --
+        -- The same shape a cast has, and the precedent is exact: Cast.castSpell does
+        -- not ask whether the caster wants to pay after they have announced the
+        -- spell, because announcing it was the choosing. What the player is still
+        -- asked here is WHICH sources to tap -- Mana.payCost's own prompt, CR
+        -- 508.1i's window -- so no source is committed for them either.
+        paid <-
+          if null (ManaCost.unwrap owed)
+            then pure True
+            else Mana.payCost pid owed
+        if not paid
+          then
+            -- CR 508.1's preamble: "the declaration is illegal; the game returns to
+            -- the moment before the declaration". The restore IS that sentence, and
+            -- it is reachable by an ordinary player -- declaring more attackers
+            -- than they can pay for is a mistake the rules catch here.
+            --
+            -- What the rules then expect, and pawl cannot do, is a fresh
+            -- declaration: a pure `Prompt r -> r` returns the identical answer, so
+            -- re-prompting would loop. The active player therefore attacks with
+            -- nothing, which can leave a CR 508.1d requirement unobeyed that a
+            -- smaller declaration would have obeyed (#600).
+            State.put before
+          else
+            -- CR 508.1k: "each chosen creature still controlled by the active
+            -- player becomes an attacking creature." After the payment, which is
+            -- the rules' own order.
+            do
+              State.modify' attach
+              -- CR 508.2b: the declaration is what abilities trigger on, and CR
+              -- 508.3a scopes them to a creature that "is declared as an attacker"
+              -- -- so one event per creature chosen HERE, and none at all for a
+              -- creature put onto the battlefield attacking. Recorded after the
+              -- record is written, so the board a trigger's intervening-if clause
+              -- reads (CR 603.4) already has these creatures attacking.
+              --
+              -- The event names the creature and not what it was announced as
+              -- attacking, so CR 508.3a's "attacks [a player, planeswalker, or
+              -- battle]", CR 508.3b and CR 508.3e are unavailable (#538).
+              State.modify' (\g -> List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid) h) g attacking)
 
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
 -- chooses which defending player, planeswalker a defending player controls, or

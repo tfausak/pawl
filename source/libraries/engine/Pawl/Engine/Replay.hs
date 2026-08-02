@@ -230,8 +230,12 @@ defaultAnswer p = case p of
   -- CR 704.5j: every candidate is a legal thing to keep, so the head is a legal
   -- answer and the least eventful fallback.
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  -- Declining to attack is always legal, and is the least eventful thing a
-  -- fallback can do.
+  -- Declining to ATTACK is not always legal -- a CR 508.1d requirement (Curse of
+  -- the Nightly Hunt) can make the empty declaration the one illegal answer,
+  -- unless CR 508.1d's cost clause excuses it (Ghostly Prison). Still the least
+  -- eventful fallback, and still total, on DeclareBlockers' terms below:
+  -- Combat.declareAttackers repairs an illegal declaration to
+  -- Combat.forcedAttackDeclaration rather than dropping it.
   Prompt.DeclareAttackers {} -> []
   -- CR 508.1b: the head is the defending player (Combat.attackTargets orders it
   -- first), which is always a legal thing to attack and is what every attack in a
