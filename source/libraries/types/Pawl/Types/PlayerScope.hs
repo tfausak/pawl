@@ -5,8 +5,8 @@ module Pawl.Types.PlayerScope where
 -- Membership is Pawl.Engine.PlayerEffect.inScope and the set is the fold over it,
 -- Pawl.Engine.PlayerEffect.playersInScope -- one reading, two shapes.
 --
--- Two carriers, and CR 109.5's "you" is the perspective for both; they differ
--- only in where that player comes from:
+-- THREE carriers. They differ only in where the perspective comes from, and the
+-- first two take CR 109.5's "you":
 --
 --   * Pawl.Types.PlayerStaticAbility / ActivePlayerEffect -- which players a
 --     Pawl.Types.PlayerEffect applies to, against the effect's CONTROLLER ("for
@@ -15,6 +15,14 @@ module Pawl.Types.PlayerScope where
 --     from (CR 400.1), against the perspective the targeting carries. That
 --     carrier is why this is not Pawl.Types.PlayerRef, whose InSlot arm names a
 --     target slot CR 601.2c has not filled yet; see Pool's own note.
+--   * Pawl.Types.PlayerEffect.CantBeTargetedBy -- whose spells and abilities
+--     cannot target the player the effect applies to (CR 702.18a's shroud, CR
+--     702.11c's hexproof). Its perspective is that PROTECTED player, which is
+--     not CR 109.5's "you" at all: the effect's controller is who "you" names,
+--     and the two coincide only because both cards in the pool say "You have
+--     ...". Pawl.Engine.PlayerEffect.protectedFromTargeting is the reader, and
+--     it is the one caller that hands inScope something other than a
+--     controller.
 --
 -- The scope is always resolved DYNAMICALLY on both PlayerEffect carriers. CR
 -- 611.2c's first sentence freezes a stored effect's object set -- which is what
@@ -27,7 +35,9 @@ module Pawl.Types.PlayerScope where
 -- is the same type on the printed and the stored carrier. Freeze it and Silence,
 -- which resolves with no opponent spell on the stack, does literally nothing.
 data PlayerScope
-  = -- | CR 109.5: the effect's controller.
+  = -- | CR 109.5: the effect's controller -- or, on the CantBeTargetedBy
+    -- carrier, the protected player the scope is anchored to. "The one player
+    -- the perspective names", whichever carrier supplied it.
     You
   | -- | Every other player. Not a two-player shortcut: CR 806.1 has a
     -- free-for-all's players compete as individuals against each other, so

@@ -497,10 +497,14 @@ keywordsWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> PC.keywords (LastKnown.characteristics lk)
   Nothing -> keywordsOf oid gs
 
--- controllerOf with the same fallback, and it needs one for the same rule: CR
--- 702.15b's answer is "that source's controller, or its owner if it has no
--- controller", which CR 702.15c then says to read from last known information
--- once the source has ceased.
+-- controllerOf with the same fallback. CR 702.15b is why a controller is wanted
+-- at all -- its answer is "that source's controller, or its owner if it has no
+-- controller" -- but the authority for taking it from last known information is
+-- CR 608.2h, NOT CR 702.15c: that rule licenses last known information for
+-- "whether it had lifelink" and says nothing about who controlled it. CR 608.2h
+-- is the general clause that does ("If the effect requires information from a
+-- specific object ... the effect uses the object's last known information"), and
+-- viewWithLastKnown above already cites it for exactly this reason.
 --
 -- LastKnown.controller is a PlayerId rather than a Maybe -- CR 613.1b control is
 -- recorded for the object as it left, which is why that record keeps it

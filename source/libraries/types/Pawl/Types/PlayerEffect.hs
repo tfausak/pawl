@@ -95,9 +95,12 @@ data PlayerEffect
     -- the third value and has none: it would mean "only your OWN spells can't
     -- target you", which no rule 702 keyword states.
     --
-    -- Redundancy is not counted, and both rules say so outright: CR 702.18b
-    -- ("multiple instances of shroud on the same permanent or player are
-    -- redundant") and CR 702.11h (the same for hexproof). A membership question,
+    -- Redundancy is not counted, and both rules say so outright for the PLAYER
+    -- case and not only the permanent one: CR 702.18b ("multiple instances of
+    -- shroud on the same permanent or player are redundant") and CR 702.11h
+    -- ("multiple instances of THE SAME hexproof ability on the same permanent or
+    -- player are redundant" -- the qualifier is 702.11d's, for hexproof from a
+    -- quality, and does not bear on the player half). A membership question,
     -- never a tally -- the same posture Pawl.Engine.Target.targetable takes for the
     -- permanent halves.
     CantBeTargetedBy PlayerScope.PlayerScope

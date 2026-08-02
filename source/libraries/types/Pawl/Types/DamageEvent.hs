@@ -20,8 +20,11 @@ data DamageEvent = MkDamageEvent
     target :: Recipient.Recipient,
     amount :: Natural.Natural,
     -- | CR 702.2e: whether the source had deathtouch WHEN THIS DAMAGE WAS DEALT.
-    -- Captured from the projection at deal time (Projection.hasKeyword), not
-    -- re-derived at SBA-check time -- last-known information. Read by the CR
+    -- Captured at deal time (Pawl.Engine.Damage.damageEvent, through
+    -- Projection.keywordsWithLastKnown) rather than re-derived at SBA-check
+    -- time, so a source that has since changed or ceased cannot alter it. That
+    -- reader is also what supplies CR 702.2e's own last-known-information
+    -- clause, for a source already gone as the damage is dealt. Read by the CR
     -- 704.5h SBA. See the M3b spec, section 4.
     dealtByDeathtouch :: Bool,
     -- | CR 702.90d: whether the source had infect WHEN THIS DAMAGE WAS DEALT

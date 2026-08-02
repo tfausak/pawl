@@ -117,10 +117,10 @@ blockerThreshold gs attacker blocker =
 --
 -- Lifelink's rider carries WHO rather than WHETHER, because CR 702.15b's answer
 -- is a player: "that source's controller, or its owner if it has no
--- controller". Projection.controllerOf is both of those clauses at once -- it
--- returns a control effect's player when one applies and the object's own owner
--- when none does, in any zone, which is what CR 702.15d ("no matter what zone")
--- needs.
+-- controller". Projection.controllerWithLastKnown below delegates to
+-- controllerOf, which is both of those clauses at once -- it returns a control
+-- effect's player when one applies and the object's own owner when none does, in
+-- any zone, which is what CR 702.15d ("no matter what zone") needs.
 --
 -- Read through the ...WithLastKnown pair rather than the plain readers, because
 -- the source may already have CEASED by the time it deals damage -- Ghitu

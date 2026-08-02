@@ -43,8 +43,14 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 -- CR 109.5: "the words 'you' and 'your' on an object refer to the object's
 -- controller ... for a static ability, this is the current controller of the
 -- object it's on". `pid` is the player being asked about; `controller` is the
--- effect's controller. The argument order is (asked-about, effect's) and the two
--- are never interchangeable.
+-- player the scope is anchored to. The argument order is (asked-about, anchor)
+-- and the two are never interchangeable.
+--
+-- The anchor is CR 109.5's "you" for every caller but one: protectedFromTargeting
+-- below passes the PROTECTED player, because CR 702.11c's "your opponents" are
+-- the opponents of whoever has hexproof rather than of the effect's controller.
+-- The parameter is named for the common case; see that function and
+-- Pawl.Types.PlayerScope's carrier list for why the two come apart.
 inScope :: PlayerId -> PlayerId -> PlayerScope -> Bool
 inScope pid controller scope = case scope of
   PlayerScope.You -> pid == controller

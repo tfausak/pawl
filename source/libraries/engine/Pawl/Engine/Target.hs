@@ -185,22 +185,42 @@ admittedGiven pcs perspective source spec gs =
 -- Leyline of Sanctity are the producers. PlayerEffect.protectedFromTargeting is
 -- the typed question; this module never sees the constructor.
 --
--- The two halves stay apart on purpose rather than being unified: the object
--- half's answer comes from a projection this function already holds `pcs` for,
--- and the player half's from a live battlefield walk that has no projection in
--- it at all. One reader over both would have to do the worse of the two for
--- every candidate.
+-- The two halves are separate readers because they read different things: the
+-- object half wants post-layer KEYWORDS, which `pcs` already holds, and the
+-- player half wants the CR 613.10/613.11 tier, which the layer machine does not
+-- compute at all. Neither could serve the other.
+--
+-- NOT because the player half is cheap. PlayerEffect.applying forces
+-- Projection.abilityRemoval -- a whole-board gather -- the moment any permanent
+-- carries a player ability, which is exactly the board an Ivory Mask makes, and
+-- this asks it once per player candidate rather than once per enumeration. That
+-- is the same cost class the cast path already pays on such a board and does not
+-- add a new one: Cast.castable calls prohibitsCasting and Cost.totalMana calls
+-- costAdjustments, both `applying`, once per card in hand per legalActions pass
+-- -- strictly more calls than the two seats this adds. Measured: all five
+-- benchmarks unmoved (fighting 2p aura 594ms -> 586ms, inside +/-29). None of
+-- them puts a player ability on the board, so that arm is reasoned rather than
+-- measured; hoisting `applying` per enumeration the way `pcs` is hoisted is
+-- #435's question, and #578 is what would catch it regressing.
+--
+-- EXHAUSTIVE over Recipient rather than routed through Recipient.objectOf: with
+-- the player arm split out, an objectOf-shaped match would leave a Nothing
+-- branch no input reaches and would silently swallow a new constructor. CR
+-- 120.3h's battle (#302) is the one already planned, and it must break this
+-- build rather than default to targetable.
 targetable :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> GameState -> Recipient -> Bool
-targetable pcs perspective gs recipient = case recipient of
-  Recipient.ToPlayer pid -> not (PlayerEffect.protectedFromTargeting perspective pid gs)
-  _ -> case Recipient.objectOf recipient of
-    Nothing -> True
-    Just oid ->
-      let has keyword = Projection.hasKeywordGiven pcs keyword oid gs
-          restricted =
-            has Keyword.Shroud
-              || (has Keyword.Hexproof && opponentOfController perspective oid gs)
-       in not (Set.member oid (GameState.battlefield gs) && restricted)
+targetable pcs perspective gs recipient =
+  let restrictedObject oid =
+        let has keyword = Projection.hasKeywordGiven pcs keyword oid gs
+            restricted =
+              has Keyword.Shroud
+                || (has Keyword.Hexproof && opponentOfController perspective oid gs)
+         in not (Set.member oid (GameState.battlefield gs) && restricted)
+   in case recipient of
+        Recipient.ToPlayer pid -> not (PlayerEffect.protectedFromTargeting perspective pid gs)
+        Recipient.ToCreature oid -> restrictedObject oid
+        Recipient.ToPlaneswalker oid -> restrictedObject oid
+        Recipient.ToObject oid -> restrictedObject oid
 
 -- CR 702.11b's "your opponents": is `perspective` -- CR 109.5's "you" for the
 -- spell or ability being aimed -- someone other than `oid`'s controller?

@@ -230,6 +230,29 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "under Leyline of Sanctity, bob takes nothing from his opponent" (S.lifeOf S.bob warded) (Just 20)
     Spec.assertEqWith s "and alice takes it instead" (S.lifeOf S.alice warded) (Just 17)
 
+  -- CR 601.2c / 700.2a: with BOTH players masked and no creature on the board,
+  -- Lightning Bolt's only slot has no candidate left, so the spell is
+  -- UNCASTABLE rather than castable-and-fizzling. Cast.instantSpeed's own
+  -- comment used to call this unobservable for Bolt, on the grounds that
+  -- AnyTarget always holds a living player; Ivory Mask is what stopped that
+  -- being true, so the claim is pinned here rather than left as prose.
+  Spec.it s "CR 601.2c a Bolt with every player masked and no creature is uncastable" $ do
+    ivoryMask <- S.printingOf s registry "Ivory Mask"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let base = S.landsInPlay mountain 1
+        (_, oneMask) = S.addCreature ivoryMask S.bob base
+        (_, bothMasked) = S.addCreature ivoryMask S.alice oneMask
+        castableIn board =
+          let (ready, boltId) = S.handOne bolt board
+           in Cast.castable S.alice boltId (ready {GameState.priority = Just S.alice})
+    -- The control twin, one step at a time: with only bob masked, alice is still
+    -- a candidate and the Bolt is castable, so it is the SECOND Mask that empties
+    -- the slot rather than anything else about the board.
+    Spec.assertBool s (castableIn base) "unmasked, the Bolt is castable"
+    Spec.assertBool s (castableIn oneMask) "with bob masked, alice is still a candidate"
+    Spec.assertBool s (not (castableIn bothMasked)) "with both masked, there is nothing to target and it is uncastable"
+
   -- CR 702.18a says "spells OR ABILITIES", so the gate cannot live on the cast
   -- path. Prodigal Sorcerer's "{T}: This creature deals 1 damage to any target"
   -- is an activated ability with a Pool.AnyTarget slot (CR 115.4), and the same
