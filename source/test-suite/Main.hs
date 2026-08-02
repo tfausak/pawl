@@ -19,6 +19,7 @@ import qualified Pawl.DamageSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec
+import qualified Pawl.EngineSpec
 import qualified Pawl.EventSpec
 import qualified Pawl.ExpirySpec
 import qualified Pawl.Extra.BuilderSpec
@@ -48,7 +49,6 @@ import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.ProjectionSpec
-import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec
@@ -67,8 +67,7 @@ main :: IO ()
 main = do
   root <- Registry.defaultRoot
   registry <- Registry.fileRegistry root
-  decks <- PropertySpec.loadDecks registry
-  Tasty.defaultMain (testTree registry decks)
+  Tasty.defaultMain (testTree registry)
 
 tasty :: Spec.Spec IO (Writer.Writer [Tasty.TestTree])
 tasty =
@@ -78,13 +77,11 @@ tasty =
       Spec.it = \s -> Writer.tell . List.singleton . HU.testCase s
     }
 
-testTree :: Registry.Registry IO -> PropertySpec.Decks -> Tasty.TestTree
-testTree registry decks =
+testTree :: Registry.Registry IO -> Tasty.TestTree
+testTree registry =
   Tasty.testGroup
     "pawl"
-    ( [ PropertySpec.tests decks,
-        Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry
-      ]
+    ( [Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry]
         -- Pawl.ReplacementSpec is wired separately because its timeout is a
         -- tasty option and Pawl.Spec cannot express one. The rationale for the
         -- timeout is at that module's `spec`; it guards CR 616.1's termination,
@@ -92,6 +89,15 @@ testTree registry decks =
         <> fmap
           (Tasty.localOption (Tasty.mkTimeout 5000000))
           (Writer.execWriter (Pawl.ReplacementSpec.spec tasty registry))
+        -- Pawl.EngineSpec is wired separately for the same reason, and guards
+        -- the same failure mode one level up: it asserts that a whole game
+        -- terminates, which without a timeout hangs rather than fails. Its
+        -- budget is the looser one because each of its cases plays out one or
+        -- two complete games (the longest runs 161 turns) rather than resolving
+        -- a single event.
+        <> fmap
+          (Tasty.localOption (Tasty.mkTimeout 30000000))
+          (Writer.execWriter (Pawl.EngineSpec.spec tasty registry))
     )
 
 -- Specs that reach for card data take a registry over the same monad they
