@@ -16,6 +16,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
@@ -30,6 +31,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card.Type
@@ -53,6 +55,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -761,12 +764,143 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
         (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (Mana.tapForMana solRingId)) 0) 0
 
+-- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
+-- other source's prompt to S.identityAnswer, which takes the head. A payment off
+-- several two-yield sources needs a different answer from each, and the prompt
+-- carries the object it is about, so keying on that is what lets one answerer
+-- send one Palladium Myr to its Forest and the other to its {C}{C}.
+prefersLongYieldFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+prefersLongYieldFrom wanted p = case p of
+  Prompt.ChooseManaYield _ _ oid candidates
+    | oid == wanted ->
+        let size yield = case yield of
+              Mana.Type.MkMana units -> length units
+         in List.maximumBy (\a b -> compare (size a) (size b)) (NonEmpty.toList candidates)
+  _ -> S.identityAnswer p
+
+-- CR 118.3 on a source offering SEVERAL yields, one of which adds more than one
+-- mana. Ashaya, Soul of the Wild ("Each nontoken creature you control is a Forest
+-- land in addition to its other types") turns a Palladium Myr ({3} Artifact
+-- Creature -- Myr, "{T}: Add {C}{C}") into exactly that: CR 305.6 gives the
+-- Forest an intrinsic "{T}: Add {G}", so one permanent offers {G} OR {C}{C}, and
+-- nothing else.
+--
+-- The pool's first such source, and the falsifier for the supply model that
+-- TRANSPOSED a source's yields (#450): position by position that reads the first
+-- mana as green-or-colorless and the second as colorless, so one Myr looked able
+-- to make {G} AND a second mana -- a mix no single activation of it produces.
+-- Both of the model's over-counts are here at once, because a Palladium Myr is
+-- credited with the LONGER yield's two mana while keeping the SHORTER yield's
+-- green.
+--
+-- CR 107.5 is why one yield per source is the exact reading: both of the Myr's
+-- mana abilities include {T} in their activation cost, and "a permanent that's
+-- already tapped can't be tapped again to pay the cost", so an untapped source
+-- is tapped for mana at most once and adds what exactly one activation adds.
+palladiumMyrSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
+  -- The fixture fact everything below rests on: two yields, and they differ in
+  -- TYPE as well as in length. Without Ashaya the Myr is Sol Ring's shape (one
+  -- yield of two mana) and the transpose was exact.
+  Spec.it s "CR 305.6 an Ashaya'd Palladium Myr offers {G} or {C}{C}, and nothing between" $ do
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    palladiumMyr <- S.printingOf s registry "Palladium Myr"
+    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (myrId, gs) = S.addCreature palladiumMyr S.alice g1
+        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
+    Spec.assertEqWith
+      s
+      "the Forest's {G} and the artifact's {C}{C}"
+      (Mana.manaYieldsOf myrId gs)
+      [Mana.Type.MkMana [green], Mana.Type.MkMana [colorless, colorless]]
+
+  -- THE PROVING CASE. Ashaya taps for {G}; each Myr adds {G} or {C}{C}. Every
+  -- green mana past the first therefore costs a Myr its colorless pair, so the
+  -- board makes three mana all green, or four of which two are green, or five of
+  -- which one is -- and never five with two green. Transposing said otherwise:
+  -- five supplies, three of them able to be green, which passes both of
+  -- payableResolutions' counting clauses.
+  Spec.it s "CR 118.3 Ashaya and two Palladium Myrs cannot pay {3}{G}{G}" $ do
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    palladiumMyr <- S.printingOf s registry "Palladium Myr"
+    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addCreature palladiumMyr S.alice g1
+        (_, gs) = S.addCreature palladiumMyr S.alice g2
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertBool
+      s
+      (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3, green, green]) gs))
+      "five mana with two green is out of reach"
+
+  -- The control legs, on the SAME board: everything the board really can pay is
+  -- still payable, and each leg needs a different yield out of the same Myr.
+  Spec.it s "CR 118.3 the same board still pays {2}{G}{G}, {5} and {G}{G}{G}" $ do
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    palladiumMyr <- S.printingOf s registry "Palladium Myr"
+    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addCreature palladiumMyr S.alice g1
+        (_, gs) = S.addCreature palladiumMyr S.alice g2
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        pays cost = Mana.canPay S.alice (ManaCost.MkManaCost cost) gs
+    -- One Myr on its Forest, one on its {C}{C}: {G}{G}{C}{C}.
+    Spec.assertBool s (pays [ManaSymbol.Generic 2, green, green]) "{2}{G}{G}"
+    -- Both Myrs on {C}{C}: {G}{C}{C}{C}{C}, the board's largest payment.
+    Spec.assertBool s (pays [ManaSymbol.Generic 5]) "{5}"
+    -- Both Myrs on their Forest: {G}{G}{G}, the board's greenest.
+    Spec.assertBool s (pays [green, green, green]) "{G}{G}{G}"
+    -- And each axis has a real ceiling: five mana, or three green, never both.
+    Spec.assertBool s (not (pays [ManaSymbol.Generic 6])) "but not {6}"
+    Spec.assertBool s (not (pays [green, green, green, green])) "and not {G}{G}{G}{G}"
+
+  -- The gameplay-level proof (design.md section 4), through the door
+  -- Action.legalActions opens: CR 118.3's payability is what decides whether a
+  -- cast is OFFERED at all, so an over-counted supply side offers the player an
+  -- action whose payment then fails and rolls back (CR 601.2h). Two real spells,
+  -- one board, one generic symbol apart.
+  Spec.it s "CR 118.3 Living Plane is offered off Ashaya and two Palladium Myrs, Meandering Towershell is not" $ do
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    palladiumMyr <- S.printingOf s registry "Palladium Myr"
+    livingPlane <- S.printingOf s registry "Living Plane"
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addCreature palladiumMyr S.alice g1
+        (_, g3) = S.addCreature palladiumMyr S.alice g2
+        (planeId, g4) = S.addHandCard livingPlane S.alice g3
+        (towershellId, g5) = S.addHandCard towershell S.alice g4
+        -- CR 303.1 (the enchantment) and CR 302.1 (the creature) name the same
+        -- window -- a main phase of your own turn, stack empty -- so it has to be
+        -- open for either to be offered at all.
+        gs = g5 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        offered = Action.legalActions S.alice gs
+    Spec.assertBool s (elem (Action.Type.Cast planeId) offered) "{2}{G}{G} is offered"
+    Spec.assertBool s (notElem (Action.Type.Cast towershellId) offered) "{3}{G}{G} is not"
+
+  -- And the offer is honoured: the same board casts Living Plane end to end,
+  -- which it can only do by tapping one Myr for its Forest's {G} and the other
+  -- for {C}{C} -- the mixed choice the transposing model could not represent.
+  Spec.it s "CR 601.2g Living Plane is cast off Ashaya and two Palladium Myrs" $ do
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    palladiumMyr <- S.printingOf s registry "Palladium Myr"
+    livingPlane <- S.printingOf s registry "Living Plane"
+    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (firstMyrId, g2) = S.addCreature palladiumMyr S.alice g1
+        (_, g3) = S.addCreature palladiumMyr S.alice g2
+        (withSpell, planeId) = S.handOne livingPlane g3
+        cast = S.runPure (prefersLongYieldFrom firstMyrId) withSpell (Cast.castSpell S.alice planeId)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "Living Plane resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Living Plane") S.alice resolved) 1
+    Spec.assertEqWith s "all three sources tapped" (S.tappedCount S.alice resolved) 3
+    Spec.assertEqWith s "and nothing was left over" (poolSize S.alice resolved) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
   castabilitySpec s registry
   anyColorSpec s registry
   solRingSpec s registry
+  palladiumMyrSpec s registry
   hybridSpec s registry
   monocoloredHybridSpec s registry
   phyrexianSpec s registry
