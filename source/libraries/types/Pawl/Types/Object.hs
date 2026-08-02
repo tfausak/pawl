@@ -21,14 +21,20 @@ data Object = MkObject
     -- is recorded -- read by Pawl.Engine.Projection.controllerOfGiven as the base
     -- a CR 613.1b layer-2 effect then overrides.
     --
-    -- Nothing means "no recorded entry controller, so use the owner", which is
-    -- CR 110.2a's own default ("if an effect instructs a player to put an object
-    -- onto the battlefield, that object enters the battlefield under that
-    -- player's control unless the effect states otherwise" -- and every mover in
-    -- this engine but one is the object's own owner) together with CR 108.4a for
-    -- a card that is not a permanent at all. Nothing on all but a permanent a CR
-    -- 616.1b replacement redirected, which is the "unless the effect states
-    -- otherwise".
+    -- Nothing means "no recorded entry controller, so use the owner". That
+    -- covers two things at once: CR 108.4a's fallback for a card that is not a
+    -- permanent at all ("if anything asks for the controller of a card that
+    -- doesn't have one ... use its owner instead"), and, for a permanent, the
+    -- fact that every effect in this pool that puts one onto the battlefield is
+    -- controlled by that permanent's own owner, so CR 110.2a's "under that
+    -- player's control" and the owner are the same player. The one write is a CR
+    -- 616.1b replacement redirecting the entry, which is CR 110.2a's "unless the
+    -- effect states otherwise".
+    --
+    -- CR 110.2a's OTHER shape -- an effect naming a controller who is not the
+    -- owner -- does not come through this field: Resolve.applyEntryControl still
+    -- expresses it as a stored layer-2 effect, and no card reaches that store
+    -- (#582).
     --
     -- NOT a control-changing EFFECT, and the difference is CR 800.4c's in as many
     -- words: it distinguishes "an effect that gives a player control of an
