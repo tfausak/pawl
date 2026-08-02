@@ -1008,9 +1008,9 @@ announceAttackTarget pid oid options = case options of
 --
 -- The steps run here are CR 508.1a, 508.1b, 508.1c, 508.1d, 508.1f, 508.1h,
 -- 508.1i, 508.1j and 508.1k, in the rule's own order, plus the event CR 508.1m's
--- triggers watch. CR 508.1e's banding is #187's; CR 508.1g's OPTIONAL costs to
--- attack -- "costs a player may pay 'as' a creature attacks", which the rules
--- name exert and enlist as -- are not implemented (#597).
+-- triggers watch. CR 508.1g's OPTIONAL costs to attack -- "costs a player may pay
+-- 'as' a creature attacks", which CR 701.43d and CR 702.154b name exert and
+-- enlist as -- are not implemented (#597).
 --
 -- CR 508.1's preamble is the one clause that costs this function its shape: "if
 -- at any point during the declaration of attackers, the active player is unable
