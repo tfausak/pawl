@@ -10,8 +10,8 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryRiders as EntryRiders
-import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -647,7 +647,7 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 -- something this lint would reject.
 tokenNameOffends :: Card.Type.Card -> Bool
 tokenNameOffends token =
-  case traverse (fmap fst . Json.tag . Subtype.toJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
+  case traverse (fmap (Text.pack . fst) . Common.asTagged . Subtype.toJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
     Left _ -> True
     Right subtypes ->
       notElem

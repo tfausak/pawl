@@ -1,13 +1,17 @@
--- Covers Pawl.Codec.
-module Pawl.CodecSpec where
+-- Integration coverage for the codec sublibrary: the 98 per-type
+-- Pawl.Codec.XSpec modules are the codec's own spec, each proving its shape
+-- against literals with no registry. What remains here needs one -- these
+-- cases load real cards through S.printingOf (Cancel, Rending Volley,
+-- Typhoid Rats, Branchblight Stalker) to prove codec shapes against actual
+-- card data, which a synthetic fixture could not stand in for.
+module Pawl.CodecIntegrationSpec where
 
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.GameEvent as GameEvent.Codec
-import qualified Pawl.Codec.Json as J
 import qualified Pawl.Codec.Printing as Printing.Codec
 import qualified Pawl.Engine.Card as Card
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
@@ -20,7 +24,6 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.Comparison as Comparison
@@ -49,7 +52,7 @@ roundTrip :: (Applicative m, Eq a, Show a) => Spec.Spec m n -> String -> (a -> V
 roundTrip s label enc dec x = Spec.assertEqWith s label (dec (enc x)) (Right x)
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
-spec s registry = Spec.describe s "Pawl.Codec" $ do
+spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   -- Keyword's own per-constructor coverage, including the payload-bearing
   -- Landwalk/Cycling/Flashback/Entwine/Poisonous/Toxic arms, lives in
   -- Pawl.Codec.KeywordSpec now. CounterKind's own per-constructor coverage,
@@ -105,7 +108,7 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
     Spec.it s "P2: through text" $ do
       ps <- S.allPrintings s
       mapM_
-        (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (J.parse (J.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
+        (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (Common.parse (Common.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
         ps
     Spec.it s "M4e Cancel loads as a single Counter effect targeting a spell" $ do
       cancel <- S.printingOf s registry "Cancel"
@@ -183,8 +186,14 @@ spec s registry = Spec.describe s "Pawl.Codec" $ do
       mapM_
         (roundTrip s "condition" Condition.toJson Condition.fromJson)
         [S.youControlNoSwamps, noZombiesOnBattlefield]
-    Spec.it s "AbilityName round-trips" $
-      roundTrip s "name" AbilityName.toJson AbilityName.fromJson (AbilityName.MkAbilityName (Text.pack "sacrifice it"))
+
+-- AbilityName's own per-constructor coverage used no registry -- a literal
+-- string proves the codec just as well as one loaded from a card -- so the
+-- "AbilityName round-trips" case that lived here moved to
+-- Pawl.Codec.AbilityNameSpec. Pawl.Codec.AbilityNameSpec's "fromJson"/"toJson"
+-- cases already pin both directions against a literal, which is strictly
+-- stronger than this round-trip was (it also fixes the wire shape, not only
+-- the composition), so nothing was ported: dropped as a subsumed duplicate.
 
 -- TriggeredAbility's own per-constructor coverage, including both states of
 -- the CR 603.4 intervening "if" and the CR 603.7 toJsonDelayed/fromJsonDelayed

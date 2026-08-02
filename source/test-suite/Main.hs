@@ -105,7 +105,7 @@ import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
 import qualified Pawl.Codec.ZoneChangeSubjectSpec
 import qualified Pawl.Codec.ZoneSpec
-import qualified Pawl.CodecSpec
+import qualified Pawl.CodecIntegrationSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
 import qualified Pawl.ConditionSpec
@@ -139,7 +139,6 @@ import qualified Pawl.Json.ObjectSpec
 import qualified Pawl.Json.PairSpec
 import qualified Pawl.Json.StringSpec
 import qualified Pawl.Json.ValueSpec
-import qualified Pawl.JsonSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
@@ -302,7 +301,7 @@ spec s registry = do
   Pawl.Codec.ZoneChangeSpec.spec s
   Pawl.Codec.ZoneChangeSubjectSpec.spec s
   Pawl.Codec.ZoneSpec.spec s
-  Pawl.CodecSpec.spec s registry
+  Pawl.CodecIntegrationSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
@@ -336,7 +335,6 @@ spec s registry = do
   Pawl.Json.PairSpec.spec s
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
-  Pawl.JsonSpec.spec s
   Pawl.ManaSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry

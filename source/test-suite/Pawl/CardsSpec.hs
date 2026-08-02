@@ -7,8 +7,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
+import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryRiders as EntryRiders
-import qualified Pawl.Codec.Json as Json
 import qualified Pawl.Codec.Printing as Printing
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Mana as Mana
@@ -1186,7 +1186,7 @@ checkFile s root p = do
   case Encoding.decodeUtf8' bytes of
     Left err -> Spec.assertFailure s (path <> ": not valid UTF-8: " <> show err)
     Right contents ->
-      case Json.parse contents of
+      case Common.parse contents of
         -- Unreachable: S.allPrintings would have failed in IO first.
         Left err -> Spec.assertFailure s (path <> ": " <> Text.unpack err)
         Right value ->
@@ -1194,7 +1194,7 @@ checkFile s root p = do
           -- re-encoding the loaded printing reproduces the file's meaning. Compared
           -- up to key order and whitespace, because JSON objects are unordered and
           -- formatting is not part of the contract. The corpus is committed
-          -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
+          -- pretty-printed (`jq -S .`) while Common.render emits compact output, so
           -- this can never quietly regress into a byte comparison: every file would
           -- fail at once.
-          Spec.assertEqWith s path (Json.sortKeys (Printing.toJson p)) (Json.sortKeys value)
+          Spec.assertEqWith s path (Common.sortKeys (Printing.toJson p)) (Common.sortKeys value)

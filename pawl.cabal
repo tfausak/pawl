@@ -152,7 +152,6 @@ library codec
     Pawl.Codec.FilterSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
-    Pawl.Codec.Json
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordSpec
     Pawl.Codec.Loyalty
@@ -640,7 +639,7 @@ test-suite pawl-test-suite
     Pawl.CardSpec
     Pawl.CardsSpec
     Pawl.CastSpec
-    Pawl.CodecSpec
+    Pawl.CodecIntegrationSpec
     Pawl.ColorSpec
     Pawl.CombatSpec
     Pawl.ConditionSpec
@@ -657,7 +656,6 @@ test-suite pawl-test-suite
     Pawl.ExpirySpec
     Pawl.FilterSpec
     Pawl.GameSpec
-    Pawl.JsonSpec
     Pawl.ManaSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
