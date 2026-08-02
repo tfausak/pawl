@@ -1368,15 +1368,16 @@ controlledNamed wanted pid gs =
   length (filter (\oid -> fmap Card.name (Game.cardOf oid gs) == Just wanted) (Projection.controls pid gs))
 
 -- alice controls six untapped Islands (Gather Specimens is {3}{U}{U}{U}) and one
--- Goblin Piker for a Clone to copy; bob controls eight, enough for two Clones at
--- {3}{U} with no untap step in between. alice holds one Gather Specimens, bob
--- holds one of each printing in `bobsHand`. It is alice's precombat main phase,
--- and she has priority. Returns the state, alice's spell id, bob's hand ids in
--- order, and the Piker.
+-- Goblin Piker for a Clone to copy; bob controls ten, enough for a Gather
+-- Specimens of his own plus a Clone at {3}{U}, or for two Clones, with no untap
+-- step in between. alice holds one Gather Specimens, bob holds one of each
+-- printing in `bobsHand`. It is alice's precombat main phase, and she has
+-- priority. Returns the state, alice's spell id, bob's hand ids in order, and
+-- the Piker.
 specimenBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId)
 specimenBoard island pikerPrinting gatherSpecimens bobsHand =
   let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature island pid acc)) g [1 .. n :: Int]
-      base = addLands S.bob 8 (addLands S.alice 6 (Setup.emptyGame S.bothPlayers))
+      base = addLands S.bob 10 (addLands S.alice 6 (Setup.emptyGame S.bothPlayers))
       (piker, g1) = S.addCreature pikerPrinting S.alice base
       (gatherId, g2) = S.addHandCard gatherSpecimens S.alice g1
       addOne (ids, g) p = let (oid, g3) = S.addHandCard p S.bob g in (ids <> [oid], g3)
@@ -1480,12 +1481,11 @@ gatherSpecimensSpec s registry =
                 _ -> Spec.assertFailure s "a Clone did not reach the battlefield"
         _ -> Spec.assertFailure s "fixture did not deal bob a card"
     -- CR 614.1d's filter is the card's own "a creature", and this is the leg that
-    -- holds it to that word. The other half of the filter -- "under an OPPONENT's
-    -- control" -- has no two-player readout at all: rewriting alice's own
-    -- entering creature to alice's control is a no-op, so a filter that dropped
-    -- the relation would produce an identical board. It is observable only at
-    -- three seats or on a board where the two differ, and neither is what this
-    -- card needs to be proved (#69's producer is the creature clause).
+    -- holds it to that word. Its other half -- "under an OPPONENT's control" --
+    -- is held by the duelling-Gather-Specimens leg below, which needs a second
+    -- copy of the card to see it at all: with one on the board the relation is
+    -- invisible, because rewriting alice's own entering creature to alice's
+    -- control is a no-op and adding seats adds no discrimination.
     Spec.it s "CR 614.1d an opponent's entering NONcreature is not a specimen" $ do
       island <- S.printingOf s registry "Island"
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -1516,6 +1516,62 @@ gatherSpecimensSpec s registry =
               one = S.runPure (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob firstClone >> Stack.resolveTop)
               two = S.runPure (copyIfAskedOf S.alice piker) one (Cast.castSpell S.bob secondClone >> Stack.resolveTop)
            in Spec.assertEqWith s "both of bob's Clones are alice's" (controlledNamed (CardName.MkCardName $ Text.pack "Clone") S.alice two) 2
+        _ -> Spec.assertFailure s "fixture did not deal bob two cards"
+    -- DUELLING GATHER SPECIMENS, and the only board where the filter's
+    -- "under an OPPONENT's control" is observable at all.
+    --
+    -- alice resolves one, bob resolves one, and then BOB's Clone enters. The
+    -- entering side is what makes this discriminate; alice's own creature does
+    -- not, for the reason the two orders below converge on it.
+    --
+    -- With the relation, CR 616.1f drives a forced two-step -- "this process is
+    -- repeated (taking into account only replacement or prevention effects that
+    -- would now be applicable) until there are no more left to apply":
+    --
+    --   1. bob's creature would enter under bob's control. alice's row applies
+    --      (bob is her opponent); bob's does not (bob is not his own opponent).
+    --      One candidate in CR 616.1b's bucket, so nothing is chosen and nothing
+    --      is asked. It enters under alice's control.
+    --   2. Re-collected, bob's row is NOW applicable -- alice is his opponent --
+    --      and alice's is spent by CR 614.5's "only one opportunity". One
+    --      candidate again. It enters under BOB's control.
+    --   3. Nothing is left in that bucket, so CR 616.1c's copy choice follows,
+    --      offered to bob.
+    --
+    -- Without the relation both rows are applicable at step 1, they are EQUAL AS
+    -- VALUES (one card, one filter -- only the baked CR 109.5 controller
+    -- differs, and that rides the candidate rather than the effect), so
+    -- Replacement.choose elides the choice and applies the canonical first --
+    -- bob's, the newest floating row -- as a no-op. Alice's then applies at step
+    -- 2 and the creature is HERS. So the assertion is bob-not-alice, and the
+    -- prompt count is unchanged either way: this leg reads the board, not the
+    -- questions.
+    Spec.it s "CR 614.1d/616.1f duelling Gather Specimens: alice takes it, then bob takes it back" $ do
+      island <- S.printingOf s registry "Island"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      clonePrinting <- S.printingOf s registry "Clone"
+      let (gs, aliceGather, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [gatherSpecimens, clonePrinting]
+      case bobs of
+        bobGather : cloneId : _ ->
+          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice aliceGather >> Stack.resolveTop)
+              duelling = S.runPure S.identityAnswer armed (Cast.castSpell S.bob bobGather >> Stack.resolveTop)
+              after = S.runPure (copyIfAskedOf S.bob piker) duelling (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+              asked = answersFor (copyIfAskedOf S.bob piker) duelling (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+           in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
+                Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
+                Just clone -> do
+                  -- Both rows really are on the board: without bob's, this is
+                  -- the first case in this group and the answer is alice.
+                  Spec.assertEqWith s "two floating replacements are live" (length (GameState.replacements duelling)) 2
+                  Spec.assertEqWith s "alice took it, and bob took it back" (Projection.controllerOf clone after) (Just S.bob)
+                  -- And the copy choice landed on bob, the controller CR 616.1b
+                  -- left the object with.
+                  Spec.assertEqWith s "bob was offered the copy, and took it" (Projection.powerOf clone after) (Just 2)
+                  -- Each step of CR 616.1f had ONE applicable control rewrite,
+                  -- so there was never anything for CR 616.1b's "one of them
+                  -- must be chosen" to choose between.
+                  Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
         _ -> Spec.assertFailure s "fixture did not deal bob two cards"
 
 -- Galvanic Blast's metalcraft clause as a floating row: the damage THIS source is

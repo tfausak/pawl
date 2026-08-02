@@ -611,10 +611,13 @@ bucketOfEffect re = case re of
 -- in `effect` can still differ in `source` (matchesController and the
 -- ChooseReplacement payload both read it), so "equal as values" only implies
 -- "every order yields the same board" as long as no `apply` arm branches on, or
--- mutates state keyed by, which source is applying. Every future `apply` arm
--- must preserve that independence; the day one does not, this elision starts
--- silently choosing between two applications that produce different boards --
--- deciding for a player who was never asked, the second invariant's violation.
+-- mutates state keyed by, which source is applying.
+--
+-- Not implemented: that premise is BROKEN, by the EntryRewrite.UnderSourceControl
+-- arm -- its whole effect is the candidate's own `controller`, so two Gather
+-- Specimens are value-equal here and apply to different boards. Unreachable at
+-- two seats (a permanent has one controller, so at most one such row can see it
+-- as an opponent's) and unfixed above two (#593).
 --
 -- Not implemented: the comparison reads `effect` alone, so two floating rows
 -- alike in it but differing in `expiry` or `uses` are treated as
