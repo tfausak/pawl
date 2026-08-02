@@ -1,6 +1,8 @@
 module Pawl.Types.PlayerId where
 
-import Numeric.Natural (Natural)
+import qualified Numeric.Natural as Natural
 
-newtype PlayerId = MkPlayerId Natural
+newtype PlayerId = MkPlayerId
+  { unwrap :: Natural.Natural
+  }
   deriving (Eq, Ord, Show)

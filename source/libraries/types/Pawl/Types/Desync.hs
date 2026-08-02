@@ -1,9 +1,9 @@
 module Pawl.Types.Desync where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.Response (Response)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Response as Response
 
--- Where a recorded transcript stopped answering the prompts the engine actually
+-- | Where a recorded transcript stopped answering the prompts the engine actually
 -- asked. Pawl.Engine.Replay.replay returns the FIRST one, if any.
 --
 -- Reporting it at all is the point. Pawl.Engine.Replay.defaultAnswer is deliberately
@@ -29,9 +29,9 @@ import Pawl.Types.Response (Response)
 -- The Natural is the 0-based position of the prompt in the run's prompt
 -- sequence, which is also the number of prompts the transcript did answer.
 data Desync
-  = -- The transcript ran out before the engine ran out of questions.
-    Exhausted Natural
-  | -- The next logged response does not answer the prompt being asked -- a
+  = -- | The transcript ran out before the engine ran out of questions.
+    Exhausted Natural.Natural
+  | -- | The next logged response does not answer the prompt being asked -- a
     -- stale or foreign transcript. Carries the offending entry.
-    Mismatched Natural Response
+    Mismatched Natural.Natural Response.Response
   deriving (Eq, Show)

@@ -1,21 +1,19 @@
--- | The @Uses ⇆ Json@ codec (#481).
 module Pawl.Codec.Uses where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Uses as Uses
 
-usesToJson :: Uses.Uses -> Value
-usesToJson u = Json.nullary . Text.pack $ case u of
+toJson :: Uses.Uses -> Value.Value
+toJson u = Common.nullary $ case u of
   Uses.Unlimited -> "Unlimited"
   Uses.Once -> "Once"
 
-jsonToUses :: Value -> Either Text Uses.Uses
-jsonToUses =
-  Json.decodeNullary
-    (Text.pack "Uses")
-    [ (Text.pack "Unlimited", Uses.Unlimited),
-      (Text.pack "Once", Uses.Once)
+fromJson :: Value.Value -> Either Text.Text Uses.Uses
+fromJson =
+  Common.decodeNullary
+    "Uses"
+    [ ("Unlimited", Uses.Unlimited),
+      ("Once", Uses.Once)
     ]

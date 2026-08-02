@@ -1,8 +1,8 @@
 module Pawl.Types.CardError where
 
-import Pawl.Types.CardName (CardName)
+import qualified Pawl.Types.CardName as CardName
 
--- Why a registry could not answer with a card.
+-- | Why a registry could not answer with a card.
 --
 -- Deliberately says nothing about files. This type belongs to the registry
 -- INTERFACE, so every way of answering has to be able to speak it: a map-backed
@@ -16,9 +16,9 @@ import Pawl.Types.CardName (CardName)
 -- other two were both the second case and differed only in their message, which
 -- is where they still differ.
 data CardError
-  = Missing CardName
-  | -- Invalid rather than Corrupt: corruption suggests damaged bytes, which is
+  = Missing CardName.CardName
+  | -- | Invalid rather than Corrupt: corruption suggests damaged bytes, which is
     -- one file-specific cause among several. A card that parses and then fails
     -- validation is equally unusable and is not corrupt.
-    Invalid CardName String
+    Invalid CardName.CardName String
   deriving (Eq, Show)

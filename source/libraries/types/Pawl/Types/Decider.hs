@@ -1,6 +1,6 @@
 module Pawl.Types.Decider where
 
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerId as PlayerId
 
-newtype Decider = MkDecider PlayerId
+newtype Decider = MkDecider {unwrap :: PlayerId.PlayerId}
   deriving (Eq, Ord, Show)

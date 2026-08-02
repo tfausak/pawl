@@ -1,29 +1,27 @@
--- | The @CounterKind ⇆ Json@ codec (#481).
 module Pawl.Codec.CounterKind where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.CounterKind as CounterKind
 
--- No longer uniformly nullary: CR 122.1b's keyword counter carries the keyword it
--- grants, so this tags like every other payload-bearing sum here rather than
--- delegating the whole type to the Json.nullary helper.
-counterKindToJson :: CounterKind.CounterKind -> Value
-counterKindToJson k = case k of
-  CounterKind.PlusOnePlusOne -> Json.nullary (Text.pack "PlusOnePlusOne")
-  CounterKind.MinusOneMinusOne -> Json.nullary (Text.pack "MinusOneMinusOne")
-  CounterKind.Keyword kw -> Json.tagged (Text.pack "Keyword") (Just (keywordToJson kw))
-  CounterKind.Loyalty -> Json.nullary (Text.pack "Loyalty")
+-- | Not Common.decodeNullary's table shape any more: CR 122.1b's keyword counter
+-- carries the keyword it grants, so this tags like every other payload-bearing
+-- sum here rather than delegating the whole type to the nullary-table helper.
+toJson :: CounterKind.CounterKind -> Value.Value
+toJson k = case k of
+  CounterKind.PlusOnePlusOne -> Common.nullary "PlusOnePlusOne"
+  CounterKind.MinusOneMinusOne -> Common.nullary "MinusOneMinusOne"
+  CounterKind.Keyword kw -> Common.tagged "Keyword" . Just $ Keyword.toJson kw
+  CounterKind.Loyalty -> Common.nullary "Loyalty"
 
-jsonToCounterKind :: Value -> Either Text CounterKind.CounterKind
-jsonToCounterKind value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
+fromJson :: Value.Value -> Either Text.Text CounterKind.CounterKind
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
     ("PlusOnePlusOne", _) -> Right CounterKind.PlusOnePlusOne
     ("MinusOneMinusOne", _) -> Right CounterKind.MinusOneMinusOne
-    ("Keyword", Just v) -> CounterKind.Keyword <$> jsonToKeyword v
+    ("Keyword", Just v) -> CounterKind.Keyword <$> Keyword.fromJson v
     ("Loyalty", _) -> Right CounterKind.Loyalty
-    _ -> Left (Text.pack "unknown CounterKind: " <> t)
+    _ -> Left . Text.pack $ "unknown CounterKind: " <> t

@@ -1,6 +1,6 @@
 module Pawl.Types.TriggerFrequency where
 
--- How often a trigger condition may match within one turn.
+-- | How often a trigger condition may match within one turn.
 --
 -- There is NO comprehensive rule for "for the first time each turn". The
 -- nearest, CR 603.2h, is about "Do this only once each turn" -- a qualifier on
@@ -13,9 +13,9 @@ module Pawl.Types.TriggerFrequency where
 -- combat phase when she attacks (CR 500.8), so without the narrowing she attacks
 -- again in the phase she added, adds another, and the turn never ends.
 data TriggerFrequency
-  = -- CR 603.2c: "An ability triggers only once each time its trigger event
+  = -- | CR 603.2c: "An ability triggers only once each time its trigger event
     -- occurs" -- and every occurrence counts. Hanweir Garrison's.
     EveryTime
-  | -- Only the first occurrence in a turn.
+  | -- | Only the first occurrence in a turn.
     FirstTimeEachTurn
   deriving (Eq, Ord, Show)

@@ -1,21 +1,19 @@
--- | The @SearchDestination ⇆ Json@ codec (#481).
 module Pawl.Codec.SearchDestination where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.SearchDestination as SearchDestination
 
-searchDestinationToJson :: SearchDestination.SearchDestination -> Value
-searchDestinationToJson d = Json.nullary . Text.pack $ case d of
+toJson :: SearchDestination.SearchDestination -> Value.Value
+toJson d = Common.nullary $ case d of
   SearchDestination.BattlefieldTapped -> "BattlefieldTapped"
   SearchDestination.RevealThenHand -> "RevealThenHand"
 
-jsonToSearchDestination :: Value -> Either Text SearchDestination.SearchDestination
-jsonToSearchDestination =
-  Json.decodeNullary
-    (Text.pack "SearchDestination")
-    [ (Text.pack "BattlefieldTapped", SearchDestination.BattlefieldTapped),
-      (Text.pack "RevealThenHand", SearchDestination.RevealThenHand)
+fromJson :: Value.Value -> Either Text.Text SearchDestination.SearchDestination
+fromJson =
+  Common.decodeNullary
+    "SearchDestination"
+    [ ("BattlefieldTapped", SearchDestination.BattlefieldTapped),
+      ("RevealThenHand", SearchDestination.RevealThenHand)
     ]

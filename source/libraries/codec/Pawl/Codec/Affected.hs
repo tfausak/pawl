@@ -1,28 +1,26 @@
--- | The @Affected ⇆ Json@ codec (#481).
 module Pawl.Codec.Affected where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Affected as Affected
 
-affectedToJson :: Affected.Affected -> Value
-affectedToJson a = case a of
-  Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (Json.setTo objectIdToJson ids))
-  Affected.Matching f -> Json.tagged (Text.pack "Matching") (Just (filterToJson keywordToJson f))
-  Affected.Attached -> Json.tagged (Text.pack "Attached") Nothing
-  Affected.AttachedPlayerControls f -> Json.tagged (Text.pack "AttachedPlayerControls") (Just (filterToJson keywordToJson f))
+toJson :: Affected.Affected -> Value.Value
+toJson a = case a of
+  Affected.TheseObjects ids -> Common.tagged "TheseObjects" . Just $ Common.encodeSet ObjectId.toJson ids
+  Affected.Matching f -> Common.tagged "Matching" . Just $ Filter.toJson Keyword.toJson f
+  Affected.Attached -> Common.tagged "Attached" Nothing
+  Affected.AttachedPlayerControls f -> Common.tagged "AttachedPlayerControls" . Just $ Filter.toJson Keyword.toJson f
 
-jsonToAffected :: Value -> Either Text Affected.Affected
-jsonToAffected value = do
-  (t, mv) <- Json.tag value
-  case Text.unpack t of
-    "TheseObjects" -> Json.withValue mv (fmap Affected.TheseObjects . Json.setFrom jsonToObjectId)
-    "Matching" -> Json.withValue mv (fmap Affected.Matching . jsonToFilter jsonToKeyword)
+fromJson :: Value.Value -> Either Text.Text Affected.Affected
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case t of
+    "TheseObjects" -> Common.withValue mv (fmap Affected.TheseObjects . Common.decodeSet ObjectId.fromJson)
+    "Matching" -> Common.withValue mv (fmap Affected.Matching . Filter.fromJson Keyword.fromJson)
     "Attached" -> pure Affected.Attached
-    "AttachedPlayerControls" -> Json.withValue mv (fmap Affected.AttachedPlayerControls . jsonToFilter jsonToKeyword)
-    _ -> Left (Text.pack "unknown Affected: " <> t)
+    "AttachedPlayerControls" -> Common.withValue mv (fmap Affected.AttachedPlayerControls . Filter.fromJson Keyword.fromJson)
+    _ -> Left . Text.pack $ "unknown Affected: " <> t

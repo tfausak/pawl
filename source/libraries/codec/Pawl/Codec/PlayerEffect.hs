@@ -1,33 +1,31 @@
--- | The @PlayerEffect ⇆ Json@ codec (#481).
 module Pawl.Codec.PlayerEffect where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.ManaCost as ManaCost
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 
-playerEffectToJson :: PlayerEffect.PlayerEffect -> Value
-playerEffectToJson e = case e of
-  PlayerEffect.CantCastSpells -> Json.nullary (Text.pack "CantCastSpells")
-  PlayerEffect.CantCastMoreThan n -> Json.tagged (Text.pack "CantCastMoreThan") (Just (Json.natTo n))
-  PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array (MkArray [filterToJson keywordToJson c, Json.natTo n])))
-  PlayerEffect.ReduceSpellCost c m -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array (MkArray [filterToJson keywordToJson c, manaCostToJson m])))
-  PlayerEffect.NoMaximumHandSize -> Json.nullary (Text.pack "NoMaximumHandSize")
-  PlayerEffect.DontLoseUnspentMana -> Json.nullary (Text.pack "DontLoseUnspentMana")
+toJson :: PlayerEffect.PlayerEffect -> Value.Value
+toJson e = case e of
+  PlayerEffect.CantCastSpells -> Common.nullary "CantCastSpells"
+  PlayerEffect.CantCastMoreThan n -> Common.tagged "CantCastMoreThan" . Just $ Common.encodeNatural n
+  PlayerEffect.IncreaseSpellCost c n -> Common.tagged "IncreaseSpellCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, Common.encodeNatural n]
+  PlayerEffect.ReduceSpellCost c m -> Common.tagged "ReduceSpellCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m]
+  PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
+  PlayerEffect.DontLoseUnspentMana -> Common.nullary "DontLoseUnspentMana"
 
-jsonToPlayerEffect :: Value -> Either Text PlayerEffect.PlayerEffect
-jsonToPlayerEffect value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
+fromJson :: Value.Value -> Either Text.Text PlayerEffect.PlayerEffect
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
     ("CantCastSpells", _) -> Right PlayerEffect.CantCastSpells
-    ("CantCastMoreThan", Just v) -> PlayerEffect.CantCastMoreThan <$> Json.natFrom v
-    ("IncreaseSpellCost", Just (Array (MkArray [c, n]))) -> PlayerEffect.IncreaseSpellCost <$> jsonToFilter jsonToKeyword c <*> Json.natFrom n
-    ("ReduceSpellCost", Just (Array (MkArray [c, m]))) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter jsonToKeyword c <*> jsonToManaCost m
+    ("CantCastMoreThan", Just v) -> PlayerEffect.CantCastMoreThan <$> Common.decodeNatural v
+    ("IncreaseSpellCost", Just (Value.Array (Array.MkArray [c, n]))) -> PlayerEffect.IncreaseSpellCost <$> Filter.fromJson Keyword.fromJson c <*> Common.decodeNatural n
+    ("ReduceSpellCost", Just (Value.Array (Array.MkArray [c, m]))) -> PlayerEffect.ReduceSpellCost <$> Filter.fromJson Keyword.fromJson c <*> ManaCost.fromJson m
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     ("DontLoseUnspentMana", _) -> Right PlayerEffect.DontLoseUnspentMana
-    _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
+    _ -> Left . Text.pack $ "unknown PlayerEffect: " <> t

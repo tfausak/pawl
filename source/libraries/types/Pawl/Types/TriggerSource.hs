@@ -1,8 +1,8 @@
 module Pawl.Types.TriggerSource where
 
-import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectId as ObjectId
 
--- What an ability that has TRIGGERED but is not yet on the stack hangs on.
+-- | What an ability that has TRIGGERED but is not yet on the stack hangs on.
 --
 -- CR 113.7: "The source of a triggered ability ... that has triggered and is
 -- waiting to be put on the stack, is the object whose ability triggered" --
@@ -20,6 +20,6 @@ import Pawl.Types.ObjectId (ObjectId)
 -- the same distinction (OfTrigger / OfInherentTrigger) once the ability has been
 -- placed.
 data TriggerSource
-  = OfObject ObjectId
+  = OfObject ObjectId.ObjectId
   | Sourceless
   deriving (Eq, Ord, Show)

@@ -1,21 +1,19 @@
--- | The @DiscardCause ⇆ Json@ codec (#481).
 module Pawl.Codec.DiscardCause where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.DiscardCause as DiscardCause
 
-discardCauseToJson :: DiscardCause.DiscardCause -> Value
-discardCauseToJson c = Json.nullary . Text.pack $ case c of
+toJson :: DiscardCause.DiscardCause -> Value.Value
+toJson c = Common.nullary $ case c of
   DiscardCause.Ordinary -> "Ordinary"
   DiscardCause.ToPayCyclingCost -> "ToPayCyclingCost"
 
-jsonToDiscardCause :: Value -> Either Text DiscardCause.DiscardCause
-jsonToDiscardCause =
-  Json.decodeNullary
-    (Text.pack "DiscardCause")
-    [ (Text.pack "Ordinary", DiscardCause.Ordinary),
-      (Text.pack "ToPayCyclingCost", DiscardCause.ToPayCyclingCost)
+fromJson :: Value.Value -> Either Text.Text DiscardCause.DiscardCause
+fromJson =
+  Common.decodeNullary
+    "DiscardCause"
+    [ ("Ordinary", DiscardCause.Ordinary),
+      ("ToPayCyclingCost", DiscardCause.ToPayCyclingCost)
     ]

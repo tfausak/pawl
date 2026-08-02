@@ -1,14 +1,12 @@
--- | The @CardType ⇆ Json@ codec (#481).
 module Pawl.Codec.CardType where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.CardType as CardType
 
-cardTypeToJson :: CardType.CardType -> Value
-cardTypeToJson c = Json.nullary . Text.pack $ case c of
+toJson :: CardType.CardType -> Value.Value
+toJson c = Common.nullary $ case c of
   CardType.Land -> "Land"
   CardType.Creature -> "Creature"
   CardType.Instant -> "Instant"
@@ -18,16 +16,16 @@ cardTypeToJson c = Json.nullary . Text.pack $ case c of
   CardType.Kindred -> "Kindred"
   CardType.Planeswalker -> "Planeswalker"
 
-jsonToCardType :: Value -> Either Text CardType.CardType
-jsonToCardType =
-  Json.decodeNullary
-    (Text.pack "CardType")
-    [ (Text.pack "Land", CardType.Land),
-      (Text.pack "Creature", CardType.Creature),
-      (Text.pack "Instant", CardType.Instant),
-      (Text.pack "Enchantment", CardType.Enchantment),
-      (Text.pack "Artifact", CardType.Artifact),
-      (Text.pack "Sorcery", CardType.Sorcery),
-      (Text.pack "Kindred", CardType.Kindred),
-      (Text.pack "Planeswalker", CardType.Planeswalker)
+fromJson :: Value.Value -> Either Text.Text CardType.CardType
+fromJson =
+  Common.decodeNullary
+    "CardType"
+    [ ("Land", CardType.Land),
+      ("Creature", CardType.Creature),
+      ("Instant", CardType.Instant),
+      ("Enchantment", CardType.Enchantment),
+      ("Artifact", CardType.Artifact),
+      ("Sorcery", CardType.Sorcery),
+      ("Kindred", CardType.Kindred),
+      ("Planeswalker", CardType.Planeswalker)
     ]

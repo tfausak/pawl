@@ -1,6 +1,6 @@
 module Pawl.Types.Layer where
 
--- CR 613.1: the layers a continuous effect can apply in, ordered by rule number
+-- | CR 613.1: the layers a continuous effect can apply in, ordered by rule number
 -- so the DERIVED Ord IS the application order -- the sole thing the projection
 -- sorts on. Complete for diffability against CR 613 (the Keyword posture).
 -- Producers as of M4.5 P3b: Control (2, P1), Text (3, M3d), Type (4, M3c),

@@ -1,62 +1,60 @@
--- | The @ProjectedCharacteristics ⇆ Json@ codec (#481).
 module Pawl.Codec.ProjectedCharacteristics where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbility)
-import Pawl.Codec.Card (cardToJson, jsonToCard)
-import Pawl.Codec.CardType (cardTypeToJson, jsonToCardType)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
-import Pawl.Codec.Quantity (jsonToQuantityPair, quantityToJson)
-import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
-import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
-import Pawl.Codec.Supertype (jsonToSupertype, supertypeToJson)
-import Pawl.Codec.TriggeredAbility (jsonToTriggeredAbility, triggeredAbilityToJson)
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.Loyalty as Loyalty
+import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Codec.Subtype as Subtype
+import qualified Pawl.Codec.Supertype as Supertype
+import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 
-projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
-projectedCharacteristicsToJson pc =
-  Json.jObject
-    [ (Text.pack "name", Json.jText (PC.name pc)),
-      (Text.pack "supertypes", Json.setTo supertypeToJson (PC.supertypes pc)),
-      (Text.pack "keywords", Json.multisetTo keywordToJson (PC.keywords pc)),
-      (Text.pack "colors", Json.setTo colorToJson (PC.colors pc)),
-      (Text.pack "power", Json.maybeTo Json.jInt (PC.power pc)),
-      (Text.pack "toughness", Json.maybeTo Json.jInt (PC.toughness pc)),
-      (Text.pack "loyalty", Json.maybeTo loyaltyToJson (PC.loyalty pc)),
-      (Text.pack "characteristicPT", Json.maybeTo (\(p, t) -> Array (MkArray [quantityToJson p, quantityToJson t])) (PC.characteristicPT pc)),
-      (Text.pack "cardTypes", Json.setTo cardTypeToJson (PC.cardTypes pc)),
-      (Text.pack "subtypes", Json.setTo subtypeToJson (PC.subtypes pc)),
-      (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (PC.activatedAbilities pc)),
-      (Text.pack "replacementEffects", Json.listTo replacementEffectToJson (PC.replacementEffects pc)),
-      (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (PC.triggeredAbilities pc))
+toJson :: PC.ProjectedCharacteristics -> Value.Value
+toJson pc =
+  Common.object
+    [ Common.pair "name" . Common.text $ PC.name pc,
+      Common.pair "supertypes" . Common.encodeSet Supertype.toJson $ PC.supertypes pc,
+      Common.pair "keywords" . Common.encodeMultiset Keyword.toJson $ PC.keywords pc,
+      Common.pair "colors" . Common.encodeSet Color.toJson $ PC.colors pc,
+      Common.pair "power" . Common.encodeMaybe Common.integer $ PC.power pc,
+      Common.pair "toughness" . Common.encodeMaybe Common.integer $ PC.toughness pc,
+      Common.pair "loyalty" . Common.encodeMaybe Loyalty.toJson $ PC.loyalty pc,
+      Common.pair "characteristicPT" . Common.encodeMaybe (\(p, t) -> Common.array [Quantity.toJson p, Quantity.toJson t]) $ PC.characteristicPT pc,
+      Common.pair "cardTypes" . Common.encodeSet CardType.toJson $ PC.cardTypes pc,
+      Common.pair "subtypes" . Common.encodeSet Subtype.toJson $ PC.subtypes pc,
+      Common.pair "activatedAbilities" . Common.encodeList (ActivatedAbility.toJson Card.toJson) $ PC.activatedAbilities pc,
+      Common.pair "replacementEffects" . Common.encodeList ReplacementEffect.toJson $ PC.replacementEffects pc,
+      Common.pair "triggeredAbilities" . Common.encodeList (TriggeredAbility.toJson Card.toJson) $ PC.triggeredAbilities pc
     ]
 
-jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristics
-jsonToProjectedCharacteristics value = do
-  ps <- Json.asObject value
-  nm <- Json.field (Text.pack "name") ps >>= Json.asText
-  sups <- Json.field (Text.pack "supertypes") ps >>= Json.setFrom jsonToSupertype
-  kws <- Json.field (Text.pack "keywords") ps >>= Json.multisetFrom jsonToKeyword
-  cols <- Json.field (Text.pack "colors") ps >>= Json.setFrom jsonToColor
-  -- power/toughness/characteristicPT are encoded as required keys (Json.maybeTo
+fromJson :: Value.Value -> Either Text.Text PC.ProjectedCharacteristics
+fromJson value = do
+  ps <- Common.asObject value
+  nm <- Common.field "name" ps >>= Common.asText
+  sups <- Common.field "supertypes" ps >>= Common.decodeSet Supertype.fromJson
+  kws <- Common.field "keywords" ps >>= Common.decodeMultiset Keyword.fromJson
+  cols <- Common.field "colors" ps >>= Common.decodeSet Color.fromJson
+  -- power/toughness/characteristicPT are encoded as required keys (encodeMaybe
   -- writes JSON null for Nothing, never omits the key), so decoding them is
-  -- Json.field (required) >>= Json.maybeFrom (Null -> Nothing), exactly like every
-  -- other field here -- not the optional Json.getOpt a truly-omittable key would need.
-  pow <- Json.field (Text.pack "power") ps >>= Json.maybeFrom Json.asInteger
-  tou <- Json.field (Text.pack "toughness") ps >>= Json.maybeFrom Json.asInteger
-  loy <- Json.field (Text.pack "loyalty") ps >>= Json.maybeFrom jsonToLoyalty
-  cda <- Json.field (Text.pack "characteristicPT") ps >>= Json.maybeFrom jsonToQuantityPair
-  cts <- Json.field (Text.pack "cardTypes") ps >>= Json.setFrom jsonToCardType
-  subs <- Json.field (Text.pack "subtypes") ps >>= Json.setFrom jsonToSubtype
-  acts <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
-  reps <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect
-  trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
+  -- Common.field (required) >>= Common.decodeMaybe (Null -> Nothing), exactly
+  -- like every other field here -- not the optional Common.nullableField a
+  -- truly-omittable key would need.
+  pow <- Common.field "power" ps >>= Common.decodeMaybe Common.asInteger
+  tou <- Common.field "toughness" ps >>= Common.decodeMaybe Common.asInteger
+  loy <- Common.field "loyalty" ps >>= Common.decodeMaybe Loyalty.fromJson
+  cda <- Common.field "characteristicPT" ps >>= Common.decodeMaybe Quantity.fromJsonPair
+  cts <- Common.field "cardTypes" ps >>= Common.decodeSet CardType.fromJson
+  subs <- Common.field "subtypes" ps >>= Common.decodeSet Subtype.fromJson
+  acts <- Common.field "activatedAbilities" ps >>= Common.decodeList (ActivatedAbility.fromJson Card.fromJson)
+  reps <- Common.field "replacementEffects" ps >>= Common.decodeList ReplacementEffect.fromJson
+  trigs <- Common.field "triggeredAbilities" ps >>= Common.decodeList (TriggeredAbility.fromJson Card.fromJson)
   pure
     PC.MkProjectedCharacteristics
       { PC.name = nm,

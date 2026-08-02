@@ -1,14 +1,13 @@
--- | The @ManaCost ⇆ Json@ codec (#481).
 module Pawl.Codec.ManaCost where
 
-import Data.Text (Text)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.ManaSymbol (jsonToManaSymbol, manaSymbolToJson)
-import Pawl.Json.Value (Value)
+import qualified Data.Text as Text
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.ManaSymbol as ManaSymbol
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ManaCost as ManaCost
 
-manaCostToJson :: ManaCost.ManaCost -> Value
-manaCostToJson (ManaCost.MkManaCost xs) = Json.listTo manaSymbolToJson xs
+toJson :: ManaCost.ManaCost -> Value.Value
+toJson = Common.encodeList ManaSymbol.toJson . ManaCost.unwrap
 
-jsonToManaCost :: Value -> Either Text ManaCost.ManaCost
-jsonToManaCost value = ManaCost.MkManaCost <$> Json.listFrom jsonToManaSymbol value
+fromJson :: Value.Value -> Either Text.Text ManaCost.ManaCost
+fromJson = fmap ManaCost.MkManaCost . Common.decodeList ManaSymbol.fromJson

@@ -10,10 +10,10 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.Codec.Card (cardToJson)
-import Pawl.Codec.EntryRiders (defaultEntryRiders)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Subtype (subtypeToJson)
+import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Event as Event
@@ -777,7 +777,7 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 -- something this lint would reject.
 tokenNameOffends :: Card.Type.Card -> Bool
 tokenNameOffends token =
-  case traverse (fmap fst . Json.tag . subtypeToJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
+  case traverse (fmap (Text.pack . fst) . Common.asTagged . Subtype.toJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
     Left _ -> True
     Right subtypes ->
       notElem
@@ -1142,12 +1142,13 @@ canHostSubjectCounts card =
    in (total True, total False)
 
 -- Every occurrence of the atom's codec tag in an ENCODED card. The completeness
--- witness for the traversal above: Pawl.Codec.Card.cardToJson visits every field
--- of a Card and every type under it, is round-tripped by CodecSpec, and was
+-- witness for the traversal above: Pawl.Codec.Card.toJson visits every field
+-- of a Card and every type under it, is round-tripped by
+-- Pawl.CodecIntegrationSpec's "honesty round-trip over allPrintings", and was
 -- written for another purpose entirely -- so a Filter position cardFilters forgets
 -- is one this still sees.
 --
--- A tag and not a name: Pawl.Codec.Filter spells the atom `Json.nullary
+-- A tag and not a name: Pawl.Codec.Filter spells the atom `Common.nullary
 -- "CanHostSubject"`, so the only string equal to this in a card's encoding is
 -- that tag (a card NAMED "CanHostSubject" would be a false positive, and a loud
 -- one rather than a silent miss).
@@ -1182,7 +1183,7 @@ jsonCanHostSubjects value = case value of
 canHostSubjectOffends :: Card.Type.Card -> Bool
 canHostSubjectOffends card =
   let (framed, unframedCount) = canHostSubjectCounts card
-   in unframedCount /= 0 || framed + unframedCount /= jsonCanHostSubjects (cardToJson card)
+   in unframedCount /= 0 || framed + unframedCount /= jsonCanHostSubjects (Card.toJson card)
 
 -- The D4 dataflow lint: every slot an effect reads is declared, and every
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
@@ -1474,7 +1475,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a reserved event slot the condition never binds" $ do
     roaches <- S.printingOf s registry "Endless Cockroaches"
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
-        returnIt = Effect.MoveToZone Binding.became Zone.Hand defaultEntryRiders Nothing
+        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing
         -- Rule 702.70a's shape, as a targetless read of "that player".
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
     Spec.assertBool
@@ -1532,7 +1533,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         youDiscards = Effect.Discard Binding.you (Quantity.Type.Literal 1)
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
-        returnIt = Effect.MoveToZone Binding.became Zone.Hand defaultEntryRiders Nothing
+        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
         -- CR 113.7's source slot, which every activation DOES bind.
         tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
@@ -1637,7 +1638,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Pawl.Engine.Projection may do. Layer.Control is exactly the two control
   -- constructors, so this covers a third one automatically.
   --
-  -- A codec-level rejection would be the wrong shape: jsonToModification is
+  -- A codec-level rejection would be the wrong shape: Modification.fromJson is
   -- shared with staticAbilities, which Control Magic legitimately uses.
   Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
     ps <- S.allPrintings s
@@ -1805,7 +1806,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                       [ Effect.Create
                           (Quantity.Type.Literal 1)
                           (base {Card.Type.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) (NonEmpty.singleton Modification.LoseAllAbilities)]})
-                          defaultEntryRiders
+                          EntryRiders.defaultValue
                           Nothing
                       ]
                       Map.empty
@@ -1826,7 +1827,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "and the codec counts exactly the atoms the traversal does"
-      (fmap (\(_, card) -> jsonCanHostSubjects (cardToJson card)) planted)
+      (fmap (\(_, card) -> jsonCanHostSubjects (Card.toJson card)) planted)
       (fmap (const 1) planted)
     -- The nesting, stated on its own: a top-level-only check would score every
     -- one of these zero but the first.
@@ -2060,7 +2061,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     let c = Printing.card unsummon
         blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [blue]))
-    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand defaultEntryRiders Nothing]
+    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand EntryRiders.defaultValue Nothing]
   -- Unsummon's effect exactly, over a different pool: the same MoveToZone to the
   -- hand, so the whole card is its target spec. CR 115.2's clause (a) admits it
   -- ("specifies that it can target an object in another zone"), CR 400.1 is why
@@ -2074,7 +2075,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
         target = SlotName.MkSlotName (Text.pack "target")
     Spec.assertEqWith s "cost" (Card.Type.manaCost c) (Just (ManaCost.MkManaCost [black]))
     Spec.assertBool s (Card.isSorcery c) "a sorcery"
-    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone target Zone.Hand defaultEntryRiders Nothing]
+    Spec.assertEqWith s "effect returns to hand" (Card.allEffects c) [Effect.MoveToZone target Zone.Hand EntryRiders.defaultValue Nothing]
     Spec.assertEqWith
       s
       "one creature-card-in-your-graveyard slot"
@@ -2108,7 +2109,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
           s
           "which exiles the target (CR 406.2)"
           (Modal.allEffects (ActivatedAbility.modal ability))
-          [Effect.MoveToZone target Zone.Exile defaultEntryRiders Nothing]
+          [Effect.MoveToZone target Zone.Exile EntryRiders.defaultValue Nothing]
         Spec.assertEqWith
           s
           "off one unfiltered any-graveyard slot"
@@ -2190,7 +2191,7 @@ m4bCardSpec s registry = Spec.describe s "M4bCards" $ do
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     let c = Printing.card angelicEdict
     Spec.assertBool s (not (Card.isInstant c)) "not an instant"
-    Spec.assertEqWith s "effect exiles" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile defaultEntryRiders Nothing]
+    Spec.assertEqWith s "effect exiles" (Card.allEffects c) [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile EntryRiders.defaultValue Nothing]
     Spec.assertEqWith s "creature-or-enchantment slot" (Card.allTargetSpecs c) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment]))))
   Spec.it s "Divination is a {2}{U} Sorcery that draws two cards with no target" $ do
     divination <- S.printingOf s registry "Divination"

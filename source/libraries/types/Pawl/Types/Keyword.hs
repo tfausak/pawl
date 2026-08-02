@@ -1,11 +1,11 @@
 module Pawl.Types.Keyword where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.Cost (Cost)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.Subtype (Subtype)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Subtype as Subtype
 
--- CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
+-- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
 --
 -- Casing on this is NOT a violation of the closed/open invariant. That invariant
@@ -47,7 +47,7 @@ data Keyword
   | Defender -- 702.3
   | DoubleStrike -- 702.4
   | FirstStrike -- 702.7
-  | -- 702.8a: "Flash is a static ability that functions in any zone from which
+  | -- | 702.8a: "Flash is a static ability that functions in any zone from which
     -- you could play the card it's on. 'Flash' means 'You may play this card any
     -- time you could cast an instant.'"
     --
@@ -70,7 +70,7 @@ data Keyword
     Flash
   | Flying -- 702.9
   | Haste -- 702.10
-  | -- 702.11a: "Hexproof is a static ability." 702.11b: "'Hexproof' on a
+  | -- | 702.11a: "Hexproof is a static ability." 702.11b: "'Hexproof' on a
     -- permanent means 'This permanent can't be the target of spells or abilities
     -- your opponents control.'"
     --
@@ -87,7 +87,7 @@ data Keyword
     -- (702.16) rather than this one's.
     Hexproof
   | Indestructible -- 702.12
-  | -- 702.14a: "Landwalk is a generic term that appears within an object's rules
+  | -- | 702.14a: "Landwalk is a generic term that appears within an object's rules
     -- text as '[type]walk,' where [type] is usually a land type, but it can also
     -- be the card type land plus any combination of land types, card types,
     -- and/or supertypes."
@@ -104,8 +104,8 @@ data Keyword
     --
     -- Only rule 702.14a's "usually a land type" case is represented. A Subtype
     -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
-    Landwalk Subtype
-  | -- 702.15a: "Lifelink is a static ability." 702.15b: "Damage dealt by a
+    Landwalk Subtype.Subtype
+  | -- | 702.15a: "Lifelink is a static ability." 702.15b: "Damage dealt by a
     -- source with lifelink causes that source's controller, or its owner if it
     -- has no controller, to gain that much life (in addition to any other
     -- results that damage causes)."
@@ -123,7 +123,7 @@ data Keyword
     -- of a live board when the life is handed over. See Pawl.Engine.Damage.damageEvent.
     Lifelink
   | Reach -- 702.17
-  | -- 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
+  | -- | 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
     -- player can't be the target of spells or abilities.'"
     --
     -- The pool's first TARGETING RESTRICTION, read by the CR 115
@@ -138,7 +138,7 @@ data Keyword
     Shroud
   | Trample -- 702.19
   | Vigilance -- 702.20
-  | -- 702.29a: "Cycling is an activated ability that functions only while the
+  | -- | 702.29a: "Cycling is an activated ability that functions only while the
     -- card with cycling is in a player's hand. 'Cycling [cost]' means '[Cost],
     -- Discard this card: Draw a card.'"
     --
@@ -167,8 +167,8 @@ data Keyword
     -- type is usually a subtype (as in 'mountaincycling') but can be any card
     -- type, subtype, supertype, or combination thereof (as in 'basic
     -- landcycling')" -- which is a Filter's whole job.
-    Cycling (Cost Keyword) (Maybe (Filter Keyword))
-  | -- 702.34a: "Flashback appears on some instants and sorceries. It represents
+    Cycling (Cost.Cost Keyword) (Maybe (Filter.Filter Keyword))
+  | -- | 702.34a: "Flashback appears on some instants and sorceries. It represents
     -- two static abilities: one that functions while the card is in a player's
     -- graveyard and another that functions while the card is on the stack.
     -- 'Flashback [cost]' means 'You may cast this card from your graveyard if
@@ -186,9 +186,9 @@ data Keyword
     -- Pawl.Engine.Cost.costsFor only in the graveyard), the permission
     -- (Keyword.castingPermissionsOf) and the exile replacement
     -- (Keyword.flashbackExile).
-    Flashback (Cost Keyword)
+    Flashback (Cost.Cost Keyword)
   | Fear -- 702.36
-  | -- 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
+  | -- | 702.42a: "Entwine is a static ability of modal spells (see rule 700.2)
     -- that functions while the spell is on the stack. 'Entwine [cost]' means
     -- 'You may choose all modes of this spell instead of just the number
     -- specified. If you do, you pay an additional [cost].' Using the entwine
@@ -206,17 +206,17 @@ data Keyword
     -- completely -- "all modes", never some other number -- so Pawl.Engine.Cast reads
     -- the payload's own mode count (Modal.modeCount) rather than a number
     -- restated here, and Pawl.Types.ModeSelection stays what the card PRINTS.
-    Entwine (Cost Keyword)
-  | -- 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
+    Entwine (Cost.Cost Keyword)
+  | -- | 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
     -- this creature deals combat damage to a player, that player gets N poison
     -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the
     -- N values are NOT summed: CR 702.70b says each instance triggers
     -- separately, so `Poisonous 1` twice is two abilities and two triggers --
     -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds from the
     -- projection's per-keyword count.
-    Poisonous Natural
+    Poisonous Natural.Natural
   | Infect -- 702.90
-  | -- 702.111b: "A creature with menace can't be blocked except by two or more
+  | -- | 702.111b: "A creature with menace can't be blocked except by two or more
     -- creatures."
     --
     -- Nullary like fear (702.36) and unlike landwalk, because 702.111b names no
@@ -232,12 +232,12 @@ data Keyword
     -- pairAllowedGiven.
     Menace
   | Devoid -- 702.114
-  | -- 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
+  | -- | 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
     -- a number." N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over
     -- every toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --
     -- including two with the same N, which the projection counts separately.
-    Toxic Natural
+    Toxic Natural.Natural
   deriving (Eq, Ord, Show)
 
 -- Devoid is read only at the projection SEED (Projection.baseColorsOf), not as a

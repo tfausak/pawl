@@ -1,9 +1,9 @@
 module Pawl.Types.ActivationTiming where
 
-import Pawl.Types.PhaseSelector (PhaseSelector)
-import Pawl.Types.TurnScope (TurnScope)
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.TurnScope as TurnScope
 
--- CR 307.5: when an activated ability may be activated.
+-- | CR 307.5: when an activated ability may be activated.
 --
 -- A sum type rather than a Bool on the ability: no boolean blindness, and the
 -- next rider (flash, "only during your turn", split second) is a constructor
@@ -40,12 +40,12 @@ import Pawl.Types.TurnScope (TurnScope)
 -- ONE rider and never several: an ability whose printed text joins two clauses
 -- with "and only if" (Kongming's Contraptions) is unrepresentable (#456).
 data ActivationTiming
-  = -- No rider: any time its controller has priority (CR 602.2).
+  = -- | No rider: any time its controller has priority (CR 602.2).
     AnyTime
-  | -- CR 702.6a's "Activate only as a sorcery", and every other ability that
+  | -- | CR 702.6a's "Activate only as a sorcery", and every other ability that
     -- carries the same phrase.
     SorcerySpeed
-  | -- CR 500.1: activatable only while the game is in this step or phase, on a
+  | -- | CR 500.1: activatable only while the game is in this step or phase, on a
     -- turn the scope admits. Desert's "Activate only during the end of combat
     -- step" (CR 511.1) is EachTurn; Llanowar Augur's "Activate only during your
     -- upkeep" is ControllersTurn.
@@ -79,5 +79,5 @@ data ActivationTiming
     -- Neither "an opponent's turn" (Trade Caravan, Nettling Imp) nor a turn named
     -- with no phase at all (Lavinia, Foil to Conspiracy) is sayable: TurnScope has
     -- two arms, and this one requires a window (#520).
-    DuringPhase PhaseSelector TurnScope
+    DuringPhase PhaseSelector.PhaseSelector TurnScope.TurnScope
   deriving (Eq, Ord, Show)

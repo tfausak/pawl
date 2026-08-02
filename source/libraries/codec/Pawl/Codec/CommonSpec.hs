@@ -1,0 +1,88 @@
+module Pawl.Codec.CommonSpec where
+
+import qualified Data.Either as Either
+import qualified Data.Text as Text
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Spec as Spec
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.Common" $ do
+  Spec.describe s "parse" $ do
+    Spec.it s "rejects trailing input" $
+      Spec.assertBool s (Either.isLeft . Common.parse $ Text.pack "\"a\" x") "expected a parse failure"
+    Spec.it s "round trips through render" $
+      Spec.assertEq s (Common.parse (Common.render (Common.array [Common.integer 1]))) (Right (Common.array [Common.integer 1]))
+    -- Ported from Pawl.JsonSpec's "nested array/object": a heterogeneous value
+    -- (an escaped-quote string, under a nested object, alongside a bool and a
+    -- null, all inside an array) round-trips as one composite. The
+    -- array-of-integer case above never exercises string escaping, booleans,
+    -- null, or a nested object, so this is not a duplicate of it.
+    Spec.it s "round trips a nested, heterogeneous value" $
+      let v =
+            Common.array
+              [ Common.object [Common.pair "k" (Common.text (Text.pack "v\"x"))],
+                Common.boolean True,
+                Common.null
+              ]
+       in Spec.assertEq s (Common.parse (Common.render v)) (Right v)
+    -- Ported from Pawl.JsonSpec's "surrounding blanks are accepted": parse
+    -- must accept blanks on both sides of the document, not merely reject
+    -- trailing garbage.
+    Spec.it s "accepts surrounding blanks" $
+      Spec.assertEq s (Common.parse (Text.pack " 1 ")) (Right (Common.integer 1))
+
+  Spec.describe s "tagged" $ do
+    Spec.it s "omits an absent value" $
+      Spec.assertEq s (Common.render (Common.tagged "ManaValue" Nothing)) (Text.pack "{\"type\":\"ManaValue\"}")
+    Spec.it s "includes a present value" $
+      Spec.assertEq s (Common.render (Common.tagged "Literal" (Just (Common.integer 5)))) (Text.pack "{\"type\":\"Literal\",\"value\":5}")
+
+  Spec.describe s "asTagged" $ do
+    Spec.it s "returns a String tag" $
+      Spec.assertEq s (Common.asTagged (Common.nullary "X")) (Right ("X", Nothing))
+    -- Ported from Pawl.JsonSpec's "tag reads back what tagged wrote": the
+    -- payload-bearing case, which "returns a String tag" above (a nullary tag)
+    -- does not exercise.
+    Spec.it s "reads back a tagged value's payload" $
+      Spec.assertEq s (Common.asTagged (Common.tagged "Literal" (Just (Common.integer 5)))) (Right ("Literal", Just (Common.integer 5)))
+
+  Spec.describe s "sortKeys" $ do
+    Spec.it s "orders object keys" $
+      Spec.assertEq
+        s
+        (Common.sortKeys (Common.object [Common.pair "b" (Common.integer 1), Common.pair "a" (Common.integer 2)]))
+        (Common.object [Common.pair "a" (Common.integer 2), Common.pair "b" (Common.integer 1)])
+    -- The remaining cases are ported from Pawl.JsonSpec's "sortKeys" group:
+    -- sortKeys is now load-bearing for every assertToJson in the codec's spec
+    -- suite, so its own coverage stays as thorough here as it was there.
+    Spec.it s "sorts nested objects" $
+      Spec.assertEq
+        s
+        (Common.sortKeys (Common.object [Common.pair "a" (Common.object [Common.pair "d" (Common.integer 2), Common.pair "c" (Common.integer 1)])]))
+        (Common.object [Common.pair "a" (Common.object [Common.pair "c" (Common.integer 1), Common.pair "d" (Common.integer 2)])])
+    Spec.it s "preserves array order" $
+      Spec.assertEq
+        s
+        (Common.sortKeys (Common.array [Common.integer 2, Common.integer 1]))
+        (Common.array [Common.integer 2, Common.integer 1])
+    Spec.it s "sorts objects inside arrays" $
+      Spec.assertEq
+        s
+        (Common.sortKeys (Common.array [Common.object [Common.pair "b" (Common.integer 2), Common.pair "a" (Common.integer 1)]]))
+        (Common.array [Common.object [Common.pair "a" (Common.integer 1), Common.pair "b" (Common.integer 2)]])
+    Spec.it s "leaves an already-sorted value alone" $
+      let v = Common.object [Common.pair "a" (Common.integer 1), Common.pair "b" (Common.integer 2)]
+       in Spec.assertEq s (Common.sortKeys v) v
+    Spec.it s "leaves scalars alone" $
+      Spec.assertEq s (Common.sortKeys Common.null) Common.null
+    Spec.it s "is idempotent" $
+      let v =
+            Common.object
+              [ Common.pair "b" (Common.object [Common.pair "d" (Common.integer 2), Common.pair "c" (Common.integer 1)]),
+                Common.pair "a" Common.null
+              ]
+       in Spec.assertEq s (Common.sortKeys (Common.sortKeys v)) (Common.sortKeys v)
+
+  Spec.describe s "assertToJson"
+    . Spec.it s "ignores object key order"
+    $ Common.assertToJson s id (Common.object [Common.pair "b" (Common.integer 1), Common.pair "a" (Common.integer 2)]) "{\"a\":2,\"b\":1}"

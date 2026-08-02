@@ -1,13 +1,12 @@
--- | The @ObjectId ⇆ Json@ codec (#481).
 module Pawl.Codec.ObjectId where
 
-import Data.Text (Text)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Data.Text as Text
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ObjectId as ObjectId
 
-objectIdToJson :: ObjectId.ObjectId -> Value
-objectIdToJson (ObjectId.MkObjectId n) = Json.natTo n
+toJson :: ObjectId.ObjectId -> Value.Value
+toJson = Common.encodeNatural . ObjectId.unwrap
 
-jsonToObjectId :: Value -> Either Text ObjectId.ObjectId
-jsonToObjectId value = ObjectId.MkObjectId <$> Json.natFrom value
+fromJson :: Value.Value -> Either Text.Text ObjectId.ObjectId
+fromJson = fmap ObjectId.MkObjectId . Common.decodeNatural

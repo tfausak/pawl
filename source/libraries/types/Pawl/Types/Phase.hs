@@ -1,13 +1,13 @@
 module Pawl.Types.Phase where
 
-import Pawl.Types.BeginningStep (BeginningStep)
-import Pawl.Types.CombatStep (CombatStep)
-import Pawl.Types.EndingStep (EndingStep)
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.EndingStep as EndingStep
 
 data Phase
-  = Beginning BeginningStep
+  = Beginning BeginningStep.BeginningStep
   | PrecombatMain
-  | Combat CombatStep
+  | Combat CombatStep.CombatStep
   | PostcombatMain
-  | Ending EndingStep
+  | Ending EndingStep.EndingStep
   deriving (Eq, Ord, Show)

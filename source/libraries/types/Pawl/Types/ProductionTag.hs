@@ -1,6 +1,6 @@
 module Pawl.Types.ProductionTag where
 
--- A fact about the EVENT that produced one unit of mana, captured as the mana is
+-- | A fact about the EVENT that produced one unit of mana, captured as the mana is
 -- added and carried by the unit for as long as it exists.
 --
 -- The CLOSED half of the two collections Pawl.Types.ManaUnit grows; its header
@@ -10,7 +10,7 @@ module Pawl.Types.ProductionTag where
 -- constructor is the same kind of act as casing on a Phase -- never an effect's
 -- identity.
 data ProductionTag
-  = -- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
+  = -- | CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
     -- that can be paid with one mana of any type produced by a snow source (see
     -- rule 106.3)."
     --

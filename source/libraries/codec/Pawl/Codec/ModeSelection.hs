@@ -1,19 +1,16 @@
--- | The @ModeSelection ⇆ Json@ codec (#481).
 module Pawl.Codec.ModeSelection where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ModeSelection as ModeSelection
 
-modeSelectionToJson :: ModeSelection.ModeSelection -> Value
-modeSelectionToJson (ModeSelection.ChooseExactly n) =
-  Json.tagged (Text.pack "ChooseExactly") (Just (Json.natTo n))
+toJson :: ModeSelection.ModeSelection -> Value.Value
+toJson m = Common.tagged "ChooseExactly" . Just . Common.encodeNatural $ ModeSelection.unwrap m
 
-jsonToModeSelection :: Value -> Either Text ModeSelection.ModeSelection
-jsonToModeSelection value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("ChooseExactly", Just n) -> ModeSelection.ChooseExactly <$> Json.natFrom n
-    _ -> Left (Text.pack "unknown ModeSelection: " <> t)
+fromJson :: Value.Value -> Either Text.Text ModeSelection.ModeSelection
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
+    ("ChooseExactly", Just n) -> ModeSelection.ChooseExactly <$> Common.decodeNatural n
+    _ -> Left . Text.pack $ "unknown ModeSelection: " <> t

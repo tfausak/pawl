@@ -1,13 +1,12 @@
--- | The @Printing ⇆ Json@ codec (#481).
 module Pawl.Codec.Printing where
 
-import Data.Text (Text)
-import Pawl.Codec.Card (cardToJson, jsonToCard)
-import Pawl.Json.Value (Value)
+import qualified Data.Text as Text
+import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Printing as Printing
 
-printingToJson :: Printing.Printing -> Value
-printingToJson (Printing.MkPrinting c) = cardToJson c
+toJson :: Printing.Printing -> Value.Value
+toJson = Card.toJson . Printing.card
 
-jsonToPrinting :: Value -> Either Text Printing.Printing
-jsonToPrinting value = Printing.MkPrinting <$> jsonToCard value
+fromJson :: Value.Value -> Either Text.Text Printing.Printing
+fromJson = fmap Printing.MkPrinting . Card.fromJson

@@ -1,43 +1,43 @@
 module Pawl.Types.Card where
 
-import Data.Map.Strict (Map)
-import Data.Set (Set)
-import Data.Text (Text)
-import Pawl.Types.AbilityName (AbilityName)
-import Pawl.Types.ActivatedAbility (ActivatedAbility)
-import Pawl.Types.AttackRequirement (AttackRequirement)
-import Pawl.Types.BlockRequirement (BlockRequirement)
-import Pawl.Types.CastingPermission (CastingPermission)
-import Pawl.Types.CastingRestriction (CastingRestriction)
-import Pawl.Types.Color (Color)
-import Pawl.Types.CombatRestriction (CombatRestriction)
-import Pawl.Types.Cost (Cost)
-import Pawl.Types.CostComponent (CostComponent)
-import Pawl.Types.Counterability (Counterability)
-import Pawl.Types.Effect (Effect)
-import Pawl.Types.Keyword (Keyword)
-import Pawl.Types.Loyalty (Loyalty)
-import Pawl.Types.ManaCost (ManaCost)
-import Pawl.Types.Modal (Modal)
-import Pawl.Types.PlayerStaticAbility (PlayerStaticAbility)
-import Pawl.Types.Power (Power)
-import Pawl.Types.Quantity (Quantity)
-import Pawl.Types.ReplacementEffect (ReplacementEffect)
-import Pawl.Types.StaticAbility (StaticAbility)
-import Pawl.Types.TargetSpec (TargetSpec)
-import Pawl.Types.Toughness (Toughness)
-import Pawl.Types.TriggeredAbility (TriggeredAbility)
-import Pawl.Types.TypeLine (TypeLine)
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TypeLine as TypeLine
 
 data Card = MkCard
-  { name :: Text,
-    -- Nothing, not a zero cost: CR 202.1, a land has no mana cost at all.
-    manaCost :: Maybe ManaCost,
-    typeLine :: TypeLine,
-    -- Only creatures have these.
-    power :: Maybe Power,
-    toughness :: Maybe Toughness,
-    -- CR 306.5 / 306.5a: "Loyalty is a characteristic only planeswalkers have",
+  { name :: Text.Text,
+    -- | Nothing, not a zero cost: CR 202.1, a land has no mana cost at all.
+    manaCost :: Maybe ManaCost.ManaCost,
+    typeLine :: TypeLine.TypeLine,
+    -- | Only creatures have these.
+    power :: Maybe Power.Power,
+    toughness :: Maybe Toughness.Toughness,
+    -- | CR 306.5 / 306.5a: "Loyalty is a characteristic only planeswalkers have",
     -- and a planeswalker card's is "the number printed in its lower right
     -- corner". Nothing for every card that is not a planeswalker; the CardSpec
     -- lint family holds that biconditional in both directions.
@@ -48,8 +48,8 @@ data Card = MkCard
     -- What reads it is CR 306.5b's intrinsic enters-with replacement, which needs
     -- the loyalty of the permanent as it WOULD exist on the battlefield (CR
     -- 614.12) rather than the loyalty printed on whatever card is underneath.
-    loyalty :: Maybe Loyalty,
-    -- CR 702. A Set because this is PRINTED text: a card names each keyword
+    loyalty :: Maybe Loyalty.Loyalty,
+    -- | CR 702. A Set because this is PRINTED text: a card names each keyword
     -- ability it has once, so there is no printed multiplicity to lose. Where
     -- multiplicity does arise -- the same ability twice, once printed and once
     -- granted, which CR 702.164b's toxic SUMS rather than treating as redundant
@@ -62,46 +62,46 @@ data Card = MkCard
     -- reach -- rule 702.34a's flashback, read here by Pawl.Engine.Cast and Pawl.Engine.Cost
     -- via Pawl.Engine.Keyword while the card sits in a graveyard -- which is the same
     -- carve-out castingPermissions and additionalCosts below already take.
-    keywords :: Set Keyword,
-    -- CR 204.1/204.2: the colour indicator printed left of the type line. An
+    keywords :: Set.Set Keyword.Keyword,
+    -- | CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana
     -- cost (CR 202.2/202.2e). Empty for a card whose colours come from its cost
     -- alone. This is also where a TOKEN's colour lives: CR 111.3 makes the
     -- creating effect's stated characteristics "functionally equivalent to the
     -- characteristic values that are printed on a card", and a token has no mana
     -- cost. Read through Pawl.Engine.Projection.colorsOf, never directly.
-    colorIndicator :: Set Color,
-    -- CR 604.3 / 208.2a: this card's characteristic-defining P/T ability -- the
+    colorIndicator :: Set.Set Color.Color,
+    -- | CR 604.3 / 208.2a: this card's characteristic-defining P/T ability -- the
     -- quantity a printed star (Quantity.Star) in its power/toughness box stands
     -- for. Nothing for every card without a star. A CDA is an ABILITY, not a
     -- number: the projection seeds it unevaluated so a copy acquires the ability
     -- (CR 707.2a) and layer 7a recomputes it on every projection. Read through
     -- Pawl.Engine.Projection, never directly.
-    characteristicPT :: Maybe Quantity,
-    -- CR 604.1/604.2: this card's static continuous abilities (Humility). Empty
+    characteristicPT :: Maybe Quantity.Quantity,
+    -- | CR 604.1/604.2: this card's static continuous abilities (Humility). Empty
     -- for everything but the few printings that generate a continuous effect just
     -- by being on the battlefield. The projection gathers these live.
-    staticAbilities :: [StaticAbility],
-    -- The card's spell payload as data: what casting this card does when it
+    staticAbilities :: [StaticAbility.StaticAbility],
+    -- | The card's spell payload as data: what casting this card does when it
     -- resolves, as one or more modes (CR 700.2). A non-modal card -- every card
     -- before M4g -- is a single mode with ChooseExactly 1 (forced, unprompted). A
     -- land or vanilla creature is a single EMPTY mode (no spell effects; resolution
     -- just enters the battlefield). Card ties Modal's `card` knot at `Modal Card`.
-    spell :: Modal Card,
-    -- CR 602: this card's printed activated abilities. Empty for all but the few
+    spell :: Modal.Modal Card,
+    -- | CR 602: this card's printed activated abilities. Empty for all but the few
     -- printings that grant one. The closed half reads these through
     -- Pawl.Engine.Projection.abilitiesOf (Task 9), never directly: layer 6 (Humility)
     -- removes abilities.
-    activatedAbilities :: [ActivatedAbility Card],
-    -- CR 614: this card's replacement effects, active while it is on the
+    activatedAbilities :: [ActivatedAbility.ActivatedAbility Card],
+    -- | CR 614: this card's replacement effects, active while it is on the
     -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never directly)
     -- so layer 6 LoseAllAbilities strips them uniformly. Empty for all but Rest
     -- in Peace.
-    replacementEffects :: [ReplacementEffect],
-    -- CR 603: this card's triggered abilities, read through
+    replacementEffects :: [ReplacementEffect.ReplacementEffect],
+    -- | CR 603: this card's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf. Empty for all but Rest in Peace.
-    triggeredAbilities :: [TriggeredAbility Card],
-    -- CR 603.7: this card's DELAYED triggered abilities, keyed by name -- the
+    triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card],
+    -- | CR 603.7: this card's DELAYED triggered abilities, keyed by name -- the
     -- payloads an Effect.ArmDelayedTrigger in this card's own text arms. Card
     -- DATA, not an opcode payload: Effect is first-order and non-recursive
     -- (design.md section 1), and Effect -> TriggeredAbility -> Modal -> Mode ->
@@ -111,8 +111,8 @@ data Card = MkCard
     -- Read straight from the card, never through the projection: a delayed
     -- ability is not ON the source object -- CR 603.7d gives it no source
     -- permanent to lose, so layer 6 cannot strip it.
-    delayedAbilities :: Map AbilityName (TriggeredAbility Card),
-    -- CR 601.3: this card's PRINTED casting permissions -- zone/condition
+    delayedAbilities :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card),
+    -- | CR 601.3: this card's PRINTED casting permissions -- zone/condition
     -- exceptions to normal timing. Read directly from the card (NOT the
     -- projection): the permission functions in the library (CR 113.6), where the
     -- CR 613 layer system does not reach. Empty for all but Panglacial Wurm.
@@ -122,8 +122,8 @@ data Card = MkCard
     -- Pawl.Engine.Keyword.castingPermissionsOf mints from the keyword. Pawl.Engine.Cast
     -- (permissionsOf) is the one place the two are put together; a reader that
     -- wants every permission a card has must do the same.
-    castingPermissions :: [CastingPermission],
-    -- CR 601.3: this card's PRINTED casting restrictions -- the clauses of a
+    castingPermissions :: [CastingPermission.CastingPermission],
+    -- | CR 601.3: this card's PRINTED casting restrictions -- the clauses of a
     -- "Cast this spell only during ..." that WITHHOLD a cast the rules would
     -- otherwise allow. Rally the Troops is
     -- `[DuringPhase (Combat DeclareAttackers), AttackedThisStep]`; empty for
@@ -147,8 +147,8 @@ data Card = MkCard
     -- aimed at a PLAYER -- Rule of Law, Silence -- is a continuous effect on the
     -- CR 613.11 axis (playerAbilities / Effect.AffectPlayers, read by
     -- Pawl.Engine.PlayerEffect); every entry here is a card restricting only itself.
-    castingRestrictions :: [CastingRestriction],
-    -- CR 702.5a: this card's `enchant` ability -- "Enchant [object or player]"
+    castingRestrictions :: [CastingRestriction.CastingRestriction],
+    -- | CR 702.5a: this card's `enchant` ability -- "Enchant [object or player]"
     -- -- which "restricts what an Aura spell can target and what an Aura can
     -- enchant". Nothing for every card that is not an Aura; the CardSpec lint
     -- family holds the biconditional (Aura iff enchant) in both directions.
@@ -158,15 +158,15 @@ data Card = MkCard
     --
     -- SINGULAR: CR 702.5c's "multiple instances of enchant, all of them apply"
     -- is unrepresentable, and no card in this pool prints two (#189).
-    enchant :: Maybe TargetSpec,
-    -- CR 113.6g: "an object's ability that states it can't be countered …
+    enchant :: Maybe TargetSpec.TargetSpec,
+    -- | CR 113.6g: "an object's ability that states it can't be countered …
     -- functions on the stack" (Rending Volley). Counterable for every other
     -- printing, and read straight off the card by Event.counter rather than
     -- through the projection -- the castingPermissions precedent, and here it is
     -- forced rather than chosen: a spell on the stack is not on the battlefield,
     -- so the CR 613 layer system does not reach it at all.
-    counterability :: Counterability,
-    -- CR 118.8: this card's printed additional costs -- "a cost listed in a
+    counterability :: Counterability.Counterability,
+    -- | CR 118.8: this card's printed additional costs -- "a cost listed in a
     -- spell's rules text ... that its controller must pay at the same time they
     -- pay the spell's mana cost" (Village Rites). Empty for every other
     -- printing.
@@ -177,8 +177,8 @@ data Card = MkCard
     --
     -- CR 118.8d: this does not change the card's mana cost. Card.manaCost, and
     -- every reader of mana value, is unaffected.
-    additionalCosts :: [CostComponent Keyword],
-    -- CR 118.9: this card's printed alternative costs -- "a cost listed in a
+    additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
+    -- | CR 118.9: this card's printed alternative costs -- "a cost listed in a
     -- spell's text ... that its controller MAY pay rather than paying the
     -- spell's mana cost" (Fireblast). Empty for every other printing.
     --
@@ -203,30 +203,30 @@ data Card = MkCard
     -- NOT one of these: a cost here is payable wherever the card can be cast
     -- from, and flashback's may be paid only from the graveyard. It rides its
     -- keyword instead, and Pawl.Engine.Cost.costsFor offers it by zone.
-    alternativeCosts :: [Cost Keyword],
-    -- CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
+    alternativeCosts :: [Cost.Cost Keyword.Keyword],
+    -- | CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary
     -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put
     -- OUTSIDE the layer system, so these are read by Pawl.Engine.PlayerEffect and never
     -- by Pawl.Engine.Projection. Empty for every other printing.
-    playerAbilities :: [PlayerStaticAbility],
-    -- CR 604.1/604.2 / 509.1c: this card's printed BLOCKING REQUIREMENTS -- "all
+    playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
+    -- | CR 604.1/604.2 / 509.1c: this card's printed BLOCKING REQUIREMENTS -- "all
     -- creatures able to block enchanted creature do so" (Lure). The THIRD
     -- printed-static-ability field, alongside staticAbilities and
     -- playerAbilities; Pawl.Types.BlockRequirement argues why neither of those two
     -- can hold one. Read by Pawl.Engine.BlockRequirement and never by Pawl.Engine.Projection,
     -- since CR 613.11 applies these after the layer system rather than inside it.
     -- Empty for every other printing.
-    blockRequirements :: [BlockRequirement],
-    -- CR 604.1/604.2 / 508.1d: this card's printed ATTACKING REQUIREMENTS --
+    blockRequirements :: [BlockRequirement.BlockRequirement],
+    -- | CR 604.1/604.2 / 508.1d: this card's printed ATTACKING REQUIREMENTS --
     -- "creatures enchanted player controls attack each combat if able" (Curse of
     -- the Nightly Hunt). The FOURTH printed-static-ability field, and the twin of
     -- blockRequirements on the other side of the combat phase; read by
     -- Pawl.Engine.AttackRequirement and never by Pawl.Engine.Projection, since CR 613.11 applies
     -- these after the layer system rather than inside it. Empty for every other
     -- printing.
-    attackRequirements :: [AttackRequirement],
-    -- CR 604.1/604.2 / 508.1c / 509.1b: this card's printed COMBAT RESTRICTIONS
+    attackRequirements :: [AttackRequirement.AttackRequirement],
+    -- | CR 604.1/604.2 / 508.1c / 509.1b: this card's printed COMBAT RESTRICTIONS
     -- -- "enchanted creature can't attack or block" (Pacifism). The FIFTH
     -- printed-static-ability field; read by Pawl.Engine.CombatRestriction and never by
     -- Pawl.Engine.Projection, since CR 613.11 applies these after the layer system
@@ -235,8 +235,8 @@ data Card = MkCard
     -- ONE list for both of Pacifism's halves, where the requirements take two
     -- fields: Pawl.Types.CombatRestriction argues why the axis that split those is
     -- absent here.
-    combatRestrictions :: [CombatRestriction],
-    -- CR 103.5b: the effects of this card's "any time you could mulligan"
+    combatRestrictions :: [CombatRestriction.CombatRestriction],
+    -- | CR 103.5b: the effects of this card's "any time you could mulligan"
     -- action, in written order. Empty for every printing but Serum Powder.
     --
     -- Read DIRECTLY from the card and never through the projection -- the
@@ -247,8 +247,8 @@ data Card = MkCard
     -- are indistinguishable in play, so the ambiguity costs nothing.
     --
     -- One action per card. A printing declaring two is unrepresentable (#183).
-    mulliganAction :: [Effect Card],
-    -- CR 103.6: the effects of this card's opening-hand action, in written
+    mulliganAction :: [Effect.Effect Card],
+    -- | CR 103.6: the effects of this card's opening-hand action, in written
     -- order -- what "you may begin the game with it on the battlefield" (CR
     -- 103.6a) does when the player takes it. Empty for every printing but
     -- Leyline of the Void.
@@ -263,6 +263,6 @@ data Card = MkCard
     -- be offered at the other.
     --
     -- One action per card, the same shape and the same caveat (#183).
-    openingHandAction :: [Effect Card]
+    openingHandAction :: [Effect.Effect Card]
   }
   deriving (Eq, Ord, Show)

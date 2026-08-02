@@ -1,25 +1,23 @@
--- | The @PlayerRef ⇆ Json@ codec (#481).
 module Pawl.Codec.PlayerRef where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.PlayerRelation (jsonToPlayerRelation, playerRelationToJson)
-import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
+import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
-playerRefToJson :: PlayerRef.PlayerRef -> Value
-playerRefToJson r = case r of
-  PlayerRef.EachPlayer -> Json.nullary (Text.pack "EachPlayer")
-  PlayerRef.Relative rel -> Json.tagged (Text.pack "Relative") (Just (playerRelationToJson rel))
-  PlayerRef.InSlot n -> Json.tagged (Text.pack "InSlot") (Just (slotNameToJson n))
+toJson :: PlayerRef.PlayerRef -> Value.Value
+toJson r = case r of
+  PlayerRef.EachPlayer -> Common.nullary "EachPlayer"
+  PlayerRef.Relative rel -> Common.tagged "Relative" . Just $ PlayerRelation.toJson rel
+  PlayerRef.InSlot n -> Common.tagged "InSlot" . Just $ SlotName.toJson n
 
-jsonToPlayerRef :: Value -> Either Text PlayerRef.PlayerRef
-jsonToPlayerRef value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
+fromJson :: Value.Value -> Either Text.Text PlayerRef.PlayerRef
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
     ("EachPlayer", _) -> Right PlayerRef.EachPlayer
-    ("Relative", Just v) -> PlayerRef.Relative <$> jsonToPlayerRelation v
-    ("InSlot", Just v) -> PlayerRef.InSlot <$> jsonToSlotName v
-    _ -> Left (Text.pack "unknown PlayerRef: " <> t)
+    ("Relative", Just v) -> PlayerRef.Relative <$> PlayerRelation.fromJson v
+    ("InSlot", Just v) -> PlayerRef.InSlot <$> SlotName.fromJson v
+    _ -> Left . Text.pack $ "unknown PlayerRef: " <> t

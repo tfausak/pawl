@@ -1,8 +1,8 @@
 module Pawl.Types.Sickness where
 
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerId as PlayerId
 
--- CR 302.6: a creature can't attack, or use an activated ability with the tap or
+-- | CR 302.6: a creature can't attack, or use an activated ability with the tap or
 -- untap symbol, unless it has been under its controller's control continuously
 -- since their most recent turn began. Only the tap half is reachable -- no cost
 -- component expresses the untap symbol (#204).
@@ -37,5 +37,5 @@ import Pawl.Types.PlayerId (PlayerId)
 -- group: it reaches the stack through Event.changeZone, so it carries `Sick`.
 data Sickness
   = Sick
-  | Settled PlayerId
+  | Settled PlayerId.PlayerId
   deriving (Eq, Ord, Show)

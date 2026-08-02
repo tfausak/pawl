@@ -1,21 +1,19 @@
--- | The @PlayerCounterKind ⇆ Json@ codec (#481).
 module Pawl.Codec.PlayerCounterKind where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 
-playerCounterKindToJson :: PlayerCounterKind.PlayerCounterKind -> Value
-playerCounterKindToJson k = Json.nullary . Text.pack $ case k of
+toJson :: PlayerCounterKind.PlayerCounterKind -> Value.Value
+toJson k = Common.nullary $ case k of
   PlayerCounterKind.Energy -> "Energy"
   PlayerCounterKind.Poison -> "Poison"
 
-jsonToPlayerCounterKind :: Value -> Either Text PlayerCounterKind.PlayerCounterKind
-jsonToPlayerCounterKind =
-  Json.decodeNullary
-    (Text.pack "PlayerCounterKind")
-    [ (Text.pack "Energy", PlayerCounterKind.Energy),
-      (Text.pack "Poison", PlayerCounterKind.Poison)
+fromJson :: Value.Value -> Either Text.Text PlayerCounterKind.PlayerCounterKind
+fromJson =
+  Common.decodeNullary
+    "PlayerCounterKind"
+    [ ("Energy", PlayerCounterKind.Energy),
+      ("Poison", PlayerCounterKind.Poison)
     ]

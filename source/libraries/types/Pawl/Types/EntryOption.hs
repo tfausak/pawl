@@ -1,9 +1,9 @@
 module Pawl.Types.EntryOption where
 
-import Data.Set (Set)
-import Pawl.Types.Keyword (Keyword)
+import qualified Data.Set as Set
+import qualified Pawl.Types.Keyword as Keyword
 
--- CR 208.2b / 614.1c: one of the shapes an "as this creature enters, it becomes
+-- | CR 208.2b / 614.1c: one of the shapes an "as this creature enters, it becomes
 -- your choice of ..." ability offers. Primal Plasma's three are (3,3,{}),
 -- (2,2,{Flying}) and (1,6,{Defender}).
 --
@@ -15,6 +15,6 @@ import Pawl.Types.Keyword (Keyword)
 data EntryOption = MkEntryOption
   { power :: Integer,
     toughness :: Integer,
-    keywords :: Set Keyword
+    keywords :: Set.Set Keyword.Keyword
   }
   deriving (Eq, Ord, Show)

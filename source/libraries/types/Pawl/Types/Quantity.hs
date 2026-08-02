@@ -1,9 +1,9 @@
 module Pawl.Types.Quantity where
 
-import Pawl.Types.Count (Count)
-import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.SlotName as SlotName
 
--- A number that may not be a literal number.
+-- | A number that may not be a literal number.
 --
 -- Deliberately NOT called Characteristic: CR 109.3 already uses that word for an
 -- object's whole characteristic set (name, mana cost, color, type line, rules
@@ -18,14 +18,13 @@ import Pawl.Types.SlotName (SlotName)
 -- (signum Star? negate Infinite?), which collides with the no-partial-functions
 -- rule, and fromInteger would silently erase the very distinction this type
 -- exists to draw. Combining is explicit named functions.
---
 data Quantity
   = Literal Integer
-  | -- CR 202.3: an object's mana value, computed from its mana cost. A
+  | -- | CR 202.3: an object's mana value, computed from its mana cost. A
     -- computed quantity (Opalescence's "base P/T equal to its mana value"),
     -- evaluated against the affected object.
     ManaValue
-  | -- CR 208.1: the power of the object this quantity is evaluated against --
+  | -- | CR 208.1: the power of the object this quantity is evaluated against --
     -- for an effect, its SOURCE (Ghitu Fire-Eater's "damage equal to its
     -- power"). The projected value, not the printed one, so a pumped source
     -- deals what it currently has.
@@ -40,12 +39,12 @@ data Quantity
     -- No Toughness sibling: nothing in the pool reads one, and an unused arm is
     -- the speculative construction the project forbids.
     Power
-  | -- CR 601.2b: X -- a value the caster chose while casting, read from the
+  | -- | CR 601.2b: X -- a value the caster chose while casting, read from the
     -- object's binding environment (Pawl.Engine.Binding.variableX). One-shot only: a
     -- continuous effect must FREEZE this to a Literal when stored (Projection.hs
     -- note), which no M4a card exercises.
     X
-  | -- A number an EARLIER effect of the same resolution bound into a slot -- Bane
+  | -- | A number an EARLIER effect of the same resolution bound into a slot -- Bane
     -- of Progress' "for each permanent destroyed this way", where the sweep's own
     -- Destroy writes how many it actually destroyed and this reads it back. Read
     -- from the binding environment of whichever object the evaluation is aimed at
@@ -69,8 +68,8 @@ data Quantity
     -- yet, or bound nothing. Not 0: "how many were destroyed" is unanswered, not
     -- answered with zero, and Resolve's arms already no-op on an unevaluable
     -- quantity.
-    InSlot SlotName
-  | -- CR 208.2 / 208.2a: the star printed in a power/toughness box, standing for
+    InSlot SlotName.SlotName
+  | -- | CR 208.2 / 208.2a: the star printed in a power/toughness box, standing for
     -- a value a characteristic-defining ability defines. NOTATION, not a value:
     -- Quantity.evaluate returns Nothing for it. Projection.baseCharacteristics
     -- resolves it at the seed by substituting Card.characteristicPT, so a Star
@@ -92,9 +91,9 @@ data Quantity
     --     CDA. See Pawl.Engine.Projection's doc comment above `baseColorsOf` for the
     --     consequence in full (#76).
     Star
-  | -- CR 208.2: composition, so a printed 1+* needs no constructor of its own.
+  | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity
-  | -- A quantity that counts game state (CR 208.2a, CR 608.2h). See
+  | -- | A quantity that counts game state (CR 208.2a, CR 608.2h). See
     -- Pawl.Types.Count for why the payload is its own type.
     --
     -- This is where the knot is tied: a Count's Aggregation may itself name a
@@ -102,5 +101,5 @@ data Quantity
     -- `Count Quantity` and the recursion lives in the DATA rather than in a
     -- module cycle. Structural, not a recursive call -- evaluating a Greatest
     -- descends into a strictly smaller Quantity, so the fold terminates.
-    Count (Count Quantity)
+    Count (Count.Count Quantity)
   deriving (Eq, Ord, Show)

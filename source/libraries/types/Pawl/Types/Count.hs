@@ -1,11 +1,11 @@
 module Pawl.Types.Count where
 
-import Pawl.Types.Aggregation (Aggregation)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.Keyword (Keyword)
-import Pawl.Types.Scope (Scope)
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Scope as Scope
 
--- A number derived from game state: a scope to fold over, a per-object predicate
+-- | A number derived from game state: a scope to fold over, a per-object predicate
 -- to keep by, and an aggregation. First-order and analyzable -- never a
 -- predicate function -- and evaluated by one generic fold (Pawl.Engine.Count.evaluate)
 -- that never learns which effect or card produced it.
@@ -18,5 +18,5 @@ import Pawl.Types.Scope (Scope)
 -- is where it is actually used and where the reason for it is written. Every
 -- customer but Pawl.Types.Quantity instantiates it concretely as
 -- `Count Quantity`.
-data Count quantity = MkCount Scope (Filter Keyword) (Aggregation quantity)
+data Count quantity = MkCount Scope.Scope (Filter.Filter Keyword.Keyword) (Aggregation.Aggregation quantity)
   deriving (Eq, Ord, Show)

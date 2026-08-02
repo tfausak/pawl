@@ -1,21 +1,19 @@
--- | The @CastingPermission ⇆ Json@ codec (#481).
 module Pawl.Codec.CastingPermission where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.CastingPermission as CastingPermission
 
-castingPermissionToJson :: CastingPermission.CastingPermission -> Value
-castingPermissionToJson c = Json.nullary . Text.pack $ case c of
+toJson :: CastingPermission.CastingPermission -> Value.Value
+toJson c = Common.nullary $ case c of
   CastingPermission.CastFromLibraryWhileSearching -> "CastFromLibraryWhileSearching"
   CastingPermission.CastFromGraveyard -> "CastFromGraveyard"
 
-jsonToCastingPermission :: Value -> Either Text CastingPermission.CastingPermission
-jsonToCastingPermission =
-  Json.decodeNullary
-    (Text.pack "CastingPermission")
-    [ (Text.pack "CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching),
-      (Text.pack "CastFromGraveyard", CastingPermission.CastFromGraveyard)
+fromJson :: Value.Value -> Either Text.Text CastingPermission.CastingPermission
+fromJson =
+  Common.decodeNullary
+    "CastingPermission"
+    [ ("CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching),
+      ("CastFromGraveyard", CastingPermission.CastFromGraveyard)
     ]

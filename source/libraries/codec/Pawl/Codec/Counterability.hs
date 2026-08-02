@@ -1,28 +1,27 @@
--- | The @Counterability ⇆ Json@ codec (#481).
 module Pawl.Codec.Counterability where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value (Null))
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Counterability as Counterability
 
-counterabilityToJson :: Counterability.Counterability -> Value
-counterabilityToJson c = Json.nullary . Text.pack $ case c of
+toJson :: Counterability.Counterability -> Value.Value
+toJson c = Common.nullary $ case c of
   Counterability.Counterable -> "Counterable"
   Counterability.CantBeCountered -> "CantBeCountered"
 
--- Absent means Counterable (CR 113.6g is printed text: a card either says it or
--- does not), the shape Json.jsonToBoolDefault gives the other defaulted keys.
-jsonToCounterabilityDefault :: Value -> Either Text Counterability.Counterability
-jsonToCounterabilityDefault value = case value of
-  Null _ -> Right Counterability.Counterable
-  _ -> jsonToCounterability value
+-- | Absent means Counterable (CR 113.6g is printed text: a card either says it
+-- or does not), the shape 'Common.decodeBooleanDefault' gives the other
+-- defaulted keys.
+fromJsonDefault :: Value.Value -> Either Text.Text Counterability.Counterability
+fromJsonDefault value = case value of
+  Value.Null _ -> Right Counterability.Counterable
+  _ -> fromJson value
 
-jsonToCounterability :: Value -> Either Text Counterability.Counterability
-jsonToCounterability =
-  Json.decodeNullary
-    (Text.pack "Counterability")
-    [ (Text.pack "Counterable", Counterability.Counterable),
-      (Text.pack "CantBeCountered", Counterability.CantBeCountered)
+fromJson :: Value.Value -> Either Text.Text Counterability.Counterability
+fromJson =
+  Common.decodeNullary
+    "Counterability"
+    [ ("Counterable", Counterability.Counterable),
+      ("CantBeCountered", Counterability.CantBeCountered)
     ]

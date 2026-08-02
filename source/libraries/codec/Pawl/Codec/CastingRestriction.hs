@@ -1,24 +1,20 @@
--- | The @CastingRestriction ⇆ Json@ codec (#481).
 module Pawl.Codec.CastingRestriction where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Phase (jsonToPhase, phaseToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Phase as Phase
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 
-castingRestrictionToJson :: CastingRestriction.CastingRestriction -> Value
-castingRestrictionToJson r = case r of
-  CastingRestriction.DuringPhase p -> Json.tagged (Text.pack "DuringPhase") (Just (phaseToJson p))
-  CastingRestriction.AttackedThisStep -> Json.nullary (Text.pack "AttackedThisStep")
+toJson :: CastingRestriction.CastingRestriction -> Value.Value
+toJson r = case r of
+  CastingRestriction.DuringPhase p -> Common.tagged "DuringPhase" . Just $ Phase.toJson p
+  CastingRestriction.AttackedThisStep -> Common.nullary "AttackedThisStep"
 
-jsonToCastingRestriction :: Value -> Either Text CastingRestriction.CastingRestriction
-jsonToCastingRestriction value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("DuringPhase", Just v) -> CastingRestriction.DuringPhase <$> jsonToPhase v
+fromJson :: Value.Value -> Either Text.Text CastingRestriction.CastingRestriction
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
+    ("DuringPhase", Just v) -> CastingRestriction.DuringPhase <$> Phase.fromJson v
     ("AttackedThisStep", _) -> Right CastingRestriction.AttackedThisStep
-    _ -> Left (Text.pack "unknown CastingRestriction: " <> t)
-
--- Newtypes -------------------------------------------------------------------
+    _ -> Left . Text.pack $ "unknown CastingRestriction: " <> t

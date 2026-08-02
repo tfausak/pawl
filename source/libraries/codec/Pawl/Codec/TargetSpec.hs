@@ -1,15 +1,13 @@
--- | The @TargetSpec ⇆ Json@ codec (#481).
 module Pawl.Codec.TargetSpec where
 
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.Pool (jsonToPool, poolToJson)
-import Pawl.Codec.SlotName (jsonToSlotName, slotNameToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.Pool as Pool
+import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
 
@@ -17,32 +15,35 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- key is omitted when Nothing (a bare "target creature" narrows nothing),
 -- mirroring how optional fields are encoded elsewhere. CR 601.2c's "another" is
 -- a Not IsSource conjunct inside that filter, not a key of its own (#163).
-targetSpecToJson :: TargetSpec.TargetSpec -> Value
-targetSpecToJson (TargetSpec.MkTargetSpec pool restriction) =
-  let base = [(Text.pack "pool", poolToJson pool)]
-      withFilter = case restriction of
-        Nothing -> base
-        Just f -> base <> [(Text.pack "filter", filterToJson keywordToJson f)]
-   in Json.jObject withFilter
+toJson :: TargetSpec.TargetSpec -> Value.Value
+toJson (TargetSpec.MkTargetSpec pool restriction) =
+  Common.object $
+    Common.pair "pool" (Pool.toJson pool) : case restriction of
+      Nothing -> []
+      Just f -> [Common.pair "filter" (Filter.toJson Keyword.toJson f)]
 
-jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
-jsonToTargetSpec value = do
-  ps <- Json.asObject value
-  pool <- Json.field (Text.pack "pool") ps >>= jsonToPool
-  restriction <- case Json.optField (Text.pack "filter") ps of
+fromJson :: Value.Value -> Either Text.Text TargetSpec.TargetSpec
+fromJson value = do
+  ps <- Common.asObject value
+  pool <- Common.field "pool" ps >>= Pool.fromJson
+  restriction <- case Common.optionalField "filter" ps of
     Nothing -> Right Nothing
-    Just v -> Just <$> jsonToFilter jsonToKeyword v
+    Just v -> Just <$> Filter.fromJson Keyword.fromJson v
   pure (TargetSpec.MkTargetSpec pool restriction)
 
-targetSpecsToJson :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value
-targetSpecsToJson m =
-  Json.listTo (\(k, v) -> Json.jObject [(Text.pack "slot", slotNameToJson k), (Text.pack "spec", targetSpecToJson v)]) (Map.toAscList m)
+-- A name-keyed map as a sorted array of entries, so the render is deterministic
+-- and the file byte-stable.
+toJsonMap :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value.Value
+toJsonMap m =
+  Common.encodeList
+    (\(k, v) -> Common.object [Common.pair "slot" (SlotName.toJson k), Common.pair "spec" (toJson v)])
+    (Map.toAscList m)
 
-jsonToTargetSpecs :: Value -> Either Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
-jsonToTargetSpecs value =
+fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
+fromJsonMap value =
   let decodeEntry v = do
-        ps <- Json.asObject v
-        k <- Json.field (Text.pack "slot") ps >>= jsonToSlotName
-        s <- Json.field (Text.pack "spec") ps >>= jsonToTargetSpec
-        pure (k, s)
-   in Map.fromList <$> Json.listFrom decodeEntry value
+        ps <- Common.asObject v
+        k <- Common.field "slot" ps >>= SlotName.fromJson
+        spec <- Common.field "spec" ps >>= fromJson
+        pure (k, spec)
+   in Map.fromList <$> Common.decodeList decodeEntry value

@@ -1,12 +1,12 @@
 module Pawl.Types.Filter where
 
-import Pawl.Types.CardType (CardType)
-import Pawl.Types.Color (Color)
-import Pawl.Types.PlayerRelation (PlayerRelation)
-import Pawl.Types.Subtype (Subtype)
-import Pawl.Types.Supertype (Supertype)
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 
--- A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
+-- | A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
 -- predicate over one candidate -- an object, or (CR 115.1) a player, since a
 -- target may be either -- expressed as data and evaluated by one generic
 -- matcher (Pawl.Engine.Filter.matches) that never learns which effect produced it. Its
@@ -37,14 +37,14 @@ import Pawl.Types.Supertype (Supertype)
 -- ties the knot by instantiating `Filter Keyword`, which is the single
 -- application every other module in the project writes -- the same shape
 -- Pawl.Types.Effect's `card` parameter takes for the Card/Effect cycle. Nothing
--- else is ever substituted for it, so read `Filter keyword` as `Filter Keyword`
+-- else is ever substituted for it, so read `Filter keyword` as `Filter Keyword.Keyword`
 -- everywhere but here, in Pawl.Types.Cost and in Pawl.Types.CostComponent.
 data Filter keyword
-  = HasCardType CardType -- CR 205 / 300: the object's card types include this one.
-  | HasSupertype Supertype -- CR 205.4: the object's supertypes include this one.
-  | HasColor Color -- CR 105.2: the object's colours include this one.
-  | HasSubtype Subtype -- CR 205.3: the object's subtypes include this one.
-  | -- The object HAS this keyword ability (CR 702.1: an object "lists only the
+  = HasCardType CardType.CardType -- CR 205 / 300: the object's card types include this one.
+  | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
+  | HasColor Color.Color -- CR 105.2: the object's colours include this one.
+  | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
+  | -- | The object HAS this keyword ability (CR 702.1: an object "lists only the
     -- name of the ability as a 'keyword'") -- Plummet's "target creature with
     -- flying" (CR 702.9). Unlike the five uncharacteristic atoms below, this one
     -- needs no defence at all: CR 109.3 lists "abilities" among an object's
@@ -64,8 +64,8 @@ data Filter keyword
     -- fallback in viewOfCard for a candidate off the battlefield.
     HasKeyword keyword
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
-  | ControlledBy PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
-  | -- The candidate IS the evaluation's source object. Context-relative in the
+  | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
+  | -- | The candidate IS the evaluation's source object. Context-relative in the
     -- same way ControlledBy is: the Filter value carries no object id, and the
     -- answer comes from the Context the caller supplies. `Not IsSource` is how
     -- CR 601.2c's "another" (a target slot) and a continuous effect's own
@@ -73,7 +73,7 @@ data Filter keyword
     -- number) are both written -- one relation, one spelling, rather than a
     -- parallel Exclusion field on each (#163).
     IsSource
-  | -- CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
+  | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative in exactly the way ControlledBy is: it
     -- carries no player id, and the answer comes from the Context the caller
     -- supplies.
@@ -84,8 +84,8 @@ data Filter keyword
     -- has no "player" in it, and CR 108.4 gives a controller only to a card
     -- representing a permanent or spell -- so the two are never both answerable
     -- for one candidate.
-    IsPlayer PlayerRelation
-  | -- CR 508.1k: the candidate is an ATTACKING creature -- a creature declared
+    IsPlayer PlayerRelation.PlayerRelation
+  | -- | CR 508.1k: the candidate is an ATTACKING creature -- a creature declared
     -- as an attacker this combat phase and not since removed from combat
     -- (CR 506.4). "Target attacking creature" (Kill Shot) is the card text this
     -- exists for.
@@ -99,7 +99,7 @@ data Filter keyword
     -- type. What the invariant forbids is casing on an EFFECT's identity, which
     -- this arm still does not do.
     IsAttacking
-  | -- CR 509.1g: the candidate is a BLOCKING creature -- one declared as a
+  | -- | CR 509.1g: the candidate is a BLOCKING creature -- one declared as a
     -- blocker this combat phase ("it remains a blocking creature until it's
     -- removed from combat or the combat phase ends, whichever comes first") and
     -- not since removed under CR 506.4. Labyrinth of Skophos' "target attacking
@@ -124,7 +124,7 @@ data Filter keyword
     -- all the creatures blocking it are removed from combat" -- so an attacker
     -- can be blocked at a moment when nothing answers True here.
     IsBlocking
-  | -- CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
+  | -- | CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
     -- read of the turn-scoped GameEvent log, which is what CR 608.2i sanctions:
     -- "Some effects look back in time and require information about previous
@@ -150,7 +150,7 @@ data Filter keyword
     -- EFFECT's identity is still what the invariant forbids and still not what
     -- this does.
     AttackedThisTurn
-  | -- CR 303.4b / 701.3a: the candidate is ATTACHED to a creature -- "the object
+  | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to a creature -- "the object
     -- or player an Aura is attached to is called enchanted" -- which is what
     -- Crown of the Ages' "target Aura attached to a creature" narrows by.
     --
@@ -166,7 +166,7 @@ data Filter keyword
     -- that would compose with the rest of this type: the narrowest atom the one
     -- card in the pool needs. The generalization is #356.
     IsAttachedToCreature
-  | -- CR 303.4 / 701.3a: the candidate is attached to a PERMANENT -- Aura Graft's
+  | -- | CR 303.4 / 701.3a: the candidate is attached to a PERMANENT -- Aura Graft's
     -- "target Aura that's attached to a permanent". Strictly wider than
     -- IsAttachedToCreature above and strictly narrower than "attached to
     -- anything": CR 303.4 attaches an Aura to "an object or player", and only one
@@ -183,7 +183,7 @@ data Filter keyword
     -- ATTACHMENT, not about the host's characteristics, so it reads no second
     -- projection at all.
     IsAttachedToPermanent
-  | -- CR 701.3a's last sentence: "An Aura, Equipment, or Fortification can't be
+  | -- | CR 701.3a's last sentence: "An Aura, Equipment, or Fortification can't be
     -- attached to an object or player it couldn't enchant, equip, or fortify,
     -- respectively." The candidate is one the SUBJECT of the surrounding attach --
     -- the permanent being moved -- could legally be attached to. Aura Graft's
@@ -216,7 +216,7 @@ data Filter keyword
     -- CR 303.4's "other effects can limit what a permanent can be enchanted by"
     -- (#472).
     CanHostSubject
-  | -- CR 111.6: "A token isn't a card." Ashaya, Soul of the Wild's "nontoken
+  | -- | CR 111.6: "A token isn't a card." Ashaya, Soul of the Wild's "nontoken
     -- creatures you control" is the card text this exists for, and it is spelled
     -- `Not IsToken` -- one relation, one spelling, the way CR 601.2c's "another"
     -- is spelled `Not IsSource` (#163) rather than given a second arm.

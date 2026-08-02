@@ -1,10 +1,10 @@
 module Pawl.Types.Expiry where
 
-import Pawl.Types.Condition (Condition)
-import Pawl.Types.PhaseSelector (PhaseSelector)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerId as PlayerId
 
--- CR 611.2: how long a STORED effect lasts, as the game remembers it. The
+-- | CR 611.2: how long a STORED effect lasts, as the game remembers it. The
 -- runtime counterpart of the printed Pawl.Types.Duration, the same way
 -- ActiveReplacement is ReplacementEffect's and PendingTrigger is
 -- DelayedTrigger's: card data says "until your next turn", the game remembers
@@ -18,21 +18,21 @@ import Pawl.Types.PlayerId (PlayerId)
 -- match no sweep and the effect would last forever -- silently. Only
 -- Pawl.Engine.Expiry may case on this type.
 data Expiry
-  = -- CR 514.2: "all 'until end of turn' and 'this turn' effects end" during
+  = -- | CR 514.2: "all 'until end of turn' and 'this turn' effects end" during
     -- the cleanup step.
     AtCleanup
-  | -- CR 611.2a: "lasts until the end of the game". No sweep ends it.
+  | -- | CR 611.2a: "lasts until the end of the game". No sweep ends it.
     Never
-  | -- CR 611.2b: "for as long as ...". The PlayerId is CR 109.5's "you", baked
+  | -- | CR 611.2b: "for as long as ...". The PlayerId is CR 109.5's "you", baked
     -- in by Pawl.Engine.Expiry.arm at the moment the effect is stored -- derived from
     -- the effect's controller, never chosen. The duration is ONE continuous
     -- period: once the condition stops holding the effect is DELETED, and a
     -- condition that becomes true again does not bring it back.
-    While PlayerId Condition
-  | -- CR 611.2a: "until your next turn", as a concrete player. Ends as that
+    While PlayerId.PlayerId Condition.Condition
+  | -- | CR 611.2a: "until your next turn", as a concrete player. Ends as that
     -- player's turn begins.
-    AtTurnOf PlayerId
-  | -- CR 500.5: "As a step or phase ends, if there are effects that last until
+    AtTurnOf PlayerId.PlayerId
+  | -- | CR 500.5: "As a step or phase ends, if there are effects that last until
     -- the end of that step or phase, those effects expire." The window is a
     -- Pawl.Types.PhaseSelector because CR 500.5 names BOTH grains in one
     -- sentence and that type already spans both -- `Step` for one schedule
@@ -50,5 +50,5 @@ data Expiry
     -- (Duration.UntilEndOfCombat, Jade Statue). The others cost nothing: this
     -- is one payload of a type Pawl.Engine.Expiry already had to case on, and
     -- the sweep is one equality either way.
-    AtEndOf PhaseSelector
+    AtEndOf PhaseSelector.PhaseSelector
   deriving (Eq, Ord, Show)

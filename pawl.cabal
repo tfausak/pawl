@@ -57,6 +57,7 @@ library codec
     pawl:decimal,
     pawl:extra,
     pawl:json,
+    pawl:spec,
     pawl:types,
     text ^>=2.1.3,
 
@@ -64,105 +65,205 @@ library codec
   -- cabal-gild: discover source/libraries/codec
   exposed-modules:
     Pawl.Codec.AbilityName
+    Pawl.Codec.AbilityNameSpec
     Pawl.Codec.ActivatedAbility
+    Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivationTiming
+    Pawl.Codec.ActivationTimingSpec
     Pawl.Codec.Affected
+    Pawl.Codec.AffectedSpec
     Pawl.Codec.Aggregation
+    Pawl.Codec.AggregationSpec
     Pawl.Codec.AttackRequirement
+    Pawl.Codec.AttackRequirementSpec
     Pawl.Codec.BeginningStep
+    Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
+    Pawl.Codec.BindingSpec
     Pawl.Codec.BlockRequirement
+    Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.Card
+    Pawl.Codec.CardSpec
     Pawl.Codec.CardType
+    Pawl.Codec.CardTypeSpec
     Pawl.Codec.CastingPermission
+    Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
+    Pawl.Codec.CastingRestrictionSpec
     Pawl.Codec.Color
+    Pawl.Codec.ColorSpec
     Pawl.Codec.CombatRestriction
+    Pawl.Codec.CombatRestrictionSpec
     Pawl.Codec.CombatStep
+    Pawl.Codec.CombatStepSpec
+    Pawl.Codec.Common
+    Pawl.Codec.CommonSpec
     Pawl.Codec.Comparison
+    Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
+    Pawl.Codec.ConditionSpec
     Pawl.Codec.ControllerRelation
+    Pawl.Codec.ControllerRelationSpec
     Pawl.Codec.Cost
     Pawl.Codec.CostComponent
+    Pawl.Codec.CostComponentSpec
+    Pawl.Codec.CostSpec
     Pawl.Codec.Count
     Pawl.Codec.Counterability
+    Pawl.Codec.CounterabilitySpec
     Pawl.Codec.Countering
+    Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
+    Pawl.Codec.CounterKindSpec
     Pawl.Codec.CounterPattern
+    Pawl.Codec.CounterPatternSpec
+    Pawl.Codec.CountSpec
     Pawl.Codec.DamageEvent
+    Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
+    Pawl.Codec.DamageKindSpec
     Pawl.Codec.DamagePattern
+    Pawl.Codec.DamagePatternSpec
     Pawl.Codec.DamageRewrite
+    Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.DelayedTrigger
+    Pawl.Codec.DelayedTriggerSpec
     Pawl.Codec.DestructionRewrite
+    Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.DiscardCause
+    Pawl.Codec.DiscardCauseSpec
     Pawl.Codec.Duration
+    Pawl.Codec.DurationSpec
     Pawl.Codec.Effect
+    Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
+    Pawl.Codec.EndingStepSpec
     Pawl.Codec.EntryOption
+    Pawl.Codec.EntryOptionSpec
     Pawl.Codec.EntryRewrite
+    Pawl.Codec.EntryRewriteSpec
     Pawl.Codec.EntryRiders
+    Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EventShape
+    Pawl.Codec.EventShapeSpec
     Pawl.Codec.Expiry
+    Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
+    Pawl.Codec.ExtraPhaseSpec
     Pawl.Codec.Filter
+    Pawl.Codec.FilterSpec
     Pawl.Codec.GameEvent
-    Pawl.Codec.Json
+    Pawl.Codec.GameEventSpec
     Pawl.Codec.Keyword
+    Pawl.Codec.KeywordSpec
     Pawl.Codec.Loyalty
+    Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
+    Pawl.Codec.ManaCostSpec
     Pawl.Codec.ManaProduction
+    Pawl.Codec.ManaProductionSpec
     Pawl.Codec.ManaSymbol
+    Pawl.Codec.ManaSymbolSpec
     Pawl.Codec.ManaType
+    Pawl.Codec.ManaTypeSpec
     Pawl.Codec.Modal
+    Pawl.Codec.ModalSpec
     Pawl.Codec.Mode
     Pawl.Codec.ModeIndex
+    Pawl.Codec.ModeIndexSpec
     Pawl.Codec.ModeSelection
+    Pawl.Codec.ModeSelectionSpec
+    Pawl.Codec.ModeSpec
     Pawl.Codec.Modification
+    Pawl.Codec.ModificationSpec
     Pawl.Codec.MonarchTarget
+    Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.ObjectId
+    Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
+    Pawl.Codec.ObjectRefSpec
     Pawl.Codec.Onset
+    Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
+    Pawl.Codec.OptionalitySpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
+    Pawl.Codec.PhasePatternSpec
     Pawl.Codec.PhaseSelector
+    Pawl.Codec.PhaseSelectorSpec
+    Pawl.Codec.PhaseSpec
     Pawl.Codec.PlayerCounterKind
+    Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerEffect
+    Pawl.Codec.PlayerEffectSpec
     Pawl.Codec.PlayerId
+    Pawl.Codec.PlayerIdSpec
     Pawl.Codec.PlayerRef
+    Pawl.Codec.PlayerRefSpec
     Pawl.Codec.PlayerRelation
+    Pawl.Codec.PlayerRelationSpec
     Pawl.Codec.PlayerScope
+    Pawl.Codec.PlayerScopeSpec
     Pawl.Codec.PlayerStaticAbility
+    Pawl.Codec.PlayerStaticAbilitySpec
     Pawl.Codec.Pool
+    Pawl.Codec.PoolSpec
     Pawl.Codec.Power
+    Pawl.Codec.PowerSpec
     Pawl.Codec.Printing
+    Pawl.Codec.PrintingSpec
     Pawl.Codec.ProjectedCharacteristics
+    Pawl.Codec.ProjectedCharacteristicsSpec
     Pawl.Codec.Quantity
+    Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient
+    Pawl.Codec.RecipientSpec
     Pawl.Codec.Regenerability
+    Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.ReplacementEffect
+    Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.Scaling
+    Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
+    Pawl.Codec.ScopeSpec
     Pawl.Codec.SearchDestination
+    Pawl.Codec.SearchDestinationSpec
     Pawl.Codec.SlotName
+    Pawl.Codec.SlotNameSpec
     Pawl.Codec.StaticAbility
+    Pawl.Codec.StaticAbilitySpec
     Pawl.Codec.Subtype
+    Pawl.Codec.SubtypeSpec
     Pawl.Codec.Supertype
+    Pawl.Codec.SupertypeSpec
     Pawl.Codec.TapState
+    Pawl.Codec.TapStateSpec
     Pawl.Codec.TargetSpec
+    Pawl.Codec.TargetSpecSpec
     Pawl.Codec.TokenPattern
+    Pawl.Codec.TokenPatternSpec
     Pawl.Codec.Toughness
+    Pawl.Codec.ToughnessSpec
     Pawl.Codec.TriggerCondition
+    Pawl.Codec.TriggerConditionSpec
     Pawl.Codec.TriggeredAbility
+    Pawl.Codec.TriggeredAbilitySpec
     Pawl.Codec.TriggerFrequency
+    Pawl.Codec.TriggerFrequencySpec
     Pawl.Codec.TurnScope
+    Pawl.Codec.TurnScopeSpec
     Pawl.Codec.TypeLine
+    Pawl.Codec.TypeLineSpec
     Pawl.Codec.Uses
+    Pawl.Codec.UsesSpec
     Pawl.Codec.Zone
     Pawl.Codec.ZoneChange
     Pawl.Codec.ZoneChangePattern
+    Pawl.Codec.ZoneChangePatternSpec
+    Pawl.Codec.ZoneChangeSpec
     Pawl.Codec.ZoneChangeSubject
+    Pawl.Codec.ZoneChangeSubjectSpec
+    Pawl.Codec.ZoneSpec
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
 -- scientific packages.
@@ -540,7 +641,7 @@ test-suite pawl-test-suite
     Pawl.CardSpec
     Pawl.CardsSpec
     Pawl.CastSpec
-    Pawl.CodecSpec
+    Pawl.CodecIntegrationSpec
     Pawl.ColorSpec
     Pawl.CombatSpec
     Pawl.ConditionSpec
@@ -558,7 +659,6 @@ test-suite pawl-test-suite
     Pawl.ExpirySpec
     Pawl.FilterSpec
     Pawl.GameSpec
-    Pawl.JsonSpec
     Pawl.ManaSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec

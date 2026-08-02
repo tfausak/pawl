@@ -1,8 +1,7 @@
--- | The @Card ⇆ Json@ codec (§2 of the M3.5 spec), and the entry point to the
--- rest of @Pawl.Codec@: the transitive closure of @Card@'s fields is one
--- module per type, each exposing free @xToJson@\/@jsonToX@ functions rather
--- than a type class, and this module is where they are instantiated at
--- @Card@ (#481).
+-- | @Card@ is the entry point to the rest of @Pawl.Codec@: the transitive
+-- closure of @Card@'s fields is one module per type, each exposing free
+-- @toJson@\/@fromJson@ functions rather than a type class, and this module is
+-- where they are instantiated at @Card@ (§2 of the M3.5 spec).
 --
 -- Every @Pawl.Types.*@ module stays JSON-free. Casing on an effect's identity
 -- anywhere under @Pawl.Codec@ is open-half machinery, not the rules core --
@@ -11,185 +10,184 @@ module Pawl.Codec.Card where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.ActivatedAbility (activatedAbilityToJson, jsonToActivatedAbility)
-import Pawl.Codec.AttackRequirement (attackRequirementToJson, jsonToAttackRequirement)
-import Pawl.Codec.BlockRequirement (blockRequirementToJson, jsonToBlockRequirement)
-import Pawl.Codec.CastingPermission (castingPermissionToJson, jsonToCastingPermission)
-import Pawl.Codec.CastingRestriction (castingRestrictionToJson, jsonToCastingRestriction)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
-import Pawl.Codec.CombatRestriction (combatRestrictionToJson, jsonToCombatRestriction)
-import Pawl.Codec.Cost (costToJson, jsonToCost)
-import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
-import Pawl.Codec.Counterability (counterabilityToJson, jsonToCounterabilityDefault)
-import Pawl.Codec.Effect (effectToJson, jsonToEffect)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.Loyalty (jsonToLoyalty, loyaltyToJson)
-import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
-import Pawl.Codec.Modal (jsonToModal, modalToJson)
-import Pawl.Codec.PlayerStaticAbility (jsonToPlayerStaticAbility, playerStaticAbilityToJson)
-import Pawl.Codec.Power (jsonToPower, powerToJson)
-import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
-import Pawl.Codec.ReplacementEffect (jsonToReplacementEffect, replacementEffectToJson)
-import Pawl.Codec.StaticAbility (jsonToStaticAbility, staticAbilityToJson)
-import Pawl.Codec.TargetSpec (jsonToTargetSpec, targetSpecToJson)
-import Pawl.Codec.Toughness (jsonToToughness, toughnessToJson)
-import Pawl.Codec.TriggeredAbility (delayedAbilitiesToJson, jsonToDelayedAbilities, jsonToTriggeredAbility, triggeredAbilityToJson)
-import Pawl.Codec.TypeLine (jsonToTypeLine, typeLineToJson)
-import Pawl.Json.Value (Value)
-import qualified Pawl.Types.Card as CardT
+import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.AttackRequirement as AttackRequirement
+import qualified Pawl.Codec.BlockRequirement as BlockRequirement
+import qualified Pawl.Codec.CastingPermission as CastingPermission
+import qualified Pawl.Codec.CastingRestriction as CastingRestriction
+import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.CombatRestriction as CombatRestriction
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Cost as Cost
+import qualified Pawl.Codec.CostComponent as CostComponent
+import qualified Pawl.Codec.Counterability as Counterability
+import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.Loyalty as Loyalty
+import qualified Pawl.Codec.ManaCost as ManaCost
+import qualified Pawl.Codec.Modal as Modal
+import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Codec.Power as Power
+import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Codec.StaticAbility as StaticAbility
+import qualified Pawl.Codec.TargetSpec as TargetSpec
+import qualified Pawl.Codec.Toughness as Toughness
+import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Codec.TypeLine as TypeLine
+import qualified Pawl.Json.Value as Value
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Counterability as Counterability
 
-cardToJson :: CardT.Card -> Value
-cardToJson c =
-  Json.jObject
-    ( [ (Text.pack "name", Json.jText (CardT.name c)),
-        (Text.pack "manaCost", Json.maybeTo manaCostToJson (CardT.manaCost c)),
-        (Text.pack "typeLine", typeLineToJson (CardT.typeLine c)),
-        (Text.pack "power", Json.maybeTo powerToJson (CardT.power c)),
-        (Text.pack "toughness", Json.maybeTo toughnessToJson (CardT.toughness c)),
-        (Text.pack "keywords", Json.setTo keywordToJson (CardT.keywords c)),
-        (Text.pack "staticAbilities", Json.listTo staticAbilityToJson (CardT.staticAbilities c)),
-        (Text.pack "spell", modalToJson cardToJson (CardT.spell c)),
-        (Text.pack "activatedAbilities", Json.listTo (activatedAbilityToJson cardToJson) (CardT.activatedAbilities c)),
-        (Text.pack "replacementEffects", Json.listTo replacementEffectToJson (CardT.replacementEffects c)),
-        (Text.pack "triggeredAbilities", Json.listTo (triggeredAbilityToJson cardToJson) (CardT.triggeredAbilities c)),
-        (Text.pack "castingPermissions", Json.listTo castingPermissionToJson (CardT.castingPermissions c))
+toJson :: Card.Card -> Value.Value
+toJson c =
+  Common.object
+    ( [ Common.pair "name" . Common.text $ Card.name c,
+        Common.pair "manaCost" . Common.encodeMaybe ManaCost.toJson $ Card.manaCost c,
+        Common.pair "typeLine" . TypeLine.toJson $ Card.typeLine c,
+        Common.pair "power" . Common.encodeMaybe Power.toJson $ Card.power c,
+        Common.pair "toughness" . Common.encodeMaybe Toughness.toJson $ Card.toughness c,
+        Common.pair "keywords" . Common.encodeSet Keyword.toJson $ Card.keywords c,
+        Common.pair "staticAbilities" . Common.encodeList StaticAbility.toJson $ Card.staticAbilities c,
+        Common.pair "spell" $ Modal.toJson toJson (Card.spell c),
+        Common.pair "activatedAbilities" . Common.encodeList (ActivatedAbility.toJson toJson) $ Card.activatedAbilities c,
+        Common.pair "replacementEffects" . Common.encodeList ReplacementEffect.toJson $ Card.replacementEffects c,
+        Common.pair "triggeredAbilities" . Common.encodeList (TriggeredAbility.toJson toJson) $ Card.triggeredAbilities c,
+        Common.pair "castingPermissions" . Common.encodeList CastingPermission.toJson $ Card.castingPermissions c
       ]
         -- CR 306.5: omitted for every card that is not a planeswalker, the
         -- counterability posture below rather than the power/toughness one. Those
         -- two are required keys spelled `null` on every noncreature because they
         -- predate the pool; a required loyalty key would have meant editing every
         -- other card file to say nothing.
-        <> ( case CardT.loyalty c of
+        <> ( case Card.loyalty c of
                Nothing -> []
-               Just l -> [(Text.pack "loyalty", loyaltyToJson l)]
+               Just l -> [Common.pair "loyalty" (Loyalty.toJson l)]
            )
-        <> ( if Set.null (CardT.colorIndicator c)
+        <> ( if Set.null (Card.colorIndicator c)
                then []
-               else [(Text.pack "colorIndicator", Json.setTo colorToJson (CardT.colorIndicator c))]
+               else [Common.pair "colorIndicator" (Common.encodeSet Color.toJson (Card.colorIndicator c))]
            )
-        <> ( case CardT.characteristicPT c of
+        <> ( case Card.characteristicPT c of
                Nothing -> []
-               Just q -> [(Text.pack "characteristicPT", quantityToJson q)]
+               Just q -> [Common.pair "characteristicPT" (Quantity.toJson q)]
            )
-        <> ( if Map.null (CardT.delayedAbilities c)
+        <> ( if Map.null (Card.delayedAbilities c)
                then []
-               else [(Text.pack "delayedAbilities", delayedAbilitiesToJson cardToJson (CardT.delayedAbilities c))]
+               else [Common.pair "delayedAbilities" (TriggeredAbility.toJsonDelayed toJson (Card.delayedAbilities c))]
            )
-        <> ( if null (CardT.playerAbilities c)
+        <> ( if null (Card.playerAbilities c)
                then []
-               else [(Text.pack "playerAbilities", Json.listTo playerStaticAbilityToJson (CardT.playerAbilities c))]
+               else [Common.pair "playerAbilities" (Common.encodeList PlayerStaticAbility.toJson (Card.playerAbilities c))]
            )
-        <> ( if null (CardT.blockRequirements c)
+        <> ( if null (Card.blockRequirements c)
                then []
-               else [(Text.pack "blockRequirements", Json.listTo blockRequirementToJson (CardT.blockRequirements c))]
+               else [Common.pair "blockRequirements" (Common.encodeList BlockRequirement.toJson (Card.blockRequirements c))]
            )
-        <> ( if null (CardT.attackRequirements c)
+        <> ( if null (Card.attackRequirements c)
                then []
-               else [(Text.pack "attackRequirements", Json.listTo attackRequirementToJson (CardT.attackRequirements c))]
+               else [Common.pair "attackRequirements" (Common.encodeList AttackRequirement.toJson (Card.attackRequirements c))]
            )
-        <> ( if null (CardT.combatRestrictions c)
+        <> ( if null (Card.combatRestrictions c)
                then []
-               else [(Text.pack "combatRestrictions", Json.listTo combatRestrictionToJson (CardT.combatRestrictions c))]
+               else [Common.pair "combatRestrictions" (Common.encodeList CombatRestriction.toJson (Card.combatRestrictions c))]
            )
-        <> ( if null (CardT.additionalCosts c)
+        <> ( if null (Card.additionalCosts c)
                then []
-               else [(Text.pack "additionalCosts", Json.listTo (costComponentToJson keywordToJson) (CardT.additionalCosts c))]
+               else [Common.pair "additionalCosts" (Common.encodeList (CostComponent.toJson Keyword.toJson) (Card.additionalCosts c))]
            )
-        <> ( if null (CardT.alternativeCosts c)
+        <> ( if null (Card.alternativeCosts c)
                then []
-               else [(Text.pack "alternativeCosts", Json.listTo (costToJson keywordToJson) (CardT.alternativeCosts c))]
+               else [Common.pair "alternativeCosts" (Common.encodeList (Cost.toJson Keyword.toJson) (Card.alternativeCosts c))]
            )
         -- Omitted when Counterable, the posture every other defaulted key here
         -- takes: one card in the pool prints "this spell can't be countered", and
         -- a required key would have meant editing every other card file to say
         -- nothing.
-        <> ( case CardT.counterability c of
+        <> ( case Card.counterability c of
                Counterability.Counterable -> []
-               Counterability.CantBeCountered -> [(Text.pack "counterability", counterabilityToJson (CardT.counterability c))]
+               Counterability.CantBeCountered -> [Common.pair "counterability" (Counterability.toJson (Card.counterability c))]
            )
-        <> ( if null (CardT.mulliganAction c)
+        <> ( if null (Card.mulliganAction c)
                then []
-               else [(Text.pack "mulliganAction", Json.listTo (effectToJson cardToJson) (CardT.mulliganAction c))]
+               else [Common.pair "mulliganAction" (Common.encodeList (Effect.toJson toJson) (Card.mulliganAction c))]
            )
-        <> ( if null (CardT.openingHandAction c)
+        <> ( if null (Card.openingHandAction c)
                then []
-               else [(Text.pack "openingHandAction", Json.listTo (effectToJson cardToJson) (CardT.openingHandAction c))]
+               else [Common.pair "openingHandAction" (Common.encodeList (Effect.toJson toJson) (Card.openingHandAction c))]
            )
-        <> ( case CardT.enchant c of
+        <> ( case Card.enchant c of
                Nothing -> []
-               Just spec -> [(Text.pack "enchant", targetSpecToJson spec)]
+               Just spec -> [Common.pair "enchant" (TargetSpec.toJson spec)]
            )
         -- Omitted when empty, unlike the required `castingPermissions` key it
         -- mirrors: one card in the pool prints a casting restriction, and a
         -- required key would have meant editing every other card file to say
         -- nothing.
-        <> ( if null (CardT.castingRestrictions c)
+        <> ( if null (Card.castingRestrictions c)
                then []
-               else [(Text.pack "castingRestrictions", Json.listTo castingRestrictionToJson (CardT.castingRestrictions c))]
+               else [Common.pair "castingRestrictions" (Common.encodeList CastingRestriction.toJson (Card.castingRestrictions c))]
            )
     )
 
-jsonToCard :: Value -> Either Text CardT.Card
-jsonToCard value = do
-  ps <- Json.asObject value
-  name <- Json.field (Text.pack "name") ps >>= Json.asText
-  manaCost <- Json.maybeFrom jsonToManaCost (Json.getOpt (Text.pack "manaCost") ps)
-  typeLine <- Json.field (Text.pack "typeLine") ps >>= jsonToTypeLine
-  power <- Json.maybeFrom jsonToPower (Json.getOpt (Text.pack "power") ps)
-  toughness <- Json.maybeFrom jsonToToughness (Json.getOpt (Text.pack "toughness") ps)
-  loyalty <- Json.maybeFrom jsonToLoyalty (Json.getOpt (Text.pack "loyalty") ps)
-  keywords <- Json.field (Text.pack "keywords") ps >>= Json.setFrom jsonToKeyword
-  statics <- Json.field (Text.pack "staticAbilities") ps >>= Json.listFrom jsonToStaticAbility
-  spell <- Json.field (Text.pack "spell") ps >>= jsonToModal jsonToCard
-  activated <- Json.field (Text.pack "activatedAbilities") ps >>= Json.listFrom (jsonToActivatedAbility jsonToCard)
-  replacements <- Json.field (Text.pack "replacementEffects") ps >>= Json.listFrom jsonToReplacementEffect
-  triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= Json.listFrom (jsonToTriggeredAbility jsonToCard)
-  permissions <- Json.field (Text.pack "castingPermissions") ps >>= Json.listFrom jsonToCastingPermission
-  restrictions <- Json.listFromDefault jsonToCastingRestriction (Json.getOpt (Text.pack "castingRestrictions") ps)
-  colorIndicator <- Json.setFromDefault jsonToColor (Json.getOpt (Text.pack "colorIndicator") ps)
-  characteristicPT <- Json.maybeFrom jsonToQuantity (Json.getOpt (Text.pack "characteristicPT") ps)
-  delayed <- Json.mapFromDefault (jsonToDelayedAbilities jsonToCard) (Json.getOpt (Text.pack "delayedAbilities") ps)
-  playerAbilities <- Json.listFromDefault jsonToPlayerStaticAbility (Json.getOpt (Text.pack "playerAbilities") ps)
-  blockRequirements <- Json.listFromDefault jsonToBlockRequirement (Json.getOpt (Text.pack "blockRequirements") ps)
-  attackRequirements <- Json.listFromDefault jsonToAttackRequirement (Json.getOpt (Text.pack "attackRequirements") ps)
-  combatRestrictions <- Json.listFromDefault jsonToCombatRestriction (Json.getOpt (Text.pack "combatRestrictions") ps)
-  additionalCosts <- Json.listFromDefault (jsonToCostComponent jsonToKeyword) (Json.getOpt (Text.pack "additionalCosts") ps)
-  alternativeCosts <- Json.listFromDefault (jsonToCost jsonToKeyword) (Json.getOpt (Text.pack "alternativeCosts") ps)
-  mulliganAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "mulliganAction") ps)
-  openingHandAction <- Json.listFromDefault (jsonToEffect jsonToCard) (Json.getOpt (Text.pack "openingHandAction") ps)
-  enchant <- Json.maybeFrom jsonToTargetSpec (Json.getOpt (Text.pack "enchant") ps)
-  counterability <- jsonToCounterabilityDefault (Json.getOpt (Text.pack "counterability") ps)
+fromJson :: Value.Value -> Either Text.Text Card.Card
+fromJson value = do
+  ps <- Common.asObject value
+  name <- Common.field "name" ps >>= Common.asText
+  manaCost <- Common.decodeMaybe ManaCost.fromJson (Common.nullableField "manaCost" ps)
+  typeLine <- Common.field "typeLine" ps >>= TypeLine.fromJson
+  power <- Common.decodeMaybe Power.fromJson (Common.nullableField "power" ps)
+  toughness <- Common.decodeMaybe Toughness.fromJson (Common.nullableField "toughness" ps)
+  loyalty <- Common.decodeMaybe Loyalty.fromJson (Common.nullableField "loyalty" ps)
+  keywords <- Common.field "keywords" ps >>= Common.decodeSet Keyword.fromJson
+  statics <- Common.field "staticAbilities" ps >>= Common.decodeList StaticAbility.fromJson
+  spell <- Common.field "spell" ps >>= Modal.fromJson fromJson
+  activated <- Common.field "activatedAbilities" ps >>= Common.decodeList (ActivatedAbility.fromJson fromJson)
+  replacements <- Common.field "replacementEffects" ps >>= Common.decodeList ReplacementEffect.fromJson
+  triggered <- Common.field "triggeredAbilities" ps >>= Common.decodeList (TriggeredAbility.fromJson fromJson)
+  permissions <- Common.field "castingPermissions" ps >>= Common.decodeList CastingPermission.fromJson
+  restrictions <- Common.decodeListDefault CastingRestriction.fromJson (Common.nullableField "castingRestrictions" ps)
+  colorIndicator <- Common.decodeSetDefault Color.fromJson (Common.nullableField "colorIndicator" ps)
+  characteristicPT <- Common.decodeMaybe Quantity.fromJson (Common.nullableField "characteristicPT" ps)
+  delayed <- Common.decodeMapDefault (TriggeredAbility.fromJsonDelayed fromJson) (Common.nullableField "delayedAbilities" ps)
+  playerAbilities <- Common.decodeListDefault PlayerStaticAbility.fromJson (Common.nullableField "playerAbilities" ps)
+  blockRequirements <- Common.decodeListDefault BlockRequirement.fromJson (Common.nullableField "blockRequirements" ps)
+  attackRequirements <- Common.decodeListDefault AttackRequirement.fromJson (Common.nullableField "attackRequirements" ps)
+  combatRestrictions <- Common.decodeListDefault CombatRestriction.fromJson (Common.nullableField "combatRestrictions" ps)
+  additionalCosts <- Common.decodeListDefault (CostComponent.fromJson Keyword.fromJson) (Common.nullableField "additionalCosts" ps)
+  alternativeCosts <- Common.decodeListDefault (Cost.fromJson Keyword.fromJson) (Common.nullableField "alternativeCosts" ps)
+  mulliganAction <- Common.decodeListDefault (Effect.fromJson fromJson) (Common.nullableField "mulliganAction" ps)
+  openingHandAction <- Common.decodeListDefault (Effect.fromJson fromJson) (Common.nullableField "openingHandAction" ps)
+  enchant <- Common.decodeMaybe TargetSpec.fromJson (Common.nullableField "enchant" ps)
+  counterability <- Counterability.fromJsonDefault (Common.nullableField "counterability" ps)
   pure
-    CardT.MkCard
-      { CardT.name = name,
-        CardT.manaCost = manaCost,
-        CardT.typeLine = typeLine,
-        CardT.power = power,
-        CardT.toughness = toughness,
-        CardT.loyalty = loyalty,
-        CardT.keywords = keywords,
-        CardT.staticAbilities = statics,
-        CardT.spell = spell,
-        CardT.activatedAbilities = activated,
-        CardT.replacementEffects = replacements,
-        CardT.triggeredAbilities = triggered,
-        CardT.castingPermissions = permissions,
-        CardT.castingRestrictions = restrictions,
-        CardT.colorIndicator = colorIndicator,
-        CardT.characteristicPT = characteristicPT,
-        CardT.delayedAbilities = delayed,
-        CardT.playerAbilities = playerAbilities,
-        CardT.blockRequirements = blockRequirements,
-        CardT.attackRequirements = attackRequirements,
-        CardT.combatRestrictions = combatRestrictions,
-        CardT.additionalCosts = additionalCosts,
-        CardT.alternativeCosts = alternativeCosts,
-        CardT.mulliganAction = mulliganAction,
-        CardT.openingHandAction = openingHandAction,
-        CardT.enchant = enchant,
-        CardT.counterability = counterability
+    Card.MkCard
+      { Card.name = name,
+        Card.manaCost = manaCost,
+        Card.typeLine = typeLine,
+        Card.power = power,
+        Card.toughness = toughness,
+        Card.loyalty = loyalty,
+        Card.keywords = keywords,
+        Card.staticAbilities = statics,
+        Card.spell = spell,
+        Card.activatedAbilities = activated,
+        Card.replacementEffects = replacements,
+        Card.triggeredAbilities = triggered,
+        Card.castingPermissions = permissions,
+        Card.castingRestrictions = restrictions,
+        Card.colorIndicator = colorIndicator,
+        Card.characteristicPT = characteristicPT,
+        Card.delayedAbilities = delayed,
+        Card.playerAbilities = playerAbilities,
+        Card.blockRequirements = blockRequirements,
+        Card.attackRequirements = attackRequirements,
+        Card.combatRestrictions = combatRestrictions,
+        Card.additionalCosts = additionalCosts,
+        Card.alternativeCosts = alternativeCosts,
+        Card.mulliganAction = mulliganAction,
+        Card.openingHandAction = openingHandAction,
+        Card.enchant = enchant,
+        Card.counterability = counterability
       }

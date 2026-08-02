@@ -1,6 +1,6 @@
 module Pawl.Types.PhyrexianPayment where
 
--- CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid either
+-- | CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid either
 -- with one mana of its color or by paying 2 life." This is WHICH of those two,
 -- as announced under CR 118.13a -- "the choice of how to pay for that symbol is
 -- made as its controller proposes that spell or ability."
@@ -17,8 +17,8 @@ module Pawl.Types.PhyrexianPayment where
 -- 107.4f's hybrid Phyrexian symbols ("{G/U/P}") would break that -- their mana
 -- way names two colours -- and they have no ManaSymbol constructor either (#364).
 data PhyrexianPayment
-  = -- CR 107.4f: "with one mana of its color".
+  = -- | CR 107.4f: "with one mana of its color".
     PaysMana
-  | -- CR 107.4f: "or by paying 2 life".
+  | -- | CR 107.4f: "or by paying 2 life".
     PaysLife
   deriving (Eq, Ord, Show)

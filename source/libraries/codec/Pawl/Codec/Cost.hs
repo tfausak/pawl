@@ -1,27 +1,28 @@
--- | The @Cost ⇆ Json@ codec (#481).
 module Pawl.Codec.Cost where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.CostComponent (costComponentToJson, jsonToCostComponent)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.ManaCost (jsonToManaCost, manaCostToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.CostComponent as CostComponent
+import qualified Pawl.Codec.ManaCost as ManaCost
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Cost as Cost
 
-costToJson :: (keyword -> Value) -> Cost.Cost keyword -> Value
-costToJson encode c =
-  Json.jObject
-    [ (Text.pack "mana", Json.maybeTo manaCostToJson (Cost.mana c)),
-      (Text.pack "components", Json.listTo (costComponentToJson encode) (Cost.components c))
+-- | The keyword codec is a PARAMETER, mirroring CostComponent's own -- see
+-- Pawl.Codec.Filter's header: the CostComponents this carries need one, and
+-- every caller passes Pawl.Codec.Keyword.toJson.
+toJson :: (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
+toJson encode c =
+  Common.object
+    [ Common.pair "mana" (Common.encodeMaybe ManaCost.toJson (Cost.mana c)),
+      Common.pair "components" (Common.encodeList (CostComponent.toJson encode) (Cost.components c))
     ]
 
--- CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
+-- | CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
 -- never to {0}. Every ability-bearing card file states its mana part explicitly
 -- (`[]` for {0}), so the absent case is only ever reached by a malformed file.
-jsonToCost :: (Value -> Either Text keyword) -> Value -> Either Text (Cost.Cost keyword)
-jsonToCost decode value = do
-  ps <- Json.asObject value
-  m <- Json.maybeFrom jsonToManaCost (Json.getOpt (Text.pack "mana") ps)
-  cs <- Json.listFromDefault (jsonToCostComponent decode) (Json.getOpt (Text.pack "components") ps)
+fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Cost.Cost keyword)
+fromJson decode value = do
+  ps <- Common.asObject value
+  m <- Common.decodeMaybe ManaCost.fromJson (Common.nullableField "mana" ps)
+  cs <- Common.decodeListDefault (CostComponent.fromJson decode) (Common.nullableField "components" ps)
   pure Cost.MkCost {Cost.mana = m, Cost.components = cs}

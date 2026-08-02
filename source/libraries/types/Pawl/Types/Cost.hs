@@ -1,9 +1,9 @@
 module Pawl.Types.Cost where
 
-import Pawl.Types.CostComponent (CostComponent)
-import Pawl.Types.ManaCost (ManaCost)
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.ManaCost as ManaCost
 
--- CR 118.1: "a cost is an action or payment necessary to take another action".
+-- | CR 118.1: "a cost is an action or payment necessary to take another action".
 -- ONE type for both carriers -- a spell's cost (CR 601.2f) and an activated
 -- ability's activation cost (CR 602.1a) -- because the rules make them the same
 -- thing: a mana part plus the non-mana components.
@@ -29,9 +29,9 @@ import Pawl.Types.ManaCost (ManaCost)
 --
 -- PARAMETRIC in the keyword for the components it carries, and for
 -- Pawl.Types.Filter's reason alone -- CR 702.29e's cycling carries a Cost, and a
--- Filter can now name a Keyword. Every caller writes `Cost Keyword`.
+-- Filter can now name a Keyword. Every caller writes `Cost Keyword.Keyword`.
 data Cost keyword = MkCost
-  { mana :: Maybe ManaCost,
-    components :: [CostComponent keyword]
+  { mana :: Maybe ManaCost.ManaCost,
+    components :: [CostComponent.CostComponent keyword]
   }
   deriving (Eq, Ord, Show)

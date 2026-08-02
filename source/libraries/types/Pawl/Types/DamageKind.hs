@@ -1,6 +1,6 @@
 module Pawl.Types.DamageKind where
 
--- Whether a damage event is combat damage (CR 510) or damage from a resolving
+-- | Whether a damage event is combat damage (CR 510) or damage from a resolving
 -- spell or ability (CR 608). Read by Replacement.applies's DamageR arm (Fog
 -- prevents only combat damage, CR 615), by CR 120.3g's toxic arm in
 -- Pawl.Engine.Damage.applyDamage, and, later, by combat-damage triggers. A Bool would

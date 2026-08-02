@@ -1,13 +1,13 @@
 module Pawl.Types.ActivePlayerEffect where
 
-import Pawl.Types.Expiry (Expiry)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.PlayerEffect (PlayerEffect)
-import Pawl.Types.PlayerId (PlayerId)
-import Pawl.Types.PlayerScope (PlayerScope)
-import Pawl.Types.Timestamp (Timestamp)
+import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.Timestamp as Timestamp
 
--- CR 611.1 / 613.11: a stored, resolution-generated player or rules-modifying
+-- | CR 611.1 / 613.11: a stored, resolution-generated player or rules-modifying
 -- continuous effect, held in GameState.playerEffects. The player-axis analogue of
 -- ActiveReplacement and ContinuousEffect: the printed carrier
 -- (Pawl.Types.PlayerStaticAbility) is re-derived live from the battlefield, while
@@ -40,11 +40,11 @@ import Pawl.Types.Timestamp (Timestamp)
 -- and has no codec, which is what keeps a stored value out of a card file and a
 -- printed value out of the store.
 data ActivePlayerEffect = MkActivePlayerEffect
-  { source :: ObjectId,
-    controller :: PlayerId,
-    timestamp :: Timestamp,
-    expiry :: Expiry,
-    scope :: PlayerScope,
-    effect :: PlayerEffect
+  { source :: ObjectId.ObjectId,
+    controller :: PlayerId.PlayerId,
+    timestamp :: Timestamp.Timestamp,
+    expiry :: Expiry.Expiry,
+    scope :: PlayerScope.PlayerScope,
+    effect :: PlayerEffect.PlayerEffect
   }
   deriving (Eq, Ord, Show)

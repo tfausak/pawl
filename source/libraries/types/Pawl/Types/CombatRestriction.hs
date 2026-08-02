@@ -1,8 +1,8 @@
 module Pawl.Types.CombatRestriction where
 
-import Pawl.Types.Affected (Affected)
+import qualified Pawl.Types.Affected as Affected
 
--- CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an "effect that says a
+-- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an "effect that says a
 -- creature can't attack, or that it can't attack unless some condition is met",
 -- or the sentence CR 509.1b writes with "block" in place of "attack". Pacifism's
 -- "Enchanted creature can't attack or block" is one line stating both, and prints
@@ -53,14 +53,14 @@ import Pawl.Types.Affected (Affected)
 -- posture all four siblings take -- so a Pacifism leaving the battlefield lifts
 -- its restriction with nothing to unwind.
 data CombatRestriction
-  = -- CR 508.1c: these creatures can't attack. Pacifism's first half, and the
+  = -- | CR 508.1c: these creatures can't attack. Pacifism's first half, and the
     -- second printed attacking restriction in the pool after CR 702.3b's
     -- defender keyword -- which stays a Keyword, because rule 702 is part of the
     -- rulebook and a keyword's meaning is the closed half's to know.
-    CantAttack Affected
-  | -- CR 509.1b: these creatures can't block. Pacifism's second half, and the
+    CantAttack Affected.Affected
+  | -- | CR 509.1b: these creatures can't block. Pacifism's second half, and the
     -- first printed blocking restriction in the pool: every other one today is an
     -- evasion keyword on the ATTACKER (flying, fear, landwalk), which restricts
     -- being blocked rather than blocking.
-    CantBlock Affected
+    CantBlock Affected.Affected
   deriving (Eq, Ord, Show)

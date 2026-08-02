@@ -1,6 +1,6 @@
 module Pawl.Types.CastingPermission where
 
--- CR 113.6 / 601.3: a static permission to cast a card from a zone or under a
+-- | CR 113.6 / 601.3: a static permission to cast a card from a zone or under a
 -- condition it normally could not. Classified by the permission pattern (the M3f
 -- TriggerCondition shape). CastFromLibraryWhileSearching = Panglacial Wurm: "while
 -- you're searching your library, you may cast this from your library." A general
@@ -16,7 +16,7 @@ module Pawl.Types.CastingPermission where
 -- and still has none (#96).
 data CastingPermission
   = CastFromLibraryWhileSearching
-  | -- CR 702.34a's first static ability, the half that "functions while the card
+  | -- | CR 702.34a's first static ability, the half that "functions while the card
     -- is in a player's graveyard": "You may cast this card from your graveyard
     -- ... by paying [cost] rather than paying its mana cost." Produced by
     -- Pawl.Engine.Keyword.castingPermissionsOf from the Flashback keyword, not printed

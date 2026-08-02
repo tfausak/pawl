@@ -1,53 +1,51 @@
--- | The @Modification ⇆ Json@ codec (#481).
 module Pawl.Codec.Modification where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.CardType (cardTypeToJson, jsonToCardType)
-import Pawl.Codec.Color (colorToJson, jsonToColor)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Codec.PlayerId (jsonToPlayerId, playerIdToJson)
-import Pawl.Codec.Quantity (jsonToQuantity, quantityToJson)
-import Pawl.Codec.Subtype (jsonToSubtype, subtypeToJson)
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.Subtype as Subtype
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Modification as Modification
 
-modificationToJson :: Modification.Modification -> Value
-modificationToJson m = case m of
-  Modification.GainKeyword k -> Json.tagged (Text.pack "GainKeyword") (Just (keywordToJson k))
-  Modification.LoseAllAbilities -> Json.nullary (Text.pack "LoseAllAbilities")
-  Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
-  Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
-  Modification.SetLandSubtype s -> Json.tagged (Text.pack "SetLandSubtype") (Just (subtypeToJson s))
-  Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (subtypeToJson s))
-  Modification.SetCreatureSubtype s -> Json.tagged (Text.pack "SetCreatureSubtype") (Just (subtypeToJson s))
-  Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (cardTypeToJson c))
-  Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array (MkArray [subtypeToJson a, subtypeToJson b])))
-  Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))
-  Modification.SetControllerToSource -> Json.nullary (Text.pack "SetControllerToSource")
-  Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (Json.setTo colorToJson cs))
-  Modification.SwitchPowerToughness -> Json.nullary (Text.pack "SwitchPowerToughness")
+toJson :: Modification.Modification -> Value.Value
+toJson m = case m of
+  Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Keyword.toJson k
+  Modification.LoseAllAbilities -> Common.nullary "LoseAllAbilities"
+  Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Common.array $ [Quantity.toJson p, Quantity.toJson t]
+  Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Common.array $ [Quantity.toJson p, Quantity.toJson t]
+  Modification.SetLandSubtype s -> Common.tagged "SetLandSubtype" . Just $ Subtype.toJson s
+  Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Subtype.toJson s
+  Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Subtype.toJson s
+  Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
+  Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Common.array $ [Subtype.toJson a, Subtype.toJson b]
+  Modification.SetController p -> Common.tagged "SetController" . Just $ PlayerId.toJson p
+  Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
+  Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet Color.toJson cs
+  Modification.SwitchPowerToughness -> Common.nullary "SwitchPowerToughness"
 
-jsonToModification :: Value -> Either Text Modification.Modification
-jsonToModification value = do
-  (t, mv) <- Json.tag value
+fromJson :: Value.Value -> Either Text.Text Modification.Modification
+fromJson value = do
+  (t, mv) <- Common.asTagged value
   let pair v = case v of
-        Just (Array (MkArray [x, y])) -> Right (x, y)
-        _ -> Left (Text.pack "expected a two-element array")
-  case Text.unpack t of
-    "GainKeyword" -> Json.withValue mv (fmap Modification.GainKeyword . jsonToKeyword)
+        Just (Value.Array (Array.MkArray [x, y])) -> Right (x, y)
+        _ -> Left $ Text.pack "expected a two-element array"
+  case t of
+    "GainKeyword" -> Common.withValue mv (fmap Modification.GainKeyword . Keyword.fromJson)
     "LoseAllAbilities" -> Right Modification.LoseAllAbilities
-    "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
-    "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
-    "SetLandSubtype" -> Json.withValue mv (fmap Modification.SetLandSubtype . jsonToSubtype)
-    "AddLandSubtype" -> Json.withValue mv (fmap Modification.AddLandSubtype . jsonToSubtype)
-    "SetCreatureSubtype" -> Json.withValue mv (fmap Modification.SetCreatureSubtype . jsonToSubtype)
-    "AddCardType" -> Json.withValue mv (fmap Modification.AddCardType . jsonToCardType)
-    "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
-    "SetController" -> Json.withValue mv (fmap Modification.SetController . jsonToPlayerId)
+    "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
+    "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
+    "SetLandSubtype" -> Common.withValue mv (fmap Modification.SetLandSubtype . Subtype.fromJson)
+    "AddLandSubtype" -> Common.withValue mv (fmap Modification.AddLandSubtype . Subtype.fromJson)
+    "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Subtype.fromJson)
+    "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
+    "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Subtype.fromJson x <*> Subtype.fromJson y
+    "SetController" -> Common.withValue mv (fmap Modification.SetController . PlayerId.fromJson)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
-    "SetColor" -> Json.withValue mv (fmap Modification.SetColor . Json.setFrom jsonToColor)
+    "SetColor" -> Common.withValue mv (fmap Modification.SetColor . Common.decodeSet Color.fromJson)
     "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness
-    _ -> Left (Text.pack "unknown Modification: " <> t)
+    _ -> Left . Text.pack $ "unknown Modification: " <> t

@@ -1,18 +1,18 @@
 module Pawl.Types.TriggerCondition where
 
-import Pawl.Types.Condition (Condition)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.Keyword (Keyword)
-import Pawl.Types.Phase (Phase)
-import Pawl.Types.PlayerRelation (PlayerRelation)
-import Pawl.Types.TriggerFrequency (TriggerFrequency)
-import Pawl.Types.TurnScope (TurnScope)
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TurnScope as TurnScope
 
--- CR 603.2: the pattern that fires a triggered ability. Only Pawl.Engine.Event may case
+-- | CR 603.2: the pattern that fires a triggered ability. Only Pawl.Engine.Event may case
 -- on it for RULES purposes; Pawl.Codec also cases on every constructor, but only
 -- as the JSON data boundary (encode/decode), not to decide game behaviour.
 data TriggerCondition
-  = -- CR 603.6a: "when this ... enters [the battlefield]" -- fires when the object
+  = -- | CR 603.6a: "when this ... enters [the battlefield]" -- fires when the object
     -- BEARING the ability enters. Self-scoped: the scan checks every permanent
     -- (CR 603.6a), so the bearer's identity is part of the match, not an accident
     -- of which object the scan happened to visit. PermanentEnters below is the
@@ -22,7 +22,7 @@ data TriggerCondition
     -- them can come up empty for an entrant that ceased without a zone change
     -- ever filing last known information (see Pawl.Engine.Event.matchesTrigger).
     SelfEnters
-  | -- CR 603.6a's SECOND written form, in the same breath as the first:
+  | -- | CR 603.6a's SECOND written form, in the same breath as the first:
     -- "Whenever a [type] enters, . . ." -- fires when ANY permanent the Filter
     -- admits enters the battlefield, whoever bears the ability. The "[type]" is
     -- a Filter, matched against the entering permanent with the bearer as the
@@ -37,23 +37,23 @@ data TriggerCondition
     -- `Not IsSource` -- the one spelling Filter.IsSource's own haddock already
     -- fixes for "another" (#163) -- rather than into a parallel exclusion flag
     -- here.
-    PermanentEnters (Filter Keyword)
-  | -- CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
+    PermanentEnters (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
-    StepBegins Phase TurnScope
-  | -- CR 603.8: a STATE trigger -- it fires whenever its condition is true, not
+    StepBegins Phase.Phase TurnScope.TurnScope
+  | -- | CR 603.8: a STATE trigger -- it fires whenever its condition is true, not
     -- when an event occurs. "It doesn't trigger again until the ability has
     -- resolved, has been countered, or has otherwise left the stack", which is why
     -- Pawl.Engine.Event derives armedness from the stack rather than storing it.
-    StateIs Condition
-  | -- CR 603.2 / 509-510: the bearer dealt combat damage to a player. Rides P4's
+    StateIs Condition.Condition
+  | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player. Rides P4's
     -- event history -- combat damage already records a DamageDealt event.
     SelfDealsCombatDamageToPlayer
-  | -- CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
+  | -- | CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
     -- (any creature); matched only via Pawl.Engine.Monarch.inherentMatch, never through a
     -- card's bearer. Rides P4's DamageDealt history.
     CreatureDealtCombatDamageToMonarch
-  | -- CR 702.29c: "'When you cycle this card' means 'When you discard this card
+  | -- | CR 702.29c: "'When you cycle this card' means 'When you discard this card
     -- to pay an activation cost of a cycling ability.'" Self-scoped like
     -- SelfEnters: the scan visits every candidate source, so the bearer being the
     -- cycled card is part of the match.
@@ -62,7 +62,7 @@ data TriggerCondition
     -- continues "these abilities trigger from whatever zone the card winds up in
     -- after it's cycled" -- the graveyard, for every printing today.
     SelfCycled
-  | -- CR 701.9a: "whenever [a player] discards a card" -- Megrim's "whenever an
+  | -- | CR 701.9a: "whenever [a player] discards a card" -- Megrim's "whenever an
     -- OPPONENT discards a card". Matched against GameEvent.Discarded, whose
     -- PlayerId is the discarding player; the PlayerRelation reads that player
     -- against CR 109.5's "you", the ability's controller (CR 603.3a).
@@ -76,8 +76,8 @@ data TriggerCondition
     -- makes cycling a discard, so a cycled card must fire this; CR 702.29d
     -- bounds it to once, which the single Discarded event supplies by
     -- construction (see Pawl.Types.GameEvent).
-    PlayerDiscards PlayerRelation
-  | -- CR 508.3a: "An ability that reads 'Whenever [a creature] attacks, . . .'
+    PlayerDiscards PlayerRelation.PlayerRelation
+  | -- | CR 508.3a: "An ability that reads 'Whenever [a creature] attacks, . . .'
     -- triggers if that creature is declared as an attacker." Hanweir Garrison's.
     -- Self-scoped like SelfEnters and SelfCycled: the scan visits every
     -- permanent, so the bearer being the declared attacker is part of the match.
@@ -98,8 +98,8 @@ data TriggerCondition
     -- same trigger event rather than naming a different one. Hanweir Garrison is
     -- EveryTime. See Pawl.Types.TriggerFrequency for why no rule number is cited
     -- for the phrase.
-    SelfAttacks TriggerFrequency
-  | -- CR 603.6 (a zone-change trigger): "when this card is put into your
+    SelfAttacks TriggerFrequency.TriggerFrequency
+  | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters
     -- and SelfCycled: the scan visits every candidate source, so the bearer
     -- being the card that arrived is part of the match.
@@ -126,7 +126,7 @@ data TriggerCondition
     -- controller that same owner: the two "your"s can only ever name the player
     -- the scan already picks.
     SelfPutIntoGraveyardFromLibrary
-  | -- CR 603.6c: a LEAVES-THE-BATTLEFIELD ability, narrowed to the one written
+  | -- | CR 603.6c: a LEAVES-THE-BATTLEFIELD ability, narrowed to the one written
     -- form Doomed Traveler prints. That rule's second written form is "Whenever
     -- [something] is put into a graveyard from the battlefield", and CR 700.4
     -- abbreviates it: "The term dies means 'is put into a graveyard from the
@@ -165,7 +165,7 @@ data TriggerCondition
     -- battlefield), and reads the ARRIVING incarnation; this one is battlefield
     -- to graveyard, functions on the battlefield, and reads the DEPARTING one.
     SelfDies
-  | -- CR 603.6c's FIRST written form -- "When [this object] leaves the
+  | -- | CR 603.6c's FIRST written form -- "When [this object] leaves the
     -- battlefield, . . ." -- which is the rule's own first clause taken whole:
     -- "Leaves-the-battlefield abilities trigger when a permanent moves from the
     -- battlefield to another zone". ANY other zone, so an exile, a bounce to a
@@ -197,7 +197,7 @@ data TriggerCondition
     -- CR 603.6c's SECOND trigger event -- "or when a phased-in permanent leaves
     -- the game because its owner leaves the game" -- is not matched (#385).
     SelfLeavesTheBattlefield
-  | -- CR 701.6a: "whenever a spell or ability you control counters a spell" --
+  | -- | CR 701.6a: "whenever a spell or ability you control counters a spell" --
     -- Baral, Chief of Compliance's. Matched against GameEvent.SpellCountered,
     -- whose Countering carries the controller of the spell or ability that DID
     -- the countering; the PlayerRelation reads that player against CR 109.5's
@@ -221,5 +221,5 @@ data TriggerCondition
     -- event for this condition to match. The countered-ability sibling of that
     -- record does not exist, and no card in the pool wants one (#541); it would
     -- be a new event and a new condition, never a widening of these two.
-    SpellOrAbilityCounters PlayerRelation
+    SpellOrAbilityCounters PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

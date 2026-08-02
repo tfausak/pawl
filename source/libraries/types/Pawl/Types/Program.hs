@@ -5,7 +5,7 @@ module Pawl.Types.Program where
 
 import Control.Monad ((>=>))
 
--- An operational (free) monad over an instruction functor 'instr'.
+-- | An operational (free) monad over an instruction functor 'instr'.
 -- 'Then i k' suspends on instruction 'i' and resumes with continuation 'k'.
 data Program instr a where
   Return :: a -> Program instr a

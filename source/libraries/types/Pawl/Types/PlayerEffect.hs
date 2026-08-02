@@ -1,11 +1,11 @@
 module Pawl.Types.PlayerEffect where
 
-import Numeric.Natural (Natural)
-import Pawl.Types.Filter (Filter)
-import Pawl.Types.Keyword (Keyword)
-import Pawl.Types.ManaCost (ManaCost)
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
 
--- CR 611.1's third clause: a continuous effect that "affects players or the
+-- | CR 611.1's third clause: a continuous effect that "affects players or the
 -- rules of the game" rather than the characteristics of an object. The player
 -- analogue of Pawl.Types.Modification, and NOT a member of it: CR 613.1 makes the
 -- seven layers a machine for computing an OBJECT's characteristics, while CR
@@ -14,17 +14,17 @@ import Pawl.Types.ManaCost (ManaCost)
 --
 -- Open-half card data. Pawl.Engine.PlayerEffect is the ONLY module that may case on it.
 data PlayerEffect
-  = -- CR 601.3 / Silence: this player can't cast spells at all.
+  = -- | CR 601.3 / Silence: this player can't cast spells at all.
     CantCastSpells
-  | -- CR 601.3 / Rule of Law: this player can't cast more than this many spells
+  | -- | CR 601.3 / Rule of Law: this player can't cast more than this many spells
     -- each turn. The limit is carried, not hardcoded: Rule of Law and Arcane
     -- Laboratory both say one, and a card that says two must not need a sibling
     -- constructor.
-    CantCastMoreThan Natural
-  | -- CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
+    CantCastMoreThan Natural.Natural
+  | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
-    IncreaseSpellCost (Filter Keyword) Natural
-  | -- CR 613.11 / 601.2f / Sapphire Medallion, Edgewalker: matching spells cost
+    IncreaseSpellCost (Filter.Filter Keyword.Keyword) Natural.Natural
+  | -- | CR 613.11 / 601.2f / Sapphire Medallion, Edgewalker: matching spells cost
     -- this much less to cast.
     --
     -- A SEPARATE constructor from IncreaseSpellCost, never one signed delta. The
@@ -43,10 +43,10 @@ data PlayerEffect
     -- An EXCESS typed symbol is dropped rather than spilling onto the generic
     -- component, which is Edgewalker's "This effect reduces only the amount of
     -- colored mana you pay" and not CR 118.7b-d (#309).
-    ReduceSpellCost (Filter Keyword) ManaCost
-  | -- CR 402.2 / Reliquary Tower: this player has no maximum hand size.
+    ReduceSpellCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost
+  | -- | CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
-  | -- CR 500.5 / 703.4q / Upwelling: this player does not lose the unspent mana
+  | -- | CR 500.5 / 703.4q / Upwelling: this player does not lose the unspent mana
     -- in their mana pool as a step or phase ends.
     --
     -- CR 106.4 supplies the verb: "Each player's mana pool empties at the end of

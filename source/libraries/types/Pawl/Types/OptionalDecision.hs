@@ -1,6 +1,6 @@
 module Pawl.Types.OptionalDecision where
 
--- CR 603.5 / 608.2d: a player's answer to a printed "may" as the spell or
+-- | CR 603.5 / 608.2d: a player's answer to a printed "may" as the spell or
 -- ability resolves. CR 603.5's own wording supplies both names -- an ability
 -- goes on the stack "regardless of whether their controller intends to exercise
 -- the ability's option or not".

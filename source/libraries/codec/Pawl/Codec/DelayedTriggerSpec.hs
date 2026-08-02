@@ -1,0 +1,67 @@
+module Pawl.Codec.DelayedTriggerSpec where
+
+import qualified Data.Map.Strict as Map
+import qualified Data.Text as Text
+import qualified Pawl.Codec.CardSpec as CardSpec
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.SlotName as SlotName
+
+-- | R7's one case for MkDelayedTrigger's single constructor, at CR 603.7a/603.7b's
+-- default (both notBefore and expiry absent), plus the two elision biconditional
+-- cases each stated field takes when present. 'bindings' carries a minimal
+-- Binding rather than one with a `copy` snapshot (Pawl.Codec.BindingSpec is
+-- already total over every Binding field on its own); 'ability' reuses
+-- 'CardSpec.minimalTriggeredAbility' rather than building a second one by hand.
+entry :: DelayedTrigger.DelayedTrigger
+entry =
+  DelayedTrigger.MkDelayedTrigger
+    { DelayedTrigger.ability = CardSpec.minimalTriggeredAbility,
+      DelayedTrigger.source = ObjectId.MkObjectId 4,
+      DelayedTrigger.controller = PlayerId.MkPlayerId 0,
+      DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.empty {Binding.amount = Just 9}),
+      DelayedTrigger.notBefore = Nothing,
+      DelayedTrigger.expiry = Nothing
+    }
+
+entryJson :: String
+entryJson =
+  "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
+    <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
+    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+    <> "\"notBefore\":null,\"expiry\":null}"
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
+  Spec.it s "MkDelayedTrigger, CR 603.7a/603.7b's default (armed with no onset gate, no stated duration)" $
+    Common.assertJsonCodec s DelayedTrigger.toJson DelayedTrigger.fromJson entry entryJson
+  -- CR 603.7b: a stated duration, Full Throttle's "this turn" as the game
+  -- remembers it (Pawl.Engine.Expiry.arm's output, not the printed Duration).
+  Spec.it s "MkDelayedTrigger, a stated expiry (CR 603.7b)" $
+    Common.assertJsonCodec
+      s
+      DelayedTrigger.toJson
+      DelayedTrigger.fromJson
+      entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
+      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
+          <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+          <> "\"notBefore\":null,\"expiry\":{\"type\":\"AtCleanup\"}}"
+      )
+  Spec.it s "MkDelayedTrigger, an onset gate (CR 603.7a)" $
+    Common.assertJsonCodec
+      s
+      DelayedTrigger.toJson
+      DelayedTrigger.fromJson
+      entry {DelayedTrigger.notBefore = Just 7}
+      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
+          <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+          <> "\"notBefore\":7,\"expiry\":null}"
+      )

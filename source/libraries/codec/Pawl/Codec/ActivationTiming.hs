@@ -1,21 +1,19 @@
--- | The @ActivationTiming ⇆ Json@ codec (#481).
 module Pawl.Codec.ActivationTiming where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.PhaseSelector (jsonToPhaseSelector, phaseSelectorToJson)
-import Pawl.Codec.TurnScope (jsonToTurnScope, turnScopeToJson)
-import Pawl.Json.Array (Array (MkArray))
-import Pawl.Json.Value (Value (Array))
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.PhaseSelector as PhaseSelector
+import qualified Pawl.Codec.TurnScope as TurnScope
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 
--- Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a window,
--- the shape costComponentToJson takes. AnyTime and SorcerySpeed still render as
+-- | Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a window,
+-- the shape CostComponent's toJson takes. AnyTime and SorcerySpeed still render as
 -- the bare tag they always did.
 --
 -- DuringPhase's payload is a PAIR -- the window and the turn scope -- written as
--- a two-element array, which is the shape triggerConditionToJson already gives
+-- a two-element array, which is the shape TriggerCondition's toJson already gives
 -- TriggerCondition.StepBegins for the same two components. There is deliberately
 -- no scope-less form: the axis is not a default a card may omit, so a bare
 -- window payload is a decode failure rather than a silent EachTurn.
@@ -27,17 +25,17 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 -- rewritten with the type (no-api-stability), and a codec that quietly took
 -- both would leave two spellings of one window, which is the thing
 -- Pawl.Types.PhaseSelector exists to prevent.
-activationTimingToJson :: ActivationTiming.ActivationTiming -> Value
-activationTimingToJson t = case t of
-  ActivationTiming.AnyTime -> Json.nullary (Text.pack "AnyTime")
-  ActivationTiming.SorcerySpeed -> Json.nullary (Text.pack "SorcerySpeed")
-  ActivationTiming.DuringPhase sel sc -> Json.tagged (Text.pack "DuringPhase") (Just (Array (MkArray [phaseSelectorToJson sel, turnScopeToJson sc])))
+toJson :: ActivationTiming.ActivationTiming -> Value.Value
+toJson t = case t of
+  ActivationTiming.AnyTime -> Common.nullary "AnyTime"
+  ActivationTiming.SorcerySpeed -> Common.nullary "SorcerySpeed"
+  ActivationTiming.DuringPhase sel sc -> Common.tagged "DuringPhase" . Just . Common.array $ [PhaseSelector.toJson sel, TurnScope.toJson sc]
 
-jsonToActivationTiming :: Value -> Either Text ActivationTiming.ActivationTiming
-jsonToActivationTiming value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
+fromJson :: Value.Value -> Either Text.Text ActivationTiming.ActivationTiming
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case (t, mv) of
     ("AnyTime", _) -> Right ActivationTiming.AnyTime
     ("SorcerySpeed", _) -> Right ActivationTiming.SorcerySpeed
-    ("DuringPhase", Just (Array (MkArray [sel, sc]))) -> ActivationTiming.DuringPhase <$> jsonToPhaseSelector sel <*> jsonToTurnScope sc
-    _ -> Left (Text.pack "unknown ActivationTiming: " <> t)
+    ("DuringPhase", Just (Value.Array (Array.MkArray [sel, sc]))) -> ActivationTiming.DuringPhase <$> PhaseSelector.fromJson sel <*> TurnScope.fromJson sc
+    _ -> Left . Text.pack $ "unknown ActivationTiming: " <> t

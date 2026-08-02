@@ -1,12 +1,12 @@
 module Pawl.Types.ActiveReplacement where
 
-import Pawl.Types.Expiry (Expiry)
-import Pawl.Types.ObjectId (ObjectId)
-import Pawl.Types.ReplacementEffect (ReplacementEffect)
-import Pawl.Types.Timestamp (Timestamp)
-import Pawl.Types.Uses (Uses)
+import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.Uses as Uses
 
--- CR 614.3 / 615.3: a floating, resolution-generated replacement effect, held in
+-- | CR 614.3 / 615.3: a floating, resolution-generated replacement effect, held in
 -- GameState.replacements. The event-pipeline analog of ContinuousEffect: the
 -- projection re-derives a permanent's static replacement abilities live, while
 -- these are stored because the object that made them may be long gone.
@@ -41,10 +41,10 @@ import Pawl.Types.Uses (Uses)
 -- `timestamp` doubles as this instance's CR 614.5 identity (Pawl.Types.CandidateId):
 -- GameState.nextTimestamp is monotone, so no two floating replacements share one.
 data ActiveReplacement = MkActiveReplacement
-  { effect :: ReplacementEffect,
-    source :: ObjectId,
-    timestamp :: Timestamp,
-    expiry :: Expiry,
-    uses :: Uses
+  { effect :: ReplacementEffect.ReplacementEffect,
+    source :: ObjectId.ObjectId,
+    timestamp :: Timestamp.Timestamp,
+    expiry :: Expiry.Expiry,
+    uses :: Uses.Uses
   }
   deriving (Eq, Ord, Show)

@@ -1,16 +1,13 @@
--- | The @DamageRewrite ⇆ Json@ codec (#481).
 module Pawl.Codec.DamageRewrite where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 
-damageRewriteToJson :: DamageRewrite.DamageRewrite -> Value
-damageRewriteToJson r = Json.nullary . Text.pack $ case r of
+toJson :: DamageRewrite.DamageRewrite -> Value.Value
+toJson r = Common.nullary $ case r of
   DamageRewrite.PreventAll -> "PreventAll"
 
-jsonToDamageRewrite :: Value -> Either Text DamageRewrite.DamageRewrite
-jsonToDamageRewrite =
-  Json.decodeNullary (Text.pack "DamageRewrite") [(Text.pack "PreventAll", DamageRewrite.PreventAll)]
+fromJson :: Value.Value -> Either Text.Text DamageRewrite.DamageRewrite
+fromJson = Common.decodeNullary "DamageRewrite" [("PreventAll", DamageRewrite.PreventAll)]

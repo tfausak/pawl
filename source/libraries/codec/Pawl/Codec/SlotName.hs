@@ -1,13 +1,12 @@
--- | The @SlotName ⇆ Json@ codec (#481).
 module Pawl.Codec.SlotName where
 
-import Data.Text (Text)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Data.Text as Text
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.SlotName as SlotName
 
-slotNameToJson :: SlotName.SlotName -> Value
-slotNameToJson (SlotName.MkSlotName t) = Json.jText t
+toJson :: SlotName.SlotName -> Value.Value
+toJson = Common.text . SlotName.unwrap
 
-jsonToSlotName :: Value -> Either Text SlotName.SlotName
-jsonToSlotName value = SlotName.MkSlotName <$> Json.asText value
+fromJson :: Value.Value -> Either Text.Text SlotName.SlotName
+fromJson = fmap SlotName.MkSlotName . Common.asText

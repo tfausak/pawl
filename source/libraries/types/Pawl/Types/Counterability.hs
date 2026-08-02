@@ -1,6 +1,6 @@
 module Pawl.Types.Counterability where
 
--- Whether a spell can be countered (CR 701.6a: "to counter a spell or ability
+-- | Whether a spell can be countered (CR 701.6a: "to counter a spell or ability
 -- means to cancel it, removing it from the stack").
 --
 -- CR 113.6g is what makes this a property of the OBJECT and not of the

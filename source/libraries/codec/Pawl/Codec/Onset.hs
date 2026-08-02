@@ -1,21 +1,19 @@
--- | The @Onset ⇆ Json@ codec (#481).
 module Pawl.Codec.Onset where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Onset as Onset
 
-onsetToJson :: Onset.Onset -> Value
-onsetToJson o = case o of
-  Onset.Immediately -> Json.nullary (Text.pack "Immediately")
-  Onset.FromYourNextTurn -> Json.nullary (Text.pack "FromYourNextTurn")
+toJson :: Onset.Onset -> Value.Value
+toJson o = Common.nullary $ case o of
+  Onset.Immediately -> "Immediately"
+  Onset.FromYourNextTurn -> "FromYourNextTurn"
 
-jsonToOnset :: Value -> Either Text Onset.Onset
-jsonToOnset =
-  Json.decodeNullary
-    (Text.pack "Onset")
-    [ (Text.pack "Immediately", Onset.Immediately),
-      (Text.pack "FromYourNextTurn", Onset.FromYourNextTurn)
+fromJson :: Value.Value -> Either Text.Text Onset.Onset
+fromJson =
+  Common.decodeNullary
+    "Onset"
+    [ ("Immediately", Onset.Immediately),
+      ("FromYourNextTurn", Onset.FromYourNextTurn)
     ]

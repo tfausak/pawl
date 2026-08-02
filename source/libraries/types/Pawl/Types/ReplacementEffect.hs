@@ -1,17 +1,17 @@
 module Pawl.Types.ReplacementEffect where
 
-import Pawl.Types.CounterPattern (CounterPattern)
-import Pawl.Types.DamagePattern (DamagePattern)
-import Pawl.Types.DamageRewrite (DamageRewrite)
-import Pawl.Types.DestructionRewrite (DestructionRewrite)
-import Pawl.Types.EntryRewrite (EntryRewrite)
-import Pawl.Types.PhasePattern (PhasePattern)
-import Pawl.Types.Scaling (Scaling)
-import Pawl.Types.TokenPattern (TokenPattern)
-import Pawl.Types.Zone (Zone)
-import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
+import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
--- CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
+-- | CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
 -- and the REWRITE SHAPE it applies. One arm per replaceable event class -- the
 -- arm count tracks the ~40 classes the comprehensive rules define, never the card
 -- pool. Rest in Peace is DATA (`ZoneChangeR (MkZoneChangePattern Graveyard
@@ -26,8 +26,10 @@ import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
 -- rules out "redirect a damage event" without a validity pass.
 --
 -- EntryR and DestructionR carry NO pattern: both are self-only in the pool today
--- (CR 614.1c's "[this permanent] enters as"; CR 201.5/201.5c make "regenerate
--- this creature" name the ability's own source). CR 614.1d's other-objects form
+-- (CR 614.1c's "[this permanent] enters as"; CR 113.7a's own example --
+-- "This creature deals 1 damage to any target" -- establishes that "this
+-- creature" names the ability's source, so "regenerate this creature" names no
+-- object but its own). CR 614.1d's other-objects form
 -- ("[Objects] enter the battlefield ...", Essence of the Wild) has no producer,
 -- so the field appears when a card needs it rather than as speculative structure.
 --
@@ -48,11 +50,11 @@ import Pawl.Types.ZoneChangePattern (ZoneChangePattern)
 -- The sole rules-casing site is Pawl.Engine.Replacement (CR 616.1's loop). Pawl.Codec
 -- also cases on every constructor, but only as the JSON data boundary.
 data ReplacementEffect
-  = ZoneChangeR ZoneChangePattern Zone
-  | EntryR EntryRewrite
-  | DamageR DamagePattern DamageRewrite
-  | DestructionR DestructionRewrite
-  | CounterR CounterPattern Scaling
-  | TokenR TokenPattern Scaling
-  | PhaseR PhasePattern
+  = ZoneChangeR ZoneChangePattern.ZoneChangePattern Zone.Zone
+  | EntryR EntryRewrite.EntryRewrite
+  | DamageR DamagePattern.DamagePattern DamageRewrite.DamageRewrite
+  | DestructionR DestructionRewrite.DestructionRewrite
+  | CounterR CounterPattern.CounterPattern Scaling.Scaling
+  | TokenR TokenPattern.TokenPattern Scaling.Scaling
+  | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

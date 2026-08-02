@@ -1,6 +1,6 @@
 module Pawl.Types.Optionality where
 
--- CR 603.5: whether a mode's instructions are OPTIONAL -- the printed "may", as
+-- | CR 603.5: whether a mode's instructions are OPTIONAL -- the printed "may", as
 -- in "At the beginning of your upkeep, you may draw a card". "These abilities go
 -- on the stack when they trigger, regardless of whether their controller intends
 -- to exercise the ability's option or not. The choice is made when the ability

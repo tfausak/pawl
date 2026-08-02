@@ -1,8 +1,8 @@
 module Pawl.Types.MonarchWatch where
 
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerId as PlayerId
 
--- CR 725 (Palace Jailer): one object exiled "until an opponent becomes the
+-- | CR 725 (Palace Jailer): one object exiled "until an opponent becomes the
 -- monarch", and what the game must remember to know when that has happened.
 --
 -- The card's ruling makes this an EVENT, not a state. "If you're not the monarch
@@ -16,11 +16,11 @@ import Pawl.Types.PlayerId (PlayerId)
 -- true when the exile resolves, and the creature stays exiled anyway. The
 -- question is whether the crown has CHANGED HANDS to an opponent since.
 data MonarchWatch = MkMonarchWatch
-  { -- The effect's controller. Whose opponents are being watched for -- fixed
+  { -- | The effect's controller. Whose opponents are being watched for -- fixed
     -- when the exile resolves, and it outlives both its source permanent and the
     -- controller's own departure from the game.
-    controller :: PlayerId,
-    -- The monarch as of the last time this watch was examined. `Nothing` means no
+    controller :: PlayerId.PlayerId,
+    -- | The monarch as of the last time this watch was examined. `Nothing` means no
     -- player was the monarch then, which is the game's opening state (CR 725.1)
     -- and a perfectly ordinary thing to be watching from: the first player ever
     -- crowned is a change like any other.
@@ -30,6 +30,6 @@ data MonarchWatch = MkMonarchWatch
     -- to the controller themselves discharges nothing, but it does move the
     -- baseline, so that the SAME opponent retaking it later still counts as a new
     -- monarch being crowned.
-    lastMonarch :: Maybe PlayerId
+    lastMonarch :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

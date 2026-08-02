@@ -1,8 +1,8 @@
 module Pawl.Types.EventShape where
 
-import Pawl.Types.Zone (Zone)
+import qualified Pawl.Types.Zone as Zone
 
--- Which recorded events a history count folds over. GameState.events is cleared
+-- | Which recorded events a history count folds over. GameState.events is cleared
 -- at the turn change (Pawl.Engine.Engine), an engine choice made under CR 608.2i
 -- because every history-reading card in the pool asks "this turn" -- so the
 -- log's extent IS the window and none is carried here.
@@ -15,7 +15,7 @@ import Pawl.Types.Zone (Zone)
 -- so it is the one an arm here could match a Filter against without any new
 -- payload.
 data EventShape
-  = -- CR 700.4: "dies" means "is put into a graveyard from the battlefield",
+  = -- | CR 700.4: "dies" means "is put into a graveyard from the battlefield",
     -- which is MovedBetween Battlefield Graveyard.
-    MovedBetween Zone Zone
+    MovedBetween Zone.Zone Zone.Zone
   deriving (Eq, Ord, Show)

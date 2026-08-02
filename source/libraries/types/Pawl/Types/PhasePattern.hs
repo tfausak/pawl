@@ -1,9 +1,9 @@
 module Pawl.Types.PhasePattern where
 
-import Pawl.Types.PhaseSelector (PhaseSelector)
-import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerId as PlayerId
 
--- CR 614.1b / 500.11: which step-or-phase beginnings a SKIP intercepts. Eon Hub
+-- | CR 614.1b / 500.11: which step-or-phase beginnings a SKIP intercepts. Eon Hub
 -- is (Step (Beginning Upkeep)) for everybody; Fatigue is
 -- (Step (Beginning DrawStep)) for the one player its resolution named; Stonehorn
 -- Dignitary is CombatPhase for that player -- the whole of CR 506.1's five steps
@@ -37,7 +37,7 @@ import Pawl.Types.PlayerId (PlayerId)
 -- runtime-only, and nothing ENFORCES that: the codec round-trips it, so card
 -- JSON could author a Just, which is meaningless (#437).
 data PhasePattern = MkPhasePattern
-  { whichPhase :: PhaseSelector,
-    whosePhase :: Maybe PlayerId
+  { whichPhase :: PhaseSelector.PhaseSelector,
+    whosePhase :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

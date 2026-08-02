@@ -1,6 +1,8 @@
 module Pawl.Types.Power where
 
-import Pawl.Types.Quantity (Quantity)
+import qualified Pawl.Types.Quantity as Quantity
 
-newtype Power = MkPower Quantity
+newtype Power = MkPower
+  { unwrap :: Quantity.Quantity
+  }
   deriving (Eq, Ord, Show)

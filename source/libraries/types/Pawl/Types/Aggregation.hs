@@ -1,8 +1,8 @@
 module Pawl.Types.Aggregation where
 
--- How a Pawl.Types.Count turns its matched set into a number. A real axis, not
--- always "length": CR 208.2a's Tarmogoyf counts the distinct card TYPES among
--- the cards in every graveyard, which is the size of a union.
+-- | How a Pawl.Types.Count turns its matched set into a number. A real axis,
+-- not always "length": CR 208.2a's Tarmogoyf counts the distinct card TYPES
+-- among the cards in every graveyard, which is the size of a union.
 --
 -- The `quantity` parameter is here for the same module-cycle reason
 -- Pawl.Types.Effect's `card` is: Greatest reads a Pawl.Types.Quantity off each
@@ -13,9 +13,10 @@ module Pawl.Types.Aggregation where
 data Aggregation quantity
   = Objects
   | DistinctCardTypes
-  | -- The largest value of a per-member quantity: "the greatest mana value among
-    -- artifacts you control" (One with the Machine, Karn, Legacy Reforged),
-    -- "the greatest power among creatures you control" (Fungal Sprouting).
+  | -- | The largest value of a per-member quantity: "the greatest mana value
+    -- among artifacts you control" (One with the Machine, Karn, Legacy
+    -- Reforged), "the greatest power among creatures you control" (Fungal
+    -- Sprouting).
     --
     -- NOT a sibling of the two above, which need only the matched set. This one
     -- also needs to know WHICH per-object quantity to read, and a Quantity is

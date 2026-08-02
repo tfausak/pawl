@@ -1,9 +1,9 @@
 module Pawl.Types.Condition where
 
-import Pawl.Types.Comparison (Comparison)
-import Pawl.Types.Quantity (Quantity)
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Quantity as Quantity
 
--- A predicate over game STATE rather than over an event, with three customers
+-- | A predicate over game STATE rather than over an event, with three customers
 -- and one vocabulary: a state trigger's condition (CR 603.8, checked at every
 -- CR 117.5 boundary), an intervening "if" (CR 603.4 when the trigger event
 -- occurs, CR 608.2a again on resolution), and a "for as long as" duration
@@ -16,7 +16,7 @@ import Pawl.Types.Quantity (Quantity)
 -- BOTH SIDES are a Quantity, and symmetrically so -- neither side is "the
 -- measured thing" and the other "the threshold". Quantity already embeds
 -- `Count` (its Count arm), so this is strictly wider than the Count-on-the-left
--- shape it replaces and no card file changed: Pawl.Codec's quantityToJson emits
+-- shape it replaces and no card file changed: Pawl.Codec.Quantity's toJson emits
 -- a Count arm as the count's own tag, so the existing `{"type": "Count", ...}`
 -- payloads decode unchanged.
 --
@@ -33,5 +33,5 @@ import Pawl.Types.Quantity (Quantity)
 -- InSlot count stored that way outlives its slot binding: Pawl.Engine.Count.playersFor
 -- then yields Nothing, and Pawl.Engine.Condition.holds collapses that to False
 -- silently (#159).
-data Condition = MkCondition Quantity Comparison Quantity
+data Condition = MkCondition Quantity.Quantity Comparison.Comparison Quantity.Quantity
   deriving (Eq, Ord, Show)

@@ -8,9 +8,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import Pawl.Codec.EntryRiders (defaultEntryRiders)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Printing (printingToJson)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.Printing as Printing
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Mana as Mana
@@ -151,7 +151,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     case concatMap (concatMap snd . modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c) of
       [Effect.MoveToZone slot zone entry bound, Effect.ArmDelayedTrigger name onset duration] -> do
         Spec.assertEqWith s "it exiles ITSELF" (slot, zone) (Binding.triggerSource, Zone.Exile)
-        Spec.assertEqWith s "with no entry riders on the way out" entry defaultEntryRiders
+        Spec.assertEqWith s "with no entry riders on the way out" entry EntryRiders.defaultValue
         -- CR 400.7 / 603.7c: the exiled incarnation is a new object, so the
         -- delayed ability can only name it through a slot this effect binds.
         Spec.assertEqWith s "binding the exiled incarnation" bound (Just exiledSlot)
@@ -416,7 +416,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "and may put the card itself onto the battlefield"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Optional, [Effect.MoveToZone Binding.triggerSource Zone.Battlefield defaultEntryRiders Nothing])]]
+      [[(Optionality.Optional, [Effect.MoveToZone Binding.triggerSource Zone.Battlefield EntryRiders.defaultValue Nothing])]]
   Spec.it s "hanweir-garrison.json loads as a {2}{R} 2/3 whose attack trigger makes two tapped attacking Humans" $ do
     c <- S.cardOf s registry "Hanweir Garrison"
     Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Hanweir Garrison")
@@ -518,7 +518,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "returning the became slot to its owner's hand"
       (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c))
-      [[(Optionality.Mandatory, [Effect.MoveToZone Binding.became Zone.Hand defaultEntryRiders Nothing])]]
+      [[(Optionality.Mandatory, [Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing])]]
   -- The pool's first INTERVENING "if" on a look-back trigger (CR 603.4 read
   -- against CR 608.2h last known information), and the first condition whose
   -- measured side is not a Count at all.
@@ -655,7 +655,7 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       s
       "the CR 103.6a action puts itself onto the battlefield"
       (CardT.openingHandAction c)
-      [Effect.MoveToZone Binding.triggerSource Zone.Battlefield defaultEntryRiders Nothing]
+      [Effect.MoveToZone Binding.triggerSource Zone.Battlefield EntryRiders.defaultValue Nothing]
     Spec.assertEqWith
       s
       "and the redirect is scoped to an opponent's graveyard"
@@ -1497,7 +1497,7 @@ checkFile s root p = do
   case Encoding.decodeUtf8' bytes of
     Left err -> Spec.assertFailure s (path <> ": not valid UTF-8: " <> show err)
     Right contents ->
-      case Json.parse contents of
+      case Common.parse contents of
         -- Unreachable: S.allPrintings would have failed in IO first.
         Left err -> Spec.assertFailure s (path <> ": " <> Text.unpack err)
         Right value ->
@@ -1505,7 +1505,7 @@ checkFile s root p = do
           -- re-encoding the loaded printing reproduces the file's meaning. Compared
           -- up to key order and whitespace, because JSON objects are unordered and
           -- formatting is not part of the contract. The corpus is committed
-          -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
+          -- pretty-printed (`jq -S .`) while Common.render emits compact output, so
           -- this can never quietly regress into a byte comparison: every file would
           -- fail at once.
-          Spec.assertEqWith s path (Json.sortKeys (printingToJson p)) (Json.sortKeys value)
+          Spec.assertEqWith s path (Common.sortKeys (Printing.toJson p)) (Common.sortKeys value)

@@ -1,30 +1,28 @@
--- | The @CounterPattern ⇆ Json@ codec (#481).
 module Pawl.Codec.CounterPattern where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.ControllerRelation (controllerRelationToJson, jsonToControllerRelation)
-import Pawl.Codec.CounterKind (counterKindToJson, jsonToCounterKind)
-import Pawl.Codec.Filter (filterToJson, jsonToFilter)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.Keyword (jsonToKeyword, keywordToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.ControllerRelation as ControllerRelation
+import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.CounterPattern as CounterPattern
 
-counterPatternToJson :: CounterPattern.CounterPattern -> Value
-counterPatternToJson p =
-  Json.jObject
-    [ (Text.pack "whichKind", Json.maybeTo counterKindToJson (CounterPattern.whichKind p)),
-      (Text.pack "whose", controllerRelationToJson (CounterPattern.whose p)),
-      (Text.pack "onWhat", filterToJson keywordToJson (CounterPattern.onWhat p))
+toJson :: CounterPattern.CounterPattern -> Value.Value
+toJson p =
+  Common.object
+    [ Common.pair "whichKind" . Common.encodeMaybe CounterKind.toJson $ CounterPattern.whichKind p,
+      Common.pair "whose" . ControllerRelation.toJson $ CounterPattern.whose p,
+      Common.pair "onWhat" . Filter.toJson Keyword.toJson $ CounterPattern.onWhat p
     ]
 
-jsonToCounterPattern :: Value -> Either Text CounterPattern.CounterPattern
-jsonToCounterPattern value = do
-  ps <- Json.asObject value
-  k <- Json.field (Text.pack "whichKind") ps >>= Json.maybeFrom jsonToCounterKind
-  w <- Json.field (Text.pack "whose") ps >>= jsonToControllerRelation
-  o <- Json.field (Text.pack "onWhat") ps >>= jsonToFilter jsonToKeyword
+fromJson :: Value.Value -> Either Text.Text CounterPattern.CounterPattern
+fromJson value = do
+  ps <- Common.asObject value
+  k <- Common.field "whichKind" ps >>= Common.decodeMaybe CounterKind.fromJson
+  w <- Common.field "whose" ps >>= ControllerRelation.fromJson
+  o <- Common.field "onWhat" ps >>= Filter.fromJson Keyword.fromJson
   pure
     CounterPattern.MkCounterPattern
       { CounterPattern.whichKind = k,

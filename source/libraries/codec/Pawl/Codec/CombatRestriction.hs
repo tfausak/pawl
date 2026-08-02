@@ -1,26 +1,24 @@
--- | The @CombatRestriction ⇆ Json@ codec (#481).
 module Pawl.Codec.CombatRestriction where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Pawl.Codec.Affected (affectedToJson, jsonToAffected)
-import qualified Pawl.Codec.Json as Json
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Affected as Affected
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 
--- TAGGED, where the requirement codecs are objects with one named key: this type
+-- | TAGGED, where the requirement codecs are objects with one named key: this type
 -- is a sum over which declaration the restriction forbids, and the two
 -- requirement types are newtypes over one field each
 -- (Pawl.Types.CombatRestriction says why the shapes differ).
-combatRestrictionToJson :: CombatRestriction.CombatRestriction -> Value
-combatRestrictionToJson cr = case cr of
-  CombatRestriction.CantAttack a -> Json.tagged (Text.pack "CantAttack") (Just (affectedToJson a))
-  CombatRestriction.CantBlock a -> Json.tagged (Text.pack "CantBlock") (Just (affectedToJson a))
+toJson :: CombatRestriction.CombatRestriction -> Value.Value
+toJson cr = case cr of
+  CombatRestriction.CantAttack a -> Common.tagged "CantAttack" . Just $ Affected.toJson a
+  CombatRestriction.CantBlock a -> Common.tagged "CantBlock" . Just $ Affected.toJson a
 
-jsonToCombatRestriction :: Value -> Either Text CombatRestriction.CombatRestriction
-jsonToCombatRestriction value = do
-  (t, mv) <- Json.tag value
-  case Text.unpack t of
-    "CantAttack" -> Json.withValue mv (fmap CombatRestriction.CantAttack . jsonToAffected)
-    "CantBlock" -> Json.withValue mv (fmap CombatRestriction.CantBlock . jsonToAffected)
-    _ -> Left (Text.pack "unknown CombatRestriction: " <> t)
+fromJson :: Value.Value -> Either Text.Text CombatRestriction.CombatRestriction
+fromJson value = do
+  (t, mv) <- Common.asTagged value
+  case t of
+    "CantAttack" -> Common.withValue mv (fmap CombatRestriction.CantAttack . Affected.fromJson)
+    "CantBlock" -> Common.withValue mv (fmap CombatRestriction.CantBlock . Affected.fromJson)
+    _ -> Left . Text.pack $ "unknown CombatRestriction: " <> t

@@ -1,8 +1,8 @@
 module Pawl.Types.CardType where
 
--- CR 205.2a lists fifteen card types. The seven missing ones are Battle (#302)
--- and the six command-zone residents in #131 -- Dungeon, Plane, Phenomenon,
--- Vanguard, Scheme and Conspiracy.
+-- | CR 205.2a lists fifteen card types. The seven missing ones are Battle
+-- (#302) and the six command-zone residents in #131 -- Dungeon, Plane,
+-- Phenomenon, Vanguard, Scheme and Conspiracy.
 --
 -- Ord here is DECLARATION ORDER, and a card file stores its type set in that
 -- order (Pawl.CardsSpec's whole-pool round trip compares the arrays), so a new
@@ -14,15 +14,15 @@ data CardType
   = Land
   | Creature
   | Instant
-  | -- CR 110.4: one of the six permanent types. Humility is the first
+  | -- | CR 110.4: one of the six permanent types. Humility is the first
     -- enchantment printing (M3b).
     Enchantment
-  | -- CR 301: an artifact, a permanent type. Mindslaver is the first (M3g).
+  | -- | CR 301: an artifact, a permanent type. Mindslaver is the first (M3g).
     Artifact
-  | -- CR 307: a sorcery, cast only at sorcery speed (not a permanent). Blaze is
+  | -- | CR 307: a sorcery, cast only at sorcery speed (not a permanent). Blaze is
     -- the first sorcery printing (M4a).
     Sorcery
-  | -- CR 308.1: a kindred card. "Each kindred card has another card type.
+  | -- | CR 308.1: a kindred card. "Each kindred card has another card type.
     -- Casting and resolving a kindred card follows the rules for casting and
     -- resolving a card of the other card type" -- so this arm adds no casting or
     -- resolution path of its own, and CR 110.4 leaves kindred off the six
@@ -36,7 +36,7 @@ data CardType
     -- "tribal" cards need no second name here: they are errata'd to kindred in
     -- the Oracle reference, which is what the card files transcribe.
     Kindred
-  | -- CR 306: a planeswalker, one of CR 110.4's six permanent types. Jace
+  | -- | CR 306: a planeswalker, one of CR 110.4's six permanent types. Jace
     -- Beleren is the first printing.
     --
     -- The card type is what the rest of CR 306 hangs off, and every clause of it

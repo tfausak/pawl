@@ -1,28 +1,26 @@
--- | The @Countering ⇆ Json@ codec (#481).
 module Pawl.Codec.Countering where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Json as Json
-import Pawl.Codec.ObjectId (jsonToObjectId, objectIdToJson)
-import Pawl.Codec.PlayerId (jsonToPlayerId, playerIdToJson)
-import Pawl.Json.Value (Value)
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Countering as Countering
 
-counteringToJson :: Countering.Countering -> Value
-counteringToJson c =
-  Json.jObject
-    [ (Text.pack "spell", objectIdToJson (Countering.spell c)),
-      (Text.pack "source", objectIdToJson (Countering.source c)),
-      (Text.pack "controller", playerIdToJson (Countering.controller c))
+toJson :: Countering.Countering -> Value.Value
+toJson c =
+  Common.object
+    [ Common.pair "spell" . ObjectId.toJson $ Countering.spell c,
+      Common.pair "source" . ObjectId.toJson $ Countering.source c,
+      Common.pair "controller" . PlayerId.toJson $ Countering.controller c
     ]
 
-jsonToCountering :: Value -> Either Text Countering.Countering
-jsonToCountering value = do
-  ps <- Json.asObject value
-  s <- Json.field (Text.pack "spell") ps >>= jsonToObjectId
-  o <- Json.field (Text.pack "source") ps >>= jsonToObjectId
-  c <- Json.field (Text.pack "controller") ps >>= jsonToPlayerId
+fromJson :: Value.Value -> Either Text.Text Countering.Countering
+fromJson value = do
+  ps <- Common.asObject value
+  s <- Common.field "spell" ps >>= ObjectId.fromJson
+  o <- Common.field "source" ps >>= ObjectId.fromJson
+  c <- Common.field "controller" ps >>= PlayerId.fromJson
   pure
     Countering.MkCountering
       { Countering.spell = s,
