@@ -1101,6 +1101,29 @@ rewriteModification pairs m =
         _ -> acc
    in List.foldl' apply1 m pairs
 
+-- rewriteModification's sibling for the OTHER half of a static ability. CR 612.1:
+-- a text-changing effect "can apply to any words or symbols printed on that
+-- object, but generally affects only that object's rules text", and an ability's
+-- affected clause is rules text like any other -- so a hacked Kormus Bell, whose
+-- "All Swamps" is Affected.Matching (HasSubtype Swamp), animates Islands after
+-- the swap and stops animating Swamps.
+--
+-- Delegates to Filter.rewrite, which #395 added for a Filter carried by an
+-- EFFECT; this is the same call one level up, and the only thing #402 was
+-- missing.
+--
+-- EXHAUSTIVE over Affected, not a wildcard: the two arms that carry a Filter are
+-- the two that could hide a land-type word, and a new arm carrying one must
+-- break this build rather than silently keep the old word.
+rewriteAffected :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Affected.Affected -> Affected.Affected
+rewriteAffected pairs a = case a of
+  Affected.Matching f -> Affected.Matching (Filter.rewrite pairs f)
+  Affected.AttachedPlayerControls f -> Affected.AttachedPlayerControls (Filter.rewrite pairs f)
+  -- A frozen id set names no word (CR 611.2c locks it at resolution), and an
+  -- attachment names none either -- both read the SOURCE's own state.
+  Affected.TheseObjects _ -> a
+  Affected.Attached -> a
+
 -- Every continuous effect in the game: stored resolution effects, plus the
 -- static abilities of every battlefield permanent (CR 613.7a: with the
 -- permanent's own timestamp), dropping a permanent whose static abilities are
@@ -1364,7 +1387,9 @@ gatherStatic src ts changes stripped n sa =
         MkGathered
           { gEffect = key,
             gSource = src,
-            gAffected = StaticAbility.affected sa,
+            -- CR 612.1: rewritten for the same reason the modifications above
+            -- are -- the affected clause is rules text too (#402).
+            gAffected = rewriteAffected changes (StaticAbility.affected sa),
             gLayer = layer m',
             gLowest = lowest,
             gTimestamp = ts,
