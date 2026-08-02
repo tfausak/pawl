@@ -33,7 +33,10 @@ playableLands pid gs =
 
 legalActions :: PlayerId -> GameState -> [Action]
 legalActions pid gs =
-  let canPlayLand =
+  let -- CR 702.8a's window says "play this card", which reaches a land as well
+      -- as a spell; this gate does not consult the keyword, so a land card with
+      -- flash would still be playable only at sorcery speed (#566).
+      canPlayLand =
         Turn.isMainPhase (GameState.phase gs)
           && GameState.activePlayer gs == pid
           && not (Set.member pid (GameState.landPlayed gs))

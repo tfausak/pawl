@@ -109,10 +109,21 @@ blockerThreshold gs attacker blocker =
 -- AS THE DAMAGE IS DEALT, and the source may be gone by the time the CR 704.5h
 -- SBA or a later reader asks. CR 702.2e and CR 702.90d say so outright for
 -- deathtouch and infect ("its last known information is used to determine
--- whether it had" the keyword). Rule 702.164 has NO such clause, so toxic's
--- total value (CR 702.164b) is captured by analogy rather than by citation --
--- observably the same today, since applyDamage runs in the same instant, and it
--- keeps the CR 608.2i record self-contained.
+-- whether it had" the keyword), and CR 702.15c says it for lifelink. Rule
+-- 702.164 has NO such clause, so toxic's total value (CR 702.164b) is captured
+-- by analogy rather than by citation -- observably the same today, since
+-- applyDamage runs in the same instant, and it keeps the CR 608.2i record
+-- self-contained.
+--
+-- Lifelink's rider carries WHO rather than WHETHER, because CR 702.15b's answer
+-- is a player: "that source's controller, or its owner if it has no
+-- controller". Projection.controllerOf is both of those clauses at once -- it
+-- returns a control effect's player when one applies and the object's own owner
+-- when none does, in any zone, which is what CR 702.15d ("no matter what zone")
+-- needs. It returns Nothing only when the id names nothing at all, so a source
+-- that has already ceased to exist gains nobody life; CR 702.15c would have
+-- last-known information answer that, and no rider on this path consults it
+-- (#562).
 --
 -- Every damage the engine deals is built here -- the only other constructor call
 -- in the library is Pawl.Codec's decoder, which rebuilds an event rather than
@@ -127,6 +138,10 @@ damageEvent gs kind source target amount =
       DamageEvent.dealtByDeathtouch = Projection.hasKeyword Keyword.Deathtouch source gs,
       DamageEvent.dealtByInfect = Projection.hasKeyword Keyword.Infect source gs,
       DamageEvent.dealtByToxic = Projection.totalToxic source gs,
+      DamageEvent.dealtByLifelink =
+        if Projection.hasKeyword Keyword.Lifelink source gs
+          then Projection.controllerOf source gs
+          else Nothing,
       DamageEvent.kind = kind
     }
 
@@ -429,9 +444,39 @@ applyDamage events = do
         -- Doing anything here would be the wrong answer if anything did reach
         -- it: nothing has said which of CR 120.3's results applies.
         Recipient.ToObject _ -> g
+      -- CR 120.3f: "Damage dealt by a source with lifelink causes that source's
+      -- controller to gain that much life, IN ADDITION to the damage's other
+      -- results." A second pass over the same survivors, deliberately not a
+      -- branch inside markOne: "in addition" is then structural, and no arm of
+      -- CR 120.3 above can be turned into "instead" by an edit here.
+      --
+      -- Every survivor, whatever it was dealt to. CR 702.15b hangs the gain off
+      -- the SOURCE ("that source's controller, or its owner if it has no
+      -- controller"), so which of CR 120.3's results the damage had -- marked
+      -- damage, loyalty counters, life loss, poison -- is none of this pass's
+      -- business.
+      --
+      -- One adjustment per event rather than one per player: CR 702.15e, "if
+      -- multiple sources with lifelink deal damage at the same time, they cause
+      -- SEPARATE life gain events (see rules 119.9-10)". Summing them first would
+      -- be one event, which is the thing that rule says it is not.
+      --
+      -- Over `survivors`, so CR 615.6's prevented event ("the event never
+      -- happens") gains nobody anything -- the same reading toxic's arm above
+      -- takes.
+      gainOne g ev = case DamageEvent.dealtByLifelink ev of
+        Nothing -> g
+        Just pid ->
+          let gain player = player {Player.life = Player.life player + toInteger (DamageEvent.amount ev)}
+           in g {GameState.players = Map.adjust gain pid (GameState.players g)}
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
-  State.modify' (\gs -> List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) (List.foldl' markOne gs survivors) survivors)
+  State.modify'
+    ( \gs ->
+        let marked = List.foldl' markOne gs survivors
+            gained = List.foldl' gainOne marked survivors
+         in List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) gained survivors
+    )
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).

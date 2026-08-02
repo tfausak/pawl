@@ -47,6 +47,27 @@ data Keyword
   | Defender -- 702.3
   | DoubleStrike -- 702.4
   | FirstStrike -- 702.7
+  | -- 702.8a: "Flash is a static ability that functions in any zone from which
+    -- you could play the card it's on. 'Flash' means 'You may play this card any
+    -- time you could cast an instant.'"
+    --
+    -- The first keyword here about WHEN a card may be cast. Rule 702's other
+    -- casting keywords in this pool move a different axis: flashback (702.34a)
+    -- moves the zone and the cost, cycling (702.29a) is an activated ability
+    -- rather than a cast at all, and entwine (702.42a) moves the modes and the
+    -- cost. This one moves only the window, and nothing reads it once the spell
+    -- is on the stack. Read by Pawl.Engine.Cast.instantSpeed.
+    --
+    -- Nullary, because rule 702.8a takes no parameter, and CR 702.8b makes
+    -- multiple instances redundant -- so its reader takes membership rather than
+    -- the per-keyword count Pawl.Types.ProjectedCharacteristics.keywords carries.
+    --
+    -- Not a Pawl.Types.CastingPermission. That type's arms name a ZONE a card may
+    -- be cast from (CR 601.3); rule 702.8a's second sentence names a TIME and no
+    -- zone at all, and its first sentence is about where the ability functions
+    -- rather than where the card may be cast from. A Pouncing Cheetah in a
+    -- graveyard is as uncastable as a War Mammoth there.
+    Flash
   | Flying -- 702.9
   | Haste -- 702.10
   | -- 702.11a: "Hexproof is a static ability." 702.11b: "'Hexproof' on a
@@ -84,6 +105,23 @@ data Keyword
     -- Only rule 702.14a's "usually a land type" case is represented. A Subtype
     -- cannot say "nonbasic land", "artifact land" or "snow Swamp" (#499).
     Landwalk Subtype
+  | -- 702.15a: "Lifelink is a static ability." 702.15b: "Damage dealt by a
+    -- source with lifelink causes that source's controller, or its owner if it
+    -- has no controller, to gain that much life (in addition to any other
+    -- results that damage causes)."
+    --
+    -- Nullary, because rule 702.15b takes no parameter, and CR 702.15f
+    -- ("multiple instances of lifelink on the same object are redundant") is why
+    -- its reader takes membership rather than the per-keyword count
+    -- Pawl.Types.ProjectedCharacteristics.keywords carries -- flying's shape,
+    -- not toxic's.
+    --
+    -- Read ONCE, at deal time, into Pawl.Types.DamageEvent.dealtByLifelink:
+    -- CR 702.15c says the source's last known information decides whether it had
+    -- lifelink, and CR 702.15d says the rules "function no matter what zone an
+    -- object with lifelink deals damage from", so this is never a question asked
+    -- of a live board when the life is handed over. See Pawl.Engine.Damage.damageEvent.
+    Lifelink
   | Reach -- 702.17
   | -- 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
     -- player can't be the target of spells or abilities.'"

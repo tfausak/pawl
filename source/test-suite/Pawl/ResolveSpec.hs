@@ -1116,8 +1116,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (gs1, fogId) = S.handOne fog gs0
         cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Combat])
-        spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Noncombat])
+        combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Combat])
+        spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Noncombat])
     Spec.assertEqWith s "Fog installed one replacement" (length (GameState.replacements resolved)) 1
     Spec.assertEqWith s "combat damage prevented (the cancel shape)" (S.damageOf victim combat) (Just 0)
     -- The falsifier: a tag-blind Fog would also blunt this spell damage.
@@ -1682,7 +1682,7 @@ indestructibleSpec s registry = Spec.describe s "Indestructible" $ do
     let (myrId, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
         -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
         -- the 704.5h path; indestructible must guard it too (CR 700.4).
-        wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False 0 DamageKind.Combat)] gs
+        wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False 0 Nothing DamageKind.Combat)] gs
         after = S.settleSba wounded
     Spec.assertEqWith s "Myr survives deathtouch" (S.creaturesInPlay S.bob after) 1
   Spec.it s "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $ do

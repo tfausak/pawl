@@ -3,6 +3,7 @@ module Pawl.CardsSpec where
 
 import qualified Data.ByteString as ByteString
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -11,6 +12,7 @@ import Pawl.Codec.EntryRiders (defaultEntryRiders)
 import qualified Pawl.Codec.Json as Json
 import Pawl.Codec.Printing (printingToJson)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
@@ -19,6 +21,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as CardT
@@ -65,6 +68,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
@@ -208,6 +212,31 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
     Spec.assertEqWith s "one keyword: menace" (CardT.keywords c) (Set.singleton Keyword.Menace)
     Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
     Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+  -- The first card file with flash (CR 702.8), and so the first whose keyword
+  -- moves the CR 302.1 window the card may be CAST in rather than anything
+  -- about it once it is a permanent. Its entire printed rules text is the
+  -- keyword, so a flash case in Pawl.CastSpec that uses this printing is asking
+  -- about 702.8a and nothing else.
+  Spec.it s "pouncing-cheetah.json loads as a {2}{G} 3/2 Cat whose only keyword is flash" $ do
+    c <- S.cardOf s registry "Pouncing Cheetah"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Pouncing Cheetah")
+    Spec.assertEqWith
+      s
+      "{2}{G}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Green)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 3)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 2)))
+    Spec.assertEqWith s "Creature -- Cat" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Cat)
+    Spec.assertEqWith s "one keyword: flash" (CardT.keywords c) (Set.singleton Keyword.Flash)
+    Spec.assertEqWith s "no other text" (CardT.staticAbilities c) []
+    Spec.assertEqWith s "and no triggered ability either" (CardT.triggeredAbilities c) []
+    -- CR 601.3: flash is a TIMING ability, so it grants no zone permission.
+    -- Asked of Cast.castableZones and not of CardT.castingPermissions, because
+    -- the printed list is empty on a flashback card too -- rule 702.34a's
+    -- permission arrives through Keyword.castingPermissionsOf, and only the
+    -- union of the two discriminates. Firebolt answers [Hand, Graveyard] here.
+    Spec.assertEqWith s "castable from the hand and nowhere else" (Cast.castableZones c) [Zone.Hand]
   -- The first card file to carry BOTH a keyword and a counterability, and the
   -- first whose CR 113.6g clause sits on a creature rather than an instant
   -- (Rending Volley's). The two clauses are separate fields because they are
@@ -1399,6 +1428,63 @@ spec s registry = Spec.describe s "Pawl.Cards" $ do
       (fmap (Map.toList . Mode.targetSpecs) (Foldable.toList (Modal.modes (CardT.spell c))))
       [[(target, TargetSpec.MkTargetSpec Pool.Creatures Nothing)]]
     Spec.assertEqWith s "no permanent text at all" (CardT.staticAbilities c, CardT.triggeredAbilities c, CardT.replacementEffects c) ([], [], [])
+  -- The first card file with lifelink (CR 702.15), and a vanilla one otherwise:
+  -- its entire printed rules text is the keyword, so a lifelink case in
+  -- Pawl.DamageSpec that uses this printing is asking about 702.15b and nothing
+  -- else.
+  Spec.it s "child-of-night.json loads as a {1}{B} 2/1 Vampire whose only keyword is lifelink" $ do
+    c <- S.cardOf s registry "Child of Night"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Child of Night")
+    Spec.assertEqWith
+      s
+      "{1}{B}"
+      (CardT.manaCost c)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)]))
+    Spec.assertEqWith s "power" (CardT.power c) (Just (Power.MkPower (Quantity.Literal 2)))
+    Spec.assertEqWith s "toughness" (CardT.toughness c) (Just (Toughness.MkToughness (Quantity.Literal 1)))
+    Spec.assertEqWith s "Creature -- Vampire" (TypeLine.subtypes (CardT.typeLine c)) (Set.singleton Subtype.Vampire)
+    Spec.assertEqWith s "one keyword: lifelink" (CardT.keywords c) (Set.singleton Keyword.Lifelink)
+    Spec.assertEqWith s "no other text at all" (CardT.staticAbilities c, CardT.triggeredAbilities c, CardT.activatedAbilities c) ([], [], [])
+  -- "Equipped creature has deathtouch and lifelink", so both keywords are on the
+  -- Equipment's layer-6 GRANT and neither is in its own printed keyword set --
+  -- the distinction the assertions below draw, and the one that makes this
+  -- printing the pool's proof that lifelink is read off the CR 613 layer-6
+  -- PROJECTION rather than off a printed card. Two modifications on ONE static ability, because both are
+  -- granted to the same Affected.Attached -- the Setessan Training shape, not
+  -- two abilities that could be affected separately.
+  Spec.it s "basilisk-collar.json loads as a {1} Equipment granting deathtouch and lifelink for {2}" $ do
+    c <- S.cardOf s registry "Basilisk Collar"
+    Spec.assertEqWith s "name" (CardT.name c) (Text.pack "Basilisk Collar")
+    Spec.assertEqWith s "{1}" (CardT.manaCost c) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "Artifact -- Equipment"
+      (CardT.typeLine c)
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Artifact) (Set.singleton Subtype.Equipment))
+    Spec.assertEqWith s "no P/T" (CardT.power c, CardT.toughness c) (Nothing, Nothing)
+    Spec.assertEqWith s "no printed keywords of its own" (CardT.keywords c) Set.empty
+    Spec.assertEqWith
+      s
+      "one static ability: the equipped creature gains deathtouch and lifelink"
+      (CardT.staticAbilities c)
+      [ StaticAbility.MkStaticAbility
+          Affected.Attached
+          (Modification.GainKeyword Keyword.Deathtouch NonEmpty.:| [Modification.GainKeyword Keyword.Lifelink])
+      ]
+    -- CR 702.6a: "'Equip [cost]' means '[Cost]: Attach this permanent to target
+    -- creature you control. Activate only as a sorcery.'" The timing rider is
+    -- the last clause, and it is what keeps the Collar out of combat.
+    Spec.assertEqWith
+      s
+      "one activated ability, {2} at sorcery speed"
+      (fmap (\ab -> (Cost.mana (ActivatedAbility.cost ab), Cost.components (ActivatedAbility.cost ab), ActivatedAbility.timing ab)) (CardT.activatedAbilities c))
+      [(Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]), [], ActivationTiming.SorcerySpeed)]
+    Spec.assertEqWith
+      s
+      "which attaches this Equipment to the chosen creature"
+      (concatMap (modeShapes . ActivatedAbility.modal) (CardT.activatedAbilities c))
+      [(Optionality.Mandatory, [Effect.Attach (SlotName.MkSlotName (Text.pack "target"))])]
+    Spec.assertEqWith s "and no triggered ability" (CardT.triggeredAbilities c) []
 
 checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
 checkFile s root p = do
