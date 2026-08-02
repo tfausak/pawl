@@ -546,6 +546,64 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) gs0
     Spec.assertEqWith s "still Forest" (Projection.subtypesOf landId gs) (Set.singleton Subtype.Type.Forest)
 
+  -- CR 612.1: a text-changing effect "can apply to any words or symbols printed
+  -- on that object, but generally affects only that object's rules text ...
+  -- and/or the text that appears in its type line". A static ability's AFFECTED
+  -- clause is rules text like any other, so hacking the ability's source moves
+  -- the SET it applies to and not only its modifications (#402).
+  --
+  -- Kormus Bell {4} Artifact -- "All Swamps are 1/1 black creatures that are
+  -- still lands" (checked against Scryfall) -- is the card that shows it: its
+  -- affected set is Matching (HasSubtype Swamp), the shape whose word the swap
+  -- has to reach. Blood Moon and Humility cannot, since they select by supertype
+  -- and card type; Urborg carries its land type in the MODIFICATION, which was
+  -- already rewritten.
+  Spec.it s "CR 612.1 hacking Kormus Bell moves which lands it animates" $ do
+    kormusBell <- S.printingOf s registry "Kormus Bell"
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    let base = Setup.emptyGame S.bothPlayers
+        (bellId, g1) = S.addCreature kormusBell S.alice base
+        (swampId, g2) = S.addCreature swamp S.alice g1
+        (islandId, plain) = S.addCreature island S.alice g2
+        -- The swap is on the BELL, which is where the words are printed.
+        hacked = S.withEffectAt bellId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island) plain
+    -- Unhacked, the Bell animates the Swamp and nothing else.
+    Spec.assertBool s (Projection.isCreatureOf swampId plain) "the Swamp is a creature"
+    Spec.assertEqWith s "a 1/1" (Projection.powerOf swampId plain) (Just 1)
+    Spec.assertBool s (not (Projection.isCreatureOf islandId plain)) "and the Island is not"
+    -- Hacked, the affected set moves with the word: the Island animates and the
+    -- Swamp stops. An implementation that rewrote only the modifications would
+    -- leave BOTH of these the way they are above.
+    Spec.assertBool s (Projection.isCreatureOf islandId hacked) "hacked, the Island is a creature"
+    Spec.assertEqWith s "a 1/1 too" (Projection.powerOf islandId hacked) (Just 1)
+    Spec.assertBool s (not (Projection.isCreatureOf swampId hacked)) "and the Swamp is not animated any more"
+
+  -- CR 613.8a: Kormus Bell's affected set READS subtypes at layer 4, and
+  -- Urborg's AddLandSubtype WRITES them at layer 4 -- so the two are dependent
+  -- and Urborg must apply first, which is the classic pairing. It is what makes
+  -- every land a 1/1: Urborg makes them all Swamps, and the Bell then animates
+  -- what Urborg produced rather than what the printed type lines said.
+  --
+  -- Not a text-change case, but it is the same reader (`affected` at layer 4)
+  -- that #402 changed, and nothing else in the suite pairs an affected-set read
+  -- with a same-layer write.
+  Spec.it s "CR 613.8a Urborg makes every land a Swamp, so Kormus Bell animates all of them" $ do
+    kormusBell <- S.printingOf s registry "Kormus Bell"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    forest <- S.printingOf s registry "Forest"
+    let base = Setup.emptyGame S.bothPlayers
+        (_, g1) = S.addCreature kormusBell S.alice base
+        (forestId, withBell) = S.addCreature forest S.alice g1
+        (_, withUrborg) = S.addCreature urborg S.alice withBell
+    -- Without Urborg the Forest is no Swamp, so the Bell leaves it alone.
+    Spec.assertBool s (not (Projection.isCreatureOf forestId withBell)) "the Forest is not animated on its own"
+    -- With Urborg it is a Swamp (layer 4, written) and therefore animated (layer
+    -- 4, read) -- and a 1/1 at 7b.
+    Spec.assertBool s (Set.member Subtype.Type.Swamp (Projection.subtypesOf forestId withUrborg)) "Urborg makes it a Swamp"
+    Spec.assertBool s (Projection.isCreatureOf forestId withUrborg) "so the Bell animates it"
+    Spec.assertEqWith s "as a 1/1" (Projection.powerOf forestId withUrborg) (Just 1)
+
   Spec.it s "CR 613.1d AddLandSubtype gives a Forest the Swamp subtype" $ do
     forest <- S.printingOf s registry "Forest"
     let gs0 = S.landsInPlay forest 1

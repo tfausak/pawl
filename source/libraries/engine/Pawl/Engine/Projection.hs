@@ -995,6 +995,15 @@ setLandSubtypeEffects gs =
         if isSet (ContinuousEffect.modification eff)
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
           else []
+      -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
+      -- 612's word swap to the same ability's (#402). So a text-changed source
+      -- would have this gate and the layer fold disagreeing about which
+      -- permanents it names. Unreachable: the pool's only SetLandSubtype is
+      -- Blood Moon, which selects by card type and supertype and so carries no
+      -- land-type word for a swap to reach. Rewriting here is not free either --
+      -- textChangesAffecting folds the whole effect list, and this function is
+      -- hoisted out of gather's walk precisely to avoid per-permanent cost
+      -- (#584).
       fromPerm permId = case Game.cardOf permId gs of
         Nothing -> []
         Just card ->
@@ -1100,6 +1109,29 @@ rewriteModification pairs m =
         Modification.SetController _ -> acc
         _ -> acc
    in List.foldl' apply1 m pairs
+
+-- rewriteModification's sibling for the OTHER half of a static ability. CR 612.1:
+-- a text-changing effect "can apply to any words or symbols printed on that
+-- object, but generally affects only that object's rules text", and an ability's
+-- affected clause is rules text like any other -- so a hacked Kormus Bell, whose
+-- "All Swamps" is Affected.Matching (HasSubtype Swamp), animates Islands after
+-- the swap and stops animating Swamps.
+--
+-- Delegates to Filter.rewrite, which #395 added for a Filter carried by an
+-- EFFECT; this is the same call one level up, and the only thing #402 was
+-- missing.
+--
+-- EXHAUSTIVE over Affected, not a wildcard: the two arms that carry a Filter are
+-- the two that could hide a land-type word, and a new arm carrying one must
+-- break this build rather than silently keep the old word.
+rewriteAffected :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Affected.Affected -> Affected.Affected
+rewriteAffected pairs a = case a of
+  Affected.Matching f -> Affected.Matching (Filter.rewrite pairs f)
+  Affected.AttachedPlayerControls f -> Affected.AttachedPlayerControls (Filter.rewrite pairs f)
+  -- A frozen id set names no word (CR 611.2c locks it at resolution), and an
+  -- attachment names none either -- both read the SOURCE's own state.
+  Affected.TheseObjects _ -> a
+  Affected.Attached -> a
 
 -- Every continuous effect in the game: stored resolution effects, plus the
 -- static abilities of every battlefield permanent (CR 613.7a: with the
@@ -1360,11 +1392,25 @@ gatherStatic src ts changes stripped n sa =
       -- copied onto each of its parts. Total: an ability has at least one
       -- modification, so this minimum is over a NonEmpty.
       lowest = minimum (fmap layer ms)
+      -- CR 612.1: rewritten for the same reason the modifications above are --
+      -- the affected clause is rules text too (#402).
+      --
+      -- Hoisted out of `one` and short-circuited, both for the same reason: this
+      -- runs inside gather, which the SBA sweep reruns at every priority
+      -- boundary. Inside `one` it would rebuild the filter once PER PART (three
+      -- times for Kormus Bell), and Filter.rewrite walks and rebuilds the whole
+      -- tree even for an empty pair list -- unlike rewriteModification, whose
+      -- fold over [] is free. An ordinary board has no text change at all, so
+      -- the guard is what keeps this off the hot path entirely.
+      affected =
+        if null changes
+          then StaticAbility.affected sa
+          else rewriteAffected changes (StaticAbility.affected sa)
       one m' =
         MkGathered
           { gEffect = key,
             gSource = src,
-            gAffected = StaticAbility.affected sa,
+            gAffected = affected,
             gLayer = layer m',
             gLowest = lowest,
             gTimestamp = ts,

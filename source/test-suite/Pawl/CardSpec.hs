@@ -2293,13 +2293,37 @@ basicLandSpec s registry = Spec.describe s "BasicLand" $ do
       (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
       "forest subtype"
 
-m3cCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+m3cCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m3cCardSpec s registry = Spec.describe s "M3cCards" $ do
   Spec.it s "Blood Moon is a {2}{R} enchantment with one SetLandSubtype static ability" $ do
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let card = Printing.card bloodMoon
     Spec.assertEqWith s "one static ability" (length (Card.Type.staticAbilities card)) 1
     Spec.assertBool s (Map.null (Card.allTargetSpecs card)) "not a permanent target"
+  -- Kormus Bell {4} Artifact -- "All Swamps are 1/1 black creatures that are
+  -- still lands" (checked against Scryfall). The pool's first static ability
+  -- whose AFFECTED clause names a basic land type, which is the whole reason it
+  -- is here: Blood Moon and Humility select by supertype and card type, and
+  -- Urborg carries its land type in the MODIFICATION. So this is the only card
+  -- that can show CR 612.1's word swap reaching an affected set (#402), which
+  -- ProjectionSpec proves by hacking the Bell.
+  Spec.it s "Kormus Bell's affected set is a bare land-type filter, the shape CR 612.1 must reach" $ do
+    kormusBell <- S.printingOf s registry "Kormus Bell"
+    let card = Printing.card kormusBell
+    Spec.assertEqWith s "name" (Card.Type.name card) (Text.pack "Kormus Bell")
+    Spec.assertEqWith s "{4}" (Card.Type.manaCost card) (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
+    Spec.assertEqWith s "Artifact" (TypeLine.types (Card.Type.typeLine card)) (Set.singleton CardType.Artifact)
+    Spec.assertEqWith
+      s
+      "one static ability, affecting exactly the Swamps"
+      (fmap StaticAbility.affected (Card.Type.staticAbilities card))
+      [Affected.Matching (Filter.Type.HasSubtype Subtype.Swamp)]
+    -- "are 1/1 black creatures THAT ARE STILL LANDS": an ADD, never a set, so
+    -- the animated Swamp keeps its land type and taps for mana as before.
+    Spec.assertBool
+      s
+      (any (elem (Modification.AddCardType CardType.Creature) . StaticAbility.modifications) (Card.Type.staticAbilities card))
+      "it ADDS the creature type rather than setting it"
 
 m3eCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 m3eCardSpec s registry = Spec.describe s "M3eCards" $ do
