@@ -34,10 +34,14 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- they differ in WHEN rather than in what they write -- Resolve.applyEffect's
 -- SkipNextPhase arm at resolution, and Pawl.Engine.Replacement.installTurnSkips as
 -- an extra turn begins (see above). Runtime-only, and the TYPE does not enforce
--- that -- the codec round-trips the field, because a stored ActiveReplacement
--- carrying a baked pattern must survive the trip. Pawl.CardSpec's "no card
--- authors a player-scoped phase skip" is what rejects a Just written into card
--- JSON, the same treatment SetController's baked PlayerId gets.
+-- that: this pattern reaches card data only inside ReplacementEffect.PhaseR, and
+-- that sum is the carrier for BOTH halves -- Card.replacementEffects, which a
+-- card authors, and ActiveReplacement.effect, which the engine bakes. Making a
+-- Just unrepresentable card-side would mean splitting or parameterizing
+-- ReplacementEffect, not merely this record. Pawl.CardSpec's "no card authors a
+-- player-scoped phase skip" is what rejects a Just written into card JSON
+-- instead -- the same treatment, for the same structural reason, that
+-- Modification.SetController's baked PlayerId gets (#199).
 data PhasePattern = MkPhasePattern
   { whichPhase :: PhaseSelector.PhaseSelector,
     whosePhase :: Maybe PlayerId.PlayerId

@@ -548,9 +548,11 @@ modalReadOffends abilityBound modal =
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
 -- (Card.replacementEffects, Eon Hub's) and the ones an effect of its own
--- installs (Effect.Replace, a floating one). Both come out of card JSON, which
--- is the whole of what the lint below is about; a replacement the ENGINE bakes
--- reaches GameState without passing through a Card and is not swept here.
+-- installs (Effect.Replace, a floating one) -- and, through effectReplacements
+-- below, everything a token or emblem those effects mint prints in turn. All of
+-- them come out of card JSON, which is the whole of what the lint below is
+-- about; a replacement the ENGINE bakes reaches GameState without passing
+-- through a Card and is not swept here.
 cardReplacementEffects :: Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
 cardReplacementEffects card =
   Card.Type.replacementEffects card
@@ -617,20 +619,26 @@ effectReplacements effect = case effect of
 -- pending extra turn (Replacement.installTurnSkips). Card data cannot name a
 -- player at all.
 --
--- Nothing enforced that split. Codec.PhasePattern round-trips the field in both
--- directions and has to, since a stored ActiveReplacement carrying a baked
--- pattern must survive the trip -- so a card file could write `"whosePhase": 1`,
--- which is meaningless. Player 1 is a seat in some game, not a fact about a
--- printed card, and the skip would land on whoever happened to hold that id.
+-- Nothing enforced that split. Codec.PhasePattern is structural over the record,
+-- so it accepts a Just from card JSON -- and a card file could write
+-- `"whosePhase": 1`, which is meaningless. Player 1 is a seat in some game, not
+-- a fact about a printed card, and the skip would land on whoever happened to
+-- hold that id.
 --
 -- A LINT rather than a type-level split, which is the call #199 already records
 -- for the sibling case (Modification.SetController's baked PlayerId, likewise
--- accepted by its codec and likewise kept out of card data by a lint here). A
--- split -- a card-side pattern and a runtime-side one, the way Duration and
--- Expiry are split -- would make the bad value unrepresentable rather than
--- merely rejected, at the cost of a second type and a conversion. Worth doing
--- for BOTH baked PlayerIds or neither; doing it for one would leave the pair
--- inconsistent, which is what the issue asks be decided once.
+-- accepted by its codec and likewise kept out of card data by a lint here).
+--
+-- What makes the split expensive is NOT the codec -- nothing needs a baked
+-- pattern to round-trip, since ActiveReplacement and GameState have no codec at
+-- all (#126). It is that ReplacementEffect is the carrier for both halves:
+-- Card.replacementEffects, which a card authors, and ActiveReplacement.effect,
+-- which the engine bakes. A card-side / runtime-side split the way Duration and
+-- Expiry are split would therefore have to split or parameterize that whole sum,
+-- not just PhasePattern. Modification is shared exactly the same way, between
+-- StaticAbility.modifications and a stored ContinuousEffect, which is why the
+-- two cases want ONE answer rather than two -- what the issue asks be decided
+-- once.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- pattern-carrying replacement must break this build rather than silently pass.
@@ -674,10 +682,10 @@ slotNamesCollide sets = Set.size (Set.unions sets) /= sum (fmap Set.size sets)
 -- permanent, which is what the CR 702.42b resolution-order test in CastSpec
 -- does.
 --
--- The enchant slot joins the SPELL's modes and no ability's, because
--- Card.modesTargetSpecs is the only union that adds it -- CR 303.4a's slot is
--- announced when the Aura spell is cast, and Activate stamps
--- Modal.modesTargetSpecs, which has no enchant half. Each ability is checked on
+-- The enchant slot joins the SPELL's modes and no ability's, because the unions
+-- that add it -- Card.modesTargetSpecs and Card.allTargetSpecs -- are both over
+-- the spell. CR 303.4a's slot is announced when the Aura spell is cast, and
+-- Activate stamps Modal.modesTargetSpecs, which has no enchant half. Each ability is checked on
 -- its own for the same reason: two abilities are two separate announcements, so
 -- a name they share is never fused.
 cardSlotNamesCollide :: Card.Type.Card -> Bool
@@ -1415,13 +1423,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- cardSlotNamesCollide for what a shared name silently does.
   Spec.it s "no card's modes share a target slot name" $ do
     ps <- S.allPrintings s
-    let declaring card =
-          length (filter (not . Map.null . Mode.targetSpecs) (Foldable.toList (Modal.modes (Card.Type.spell card))))
+    let declaring modal =
+          length (filter (not . Map.null . Mode.targetSpecs) (Foldable.toList (Modal.modes modal)))
+        -- Every modal cardSlotNamesCollide sweeps, so the guard below ranges over
+        -- the same four scopes the lint does rather than over the spell alone.
+        modalsOf card =
+          Card.Type.spell card
+            : fmap ActivatedAbility.modal (Card.Type.activatedAbilities card)
+              <> fmap TriggeredAbility.modal (Card.Type.triggeredAbilities card)
+              <> fmap TriggeredAbility.modal (Map.elems (Card.Type.delayedAbilities card))
         offenders = filter (cardSlotNamesCollide . Printing.card) ps
-    -- Guards against passing vacuously: a pool whose every modal card had at
-    -- most one slot-declaring mode could not collide whatever the lint said.
-    -- Dream's Grip is the card that makes it real.
-    Spec.assertBool s (any ((> 1) . declaring . Printing.card) ps) "the pool has a card with two slot-declaring modes"
+    -- Guards against passing vacuously: a pool whose every modal had at most one
+    -- slot-declaring mode could not collide whatever the lint said. Dream's Grip
+    -- is the spell that makes it real; Aether Channeler's triggered ability is
+    -- the multi-mode ability nearest to it, with one declaring mode of three.
+    Spec.assertBool s (any (any ((> 1) . declaring) . modalsOf . Printing.card) ps) "the pool has a modal with two slot-declaring modes"
     Spec.assertEqWith s "no fused mode slot" (fmap (Card.Type.name . Printing.card) offenders) []
   -- The sweep above passes because the pool is authored correctly, so it proves
   -- nothing about the lint. The REJECTING direction is proven here, against
@@ -1825,10 +1841,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       [False, False, False]
   -- The PER-MODE half of all three read lints (#570), which no sweep above can
   -- reach: a one-mode ability cannot have a mode read another mode's slot at
-  -- all, and every multi-mode ability in the pool (Synthetic Modal Activator's,
-  -- Synthetic Modal Trigger's) has each mode reading only what that mode
-  -- declares, so per-mode and the old union shape agree on every card committed
-  -- today. Proven here against hand-built offenders instead.
+  -- all, and all three multi-mode abilities in the pool have each mode reading
+  -- only what that mode declares, so per-mode and the old union shape agree on
+  -- every card committed today. Aether Channeler's is the one that comes closest
+  -- to exercising the difference and the only non-synthetic one -- three modes,
+  -- of which only the middle declares a slot -- and the other two (Synthetic
+  -- Modal Activator's, Synthetic Modal Trigger's) declare one apiece. Proven
+  -- here against hand-built offenders instead.
   --
   -- Both halves of the union, because closing one and leaving the other would
   -- pass this: the declared TARGET slots (CR 700.2c) and the slots an effect

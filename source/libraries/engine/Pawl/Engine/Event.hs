@@ -1591,8 +1591,8 @@ eventTriggers events gs =
       -- actually fire and not to graveyard size.
       --
       -- Abilities come from the PRINTED card and the controller is the OWNER,
-      -- both for the reasons `cycledCard` above spells out (CR 613's layers stop
-      -- at the battlefield; CR 108.4 leaves a graveyard card with no controller,
+      -- both for the reasons `cycledCard` above spells out (pawl's projection
+      -- stops at the battlefield, #160; CR 108.4 leaves a graveyard card with no controller,
       -- so CR 113.8's second clause names the owner).
       --
       -- CR 603.10a does NOT apply to what this source serves. Its look-back list

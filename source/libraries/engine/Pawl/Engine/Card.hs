@@ -19,7 +19,6 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.TargetSpec (TargetSpec)
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- Every effect across all of a card's modes, in printed (mode, then written)
@@ -124,11 +123,6 @@ isPermanentType cardType = case cardType of
 -- reason the engine never needs to know WHICH card is resolving.
 isPermanent :: Card.Card -> Bool
 isPermanent c = any isPermanentType (Set.toList (TypeLine.types (Card.typeLine c)))
-
--- CR 603.7: every effect across all of a card's DELAYED abilities' modes. The
--- read half of the delayed-ability dataflow lint, as allEffects is for the spell.
-delayedEffects :: Card.Card -> [Effect Card.Card]
-delayedEffects card = concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Card.delayedAbilities card))
 
 -- CR 205.3h / 303.4: is this card an Aura? A SUBTYPE read off the printed type
 -- line, exactly the kind of closed-half classification isPermanent is -- NOT a
