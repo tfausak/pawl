@@ -206,8 +206,13 @@ data Filter keyword
     -- the offer instead, and the two are only the same when the player would have
     -- picked a legal destination anyway.
     --
-    -- Answerable only where an attach frames the match, and silently False in any
-    -- other Filter position (#471). Reads the subject's enchant ability and not
+    -- Answerable only where an attach frames the match, and vacuously False in
+    -- any other Filter position -- which is why writing it into one is a FAILING
+    -- TEST rather than a quiet False: Pawl.CardSpec's "CR 701.3a no card asks
+    -- CanHostSubject outside an attach's destination" walks every Filter position
+    -- a card has and rejects the atom in all of them but that one. Widening the
+    -- subject so every evaluation could see it is #572, and needs a card that asks
+    -- the question outside an attach. Reads the subject's enchant ability and not
     -- CR 303.4's "other effects can limit what a permanent can be enchanted by"
     -- (#472).
     CanHostSubject
