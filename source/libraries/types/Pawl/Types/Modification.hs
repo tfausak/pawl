@@ -31,11 +31,10 @@ data Modification
     -- any existing creature types". CR 205.3m (Pawl.Engine.Subtype.isCreatureType)
     -- is the list of what that reaches.
     --
-    -- No AddCreatureSubtype beside it. Unlike SetColor's missing AddColor -- a
-    -- RULES answer, since CR 105.3 makes every colour change a replacement --
-    -- adding a creature type is a real thing an effect can do ("in addition to
-    -- its other types"). It is absent only because no card in the pool does it,
-    -- so the constructor would have no producer.
+    -- No AddCreatureSubtype beside it, though AddColor now sits beside SetColor
+    -- below: adding a creature type is a real thing an effect can do ("in
+    -- addition to its other types"), and it is absent only because no card in
+    -- the pool does it, so the constructor would have no producer.
     --
     -- CR 205.1b says "[creature type or types]" and this carries exactly one,
     -- the same narrowing SetLandSubtype takes and for the same reason -- no card
@@ -70,10 +69,15 @@ data Modification
     SetControllerToSource
   | -- | layer 5, CR 613.1e / 105.3: this object becomes exactly these colours. A
     -- SET, not an add: CR 105.3 says a new colour REPLACES all previous colours
-    -- unless the effect says "in addition" -- and no card in the pool does, so
-    -- there is deliberately no AddColor constructor. SetColor with an empty set
-    -- is "becomes colourless" (CR 105.2c).
+    -- unless the effect says "in addition". SetColor with an empty set is
+    -- "becomes colourless" (CR 105.2c).
     SetColor (Set.Set Color.Color)
+  | -- | layer 5, CR 613.1e / 105.3: this object becomes these colours IN
+    -- ADDITION to the ones it already has. CR 105.3's parenthetical -- "unless
+    -- the effect said the object became that color 'in addition' to its other
+    -- colors" -- so this unions where SetColor replaces. Indigo Faerie's
+    -- "target permanent becomes blue in addition to its other colors".
+    AddColor (Set.Set Color.Color)
   | -- | layer 7d, CR 613.4d: switch this object's power and toughness. Takes the
     -- value of power and applies it to toughness, and vice versa -- so it acts on
     -- whatever 7a, 7b and 7c already produced, not on the printed box. Carries no

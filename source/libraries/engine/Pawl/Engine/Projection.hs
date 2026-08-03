@@ -76,6 +76,7 @@ layer m = case m of
   Modification.SetController _ -> Layer.Control
   Modification.SetControllerToSource -> Layer.Control
   Modification.SetColor _ -> Layer.Color
+  Modification.AddColor _ -> Layer.Color
   Modification.SwitchPowerToughness -> Layer.SwitchPT
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
@@ -250,6 +251,10 @@ applyModification lyr src cands gs oid m pc =
         Modification.SetColor cs ->
           -- CR 105.3: the new colours replace all previous ones.
           pc {PC.colors = cs}
+        -- CR 105.3's parenthetical: an "in addition" colour is added to the
+        -- object's existing colours rather than replacing them.
+        Modification.AddColor cs ->
+          pc {PC.colors = Set.union cs (PC.colors pc)}
         -- CR 613.4d: "take the value of power and apply it to the creature's
         -- toughness, and take the value of toughness and apply it to the
         -- creature's power."
@@ -964,6 +969,7 @@ freezeQuantities gs oid you m =
         Modification.SetController _ -> Just m
         Modification.SetControllerToSource -> Just m
         Modification.SetColor _ -> Just m
+        Modification.AddColor _ -> Just m
         Modification.SwitchPowerToughness -> Just m
 
 -- Every Quantity a modification carries, in the order it carries them. Another
@@ -988,6 +994,7 @@ quantitiesOf m = case m of
   Modification.SetController _ -> []
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
+  Modification.AddColor _ -> []
   Modification.SwitchPowerToughness -> []
 
 -- Every SetLandSubtype effect in the game, each with its source and affected set
@@ -1305,6 +1312,7 @@ removesAbilities m = case m of
   Modification.ChangeSubtypeWord _ _ -> False
   Modification.AddCardType _ -> False
   Modification.SetColor _ -> False
+  Modification.AddColor _ -> False
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
 
@@ -1642,6 +1650,7 @@ modificationWrites m = case m of
   Modification.ChangeSubtypeWord _ _ -> Set.singleton Subtypes
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors
+  Modification.AddColor _ -> Set.singleton Colors
   Modification.SetController _ -> Set.singleton Controller
   Modification.SetControllerToSource -> Set.singleton Controller
 

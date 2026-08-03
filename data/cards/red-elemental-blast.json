@@ -1,0 +1,92 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Red Elemental Blast",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "Counter",
+            "value": "spell"
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "spell",
+            "spec": {
+              "filter": {
+                "type": "HasColor",
+                "value": {
+                  "type": "Blue"
+                }
+              },
+              "pool": {
+                "type": "Spells"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "effects": [
+          {
+            "type": "Destroy",
+            "value": [
+              "permanent",
+              {
+                "type": "Regenerable"
+              }
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "permanent",
+            "spec": {
+              "filter": {
+                "type": "HasColor",
+                "value": {
+                  "type": "Blue"
+                }
+              },
+              "pool": {
+                "type": "Permanents"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

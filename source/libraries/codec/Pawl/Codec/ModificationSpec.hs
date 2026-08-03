@@ -103,6 +103,15 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.SetColor (Set.singleton Color.Blue))
       "{\"type\":\"SetColor\",\"value\":[{\"type\":\"Blue\"}]}"
+  -- layer 5, CR 613.1e / 105.3: an ADD, not a set -- CR 105.3's "in addition"
+  -- parenthetical.
+  Spec.it s "AddColor" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.AddColor (Set.singleton Color.Blue))
+      "{\"type\":\"AddColor\",\"value\":[{\"type\":\"Blue\"}]}"
   -- layer 7d, CR 613.4d: switches power and toughness. Payload-free.
   Spec.it s "SwitchPowerToughness" $
     Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.SwitchPowerToughness "{\"type\":\"SwitchPowerToughness\"}"

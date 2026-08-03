@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
 -- 702.114a devoid and CR 111.3 token colour), Pawl.Engine.Target (NonblackCreatureTarget)
 -- and the P3a colour gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon,
@@ -6,7 +8,10 @@
 -- asserted on.
 module Pawl.ColorSpec where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -20,12 +25,24 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
@@ -33,6 +50,23 @@ import qualified Pawl.Types.Zone as Zone
 -- "target nonblack creature", the spec Doom Blade and the CR 115.1a cases share.
 nonblackCreature :: TargetSpec.TargetSpec
 nonblackCreature = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
+
+-- The single activated ability of a printing (Indigo Faerie has exactly one).
+-- Same shape as ActivateSpec.theAbility -- duplicated per this test suite's
+-- existing convention of group-local helpers (ActivateSpec, ReplacementSpec)
+-- rather than centralizing a helper this small in Support.
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+  ab : _ -> ab
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+
+-- Aims every ChooseTargets slot at one object, deferring the rest to
+-- S.identityAnswer -- ProjectionSpec.aimAtObject's shape, duplicated because
+-- Indigo Faerie's "target permanent" (Pool.Permanents) answers with ToObject.
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
@@ -260,6 +294,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         gs = S.withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) multi
     Spec.assertEqWith s "red only, no residue of blue or black" (Projection.colorsOf ratsId gs) $ Set.singleton Color.Red
 
+  Spec.it s "CR 105.3 an 'in addition' colour effect ADDS rather than replaces" $ do
+    -- The falsifier for implementing every colour change as a replacement: the
+    -- Rats are black, and after an AddColor they are black AND blue.
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (ratsId, board) = S.addCreature typhoidRats S.alice gs0
+        gs = S.withEffect ratsId (Modification.AddColor (Set.singleton Color.Blue)) board
+    Spec.assertEq s (Projection.colorsOf ratsId gs) $ Set.fromList [Color.Black, Color.Blue]
+
   Spec.it s "CR 613.1c/613.1e 2008-05-01 changing a permanent's colour doesn't change its text" $ do
     -- Gatherer ruling on Crimson Wisps / Aphotic Wisps (WotC, 2008-05-01):
     -- "Changing a permanent's color won't change its text. If you turn
@@ -281,3 +324,21 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     Spec.assertEqWith s "Bad Moon itself is now red" (Projection.colorsOf moonId gs) $ Set.singleton Color.Red
     Spec.assertEqWith s "the black Rats are still pumped to 2 power" (Projection.powerOf ratsId gs) $ Just 2
     Spec.assertEqWith s "the black Rats are still pumped to 2 toughness" (Projection.toughnessOf ratsId gs) $ Just 2
+
+  Spec.it s "Indigo Faerie's 'in addition' blue makes a devoid drone a legal blue target" $ do
+    -- Slaughter Drone is devoid, so it is colourless until something adds a
+    -- colour. Red Elemental Blast's destroy mode reads blue, and the drone is
+    -- outside its set until Indigo Faerie's ability resolves. Driven through a
+    -- real activation (not S.withEffect) so the card, not just the projection,
+    -- is under test.
+    island <- S.printingOf s registry "Island"
+    indigoFaerie <- S.printingOf s registry "Indigo Faerie"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let base = S.landsInPlay island 1
+        (faerieId, withFaerie) = S.addCreature indigoFaerie S.alice base
+        (droneId, board) = S.addCreature slaughterDrone S.alice withFaerie
+        g1 = board {GameState.priority = Just S.alice}
+        activated = snd (Engine.runGamePure (aimAtObject droneId) g1 (Activate.activateAbility S.alice faerieId (theAbility indigoFaerie)))
+        after = snd (Engine.runGamePure (aimAtObject droneId) activated Stack.resolveTop)
+    Spec.assertEqWith s "colourless before" (Projection.colorsOf droneId board) Set.empty
+    Spec.assertEqWith s "blue after" (Projection.colorsOf droneId after) $ Set.singleton Color.Blue
