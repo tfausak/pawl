@@ -22,6 +22,19 @@ data Affected
     -- Filter.Not Filter.IsSource inside the Filter, not a separate field -- the
     -- predicate language already names the source that way.
     Matching (Filter.Filter Keyword.Keyword)
+  | -- | Matching, without the battlefield gate. Painter's Servant's "all cards
+    -- that aren't on the battlefield, spells, and permanents" is the first
+    -- affected set in the pool that is not scoped to the battlefield, and the
+    -- ONLY reason this is a separate arm rather than a zone payload on Matching:
+    -- every other card in the pool depends on that gate, since Bad Moon's "black
+    -- creatures get +1/+1" must not reach a creature card in a graveyard.
+    --
+    -- The set the CR describes is every object in every zone. This reaches the
+    -- battlefield and the stack, which are the two zones where a projection
+    -- exists (Projection.viewOfObject). A card in a hand, library, graveyard or
+    -- exile is matched against its PRINTED characteristics by viewOfCard and is
+    -- never reached (#160, #623).
+    MatchingAnywhere (Filter.Filter Keyword.Keyword)
   | -- | CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". A THIRD kind of affected set: TheseObjects is fixed at
     -- resolution (CR 611.2c) and Matching is a predicate re-derived per

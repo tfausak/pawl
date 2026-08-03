@@ -26,6 +26,13 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       Affected.fromJson
       (Affected.Matching (Filter.HasCardType CardType.Creature))
       "{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
+  Spec.it s "MatchingAnywhere" $
+    Common.assertJsonCodec
+      s
+      Affected.toJson
+      Affected.fromJson
+      (Affected.MatchingAnywhere (Filter.HasCardType CardType.Creature))
+      "{\"type\":\"MatchingAnywhere\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
   -- Opalescence's shape: its own "each other" card text (not a rule) as Not
   -- IsSource, nested inside Matching -- the composed form a bare atom case
   -- above would not exercise.

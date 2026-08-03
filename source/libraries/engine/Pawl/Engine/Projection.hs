@@ -357,6 +357,11 @@ affects source oid a partial gs = case a of
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
+  -- Matching's body without the battlefield conjunct. The `perspective` laziness
+  -- caveat in the Matching arm above applies here unchanged (#197).
+  Affected.MatchingAnywhere f ->
+    let perspective = controllerOf source gs
+     in Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the SOURCE's attachment again, but read for the PLAYER it
   -- names -- "creatures enchanted player controls". A source that is unattached,
   -- or attached to an object, names no player and so affects nobody.
@@ -1147,12 +1152,13 @@ rewriteModification pairs m =
 -- EFFECT; this is the same call one level up, and the only thing #402 was
 -- missing.
 --
--- EXHAUSTIVE over Affected, not a wildcard: the two arms that carry a Filter are
--- the two that could hide a land-type word, and a new arm carrying one must
--- break this build rather than silently keep the old word.
+-- EXHAUSTIVE over Affected, not a wildcard: the three arms that carry a Filter
+-- are the three that could hide a land-type word, and a new arm carrying one
+-- must break this build rather than silently keep the old word.
 rewriteAffected :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Affected.Affected -> Affected.Affected
 rewriteAffected pairs a = case a of
   Affected.Matching f -> Affected.Matching (Filter.rewrite pairs f)
+  Affected.MatchingAnywhere f -> Affected.MatchingAnywhere (Filter.rewrite pairs f)
   Affected.AttachedPlayerControls f -> Affected.AttachedPlayerControls (Filter.rewrite pairs f)
   -- A frozen id set names no word (CR 611.2c locks it at resolution), and an
   -- attachment names none either -- both read the SOURCE's own state.
@@ -1664,6 +1670,7 @@ modificationWrites m = case m of
 staticallyMovable :: Gathered -> Bool
 staticallyMovable c = case gAffected c of
   Affected.Matching _ -> True
+  Affected.MatchingAnywhere _ -> True
   Affected.TheseObjects _ -> False
   Affected.Attached -> False
   -- Movable, unlike Attached: the attachment half is immovable for Attached's
@@ -1870,6 +1877,9 @@ projectWith admits cands = forObject
                     Affected.TheseObjects _ -> Nothing
                     Affected.Attached -> Nothing
                     Affected.Matching f ->
+                      let aspects = filterReads f
+                       in if Set.null aspects then Nothing else Just aspects
+                    Affected.MatchingAnywhere f ->
                       let aspects = filterReads f
                        in if Set.null aspects then Nothing else Just aspects
                     -- Always movable, whatever the filter reads: the set is
@@ -2431,10 +2441,11 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 -- Parameterized by the source because Affected.Attached is a question about the
 -- SOURCE's state, and the stored and derived paths carry different sources.
 --
--- Deliberately a total case with no wildcard, and two of its four arms are
+-- Deliberately a total case with no wildcard, and three of its five arms are
 -- empty: this fold must not project (see controlGrants), which rules out
--- Matching, and AttachedPlayerControls would re-enter controllerOf, which is the
--- fold that reads this. No card produces either (#195).
+-- Matching and MatchingAnywhere alike, and AttachedPlayerControls would
+-- re-enter controllerOf, which is the fold that reads this. No card produces
+-- any of the three (#195).
 controlNames :: GameState -> ObjectId -> Affected.Affected -> Set ObjectId
 controlNames gs source a = case a of
   Affected.TheseObjects s -> s
@@ -2442,6 +2453,7 @@ controlNames gs source a = case a of
   -- keeps the fold reading this lean.
   Affected.Attached -> maybe Set.empty Set.singleton (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf)
   Affected.Matching _ -> Set.empty
+  Affected.MatchingAnywhere _ -> Set.empty
   Affected.AttachedPlayerControls _ -> Set.empty
 
 -- CR 603.3a: every object whose controller a CR 613.1b layer-2 effect currently

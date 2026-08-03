@@ -12,6 +12,7 @@ toJson :: Affected.Affected -> Value.Value
 toJson a = case a of
   Affected.TheseObjects ids -> Common.tagged "TheseObjects" . Just $ Common.encodeSet ObjectId.toJson ids
   Affected.Matching f -> Common.tagged "Matching" . Just $ Filter.toJson Keyword.toJson f
+  Affected.MatchingAnywhere f -> Common.tagged "MatchingAnywhere" . Just $ Filter.toJson Keyword.toJson f
   Affected.Attached -> Common.tagged "Attached" Nothing
   Affected.AttachedPlayerControls f -> Common.tagged "AttachedPlayerControls" . Just $ Filter.toJson Keyword.toJson f
 
@@ -21,6 +22,7 @@ fromJson value = do
   case t of
     "TheseObjects" -> Common.withValue mv (fmap Affected.TheseObjects . Common.decodeSet ObjectId.fromJson)
     "Matching" -> Common.withValue mv (fmap Affected.Matching . Filter.fromJson Keyword.fromJson)
+    "MatchingAnywhere" -> Common.withValue mv (fmap Affected.MatchingAnywhere . Filter.fromJson Keyword.fromJson)
     "Attached" -> pure Affected.Attached
     "AttachedPlayerControls" -> Common.withValue mv (fmap Affected.AttachedPlayerControls . Filter.fromJson Keyword.fromJson)
     _ -> Left . Text.pack $ "unknown Affected: " <> t
