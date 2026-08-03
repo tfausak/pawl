@@ -1455,7 +1455,7 @@ hackBoard mountain island magicalHack cancel =
 -- test can tell an honoured answer from the fallback.
 hackToIsland :: Prompt.Prompt r -> r
 hackToIsland p = case p of
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Island)
   _ -> S.identityAnswer p
 
 -- The basic-land-type answers in a transcript, in order.
@@ -1464,7 +1464,7 @@ basicLandTypeResponses = filter isBasicLandTypesResponse
 
 isBasicLandTypesResponse :: Response.Response -> Bool
 isBasicLandTypesResponse response = case response of
-  Response.ChoseBasicLandTypes _ -> True
+  Response.ChoseLandTypeSwap _ -> True
   _ -> False
 
 -- CR 608.2d: Magical Hack's "replacing all instances of one basic land type
@@ -1505,7 +1505,7 @@ magicalHackTimingSpec s registry = Spec.describe s "MagicalHackTiming" $ do
       s
       "the resolution asked exactly once"
       (basicLandTypeResponses resolveTranscript)
-      [Response.ChoseBasicLandTypes (Subtype.Mountain, Subtype.Island)]
+      [Response.ChoseLandTypeSwap (Subtype.Mountain, Subtype.Island)]
     -- CR 612 / 305.6: the answer is honoured, so the choice did not go missing
     -- when it moved. Mountain -> Island, not identityAnswer's Mountain ->
     -- Mountain, is what tells the two apart.

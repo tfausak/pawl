@@ -432,7 +432,7 @@ discardLastAnswer p = case p of
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> lastN n ids
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -528,7 +528,7 @@ handInPlay printing board =
 -- this has to drive the resolution as well as the cast.
 hackAnswer :: Prompt.Prompt r -> r
 hackAnswer p = case p of
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Island)
   _ -> S.identityAnswer p
 
 magicalHackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1555,7 +1555,7 @@ castFirstOption p = case p of
     case filter S.isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
@@ -1617,7 +1617,7 @@ castPanglacial p = case p of
     case filter S.isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing

@@ -222,7 +222,12 @@ data Prompt r where
   -- countered spell is never asked at all, and a player asked at cast would be
   -- choosing without information the responses gave them. Pawl.ResolveSpec's
   -- MagicalHackTiming group holds both halves.
-  ChooseBasicLandTypes :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Prompt (Subtype.Subtype, Subtype.Subtype)
+  --
+  -- Named for the CR 612 word REPLACEMENT it performs rather than for counting
+  -- its payload: a name that says "basic land types" and means "two of them"
+  -- reads as a near-namesake of any prompt that asks for one, and the pair is
+  -- not what makes this prompt what it is -- the swap is.
+  ChooseLandTypeSwap :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Prompt (Subtype.Subtype, Subtype.Subtype)
   -- | CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
   -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
   -- find," always permitted for a search of one's own library for a quality.

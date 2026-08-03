@@ -244,7 +244,7 @@ identityAnswer p = case p of
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -306,7 +306,7 @@ castAnswer p = case p of
           [] -> case filter isPlay actions of
             h : _ -> h
             [] -> A.Pass
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -361,7 +361,7 @@ aggressiveAnswer p = case p of
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -450,7 +450,7 @@ playLandAnswer p = case p of
      in case filter isPlay actions of
           h : _ -> h
           [] -> A.Pass
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0

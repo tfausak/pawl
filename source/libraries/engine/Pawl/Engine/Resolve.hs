@@ -1041,7 +1041,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       Just target -> do
         gs0 <- State.get
         let decider = Decide.deciderFor controller gs0
-        (from, to) <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider controller resolving slot))
+        (from, to) <- Trans.lift (Program.prompt (Prompt.ChooseLandTypeSwap decider controller resolving slot))
         State.modify' $ \gs ->
           -- CR 611.2a: the opcode states no duration, so the effect "lasts
           -- until the end of the game" -- Duration.Indefinite, armed through

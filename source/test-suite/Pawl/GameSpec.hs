@@ -344,7 +344,7 @@ recordingAnswer p = case p of
     pure $ case filter isCast actions of
       h : _ -> h
       [] -> A.Pass
-  Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> pure (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
   Prompt.ChooseX {} -> pure 0
@@ -1490,7 +1490,7 @@ slaveAnswer p = case p of
     case filter S.isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0

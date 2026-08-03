@@ -1151,7 +1151,7 @@ rewriteModification pairs m =
         -- land-type case. What cannot reach it is the PAIR: the pool's only
         -- ChangeSubtypeWord producer is Magical Hack, whose text replaces one
         -- basic land type with another and whose pair is answered by
-        -- Prompt.ChooseBasicLandTypes. So `from` is never a creature type and a
+        -- Prompt.ChooseLandTypeSwap. So `from` is never a creature type and a
         -- swap here would be the identity on every board pawl can reach. The
         -- card that would make the difference visible, Artificial Evolution, has
         -- no producer in the pool (#529).
