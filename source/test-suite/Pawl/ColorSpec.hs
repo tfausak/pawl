@@ -3,10 +3,11 @@
 -- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
 -- 702.114a devoid, CR 613.3's characteristic-defining-ability-first ordering
 -- within layer 5, and CR 111.3 token colour), Pawl.Engine.Target (the "target
--- nonblack creature" and "target blue spell" filters below), the P3a colour
--- gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder) and
--- this phase's own CR 613.3 gates (Indigo Faerie, Painter's Servant), plus the
--- CR 608.2b colour-change fizzle.
+-- nonblack creature" filter below, and Red Elemental Blast's two colour-filtered
+-- pools read straight off the card), the P3a colour gates (Doom Blade, Crimson
+-- Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder) and this phase's own CR 613.3
+-- gates (Indigo Faerie, Painter's Servant, Red Elemental Blast), plus the CR
+-- 608.2b colour-change fizzle.
 -- Mostly gameplay-level: a card is cast or resolved through the stack and the
 -- resulting game state is asserted on. The rest assert on a projection over a
 -- hand-built board, either because no card in the pool produces the effect
@@ -18,6 +19,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -43,6 +45,7 @@ import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
@@ -60,9 +63,25 @@ import qualified Pawl.Types.Zone as Zone
 nonblackCreature :: TargetSpec.TargetSpec
 nonblackCreature = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
 
--- "target blue spell", Red Elemental Blast's first mode.
-blueSpell :: TargetSpec.TargetSpec
-blueSpell = TargetSpec.MkTargetSpec Pool.Spells (Just (Filter.Type.HasColor Color.Blue))
+-- Red Elemental Blast's two modes, in printed order (CR 700.2 /
+-- data/cards/red-elemental-blast.json):
+--   0. "Counter target blue spell."     -- slot "spell", Pool.Spells
+--   1. "Destroy target blue permanent." -- slot "permanent", Pool.Permanents
+counterMode :: ModeIndex.ModeIndex
+counterMode = ModeIndex.MkModeIndex 0
+
+destroyMode :: ModeIndex.ModeIndex
+destroyMode = ModeIndex.MkModeIndex 1
+
+-- The one TargetSpec a mode of a printing's spell declares, read out of the
+-- JSON-loaded card BY INDEX -- so a swapped mode order is as visible to a
+-- legality assertion here as a wrong pool or a wrong filter is. Nothing when the
+-- index is out of range or the mode does not declare exactly one slot; the
+-- callers assert on that rather than defaulting to a hand-built spec.
+modeSpec :: Printing.Printing -> ModeIndex.ModeIndex -> Maybe TargetSpec.TargetSpec
+modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (Printing.card printing)) of
+  Just [only] -> Just only
+  _ -> Nothing
 
 -- The single activated ability of a printing (Indigo Faerie has exactly one).
 -- Same shape as ActivateSpec.theAbility -- duplicated per this test suite's
@@ -86,6 +105,20 @@ choosingBlue p = case p of
 -- Indigo Faerie's "target permanent" (Pool.Permanents) answers with ToObject.
 aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  _ -> S.identityAnswer p
+
+-- Casts Red Elemental Blast: chooses mode `idx` at CR 700.2's mode prompt and
+-- aims every target slot at `oid` -- both of the card's pools (Pool.Spells and
+-- Pool.Permanents) answer with ToObject. ModalSpec.chooseModeAt's shape,
+-- duplicated per this suite's group-local-helper convention rather than
+-- centralized. Deliberately does NOT answer ChooseColor: the Painter's Servant
+-- cast that precedes it runs under choosingBlue, and the blast's own cast has no
+-- colour to choose -- so a ChooseColor reaching here would be a real surprise
+-- and falls to S.identityAnswer's white rather than being papered over.
+blasting :: ModeIndex.ModeIndex -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+blasting idx oid p = case p of
+  Prompt.ChooseModes {} -> Set.singleton idx
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   _ -> S.identityAnswer p
 
@@ -350,23 +383,45 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     Spec.assertEqWith s "the black Rats are still pumped to 2 power" (Projection.powerOf ratsId gs) $ Just 2
     Spec.assertEqWith s "the black Rats are still pumped to 2 toughness" (Projection.toughnessOf ratsId gs) $ Just 2
 
-  Spec.it s "Indigo Faerie's 'in addition' blue makes a devoid drone a legal blue target" $ do
+  Spec.it s "Indigo Faerie's 'in addition' blue makes a devoid drone a legal Red Elemental Blast target" $ do
     -- Slaughter Drone is devoid, so it is colourless until something adds a
     -- colour. Red Elemental Blast's destroy mode reads blue, and the drone is
-    -- outside its set until Indigo Faerie's ability resolves. Driven through a
-    -- real activation (not S.withEffect) so the card, not just the projection,
-    -- is under test.
+    -- outside its set until Indigo Faerie's ability resolves. Both halves are
+    -- driven through real cards -- a real activation and a real cast, not
+    -- S.withEffect and not a hand-built TargetSpec -- so the two JSON files, not
+    -- just the projection, are under test.
     island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
     indigoFaerie <- S.printingOf s registry "Indigo Faerie"
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
     let base = S.landsInPlay island 1
-        (faerieId, withFaerie) = S.addCreature indigoFaerie S.alice base
+        -- The Island pays Indigo Faerie's {U}; the Mountain pays the blast's {R}.
+        (_, withMountain) = S.addCreature mountain S.alice base
+        (faerieId, withFaerie) = S.addCreature indigoFaerie S.alice withMountain
         (droneId, board) = S.addCreature slaughterDrone S.alice withFaerie
-        g1 = board {GameState.priority = Just S.alice}
-        activated = snd (Engine.runGamePure (aimAtObject droneId) g1 (Activate.activateAbility S.alice faerieId (theAbility indigoFaerie)))
-        after = snd (Engine.runGamePure (aimAtObject droneId) activated Stack.resolveTop)
-    Spec.assertEqWith s "colourless before" (Projection.colorsOf droneId board) Set.empty
-    Spec.assertEqWith s "blue after" (Projection.colorsOf droneId after) $ Set.singleton Color.Blue
+        (gs, rebId) = S.handOne redElementalBlast board
+        activated = snd (Engine.runGamePure (aimAtObject droneId) gs (Activate.activateAbility S.alice faerieId (theAbility indigoFaerie)))
+        blued = snd (Engine.runGamePure (aimAtObject droneId) activated Stack.resolveTop)
+        answer :: Prompt.Prompt r -> r
+        answer = blasting destroyMode droneId
+        cast = snd (Engine.runGamePure answer blued (Cast.castSpell S.alice rebId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "colourless before" (Projection.colorsOf droneId gs) Set.empty
+    Spec.assertEqWith s "blue after" (Projection.colorsOf droneId blued) $ Set.singleton Color.Blue
+    case modeSpec redElementalBlast destroyMode of
+      Nothing -> Spec.assertFailure s "Red Elemental Blast's destroy mode declares exactly one target slot"
+      Just destroySpec -> do
+        Spec.assertBool
+          s
+          (not (Set.member (Recipient.ToObject droneId) (Target.legalRecipients Nothing S.noSource destroySpec gs)))
+          "the colourless drone is not a legal 'target blue permanent'"
+        Spec.assertBool
+          s
+          (Set.member (Recipient.ToObject droneId) (Target.legalRecipients Nothing S.noSource destroySpec blued))
+          "the blue drone is"
+    Spec.assertBool s (not (Set.member droneId (GameState.battlefield after))) "and Red Elemental Blast destroys it"
+    Spec.assertBool s (Set.member faerieId (GameState.battlefield after)) "the blast hit the drone, not the equally blue Faerie"
 
   Spec.it s "CR 613.3 devoid applies at the START of layer 5, so layers 2-4 read the mana cost" $ do
     -- CR 613.3 applies characteristic-defining abilities first WITHIN a layer,
@@ -400,36 +455,68 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     mountain <- S.printingOf s registry "Mountain"
     paintersServant <- S.printingOf s registry "Painter's Servant"
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
-    let base = S.landsInPlay mountain 2
+    redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
+    -- Three Mountains: {2} for the Servant and {R} for the blast.
+    let base = S.landsInPlay mountain 3
         (inHand, psId) = S.handOne paintersServant base
         cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
         withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
-        (droneId, gs) = S.addCreature slaughterDrone S.alice withPainter
+        (droneId, withDrone) = S.addCreature slaughterDrone S.alice withPainter
+        (rebId, gs) = S.addHandCard redElementalBlast S.alice withDrone
         entered = Set.difference (GameState.battlefield withPainter) (GameState.battlefield base)
+        answer :: Prompt.Prompt r -> r
+        answer = blasting destroyMode droneId
+        blasted = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice rebId))
+        after = snd (Engine.runGamePure answer blasted Stack.resolveTop)
     case Set.toList entered of
       [painterId] -> case (Game.lookupObject painterId gs, Game.lookupObject droneId gs) of
         (Just painter, Just drone) -> do
           Spec.assertEqWith s "the Servant chose blue on entry and coloured itself" (Projection.colorsOf painterId withPainter) $ Set.singleton Color.Blue
           Spec.assertBool s (Object.timestamp painter < Object.timestamp drone) "the Servant's effect is OLDER than the drone"
+          Spec.assertBool s (Set.member painterId (GameState.battlefield after)) "the blast hit the drone, not the equally blue Servant"
         _ -> Spec.assertFailure s "the fixture lost the Servant or the drone"
       _ -> Spec.assertFailure s "Painter's Servant did not reach the battlefield"
     Spec.assertEqWith s "blue, not colourless" (Projection.colorsOf droneId gs) $ Set.singleton Color.Blue
+    -- THE READER, end to end: Red Elemental Blast's "destroy target blue
+    -- permanent" mode names the drone only because CR 613.3 left it blue.
+    Spec.assertBool s (not (Set.member droneId (GameState.battlefield after))) "Red Elemental Blast destroys the blue-ified drone"
 
-  Spec.it s "CR 604.3 Painter's Servant colours a devoid SPELL on the stack" $ do
+  Spec.it s "CR 604.3 Red Elemental Blast counters a devoid SPELL that Painter's Servant has coloured" $ do
     -- Painter's set is "all cards that aren't on the battlefield, spells, and
     -- permanents", so it is not scoped to the battlefield
     -- (Affected.MatchingAnywhere). CR 604.3 makes a characteristic-defining
     -- ability function in all zones, so devoid still empties the drone SPELL's
     -- colours first and the Servant's blue lands on top -- and Red Elemental
-    -- Blast's "target blue spell" can then name it.
+    -- Blast's "counter target blue spell" mode can then name it.
+    --
+    -- This is also the one test that exercises the card's MODE ORDER: with the
+    -- Servant and the Mountains all blue, both of the blast's modes are
+    -- fillable, so CR 601.2b's ChooseModes is really asked and mode 0 is really
+    -- chosen. Swap the two modes in the JSON and mode 0 becomes "destroy target
+    -- blue permanent", which cannot name a spell on the stack -- the cast
+    -- no-ops and the drone resolves.
     mountain <- S.printingOf s registry "Mountain"
     paintersServant <- S.printingOf s registry "Painter's Servant"
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
-    let base = S.landsInPlay mountain 2
+    redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
+    -- Three Mountains: {2} for the Servant and {R} for the blast.
+    let base = S.landsInPlay mountain 3
         (inHand, psId) = S.handOne paintersServant base
         cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
         withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
-        (spellId, gs) = S.spellOnStack slaughterDrone S.alice withPainter
-        legal = Target.legalRecipients Nothing S.noSource blueSpell gs
+        (spellId, withSpell) = S.spellOnStack slaughterDrone S.alice withPainter
+        (rebId, gs) = S.addHandCard redElementalBlast S.alice withSpell
+        answer :: Prompt.Prompt r -> r
+        answer = blasting counterMode spellId
+        blasted = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice rebId))
+        after = snd (Engine.runGamePure answer blasted Stack.resolveTop)
     Spec.assertEqWith s "the spell is blue" (Projection.colorsOf spellId gs) $ Set.singleton Color.Blue
-    Spec.assertBool s (Set.member (Recipient.ToObject spellId) legal) "and a legal blue-spell target"
+    case modeSpec redElementalBlast counterMode of
+      Nothing -> Spec.assertFailure s "Red Elemental Blast's counter mode declares exactly one target slot"
+      Just counterSpec ->
+        Spec.assertBool
+          s
+          (Set.member (Recipient.ToObject spellId) (Target.legalRecipients Nothing S.noSource counterSpec gs))
+          "and a legal 'target blue spell'"
+    Spec.assertBool s (notElem spellId (GameState.stack after)) "the drone spell is off the stack"
+    Spec.assertEqWith s "countered into its owner's graveyard, so it never entered the battlefield" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2

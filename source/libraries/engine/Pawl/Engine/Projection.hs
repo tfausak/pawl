@@ -831,15 +831,25 @@ definesColorless = Set.member Keyword.Devoid
 -- under CR 613.7. NOT applyCharacteristicPT's Humility reason, which is the one
 -- that does not transfer -- see below.
 --
--- Read from the PARTIAL projection's keywords rather than from the card. At
--- layer 5 that map holds the printed keywords, those a copy effect brought in at
--- layer 1, and those a text-changing effect wrote at layer 3 -- and it cannot yet
--- hold a layer-6 grant, because layer 6 has not been applied. Those are CR
--- 604.3a(2)'s ways for a static ability to be characteristic-defining, minus the
--- token clause, which pawl covers at the seed instead. The one other pre-layer-5
--- writer is Modification.SetLandSubtype at Layer.Type, and it only ever EMPTIES
--- the map (CR 305.7) -- a removal cannot introduce a non-characteristic-defining
--- source, so the rule still holds by construction rather than by a test.
+-- Read from the PARTIAL projection's keywords rather than from the card. CR
+-- 604.3a(2) makes a static ability characteristic-defining when "it is printed on
+-- the card it affects, it was granted to the token it affects by the effect that
+-- created the token, or it was acquired by the object it affects as the result of
+-- a copy effect or text-changing effect" -- and at layer 5 that map holds exactly
+-- those, minus the token clause, which pawl covers at the seed instead. It cannot
+-- yet hold a layer-6 grant, because layer 6 has not been applied.
+--
+-- The printed and copy-effect halves both arrive in the SEED: CR 613.1a's
+-- copiable value is copiableCharacteristics, the entry-stamped snapshot when the
+-- object has one and the printed card otherwise. The rule's text-change clause
+-- has no writer at all today -- Layer.Text's one modification is
+-- ChangeSubtypeWord, whose arm touches PC.subtypes alone -- so nothing between
+-- the seed and layer 5 ADDS a keyword. The one pre-layer-5 modification that
+-- touches the map is Modification.SetLandSubtype at Layer.Type, and it only ever
+-- EMPTIES it (CR 305.7); a removal cannot introduce a non-characteristic-defining
+-- source. So the rule holds by construction rather than by a test, and a future
+-- text-changing effect that granted a keyword would land inside CR 604.3a(2)
+-- rather than outside it.
 --
 -- Humility therefore cannot remove it: LoseAllAbilities is layer 6, after this.
 --
@@ -1037,7 +1047,7 @@ setLandSubtypeEffects gs =
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
           else []
       -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
-      -- 612's word swap to the same ability's (#402). So a text-changed source
+      -- 612's word swap to the same ability's (#624). So a text-changed source
       -- would have this gate and the layer fold disagreeing about which
       -- permanents it names. Unreachable: the pool's only SetLandSubtype is
       -- Blood Moon, which selects by card type and supertype and so carries no
@@ -1675,10 +1685,10 @@ modificationWrites m = case m of
 
 -- Could another effect move this one's affected set at all? The structural half
 -- of projectWith's movableReads: a set is movable when something a modification
--- writes selects it -- a Matching set's predicate over characteristics, or an
--- AttachedPlayerControls set's controller (CR 613.1b). A TheseObjects set names
--- ids (CR 611.2c) and an Attached one reads its source's attachment off the game
--- state (CR 303.4m), and no modification writes either.
+-- writes selects it -- a Matching or MatchingAnywhere set's predicate over
+-- characteristics, or an AttachedPlayerControls set's controller (CR 613.1b). A
+-- TheseObjects set names ids (CR 611.2c) and an Attached one reads its source's
+-- attachment off the game state (CR 303.4m), and no modification writes either.
 staticallyMovable :: Gathered -> Bool
 staticallyMovable c = case gAffected c of
   Affected.Matching _ -> True
@@ -1822,9 +1832,11 @@ projectWith admits cands = forObject
     -- object with neither, each extra pass is an identity function over an empty
     -- candidate filter.
     layers = filter admits (Set.toAscList (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands)))))
-    -- The layers CR 613.8 could reorder anything in: those holding an effect with
-    -- a Matching set, the only kind another effect can move. Bound HERE, before
-    -- the object, so a whole-board sweep pays for it once for the board rather
+    -- The layers CR 613.8 could reorder anything in: those holding an effect
+    -- whose affected set another effect can move -- a Matching or
+    -- MatchingAnywhere predicate over characteristics, or an
+    -- AttachedPlayerControls set's controller (staticallyMovable). Bound HERE,
+    -- before the object, so a whole-board sweep pays for it once for the board rather
     -- than once per object per layer -- and for most boards it is empty, so the
     -- per-layer question becomes a lookup in an empty Set.
     --

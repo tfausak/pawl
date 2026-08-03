@@ -337,8 +337,10 @@ data Prompt r where
   -- ObjectId is the entering object.
   --
   -- No candidate list: CR 105.1 fixes the five colours and no card in the pool
-  -- narrows them. Always asked -- five colours are five distinguishable options,
-  -- so there is nothing here the engine may decide for a player.
+  -- narrows them. Asked whenever the entering object has a controller to ask --
+  -- five colours are five distinguishable options, so there is no one-option
+  -- case to elide. Replacement's arm has an unreachable no-controller fallback
+  -- beside it; see there.
   ChooseColor :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Color.Color
   -- | CR 603.3b: "each player, in APNAP order, puts each triggered ability they
   -- control ... on the stack in any order they choose." The [TriggerEntry]

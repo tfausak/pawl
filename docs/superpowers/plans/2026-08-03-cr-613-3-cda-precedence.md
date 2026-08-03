@@ -561,19 +561,22 @@ definesColorless = Set.member Keyword.Devoid
 -- START of layer 5 -- "within layers 2-6, apply effects from characteristic-
 -- defining abilities first, then all other effects in timestamp order".
 --
--- Folded IN PLACE rather than emitted as a synthetic Gathered, for
--- applyCharacteristicPT's three reasons, which transfer word for word: a CDA
--- affects only the object it is on (CR 604.3a(3)) so it has no affected set to
--- gather over; CR 604.3 makes it function in ALL zones while gather walks the
--- battlefield only; and it has no source object and no timestamp, so it has
--- nothing to sort on under CR 613.7.
+-- Folded IN PLACE rather than emitted as a synthetic Gathered, for these three
+-- reasons: a CDA affects only the object it is on (CR 604.3a(3)) so it has no
+-- affected set to gather over; CR 604.3 makes it function in ALL zones while
+-- gather walks the battlefield only; and it has no source object and no
+-- timestamp, so it has nothing to sort on under CR 613.7. NOT
+-- applyCharacteristicPT's Humility reason, which is the one that does not
+-- transfer: layer 6 is AFTER layer 5.
 --
--- Read from the PARTIAL projection's keywords rather than from the card. At
--- layer 5 that map holds the printed keywords, those a copy effect brought in at
--- layer 1, and those a text-changing effect wrote at layer 3 -- and it cannot yet
--- hold a layer-6 grant, because layer 6 has not been applied. That is exactly CR
--- 604.3a(2)'s list of what makes a static ability characteristic-defining, so the
--- rule holds by construction rather than by a test.
+-- Read from the PARTIAL projection's keywords rather than from the card. CR
+-- 604.3a(2)'s list of what makes a static ability characteristic-defining is
+-- "printed on the card it affects ... granted to the token ... or acquired ... as
+-- the result of a copy effect or text-changing effect", and at layer 5 the map
+-- holds exactly those (minus the token clause, covered at the seed); it cannot
+-- yet hold a layer-6 grant, because layer 6 has not been applied. Pawl has no
+-- text-change keyword writer today, so the rule holds by construction rather
+-- than by a test.
 --
 -- Humility therefore cannot remove it: LoseAllAbilities is layer 6, after this.
 --

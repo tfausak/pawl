@@ -7,10 +7,11 @@ import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | What a continuous effect applies to. CR 611.2c: a resolution effect's set is
 -- LOCKED when it begins (TheseObjects -- a bounced-and-returned creature is a new
--- id the effect no longer names). A static ability's set is DYNAMIC, of which
--- there are two kinds: Matching (any object currently matching a Filter) and
--- Attached (the one object the source is attached to, if any) -- both are
--- re-derived each projection, never captured once.
+-- id the effect no longer names). A static ability's set is DYNAMIC: Matching and
+-- MatchingAnywhere (any object currently matching a Filter, on the battlefield or
+-- in any projected zone), Attached (the one object the source is attached to, if
+-- any) and AttachedPlayerControls (what the enchanted PLAYER controls) -- all
+-- four are re-derived each projection, never captured once.
 data Affected
   = -- | CR 611.2c: a fixed id set, NOT a predicate.
     TheseObjects (Set.Set ObjectId.ObjectId)
@@ -34,11 +35,21 @@ data Affected
     -- exists (Projection.viewOfObject). A card in a hand, library, graveyard or
     -- exile is matched against its PRINTED characteristics by viewOfCard and is
     -- never reached (#160, #623).
+    --
+    -- Not implemented, the symmetric OVER-reach, recorded at the same place
+    -- because the card's JSON cannot carry a comment: Painter's own filter is
+    -- And [], which matches EVERY object, while the card scopes to three kinds
+    -- of thing -- cards not on the battlefield, spells, and permanents. So this
+    -- also reaches an activated or triggered ability on the stack, which CR
+    -- 113.1c makes an object but not a spell, and an emblem in the command zone,
+    -- which CR 114.5 says "is neither a card nor a permanent". Neither is
+    -- observable today (#623).
     MatchingAnywhere (Filter.Filter Keyword.Keyword)
   | -- | CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
-    -- creature". A THIRD kind of affected set: TheseObjects is fixed at
-    -- resolution (CR 611.2c) and Matching is a predicate re-derived per
-    -- candidate, while this is re-derived from the SOURCE's own state.
+    -- creature". Neither a fixed id set nor a predicate over candidates:
+    -- TheseObjects is fixed at resolution (CR 611.2c) and Matching /
+    -- MatchingAnywhere are predicates re-derived per candidate, while this is
+    -- re-derived from the SOURCE's own state.
     --
     -- The set is {o} when the source is attached to o, and EMPTY when it is
     -- unattached -- an Aura in the graveyard, or one the CR 704.5m sweep has not

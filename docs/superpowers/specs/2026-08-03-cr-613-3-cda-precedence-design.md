@@ -31,7 +31,11 @@ never gathered. CR 604.3a(3) says a CDA "does not directly affect the characteri
 of any other objects", so a CDA has no affected set to gather over, no source object
 other than itself, and no timestamp to sort on. The `Gathered` precedence key that
 P3a §2.2 imagined is therefore the wrong shape; `applyCharacteristicPT`'s existing
-7a hook is the right one, and its three stated reasons transfer to colour verbatim.
+7a hook is the right one. Two of its three stated reasons transfer to colour — the
+all-zones one (CR 604.3) and the nothing-to-sort-on one (CR 613.7). The third does
+**not**: 7a folds in place partly so Humility can strip the CDA at layer 6 first,
+and layer 6 comes *after* layer 5, so a Humility'd devoid object stays colourless.
+CR 604.3a(3)'s "no affected set to gather over" takes its place at layer 5.
 
 ### Gate cards
 
@@ -88,14 +92,15 @@ no layer-5 candidate must still reach the layer. For everything else that pass i
 `Map.member` over an empty candidate filter — the cost 7a already pays.
 
 **Read from the partial, not from the card.** At layer 5 `PC.keywords` holds the
-printed keywords, those a copy effect brought in at layer 1, and those a
-text-changing effect wrote at layer 3 — and it structurally *cannot* hold a layer-6
-grant, because layer 6 has not been applied. That is exactly CR 604.3a(2)'s list of
-what makes a static ability characteristic-defining: "it is printed on the card it
-affects, it was granted to the token it affects by the effect that created the
-token, or it was acquired by the object it affects as the result of a copy effect
-or text-changing effect". Reading the partial gets the rule right by construction
-rather than by a test.
+printed keywords and those a copy effect brought in at layer 1 — and it structurally
+*cannot* hold a layer-6 grant, because layer 6 has not been applied. Those are CR
+604.3a(2)'s list of what makes a static ability characteristic-defining: "it is
+printed on the card it affects, it was granted to the token it affects by the effect
+that created the token, or it was acquired by the object it affects as the result of
+a copy effect or text-changing effect" — minus the token clause, which pawl covers at
+the seed, and minus the text-change clause, for which pawl has no keyword writer today
+(`Layer.Text`'s one modification is `ChangeSubtypeWord`, which touches subtypes alone).
+Reading the partial gets the rule right by construction rather than by a test.
 
 Two consequences fall out, both wanted:
 
@@ -223,8 +228,9 @@ below-layer-5 effect with a colour-keyed affected set — see §6.
 - **A precedence key on `Gathered`**, which P3a §2.2 named as the machinery this
   would need. A CDA affects only the object it is on (CR 604.3a(3)), so it has no
   affected set, no foreign source, and no timestamp; it does not belong in the
-  candidate list at all. `applyCharacteristicPT`'s three reasons for folding 7a in
-  place hold for layer 5 word for word.
+  candidate list at all. Two of `applyCharacteristicPT`'s three reasons for folding
+  7a in place hold for layer 5 as written; the Humility one does not (§0), and CR
+  604.3a(3) supplies the replacement.
 - **Reading devoid from the card at layer 5.** The partial's keywords are already
   CR 604.3a(2)'s exact set, and cannot see a layer-6 grant. Reading the card would
   need a test to exclude what the structure excludes for free.

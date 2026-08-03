@@ -796,7 +796,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0)) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.36b a devoid creature with a black mana cost may not block a creature with fear" $ do
-    -- THE FALSIFIER for reading the blocker's PRINTED colour: the Devoid
+    -- THE FALSIFIER for reading the blocker's PRINTED colour: Slaughter
     -- Drone's mana cost is {1}{B}, but CR 702.114a makes it colourless (not
     -- black), so it is not a legal blocker of a fear attacker. Fails against
     -- any implementation that reads the blocker's printed colour rather than
