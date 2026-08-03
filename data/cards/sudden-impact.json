@@ -30,8 +30,15 @@
               "target",
               {
                 "type": "Count",
-                "value": [
-                  {
+                "value": {
+                  "aggregation": {
+                    "type": "Objects"
+                  },
+                  "filter": {
+                    "type": "And",
+                    "value": []
+                  },
+                  "scope": {
                     "type": "InZone",
                     "value": [
                       {
@@ -42,15 +49,8 @@
                         "value": "target"
                       }
                     ]
-                  },
-                  {
-                    "type": "And",
-                    "value": []
-                  },
-                  {
-                    "type": "Objects"
                   }
-                ]
+                }
               }
             ]
           }

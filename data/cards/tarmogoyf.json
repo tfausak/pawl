@@ -3,8 +3,15 @@
   "castingPermissions": [],
   "characteristicPT": {
     "type": "Count",
-    "value": [
-      {
+    "value": {
+      "aggregation": {
+        "type": "DistinctCardTypes"
+      },
+      "filter": {
+        "type": "And",
+        "value": []
+      },
+      "scope": {
         "type": "InZone",
         "value": [
           {
@@ -14,15 +21,8 @@
             "type": "EachPlayer"
           }
         ]
-      },
-      {
-        "type": "And",
-        "value": []
-      },
-      {
-        "type": "DistinctCardTypes"
       }
-    ]
+    }
   },
   "keywords": [],
   "manaCost": [

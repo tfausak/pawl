@@ -178,7 +178,7 @@ quantityCounts quantity = case quantity of
 -- descent the shared-zone lint below would sweep past a misauthored inner
 -- scope.
 countCounts :: Count.Type.Count Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
-countCounts (Count.Type.MkCount _ _ aggregation) = case aggregation of
+countCounts count = case Count.Type.aggregation count of
   Aggregation.Objects -> []
   Aggregation.DistinctCardTypes -> []
   Aggregation.Greatest quantity -> quantityCounts quantity
@@ -371,7 +371,7 @@ scopeOffends scope = case scope of
 
 cardOffendsSharedZoneScope :: Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
-  any (\(Count.Type.MkCount scope _ _) -> scopeOffends scope) (cardCounts card)
+  any (scopeOffends . Count.Type.scope) (cardCounts card)
 
 -- The shared shape of all three ability read lints: every slot an effect of ONE
 -- MODE reads must be bound for that mode, given `abilityBound` -- the slots the
@@ -981,7 +981,7 @@ objectRefFilters ref = case ref of
 -- holds. That reuse is also the one seam here that -Werror does not police -- a
 -- Count added to a NEW carrier has to be added there, not here.
 countFilters :: [Count.Type.Count Quantity.Type.Quantity] -> [Filter.Type.Filter Keyword.Keyword]
-countFilters counts = [f | Count.Type.MkCount _ f _ <- counts]
+countFilters = fmap Count.Type.filter
 
 quantityFilters :: Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
 quantityFilters = countFilters . quantityCounts

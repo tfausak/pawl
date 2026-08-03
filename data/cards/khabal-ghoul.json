@@ -68,8 +68,17 @@
                   },
                   {
                     "type": "Count",
-                    "value": [
-                      {
+                    "value": {
+                      "aggregation": {
+                        "type": "Objects"
+                      },
+                      "filter": {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      "scope": {
                         "type": "InHistory",
                         "value": {
                           "type": "MovedBetween",
@@ -82,17 +91,8 @@
                             }
                           ]
                         }
-                      },
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Creature"
-                        }
-                      },
-                      {
-                        "type": "Objects"
                       }
-                    ]
+                    }
                   },
                   "self"
                 ]

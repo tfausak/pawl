@@ -18,11 +18,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- data/cards so far has a Literal `threshold`, but nothing stops it being a
 -- Count, and Pawl.Codec.ConditionSpec round-trips a Literal `measured`.
 -- Quantity already embeds `Count` (its Count arm), so this is strictly wider
--- than the Count-on-the-left shape it replaces: Pawl.Codec.Quantity's toJson
--- emits a Count arm as the count's own tag, so a side that is a Count is still
--- the `{"type": "Count", ...}` payload it always was. Naming the fields changed
--- only the shape ENCLOSING the three sides, never a side's own payload
--- (Pawl.Codec.Condition).
+-- than the Count-on-the-left shape it replaces -- a side that is a count says so
+-- through Quantity rather than by being one.
 --
 -- The two sides are EVALUATED symmetrically even though they are named
 -- asymmetrically: Pawl.Engine.Condition.holds passes both through

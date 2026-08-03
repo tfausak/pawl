@@ -60,8 +60,14 @@
                       },
                       "measured": {
                         "type": "Count",
-                        "value": [
-                          {
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "IsSource"
+                          },
+                          "scope": {
                             "type": "InZone",
                             "value": [
                               {
@@ -71,14 +77,8 @@
                                 "type": "EachPlayer"
                               }
                             ]
-                          },
-                          {
-                            "type": "IsSource"
-                          },
-                          {
-                            "type": "Objects"
                           }
-                        ]
+                        }
                       },
                       "threshold": {
                         "type": "Literal",
@@ -106,8 +106,14 @@
                       },
                       "measured": {
                         "type": "Count",
-                        "value": [
-                          {
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "IsSource"
+                          },
+                          "scope": {
                             "type": "InZone",
                             "value": [
                               {
@@ -117,14 +123,8 @@
                                 "type": "EachPlayer"
                               }
                             ]
-                          },
-                          {
-                            "type": "IsSource"
-                          },
-                          {
-                            "type": "Objects"
                           }
-                        ]
+                        }
                       },
                       "threshold": {
                         "type": "Literal",
@@ -152,8 +152,14 @@
                       },
                       "measured": {
                         "type": "Count",
-                        "value": [
-                          {
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "IsSource"
+                          },
+                          "scope": {
                             "type": "InZone",
                             "value": [
                               {
@@ -163,14 +169,8 @@
                                 "type": "EachPlayer"
                               }
                             ]
-                          },
-                          {
-                            "type": "IsSource"
-                          },
-                          {
-                            "type": "Objects"
                           }
-                        ]
+                        }
                       },
                       "threshold": {
                         "type": "Literal",

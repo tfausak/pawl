@@ -35,8 +35,15 @@
                 "value": [
                   {
                     "type": "Count",
-                    "value": [
-                      {
+                    "value": {
+                      "aggregation": {
+                        "type": "Objects"
+                      },
+                      "filter": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "scope": {
                         "type": "InZone",
                         "value": [
                           {
@@ -49,20 +56,20 @@
                             }
                           }
                         ]
-                      },
-                      {
-                        "type": "And",
-                        "value": []
-                      },
-                      {
-                        "type": "Objects"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "Count",
-                    "value": [
-                      {
+                    "value": {
+                      "aggregation": {
+                        "type": "Objects"
+                      },
+                      "filter": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "scope": {
                         "type": "InZone",
                         "value": [
                           {
@@ -75,15 +82,8 @@
                             }
                           }
                         ]
-                      },
-                      {
-                        "type": "And",
-                        "value": []
-                      },
-                      {
-                        "type": "Objects"
                       }
-                    ]
+                    }
                   }
                 ]
               },

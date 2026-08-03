@@ -20,13 +20,9 @@ import qualified Pawl.Types.Condition as Condition
 -- them decoded silently into the wrong condition. "measured" and "threshold"
 -- cannot be swapped by accident.
 --
--- Both sides go through Quantity.toJson, which is what keeps a Count-valued side
--- indistinguishable from the Count-on-the-left shape this type replaced:
--- Quantity.toJson's Count arm delegates to Count.toJson and emits no wrapper of
--- its own, so a `Quantity.Count c` is byte-for-byte the JSON `Count.toJson c`
--- used to produce. Naming the fields moved the three sides into a keyed object
--- and left every side's own payload alone, which is the whole of what the card
--- files' condition nodes changed by.
+-- Both sides go through Quantity.toJson and nothing here spells out how a
+-- Quantity is written, so a side that is a Count is Pawl.Codec.Quantity's tagged
+-- Count arm and this module never has to know it.
 toJson :: Condition.Condition -> Value.Value
 toJson condition =
   Common.object

@@ -5,9 +5,10 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Scope as Scope
 
--- | A number derived from game state: a scope to fold over, a per-object predicate
--- to keep by, and an aggregation. First-order and analyzable -- never a
--- predicate function -- and evaluated by one generic fold (Pawl.Engine.Count.evaluate)
+-- | A number derived from game state: a `scope` to fold over, a `filter` to keep
+-- each candidate by, and an `aggregation` that turns the survivors into a
+-- number. First-order and analyzable -- the filter is data, never a predicate
+-- function -- and evaluated by one generic fold (Pawl.Engine.Count.evaluate)
 -- that never learns which effect or card produced it.
 --
 -- This replaced a hand-carved variant per card (the retired
@@ -18,5 +19,13 @@ import qualified Pawl.Types.Scope as Scope
 -- is where it is actually used and where the reason for it is written. Every
 -- customer but Pawl.Types.Quantity instantiates it concretely as
 -- `Count Quantity`.
-data Count quantity = MkCount Scope.Scope (Filter.Filter Keyword.Keyword) (Aggregation.Aggregation quantity)
+--
+-- `filter` shadows the Prelude's, which costs nothing here: every module imports
+-- this one qualified, and naming the three fields after their types keeps them
+-- consistent with each other.
+data Count quantity = MkCount
+  { scope :: Scope.Scope,
+    filter :: Filter.Filter Keyword.Keyword,
+    aggregation :: Aggregation.Aggregation quantity
+  }
   deriving (Eq, Ord, Show)

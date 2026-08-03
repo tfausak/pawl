@@ -94,7 +94,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 )
           }
       )
-      "{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},{\"type\":\"ControllersTurn\"}]},\"intervening\":{\"measured\":{\"type\":\"Count\",\"value\":[{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Zombie\"}},{\"type\":\"Objects\"}]},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"DealDamage\",\"value\":[\"you\",{\"type\":\"Literal\",\"value\":1}]}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}"
+      "{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},{\"type\":\"ControllersTurn\"}]},\"intervening\":{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Zombie\"}},\"aggregation\":{\"type\":\"Objects\"}}},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"DealDamage\",\"value\":[\"you\",{\"type\":\"Literal\",\"value\":1}]}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}"
   -- CR 603.7: Card.delayedAbilities is a name-keyed map, rendered as a sorted
   -- array of entries so the render is deterministic and the file byte-stable
   -- (Pawl.Codec.TargetSpec.toJsonMap's own comment, and Pawl.Codec.Binding's).

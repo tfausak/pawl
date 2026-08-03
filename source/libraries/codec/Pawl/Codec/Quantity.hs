@@ -8,13 +8,11 @@ import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Quantity as Quantity
 
--- | Quantity.Count's arm is @Count.toJson toJson c@ directly, NOT re-wrapped in
--- another "Count" tag: 'Count.toJson' already tags its own output "Count" (it is
--- shared with Condition's embedding of a Count), and the two types happen to use
--- the SAME tag name at two different levels. Re-wrapping would double-tag
--- (@{"type":"Count","value":{"type":"Count","value":[...]}}@) -- guarded by
--- Pawl.Codec.QuantitySpec's "Count shares Count's own tag, not double-tagged"
--- test.
+-- | Quantity.Count's arm is tagged HERE, like every other arm. Pawl.Codec.Count
+-- writes a bare object, so the tag that picks this arm has to come from the
+-- dispatching type -- which is this one. It used to live inside Count itself,
+-- leaving the two types sharing one tag name across two levels and this arm the
+-- only one that skipped its own wrapper to avoid double-tagging.
 toJson :: Quantity.Quantity -> Value.Value
 toJson q = case q of
   Quantity.Literal n -> Common.tagged "Literal" . Just $ Common.integer n
@@ -24,7 +22,7 @@ toJson q = case q of
   Quantity.InSlot s -> Common.tagged "InSlot" . Just $ SlotName.toJson s
   Quantity.Star -> Common.nullary "Star"
   Quantity.Plus a b -> Common.tagged "Plus" . Just . Common.array $ [toJson a, toJson b]
-  Quantity.Count c -> Count.toJson toJson c
+  Quantity.Count c -> Common.tagged "Count" . Just $ Count.toJson toJson c
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -37,9 +35,7 @@ fromJson value = do
     ("InSlot", Just v) -> Quantity.InSlot <$> SlotName.fromJson v
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Value.Array (Array.MkArray [x, y]))) -> Quantity.Plus <$> fromJson x <*> fromJson y
-    -- Count.fromJson re-derives the tag from the WHOLE value (see the comment on
-    -- toJson) rather than from `mv`, which has already had it stripped.
-    ("Count", _) -> Quantity.Count <$> Count.fromJson fromJson value
+    ("Count", Just v) -> Quantity.Count <$> Count.fromJson fromJson v
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)

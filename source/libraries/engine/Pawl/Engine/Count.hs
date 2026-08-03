@@ -54,7 +54,7 @@ type QuantityOf quantity = ObjectId -> quantity -> Maybe Integer
 -- member with no value. It propagates; CR 208.2a's "use 0 instead of that
 -- number" is a different rule and is not implemented here (#65).
 evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
-evaluate viewOf quantityOf context gs (Count.Type.MkCount scope predicate aggregation) = case scope of
+evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   Scope.InZone zone ref -> do
     pids <- playersFor context gs ref
     let ids = concatMap (\pid -> Game.zoneMembers zone pid gs) pids
@@ -67,6 +67,9 @@ evaluate viewOf quantityOf context gs (Count.Type.MkCount scope predicate aggreg
     let views = Maybe.mapMaybe (snapshotView shape) (Foldable.toList (GameState.events gs))
         kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
      in aggregate quantityOf aggregation kept
+  where
+    predicate = Count.Type.filter count
+    aggregation = Count.Type.aggregation count
 
 -- The binding slots the per-member quantity of a count reads, with the reader
 -- INJECTED for the module-cycle reason QuantityOf is injected above: Pawl.Engine.Quantity
@@ -74,7 +77,7 @@ evaluate viewOf quantityOf context gs (Count.Type.MkCount scope predicate aggreg
 -- Aggregation.Greatest carries a quantity; the other two aggregate the matched set
 -- alone and so read no slot. The Scope and the Filter hold no slot name at all.
 slots :: (quantity -> Set slot) -> Count.Type.Count quantity -> Set slot
-slots slotsOfQuantity (Count.Type.MkCount _ _ aggregation) = case aggregation of
+slots slotsOfQuantity count = case Count.Type.aggregation count of
   Aggregation.Objects -> Set.empty
   Aggregation.DistinctCardTypes -> Set.empty
   Aggregation.Greatest quantity -> slotsOfQuantity quantity

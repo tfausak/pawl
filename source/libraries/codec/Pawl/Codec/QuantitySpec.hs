@@ -48,10 +48,11 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.Plus (Quantity.Literal 1) Quantity.Star)
       "{\"type\":\"Plus\",\"value\":[{\"type\":\"Literal\",\"value\":1},{\"type\":\"Star\"}]}"
-  -- Task 5: Quantity.Count's arm shares Count's own "Count" tag rather than
-  -- wrapping it in a second one, so `Quantity.Count c` is byte-for-byte the
-  -- JSON `Count.toJson Quantity.toJson c` used to produce.
-  Spec.it s "Count shares Count's own tag, not double-tagged" $
+  -- Quantity.Count's arm is tagged here and nowhere else: Pawl.Codec.Count
+  -- writes a bare object, so this pins the one "Count" tag in the encoding --
+  -- the arm reads like every other arm, and a Count payload can never be
+  -- double-tagged because only one level writes a tag at all.
+  Spec.it s "Count is tagged by Quantity, and the payload is Count's bare object" $
     Common.assertJsonCodec
       s
       Quantity.toJson
@@ -63,7 +64,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
               Aggregation.DistinctCardTypes
           )
       )
-      "{\"type\":\"Count\",\"value\":[{\"type\":\"InZone\",\"value\":[{\"type\":\"Graveyard\"},{\"type\":\"EachPlayer\"}]},{\"type\":\"And\",\"value\":[]},{\"type\":\"DistinctCardTypes\"}]}"
+      "{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Graveyard\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"DistinctCardTypes\"}}}"
   -- The arm that proves the Greatest payload is a whole Quantity rather than a
   -- nullary tag: a Greatest whose per-member quantity is itself a Count
   -- round-trips, which is the recursion Pawl.Types.Quantity's parameter exists
@@ -88,7 +89,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
               )
           )
       )
-      "{\"type\":\"Count\",\"value\":[{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},{\"type\":\"And\",\"value\":[]},{\"type\":\"Greatest\",\"value\":{\"type\":\"Count\",\"value\":[{\"type\":\"InZone\",\"value\":[{\"type\":\"Graveyard\"},{\"type\":\"EachPlayer\"}]},{\"type\":\"And\",\"value\":[]},{\"type\":\"DistinctCardTypes\"}]}}]}"
+      "{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"Greatest\",\"value\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Graveyard\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"DistinctCardTypes\"}}}}}}"
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s
