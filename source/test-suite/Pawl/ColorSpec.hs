@@ -63,9 +63,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 702.114a devoid makes an object colourless despite a black mana cost" $ do
     -- THE FALSIFIER for "an object's colours are the coloured symbols in its
     -- mana cost": this card's cost is {1}{B} and it is colourless.
-    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (droneId, gs) = S.addCreature devoidDrone S.alice gs0
+        (droneId, gs) = S.addCreature slaughterDrone S.alice gs0
     Spec.assertEq s (Projection.colorsOf droneId gs) Set.empty
 
   Spec.it s "CR 105.3 a new colour REPLACES all previous colours" $ do
@@ -85,9 +85,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     Spec.assertEq s (Projection.colorsOf ratsId gs) Set.empty
 
   Spec.it s "CR 613.1e a layer-5 colour change beats the CR 702.114a devoid seed" $ do
-    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (droneId, board) = S.addCreature devoidDrone S.alice gs0
+        (droneId, board) = S.addCreature slaughterDrone S.alice gs0
         gs = S.withEffect droneId (Modification.SetColor (Set.singleton Color.Black)) board
     Spec.assertEq s (Projection.colorsOf droneId gs) $ Set.singleton Color.Black
 
@@ -107,10 +107,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- FALSIFIER, reader (b) half: a naive "colours are the mana cost's
     -- symbols" implementation pumps this 2/2 to 3/3.
     badMoon <- S.printingOf s registry "Bad Moon"
-    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withMoon) = S.addCreature badMoon S.alice gs0
-        (droneId, gs) = S.addCreature devoidDrone S.alice withMoon
+        (droneId, gs) = S.addCreature slaughterDrone S.alice withMoon
     Spec.assertEqWith s "power unchanged" (Projection.powerOf droneId gs) $ Just 2
     Spec.assertEqWith s "toughness unchanged" (Projection.toughnessOf droneId gs) $ Just 2
 
@@ -165,18 +165,18 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
 
   Spec.it s "CR 702.114a a devoid creature with a black cost IS a legal nonblack target" $ do
     -- FALSIFIER, reader (a) half.
-    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (droneId, gs) = S.addCreature devoidDrone S.alice gs0
+        (droneId, gs) = S.addCreature slaughterDrone S.alice gs0
         legal = Target.legalRecipients Nothing S.noSource nonblackCreature gs
     Spec.assertBool s (Set.member (Recipient.ToCreature droneId) legal) "colourless is nonblack"
 
   Spec.it s "Doom Blade destroys a devoid creature whose mana cost is black" $ do
     swamp <- S.printingOf s registry "Swamp"
-    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let base = S.landsInPlay swamp 2
-        (_, board) = S.addCreature devoidDrone S.bob base
+        (_, board) = S.addCreature slaughterDrone S.bob base
         (gs, dbId) = S.handOne doomBlade board
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)

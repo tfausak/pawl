@@ -802,8 +802,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- any implementation that reads the blocker's printed colour rather than
     -- its projected colour.
     piker <- S.printingOf s registry "Goblin Piker"
-    devoidDrone <- S.printingOf s registry "Synthetic Devoid Drone"
-    let (gs0, mine, theirs) = attacking [piker] [devoidDrone]
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let (gs0, mine, theirs) = attacking [piker] [slaughterDrone]
     case (mine, theirs) of
       (a : _, b : _) ->
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0))) "illegal"
