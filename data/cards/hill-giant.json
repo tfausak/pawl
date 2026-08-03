@@ -1,47 +1,27 @@
 {
   "activatedAbilities": [],
   "castingPermissions": [],
-  "combatRestrictions": [
-    {
-      "type": "CantAttack",
-      "value": {
-        "affected": {
-          "type": "Attached"
-        }
-      }
-    },
-    {
-      "type": "CantBlock",
-      "value": {
-        "affected": {
-          "type": "Attached"
-        }
-      }
-    }
-  ],
-  "enchant": {
-    "pool": {
-      "type": "Creatures"
-    }
-  },
   "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
-      "value": 1
+      "value": 3
     },
     {
       "type": "OfType",
       "value": {
         "type": "Colored",
         "value": {
-          "type": "White"
+          "type": "Red"
         }
       }
     }
   ],
-  "name": "Pacifism",
-  "power": null,
+  "name": "Hill Giant",
+  "power": {
+    "type": "Literal",
+    "value": 3
+  },
   "replacementEffects": [],
   "spell": {
     "modes": [
@@ -56,18 +36,21 @@
     }
   },
   "staticAbilities": [],
-  "toughness": null,
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
   "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
-        "type": "Aura"
+        "type": "Giant"
       }
     ],
     "supertypes": [],
     "types": [
       {
-        "type": "Enchantment"
+        "type": "Creature"
       }
     ]
   }

@@ -24,11 +24,13 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- repeated; only what is different is.
 --
 -- What is different is that this is a SECOND carrier for one rule.
--- Pawl.Types.CombatRestriction holds CR 508.1c's first arm and states outright
--- that "neither arm carries a condition, so the second clause is unrepresentable
--- (#534)"; this type is that second clause, narrowed to the one condition CR
--- 508.1h can price. The split is pawl's and not the rules': at the CR's own level
--- Ghostly Prison is a 508.1c restriction like Pacifism, and 508.1g-508.1j is the
+-- Pawl.Types.CombatRestriction holds both of CR 508.1c's arms -- the
+-- unconditional one and, since Blind-Spot Giant, the one gated on a
+-- Pawl.Types.Condition; this type is that same second clause narrowed to the one
+-- condition that is not a Condition at all, because it is a cost to be PAID
+-- rather than a fact to be read, and CR 508.1d's third sentence makes paying it
+-- optional. The split is pawl's and not the rules': at the CR's own level Ghostly
+-- Prison is a 508.1c restriction like Pacifism, and 508.1g-508.1j is the
 -- machinery for meeting its condition rather than a category beside it.
 --
 -- The split is forced by what the other carrier's ANSWER is.

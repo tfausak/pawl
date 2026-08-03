@@ -302,9 +302,10 @@ triggeredAbilityCounts ability =
 -- Every Count reachable from a card: every site a Pawl.Types.Count can be
 -- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
 -- effect/modification quantity), Condition (a trigger's own condition, a
--- triggered ability's intervening clause, and a ForAsLongAs duration), and
--- every effect (spell, activated, triggered, delayed), recursing into a
--- minted token or emblem.
+-- triggered ability's intervening clause, a ForAsLongAs duration, and CR
+-- 508.1c's / CR 509.1b's "unless some condition is met"), and every effect
+-- (spell, activated, triggered, delayed), recursing into a minted token or
+-- emblem.
 --
 -- This traversal is hand-maintained, not derived, so it is NOT enforced
 -- exhaustive by -Werror the way the Zone/Effect/Modification cases inside it
@@ -328,6 +329,14 @@ declaresVariable m = case m of
   Nothing -> False
   Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
 
+-- Every Count reachable from a combat restriction: only CR 508.1c's / CR
+-- 509.1b's "unless some condition is met" carries one, and the subject beside it
+-- is an Affected, which holds a Filter but no Count.
+combatRestrictionCounts :: CombatRestriction.CombatRestriction -> [Count.Type.Count Quantity.Type.Quantity]
+combatRestrictionCounts restriction = case restriction of
+  CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
+  CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
+
 -- Hand-maintained, with cardCounts' caveat: a NEW Card field holding effects
 -- must be added here too.
 cardResolutionEffects :: Card.Type.Card -> [Effect.Effect Card.Type.Card]
@@ -347,6 +356,7 @@ cardCounts card =
     <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Card.Type.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Card.Type.delayedAbilities card))
+    <> concatMap combatRestrictionCounts (Card.Type.combatRestrictions card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." Battlefield/Stack/Exile/Command are
@@ -1062,10 +1072,13 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.TokenR _ _ -> []
   ReplacementEffect.PhaseR _ -> []
 
+-- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
+-- Giant's gate carries `Not IsSource`, which is as much card data as the affected
+-- set beside it.
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.Filter Keyword.Keyword]
 combatRestrictionFilters restriction = case restriction of
-  CombatRestriction.CantAttack affected -> affectedFilters affected
-  CombatRestriction.CantBlock affected -> affectedFilters affected
+  CombatRestriction.CantAttack affected condition -> affectedFilters affected <> foldMap conditionFilters condition
+  CombatRestriction.CantBlock affected condition -> affectedFilters affected <> foldMap conditionFilters condition
 
 -- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,
 -- which is every position in the type except the one below.
@@ -1982,7 +1995,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 508.1c's combat restriction",
-              base {Card.Type.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried)]}
+              base {Card.Type.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried) Nothing]}
             ),
             ( "CR 614.1's counter-placement pattern",
               base

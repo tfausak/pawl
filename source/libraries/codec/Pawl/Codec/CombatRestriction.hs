@@ -3,22 +3,51 @@ module Pawl.Codec.CombatRestriction where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.Types.Affected as Affected.Type
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.Condition as Condition.Type
 
 -- | TAGGED, where the requirement codecs are objects with one named key: this type
 -- is a sum over which declaration the restriction forbids, and the two
 -- requirement types are newtypes over one field each
 -- (Pawl.Types.CombatRestriction says why the shapes differ).
+--
+-- The tag's payload is an OBJECT rather than the Affected itself, because each
+-- arm carries two things and the second is CR 508.1c's "unless some condition is
+-- met". Named keys and not a positional array for Pawl.Codec.Condition's reason:
+-- a card file that swapped two same-shaped elements would decode silently into
+-- the wrong card, and "affected" and "unless" cannot be swapped by accident.
 toJson :: CombatRestriction.CombatRestriction -> Value.Value
 toJson cr = case cr of
-  CombatRestriction.CantAttack a -> Common.tagged "CantAttack" . Just $ Affected.toJson a
-  CombatRestriction.CantBlock a -> Common.tagged "CantBlock" . Just $ Affected.toJson a
+  CombatRestriction.CantAttack a c -> Common.tagged "CantAttack" . Just $ payload a c
+  CombatRestriction.CantBlock a c -> Common.tagged "CantBlock" . Just $ payload a c
+
+-- | "unless" is OMITTED when the restriction is unconditional, rather than
+-- written as null: an absent key is how every optional field in this codec spells
+-- "the card does not say this" (Pawl.Codec.Card's empty-list fields), and
+-- Pacifism's two arms are the ones that do not say it.
+payload :: Affected.Type.Affected -> Maybe Condition.Type.Condition -> Value.Value
+payload a c =
+  Common.object $
+    Common.pair "affected" (Affected.toJson a)
+      : foldMap (\condition -> [Common.pair "unless" (Condition.toJson condition)]) c
 
 fromJson :: Value.Value -> Either Text.Text CombatRestriction.CombatRestriction
 fromJson value = do
   (t, mv) <- Common.asTagged value
   case t of
-    "CantAttack" -> Common.withValue mv (fmap CombatRestriction.CantAttack . Affected.fromJson)
-    "CantBlock" -> Common.withValue mv (fmap CombatRestriction.CantBlock . Affected.fromJson)
+    "CantAttack" -> Common.withValue mv (payloadFromJson CombatRestriction.CantAttack)
+    "CantBlock" -> Common.withValue mv (payloadFromJson CombatRestriction.CantBlock)
     _ -> Left . Text.pack $ "unknown CombatRestriction: " <> t
+
+payloadFromJson ::
+  (Affected.Type.Affected -> Maybe Condition.Type.Condition -> CombatRestriction.CombatRestriction) ->
+  Value.Value ->
+  Either Text.Text CombatRestriction.CombatRestriction
+payloadFromJson mk value = do
+  ps <- Common.asObject value
+  a <- Common.field "affected" ps >>= Affected.fromJson
+  c <- traverse Condition.fromJson (Common.optionalField "unless" ps)
+  pure $ mk a c

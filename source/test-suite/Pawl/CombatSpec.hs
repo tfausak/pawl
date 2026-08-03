@@ -1726,6 +1726,124 @@ combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
         Spec.assertEqWith s "and bob's creature is alive, having blocked nothing" (S.creaturesInPlay S.bob after) 1
       _ -> Spec.assertFailure s "fixture should have one blocker"
 
+-- CR 508.1c's and CR 509.1b's SECOND clause -- "or that it can't attack unless
+-- some condition is met" -- proved by Blind-Spot Giant ("This creature can't
+-- attack or block unless you control another Giant"), the pool's first printed
+-- conditional restriction. Pacifism above prints the first clause of the same
+-- parenthetical, and the two groups are deliberately separate: what is under test
+-- here is only that the gate is read, and read afresh.
+--
+-- The card is the right prover on three counts. Its condition reads YOUR OWN
+-- board rather than the defending player's, which is the one thing a condition
+-- still cannot name (#620), and it gates on a FACT rather than on a cost, which
+-- rides Pawl.Types.AttackCost instead for the reason CR 508.1d's third sentence
+-- gives. It prints BOTH arms from one line, as Pacifism does. And "ANOTHER
+-- Giant" makes it self-excluding, which the two directions below are about: a
+-- lone Blind-Spot Giant does not count itself, while a second one counts the
+-- first.
+conditionalCombatRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional CombatRestrictions" $ do
+  Spec.it s "CR 508.1c a lone Blind-Spot Giant can't attack: 'another Giant' does not count itself" $ do
+    -- Direction one of the self-exclusion. The Goblin Piker beside it is the
+    -- control on two axes at once: it is not a Giant, so it does not satisfy the
+    -- condition, and it carries no restriction, so a blanket "nothing may attack"
+    -- bug cannot pass.
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [blindSpotGiant, piker] []
+    case mine of
+      [giant, other] -> do
+        Spec.assertBool s (not (Combat.canAttack S.alice giant gs)) "the Giant cannot attack"
+        Spec.assertBool s (Combat.canAttack S.alice other gs) "the Piker beside it can"
+        Spec.assertEqWith s "and only the Piker is offered" (Combat.legalAttackers S.alice gs) [other]
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [giant] gs)) "declaring the Giant is illegal"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1c a Hill Giant beside it meets the condition and the restriction does not apply" $ do
+    -- The other side of the same board. Hill Giant is a vanilla Giant, so the
+    -- only thing that changed between this case and the one above is whether the
+    -- condition holds.
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, _) = S.combatBoardOf [blindSpotGiant, hillGiant] []
+    case mine of
+      [giant, hill] -> do
+        Spec.assertBool s (Combat.canAttack S.alice giant gs) "the Blind-Spot Giant may attack"
+        Spec.assertEqWith s "and both are offered" (Combat.legalAttackers S.alice gs) [giant, hill]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [giant, hill] gs) "declaring both is legal"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1c two Blind-Spot Giants each count as the other's 'another Giant'" $ do
+    -- Direction two of the self-exclusion, and the case that discriminates
+    -- "another" from "no Blind-Spot Giant counts". The condition is read once per
+    -- SOURCE, so `Not IsSource` excludes a different creature for each of them and
+    -- both are freed.
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    let (gs, mine, _) = S.combatBoardOf [blindSpotGiant, blindSpotGiant] []
+        (lone, _, _) = S.combatBoardOf [blindSpotGiant] []
+    case (mine, Combat.legalAttackers S.alice lone) of
+      ([first, second], []) -> do
+        Spec.assertBool s (Combat.canAttack S.alice first gs) "the first may attack"
+        Spec.assertBool s (Combat.canAttack S.alice second gs) "so may the second"
+        Spec.assertEqWith s "and both are offered" (Combat.legalAttackers S.alice gs) [first, second]
+      (_, offered) -> Spec.assertFailure s ("fixture should have two Giants and a restricted lone one, got " <> show offered)
+  Spec.it s "CR 508.1c the condition reads YOUR board: an opponent's Giant does not free it" $ do
+    -- "you control another Giant" -- CR 109.5's "you" is the ability's
+    -- controller, so bob's Hill Giant is not one of yours. Without this the
+    -- condition would be a bare subtype count.
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, _) = S.combatBoardOf [blindSpotGiant] [hillGiant]
+    case mine of
+      [giant] -> Spec.assertBool s (not (Combat.canAttack S.alice giant gs)) "bob's Giant does not free alice's"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 509.1b the same condition gates the block half" $ do
+    -- CR 509.1b's parenthetical is CR 508.1c's with "block" in place of
+    -- "attack", and the card prints both from one line. Both worlds again, so a
+    -- block half wired to the attack half's answer cannot pass.
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (alone, _, theirs) = attacking [piker] [blindSpotGiant]
+        (freed, _, pair) = attacking [piker] [blindSpotGiant, hillGiant]
+    case (theirs, pair) of
+      ([lone], [giant, _]) -> do
+        Spec.assertBool s (not (Combat.canBlock S.bob lone alone)) "the lone Giant cannot block"
+        Spec.assertEqWith s "and is not offered" (Combat.legalBlockers S.bob alone) []
+        Spec.assertBool s (Combat.canBlock S.bob giant freed) "with a Hill Giant beside it, it can"
+      _ -> Spec.assertFailure s "fixture should have the Giants on bob's side"
+  Spec.it s "CR 508.1c the gate is re-read: the Hill Giant leaving re-imposes the restriction" $ do
+    -- The gather is LIVE and re-derived on every read, the posture every carrier
+    -- of a CR 613.11 effect takes, so a condition that stops holding re-imposes
+    -- the restriction with nothing to unwind -- and one that starts holding lifts
+    -- it. Both worlds on ONE board, so the pair cannot drift.
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, _) = S.combatBoardOf [blindSpotGiant, hillGiant] []
+    case mine of
+      [giant, hill] -> do
+        let gone = S.runPure S.identityAnswer gs (Event.changeZone hill Zone.Graveyard)
+        Spec.assertBool s (Combat.canAttack S.alice giant gs) "with the Hill Giant it may attack"
+        Spec.assertBool s (not (Combat.canAttack S.alice giant gone)) "with the Hill Giant in the graveyard it may not"
+        Spec.assertBool s (not (Combat.canBlock S.alice giant gone)) "nor block"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1c whole cards: the condition decides a real declare attackers step" $ do
+    -- The gameplay-level case, run through the priority loop and CR 703.4i's
+    -- turn-based action rather than a direct call. With the Hill Giant both
+    -- connect for 4 + 3; without it the Blind-Spot Giant is never declared and
+    -- bob takes nothing.
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, _) = S.combatBoardOf [blindSpotGiant, hillGiant] []
+    case mine of
+      [giant, hill] -> do
+        let gone = S.runPure S.identityAnswer gs (Event.changeZone hill Zone.Graveyard)
+            after = S.runCombat S.aggressiveAnswer gs
+            control = S.runCombat S.aggressiveAnswer gone
+        Spec.assertEqWith s "with the Hill Giant, bob takes seven" (S.lifeOf S.bob after) (Just 13)
+        Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf after) [giant, hill]
+        Spec.assertEqWith s "without it, bob takes nothing" (S.lifeOf S.bob control) (Just 20)
+        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+
 vigilanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
   Spec.it s "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $ do
@@ -3251,6 +3369,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   blockRequirementSpec s registry
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
+  conditionalCombatRestrictionSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry
