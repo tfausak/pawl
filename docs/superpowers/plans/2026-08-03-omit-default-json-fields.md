@@ -56,7 +56,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.ByteString as ByteString
 import qualified Pawl.Codec.Common as Common
-import qualified Pawl.Codec.Printing as Codec.Printing
+import qualified Pawl.Codec.Printing as Printing
 import qualified Pawl.Registry as Registry
 import qualified System.Directory as Directory
 
@@ -75,17 +75,13 @@ rewrite root file = do
   bytes <- ByteString.readFile path
   case Encoding.decodeUtf8' bytes of
     Left err -> fail (path <> ": not valid UTF-8: " <> show err)
-    Right contents -> case Common.parse contents >>= Codec.Printing.fromJson of
+    Right contents -> case Common.parse contents >>= Printing.fromJson of
       Left err -> fail (path <> ": " <> Text.unpack err)
       Right printing ->
         ByteString.writeFile path
           . Encoding.encodeUtf8
-          $ Common.render (Codec.Printing.toJson printing) <> Text.pack "\n"
+          $ Common.render (Printing.toJson printing) <> Text.pack "\n"
 ```
-
-Note the alias: `Pawl.Codec.Printing` and `Pawl.Types.Printing` both end in
-`Printing`, so the codec one takes `Codec.Printing` here rather than colliding.
-Only the codec one is needed.
 
 The `pawl` executable stanza in `pawl.cabal` inherits the `executable` import; if
 `bytestring`, `directory`, `text`, `codec` or `registry` is missing from its
