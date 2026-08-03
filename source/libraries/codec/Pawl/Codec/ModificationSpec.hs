@@ -49,6 +49,10 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.SetLandSubtype Subtype.Mountain)
       "{\"type\":\"SetLandSubtype\",\"value\":{\"type\":\"Mountain\"}}"
+  -- Nullary: the subtype is read from the effect's source at projection time
+  -- (Object.chosenSubtype), so there is nothing on the wire. Convincing Mirage.
+  Spec.it s "SetLandSubtypeToChosen" $
+    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.SetLandSubtypeToChosen "{\"type\":\"SetLandSubtypeToChosen\"}"
   -- layer 4, CR 305.7 add (Urborg -> Swamp).
   Spec.it s "AddLandSubtype" $
     Common.assertJsonCodec

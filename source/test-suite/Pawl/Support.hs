@@ -601,6 +601,33 @@ withEffectAt oid ts m gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
+-- withEffectAt, but naming a REAL source instead of the 998 stand-in. Needed
+-- because a modification can read its own source's state: Modification's
+-- SetLandSubtypeToChosen reads Object.chosenSubtype off the effect's source, and
+-- a source that names no object answers Nothing for every board. Pair it with
+-- withChosenSubtype below.
+withEffectFromAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffectFromAt src oid ts m gs =
+  let eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = src,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
+            ContinuousEffect.modification = m,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
+
+-- CR 614.1c: stamp the basic land type a permanent's controller would have
+-- chosen as it entered, without running the entry loop. A STATE fixture, the
+-- shape `attach` and `withEffect` already have -- the cast-it-for-real proof
+-- that the choice is actually MADE is Pawl.AuraSpec's whole-card Convincing
+-- Mirage test, and this exists so a projection test does not have to cast.
+withChosenSubtype :: Subtype.Subtype -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withChosenSubtype subtype oid gs =
+  let set obj = obj {Object.chosenSubtype = Just subtype}
+   in gs {GameState.objects = Map.adjust set oid (GameState.objects gs)}
+
 -- withEffectAt, allocating its own fresh timestamp -- the convenience shape for
 -- a caller that doesn't care which timestamp the effect lands at.
 withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameState -> GameState.GameState
