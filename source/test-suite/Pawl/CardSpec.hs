@@ -1337,8 +1337,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (cardSlotNamesCollide fused) "Dream's Grip with both modes on one slot is rejected"
     Spec.assertBool s (not (collides dreamsGrip)) "and the real card, naming them 'tapped' and 'untapped', is accepted"
   Spec.it s "every file in data/cards loads, and its card is named by its file name" $ do
-    -- The registry checks name-against-file-name on each load
-    -- (Pawl.Registry.loadFile), so sweeping the listing is the whole assertion:
+    -- Name-against-file-name is checked on each load
+    -- (Pawl.Registry.parseCard), so sweeping the listing is the whole assertion:
     -- a stray file, a file whose card was renamed, and a file that no test
     -- happens to name all fail here. A hand-kept list is exactly what forgets
     -- the file nobody loads.

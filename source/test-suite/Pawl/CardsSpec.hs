@@ -27,10 +27,12 @@ spec s = Spec.describe s "Pawl.Cards" $ do
 checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
 checkFile s root p = do
   let slug = slugOf p
-  let path = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
-  -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Corpus.loadOne:
-  -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
-  -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".
+  let path = Registry.cardPath root slug
+  -- Read as bytes and decoded as UTF-8 explicitly, for the reason
+  -- Pawl.Registry.parseCard is: Data.Text.IO.readFile decodes using the locale
+  -- encoding, which is ASCII under LC_ALL=C, so this would otherwise die on
+  -- khabal-ghoul.json's "á". Not parseCard itself -- this case wants the decoded
+  -- JSON value to compare against, not a Card.
   bytes <- ByteString.readFile path
   case Encoding.decodeUtf8' bytes of
     Left err -> Spec.assertFailure s (path <> ": not valid UTF-8: " <> show err)
