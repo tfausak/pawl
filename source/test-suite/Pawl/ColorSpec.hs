@@ -1,14 +1,16 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
--- 702.114a devoid and CR 111.3 token colour), Pawl.Engine.Target (NonblackCreatureTarget)
--- and the P3a colour gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon,
--- Dragon Fodder), plus the CR 608.2b colour-change fizzle. Mostly gameplay-level:
--- a card is cast or resolved through the stack and the resulting game state is
--- asserted on. The rest assert on a projection over a hand-built board, either
--- because no card in the pool produces the effect (S.withEffect) or because the
--- claim is about a layer BOUNDARY and only projectUpTo can see one (the CR 613.3
--- devoid case at the end).
+-- 702.114a devoid, CR 613.3's characteristic-defining-ability-first ordering
+-- within layer 5, and CR 111.3 token colour), Pawl.Engine.Target (the "target
+-- nonblack creature" and "target blue spell" filters below) and the P3a colour
+-- gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder,
+-- Indigo Faerie, Painter's Servant), plus the CR 608.2b colour-change fizzle.
+-- Mostly gameplay-level: a card is cast or resolved through the stack and the
+-- resulting game state is asserted on. The rest assert on a projection over a
+-- hand-built board, either because no card in the pool produces the effect
+-- (S.withEffect) or because the claim is about a layer BOUNDARY and only
+-- projectUpTo can see one ("devoid applies at the START of layer 5").
 module Pawl.ColorSpec where
 
 import qualified Data.Map.Strict as Map
@@ -42,6 +44,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Pool as Pool
@@ -56,6 +59,10 @@ import qualified Pawl.Types.Zone as Zone
 nonblackCreature :: TargetSpec.TargetSpec
 nonblackCreature = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
 
+-- "target blue spell", Red Elemental Blast's first mode.
+blueSpell :: TargetSpec.TargetSpec
+blueSpell = TargetSpec.MkTargetSpec Pool.Spells (Just (Filter.Type.HasColor Color.Blue))
+
 -- The single activated ability of a printing (Indigo Faerie has exactly one).
 -- Same shape as ActivateSpec.theAbility -- duplicated per this test suite's
 -- existing convention of group-local helpers (ActivateSpec, ReplacementSpec)
@@ -64,6 +71,14 @@ theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.C
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+
+-- Answers CR 614.1c's as-enters colour choice with blue, deferring everything
+-- else to S.identityAnswer -- whose own default for that prompt is WHITE, so a
+-- test that reached this answer by accident would not see blue.
+choosingBlue :: Prompt.Prompt r -> r
+choosingBlue p = case p of
+  Prompt.ChooseColor {} -> Color.Blue
+  _ -> S.identityAnswer p
 
 -- Aims every ChooseTargets slot at one object, deferring the rest to
 -- S.identityAnswer -- ProjectionSpec.aimAtObject's shape, duplicated because
@@ -364,3 +379,56 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         below = Projection.projectUpTo Layer.Color cands droneId gs
     Spec.assertEqWith s "black below layer 5" (PC.colors below) $ Set.singleton Color.Black
     Spec.assertEqWith s "colourless once layer 5 has applied" (Projection.colorsOf droneId gs) Set.empty
+
+  Spec.it s "CR 613.3 devoid beats an OLDER layer-5 'in addition' effect" $ do
+    -- THE GATE. Painter's Servant is cast and resolves FIRST, naming blue as it
+    -- enters (CR 614.1c), so the continuous effect its static ability generates
+    -- carries that permanent's timestamp (CR 613.7a). The drone's timestamp is
+    -- minted later, when IT enters (CR 613.7d) -- asserted below, so the fixture
+    -- cannot quietly stop discriminating. Pure CR 613.7 timestamp order would
+    -- therefore add blue FIRST and apply devoid SECOND, leaving the drone
+    -- COLOURLESS. CR 613.3 applies the characteristic-defining ability first
+    -- within layer 5 (devoid is one, CR 702.114a; colour is layer 5, CR 613.1e),
+    -- so devoid clears the colours and the older "in addition" blue lands on
+    -- top: the drone is BLUE. Blue rather than black, so nothing here can be
+    -- confused with the drone's printed {B}.
+    --
+    -- CAST rather than S.addCreature, because the colour choice happens only on
+    -- the entry path (Replacement.runEntry): a Servant placed straight onto the
+    -- battlefield has chosenColor = Nothing and its AddChosenColor adds nothing.
+    mountain <- S.printingOf s registry "Mountain"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let base = S.landsInPlay mountain 2
+        (inHand, psId) = S.handOne paintersServant base
+        cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
+        withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
+        (droneId, gs) = S.addCreature slaughterDrone S.alice withPainter
+        entered = Set.difference (GameState.battlefield withPainter) (GameState.battlefield base)
+    case Set.toList entered of
+      [painterId] -> case (Game.lookupObject painterId gs, Game.lookupObject droneId gs) of
+        (Just painter, Just drone) -> do
+          Spec.assertEqWith s "the Servant chose blue on entry and coloured itself" (Projection.colorsOf painterId withPainter) $ Set.singleton Color.Blue
+          Spec.assertBool s (Object.timestamp painter < Object.timestamp drone) "the Servant's effect is OLDER than the drone"
+        _ -> Spec.assertFailure s "the fixture lost the Servant or the drone"
+      _ -> Spec.assertFailure s "Painter's Servant did not reach the battlefield"
+    Spec.assertEqWith s "blue, not colourless" (Projection.colorsOf droneId gs) $ Set.singleton Color.Blue
+
+  Spec.it s "CR 604.3 Painter's Servant colours a devoid SPELL on the stack" $ do
+    -- Painter's set is "all cards that aren't on the battlefield, spells, and
+    -- permanents", so it is not scoped to the battlefield
+    -- (Affected.MatchingAnywhere). CR 604.3 makes a characteristic-defining
+    -- ability function in all zones, so devoid still empties the drone SPELL's
+    -- colours first and the Servant's blue lands on top -- and Red Elemental
+    -- Blast's "target blue spell" can then name it.
+    mountain <- S.printingOf s registry "Mountain"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let base = S.landsInPlay mountain 2
+        (inHand, psId) = S.handOne paintersServant base
+        cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
+        withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
+        (spellId, gs) = S.spellOnStack slaughterDrone S.alice withPainter
+        legal = Target.legalRecipients Nothing S.noSource blueSpell gs
+    Spec.assertEqWith s "the spell is blue" (Projection.colorsOf spellId gs) $ Set.singleton Color.Blue
+    Spec.assertBool s (Set.member (Recipient.ToObject spellId) legal) "and a legal blue-spell target"

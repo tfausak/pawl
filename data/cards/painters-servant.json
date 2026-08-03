@@ -1,0 +1,78 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    }
+  ],
+  "name": "Painter's Servant",
+  "power": {
+    "type": "Literal",
+    "value": 1
+  },
+  "replacementEffects": [
+    {
+      "type": "EntryR",
+      "value": [
+        {
+          "type": "IsSource"
+        },
+        {
+          "type": "ChooseColor"
+        }
+      ]
+    }
+  ],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "MatchingAnywhere",
+        "value": {
+          "type": "And",
+          "value": []
+        }
+      },
+      "modifications": [
+        {
+          "type": "AddChosenColor"
+        }
+      ]
+    }
+  ],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Scarecrow"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Artifact"
+      },
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}
