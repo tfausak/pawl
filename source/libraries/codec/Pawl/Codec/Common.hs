@@ -52,7 +52,7 @@ number m = Value.Number . Number.MkNumber . Decimal.mkDecimal m
 
 -- | The whole-number case of 'number', which is every number the codec writes.
 integer :: Integer -> Value.Value
-integer m = number m 0
+integer = flip number 0
 
 string :: String -> Value.Value
 string = text . Text.pack
