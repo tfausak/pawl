@@ -280,26 +280,49 @@ decodeBooleanDefault d value = case value of
 
 -- | Asserts both directions of a codec against one JSON literal, which is the
 -- shape almost every case in a @Pawl.Codec.XSpec@ takes.
-assertJsonCodec :: (Stack.HasCallStack, Monad m, Eq a, Show a) => Spec.Spec m n -> (a -> Value.Value) -> (Value.Value -> Either Text.Text a) -> a -> String -> m ()
+assertJsonCodec ::
+  (Stack.HasCallStack, Monad m, Eq a, Show a) =>
+  Spec.Spec m n ->
+  (a -> Value.Value) ->
+  (Value.Value -> Either Text.Text a) ->
+  a ->
+  String ->
+  m ()
 assertJsonCodec s enc dec x j = do
   assertToJson s enc x j
   assertFromJson s dec j x
 
-assertFromJson :: (Stack.HasCallStack, Monad m, Eq a, Eq b, Show a, Show b) => Spec.Spec m n -> (Value.Value -> Either a b) -> String -> b -> m ()
+assertFromJson ::
+  (Stack.HasCallStack, Monad m, Eq a, Eq b, Show a, Show b) =>
+  Spec.Spec m n ->
+  (Value.Value -> Either a b) ->
+  String ->
+  b ->
+  m ()
 assertFromJson s f j x = do
   v <- assertJson s j
   Spec.assertEq s (f v) (Right x)
 
 -- | Compares 'sortKeys'-normalized values, because JSON objects are unordered
 -- and key order is not a property the codec has.
-assertToJson :: (Stack.HasCallStack, Monad m) => Spec.Spec m n -> (a -> Value.Value) -> a -> String -> m ()
+assertToJson ::
+  (Stack.HasCallStack, Monad m) =>
+  Spec.Spec m n ->
+  (a -> Value.Value) ->
+  a ->
+  String ->
+  m ()
 assertToJson s f x j = do
   v <- assertJson s j
   Spec.assertEq s (sortKeys (f x)) (sortKeys v)
 
 -- | Goes through 'parse' rather than parsing itself, so a literal with trailing
 -- garbage is a test failure instead of silently parsing as its prefix.
-assertJson :: (Stack.HasCallStack, Monad m) => Spec.Spec m n -> String -> m Value.Value
+assertJson ::
+  (Stack.HasCallStack, Monad m) =>
+  Spec.Spec m n ->
+  String ->
+  m Value.Value
 assertJson s j = case parse (Text.pack j) of
   Left e -> Spec.assertFailure s $ "invalid JSON: " <> show j <> ": " <> show e
   Right v -> pure v
