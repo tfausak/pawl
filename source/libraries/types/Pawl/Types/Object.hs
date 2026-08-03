@@ -130,8 +130,13 @@ data Object = MkObject
     -- knows. A THIRD as-enters choice of a third type would be the thing that
     -- changes that call.
     --
-    -- NOT a copiable value, for chosenColor's reason (CR 707.5): a copy runs the
-    -- copied as-enters ability and makes its own choice.
+    -- NOT a copiable value, for chosenColor's reason (CR 707.5) and for CR
+    -- 707.6, which says it outright: "When copying a permanent, any choices that
+    -- have been made for that permanent aren't copied. Instead, if an object
+    -- enters the battlefield as a copy of another permanent, the object's
+    -- controller will get to make any 'as [this] enters the battlefield' choices
+    -- for it." Its worked example is an "As this creature enters, choose a
+    -- creature type" card, which is this field's shape exactly.
     --
     -- Per-incarnation state: reset by changeZone, because CR 400.7 makes the
     -- moved object a new one.

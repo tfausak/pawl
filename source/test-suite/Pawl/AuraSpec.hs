@@ -448,7 +448,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
--- its CR 614.1c as-enters basic land type. aimRecipient above answers only the
+-- its CR 614.1c as-enters basic land type. aimRecipient below answers only the
 -- first, and the entry choice is the whole point of this card.
 mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
 mirageOn landId subtype p = case p of
@@ -458,8 +458,10 @@ mirageOn landId subtype p = case p of
 
 -- CR 614.1c's as-enters choice, whose value is a SUBTYPE rather than a colour,
 -- and CR 305.7's set reading it back off the Aura. Convincing Mirage is the
--- pool's only producer of either, and the only Aura in the pool that enchants
--- something other than a creature.
+-- pool's only producer of either, and the only Aura in the pool that enchants a
+-- non-creature OBJECT -- the two Curses (enchantPlayerSpec below) enchant
+-- players, which is CR 702.5d's other shape and reaches the battlefield through
+-- Affected.AttachedPlayerControls rather than Affected.Attached.
 chosenLandTypeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
   -- The gameplay-level proof design.md section 4 asks for: cast the Aura, answer
