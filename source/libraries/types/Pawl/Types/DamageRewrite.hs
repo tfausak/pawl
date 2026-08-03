@@ -12,7 +12,7 @@ import qualified Pawl.Types.Scaling as Scaling
 -- REMAINING amount rather than the printed one. That is CR 615.7's own
 -- arithmetic ("preventing 1 damage reduces the remaining shield by 1"), so the
 -- number here is rewritten in place on the row that carries it, and the row is
--- dropped once it reaches 0 (Pawl.Engine.Replacement.reduceShield).
+-- dropped once it reaches 0 (Pawl.Engine.Replacement.setShield).
 --
 -- The remaining amount lives HERE rather than as a counted arm of
 -- Pawl.Types.Uses, and CR 615.7's last sentence is the reason: "such effects
