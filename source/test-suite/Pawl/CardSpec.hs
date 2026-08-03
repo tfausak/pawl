@@ -229,6 +229,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.PermanentDies _ -> []
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
@@ -1060,6 +1061,7 @@ staticAbilityFilters ability =
 triggerConditionFilters :: TriggerCondition.TriggerCondition -> [Filter.Type.Filter Keyword.Keyword]
 triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentEnters f -> [f]
+  TriggerCondition.PermanentDies f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins _ _ -> []

@@ -11,3 +11,5 @@ spec s = Spec.describe s "Pawl.Codec.PlayerCounterKind" $ do
     Common.assertJsonCodec s PlayerCounterKind.toJson PlayerCounterKind.fromJson PlayerCounterKind.Energy "{\"type\":\"Energy\"}"
   Spec.it s "Poison" $
     Common.assertJsonCodec s PlayerCounterKind.toJson PlayerCounterKind.fromJson PlayerCounterKind.Poison "{\"type\":\"Poison\"}"
+  Spec.it s "Experience" $
+    Common.assertJsonCodec s PlayerCounterKind.toJson PlayerCounterKind.fromJson PlayerCounterKind.Experience "{\"type\":\"Experience\"}"
