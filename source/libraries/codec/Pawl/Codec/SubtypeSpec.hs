@@ -137,11 +137,3 @@ spec s = Spec.describe s "Pawl.Codec.Subtype" $ do
     Common.assertJsonCodec s Subtype.toJson Subtype.fromJson Subtype.Dryad "{\"type\":\"Dryad\"}"
   Spec.it s "Knight" $
     Common.assertJsonCodec s Subtype.toJson Subtype.fromJson Subtype.Knight "{\"type\":\"Knight\"}"
-  Spec.it s "fromJsonPair round-trips a [from, to] pair" $ do
-    v <- Common.assertJson s "[{\"type\":\"Mountain\"}, {\"type\":\"Island\"}]"
-    Spec.assertEq s (Subtype.fromJsonPair v) (Right (Subtype.Mountain, Subtype.Island))
-  Spec.it s "fromJsonPair rejects a non-pair value" $
-    Spec.assertBool
-      s
-      (either (const True) (const False) (Subtype.fromJsonPair (Common.array [Subtype.toJson Subtype.Mountain])))
-      "single-element array should fail to decode as a pair"

@@ -2,7 +2,6 @@ module Pawl.Codec.Subtype where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
-import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -1102,11 +1101,3 @@ fromJson =
       ("Zombie", Subtype.Zombie),
       ("Zubera", Subtype.Zubera)
     ]
-
-fromJsonPair :: Value.Value -> Either Text.Text (Subtype.Subtype, Subtype.Subtype)
-fromJsonPair value = case value of
-  Value.Array (Array.MkArray [f, t]) -> do
-    f_ <- fromJson f
-    t_ <- fromJson t
-    pure (f_, t_)
-  _ -> Left $ Text.pack "expected a [from, to] subtype pair"

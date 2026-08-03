@@ -7,6 +7,10 @@ import qualified Pawl.Types.Keyword as Keyword
 -- your choice of ..." ability offers. Primal Plasma's three are (3,3,{}),
 -- (2,2,{Flying}) and (1,6,{Defender}).
 --
+-- An as-enters choice of a SUBTYPE is not expressible here (Convincing Mirage's
+-- "as this Aura enters, choose a basic land type"): this record carries a P/T
+-- and keywords only, and no Modification reads a subtype chosen at entry (#608).
+--
 -- The keywords are UNIONED into the object's copiable snapshot, never assigned
 -- over it. That is pinned by Primal Plasma's own Gatherer ruling: a Clone of a
 -- 2/2-flying Plasma that picks the third option is "1/6 with flying AND

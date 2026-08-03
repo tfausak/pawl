@@ -5,18 +5,24 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Subtype as Subtype
 
 -- | CR 601.2: the cast-time choices bound to one named slot of a spell or ability
--- on the stack. A record, not a sum, because one slot may carry several kinds of
--- choice at once -- Magical Hack's slot is both TARGETED (a Recipient) and
--- WORD-SWAPPED (a Subtype pair). A field per binding kind; a kind absent for this
--- slot is Nothing. Grows a field per future binding (a mode, a for-each count).
+-- on the stack. A record, not a sum: a field per binding kind, and a kind absent
+-- for this slot is Nothing. The record shape is what lets two binding
+-- environments be combined field-by-field (Pawl.Engine.Binding.mergeBinding)
+-- without a tag to case on. No slot in this pool populates two fields at once --
+-- each reserved name carries exactly one kind, and a target slot carries a
+-- Recipient -- so the merge is total and order-independent by construction
+-- rather than by luck. Grows a field per future binding (a for-each count).
+--
+-- A CHOICE AN EFFECT OFFERS is not one of these, and does not belong here: CR
+-- 608.2d has the player announce it "while applying the effect", so it is asked
+-- and consumed inside Pawl.Engine.Resolve without ever being stored. Magical
+-- Hack's two basic land types are that shape; Pawl.ResolveSpec's
+-- MagicalHackTiming group is what proves the two moments differ.
 data Binding = MkBinding
   { -- | CR 601.2c: the chosen target for this slot; re-validated at CR 608.2b.
     target :: Maybe Recipient.Recipient,
-    -- | CR 612: the (from, to) basic land types chosen for a text-changing slot.
-    subtypes :: Maybe (Subtype.Subtype, Subtype.Subtype),
     -- | CR 601.2b: the value chosen for a variable in the cost (X). Read by
     -- Quantity.evaluate. Nothing for a slot with no amount.
     amount :: Maybe Natural.Natural,
@@ -34,4 +40,4 @@ data Binding = MkBinding
 
 -- | The empty binding: no choice of any kind. The unit for merging.
 empty :: Binding
-empty = MkBinding {target = Nothing, subtypes = Nothing, amount = Nothing, modes = Nothing, copy = Nothing}
+empty = MkBinding {target = Nothing, amount = Nothing, modes = Nothing, copy = Nothing}

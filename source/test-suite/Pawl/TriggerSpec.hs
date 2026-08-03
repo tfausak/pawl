@@ -839,7 +839,7 @@ delayedSpec s registry =
               -- Stands in for a modal arming spell's own captured chosenModes --
               -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
               -- the collision is the real production shape, not a fabricated one.
-              captured = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 7))
+              captured = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 7))
               pending = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject (ObjectId.MkObjectId 0)) S.alice ability captured
               after = snd (Engine.runGamePure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Engine.placeOne pending))
               placedModes = case GameState.stack after of

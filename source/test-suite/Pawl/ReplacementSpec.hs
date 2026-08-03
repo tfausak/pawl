@@ -1131,7 +1131,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         g3 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g2))) g2
         stolen =
           S.runPure S.identityAnswer g3 $
-            Resolve.applyEffect S.noSource S.noSource S.bob Map.empty (Map.singleton slot True) (Map.singleton slot (Recipient.ToObject oid)) (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
+            Resolve.applyEffect S.noSource S.noSource S.bob (Map.singleton slot True) (Map.singleton slot (Recipient.ToObject oid)) (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
         after = S.runPure S.identityAnswer stolen (Event.changeZone oid Zone.Graveyard)
     Spec.assertEqWith s "bob really did take control of it" (Projection.controllerOf oid stolen) (Just S.bob)
     Spec.assertEqWith s "it reaches its OWNER's graveyard, unexiled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1

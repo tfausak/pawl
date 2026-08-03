@@ -205,11 +205,22 @@ data Prompt r where
   -- position. Not asked when the spell has no slots: zero slots is no choice
   -- at all, and where the rules leave nothing to ask, don't prompt.
   ChooseTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName Recipient.Recipient)
-  -- | CR 612 / the D4 binding: choose the two basic land types for a text-changing
-  -- spell's slot (Magical Hack: "one basic land type" -> "another"). Bound at cast
-  -- alongside ChooseTargets; the legal set is always the five basics, so unlike a
-  -- target it never gates castability, which is what makes cast-vs-resolution
-  -- timing indistinguishable here (#60).
+  -- | CR 612: choose the two basic land types for a text-changing spell's slot
+  -- (Magical Hack: "one basic land type" -> "another").
+  --
+  -- Asked AS THE EFFECT IS APPLIED, not as the spell is cast. CR 608.2d: "if an
+  -- effect of a spell or ability offers any choices other than choices already
+  -- made as part of casting the spell ... the player announces these while
+  -- applying the effect", and CR 601.2b-d's cast-time announcements are the
+  -- modes, the costs, X, the Phyrexian symbols, the targets and a division --
+  -- a word swap is none of them. So Pawl.Engine.Resolve raises this, and
+  -- Pawl.Engine.Cast does not. The ObjectId is the resolving spell.
+  --
+  -- The two moments are observably different even though the legal set is
+  -- always the five basics and the choice therefore never gates castability: a
+  -- countered spell is never asked at all, and a player asked at cast would be
+  -- choosing without information the responses gave them. Pawl.ResolveSpec's
+  -- MagicalHackTiming group holds both halves.
   ChooseBasicLandTypes :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Prompt (Subtype.Subtype, Subtype.Subtype)
   -- | CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
   -- criterion (the engine pre-filters to legal choices); Nothing is "fail to

@@ -18,7 +18,6 @@ import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
-import Pawl.Types.Subtype (Subtype)
 
 -- CR 601.2b: the reserved slot under which a spell's single chosen X is stored.
 -- No card's targetSpecs may name it (the D4 lint enforces this): X is not a
@@ -236,10 +235,6 @@ modesOf m = Maybe.fromMaybe Set.empty (Binding.modes =<< Map.lookup chosenModes 
 targetsOf :: Map SlotName Binding -> Map SlotName Recipient
 targetsOf = Map.mapMaybe Binding.target
 
--- Project the chosen (from, to) land-type pairs (CR 612), dropping slots without.
-subtypesOf :: Map SlotName Binding -> Map SlotName (Subtype, Subtype)
-subtypesOf = Map.mapMaybe Binding.subtypes
-
 -- The amount (X) bound at a slot, if any.
 amountOf :: SlotName -> Map SlotName Binding -> Maybe Natural
 amountOf slot m = Binding.amount =<< Map.lookup slot m
@@ -255,23 +250,23 @@ setCopy :: ProjectedCharacteristics -> Map SlotName Binding -> Map SlotName Bind
 setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
 
 -- Build the binding environment stamped on a stack object at cast: the chosen
--- targets, the chosen land-type pairs, (Just x) the chosen X under variableX,
--- and (when non-empty) the chosen modes under chosenModes. A slot present in
--- several inputs keeps every choice (Magical Hack's slot).
+-- targets, (Just x) the chosen X under variableX, and (when non-empty) the
+-- chosen modes under chosenModes. The two reserved names cannot collide with a
+-- target slot (the D4 lint forbids a card declaring them), so the merges below
+-- never actually merge; they are insertWith rather than insert so that a future
+-- binding kind sharing a slot keeps both choices instead of silently clobbering
+-- one.
 fromChoices ::
   Map SlotName Recipient ->
-  Map SlotName (Subtype, Subtype) ->
   Maybe Natural ->
   Set ModeIndex ->
   Map SlotName Binding
-fromChoices targets subtypes mAmount mModes =
+fromChoices targets mAmount mModes =
   let fromTargets = fmap (\r -> Binding.empty {Binding.target = Just r}) targets
-      fromSubtypes = fmap (\p -> Binding.empty {Binding.subtypes = Just p}) subtypes
-      merged = Map.unionWith mergeBinding fromTargets fromSubtypes
       withX = case mAmount of
-        Nothing -> merged
+        Nothing -> fromTargets
         Just n ->
-          Map.insertWith mergeBinding variableX (Binding.empty {Binding.amount = Just n}) merged
+          Map.insertWith mergeBinding variableX (Binding.empty {Binding.amount = Just n}) fromTargets
    in if Set.null mModes
         then withX
         else Map.insertWith mergeBinding chosenModes (Binding.empty {Binding.modes = Just mModes}) withX
@@ -283,7 +278,6 @@ mergeBinding :: Binding -> Binding -> Binding
 mergeBinding a b =
   Binding.MkBinding
     { Binding.target = Binding.target a <|> Binding.target b,
-      Binding.subtypes = Binding.subtypes a <|> Binding.subtypes b,
       Binding.amount = Binding.amount a <|> Binding.amount b,
       Binding.modes = Binding.modes a <|> Binding.modes b,
       Binding.copy = Binding.copy a <|> Binding.copy b

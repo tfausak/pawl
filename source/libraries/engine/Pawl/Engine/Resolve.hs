@@ -304,16 +304,6 @@ searchesLibrary effect = case effect of
   Effect.ShuffleIntoLibrary _ -> False
   Effect.TakeExtraTurn {} -> False
 
--- The target slots of ChangeText effects: the slots whose land-type pair Cast
--- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
--- this classification rather than casing on Effect itself.
-textChangeSlots :: Card.Type.Card -> [SlotName]
-textChangeSlots card =
-  let slotOf effect = case effect of
-        Effect.ChangeText slot -> Just slot
-        _ -> Nothing
-   in Maybe.mapMaybe slotOf (Card.allEffects card)
-
 -- CR 603.7: the delayed abilities an effect list ARMS, by name. The read half of
 -- the AbilityName dataflow lint, exactly as slotsOf is for target slots.
 armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
@@ -575,7 +565,7 @@ resolveSpellWith runSubgame oid = do
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalityNow = Map.mapWithKey legalSlot chosenNow
-                        applyEffectWith runSubgame oid oid effectController (Binding.subtypesOf bindingsNow) legalityNow chosenNow eff
+                        applyEffectWith runSubgame oid oid effectController legalityNow chosenNow eff
                   Monad.when taken (Monad.forM_ (Mode.effects mode) applyOne)
                 Event.changeZone oid Zone.Graveyard
 
@@ -641,7 +631,7 @@ resolveModes stackId srcId modes = do
             -- every target is already gone (CR 608.2b) -- it never resolves, so
             -- there is nothing for the answer to decide.
             taken <- exercises stackId effectController idx mode
-            Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (Mode.effects mode))
+            Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController legality chosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
@@ -933,8 +923,8 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
 -- {T}, Sacrifice this creature: It deals X damage to any target" sacrifices the
 -- source to pay, so the announced value survives only on the ability object
 -- (#544).
-applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
-applyEffectWith runSubgame resolving source controller bound legality chosen effect = case effect of
+applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
+applyEffectWith runSubgame resolving source controller legality chosen effect = case effect of
   Effect.DealDamage ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -1023,37 +1013,55 @@ applyEffectWith runSubgame resolving source controller bound legality chosen eff
                           ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
                         }
                  in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-  Effect.ChangeText slot ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of
-        (Just recipient, True, Just (from, to)) ->
-          case Recipient.objectOf recipient of
+  -- CR 608.2d: "if an effect of a spell or ability offers any choices other than
+  -- choices already made as part of casting the spell ... the player announces
+  -- these while applying the effect." Magical Hack's two basic land types are
+  -- such a choice. CR 601.2b-d is the exhaustive list of what casting announces
+  -- -- the modes, spliced cards, the alternative and additional costs, X, the
+  -- hybrid and Phyrexian equivalents, the targets, and a division -- and a
+  -- basic-land-type word swap is none of them. So the ask is HERE, at the moment
+  -- the effect is applied, and not at cast; the difference is observable,
+  -- because a countered Magical Hack is then never asked at all
+  -- (Pawl.ResolveSpec's MagicalHackTiming group proves both directions).
+  Effect.ChangeText slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    (Just recipient, True) -> case Recipient.objectOf recipient of
+      Nothing -> pure ()
+      Just target -> do
+        gs0 <- State.get
+        let decider = Decide.deciderFor controller gs0
+        (from, to) <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider controller resolving slot))
+        State.modify' $ \gs ->
+          -- CR 611.2a: the opcode states no duration, so the effect "lasts
+          -- until the end of the game" -- Duration.Indefinite, armed through
+          -- Pawl.Engine.Expiry like the other three storing arms rather than naming a
+          -- stored Expiry here. Indefinite always arms, so the Nothing branch
+          -- is unreachable; it is written out because arm is total over
+          -- Duration and CR 611.2b's "never starts" is its general answer.
+          case Expiry.arm controller source Duration.Indefinite gs of
             Nothing -> gs
-            -- CR 611.2a: the opcode states no duration, so the effect "lasts
-            -- until the end of the game" -- Duration.Indefinite, armed through
-            -- Pawl.Engine.Expiry like the other three storing arms rather than naming a
-            -- stored Expiry here. Indefinite always arms, so the Nothing branch
-            -- is unreachable; it is written out because arm is total over
-            -- Duration and CR 611.2b's "never starts" is its general answer.
-            Just target -> case Expiry.arm controller source Duration.Indefinite gs of
-              Nothing -> gs
-              Just expiry ->
-                -- CR 611 / 612: a continuous effect over the one target (CR 611.2c
-                -- fixed set). The (from, to) is the caster's binding, baked in here;
-                -- Projection rewrites both the target's type line and, at gather, any
-                -- static-ability words. Resolve CONSTRUCTS the Modification but never
-                -- cases on one.
-                let (ts, gs1) = Game.freshTimestamp gs
-                    eff =
-                      ContinuousEffect.MkContinuousEffect
-                        { ContinuousEffect.source = source,
-                          ContinuousEffect.timestamp = ts,
-                          ContinuousEffect.expiry = expiry,
-                          ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
-                          ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                        }
-                 in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-        _ -> gs
+            Just expiry ->
+              -- CR 611 / 612: a continuous effect over the one target (CR 611.2c
+              -- fixed set). The (from, to) is the answer just announced, baked in
+              -- here; Projection rewrites both the target's type line and, at
+              -- gather, any static-ability words. Resolve CONSTRUCTS the
+              -- Modification but never cases on one.
+              let (ts, gs1) = Game.freshTimestamp gs
+                  eff =
+                    ContinuousEffect.MkContinuousEffect
+                      { ContinuousEffect.source = source,
+                        ContinuousEffect.timestamp = ts,
+                        ContinuousEffect.expiry = expiry,
+                        ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
+                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                      }
+               in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+    -- CR 608.2b: an illegal target "won't be affected by parts of a resolving
+    -- spell's effect for which they're illegal", so this part does not happen --
+    -- and CR 608.2d's announcement belongs to an effect that IS applied, so
+    -- nothing is asked either. Unreachable for Magical Hack, whose only target
+    -- is this slot: with it illegal, CR 608.2b's fizzle stops the resolution
+    -- before any effect is applied.
+    _ -> pure ()
   -- CR 605.3b: a mana ability never resolves on the stack. AddMana is applied by
   -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
@@ -2285,7 +2293,7 @@ applyEntryControl controller source zone newId =
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
-applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
+applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffect = applyEffectWith noSubgame
 
 -- CR 103.5b / CR 103.6: perform the effects of an action a card grants from a
@@ -2307,7 +2315,6 @@ performHandAction source player =
         source
         source
         player
-        Map.empty
         -- CR 115.1: the reserved self slot is NOT a target, so there is no CR
         -- 608.2b legality question to answer -- the card is in the acting
         -- player's hand by construction. Binding it is how "this card" is

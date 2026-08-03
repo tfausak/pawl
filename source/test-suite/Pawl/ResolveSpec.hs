@@ -145,7 +145,6 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.noSource
               S.noSource
               S.bob
-              Map.empty
               (Map.singleton slot True)
               (Map.singleton slot (Recipient.ToObject myr))
               (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
@@ -155,7 +154,6 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.noSource
               S.noSource
               S.bob
-              Map.empty
               (Map.singleton slot True)
               (Map.singleton slot (Recipient.ToObject myr))
               (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
@@ -552,45 +550,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let (_, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-  Spec.it s "CR 612 slotsOf and textChangeSlots find a ChangeText slot" $ do
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+  Spec.it s "CR 612 slotsOf finds a ChangeText slot" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
-        card =
-          Card.Type.MkCard
-            { Card.Type.name = CardName.MkCardName $ Text.pack "T",
-              Card.Type.manaCost = Nothing,
-              Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
-              Card.Type.power = Nothing,
-              Card.Type.toughness = Nothing,
-              Card.Type.loyalty = Nothing,
-              Card.Type.keywords = Set.empty,
-              Card.Type.colorIndicator = Set.empty,
-              Card.Type.staticAbilities = [],
-              Card.Type.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.ChangeText slot)) Map.empty Optionality.Mandatory))
-                  (ModeSelection.ChooseExactly 1),
-              Card.Type.activatedAbilities = [],
-              Card.Type.replacementEffects = [],
-              Card.Type.triggeredAbilities = [],
-              Card.Type.delayedAbilities = Map.empty,
-              Card.Type.castingPermissions = [],
-              Card.Type.castingRestrictions = [],
-              Card.Type.characteristicPT = Nothing,
-              Card.Type.playerAbilities = [],
-              Card.Type.blockRequirements = [],
-              Card.Type.attackRequirements = [],
-              Card.Type.combatRestrictions = [],
-              Card.Type.attackCosts = [],
-              Card.Type.mulliganAction = [],
-              Card.Type.openingHandAction = [],
-              Card.Type.additionalCosts = [],
-              Card.Type.alternativeCosts = [],
-              Card.Type.enchant = Nothing,
-              Card.Type.counterability = Counterability.Counterable
-            }
     Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText slot)) (Set.singleton slot)
-    Spec.assertEqWith s "textChangeSlots" (Resolve.textChangeSlots card) [slot]
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
@@ -620,7 +582,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               -- (bypassing Cast.castSpell) must stamp it chosen (mode 0), or
               -- Resolve.effectsOf/resolveSpell -- now scoped to CHOSEN modes --
               -- would see no effects and no target specs at all.
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = Timestamp.MkTimestamp 0
@@ -661,7 +623,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.sickness = Sickness.Settled S.alice,
               -- CR 700.2, as the Landform case explains: a directly-built
               -- stack object must stamp its one mode chosen.
-              Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = Timestamp.MkTimestamp 0
@@ -729,7 +691,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = ts
@@ -757,7 +719,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -770,7 +732,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -795,7 +757,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -818,7 +780,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -848,7 +810,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = ts
@@ -866,7 +828,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         g3 = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g2 (replicate 5 ())
         after =
           S.runPure S.identityAnswer g3 $
-            Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty Map.empty Effect.ExileHandThenDraw
+            Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty Effect.ExileHandThenDraw
     Spec.assertEqWith s "the hand is refilled to the size it had" (S.handSize S.alice after) 2
     Spec.assertEqWith s "both old cards went to exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 2
     Spec.assertEqWith s "and the library is two shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 3
@@ -899,7 +861,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = ts
@@ -961,7 +923,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.bob,
-              Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = ts
@@ -1027,7 +989,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = ts
@@ -1092,7 +1054,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.timestamp = ts
@@ -1241,7 +1203,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               S.noSource
               S.noSource
               S.alice
-              Map.empty
               (Map.singleton slot True)
               (Map.singleton slot (Recipient.ToCreature pikerId))
               (Effect.ModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot))
@@ -1290,7 +1251,7 @@ installControlBy mindslaver controller target gs0 =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,
-            Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer target)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+            Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer target)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.timestamp = ts
@@ -1462,6 +1423,87 @@ counterSpec s registry = Spec.describe s "Counter" $ do
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the countered spell is not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
     Spec.assertEqWith s "the countered spell is exiled" (length (Game.zoneMembers Zone.Exile S.bob resolved)) 1
+
+-- The board both Magical Hack timing cases start from. alice has a Mountain --
+-- added FIRST, so it holds the lowest object id and identityAnswer's
+-- ChooseTargets (Set.lookupMin over the recipients) aims the Hack at it -- plus
+-- an Island for the Hack's {U}; bob has three Islands for Cancel's {1}{U}{U} and
+-- a Cancel in hand. Returns the Mountain, alice's Magical Hack and bob's Cancel
+-- alongside the state.
+hackBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hackBoard mountain island magicalHack cancel =
+  let (mountainId, g1) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
+      (_aliceIsland, g2) = S.addCreature island S.alice g1
+      (g3, hackId) = S.handOne magicalHack g2
+      g4 = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) g3 [1 :: Int .. 3]
+      (cancelId, g5) = S.addHandCard cancel S.bob g4
+   in (mountainId, hackId, cancelId, g5)
+
+-- Hacks Mountain -> Island, and takes the identity fallback elsewhere (the liar
+-- pattern). Deliberately unlike identityAnswer's Mountain -> Mountain, so a
+-- test can tell an honoured answer from the fallback.
+hackToIsland :: Prompt.Prompt r -> r
+hackToIsland p = case p of
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
+  _ -> S.identityAnswer p
+
+-- The basic-land-type answers in a transcript, in order.
+basicLandTypeResponses :: [Response.Response] -> [Response.Response]
+basicLandTypeResponses = filter isBasicLandTypesResponse
+
+isBasicLandTypesResponse :: Response.Response -> Bool
+isBasicLandTypesResponse response = case response of
+  Response.ChoseBasicLandTypes _ -> True
+  _ -> False
+
+-- CR 608.2d: Magical Hack's "replacing all instances of one basic land type
+-- with another" is a choice its EFFECT offers, not one CR 601.2b-d makes as the
+-- spell is cast, so it is announced while the effect is applied. The two cases
+-- below are what makes cast-time and resolution-time binding distinguishable.
+magicalHackTimingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+magicalHackTimingSpec s registry = Spec.describe s "MagicalHackTiming" $ do
+  Spec.it s "CR 608.2d a countered Magical Hack is never asked for its basic land types" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    magicalHack <- S.printingOf s registry "Magical Hack"
+    cancel <- S.printingOf s registry "Cancel"
+    let (_mountainId, hackId, cancelId, gs) = hackBoard mountain island magicalHack cancel
+        exchange = do
+          Cast.castSpell S.alice hackId
+          Cast.castSpell S.bob cancelId
+          Stack.resolveTop
+        ((_, after), transcript) = Replay.record S.identityAnswer gs exchange
+    -- The control: the exchange really happened. CR 701.6a puts the countered
+    -- spell into its owner's graveyard, and CR 608.2n puts Cancel into bob's.
+    Spec.assertEqWith s "Magical Hack countered into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "Cancel resolved into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+    -- And the point: a spell that never resolves never offers its effect's
+    -- choice. Bound at cast, this list would hold one response.
+    Spec.assertEqWith s "no basic land types were ever asked for" (basicLandTypeResponses transcript) []
+  Spec.it s "CR 608.2d an uncountered Magical Hack is asked at resolution, and the swap applies" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    magicalHack <- S.printingOf s registry "Magical Hack"
+    cancel <- S.printingOf s registry "Cancel"
+    let (mountainId, hackId, _cancelId, gs) = hackBoard mountain island magicalHack cancel
+        ((_, cast), castTranscript) = Replay.record hackToIsland gs (Cast.castSpell S.alice hackId)
+        ((_, resolved), resolveTranscript) = Replay.record hackToIsland cast Stack.resolveTop
+    Spec.assertEqWith s "the cast asked nothing about land types" (basicLandTypeResponses castTranscript) []
+    Spec.assertEqWith
+      s
+      "the resolution asked exactly once"
+      (basicLandTypeResponses resolveTranscript)
+      [Response.ChoseBasicLandTypes (Subtype.Mountain, Subtype.Island)]
+    -- CR 612 / 305.6: the answer is honoured, so the choice did not go missing
+    -- when it moved. Mountain -> Island, not identityAnswer's Mountain ->
+    -- Mountain, is what tells the two apart.
+    Spec.assertEqWith s "the hacked Mountain projects Island" (Projection.subtypesOf mountainId resolved) (Set.singleton Subtype.Island)
+    -- M0 determinism: the prompt moved, so the recorded stream has to still
+    -- feed a replay of the same run back to the same state.
+    let ((_, replayed), desync) = Replay.replay resolveTranscript cast Stack.resolveTop
+    Spec.assertEqWith s "the resolution replays deterministically" replayed resolved
+    Spec.assertEqWith s "and the transcript answered every prompt" desync Nothing
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
@@ -1655,7 +1697,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         bindings =
           Binding.setTriggerSource
             source
-            (Binding.fromChoices (Map.singleton targetSlot (Recipient.ToCreature victim)) Map.empty Nothing Set.empty)
+            (Binding.fromChoices (Map.singleton targetSlot (Recipient.ToCreature victim)) Nothing Set.empty)
         withBindings = base4 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) abilId (GameState.objects base4)}
         -- Kill the sole real target before resolution: CR 608.2b makes it
         -- illegal (it's no longer a legal CreatureTarget), while the
@@ -2362,7 +2404,6 @@ untapSpec s registry = Spec.describe s "Untap" $ do
             oid
             oid
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature oid))
             (Effect.Untap (ObjectRef.InSlot slot))
@@ -2381,7 +2422,6 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             oid
             oid
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature oid))
             (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
@@ -2406,7 +2446,6 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             oid
             oid
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature oid))
             (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
@@ -2420,7 +2459,7 @@ gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
   Spec.it s "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        act = Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
+        act = Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
         after = S.runPure S.identityAnswer gs0 act
     Spec.assertEqWith s "alice has two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
 
@@ -2440,7 +2479,7 @@ proliferatesNothing p = case p of
 -- Resolve one Proliferate for alice against `gs`, answered by `answer`.
 proliferate :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 proliferate answer src gs =
-  S.runPure answer gs (Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)
+  S.runPure answer gs (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.Proliferate)
 
 proliferateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 proliferateSpec s registry = Spec.describe s "Proliferate" $ do
@@ -2607,7 +2646,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)) 0
+        asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.Proliferate)) 0
     Spec.assertEqWith s "nobody has a counter: nothing to ask" (asks gs) 0
     Spec.assertEqWith s "someone does: one real decision" (asks (S.addCounter CounterKind.PlusOnePlusOne 1 src gs)) 1
   -- The gameplay-level proof (design.md section 4): a real card, cast and
@@ -2676,7 +2715,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
     let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (hisPiker, g1) = S.addCreature piker S.bob g0
         (hisRats, gs) = S.addCreature rats S.bob g1
-        edict = Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        edict = Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
         keptRats = S.runPure (sacrifices hisPiker) gs edict
         keptPiker = S.runPure (sacrifices hisRats) gs edict
     Spec.assertBool s (S.onBattlefield hisRats keptRats) "choosing the Piker leaves the Rats"
@@ -2700,7 +2739,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
         (hers, g1) = S.addCreature piker S.alice g0
         (hisPiker, g2) = S.addCreature piker S.bob g1
         (hisRats, gs) = S.addCreature rats S.bob g2
-        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
         bobsLeft = length (filter (`S.onBattlefield` after) [hisPiker, hisRats])
     Spec.assertBool s (S.onBattlefield hers after) "alice's creature is untouched"
     -- The edict still takes exactly one: an answer the engine refuses does not
@@ -2719,7 +2758,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        act = Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        act = Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
         asked = State.execState (Engine.runGame countingAnswer gs act) 0
         after = S.runPure S.identityAnswer gs act
     Spec.assertEqWith s "nothing to choose" asked 0
@@ -2729,7 +2768,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
   Spec.it s "CR 609.3 an edict against an empty board does nothing" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
     Spec.assertBool s (S.onBattlefield src after) "alice keeps hers"
   -- The gameplay-level proof: the real card, cast and resolved.
   Spec.it s "Diabolic Edict whole card: cast off two Swamps, bob sacrifices" $ do
@@ -2749,7 +2788,7 @@ createEmblemSpec s registry = Spec.describe s "CreateEmblem" $ do
   Spec.it s "CR 114.2 CreateEmblem puts an emblem in the command zone under the resolver" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        act = Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (Printing.card piker))
+        act = Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.CreateEmblem (Printing.card piker))
         after = S.runPure S.identityAnswer gs0 act
         emblems = filter (\oid -> fmap Object.zone (Game.lookupObject oid after) == Just Zone.Command) (Set.toList (GameState.command after))
     Spec.assertEqWith s "one emblem in command" (Set.size (GameState.command after)) 1
@@ -2760,7 +2799,7 @@ becomeMonarchSpec s registry = Spec.describe s "BecomeMonarch" $ do
   Spec.it s "CR 725 BecomeMonarch TheController makes the resolver the monarch" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs0 (Resolve.applyEffect src src S.alice Map.empty Map.empty Map.empty (Effect.BecomeMonarch MonarchTarget.TheController))
+        after = S.runPure S.identityAnswer gs0 (Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.BecomeMonarch MonarchTarget.TheController))
     Spec.assertEqWith s "alice is monarch" (GameState.monarch after) (Just S.alice)
     Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (GameState.events after)) "a BecameMonarch event was recorded"
 
@@ -2789,7 +2828,6 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.noSource
             S.noSource
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature oid))
             (Effect.ExileUntilMonarch slot)
@@ -2812,7 +2850,6 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.noSource
             S.noSource
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature oid))
             (Effect.ExileUntilMonarch slot)
@@ -2840,7 +2877,6 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.noSource
             S.noSource
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature oid))
             (Effect.ExileUntilMonarch slot)
@@ -3759,6 +3795,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   loseLifeSpec s registry
   greatestSpec s registry
   counterSpec s registry
+  magicalHackTimingSpec s registry
   stifleSpec s registry
   countersSpec s registry
   untapSpec s registry

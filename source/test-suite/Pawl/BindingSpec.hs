@@ -12,7 +12,6 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.Subtype as Subtype
 
 sampleSnapshot :: PC.ProjectedCharacteristics
 sampleSnapshot =
@@ -34,20 +33,14 @@ sampleSnapshot =
 
 spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Engine.Binding" $ do
-  Spec.describe s "fromChoices merges a shared slot's target and subtypes" $ do
+  Spec.it s "fromChoices projects a slot's chosen target" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         r = Recipient.ToPlayer S.alice
-        pair = (Subtype.Mountain, Subtype.Island)
-        m = Binding.fromChoices (Map.singleton slot r) (Map.singleton slot pair) Nothing Set.empty
-
-    Spec.it s "target projected" $ do
-      Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot r
-
-    Spec.it s "subtypes projected" $ do
-      Spec.assertEq s (Binding.subtypesOf m) $ Map.singleton slot pair
+        m = Binding.fromChoices (Map.singleton slot r) Nothing Set.empty
+    Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot r
 
   Spec.it s "fromChoices stores X under the reserved slot" $ do
-    let m = Binding.fromChoices Map.empty Map.empty (Just 3) Set.empty
+    let m = Binding.fromChoices Map.empty (Just 3) Set.empty
     Spec.assertEq s (Binding.amountOf Binding.variableX m) $ Just 3
 
   Spec.it s "amountOf is Nothing for an absent slot" $ do
@@ -55,7 +48,7 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
 
   Spec.it s "modesOf round-trips a stamped set of chosen modes" $ do
     let chosen = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]
-        m = Binding.fromChoices Map.empty Map.empty Nothing chosen
+        m = Binding.fromChoices Map.empty Nothing chosen
     Spec.assertEq s (Binding.modesOf m) chosen
 
   Spec.it s "modesOf is empty for an absent slot" $ do
