@@ -6,7 +6,8 @@ import qualified Pawl.Types.EntryOption as EntryOption
 
 -- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
 -- (CR 707.5, and a real "may" -- declining is legal); ChoiceOf is Primal Plasma
--- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c); WithCounters is CR
+-- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c);
+-- ChooseBasicLandType is Convincing Mirage (CR 614.1c); WithCounters is CR
 -- 306.5b's intrinsic loyalty; UnderSourceControl is Gather Specimens (CR
 -- 616.1b). AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which
 -- is what makes CR 707.2 fall out with no further machinery: the rule says
@@ -38,6 +39,16 @@ data EntryRewrite
     -- copied as-enters ability and makes its own choice, so the colour is not a
     -- copiable value.
     ChooseColor
+  | -- | CR 614.1c again, with a subtype instead of a colour: "As [this
+    -- permanent] enters, choose a basic land type" (Convincing Mirage).
+    -- Nullary -- CR 305.6's five basic land types are the offer, and no card
+    -- narrows them, so there is nothing to carry.
+    --
+    -- Written to Object.chosenSubtype rather than into the copiable snapshot
+    -- AsCopy and ChoiceOf write to, for ChooseColor's reason: CR 707.5's second
+    -- sentence means a copy runs the copied as-enters ability and makes its own
+    -- choice, so the subtype is not a copiable value either.
+    ChooseBasicLandType
   | -- | CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b is
     -- the one producer today -- "A planeswalker has the intrinsic ability 'This
     -- permanent enters with a number of loyalty counters on it equal to its

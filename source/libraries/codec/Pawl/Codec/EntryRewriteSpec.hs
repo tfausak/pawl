@@ -32,6 +32,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
   -- because the five colours are always the whole offer.
   Spec.it s "ChooseColor (Painter's Servant)" $
     Common.assertJsonCodec s EntryRewrite.toJson EntryRewrite.fromJson EntryRewrite.ChooseColor "{\"type\":\"ChooseColor\"}"
+  Spec.it s "ChooseBasicLandType (Convincing Mirage)" $
+    Common.assertJsonCodec s EntryRewrite.toJson EntryRewrite.fromJson EntryRewrite.ChooseBasicLandType "{\"type\":\"ChooseBasicLandType\"}"
   -- CR 614.1c / 306.5b: a planeswalker's intrinsic entry-with-counters rewrite.
   Spec.it s "WithCounters (planeswalker loyalty)" $
     Common.assertJsonCodec

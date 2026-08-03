@@ -14,6 +14,7 @@ toJson r = case r of
   EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Common.encodeList EntryOption.toJson options
   EntryRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Common.array $ [CounterKind.toJson kind, Common.encodeNatural n]
   EntryRewrite.ChooseColor -> Common.nullary "ChooseColor"
+  EntryRewrite.ChooseBasicLandType -> Common.nullary "ChooseBasicLandType"
   EntryRewrite.UnderSourceControl -> Common.nullary "UnderSourceControl"
 
 fromJson :: Value.Value -> Either Text.Text EntryRewrite.EntryRewrite
@@ -22,6 +23,7 @@ fromJson value = do
   case (t, mv) of
     ("AsCopy", _) -> Right EntryRewrite.AsCopy
     ("ChooseColor", _) -> Right EntryRewrite.ChooseColor
+    ("ChooseBasicLandType", _) -> Right EntryRewrite.ChooseBasicLandType
     ("UnderSourceControl", _) -> Right EntryRewrite.UnderSourceControl
     ("ChoiceOf", Just v) -> EntryRewrite.ChoiceOf <$> Common.decodeList EntryOption.fromJson v
     ("WithCounters", Just (Value.Array (Array.MkArray [k, n]))) -> do
