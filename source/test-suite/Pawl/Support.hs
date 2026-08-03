@@ -251,6 +251,7 @@ identityAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
@@ -311,6 +312,7 @@ castAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
@@ -364,6 +366,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
@@ -451,6 +454,7 @@ playLandAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates

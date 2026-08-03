@@ -331,6 +331,25 @@ admits :: Regenerability.Regenerability -> DestructionRewrite.DestructionRewrite
 admits regenerability rewrite = case rewrite of
   DestructionRewrite.Regenerate -> regenerability == Regenerability.Regenerable
 
+-- CR 615.7: "Once the shield has been reduced to 0, any remaining damage is
+-- dealt normally." A spent shield is therefore not an applicable prevention
+-- effect at all, and is refused HERE rather than applied for nothing -- the same
+-- place, and for the same reason, `admits` refuses a regeneration shield CR
+-- 701.19c bars: a candidate refused by `applies` is also never spent, and it
+-- never counts as one of the "two or more applicable sources" whose ordering
+-- CR 615.7 asks about.
+--
+-- `setShield` drops a floating row the moment it reaches 0, so the only 0 that
+-- can reach this test is one written into card data -- which
+-- Pawl.Types.DamageRewrite forbids and Pawl.CardSpec's lint catches. Total
+-- rather than partial.
+unspent :: DamageRewrite.DamageRewrite -> Bool
+unspent rewrite = case rewrite of
+  DamageRewrite.PreventNext remaining -> remaining > 0
+  DamageRewrite.PreventAll -> True
+  DamageRewrite.SetAmount _ -> True
+  DamageRewrite.Scale _ -> True
+
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 applies gs event candidate =
   let src = ReplacementCandidate.source candidate
@@ -341,10 +360,13 @@ applies gs event candidate =
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
         -- CR 615.1: a pattern naming no kind admits every damage event. CR
         -- 614.15: one naming TheSource admits only the damage its own source is
-        -- dealing.
-        (ReplacementEffect.DamageR pat _, ProposedEvent.WouldDealDamage de) ->
+        -- dealing. CR 615.7: one naming a RECIPIENT admits only the damage
+        -- addressed to the permanent or player it shields.
+        (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) ->
           maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
             && matchesDamageSource src (DamagePattern.whichSource pat) de
+            && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
+            && unspent rewrite
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only.
         -- DestructionR carries no pattern because the only producer in the
@@ -640,7 +662,11 @@ readsApplier re = case re of
   ReplacementEffect.EntryR _ EntryRewrite.UnderSourceControl -> True
   -- The rewritten amount is the effect's (Galvanic Blast's 4, Furnace of Rath's
   -- doubling), and a prevention prevents the same event whoever's row it is
-  -- (Fog). The event keeps its own source and recipient either way.
+  -- (Fog). The event keeps its own source and recipient either way. CR 615.7's
+  -- shield is no exception, and pointedly so: what makes two shields differ is
+  -- how much each has LEFT, which rides the effect value
+  -- (DamageRewrite.PreventNext) and so is already inside `choose`'s comparison
+  -- rather than needing the applier to be read.
   ReplacementEffect.DamageR _ _ -> False
   -- CR 701.19a acts on the creature being destroyed -- heal, tap, remove from
   -- combat -- and names no player.
@@ -931,13 +957,43 @@ apply batch candidate event =
             pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
-    (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of
+    (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of
       -- CR 615.6: a prevented event never happens -- it is not marked, not
       -- drained, and never recorded, so no deathtouch bit exists for the CR
       -- 704.5h SBA to read.
       DamageRewrite.PreventAll -> do
         consume (ReplacementCandidate.identity candidate)
         pure Nothing
+      -- CR 615.7's shield: "Each 1 damage that would be dealt to the 'shielded'
+      -- permanent or player is prevented. Preventing 1 damage reduces the
+      -- remaining shield by 1 ... Once the shield has been reduced to 0, any
+      -- remaining damage is dealt normally."
+      --
+      -- So the shield covers as much of THIS event as it has left, and whatever
+      -- it could not cover survives as a smaller event of the same source,
+      -- recipient and riders -- the shape SetAmount's comment above states for
+      -- every damage rewrite. Nothing when it covered all of it, which is CR
+      -- 615.6: a prevented event never happens.
+      --
+      -- No choice is made here, and none is owed: within one event CR 615.7
+      -- leaves nothing to decide, since the prevention is neither optional nor
+      -- divisible by anyone's say-so. The choice the rule DOES describe -- which
+      -- of several simultaneous events the shield covers -- is asked one level
+      -- up, in resolveDamageBatch.
+      --
+      -- NOT `consume`. That spends a row per APPLICATION, and CR 615.7's last
+      -- sentence puts the shield's unit elsewhere: "such effects count only the
+      -- amount of damage; the number of events or sources dealing it doesn't
+      -- matter." `setShield` writes the remainder back and drops the row at 0.
+      DamageRewrite.PreventNext remaining -> do
+        let amount = DamageEvent.amount de
+            -- Both subtractions below are total on Natural: `prevented` is a min
+            -- of the two operands, so it is no greater than either.
+            prevented = min remaining amount
+        setShield (ReplacementCandidate.identity candidate) pat (remaining - prevented)
+        if prevented >= amount
+          then pure Nothing
+          else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = amount - prevented}))
       -- CR 614.1a's "instead" with a flat amount: Galvanic Blast's "deals 4
       -- damage instead". Only the AMOUNT is rewritten, and that is the rule
       -- rather than economy -- Furnace of Rath's own ruling ("the multiplied
@@ -1116,11 +1172,184 @@ consume identity_ = case identity_ of
               && ActiveReplacement.uses active == Uses.Once
        in gs {GameState.replacements = filter (not . spent) (GameState.replacements gs)}
 
+-- CR 615.7: write back what is left of a shield after it prevented some damage,
+-- and drop the row entirely once nothing is -- "once the shield has been reduced
+-- to 0, any remaining damage is dealt normally", and a row that can prevent
+-- nothing is not a prevention effect (`unspent` above refuses it either way).
+--
+-- The floating twin of `consume`, and a separate function rather than a case in
+-- it, because the two spend a row in different UNITS: `consume` spends CR
+-- 614.3's "used up" per application, this spends CR 615.7's shield per point of
+-- damage. Both key on (source, timestamp), which is the row's CR 614.5 identity
+-- and is untouched by rewriting its `effect` -- so a partly-spent shield is the
+-- same instance to the applied-set the CR 616.1 loop carries.
+--
+-- A permanent's static replacement ability is a no-op here, as it is in
+-- `consume`, and for a stronger reason than having no row to write: CR 615.10's
+-- static shields ("If a source would deal damage to you, prevent 1 of that
+-- damage") are deliberately NOT reduced -- "it will apply separately to damage
+-- from other applicable events that would happen at the same time, or at a
+-- different time". No card can print a PreventNext at all (see
+-- Pawl.Types.DamageRewrite), so this arm has no producer.
+setShield :: CandidateId -> DamagePattern.DamagePattern -> Natural -> Game ()
+setShield identity_ pat left = case identity_ of
+  CandidateId.OfPermanent _ _ -> pure ()
+  CandidateId.OfFloating src ts ->
+    State.modify' $ \gs ->
+      let mine active =
+            ActiveReplacement.source active == src
+              && ActiveReplacement.timestamp active == ts
+          rewrite active
+            | not (mine active) = Just active
+            | left == 0 = Nothing
+            | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR pat (DamageRewrite.PreventNext left)}
+       in gs {GameState.replacements = Maybe.mapMaybe rewrite (GameState.replacements gs)}
+
 -- CR 615: settle one proposed damage event. Nothing means it does not happen.
 resolveDamage :: DamageEvent.DamageEvent -> Game (Maybe DamageEvent.DamageEvent)
 resolveDamage de = do
   outcome <- applyReplacements (ProposedEvent.WouldDealDamage de)
   pure (outcome >>= asDamageEvent)
+
+-- CR 608.2f / 510.2: settle a whole batch of SIMULTANEOUS damage events, and
+-- answer the survivors. The typed door Pawl.Engine.Damage uses, so Damage never
+-- cases on a ProposedEvent or on a ReplacementEffect.
+--
+-- Each event still runs its OWN CR 616.1 loop and the loop's unit is still one
+-- event, which is what CR 614.5 ("one opportunity to affect an event") and CR
+-- 615.10 ("applies separately to damage from other applicable events that would
+-- happen at the same time") both describe. The one thing this adds over calling
+-- resolveDamage per event is the ORDER those loops run in, because CR 615.7's
+-- shield is a single resource allocated across the whole batch and the rule
+-- gives the choice of how to the shielded side, not to the engine.
+resolveDamageBatch :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+resolveDamageBatch events = do
+  ordered <- orderForShields events
+  fmap Maybe.catMaybes (Monad.mapM resolveDamage ordered)
+
+-- CR 615.7: "If damage would be dealt to the shielded permanent or player by two
+-- or more applicable sources at the same time, the player or the controller of
+-- the permanent chooses which damage the shield prevents."
+--
+-- Asked as an ORDER over the contested events rather than as a pick, because a
+-- pick repeated IS an order: applying a shield to an event covers as much of
+-- that event as the shield has left and no more (CR 615.7's "each 1 damage ...
+-- is prevented", which nobody may decline or divide), so the only freedom the
+-- rule grants is which event the shield reaches first, then which next.
+--
+-- CR 616.1's APNAP clause -- "if two or more players have to make these choices
+-- at the same time, choices are made in APNAP order" -- is honoured across
+-- choosers here, which is the one place in this module that can honour it: a
+-- lone ProposedEvent has exactly one affected object and therefore one chooser
+-- (#71).
+orderForShields :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+orderForShields events = do
+  gs <- State.get
+  Monad.foldM askOne events (contested gs events)
+
+-- Ask one chooser for the order of the positions their shields are contested
+-- over, and splice the answer back into the batch.
+--
+-- The events keep their POSITIONS in the batch and only trade places with each
+-- other, so a second chooser's group -- a different recipient's -- is neither
+-- moved nor renumbered by the first's answer.
+askOne :: [DamageEvent.DamageEvent] -> (PlayerId, [Natural]) -> Game [DamageEvent.DamageEvent]
+askOne batch (pid, positions) = do
+  gs <- State.get
+  let byPosition :: Map.Map Natural DamageEvent.DamageEvent
+      byPosition = Map.fromList (zip [0 ..] batch)
+      group = Maybe.mapMaybe (\i -> Map.lookup i byPosition) positions
+  case group of
+    -- Unreachable: `contested` only reports a group of two or more.
+    [] -> pure batch
+    first : _ -> do
+      let decider = Decide.deciderFor pid gs
+      answer <- Trans.lift (Program.prompt (Prompt.OrderDamage decider pid group))
+      -- Reject-not-repair, as `choose` and Engine's trigger ordering already do:
+      -- an answer that is not a permutation of the offered indices leaves the
+      -- canonical order standing rather than dropping or duplicating an event.
+      let permuted =
+            if List.sort answer == zipWith const [0 ..] group
+              then fmap (\i -> at group i first) answer
+              else group
+          moved = Map.fromList (zip positions permuted)
+      pure (fmap (\(i, e) -> Map.findWithDefault e i moved) (zip [0 ..] batch))
+
+-- The batch positions one chooser's prevention shields have to be allocated
+-- across, one entry per chooser, in CR 616.1's APNAP order.
+--
+-- A shield is CONTESTED when it admits two or more of the batch's events (CR
+-- 615.7's "two or more applicable sources at the same time") and cannot cover
+-- all of them -- "such effects count only the amount of damage", so the
+-- comparison is against the total damage those events would deal, not against
+-- their number. A shield large enough to cover the lot prevents all of it
+-- whatever the order, and where the rules leave nothing to ask, don't prompt.
+--
+-- Several shields contribute ONE question per CHOOSER, over the union of what
+-- they contest: the order the batch is settled in is a single fact about the
+-- batch, and asking twice would ask the same player to state it twice. A Temper
+-- and a Healing Salve on one creature are the pair that makes this concrete.
+--
+-- The union is per chooser rather than per recipient, so one player shielding
+-- two different creatures orders both creatures' events in one answer. That is a
+-- WIDER question than either shield needs -- neither shield can reach the
+-- other's events (`applies` gates each by its own recipient), so the relative
+-- order of two recipients' events decides nothing -- but a superset of a
+-- question is still the player's answer, and splitting it would ask the same
+-- player twice about one batch.
+contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
+contested gs events =
+  let indexed :: [(Natural, DamageEvent.DamageEvent)]
+      indexed = zip [0 ..] events
+      hitsOf candidate = filter (\entry -> applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate) indexed
+      contestedBy candidate = do
+        remaining <- shieldRemaining (ReplacementCandidate.effect candidate)
+        case hitsOf candidate of
+          hits@(firstHit : _ : _)
+            | remaining < sum (fmap (DamageEvent.amount . snd) hits) -> do
+                -- CR 615.7's chooser is CR 616.1's, read off the shielded
+                -- recipient -- and every hit of ONE shield shares that
+                -- recipient, because the only thing that builds a shield is
+                -- Resolve's PreventNextDamage arm and it always names one
+                -- (DamagePattern.whichRecipient), so the head is the whole
+                -- answer. Nothing means the shielded object has left, and no one
+                -- is there to be asked.
+                pid <- chooserOf gs (ProposedEvent.WouldDealDamage (snd firstHit))
+                pure (pid, fmap fst hits)
+          _ -> Nothing
+      groups = Maybe.mapMaybe contestedBy (collect gs (GameState.replacements gs))
+      merged = Map.fromListWith (<>) groups
+      order = Game.apnapOrder gs
+      -- A chooser off the seating roster sorts last, the fallback
+      -- Resolve.objectRefObjects takes for the same lookup.
+      seated pid = Maybe.fromMaybe (length order) (List.elemIndex pid order)
+   in [ (pid, List.sort (List.nub positions))
+      | (pid, positions) <- List.sortOn (seated . fst) (Map.toList merged)
+      ]
+
+-- CR 615.7: how much of a prevention shield is left, or Nothing for an effect
+-- that is not one.
+--
+-- A CLASSIFICATION of effects -- what SHAPE an effect has, never which effect it
+-- is -- in the same genre as bucketOf and readsApplier above, and its sole
+-- consumer is `contested`. One arm per constructor, no wildcard, so a new
+-- rewrite that counts damage down breaks the build here rather than silently
+-- going unasked about.
+shieldRemaining :: ReplacementEffect -> Maybe Natural
+shieldRemaining re = case re of
+  ReplacementEffect.DamageR _ rewrite -> case rewrite of
+    DamageRewrite.PreventNext remaining -> Just remaining
+    -- Fog is unlimited for its duration, so there is nothing to allocate: it
+    -- prevents every event it admits and the order cannot matter.
+    DamageRewrite.PreventAll -> Nothing
+    DamageRewrite.SetAmount _ -> Nothing
+    DamageRewrite.Scale _ -> Nothing
+  ReplacementEffect.ZoneChangeR _ _ -> Nothing
+  ReplacementEffect.EntryR _ _ -> Nothing
+  ReplacementEffect.DestructionR _ -> Nothing
+  ReplacementEffect.CounterR _ _ -> Nothing
+  ReplacementEffect.TokenR _ _ -> Nothing
+  ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
 asDamageEvent event = case event of

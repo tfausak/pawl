@@ -587,6 +587,161 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
     Spec.assertBool s (not (null (combatStepsOf S.alice mid))) "alice's combat phase began"
     Spec.assertEqWith s "bob's skip is still armed, waiting for his own turn" (armed mid) 1
 
+-- CR 615.7's prevention shield, whose one producer in the pool is Mending Hands
+-- ({W} Instant: "Prevent the next 4 damage that would be dealt to any target this
+-- turn").
+--
+-- Three properties, and they are the three halves of the rule: the shield is
+-- spent in DAMAGE rather than in events ("such effects count only the amount of
+-- damage; the number of events or sources dealing it doesn't matter"), it is
+-- scoped to the recipient it shields, and where two simultaneous sources contend
+-- for it the shielded side chooses which damage it prevents rather than the
+-- engine.
+--
+-- The DAMAGE BATCHES below are hand-built and the SPELL is not: casting Mending
+-- Hands for real is what proves the card, and reaching a real combat-damage batch
+-- of two attackers with different powers would mean driving a whole combat phase
+-- to produce a fixture these assertions read straight off. The same split, and
+-- the same reason, as the Fog case in the group above.
+mendingHandsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
+  let -- One noncombat damage event, from `src`, at `n`.
+      hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      -- Order a contested batch by preferring the event from `src`, by SOURCE id
+      -- rather than by position, so the assertion does not depend on the order
+      -- the batch was gathered in.
+      shieldFirst src p = case p of
+        Prompt.OrderDamage _ _ events ->
+          let key e = (DamageEvent.source e /= src, DamageEvent.source e)
+           in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
+        _ -> S.identityAnswer p
+      wasAskedToOrderDamage responses =
+        let isOrder r = case r of
+              Response.OrderedDamage _ -> True
+              _ -> False
+         in any isOrder responses
+  -- CR 615.7's arithmetic, one event at a time: the shield takes what it can of
+  -- each event and reduces by exactly that much. Three 3-damage events against a
+  -- shield of 4 -- so the first is prevented whole, the second only partly, and
+  -- the third not at all.
+  Spec.it s "CR 615.7 the shield counts DAMAGE, not events: 4 covers one 3 and part of the next" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (victim, g1) = S.addCreature pikerPrinting S.alice base
+        (attacker, g2) = S.addCreature pikerPrinting S.bob g1
+        (g3, spellId) = S.handOne mendingHands g2
+        shielded = castAndResolve (aimCreature victim) g3 spellId
+        strike g = S.runPure S.identityAnswer g (Damage.applyDamage [hit attacker (Recipient.ToCreature victim) 3])
+        once = strike shielded
+        twice = strike once
+        thrice = strike twice
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    -- CR 615.6: a fully prevented event never happens, so nothing is marked and
+    -- nothing is recorded.
+    Spec.assertEqWith s "the first 3 is prevented whole" (S.damageOf victim once) (Just 0)
+    Spec.assertEqWith s "and no damage event happened at all" (amounts once) []
+    Spec.assertEqWith s "the shield is still there, holding 1" (length (GameState.replacements once)) 1
+    -- The partial case, which is what makes this a shield rather than a Fog: 1
+    -- of the second 3 is prevented and the other 2 are dealt.
+    Spec.assertEqWith s "1 of the second 3 is prevented, 2 are dealt" (S.damageOf victim twice) (Just 2)
+    Spec.assertEqWith s "and the surviving event carries the reduced amount" (amounts twice) [2]
+    -- CR 615.7: "once the shield has been reduced to 0, any remaining damage is
+    -- dealt normally."
+    Spec.assertEqWith s "the spent shield is gone" (GameState.replacements twice) []
+    Spec.assertEqWith s "so the third 3 lands in full" (S.damageOf victim thrice) (Just 5)
+  -- CR 615.7's "shielded permanent": a shield names ONE recipient, so a second
+  -- creature is not covered by it and does not spend it. The discriminating twin
+  -- of the case above -- a shield that ignored DamagePattern.whichRecipient,
+  -- which is what every damage pattern in the pool did before this card, would
+  -- prevent this damage and be spent doing it.
+  Spec.it s "CR 615.7 a shield covers the recipient it names and no other" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (shieldedOne, g1) = S.addCreature pikerPrinting S.alice base
+        (bystander, g2) = S.addCreature pikerPrinting S.alice g1
+        (attacker, g3) = S.addCreature pikerPrinting S.bob g2
+        (g4, spellId) = S.handOne mendingHands g3
+        shielded = castAndResolve (aimCreature shieldedOne) g4 spellId
+        after = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit attacker (Recipient.ToCreature bystander) 3])
+    Spec.assertEqWith s "the unshielded creature takes all of it" (S.damageOf bystander after) (Just 3)
+    Spec.assertEqWith s "and the shield was not spent on damage it does not cover" (length (GameState.replacements after)) 1
+  -- THE CR 615.7 CHOICE. Two simultaneous sources, 5 and 3, against a shield of
+  -- 4 on the player they are both aimed at: the shield can cover one of them or
+  -- part of the other, never both, so which it prevents is a decision -- and CR
+  -- 615.7 gives it to "the player or the controller of the permanent", never to
+  -- the engine.
+  --
+  -- The total dealt is 4 either way, so LIFE cannot tell the two answers apart;
+  -- what does is which events happened at all (CR 615.6). Prevent the 5 first and
+  -- both events survive, at 1 and 3; prevent the 3 first and it never happens,
+  -- leaving one event of 4.
+  Spec.it s "CR 615.7 the shielded PLAYER chooses which of two simultaneous damages the shield prevents" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (big, g1) = S.addCreature pikerPrinting S.alice base
+        (small, g2) = S.addCreature pikerPrinting S.alice g1
+        (g3, spellId) = S.handOne mendingHands g2
+        shielded = castAndResolve (aimPlayer S.bob) g3 spellId
+        batch = [hit big (Recipient.ToPlayer S.bob) 5, hit small (Recipient.ToPlayer S.bob) 3]
+        tookTheBig = settleDamage (shieldFirst big) shielded batch
+        tookTheSmall = settleDamage (shieldFirst small) shielded batch
+    Spec.assertEqWith s "setup: bob is shielded, not alice" (length (GameState.replacements shielded)) 1
+    Spec.assertBool
+      s
+      (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch)))
+      "bob was asked which damage the shield prevents"
+    Spec.assertEqWith s "bob spends the shield on the 5: 1 of it and all of the 3 get through" (amounts tookTheBig) [1, 3]
+    Spec.assertEqWith s "bob spends it on the 3 instead: that event never happens, and 4 of the 5 land" (amounts tookTheSmall) [4]
+    -- CR 615.7's last sentence again, from the other side: the shield prevents 4
+    -- whichever order it is spent in, so the two boards differ in WHICH events
+    -- happened and never in how much was prevented.
+    Spec.assertEqWith s "either way the shield prevented exactly 4" (S.lifeOf S.bob tookTheBig) (Just 16)
+    Spec.assertEqWith s "either way the shield prevented exactly 4" (S.lifeOf S.bob tookTheSmall) (Just 16)
+    Spec.assertEqWith s "and either way it is spent" (GameState.replacements tookTheBig) []
+    Spec.assertEqWith s "and either way it is spent" (GameState.replacements tookTheSmall) []
+  -- The elision half, and the reason the prompt is gated rather than raised for
+  -- every batch: a shield big enough to cover the whole batch prevents all of it
+  -- in any order, so there is nothing to decide and nothing is asked.
+  Spec.it s "CR 615.7 a shield that covers the whole batch asks nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (big, g1) = S.addCreature pikerPrinting S.alice base
+        (small, g2) = S.addCreature pikerPrinting S.alice g1
+        (g3, spellId) = S.handOne mendingHands g2
+        shielded = castAndResolve (aimPlayer S.bob) g3 spellId
+        batch = [hit big (Recipient.ToPlayer S.bob) 1, hit small (Recipient.ToPlayer S.bob) 2]
+        after = S.runPure S.identityAnswer shielded (Damage.applyDamage batch)
+    Spec.assertBool
+      s
+      (not (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch))))
+      "no OrderDamage was raised: 4 covers 1 and 2 together"
+    Spec.assertEqWith s "both events were prevented whole" (amounts after) []
+    Spec.assertEqWith s "bob's life is untouched" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and 3 of the shield's 4 were spent, so 1 remains" (length (GameState.replacements after)) 1
+
+-- Apply one damage batch under a given interpreter. Top-level rather than a
+-- `where` binding for castEach's reason: the answer is rank-2 and GHC will not
+-- infer it.
+settleDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> [DamageEvent.DamageEvent] -> GameState.GameState
+settleDamage answer gs batch = S.runPure answer gs (Damage.applyDamage batch)
+
+-- Aim every target slot at one creature. Mending Hands' spec is Pool.AnyTarget
+-- (CR 115.4), whose creature members are tagged ToCreature.
+aimCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  _ -> S.identityAnswer p
+
 -- CR 614.5's applied set is what makes the CR 616.1 loop TERMINATE, not merely
 -- correct: a regression there (an effect invoking itself repeatedly, e.g. two
 -- Hardened Scales re-triggering each other forever) manifests as this group
@@ -1223,6 +1378,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   fatigueSpec s registry
   stonehornSpec s registry
   galvanicBlastSpec s registry
+  mendingHandsSpec s registry
   gatherSpecimensSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
@@ -1690,7 +1846,7 @@ blastShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
         ReplacementEffect.DamageR
-          (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource)
+          (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing)
           (DamageRewrite.SetAmount 4),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,

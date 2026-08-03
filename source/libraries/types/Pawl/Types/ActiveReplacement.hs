@@ -18,27 +18,23 @@ import qualified Pawl.Types.Uses as Uses
 -- conditional (CR 611.2b) and turn-relative (CR 611.2a) expiries reach this
 -- carrier only through hand-built test fixtures, and AtTurnOf on a replacement
 -- has no test at all (#84). `uses` is CR 614.3's
--- "until they're used up". `source` and `timestamp` are new here. #58 recorded
--- their ABSENCE as one blocker on CR 615.13's "prevented" triggers and CR
--- 615.7's multi-source choice, and that particular blocker is gone: there is
--- now a source and a timestamp to report.
+-- "until they're used up", and a CR 615.7 shield is the one row that does not
+-- use it: its remaining amount rides its own rewrite instead
+-- (Pawl.Types.DamageRewrite.PreventNext), because 615.7 counts damage where this
+-- field counts applications.
 --
--- CR 615.7 genuinely needs the BATCH SHAPE to change: it allocates ONE shield
--- across simultaneous sources, with the recipient choosing which EVENT it
--- prevents -- a choice with no batch to be made over as long as
--- Pawl.Engine.Damage.applyDamage keeps running each DamageEvent through its own
--- independent CR 616.1 loop (Pawl.Engine.Replacement.loop), one event at a time.
+-- CR 615.7's multi-source choice is asked, and the batch it is asked over is
+-- Pawl.Engine.Replacement.resolveDamageBatch's: each DamageEvent still runs its
+-- own CR 616.1 loop, and what the shielded player (or the shielded permanent's
+-- controller) decides is the ORDER those loops run in.
 --
--- CR 615.13's blocker is NARROWER than that. Pawl.Engine.Damage.applyDamage already
--- holds the whole batch -- it is the one thing calling resolveDamage once per
--- event -- so the per-event unit does not need to change. What blocks 615.13 is
--- that resolveDamage :: DamageEvent -> Game (Maybe DamageEvent) reports only
--- whether an event survived, discarding WHICH candidate applied; applyDamage
--- therefore has nothing to group by when 615.13 asks it to fire "each time a
--- prevention effect is applied to one or more simultaneous damage events."
--- Widening that return type to also report the applying candidate would unblock
--- 615.13 without touching the per-event batch shape 615.7 still needs. Both stay
--- card-blocked (#58) until their respective blocker is addressed.
+-- Not implemented: CR 615.13's "prevented" triggers. Pawl.Engine.Damage.applyDamage
+-- already holds the whole batch, and `source` and `timestamp` here already say
+-- WHOSE shield a prevention was, so what is left is narrow --
+-- Pawl.Engine.Replacement.resolveDamage reports only whether an event survived,
+-- discarding WHICH candidate applied and how much it prevented, so nothing can
+-- fire "each time a prevention effect is applied to one or more simultaneous
+-- damage events" (#612).
 --
 -- `timestamp` doubles as this instance's CR 614.5 identity (Pawl.Types.CandidateId):
 -- GameState.nextTimestamp is monotone, so no two floating replacements share one.

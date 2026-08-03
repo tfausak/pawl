@@ -24,6 +24,8 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -70,6 +72,12 @@ combatReplaySpec s =
       orderEntries =
         [ TriggerEntry.MkTriggerEntry (TriggerSource.OfObject oid) Monarch.crownSteal,
           TriggerEntry.MkTriggerEntry TriggerSource.Sourceless Monarch.endStepDraw
+        ]
+      -- CR 615.7: two simultaneous combat damage events one shield could cover
+      -- part of, which is the batch that prompt is asked over.
+      orderDamageEvents =
+        [ DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.alice) 5 False False 0 Nothing DamageKind.Combat,
+          DamageEvent.MkDamageEvent (ObjectId.MkObjectId 8) (Recipient.ToPlayer S.alice) 3 False False 0 Nothing DamageKind.Combat
         ]
    in Spec.describe s "CombatReplay" $ do
         Spec.it s "attackers round-trip through the transcript" $
@@ -217,6 +225,24 @@ combatReplaySpec s =
             s
             "identity permutation"
             (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice orderEntries))
+            [0, 1 :: Natural.Natural]
+        -- CR 615.7's batch order. Discriminating against OrderTriggers, which
+        -- carries the same [Natural] answer: a shared Response constructor would
+        -- let one prompt's transcript entry decode as the other's.
+        Spec.it s "OrderDamage records and replays a permutation" $ do
+          let p = Prompt.OrderDamage decider S.alice orderDamageEvents
+              answer = [1, 0] :: [Natural.Natural]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "an OrderTriggers transcript entry does not answer an OrderDamage"
+            (Replay.decode p (Replay.encode (Prompt.OrderTriggers decider S.alice orderEntries) answer))
+            Nothing
+        Spec.it s "defaultAnswer keeps the batch's own order" $
+          Spec.assertEqWith
+            s
+            "identity permutation"
+            (Replay.defaultAnswer (Prompt.OrderDamage decider S.alice orderDamageEvents))
             [0, 1 :: Natural.Natural]
         Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
           let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1

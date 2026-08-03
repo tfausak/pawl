@@ -384,6 +384,36 @@ data Effect card
     -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
     -- "target player", but nothing here demands it.
     SkipNextPhase PlayerRef.PlayerRef PhaseSelector.PhaseSelector
+  | -- | CR 615.7: install a prevention SHIELD over the recipients an ObjectRef
+    -- names -- "Prevent the next 4 damage that would be dealt to any target this
+    -- turn" (Mending Hands) -- for a duration. The Quantity is the shield's
+    -- printed size; the shield then counts DAMAGE down from it (see
+    -- Pawl.Types.DamageRewrite.PreventNext).
+    --
+    -- An ObjectRef rather than a slot, and the same one DealDamage takes, because
+    -- CR 115.4's "any target" reaches a PLAYER as well as a permanent and only
+    -- Resolve.objectRefRecipients answers in that vocabulary. One shield per
+    -- recipient the ref names (CR 615.11's shape for free, though no card in the
+    -- pool names more than one).
+    --
+    -- NOT a Replace carrying a DamageR, and for exactly the reason SkipNextPhase
+    -- is not a Replace carrying a PhaseR: the pattern has to name the shielded
+    -- permanent or player, which is only known at resolution, and a
+    -- ReplacementEffect written on a card cannot name one. Resolve bakes the
+    -- Recipient into DamagePattern.whichRecipient, and the alternative -- a slot
+    -- name inside the pattern, resolved later -- would make Pawl.Engine.Resolve
+    -- case on a ReplacementEffect's identity, which Pawl.Engine.Replacement's
+    -- header reserves to itself.
+    --
+    -- A Duration, unlike SkipNextPhase and like Replace: CR 615.3 gives a
+    -- prevention effect two terminators ("until they're used up or their
+    -- duration has expired"), the shield's own count is the first, and Mending
+    -- Hands' "this turn" is the second, printed on the card rather than assumed
+    -- by the engine.
+    --
+    -- No Uses field: CR 615.7's shield is spent in damage, not in applications,
+    -- so Resolve installs it Unlimited and the count terminates it.
+    PreventNextDamage Duration.Duration ObjectRef.ObjectRef Quantity.Quantity
   | -- | CR 701.6: counter the slot's target -- "cancel it, removing it from the
     -- stack. It doesn't resolve and none of its effects occur" (CR 701.6a) --
     -- via the Event.counter funnel. ONE opcode for both of rule 701.6a's

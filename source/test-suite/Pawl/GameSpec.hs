@@ -350,6 +350,7 @@ recordingAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
+  Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseBoundToken _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseAttachment _ _ _ candidates -> pure (NonEmpty.head candidates)
@@ -1493,6 +1494,7 @@ slaveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates

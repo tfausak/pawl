@@ -65,6 +65,8 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter.Type
@@ -91,6 +93,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
@@ -271,6 +274,7 @@ effectCounts effect = case effect of
   Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase _ _ -> []
+  Effect.PreventNextDamage duration _ quantity -> durationCounts duration <> quantityCounts quantity
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
@@ -450,6 +454,7 @@ effectReplacements effect = case effect of
   Effect.LoseLife _ _ -> []
   Effect.GainLife _ _ -> []
   Effect.SkipNextPhase _ _ -> []
+  Effect.PreventNextDamage {} -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
@@ -511,12 +516,47 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR _ _ -> False
 
+-- The third baked field the codec accepts and no card may author, and the third
+-- for the same reason phasePatternOffends gives: a card cannot name an ObjectId
+-- or a PlayerId, so CR 615.7's shielded recipient is Resolve's
+-- PreventNextDamage arm to write. CR 615.7's remaining amount rides the same
+-- carrier and is equally engine-only, so both halves of a shield are checked
+-- here at once.
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum.
+damagePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
+damagePatternOffends replacement = case replacement of
+  ReplacementEffect.DamageR damagePattern rewrite ->
+    Maybe.isJust (DamagePattern.whichRecipient damagePattern) || isShield rewrite
+  ReplacementEffect.PhaseR _ -> False
+  ReplacementEffect.CounterR _ _ -> False
+  ReplacementEffect.ZoneChangeR _ _ -> False
+  ReplacementEffect.EntryR _ _ -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.TokenR _ _ -> False
+
+-- CR 615.7 versus CR 615.10: a counted shield is generated "by the resolution of
+-- a spell or ability", never by the static ability a card prints, so a printed
+-- one would be a rule that does not exist.
+isShield :: DamageRewrite.DamageRewrite -> Bool
+isShield rewrite = case rewrite of
+  DamageRewrite.PreventNext _ -> True
+  DamageRewrite.PreventAll -> False
+  DamageRewrite.SetAmount _ -> False
+  DamageRewrite.Scale _ -> False
+
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
 -- asks "did the sweep have anything to look at", not "is it well-formed".
 isPhaseR :: ReplacementEffect.ReplacementEffect -> Bool
 isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
+  _ -> False
+
+-- The non-vacuity half of damagePatternOffends' lint, isPhaseR's shape.
+isDamageR :: ReplacementEffect.ReplacementEffect -> Bool
+isDamageR replacement = case replacement of
+  ReplacementEffect.DamageR _ _ -> True
   _ -> False
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
@@ -1113,6 +1153,7 @@ effectFilters effect = case effect of
   Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> cardFilters card
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
+  Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
@@ -1838,6 +1879,37 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         baked = card {Card.Type.replacementEffects = fmap bake (Card.Type.replacementEffects card)}
     Spec.assertBool s (not (any phasePatternOffends (cardReplacementEffects card))) "the real Eon Hub is symmetric and accepted"
     Spec.assertBool s (any phasePatternOffends (cardReplacementEffects baked)) "and the same card naming a seat is rejected"
+  -- The same lint one event class over, for the OTHER pair of fields the codec
+  -- accepts and only the engine writes: CR 615.7's shielded recipient and its
+  -- remaining amount. See damagePatternOffends.
+  Spec.it s "no card authors a recipient-scoped damage pattern or a counted shield" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (any damagePatternOffends . cardReplacementEffects . Printing.card) ps
+    -- Guards against a vacuous sweep: Fog is the card that prints a DamageR.
+    Spec.assertBool s (any (any isDamageR . cardReplacementEffects . Printing.card) ps) "the pool has a card printing a damage replacement"
+    Spec.assertEqWith s "a shield is baked by the engine, never authored" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The rejecting direction, proven against Fog rather than a card file, exactly
+  -- as the Eon Hub case above is.
+  Spec.it s "the lint itself catches a baked shield" $ do
+    fog <- S.printingOf s registry "Fog"
+    -- Fog's DamageR is installed by a resolution effect rather than printed as a
+    -- static replacement ability, so the baking here is on what
+    -- cardReplacementEffects reports rather than on Card.replacementEffects --
+    -- which is the sweep's own input either way.
+    let printed = cardReplacementEffects (Printing.card fog)
+        bakeRecipient replacement = case replacement of
+          ReplacementEffect.DamageR damagePattern rewrite ->
+            ReplacementEffect.DamageR
+              damagePattern {DamagePattern.whichRecipient = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 1))}
+              rewrite
+          other -> other
+        bakeShield replacement = case replacement of
+          ReplacementEffect.DamageR damagePattern _ -> ReplacementEffect.DamageR damagePattern (DamageRewrite.PreventNext 4)
+          other -> other
+    Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
+    Spec.assertBool s (not (any damagePatternOffends printed)) "the real Fog names no recipient and counts nothing"
+    Spec.assertBool s (any (damagePatternOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
+    Spec.assertBool s (any (damagePatternOffends . bakeShield) printed) "and so is one counting a shield down"
   -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
   -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
   -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
