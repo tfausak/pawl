@@ -52,7 +52,16 @@ This is deliberately narrower than "the type has a zero". `Maybe a` defaults to
 `Nothing` and every container (`Set`, `Seq`, `[]`, `Map`) to empty, because for
 those, absence *is* the meaning. A `Bool` field naming a property the thing
 lacks defaults to `False` for the same reason: `DamageEvent.dealtByDeathtouch`,
-`dealtByInfect`, `dealtByToxic`, `dealtByLifelink`, and `EntryRiders.attacking`.
+`dealtByInfect`, and `EntryRiders.attacking`.
+
+`DamageEvent` has two more fields of the same *kind* that are not `Bool`, and
+they take the value that means the same "nothing to say here":
+`dealtByLifelink :: Maybe PlayerId` defaults to `Nothing`, and
+`dealtByToxic :: Natural` defaults to `0`. That zero is R1, not the R5 exception
+below: `Pawl.Types.DamageEvent`'s own field comment says "Zero for a source
+without toxic", and CR 702.164b defines total toxic value as a sum of `N`s, so
+zero is the empty sum rather than a printable toxic value. Contrast
+`EntryOption.power`, where 0 is a real printed characteristic.
 
 **R2 — an enum is omissible only when one constructor means "no restriction."**
 Five qualify, and two of them already have hand-rolled decode halves

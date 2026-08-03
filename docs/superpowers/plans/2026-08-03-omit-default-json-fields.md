@@ -896,7 +896,9 @@ The classification is settled; every field not listed stays `requiredPair` +
 | `ActivatedAbility` | `timing` | `ActivationTiming.AnyTime` | R2 |
 | `CounterPattern` | `whichKind` | `Nothing` | R1 |
 | `CounterPattern` | `whose` | `ControllerRelation.Anyones` | R2 |
-| `DamageEvent` | `dealtByDeathtouch`, `dealtByInfect`, `dealtByToxic`, `dealtByLifelink` | `False` | R1 |
+| `DamageEvent` | `dealtByDeathtouch`, `dealtByInfect` | `False` | R1 |
+| `DamageEvent` | `dealtByToxic` | `0` | R1 (see below) |
+| `DamageEvent` | `dealtByLifelink` | `Nothing` | R1 |
 | `DamagePattern` | `whichKind`, `whichRecipient` | `Nothing` | R1 |
 | `DamagePattern` | `whichSource` | `SourceRelation.AnySource` | R2 |
 | `EntryRiders` | `tapped` | `TapState.Untapped` | R2 |
@@ -908,6 +910,13 @@ The classification is settled; every field not listed stays `requiredPair` +
 `ZoneChangePattern.whenDestination` stays required (R4) — no `Zone` is the
 unmarked one. `DamageEvent`'s `source`, `target`, `amount` and `kind` stay
 required (R3, R4).
+
+`dealtByToxic :: Natural` defaulting to `0` is R1, not the R5 exception that
+keeps `EntryOption.power` required. `Pawl.Types.DamageEvent`'s own field comment
+says "Zero for a source without toxic", and CR 702.164b defines total toxic value
+as the sum of a source's toxic `N`s — so zero is the empty sum, meaning "no
+toxic", rather than a printable value. A 0/0 token, by contrast, is a real
+printed object, which is why `EntryOption.power` cannot take the same treatment.
 
 - [ ] **Step 1: Convert `TokenPattern` first and see it green**
 
