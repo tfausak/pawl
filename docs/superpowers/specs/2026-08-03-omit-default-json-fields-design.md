@@ -216,9 +216,11 @@ skimming.
 
 **The 512-literal regeneration is the one irreversible-feeling step.** It is not
 actually irreversible — git — but a wrong encoder change baked into the literals
-would look correct forever after. Mitigated by doing the codec change and the
-regeneration as separate commits, so the regeneration diff can be read against a
-known-good encoder.
+would look correct forever after. Mitigated by converting one codec module at a
+time, so each commit carries one module's codec change, only that module's
+literals, and the corpus delta that module caused. That is a smaller and more
+attributable diff to read than one global regeneration at the end, and it keeps
+the suite green at every commit rather than red across the middle of the work.
 
 **Per-field defaults are judgment calls, and R2 is where they concentrate.**
 Naming `ControllerRelation.Anyones` the default is a claim that "anyone's" is the
