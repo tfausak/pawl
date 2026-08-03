@@ -87,7 +87,7 @@
         "components": [
           {
             "type": "RemoveLoyaltyFromThis",
-            "value": 10
+            "value": 1E+1
           }
         ],
         "mana": []
@@ -102,7 +102,7 @@
                   "target",
                   {
                     "type": "Literal",
-                    "value": 20
+                    "value": 2E+1
                   }
                 ]
               }

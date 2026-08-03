@@ -64,7 +64,7 @@
   ],
   "toughness": {
     "type": "Literal",
-    "value": 30
+    "value": 3E+1
   },
   "triggeredAbilities": [],
   "typeLine": {

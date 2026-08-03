@@ -633,6 +633,12 @@ executable pawl
   ghc-options: -threaded
   hs-source-dirs: source/executable
   main-is: Main.hs
+  build-depends:
+    bytestring ^>=0.12.2,
+    directory ^>=1.3.10,
+    pawl:codec,
+    pawl:registry,
+    text ^>=2.1.3,
 
 test-suite pawl-test-suite
   import: executable
