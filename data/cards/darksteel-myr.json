@@ -45,10 +45,10 @@
     "supertypes": [],
     "types": [
       {
-        "type": "Creature"
+        "type": "Artifact"
       },
       {
-        "type": "Artifact"
+        "type": "Creature"
       }
     ]
   }

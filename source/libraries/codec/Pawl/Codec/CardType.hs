@@ -7,25 +7,39 @@ import qualified Pawl.Types.CardType as CardType
 
 toJson :: CardType.CardType -> Value.Value
 toJson c = Common.nullary $ case c of
-  CardType.Land -> "Land"
-  CardType.Creature -> "Creature"
-  CardType.Instant -> "Instant"
-  CardType.Enchantment -> "Enchantment"
   CardType.Artifact -> "Artifact"
-  CardType.Sorcery -> "Sorcery"
+  CardType.Battle -> "Battle"
+  CardType.Conspiracy -> "Conspiracy"
+  CardType.Creature -> "Creature"
+  CardType.Dungeon -> "Dungeon"
+  CardType.Enchantment -> "Enchantment"
+  CardType.Instant -> "Instant"
   CardType.Kindred -> "Kindred"
+  CardType.Land -> "Land"
+  CardType.Phenomenon -> "Phenomenon"
+  CardType.Plane -> "Plane"
   CardType.Planeswalker -> "Planeswalker"
+  CardType.Scheme -> "Scheme"
+  CardType.Sorcery -> "Sorcery"
+  CardType.Vanguard -> "Vanguard"
 
 fromJson :: Value.Value -> Either Text.Text CardType.CardType
 fromJson =
   Common.decodeNullary
     "CardType"
-    [ ("Land", CardType.Land),
+    [ ("Artifact", CardType.Artifact),
+      ("Battle", CardType.Battle),
+      ("Conspiracy", CardType.Conspiracy),
       ("Creature", CardType.Creature),
-      ("Instant", CardType.Instant),
+      ("Dungeon", CardType.Dungeon),
       ("Enchantment", CardType.Enchantment),
-      ("Artifact", CardType.Artifact),
-      ("Sorcery", CardType.Sorcery),
+      ("Instant", CardType.Instant),
       ("Kindred", CardType.Kindred),
-      ("Planeswalker", CardType.Planeswalker)
+      ("Land", CardType.Land),
+      ("Phenomenon", CardType.Phenomenon),
+      ("Plane", CardType.Plane),
+      ("Planeswalker", CardType.Planeswalker),
+      ("Scheme", CardType.Scheme),
+      ("Sorcery", CardType.Sorcery),
+      ("Vanguard", CardType.Vanguard)
     ]

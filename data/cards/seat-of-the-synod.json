@@ -62,10 +62,10 @@
     "supertypes": [],
     "types": [
       {
-        "type": "Land"
+        "type": "Artifact"
       },
       {
-        "type": "Artifact"
+        "type": "Land"
       }
     ]
   }
