@@ -169,6 +169,7 @@ placeInherent pending = do
             Object.bindings = bindings,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}

@@ -492,6 +492,7 @@ addCreature printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -656,6 +657,7 @@ addToken card pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -682,6 +684,7 @@ addLibraryCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -708,6 +711,7 @@ addGraveyardCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -741,6 +745,7 @@ addExiledCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -781,6 +786,7 @@ addHandCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -824,6 +830,7 @@ landsInPlay land n =
                   Object.bindings = Map.empty,
                   Object.counters = Map.empty,
                   Object.attachedTo = Nothing,
+                  Object.chosenColor = Nothing,
                   Object.timestamp = ts
                 }
          in gs2
@@ -849,6 +856,7 @@ handOne printing base =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( gs2
@@ -880,6 +888,7 @@ pikerInHand land piker n ph =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
       gs3 =
@@ -1308,6 +1317,7 @@ oneMountainState mountain ph =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState
@@ -1389,6 +1399,7 @@ spellOnStack printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,

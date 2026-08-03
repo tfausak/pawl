@@ -509,6 +509,7 @@ handInPlay printing board =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( g2
