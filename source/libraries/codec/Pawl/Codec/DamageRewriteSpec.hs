@@ -10,6 +10,12 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
   Spec.it s "PreventAll" $
     Common.assertJsonCodec s DamageRewrite.toJson DamageRewrite.fromJson DamageRewrite.PreventAll "{\"type\":\"PreventAll\"}"
+  -- CR 615.7: Mending Hands' shield, whose Natural is what REMAINS of it. Baked
+  -- by Resolve's PreventNextDamage arm and never authored on a card (see
+  -- Pawl.Types.DamageRewrite), so this codec is the only place the wire form is
+  -- pinned.
+  Spec.it s "PreventNext" $
+    Common.assertJsonCodec s DamageRewrite.toJson DamageRewrite.fromJson (DamageRewrite.PreventNext 4) "{\"type\":\"PreventNext\",\"value\":4}"
   -- CR 614.1a: Galvanic Blast's "deals 4 damage instead".
   Spec.it s "SetAmount" $
     Common.assertJsonCodec s DamageRewrite.toJson DamageRewrite.fromJson (DamageRewrite.SetAmount 4) "{\"type\":\"SetAmount\",\"value\":4}"

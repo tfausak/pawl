@@ -65,6 +65,8 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter.Type
@@ -91,6 +93,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
@@ -231,6 +234,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.PermanentDies _ -> []
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
@@ -276,6 +280,7 @@ effectCounts effect = case effect of
   Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase _ _ -> []
+  Effect.PreventNextDamage duration _ quantity -> durationCounts duration <> quantityCounts quantity
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
@@ -307,9 +312,10 @@ triggeredAbilityCounts ability =
 -- Every Count reachable from a card: every site a Pawl.Types.Count can be
 -- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
 -- effect/modification quantity), Condition (a trigger's own condition, a
--- triggered ability's intervening clause, and a ForAsLongAs duration), and
--- every effect (spell, activated, triggered, delayed), recursing into a
--- minted token or emblem.
+-- triggered ability's intervening clause, a ForAsLongAs duration, and CR
+-- 508.1c's / CR 509.1b's "unless some condition is met"), and every effect
+-- (spell, activated, triggered, delayed), recursing into a minted token or
+-- emblem.
 --
 -- This traversal is hand-maintained, not derived, so it is NOT enforced
 -- exhaustive by -Werror the way the Zone/Effect/Modification cases inside it
@@ -333,6 +339,14 @@ declaresVariable m = case m of
   Nothing -> False
   Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
 
+-- Every Count reachable from a combat restriction: only CR 508.1c's / CR
+-- 509.1b's "unless some condition is met" carries one, and the subject beside it
+-- is an Affected, which holds a Filter but no Count.
+combatRestrictionCounts :: CombatRestriction.CombatRestriction -> [Count.Type.Count Quantity.Type.Quantity]
+combatRestrictionCounts restriction = case restriction of
+  CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
+  CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
+
 -- Hand-maintained, with cardCounts' caveat: a NEW Card field holding effects
 -- must be added here too.
 cardResolutionEffects :: Card.Type.Card -> [Effect.Effect Card.Type.Card]
@@ -352,6 +366,7 @@ cardCounts card =
     <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Card.Type.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Card.Type.delayedAbilities card))
+    <> concatMap combatRestrictionCounts (Card.Type.combatRestrictions card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." Battlefield/Stack/Exile/Command are
@@ -455,6 +470,7 @@ effectReplacements effect = case effect of
   Effect.LoseLife _ _ -> []
   Effect.GainLife _ _ -> []
   Effect.SkipNextPhase _ _ -> []
+  Effect.PreventNextDamage {} -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
@@ -516,12 +532,47 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR _ _ -> False
 
+-- The third baked field the codec accepts and no card may author, and the third
+-- for the same reason phasePatternOffends gives: a card cannot name an ObjectId
+-- or a PlayerId, so CR 615.7's shielded recipient is Resolve's
+-- PreventNextDamage arm to write. CR 615.7's remaining amount rides the same
+-- carrier and is equally engine-only, so both halves of a shield are checked
+-- here at once.
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum.
+damagePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
+damagePatternOffends replacement = case replacement of
+  ReplacementEffect.DamageR damagePattern rewrite ->
+    Maybe.isJust (DamagePattern.whichRecipient damagePattern) || isShield rewrite
+  ReplacementEffect.PhaseR _ -> False
+  ReplacementEffect.CounterR _ _ -> False
+  ReplacementEffect.ZoneChangeR _ _ -> False
+  ReplacementEffect.EntryR _ _ -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.TokenR _ _ -> False
+
+-- CR 615.7 versus CR 615.10: a counted shield is generated "by the resolution of
+-- a spell or ability", never by the static ability a card prints, so a printed
+-- one would be a rule that does not exist.
+isShield :: DamageRewrite.DamageRewrite -> Bool
+isShield rewrite = case rewrite of
+  DamageRewrite.PreventNext _ -> True
+  DamageRewrite.PreventAll -> False
+  DamageRewrite.SetAmount _ -> False
+  DamageRewrite.Scale _ -> False
+
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
 -- asks "did the sweep have anything to look at", not "is it well-formed".
 isPhaseR :: ReplacementEffect.ReplacementEffect -> Bool
 isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
+  _ -> False
+
+-- The non-vacuity half of damagePatternOffends' lint, isPhaseR's shape.
+isDamageR :: ReplacementEffect.ReplacementEffect -> Bool
+isDamageR replacement = case replacement of
+  ReplacementEffect.DamageR _ _ -> True
   _ -> False
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
@@ -669,18 +720,17 @@ activatedAbilityOffends ability =
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
 --
--- Pawl.Types.Onset.FromYourNextTurn enforces only the NEXT half of that phrase:
--- Resolve turns it into a turn NUMBER (DelayedTrigger.notBefore) and
--- Event.delayedPending compares the live turn number against it, so the entry
--- cannot fire on the turn that created it. A number cannot say WHOSE turn it is.
--- The YOUR half is delivered by the delayed ability's own
--- TriggerCondition.StepBegins carrying TurnScope.ControllersTurn.
+-- Pawl.Types.Onset.FromYourNextTurn carries BOTH halves of that phrase on its
+-- own: Event.armOnset stores TurnWindow.ControllersNextTurn and
+-- Event.settleOnsets pins the entry to the one turn that turns out to be, whose
+-- active player is the entry's controller. So the ability's own
+-- TriggerCondition.StepBegins carrying TurnScope.ControllersTurn is redundant
+-- for FIRING.
 --
--- The two collaborate and neither is redundant -- the scope alone admits the
--- arming turn itself (an extra combat phase would fire the ability early), and
--- the onset alone admits an intervening opponent's turn -- so a card that arms
--- with the onset but scopes with EachTurn has a delayed ability whose printed
--- "your" is a lie. That is what this rejects.
+-- It is not redundant in the DATA, which is what this lint is about: a card that
+-- arms with the onset but scopes with EachTurn has printed an "each" the window
+-- would silently narrow to the controller's turn, so its text would mean
+-- something the card does not say. That is what this rejects.
 --
 -- A dangling name (an onset naming an ability the card does not declare) is
 -- ALSO an offence here, and deliberately not silently accepted: the neighbouring
@@ -1025,6 +1075,7 @@ staticAbilityFilters ability =
 triggerConditionFilters :: TriggerCondition.TriggerCondition -> [Filter.Type.Filter Keyword.Keyword]
 triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentEnters f -> [f]
+  TriggerCondition.PermanentDies f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins _ _ -> []
@@ -1069,10 +1120,13 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.TokenR _ _ -> []
   ReplacementEffect.PhaseR _ -> []
 
+-- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
+-- Giant's gate carries `Not IsSource`, which is as much card data as the affected
+-- set beside it.
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.Filter Keyword.Keyword]
 combatRestrictionFilters restriction = case restriction of
-  CombatRestriction.CantAttack affected -> affectedFilters affected
-  CombatRestriction.CantBlock affected -> affectedFilters affected
+  CombatRestriction.CantAttack affected condition -> affectedFilters affected <> foldMap conditionFilters condition
+  CombatRestriction.CantBlock affected condition -> affectedFilters affected <> foldMap conditionFilters condition
 
 -- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,
 -- which is every position in the type except the one below.
@@ -1120,6 +1174,7 @@ effectFilters effect = case effect of
   Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> cardFilters card
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
+  Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
@@ -1845,6 +1900,37 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         baked = card {Card.Type.replacementEffects = fmap bake (Card.Type.replacementEffects card)}
     Spec.assertBool s (not (any phasePatternOffends (cardReplacementEffects card))) "the real Eon Hub is symmetric and accepted"
     Spec.assertBool s (any phasePatternOffends (cardReplacementEffects baked)) "and the same card naming a seat is rejected"
+  -- The same lint one event class over, for the OTHER pair of fields the codec
+  -- accepts and only the engine writes: CR 615.7's shielded recipient and its
+  -- remaining amount. See damagePatternOffends.
+  Spec.it s "no card authors a recipient-scoped damage pattern or a counted shield" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (any damagePatternOffends . cardReplacementEffects . Printing.card) ps
+    -- Guards against a vacuous sweep: Fog is the card that prints a DamageR.
+    Spec.assertBool s (any (any isDamageR . cardReplacementEffects . Printing.card) ps) "the pool has a card printing a damage replacement"
+    Spec.assertEqWith s "a shield is baked by the engine, never authored" (fmap (Card.Type.name . Printing.card) offenders) []
+  -- The rejecting direction, proven against Fog rather than a card file, exactly
+  -- as the Eon Hub case above is.
+  Spec.it s "the lint itself catches a baked shield" $ do
+    fog <- S.printingOf s registry "Fog"
+    -- Fog's DamageR is installed by a resolution effect rather than printed as a
+    -- static replacement ability, so the baking here is on what
+    -- cardReplacementEffects reports rather than on Card.replacementEffects --
+    -- which is the sweep's own input either way.
+    let printed = cardReplacementEffects (Printing.card fog)
+        bakeRecipient replacement = case replacement of
+          ReplacementEffect.DamageR damagePattern rewrite ->
+            ReplacementEffect.DamageR
+              damagePattern {DamagePattern.whichRecipient = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 1))}
+              rewrite
+          other -> other
+        bakeShield replacement = case replacement of
+          ReplacementEffect.DamageR damagePattern _ -> ReplacementEffect.DamageR damagePattern (DamageRewrite.PreventNext 4)
+          other -> other
+    Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
+    Spec.assertBool s (not (any damagePatternOffends printed)) "the real Fog names no recipient and counts nothing"
+    Spec.assertBool s (any (damagePatternOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
+    Spec.assertBool s (any (damagePatternOffends . bakeShield) printed) "and so is one counting a shield down"
   -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
   -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
   -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
@@ -1989,7 +2075,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 508.1c's combat restriction",
-              base {Card.Type.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried)]}
+              base {Card.Type.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried) Nothing]}
             ),
             ( "CR 614.1's counter-placement pattern",
               base

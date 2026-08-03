@@ -88,6 +88,7 @@ toJson codec e = case e of
     Common.tagged "Replace" . Just . Common.array $
       [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
   Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Common.array [PlayerRef.toJson r, PhaseSelector.toJson sel]))
+  Effect.PreventNextDamage d r q -> Common.tagged "PreventNextDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r, Quantity.toJson q]))
   Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
@@ -202,6 +203,9 @@ fromJson decode value = do
     "SkipNextPhase" -> case mv of
       Just (Value.Array (Array.MkArray [r, sel])) -> Effect.SkipNextPhase <$> PlayerRef.fromJson r <*> PhaseSelector.fromJson sel
       _ -> Left . Text.pack $ "SkipNextPhase expects [playerRef, phaseSelector]"
+    "PreventNextDamage" -> case mv of
+      Just (Value.Array (Array.MkArray [d, r, q])) -> Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q
+      _ -> Left . Text.pack $ "PreventNextDamage expects [Duration, ObjectRef, Quantity]"
     "PutCounters" -> case mv of
       Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.PutCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
       _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, slot]"

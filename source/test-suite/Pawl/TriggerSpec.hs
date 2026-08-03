@@ -46,7 +46,11 @@
 -- with Baral, Chief of Compliance -- `counterTriggerSpec`. CR 603.6c's OTHER
 -- written form, "leaves the battlefield" for any destination, and the CR 400.7e
 -- public-zone proviso a hidden destination makes real, with Thragtusk bounced by
--- Unsummon -- `leavesBattlefieldSpec`.
+-- Unsummon -- `leavesBattlefieldSpec`. That rule's SECOND written form read by a
+-- BYSTANDER -- "whenever another creature you control dies", where the bearer
+-- watches a permanent other than itself leave the battlefield -- with Meren of
+-- Clan Nel Toth, which is also the pool's producer for CR 122's experience
+-- counters -- `permanentDiesSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -144,6 +148,7 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -2417,6 +2422,162 @@ diesTriggerSpec s registry =
           Spec.assertEqWith s "alice controlled it as it died" (Projection.controllerOf traveler stolen) (Just S.alice)
           Spec.assertEqWith s "so the trigger is hers, not its owner's" (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedEvents died) died))) [S.alice]
 
+-- CR 603.6c's SECOND written form with a BYSTANDER bearer -- "Whenever
+-- [something] is put into a graveyard from the battlefield", narrowed by CR
+-- 700.4's "dies" -- and Meren of Clan Nel Toth {2}{B}{G} Legendary Creature --
+-- Human Shaman 3/4, "Whenever another creature you control dies, you get an
+-- experience counter", the card that proves it.
+--
+-- diesTriggerSpec above is the SELF-scoped half of the same rule: there the
+-- bearer IS the permanent that died. Here the bearer watches, so the three
+-- printed words that narrow the watching are three arms of the condition's own
+-- Filter, exactly as Soul Warden's "another" is (#163) -- "creature" is
+-- HasCardType, "you control" is ControlledBy You read against CR 109.5's you
+-- (the ability's controller, CR 603.3a), and "another" is Not IsSource. Each
+-- gets a falsifier below, because a condition that ignored any one of them
+-- would still pass the whole-card case.
+--
+-- The dying permanent is read from CR 608.2h last known information, which is
+-- not an implementation convenience but CR 603.10a ("some zone-change triggers
+-- look back in time. These are leaves-the-battlefield abilities ...") read
+-- through CR 603.10's own definition of looking back: "using the existence of
+-- those abilities and the appearance of objects immediately prior to the
+-- event." By the CR 117.5 boundary the creature is a card in a graveyard,
+-- CR 108.4 says "a card doesn't have a controller unless that card represents a
+-- permanent or spell", and CR 108.4a would hand a matcher reading the graveyard
+-- card its OWNER instead -- so a creature its controller had stolen would be
+-- credited back to the player who no longer had it. The Control Magic case at
+-- the end is that falsifier.
+--
+-- Meren's SECOND ability -- "At the beginning of your end step, choose target
+-- creature card in your graveyard. If that card's mana value is less than or
+-- equal to the number of experience counters you have, return it to the
+-- battlefield. Otherwise, put it into your hand." -- is not transcribed (#614).
+--
+-- No case here kills the bearer and some other creature at once. A Meren that
+-- departs EARLIER in a batch than the death it should be watching is not
+-- offered to the scan as a candidate (#615).
+permanentDiesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+permanentDiesSpec s registry =
+  let anotherCreatureYouControl =
+        Filter.Type.And
+          [ Filter.Type.HasCardType CardType.Creature,
+            Filter.Type.ControlledBy PlayerRelation.You,
+            Filter.Type.Not Filter.Type.IsSource
+          ]
+      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
+      experienceOf = S.playerCounterOf PlayerCounterKind.Experience
+      -- alice's Meren beside one creature of `victim`'s printing, controlled by
+      -- `owner`.
+      merenBeside victim owner gs0 = do
+        meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+        printing <- S.printingOf s registry victim
+        let (merenId, withMeren) = S.addCreature meren S.alice gs0
+            (victimId, gs) = S.addCreature printing owner withMeren
+        pure (merenId, victimId, gs)
+   in Spec.describe s "PermanentDies" $ do
+        -- The gameplay-level proof, cast to resolution: alice's Lightning Bolt
+        -- kills her own Goblin Piker, CR 704.5g's state-based action moves it
+        -- to the graveyard, and the CR 117.5 settle's trigger scan sees the
+        -- death. One experience counter, from a card that started with none.
+        Spec.it s "CR 700.4 whole cards: alice's Piker dies and her Meren gets an experience counter" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          lightningBolt <- S.printingOf s registry "Lightning Bolt"
+          (_, pikerId, board) <- merenBeside "Goblin Piker" S.alice (S.landsInPlay mountain 1)
+          let (gs, spellId) = S.handOne lightningBolt board
+              -- Bolt the Piker by id rather than by S.identityAnswer's least
+              -- Recipient, which would aim at whichever creature sorts first.
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+                _ -> S.identityAnswer p
+              cast = S.runPure answer gs (Cast.castSpell S.alice spellId)
+              damaged = S.runPure answer cast Stack.resolveTop
+              settled = S.runPure answer damaged Engine.settleForPriority
+              after = S.runPure answer settled Stack.resolveTop
+          Spec.assertEqWith s "alice starts with no experience" (experienceOf S.alice gs) 0
+          Spec.assertEqWith s "the Piker is gone" (Game.lookupObject pikerId settled) Nothing
+          Spec.assertEqWith s "the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "and alice has exactly one experience counter" (experienceOf S.alice after) 1
+          Spec.assertEqWith s "bob has none" (experienceOf S.bob after) 0
+        -- "ANOTHER", the Filter's Not IsSource arm. Meren's own death IS a
+        -- creature alice controls dying, so the silence has to come from the
+        -- exclusion rather than from the condition failing to see the death at
+        -- all -- and the second pair of assertions is what tells those apart:
+        -- the same bearer, the same event, and a Filter differing only in the
+        -- exclusion fires. That also exercises the CR 608.2h read on a bearer
+        -- and a candidate that are one departed object.
+        Spec.it s "CR 603.6c another: Meren's own death does not give her controller a counter" $ do
+          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+          let anyCreatureYouControl =
+                Filter.Type.And
+                  [ Filter.Type.HasCardType CardType.Creature,
+                    Filter.Type.ControlledBy PlayerRelation.You
+                  ]
+              (merenId, gs) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+              died = S.runPure S.identityAnswer gs (Event.changeZone merenId Zone.Graveyard)
+          Spec.assertEqWith s "nothing triggered" (sourcesOf died) []
+          case Event.unscannedEvents died of
+            [death] -> do
+              Spec.assertBool s (Event.matchesTrigger died merenId S.alice (TriggerCondition.PermanentDies anyCreatureYouControl) death) "a Filter without the exclusion admits Meren's own death"
+              Spec.assertBool s (not (Event.matchesTrigger died merenId S.alice (TriggerCondition.PermanentDies anotherCreatureYouControl) death)) "so the printed \"another\" is the only thing declining it"
+            other -> Spec.assertFailure s ("expected exactly one event, got " <> show (length other))
+        -- "YOU CONTROL", the ControlledBy arm, read through CR 109.5 against
+        -- the ability's controller (CR 603.3a). bob's creature dying in front
+        -- of alice's Meren is not it.
+        Spec.it s "CR 109.5 you control: an opponent's creature dying fires nothing" $ do
+          (_, pikerId, gs) <- merenBeside "Goblin Piker" S.bob (Setup.emptyGame S.bothPlayers)
+          let died = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Graveyard)
+          Spec.assertEqWith s "nothing triggered" (sourcesOf died) []
+        -- "CREATURE", the HasCardType arm. A land alice controls reaching the
+        -- same graveyard from the same battlefield is not a creature dying.
+        Spec.it s "CR 205.2a creature: a land of alice's dying fires nothing" $ do
+          (_, landId, gs) <- merenBeside "Mountain" S.alice (Setup.emptyGame S.bothPlayers)
+          let died = S.runPure S.identityAnswer gs (Event.changeZone landId Zone.Graveyard)
+          Spec.assertEqWith s "nothing triggered" (sourcesOf died) []
+        -- CR 700.4 doing the same work it does for SelfDies: "dies" is
+        -- narrower than CR 603.6c's leaves-the-battlefield. alice's own
+        -- creature EXILED off the battlefield has left it without dying.
+        Spec.it s "CR 700.4 a creature of alice's exiled from the battlefield fires nothing" $ do
+          (_, pikerId, gs) <- merenBeside "Goblin Piker" S.alice (Setup.emptyGame S.bothPlayers)
+          let exiled = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Exile)
+          Spec.assertEqWith s "nothing triggered" (sourcesOf exiled) []
+        -- The same card discarded from a HAND reaches the same graveyard and
+        -- has not died: the `from` half of CR 700.4.
+        Spec.it s "CR 700.4 a creature card discarded from alice's hand fires nothing" $ do
+          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, withMeren) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+              (handCard, gs) = S.addHandCard piker S.alice withMeren
+              discarded = S.runPure S.identityAnswer gs (Event.changeZone handCard Zone.Graveyard)
+          Spec.assertEqWith s "nothing triggered" (sourcesOf discarded) []
+        -- CR 603.10a / CR 608.2h: the dying creature is read as it was
+        -- IMMEDIATELY PRIOR to the event. bob owns the Piker, alice has stolen
+        -- it with Control Magic, and it dies -- so "a creature YOU control"
+        -- holds for alice. A matcher reading the card that landed in the
+        -- graveyard would take CR 108.4a's substitute for CR 108.4's missing
+        -- controller -- its owner, bob -- and answer no.
+        Spec.it s "CR 608.2h a stolen creature dying is read with the controller it had as it left" $ do
+          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+          piker <- S.printingOf s registry "Goblin Piker"
+          controlMagic <- S.printingOf s registry "Control Magic"
+          let (merenId, withMeren) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, withPiker) = S.addCreature piker S.bob withMeren
+              (aura, withAura) = S.addCreature controlMagic S.alice withPiker
+              stolen = S.attach aura pikerId withAura
+              died = S.runPure S.identityAnswer stolen (Event.changeZone pikerId Zone.Graveyard)
+          Spec.assertEqWith s "alice controlled it as it died" (Projection.controllerOf pikerId stolen) (Just S.alice)
+          Spec.assertEqWith s "so her Meren triggered" (sourcesOf died) [TriggerSource.OfObject merenId]
+        -- The condition is the card's, not this spec's: the printed Filter is
+        -- what the matcher is asked about everywhere above.
+        Spec.it s "Meren's printed condition is PermanentDies over another creature you control" $ do
+          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+          Spec.assertEqWith
+            s
+            "one triggered ability, with that condition"
+            (fmap TriggeredAbility.condition (Card.Type.triggeredAbilities (Printing.card meren)))
+            [TriggerCondition.PermanentDies anotherCreatureYouControl]
+
 -- CR 603.6c's FIRST written form, and the whole of its first clause:
 -- "Leaves-the-battlefield abilities trigger when a permanent moves from the
 -- battlefield to another zone ... written as, but aren't limited to, 'When
@@ -2638,6 +2799,7 @@ representativeEvents cond =
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         TriggerCondition.SelfDies -> one (moved Zone.Battlefield Zone.Graveyard)
+        TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 603.6c admits every destination, and CR 400.2 splits them into
         -- public and hidden, so both sides of CR 400.7e's proviso have to be
         -- here for the floor to be the honest answer.
@@ -2653,6 +2815,7 @@ everyTriggerCondition :: [TriggerCondition.TriggerCondition]
 everyTriggerCondition =
   [ TriggerCondition.SelfEnters,
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
+    TriggerCondition.PermanentDies Filter.Type.IsSource,
     TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn,
     TriggerCondition.StateIs (Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
@@ -3239,11 +3402,14 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
         atExtra = runToTurnStep 1 (Phase.Combat CombatStep.DeclareAttackers) S.aggressiveAnswer resolved
         afterExtra = snd (Engine.runGamePure S.aggressiveAnswer atExtra Engine.runStep)
     Spec.assertEqWith s "the return is armed" (length armed) 1
+    -- Waiting for a BOUNDARY, not for a turn number: which turn alice's next one
+    -- is cannot be known here (Pawl.Types.TurnWindow), and this same turn is not
+    -- it whatever number it carries.
     Spec.assertEqWith
       s
-      "and gated to a turn after the one it was armed on"
-      (fmap DelayedTrigger.notBefore (Foldable.toList armed))
-      [Just 2]
+      "and gated to alice's next turn, which has not begun"
+      (fmap DelayedTrigger.window (Foldable.toList armed))
+      [TurnWindow.ControllersNextTurn]
     Spec.assertEqWith s "the extra combat's declare attackers step really happened" (GameState.phase atExtra) (Phase.Combat CombatStep.DeclareAttackers)
     Spec.assertEqWith s "it is still in exile" (S.countOnBattlefieldByName towershellName S.alice afterExtra) 0
     Spec.assertEqWith s "and still armed, unspent" (length (GameState.delayedTriggers afterExtra)) 1
@@ -3260,6 +3426,84 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
     Spec.assertEqWith s "alice's next turn is turn 3" (GameState.turnNumber atNextTurn) 3
     Spec.assertEqWith s "and there it does return" (S.countOnBattlefieldByName towershellName S.alice atNextTurn) 1
     Spec.assertEqWith s "spending the one shot (CR 603.7b)" (length (GameState.delayedTriggers atNextTurn)) 0
+
+-- CR 603.7a's last sentence -- "Other events that happen earlier may make the
+-- trigger event impossible" -- with both halves already in the pool: Meandering
+-- Towershell's return, armed for alice's NEXT turn, and Stonehorn Dignitary
+-- taking that very turn's combat phase away before it arrives.
+--
+-- The printed phrase names ONE turn. A gate that only said "not before turn n"
+-- would leave the entry armed past it and fire the return on the FOLLOWING turn
+-- of alice's -- a turn the card does not name -- which is what the second case
+-- here discriminates.
+towershellSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+towershellSkipSpec s registry = Spec.describe s "DelayedOnsetSkipped" $ do
+  let boardOf = do
+        towershell <- S.printingOf s registry "Meandering Towershell"
+        island <- S.printingOf s registry "Island"
+        plains <- S.printingOf s registry "Plains"
+        stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
+        pure (towershellStonehornBoard towershell island plains stonehorn)
+      towershellName = CardName.MkCardName $ Text.pack "Meandering Towershell"
+      -- CR 603.2b: the combat steps of pid's turn that actually BEGAN. A skipped
+      -- phase leaves none, which is CR 614.6's "if an event is replaced, it never
+      -- happens" -- and is why this is read before the turn ends, since
+      -- Engine.handoffTurn clears the log.
+      combatStepsOf pid gs =
+        [ph | GameEvent.StepBegan ph@(Phase.Combat _) who <- Foldable.toList (GameState.events gs), who == pid]
+  -- The control that makes the case below discriminating: the same board and the
+  -- same line of play with the Dignitary never cast. S.aggressiveAnswer takes no
+  -- action at all, and S.fightAnswer is exactly it plus casting what it can
+  -- afford -- so the ONE difference between the two runs is that combat phase.
+  Spec.it s "CR 603.7 with alice's next turn intact the Towershell returns on it" $ do
+    gs <- boardOf
+    let turn3 = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
+    -- All five of CR 506.1's steps, because the returning Towershell is "put
+    -- onto the battlefield attacking" -- CR 508.8's other half, which is what
+    -- keeps the declare blockers and combat damage steps from being skipped.
+    Spec.assertEqWith s "alice's turn 3 ran all five combat steps (CR 506.1)" (length (combatStepsOf S.alice turn3)) 5
+    Spec.assertEqWith s "and the Towershell returned there" (S.countOnBattlefieldByName towershellName S.alice turn3) 1
+    Spec.assertEqWith s "spending the one shot (CR 603.7b)" (length (GameState.delayedTriggers turn3)) 0
+  -- THE PROVING CASE. bob's Dignitary, cast on turn 2, takes alice's turn-3
+  -- combat phase away -- so the declare attackers step the return watches for
+  -- never happens on the one turn "your next turn" named, and CR 603.7a's "other
+  -- events that happen earlier may make the trigger event impossible" is the
+  -- whole of what follows: the ability never triggers.
+  Spec.it s "CR 603.7a a skipped combat phase on the named turn makes the return impossible, not late" $ do
+    gs <- boardOf
+    let turn3 = runToTurnStep 3 Phase.PostcombatMain S.fightAnswer gs
+        turn5 = runToTurnStep 5 Phase.PostcombatMain S.fightAnswer turn3
+    Spec.assertEqWith s "no combat step of alice's turn 3 began (CR 500.11)" (combatStepsOf S.alice turn3) []
+    Spec.assertEqWith s "so the Towershell did not return on the turn its ability named" (S.countOnBattlefieldByName towershellName S.alice turn3) 0
+    -- CR 614.10a spends the skip on ONE occurrence, so alice's turn 5 has a
+    -- combat phase of its own -- and with it the very step the return watches
+    -- for. That is what makes the assertions below about the ABILITY rather than
+    -- about the board: the trigger event does occur here, and an entry left armed
+    -- would fire on it and return the Towershell on a turn the card never named.
+    -- Not all five steps: alice declares no attackers, so CR 508.8 skips the
+    -- declare blockers and combat damage steps.
+    Spec.assertBool
+      s
+      (List.elem (Phase.Combat CombatStep.DeclareAttackers) (combatStepsOf S.alice turn5))
+      "alice's turn 5 declare attackers step happens (CR 614.10a)"
+    Spec.assertEqWith s "and the return never fires at all" (S.countOnBattlefieldByName towershellName S.alice turn5) 0
+    Spec.assertEqWith s "nor is it left in the store forever" (length (GameState.delayedTriggers turn5)) 0
+
+-- alice at her declare attackers step on turn 1 with one Meandering Towershell;
+-- bob has four untapped Plains (exactly Stonehorn Dignitary's {3}{W}) and the
+-- Dignitary in hand, and nothing else. Both libraries hold Islands so the draw
+-- steps of the five turns these cases run through cannot empty one (CR 104.3c).
+towershellStonehornBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  GameState.GameState
+towershellStonehornBoard towershell island plains stonehorn =
+  let (base, _, _) = S.combatBoardOf [towershell] []
+      withLands = List.foldl' (\g _ -> snd (S.addCreature plains S.bob g)) base [1 :: Int .. 4]
+      stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 8]
+   in snd (S.addHandCard stonehorn S.bob (stock S.bob (stock S.alice withLands)))
 
 -- alice at her declare attackers step with one Meandering Towershell, four
 -- untapped Mountains (exactly Relentless Assault's {2}{R}{R}) and the Assault in
@@ -3315,6 +3559,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   historySpec s registry
   delayedSpec s registry
   towershellOnsetSpec s registry
+  towershellSkipSpec s registry
   orderingSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
@@ -3323,6 +3568,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   diesTriggerSpec s registry
+  permanentDiesSpec s registry
   leavesBattlefieldSpec s registry
   becameSlotSpec s registry
   lookBackInterveningSpec s registry

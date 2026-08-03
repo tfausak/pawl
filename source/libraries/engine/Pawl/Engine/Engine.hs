@@ -987,44 +987,49 @@ beginTurnOf pid gs =
             if List.elem d (Game.stillPlaying gs)
               then Just decider
               else Nothing
-   in gs
-        { GameState.activePlayer = pid,
-          GameState.turnNumber = GameState.turnNumber gs + 1,
-          -- CR 608.2i is why a log exists at all -- "some effects look back in
-          -- time and require information about previous game states and
-          -- actions." It does not itself say how far back; the ONE-turn scope is
-          -- this engine's choice, made because every history-reading card in the
-          -- pool asks "this turn" (Khabál Ghoul: "creatures that died this
-          -- turn"). Cleared here, with both watermarks, and never at cleanup --
-          -- cleanup is still part of this turn and CR 514.1's discard is itself
-          -- an event of it. Engine.advance settles immediately before calling
-          -- this, so nothing unscanned is discarded.
-          GameState.events = Seq.empty,
-          GameState.scannedThrough = 0,
-          -- Cleared with the log it describes: the settle Engine.advance runs
-          -- immediately before this leaves nothing unscanned, so the sample has
-          -- no batch left to answer for.
-          GameState.controlWhenTriggered = Map.empty,
-          GameState.damageScannedThrough = 0,
-          -- GameState.lastKnown is deliberately NOT cleared alongside them. The
-          -- log's one-turn scope is a choice about what "look back in time"
-          -- (CR 608.2i) has to reach; CR 608.2h's last known information is not
-          -- history a card asks after, it is the substitute identity of an object
-          -- that no longer exists, and it stays needed for as long as anything can
-          -- still name that object -- a delayed triggered ability's source
-          -- (CR 603.7d) outlives the turn it was armed in. Pawl.Engine.Setup clears it at
-          -- the three points a NEW game begins, which is the only place it means
-          -- nothing.
-          GameState.phase = Turn.firstPhase,
-          GameState.remaining = Turn.laterPhases,
-          -- CR 723.1/723.1b: the new active player's pending control (if any)
-          -- becomes this turn's active control; overwriting activeControl every
-          -- turn is what ends a prior control at the next turn's start (CR 723.1).
-          -- CR 800.4b: unless its decider has left the game, in which case it
-          -- is not promoted (see `promoted`, above).
-          GameState.activeControl = promoted,
-          GameState.pendingControl = Map.delete pid (GameState.pendingControl gs)
-        }
+   in -- CR 603.7a: the one moment a delayed ability armed for "your next turn"
+      -- can learn which turn that is, and the one moment an entry whose turn has
+      -- passed can be retired. Applied to the UPDATED state, since both answers
+      -- are read off this turn's number and active player.
+      Event.settleOnsets
+        gs
+          { GameState.activePlayer = pid,
+            GameState.turnNumber = GameState.turnNumber gs + 1,
+            -- CR 608.2i is why a log exists at all -- "some effects look back in
+            -- time and require information about previous game states and
+            -- actions." It does not itself say how far back; the ONE-turn scope is
+            -- this engine's choice, made because every history-reading card in the
+            -- pool asks "this turn" (Khabál Ghoul: "creatures that died this
+            -- turn"). Cleared here, with both watermarks, and never at cleanup --
+            -- cleanup is still part of this turn and CR 514.1's discard is itself
+            -- an event of it. Engine.advance settles immediately before calling
+            -- this, so nothing unscanned is discarded.
+            GameState.events = Seq.empty,
+            GameState.scannedThrough = 0,
+            -- Cleared with the log it describes: the settle Engine.advance runs
+            -- immediately before this leaves nothing unscanned, so the sample has
+            -- no batch left to answer for.
+            GameState.controlWhenTriggered = Map.empty,
+            GameState.damageScannedThrough = 0,
+            -- GameState.lastKnown is deliberately NOT cleared alongside them. The
+            -- log's one-turn scope is a choice about what "look back in time"
+            -- (CR 608.2i) has to reach; CR 608.2h's last known information is not
+            -- history a card asks after, it is the substitute identity of an object
+            -- that no longer exists, and it stays needed for as long as anything can
+            -- still name that object -- a delayed triggered ability's source
+            -- (CR 603.7d) outlives the turn it was armed in. Pawl.Engine.Setup clears it at
+            -- the three points a NEW game begins, which is the only place it means
+            -- nothing.
+            GameState.phase = Turn.firstPhase,
+            GameState.remaining = Turn.laterPhases,
+            -- CR 723.1/723.1b: the new active player's pending control (if any)
+            -- becomes this turn's active control; overwriting activeControl every
+            -- turn is what ends a prior control at the next turn's start (CR 723.1).
+            -- CR 800.4b: unless its decider has left the game, in which case it
+            -- is not promoted (see `promoted`, above).
+            GameState.activeControl = promoted,
+            GameState.pendingControl = Map.delete pid (GameState.pendingControl gs)
+          }
 
 -- Consume the schedule: the next step becomes current. An empty schedule means
 -- the turn is over, so hand off. Replaces the old `Turn.next` walk -- the turn is

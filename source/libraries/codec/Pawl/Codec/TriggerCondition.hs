@@ -26,6 +26,7 @@ toJson c = case c of
   TriggerCondition.PlayerDiscards r -> Common.tagged "PlayerDiscards" . Just $ PlayerRelation.toJson r
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Common.nullary "SelfPutIntoGraveyardFromLibrary"
   TriggerCondition.SelfDies -> Common.nullary "SelfDies"
+  TriggerCondition.PermanentDies f -> Common.tagged "PermanentDies" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.SelfLeavesTheBattlefield -> Common.nullary "SelfLeavesTheBattlefield"
   TriggerCondition.SpellOrAbilityCounters r -> Common.tagged "SpellOrAbilityCounters" . Just $ PlayerRelation.toJson r
 
@@ -44,6 +45,7 @@ fromJson value = do
     ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> PlayerRelation.fromJson v
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
+    ("PermanentDies", Just v) -> TriggerCondition.PermanentDies <$> Filter.fromJson Keyword.fromJson v
     ("SelfLeavesTheBattlefield", _) -> Right TriggerCondition.SelfLeavesTheBattlefield
     ("SpellOrAbilityCounters", Just v) -> TriggerCondition.SpellOrAbilityCounters <$> PlayerRelation.fromJson v
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t

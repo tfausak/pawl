@@ -7,7 +7,8 @@
 -- Event.stateHolds and is the conservative reading of CR 611.2b -- a "for as
 -- long as" whose condition cannot be evaluated ends rather than persists. CR
 -- 208.2a's "use 0 instead of that number" is a different rule with a different
--- scope (#65).
+-- scope -- a characteristic-defining ability, where Pawl.Engine.Quantity.determine
+-- applies it -- and a condition is not one.
 --
 -- The VIEW is the caller's, and picking it is a rules decision rather than a
 -- detail: CR 603.4's intervening "if" on a leaves-the-battlefield ability asks

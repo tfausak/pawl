@@ -147,7 +147,7 @@ populatedCard =
       Card.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells],
       Card.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached],
       Card.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
-      Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached],
+      Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing],
       Card.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])],
       Card.additionalCosts = [CostComponent.TapThis],
       Card.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []],
@@ -178,7 +178,7 @@ populatedCardJson =
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
-    <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"type\":\"Attached\"}}],"
+    <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"alternativeCosts\":[{\"mana\":[],\"components\":[]}],"
@@ -318,8 +318,8 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
         s
         Card.toJson
         Card.fromJson
-        baseCard {Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached]}
-        (init baseCardJson <> ",\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"type\":\"Attached\"}}]}")
+        baseCard {Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing]}
+        (init baseCardJson <> ",\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}]}")
     Spec.it s "attackCosts" $
       Common.assertJsonCodec
         s

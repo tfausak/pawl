@@ -9,11 +9,13 @@ toJson :: PlayerCounterKind.PlayerCounterKind -> Value.Value
 toJson k = Common.nullary $ case k of
   PlayerCounterKind.Energy -> "Energy"
   PlayerCounterKind.Poison -> "Poison"
+  PlayerCounterKind.Experience -> "Experience"
 
 fromJson :: Value.Value -> Either Text.Text PlayerCounterKind.PlayerCounterKind
 fromJson =
   Common.decodeNullary
     "PlayerCounterKind"
     [ ("Energy", PlayerCounterKind.Energy),
-      ("Poison", PlayerCounterKind.Poison)
+      ("Poison", PlayerCounterKind.Poison),
+      ("Experience", PlayerCounterKind.Experience)
     ]

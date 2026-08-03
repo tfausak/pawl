@@ -248,15 +248,17 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   -- answers Pawl.ResolveSpec's One with the Machine cases cannot tell apart
   -- are visible: an undeterminable maximum is Nothing there and 0 draws
   -- here, but Nothing and Just 0 are different values.
-  Spec.it s "CR 208.2a / #65 Greatest over an EMPTY matched set is Nothing, not 0" $ do
+  Spec.it s "CR 208.2a Greatest over an EMPTY matched set is Nothing, not 0" $ do
     -- No rule in the CR gives a maximum over nothing a value. CR 208.2a's
     -- "if the ability needs to use a number that can't be determined ... use
-    -- 0 instead" is scoped to a characteristic-defining ability and is not
-    -- implemented anywhere in pawl (#65); where the CR does want an empty
-    -- maximum to be 0 it legislates it card-shape by card-shape (CR 714.2d,
-    -- a Saga with no chapter abilities). So the honest answer is the one
-    -- this codebase propagates everywhere else. THE FALSIFIER for reaching
-    -- for `maximum (0 : values)`.
+    -- 0 instead" is scoped to a characteristic-defining ability, and it is
+    -- applied THERE (Pawl.Engine.Quantity.determine) rather than in this fold;
+    -- where the CR does want an empty maximum to be 0 it otherwise legislates
+    -- it card-shape by card-shape (CR 714.2d, a Saga with no chapter
+    -- abilities). So the honest answer here is the one this codebase
+    -- propagates everywhere else, and Pawl.PowerToughnessSpec's Monstrous
+    -- War-Leech is where it becomes a 0. THE FALSIFIER for reaching for
+    -- `maximum (0 : values)`.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
         (b1, gs) = S.addCreature swampPrinting S.bob gs0

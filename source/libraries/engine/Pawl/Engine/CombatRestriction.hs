@@ -16,37 +16,52 @@ module Pawl.Engine.CombatRestriction where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.Condition as Condition.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 
 -- CR 508.1c: which of `candidates` an effect in force right now says CAN'T
--- ATTACK. Pacifism's first half.
+-- ATTACK. Pacifism's first half, and Blind-Spot Giant's when its gate is shut.
 cantAttack :: [ObjectId] -> GameState -> Set ObjectId
 cantAttack = restricted attacking
 
 -- CR 509.1b: which of `candidates` an effect in force right now says CAN'T
--- BLOCK. Pacifism's second half.
+-- BLOCK. Pacifism's second half, and Blind-Spot Giant's when its gate is shut.
 cantBlock :: [ObjectId] -> GameState -> Set ObjectId
 cantBlock = restricted blocking
 
 -- The two selectors, written out rather than a wildcard: this type has exactly
 -- two arms, so an exhaustive case is what makes a third arm a compile error at
--- both of the sites that would have to decide about it.
+-- all three of the sites that would have to decide about it.
 attacking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 attacking cr = case cr of
-  CombatRestriction.CantAttack a -> Just a
-  CombatRestriction.CantBlock _ -> Nothing
+  CombatRestriction.CantAttack a _ -> Just a
+  CombatRestriction.CantBlock _ _ -> Nothing
 
 blocking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 blocking cr = case cr of
-  CombatRestriction.CantAttack _ -> Nothing
-  CombatRestriction.CantBlock a -> Just a
+  CombatRestriction.CantAttack _ _ -> Nothing
+  CombatRestriction.CantBlock a _ -> Just a
+
+-- CR 508.1c / CR 509.1b's second clause: the condition the creature can't attack
+-- (or block) UNLESS. Read off either arm, because the clause is the same sentence
+-- in both rules and neither selector above is the one that decides about it --
+-- which declaration a restriction forbids and whether it is gated are
+-- independent, and Blind-Spot Giant prints one gate across both arms.
+--
+-- Nothing is the UNCONDITIONAL restriction (Pacifism), not a gate that fails.
+gate :: CombatRestriction.CombatRestriction -> Maybe Condition.Type.Condition
+gate cr = case cr of
+  CombatRestriction.CantAttack _ c -> c
+  CombatRestriction.CantBlock _ c -> c
 
 -- The shared walk behind both questions above, over the restrictions `select`
 -- keeps.
@@ -107,7 +122,34 @@ restricted select candidates gs =
           affected
           (Projection.project creature gs)
           gs
+      -- CR 508.1c / CR 509.1b's second clause: "or that it can't attack unless
+      -- some condition is met". A gate that HOLDS lifts the restriction, so the
+      -- creature stays on the candidate list; one that does not leaves it in
+      -- force, which is why an ungated restriction (Nothing) is False here.
+      --
+      -- Evaluated once per RESTRICTION and not per candidate, because the clause
+      -- belongs to the ability rather than to the creature it names: CR 109.5
+      -- fixes the "you" inside it as the SOURCE's controller, and Filter.IsSource
+      -- inside it names the source -- which is what makes Blind-Spot Giant's
+      -- "another Giant" exclude the Giant printing the sentence and no other.
+      --
+      -- Projection.fullView, matching the affected set above: CR 613.11 applies
+      -- these effects "after all other continuous effects have been applied", so
+      -- both halves of a restriction read the same finished projection. The source
+      -- is on the battlefield by construction here, so no CR 608.2h last known
+      -- information is in play.
+      lifted source restriction = case gate restriction of
+        Nothing -> False
+        Just condition ->
+          Condition.holds
+            (Projection.fullView gs)
+            (Filter.MkContext (Projection.controllerOf source gs) (Just source))
+            gs
+            source
+            condition
       fromRestriction source restriction = case select restriction of
         Nothing -> []
-        Just affected -> filter (named source affected) candidates
+        Just affected
+          | lifted source restriction -> []
+          | otherwise -> filter (named source affected) candidates
    in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))

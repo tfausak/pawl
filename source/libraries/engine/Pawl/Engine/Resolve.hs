@@ -40,6 +40,8 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -85,6 +87,7 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import Pawl.Types.Subtype (Subtype)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -161,6 +164,10 @@ slotsOf effect = case effect of
   Effect.Replace duration _ _ condition _ -> Set.union (durationSlots duration) (foldMap conditionSlots condition)
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
+  -- The ObjectRef names the shielded recipient -- Mending Hands' "any target" --
+  -- and the Quantity is the shield's size, a slot read like every other.
+  Effect.PreventNextDamage duration ref quantity ->
+    Set.unions [durationSlots duration, objectRefSlots ref, Quantity.slots quantity]
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
@@ -237,6 +244,7 @@ readsX = any effectReadsX
       Effect.Create quantity _ _ _ -> quantity == Quantity.Type.X
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
+      Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.X
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
@@ -283,6 +291,7 @@ searchesLibrary effect = case effect of
   Effect.Create {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
+  Effect.PreventNextDamage {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
@@ -409,6 +418,9 @@ rewriteEffect pairs effect = case effect of
   Effect.Replace {} -> effect
   -- A Phase carries no basic-land-type word for CR 612 to rewrite.
   Effect.SkipNextPhase {} -> effect
+  -- Nor does a shield: its recipient is baked at resolution and its Quantity
+  -- names no land type.
+  Effect.PreventNextDamage {} -> effect
   -- No rewritable land-type word.
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
@@ -1628,16 +1640,14 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   DelayedTrigger.source = source,
                   DelayedTrigger.controller = controller,
                   DelayedTrigger.bindings = captured,
-                  -- CR 603.7a's other end, from Pawl.Types.Onset: Nothing for an
-                  -- ability armed the moment it is created (every card but one),
-                  -- and the NEXT turn number for one printed "on your next turn"
-                  -- -- read off the live board here, because a card cannot know
-                  -- which turn that is. Every turn that begins bumps the counter
-                  -- (Engine.beginTurnOf), extra turns included, so "a later turn
-                  -- than this one" is exactly what the successor names.
-                  DelayedTrigger.notBefore = case onset of
-                    Onset.Immediately -> Nothing
-                    Onset.FromYourNextTurn -> Just (GameState.turnNumber gs + 1),
+                  -- CR 603.7a's other end, from Pawl.Types.Onset: no turn
+                  -- restriction for an ability armed the moment it is created
+                  -- (every card but one), and the BOUNDARY -- not a turn number
+                  -- -- for one printed "on your next turn". Nothing about the
+                  -- live board is read: which turn that phrase names is settled
+                  -- as that turn begins (Event.settleOnsets), because an
+                  -- intervening extra or skipped turn can still move it.
+                  DelayedTrigger.window = Event.armOnset onset,
                   -- CR 603.7b's stated duration, armed the way a continuous
                   -- effect's is. The two Maybes meet here and mean different
                   -- things: the OUTER one is the card printing no duration at
@@ -1654,7 +1664,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- CR 614.3 / 615.3: install the floating replacement; Pawl.Engine.Replacement
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
-    -- source, which is what CR 615.13's "prevented" triggers will read (#58).
+    -- source, which is what CR 615.13's "prevented" triggers will read (#612).
     --
     -- CR 614.15: the ORIGIN travels with the row rather than being re-derived,
     -- because it is a fact about the ability that wrote it and nothing on the
@@ -1692,6 +1702,79 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                         ActiveReplacement.origin = origin
                       }
                in gs1 {GameState.replacements = active : GameState.replacements gs1}
+  Effect.PreventNextDamage duration ref quantity -> do
+    -- CR 615.3 / 615.7: install one floating prevention shield per recipient the
+    -- ref names -- "Prevent the next 4 damage that would be dealt to any target
+    -- this turn" (Mending Hands). Pawl.Engine.Replacement consults it at the damage
+    -- funnel until the shield is spent (CR 615.7's "reduced to 0") or the
+    -- duration expires (CR 615.3's other terminator).
+    --
+    -- Its own opcode rather than an Effect.Replace carrying a DamageR, for the
+    -- reason Effect.PreventNextDamage's own comment gives: the pattern has to
+    -- name the shielded permanent or player, which card data cannot. Everything
+    -- ELSE about the row is Replace's -- Resolve bakes the source (CR 113.7),
+    -- CR 109.5's controller and a fresh timestamp the same way.
+    --
+    -- Through Damage.damageRecipient, so the baked recipient is in the same
+    -- vocabulary a DamageEvent's target arrives in: CR 120.1a's "damage can't be
+    -- dealt to an object that's not a battle, a creature, or a planeswalker"
+    -- means a generically-named permanent that is neither is not shieldable
+    -- either, and a shield installed over it could never match anything.
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = Filter.MkContext (Just controller) (Just source)
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      -- An unevaluable quantity is a no-op, the powerOf posture DealDamage takes.
+      Nothing -> pure ()
+      Just n ->
+        -- CR 615.7: a shield of 0 can prevent nothing, so none is installed --
+        -- the same state `setShield` leaves a spent one in.
+        Monad.when (n > 0) . State.modify' $ \g0 ->
+          let amount = Integer.toNaturalSaturating n
+              install g recipient = case Expiry.arm controller source duration g of
+                -- CR 611.2b: the duration never started, so no shield is installed.
+                Nothing -> g
+                Just expiry ->
+                  let (ts, g1) = Game.freshTimestamp g
+                      active =
+                        ActiveReplacement.MkActiveReplacement
+                          { ActiveReplacement.effect =
+                              ReplacementEffect.DamageR
+                                DamagePattern.MkDamagePattern
+                                  { -- Mending Hands says "damage that would be
+                                    -- dealt", naming no kind, so the shield
+                                    -- takes combat and noncombat alike.
+                                    DamagePattern.whichKind = Nothing,
+                                    -- Nor does it name a source, which is CR
+                                    -- 615.7's own "the number of events or
+                                    -- sources dealing it doesn't matter". CR
+                                    -- 615.9's shields against a source of a
+                                    -- chosen quality are a different rule, and
+                                    -- have no producer (#588).
+                                    DamagePattern.whichSource = SourceRelation.AnySource,
+                                    DamagePattern.whichRecipient = Just recipient
+                                  }
+                                (DamageRewrite.PreventNext amount),
+                            ActiveReplacement.source = source,
+                            -- CR 109.5, baked as Replace's is: nothing reads it
+                            -- on a shield today (the pattern names its recipient
+                            -- outright and has no ControllerRelation to resolve),
+                            -- but the row cannot be built without one.
+                            ActiveReplacement.controller = controller,
+                            ActiveReplacement.timestamp = ts,
+                            ActiveReplacement.expiry = expiry,
+                            -- CR 615.7's shield is spent in DAMAGE, not in
+                            -- applications, so the use count is not what ends it
+                            -- (see Pawl.Types.Uses).
+                            ActiveReplacement.uses = Uses.Unlimited,
+                            -- CR 614.15: a prevention shield replaces damage from
+                            -- any source, including one this resolution is not
+                            -- itself dealing, so it is not a self-replacement.
+                            ActiveReplacement.origin = ReplacementOrigin.Other
+                          }
+                   in g1 {GameState.replacements = active : GameState.replacements g1}
+           in List.foldl' install g0 recipients
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the

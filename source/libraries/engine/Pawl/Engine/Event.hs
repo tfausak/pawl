@@ -44,6 +44,8 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.Onset (Onset)
+import qualified Pawl.Types.Onset as Onset
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import Pawl.Types.PlayerId (PlayerId)
@@ -62,6 +64,8 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import Pawl.Types.TurnWindow (TurnWindow)
+import qualified Pawl.Types.TurnWindow as TurnWindow
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
@@ -1087,6 +1091,58 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
+  -- The same rule and the same zone pair as SelfDies just above -- CR 603.6c's
+  -- "whenever [something] is put into a graveyard from the battlefield",
+  -- narrowed by CR 700.4 -- watched by a BYSTANDER. The bearer frames the match
+  -- rather than being it, exactly as it does for PermanentEnters: it is the
+  -- Filter.Context's source (so `Not IsSource` is Meren of Clan Nel Toth's
+  -- "another"), and its controller is the perspective CR 109.5 gives "you" in
+  -- "a creature YOU control".
+  --
+  -- Matched on `departed`, and the candidate's characteristics come from CR
+  -- 608.2h last known information rather than from a live read. Both are CR
+  -- 603.10a ("some zone-change triggers look back in time. These are
+  -- leaves-the-battlefield abilities ...") read through CR 603.10's own
+  -- definition of looking back: "using the existence of those abilities and the
+  -- appearance of objects immediately prior to the event." The
+  -- PermanentEnters arm's live reading is the OPPOSITE choice, and rightly so --
+  -- CR 603.6b puts an entrant's continuous effects on the moment it is on the
+  -- battlefield -- but a dead permanent has no live reading left to take, and
+  -- reading the graveyard card instead would answer "you control" WRONG rather
+  -- than not at all: CR 108.4 says "a card doesn't have a controller unless that
+  -- card represents a permanent or spell", and CR 108.4a substitutes its OWNER,
+  -- so a creature its controller had stolen would be credited back to the player
+  -- who no longer had it when it died.
+  --
+  -- viewWithLastKnown aimed at the deceased twice over, which is how that
+  -- function is asked for the snapshot: it takes the last-known branch only for
+  -- the id it is anchored to, and only once that id is gone. Live whenever the
+  -- id still resolves -- a synthetic death event for a permanent still on the
+  -- battlefield reads the board -- and the CR 608.2h record once changeZone has
+  -- deleted it, which is every real death.
+  --
+  -- Nothing is a permanent that is gone AND filed no last known information
+  -- (Game.cease, Departure.objectsLeaveWith remove an object without a zone
+  -- change running over it). Nothing is known about what died, so no Filter can
+  -- honestly admit it -- the same answer, for the same reason, the
+  -- PermanentEnters arm gives an entrant that vanished.
+  TriggerCondition.PermanentDies f -> case event of
+    GameEvent.Moved zc _
+      | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
+          let deceased = ZoneChange.departed zc
+           in case Projection.viewWithLastKnown deceased gs deceased of
+                Nothing -> False
+                Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 603.6c taken whole: "leaves-the-battlefield abilities trigger when a
   -- permanent moves from the battlefield to another zone". The `from` half is
   -- the same as the SelfDies arm's; the `to` half is where the two part company,
@@ -1334,7 +1390,17 @@ eventBindingSlots cond = case cond of
   -- CR 400.7e: the incarnation the card became, which CR 603.10a's look-back
   -- keeps out of the source slot.
   TriggerCondition.SelfDies -> Set.singleton Binding.became
-  -- The same slot, and the same rule, but bound only for a PUBLIC destination
+  -- Empty, and NOT PermanentEnters' `became` even though the two conditions are
+  -- the same bystander shape pointed at opposite zone changes. CR 400.7e would
+  -- happily supply the name -- a graveyard is public (CR 400.2) -- but no card
+  -- in the pool says anything about the permanent that died: Meren of Clan Nel
+  -- Toth's payload speaks only about its own controller. Binding a slot nothing
+  -- reads is the speculative construction the project forbids, so the card that
+  -- says "return that creature card to your hand" is the one that adds it
+  -- (#616).
+  TriggerCondition.PermanentDies _ -> Set.empty
+  -- The same slot as SelfDies two arms up, and the same rule, but bound only
+  -- for a PUBLIC destination
   -- (CR 400.7e's proviso, over CR 400.2's hidden hand and library) -- so the
   -- guaranteed floor this function answers is empty. The consequence is that a
   -- card whose leaves-the-battlefield payload names `became` is rejected by the
@@ -1435,6 +1501,11 @@ isPlayerRecipient r = case r of
 -- The reverse direction is not reconstructed: a permanent that ENTERED later in
 -- the batch and left before the boundary is offered as a candidate for the
 -- batch's earlier events too, which CR 603.10 would not have it be (#441).
+--
+-- Nor is the direction that mirrors `bystanders` itself: a permanent that
+-- DEPARTED earlier in the batch is a candidate for no later event in it, so a CR
+-- 603.10a look-back condition borne by a permanent that dies alongside the
+-- permanent it is watching answers by object id (#615).
 --
 -- Events outer, permanents inner (ascending by id): a deterministic canonical
 -- order, which is what the CR 603.3b ordering prompt indexes into.
@@ -1766,8 +1837,13 @@ functionsInGraveyard cond = case cond of
   -- NOT, or the ability would be read off the graveyard card's printed text and
   -- credited to its owner instead of its last controller.
   TriggerCondition.SelfDies -> False
-  -- The same answer as SelfDies just above, and for the same CR 603.10a reason:
-  -- a leaves-the-battlefield ability triggers from the battlefield, read
+  -- The same answer, for the same reason, and one step further: this
+  -- condition's bearer is not the permanent that died at all. Meren of Clan Nel
+  -- Toth watches from the battlefield, so CR 113.6k's "can't trigger from the
+  -- battlefield" never reaches it, and a Meren in a graveyard sees nothing.
+  TriggerCondition.PermanentDies _ -> False
+  -- The same answer as both dies conditions above, and for the same CR 603.10a
+  -- reason: a leaves-the-battlefield ability triggers from the battlefield, read
   -- through the look-back, so CR 113.6k never reaches it. This condition makes
   -- the point harder to miss -- its destination may be a hand or a library, and
   -- an ability found in a GRAVEYARD could not be what fired for a permanent that
@@ -1788,12 +1864,13 @@ functionsInGraveyard cond = case cond of
 -- question about a rule 603 condition and never reaches the ability's payload.
 --
 -- Its customer is the card lint (CardSpec's "every delayed ability armed for
--- YOUR next turn is controller-scoped"). Pawl.Types.Onset.FromYourNextTurn
--- delivers only the NEXT half of "your next turn": it becomes a turn NUMBER
--- (DelayedTrigger.notBefore) and a number cannot say whose turn it is. The YOUR
--- half is this -- so an onset paired with a condition that answers False here
--- would fire on an intervening opponent's turn, and the lint rejects that
--- pairing rather than leaving the two fields to agree by luck.
+-- YOUR next turn is controller-scoped"). Pawl.Types.Onset.FromYourNextTurn now
+-- delivers BOTH halves of "your next turn" on its own -- settleOnsets pins the
+-- entry to the controller's next turn and to no other -- so this no longer
+-- guards the firing. It guards the DATA: a card that armed that onset over an
+-- EachTurn condition would have its printed "each" silently narrowed by the
+-- window, and the lint rejects the pairing rather than letting card text mean
+-- something the card does not say.
 --
 -- Exhaustive with no wildcard, for eventBindingSlots' reason: a new condition
 -- must force a decision rather than defaulting to False, which for the arms that
@@ -1823,6 +1900,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfDies -> False
+  TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
 
@@ -1902,6 +1980,7 @@ stateTriggers gs =
                 TriggerCondition.PlayerDiscards _ -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
                 TriggerCondition.SelfDies -> False
+                TriggerCondition.PermanentDies _ -> False
                 TriggerCondition.SelfLeavesTheBattlefield -> False
                 TriggerCondition.SpellOrAbilityCounters _ -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
@@ -1943,11 +2022,20 @@ delayedPending events gs =
   let -- CR 603.7a's floor -- "a delayed triggered ability won't trigger until it
       -- has actually been created, even if its trigger event occurred just
       -- beforehand" -- is the watermark's job, and is all an ordinary entry
-      -- (notBefore = Nothing) needs. This is the card's OWN further restriction:
-      -- an ability printed "on your next turn" (Pawl.Types.Onset) is not armed
-      -- on the turn it was created, whatever its condition matches. Read against
-      -- the LIVE turn number, so an entry with no onset is untouched.
-      armed entry = maybe True (GameState.turnNumber gs >=) (DelayedTrigger.notBefore entry)
+      -- (TurnWindow.AnyTurn) needs. This is the card's OWN further restriction:
+      -- an ability printed "on your next turn" (Pawl.Types.Onset) fires on that
+      -- one turn and no other, whatever its condition matches. Read against the
+      -- LIVE turn number, so an entry with no onset is untouched.
+      armed entry = case DelayedTrigger.window entry of
+        TurnWindow.AnyTurn -> True
+        -- The turn the printed phrase names has not begun yet, so no occurrence
+        -- of the trigger event counts -- including one in the turn that armed
+        -- the ability, which is the whole reason the onset exists.
+        TurnWindow.ControllersNextTurn -> False
+        -- EQUALITY, not a floor: CR 603.7a's "other events that happen earlier
+        -- may make the trigger event impossible" is a claim about ONE named
+        -- turn, so the window has an upper end and not merely a lower one.
+        TurnWindow.OnTurn n -> n == GameState.turnNumber gs
       fires entry =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
          in armed entry && any (matchesTrigger gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
@@ -1961,6 +2049,71 @@ delayedPending events gs =
       -- Firing spends the one shot only for an entry with no stated duration.
       spent entry = fires entry && Maybe.isNothing (DelayedTrigger.expiry entry)
    in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . spent) store)
+
+-- CR 603.7a: the printed Pawl.Types.Onset as the game first stores it. The
+-- delayed-trigger twin of Pawl.Engine.Expiry.arm, and deliberately blind to the
+-- board: unlike a duration, an onset has nothing to bake in at the moment the
+-- ability is created. "Your next turn" is a boundary that has not happened yet,
+-- and the turn number it turns out to be is settleOnsets' answer, below.
+armOnset :: Onset -> TurnWindow
+armOnset onset = case onset of
+  Onset.Immediately -> TurnWindow.AnyTurn
+  Onset.FromYourNextTurn -> TurnWindow.ControllersNextTurn
+
+-- CR 603.7a: a turn has BEGUN, so settle every delayed entry waiting for one and
+-- drop every entry whose turn is now over. Engine.beginTurnOf calls this after
+-- the new turn's number and active player are in place, and only for a turn that
+-- actually begins. That is CR 614.10a's "anything scheduled for the 'next'
+-- occurrence of something waits for the first occurrence that isn't skipped",
+-- read on the turn axis: CR 800.4k's turn that a departed seat never begins is
+-- walked past here without settling anything, and a whole-turn skip would be too
+-- if pawl had one (Pawl.Types.PhaseSelector names steps and phases only).
+--
+-- The turn handoff is the ONLY moment either transition can be made, which is
+-- what makes this a boundary sweep rather than something derived on demand. Two
+-- of them, in this order:
+--
+-- 1. WAITING -> THIS TURN, for an entry whose controller is the player whose turn
+--    this is (CR 603.7d-f baked that player in at arming). The number is sampled
+--    here because nothing in GameState remembers which player each earlier turn
+--    belonged to -- GameState.events is cleared at this very handoff -- so
+--    "the first turn of mine after the one I was armed on" is not a question the
+--    live board can answer later. Sampled once and thereafter only ever cleared,
+--    never re-derived.
+--
+-- 2. THIS TURN -> GONE, for an entry whose settled turn is now behind us. Its
+--    trigger event cannot occur again, so CR 603.7a's "other events that happen
+--    earlier may make the trigger event impossible" has already decided the
+--    matter: the ability never triggers. Dropping it rather than leaving it to
+--    fail delayedPending's comparison forever is hygiene -- an entry that can
+--    never fire and states no duration would otherwise outlive the game.
+--
+-- Ordered settle-then-drop within one pass, which is exactly what the composition
+-- below does: an entry settled onto THIS turn carries this turn's number, and the
+-- drop only removes numbers strictly behind it.
+--
+-- CR 603.7b's one shot is untouched: this ends entries by the CALENDAR, and
+-- firing still ends them in delayedPending. An entry with a stated duration is
+-- dropped here too, and rightly -- a duration keeps an ability armed for the next
+-- occurrence of its event, not for a turn its printed text never named.
+settleOnsets :: GameState -> GameState
+settleOnsets gs =
+  let settled entry = case DelayedTrigger.window entry of
+        -- The turn that is beginning IS the one the printed phrase named exactly
+        -- when it belongs to the entry's controller (CR 603.7d-f).
+        TurnWindow.ControllersNextTurn
+          | DelayedTrigger.controller entry == GameState.activePlayer gs ->
+              entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
+        -- Anyone else's turn, including an intervening opponent's: still waiting.
+        TurnWindow.ControllersNextTurn -> entry
+        TurnWindow.AnyTurn -> entry
+        -- Already settled, and this is a later turn -- `live` is what ends it.
+        TurnWindow.OnTurn _ -> entry
+      live entry = case DelayedTrigger.window entry of
+        TurnWindow.AnyTurn -> True
+        TurnWindow.ControllersNextTurn -> True
+        TurnWindow.OnTurn n -> n >= GameState.turnNumber gs
+   in gs {GameState.delayedTriggers = Seq.filter live (fmap settled (GameState.delayedTriggers gs))}
 
 -- Everything that has triggered and is not yet on the stack, from all three
 -- sources, plus the delayed store as it stands afterwards. One function, so
