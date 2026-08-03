@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Issue:** #629
+
 **Goal:** Make an omitted JSON field mean its default, so the codec stops writing keys that say nothing.
 
 **Architecture:** Three combinators in `Pawl.Codec.Common` replace the hand-rolled `if null then [] else [...]` blocks and the `decode*Default` family. Each record codec declares, per field, whether it is required or carries a default; the encoder omits a defaulted field and the decoder supplies the same value from the same binding. The committed corpus is regenerated from the encoder after each codec change, so the suite is green at every task boundary.
@@ -164,7 +166,7 @@ Append to `CommonSpec.hs`'s `spec`, following the existing `Spec.describe`/`Spec
         (Common.defaultedField "k" (Just (1 :: Integer)) (Common.decodeMaybe Common.asInteger) [Common.pair "k" Common.null])
         (Right Nothing)
     -- The round trip the two halves have to agree on, stated once here so the
-    -- per-codec cases in Task 8 are checking a property this pins down.
+    -- per-codec cases in Task 11 are checking a property this pins down.
     Spec.it s "round-trips the default through an omitted field" $
       Spec.assertEq
         s
@@ -209,7 +211,7 @@ defaultedField k d f ps = case lookupPair k ps of
   Just v -> f v
 ```
 
-Leave `nullableField` and the `decode*Default` family in place for now — they still have callers, and Task 7 removes them once those are gone.
+Leave `nullableField` and the `decode*Default` family in place for now — they still have callers, and Task 10 removes them once those are gone.
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -655,52 +657,132 @@ direnv exec . git commit -m "Give every Card field but name and typeLine a defau
 
 ---
 
-### Task 6: The remaining 25 record codecs
+### Task 6: The ten codecs with nothing to default
+
+Ten record codecs have no omissible field at all: their every field is an identity
+(R3) or one whose constructors are all equally meaningful (R4). Converting them
+changes the *shape* of the code and nothing on the wire, which makes this the one
+task with an exact success criterion — **the corpus must come out byte-identical.**
 
 **Files:**
-- Modify: the 25 modules in the table below, under `source/libraries/codec/Pawl/Codec/`
+- Modify, under `source/libraries/codec/Pawl/Codec/`: `AttackCost.hs`, `AttackRequirement.hs`, `BlockRequirement.hs`, `Condition.hs`, `Count.hs`, `Countering.hs`, `ManaCount.hs`, `PlayerStaticAbility.hs`, `StaticAbility.hs`, `ZoneChange.hs`
+- Test: their `*Spec.hs` siblings (expected to need no edits — see Step 3)
+
+**Interfaces:**
+- Consumes: `Common.requiredPair :: String -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]` from Task 2.
+- Produces: nothing new.
+
+**Why each has nothing to default** — settled, do not re-derive:
+
+| Module | Why every field is required |
+|---|---|
+| `AttackCost` | `subject` and `perAttacker` both name the cost; neither has an unmarked value (R4) |
+| `AttackRequirement` | `subject` (R4) |
+| `BlockRequirement` | `attacker` (R4) |
+| `Condition` | `measured`, `comparison`, `threshold` — no `Comparison` constructor is privileged (R4) |
+| `Count` | `scope`, `filter`, `aggregation` (R4) |
+| `Countering` | `spell`, `source`, `controller` are `ObjectId`/`PlayerId` (R3) |
+| `ManaCount` | `player` is a `PlayerRef` (R3); `filter` is R4 |
+| `PlayerStaticAbility` | `scope`, `effect` (R4) |
+| `StaticAbility` | `affected`, `modifications` — `modifications` is `NonEmpty`, which cannot be empty (R4) |
+| `ZoneChange` | `departed`, `object` are `ObjectId` (R3); `from`, `to` are `Zone` (R4) |
+
+- [ ] **Step 1: Convert all ten**
+
+The transformation is uniform: `Common.object [ ... ]` becomes
+`Common.object . concat $ [ ... ]`, and each `Common.pair k f x` inside becomes
+`Common.requiredPair k f x`. `fromJson` is untouched in all ten. Worked example —
+`ZoneChange` before:
+
+```haskell
+toJson zc =
+  Common.object
+    [ Common.pair "departed" (ObjectId.toJson (ZoneChange.departed zc)),
+      Common.pair "object" (ObjectId.toJson (ZoneChange.object zc)),
+      Common.pair "from" (Zone.toJson (ZoneChange.from zc)),
+      Common.pair "to" (Zone.toJson (ZoneChange.to zc))
+    ]
+```
+
+after:
+
+```haskell
+toJson zc =
+  Common.object . concat $
+    [ Common.requiredPair "departed" ObjectId.toJson (ZoneChange.departed zc),
+      Common.requiredPair "object" ObjectId.toJson (ZoneChange.object zc),
+      Common.requiredPair "from" Zone.toJson (ZoneChange.from zc),
+      Common.requiredPair "to" Zone.toJson (ZoneChange.to zc)
+    ]
+```
+
+Read each module's real body first — some take a `codec` argument, and some write
+their pair list with the encoder applied by `.` and `$` rather than by
+application. `requiredPair` takes the encoder and the value as separate
+arguments, so `Common.pair "k" . Enc.toJson $ Rec.k r` becomes
+`Common.requiredPair "k" Enc.toJson (Rec.k r)`.
+
+- [ ] **Step 2: Build and test**
+
+Run: `direnv exec . cabal build all && direnv exec . cabal test`
+Expected: warning-free; PASS with no spec literal edited. **If any spec literal
+fails, stop** — a failure here means a field changed on the wire, which for these
+ten modules is a mistake, not a migration.
+
+- [ ] **Step 3: Prove the wire did not move**
+
+```bash
+direnv exec . cabal run pawl
+direnv exec . script/format-json.sh fix data/cards/*.json
+git status --short data/cards
+```
+
+Expected: **empty output.** These ten modules add and remove no key, so the
+corpus cannot change. Any diff is a defect in Step 1.
+
+- [ ] **Step 4: Commit**
+
+```bash
+direnv exec . git add source/libraries/codec/Pawl/Codec
+direnv exec . hooky fix
+direnv exec . git add source/libraries/codec/Pawl/Codec
+direnv exec . hooky run
+direnv exec . git commit -m "Use requiredPair in the codecs with nothing to default"
+```
+
+---
+
+### Task 7: The seven codecs whose defaults are absence
+
+**Files:**
+- Modify, under `source/libraries/codec/Pawl/Codec/`: `Binding.hs`, `CombatRestriction.hs`, `Cost.hs`, `DelayedTrigger.hs`, `EntryOption.hs`, `PhasePattern.hs`, `TriggeredAbility.hs`
 - Test: their `*Spec.hs` siblings
 - Modify: `data/cards/*.json`
 
 **Interfaces:**
-- Consumes: `Common.requiredPair`/`optionalPair`/`defaultedField`.
-- Produces: nothing new; Task 8 adds the round-trip cases over all of them.
+- Consumes: `Common.requiredPair`, `Common.optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]`, `Common.defaultedField :: String -> a -> (Value.Value -> Either Text.Text a) -> [Pair.Pair Value.Value] -> Either Text.Text a`, all from Task 2.
+- Produces: nothing new.
 
-The classification below is settled — apply it, do not re-derive it. Every field not listed as omissible stays `requiredPair` + `Common.field`.
+Every default here is `Nothing` or an empty container — R1 only, no judgment
+calls. The classification is settled; every field not listed stays
+`requiredPair` + `Common.field`:
 
-| Module | Omissible field | Default | Rule |
-|---|---|---|---|
-| `ActivatedAbility` | `timing` | `ActivationTiming.AnyTime` | R2 |
-| `AttackCost` | — | | R4 |
-| `AttackRequirement` | — | | R4 |
-| `Binding` | `target`, `amount`, `modes`, `copy` | `Nothing` | R1 |
-| `BlockRequirement` | — | | R4 |
-| `CombatRestriction` | `unless` | `Nothing` | R1 |
-| `Condition` | — | | R4 |
-| `Cost` | `mana`, `components` | `Nothing`, `[]` | R1 |
-| `Count` | — | | R4 |
-| `CounterPattern` | `whichKind`, `whose` | `Nothing`, `ControllerRelation.Anyones` | R1, R2 |
-| `Countering` | — | | R3 |
-| `DamageEvent` | `dealtByDeathtouch`, `dealtByInfect`, `dealtByToxic`, `dealtByLifelink` | `False` | R1 |
-| `DamagePattern` | `whichKind`, `whichRecipient`, `whichSource` | `Nothing`, `Nothing`, `SourceRelation.AnySource` | R1, R2 |
-| `DelayedTrigger` | `expiry`, `bindings` | `Nothing`, empty | R1 |
-| `EntryOption` | `keywords` | `Set.empty` | R1 |
-| `EntryRiders` | `tapped`, `attacking` | `TapState.Untapped`, `False` | R2, R1 |
-| `ManaCount` | — | | R3, R4 |
-| `PhasePattern` | `whosePhase` | `Nothing` | R1 |
-| `PlayerStaticAbility` | — | | R4 |
-| `ProjectedCharacteristics` | every `Maybe` and every container field | `Nothing`, empty | R1 |
-| `StaticAbility` | — | | R4 |
-| `TokenPattern` | `whose` | `ControllerRelation.Anyones` | R2 |
-| `TriggeredAbility` | `intervening` | `Nothing` | R1 |
-| `ZoneChange` | — | | R3, R4 |
-| `ZoneChangePattern` | `whichObject`, `whoseObject` | `ZoneChangeSubject.AnyObject`, `ControllerRelation.Anyones` | R2 |
+| Module | Omissible field | Default |
+|---|---|---|
+| `Binding` | `target`, `amount`, `modes`, `copy` | `Nothing` |
+| `CombatRestriction` | `unless` | `Nothing` |
+| `Cost` | `mana`, `components` | `Nothing`, `[]` |
+| `DelayedTrigger` | `expiry`, `bindings` | `Nothing`, empty |
+| `EntryOption` | `keywords` | `Set.empty` |
+| `PhasePattern` | `whosePhase` | `Nothing` |
+| `TriggeredAbility` | `intervening` | `Nothing` |
 
-`EntryOption.power` and `EntryOption.toughness` stay required under R5 — a 0/0 token is legal, so an absent power must not read as `0`. `ProjectedCharacteristics.name` stays required under R3.
+`EntryOption.power` and `EntryOption.toughness` stay **required** under R5: a 0/0
+token is legal, so an absent power must not read as `0`.
 
-- [ ] **Step 1: Convert one module and see it green**
+- [ ] **Step 1: Convert `PhasePattern` first and see it green**
 
-Start with `PhasePattern` — one omissible field, small spec. Before:
+Before:
 
 ```haskell
 toJson p =
@@ -732,16 +814,26 @@ fromJson value = do
   pure (PhasePattern.MkPhasePattern which whose)
 ```
 
-Read the module's real body first — the `before` above is from memory of the shape, and some modules build their list with `<>` blocks or take a `codec` argument. What transfers is the mapping: `Common.pair k f x` becomes `Common.requiredPair k f x`; a hand-rolled `if <default> then [] else [Common.pair k …]` block becomes `Common.optionalPair k <default> f x`; `Common.field k ps >>= dec` for an omissible field becomes `Common.defaultedField k <default> dec ps`; and `Common.decode*Default dec (Common.nullableField k ps)` becomes the same thing.
+The mapping, which is the same for every module in this task: `Common.pair k f x`
+becomes `Common.requiredPair k f x`; a hand-rolled `if <default> then [] else
+[Common.pair k …]` block becomes `Common.optionalPair k <default> f x`;
+`Common.field k ps >>= dec` for an omissible field becomes
+`Common.defaultedField k <default> dec ps`; and
+`Common.decode*Default dec (Common.nullableField k ps)` becomes the same thing.
 
-Bind a `default<Field>` only where the default is an R2 enum choice — write `Nothing`, `[]`, `Set.empty`, `Map.empty`, `Seq.empty` and `False` inline, since two spellings of those cannot disagree.
+Write `Nothing`, `[]`, `Set.empty`, `Map.empty` and `Seq.empty` inline rather than
+binding a name for them — two spellings of an empty container cannot disagree, so
+a binding buys nothing here.
 
-Run: `direnv exec . cabal test 2>&1 | tail -30`, fix `PhasePatternSpec`'s literals from the `encoded …` side, re-run.
-Expected: PASS.
+Run: `direnv exec . cabal test 2>&1 | tail -30`. A failing `assertToJson` prints
+`encoded <json> but the literal says <json>`; replace that literal with the
+`encoded` side, keeping the `""" … """` wrapping and its surrounding spaces.
 
-- [ ] **Step 2: Convert the remaining 24, one at a time**
+- [ ] **Step 2: Convert the other six, one at a time**
 
-For each: convert both halves, build, run the suite, fix that module's literals from the failure output, re-run until green. Do not batch — a module whose spec you fix from another module's failure output is a module you did not check.
+For each: convert both halves, build, run the suite, fix that module's literals
+from the failure output, re-run until green. Do not batch — a module whose spec
+you fixed from another module's failure output is a module you did not check.
 
 - [ ] **Step 3: Regenerate the corpus**
 
@@ -753,7 +845,181 @@ direnv exec . cabal test
 
 Expected: PASS.
 
-- [ ] **Step 4: Verify no hand-rolled omission blocks survive**
+- [ ] **Step 4: Commit**
+
+```bash
+direnv exec . git add source/libraries/codec/Pawl/Codec data/cards
+direnv exec . hooky fix
+direnv exec . git add source/libraries/codec/Pawl/Codec data/cards
+direnv exec . hooky run
+direnv exec . git commit -m "Default the absent-means-nothing fields"
+```
+
+---
+
+### Task 8: The seven codecs with a chosen default
+
+These carry the defaults that are a *judgment* rather than an absence — R2's
+"one constructor means no restriction", plus `DamageEvent`'s boolean flags under
+R1. Each R2 default gets a named binding in its codec module, referenced by both
+halves; that binding is what stops the two halves drifting.
+
+**Files:**
+- Modify, under `source/libraries/codec/Pawl/Codec/`: `ActivatedAbility.hs`, `CounterPattern.hs`, `DamageEvent.hs`, `DamagePattern.hs`, `EntryRiders.hs`, `TokenPattern.hs`, `ZoneChangePattern.hs`
+- Test: their `*Spec.hs` siblings
+- Modify: `data/cards/*.json`
+
+**Interfaces:**
+- Consumes: `Common.requiredPair`, `Common.optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]`, `Common.defaultedField :: String -> a -> (Value.Value -> Either Text.Text a) -> [Pair.Pair Value.Value] -> Either Text.Text a`, all from Task 2.
+- Produces: nothing later tasks import.
+
+The classification is settled; every field not listed stays `requiredPair` +
+`Common.field`:
+
+| Module | Omissible field | Default | Rule |
+|---|---|---|---|
+| `ActivatedAbility` | `timing` | `ActivationTiming.AnyTime` | R2 |
+| `CounterPattern` | `whichKind` | `Nothing` | R1 |
+| `CounterPattern` | `whose` | `ControllerRelation.Anyones` | R2 |
+| `DamageEvent` | `dealtByDeathtouch`, `dealtByInfect`, `dealtByToxic`, `dealtByLifelink` | `False` | R1 |
+| `DamagePattern` | `whichKind`, `whichRecipient` | `Nothing` | R1 |
+| `DamagePattern` | `whichSource` | `SourceRelation.AnySource` | R2 |
+| `EntryRiders` | `tapped` | `TapState.Untapped` | R2 |
+| `EntryRiders` | `attacking` | `False` | R1 |
+| `TokenPattern` | `whose` | `ControllerRelation.Anyones` | R2 |
+| `ZoneChangePattern` | `whichObject` | `ZoneChangeSubject.AnyObject` | R2 |
+| `ZoneChangePattern` | `whoseObject` | `ControllerRelation.Anyones` | R2 |
+
+`ZoneChangePattern.whenDestination` stays required (R4) — no `Zone` is the
+unmarked one. `DamageEvent`'s `source`, `target`, `amount` and `kind` stay
+required (R3, R4).
+
+- [ ] **Step 1: Convert `TokenPattern` first and see it green**
+
+The shape, with the named binding that is this task's distinguishing feature:
+
+```haskell
+-- | CR 109.5 reads a controller relation against the effect's source; "anyone's"
+-- is the unrestricted reading, so it is what a pattern that says nothing means.
+defaultWhose :: ControllerRelation.ControllerRelation
+defaultWhose = ControllerRelation.Anyones
+
+toJson tp =
+  Common.object . concat $
+    [ Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (TokenPattern.whose tp)
+    ]
+
+fromJson value = do
+  ps <- Common.asObject value
+  whose <- Common.defaultedField "whose" defaultWhose ControllerRelation.fromJson ps
+  pure (TokenPattern.MkTokenPattern whose)
+```
+
+Read the module's real body first — `TokenPattern` may carry fields beyond
+`whose`, and those stay `requiredPair` + `Common.field`.
+
+The mapping for every module in this task: `Common.pair k f x` becomes
+`Common.requiredPair k f x`; a hand-rolled `if <default> then [] else
+[Common.pair k …]` block becomes `Common.optionalPair k <default> f x`;
+`Common.field k ps >>= dec` for an omissible field becomes
+`Common.defaultedField k <default> dec ps`; and
+`Common.decode*Default dec (Common.nullableField k ps)` becomes the same thing.
+
+Bind a `default<Field>` for every R2 default in the table above, with a comment
+saying why that constructor is the unmarked one. Write `Nothing` and `False`
+inline — two spellings of those cannot disagree.
+
+Run: `direnv exec . cabal test 2>&1 | tail -30`. A failing `assertToJson` prints
+`encoded <json> but the literal says <json>`; replace that literal with the
+`encoded` side, keeping the `""" … """` wrapping and its surrounding spaces.
+
+- [ ] **Step 2: Convert the other six, one at a time**
+
+For each: convert both halves, build, run the suite, fix that module's literals
+from the failure output, re-run until green. Do not batch.
+
+- [ ] **Step 3: Regenerate the corpus**
+
+```bash
+direnv exec . cabal run pawl
+direnv exec . script/format-json.sh fix data/cards/*.json
+direnv exec . cabal test
+```
+
+Expected: PASS.
+
+- [ ] **Step 4: Commit**
+
+```bash
+direnv exec . git add source/libraries/codec/Pawl/Codec data/cards
+direnv exec . hooky fix
+direnv exec . git add source/libraries/codec/Pawl/Codec data/cards
+direnv exec . hooky run
+direnv exec . git commit -m "Default the unmarked-constructor fields"
+```
+
+---
+
+### Task 9: ProjectedCharacteristics
+
+On its own because it is the widest record in the codec — twelve fields, of which
+ten are omissible — and because it is the one whose JSON appears inside other
+modules' spec literals (`ProjectedCharacteristicsSpec.testCharacteristicsJson` is
+concatenated into `BindingSpec`, `GameEventSpec` and `DelayedTriggerSpec`).
+
+**Files:**
+- Modify: `source/libraries/codec/Pawl/Codec/ProjectedCharacteristics.hs`
+- Test: `source/libraries/codec/Pawl/Codec/ProjectedCharacteristicsSpec.hs`, and the three specs that concatenate its JSON: `BindingSpec.hs`, `GameEventSpec.hs`, `DelayedTriggerSpec.hs`
+- Modify: `data/cards/*.json`
+
+**Interfaces:**
+- Consumes: `Common.requiredPair`, `Common.optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]`, `Common.defaultedField :: String -> a -> (Value.Value -> Either Text.Text a) -> [Pair.Pair Value.Value] -> Either Text.Text a`, all from Task 2.
+
+| Field | Required or default |
+|---|---|
+| `name` | **required** (R3 — a `CardName` has no default) |
+| `cardTypes` | **required** (R6's reasoning: a projection with no card type is a malformed value, not a typeless permanent) |
+| `supertypes`, `subtypes`, `colors` | `Set.empty` |
+| `keywords` | `Map.empty` (a multiset) |
+| `power`, `toughness`, `loyalty`, `characteristicPT` | `Nothing` |
+| `activatedAbilities`, `replacementEffects` | `[]` |
+
+- [ ] **Step 1: Convert both halves**
+
+The mapping: `Common.pair k f x` becomes `Common.requiredPair k f x`;
+`Common.field k ps >>= dec` for an omissible field becomes
+`Common.defaultedField k <default> dec ps`; and
+`Common.decode*Default dec (Common.nullableField k ps)` becomes the same thing.
+Write every default in the table inline — they are all `Nothing` or empty, so a
+named binding buys nothing.
+
+Unlike Task 3, add no `cardTypes` non-empty check: R6's non-empty rule is written
+for `TypeLine` and Task 3 implemented it there. Keeping `cardTypes` a required
+key is the whole of this module's guard.
+
+- [ ] **Step 2: Fix its own spec, then the three that concatenate its JSON**
+
+Run: `direnv exec . cabal test 2>&1 | tail -40`.
+
+`ProjectedCharacteristicsSpec`'s own literals come from the `encoded …` side of
+each failure. Then `testCharacteristicsJson` — the binding those three other
+specs concatenate — has to shrink to match, and the surrounding literals in
+`BindingSpec`, `GameEventSpec` and `DelayedTriggerSpec` may shrink too if this
+task changed a field they exercise. Fix `testCharacteristicsJson` first and
+re-run; the remaining failures name what else moved.
+
+- [ ] **Step 3: Regenerate the corpus**
+
+```bash
+direnv exec . cabal run pawl
+direnv exec . script/format-json.sh fix data/cards/*.json
+direnv exec . cabal test
+```
+
+Expected: PASS. `ProjectedCharacteristics` is not reachable from a card file, so
+the corpus should not move — but run it, because a shared codec it calls might.
+
+- [ ] **Step 4: Verify no hand-rolled omission blocks survive anywhere**
 
 Run: `direnv exec . grep -rn 'then \[\] else \[' source/libraries/codec/`
 Expected: no matches.
@@ -768,12 +1034,11 @@ direnv exec . git add source/libraries/codec/Pawl/Codec data/cards
 direnv exec . hooky fix
 direnv exec . git add source/libraries/codec/Pawl/Codec data/cards
 direnv exec . hooky run
-direnv exec . git commit -m "Default the remaining record codecs' fields"
+direnv exec . git commit -m "Default ProjectedCharacteristics' fields"
 ```
-
 ---
 
-### Task 7: Remove the superseded helpers
+### Task 10: Remove the superseded helpers
 
 **Files:**
 - Modify: `source/libraries/codec/Pawl/Codec/Common.hs`
@@ -785,7 +1050,7 @@ direnv exec . git commit -m "Default the remaining record codecs' fields"
 direnv exec . grep -rn 'nullableField\|decodeListDefault\|decodeSetDefault\|decodeMapDefault\|decodeBooleanDefault' source/
 ```
 
-Expected: matches only in `Common.hs` and any `CommonSpec.hs` case covering them. If a codec module still calls one, it was missed in Task 6 — go convert it before continuing.
+Expected: matches only in `Common.hs` and any `CommonSpec.hs` case covering them. If a codec module still calls one, it was missed in Tasks 3-9 — go convert it before continuing.
 
 - [ ] **Step 2: Delete**
 
@@ -812,12 +1077,12 @@ direnv exec . git commit -m "Remove the decode*Default family"
 
 ---
 
-### Task 8: An all-defaults case per record codec
+### Task 11: An all-defaults case per record codec
 
 This is the mechanism that closes the loop between a codec's two halves. Tasks 3–5 already added it for `TypeLine`, `Mode`, `Modal` and `Card`; this task covers the other 25.
 
 **Files:**
-- Test: the 25 `*Spec.hs` siblings from Task 6's table
+- Test: the `*Spec.hs` siblings of every module converted in Tasks 6-9
 
 - [ ] **Step 1: Add the case to each spec**
 
@@ -852,7 +1117,7 @@ direnv exec . git commit -m "Assert every record codec round-trips its all-defau
 
 ---
 
-### Task 9: The verbose form still decodes
+### Task 12: The verbose form still decodes
 
 R7 makes the pre-migration shape a supported input, and after Tasks 3–6 nothing exercises it any more.
 
@@ -923,7 +1188,7 @@ direnv exec . git commit -m "Cover the pre-migration JSON shape on input"
 
 ---
 
-### Task 10: Prove the corpus lost nothing, then open the PR
+### Task 13: Prove the corpus lost nothing, then open the PR
 
 P3 compares each file against the encoder, so after regeneration it passes by construction. The check that actually matters is that the cards *mean* the same thing before and after, and it needs the old corpus on disk.
 
@@ -963,7 +1228,7 @@ The old files decode through the *new* decoder, which R7 guarantees still accept
 - [ ] **Step 3: Run it**
 
 Run: `direnv exec . cabal test 2>&1 | grep -A 5 TEMPORARY`
-Expected: PASS for all 226. A failure names the card and shows both `Card` values — that is a wrong default in Task 5 or 6, not a corpus problem.
+Expected: PASS for all 226. A failure names the card and shows both `Card` values — that is a wrong default in Tasks 3-9, not a corpus problem.
 
 - [ ] **Step 4: Delete the temporary case**
 
@@ -986,11 +1251,11 @@ Expected: warning-free build; suite PASS; hooky clean; the corpus diff showing r
 
 - [ ] **Step 6: Self-review the branch before opening the PR**
 
-Per CONTRIBUTING: re-check every CR citation added by this branch against `docs/rules.txt` by number (CR 700.2 in `Modal`, CR 603.5 in `Mode`, CR 701.5 in `Card`), and re-read every comment the change touched for prose the rewrite made wrong. `Card.toJson`'s three deleted block comments are the known instance; look for others in the 25 modules from Task 6. Fix findings on the branch.
+Per CONTRIBUTING: re-check every CR citation added by this branch against `docs/rules.txt` by number (CR 700.2 in `Modal`, CR 603.5 in `Mode`, CR 701.5 in `Card`), and re-read every comment the change touched for prose the rewrite made wrong. `Card.toJson`'s three deleted block comments are the known instance; look for others in the modules from Tasks 6-9. Fix findings on the branch.
 
 - [ ] **Step 7: Open the PR**
 
-Open as a draft, then mark ready once the self-review's findings are pushed and the suite is green. Do not wait for CI. The body carries: what changed and why, with `Closes #N` as plain text (backticks break the link); the CR citations, each checked; the design calls made and rejected — per-field defaults over structurally-empty-only, regenerate-from-encoder over hand-stripping, and what the latter costs; how it was verified, including the Task 10 before/after result, the suite count before → after, and the corpus line delta; an explicit "no" on whether the diff makes the rules core case on an effect's identity; and what was deferred.
+Open as a draft, then mark ready once the self-review's findings are pushed and the suite is green. Do not wait for CI. The body carries: what changed and why, with `Closes #N` as plain text (backticks break the link); the CR citations, each checked; the design calls made and rejected — per-field defaults over structurally-empty-only, regenerate-from-encoder over hand-stripping, and what the latter costs; how it was verified, including the Task 13 before/after result, the suite count before → after, and the corpus line delta; an explicit "no" on whether the diff makes the rules core case on an effect's identity; and what was deferred.
 
 ---
 
@@ -998,4 +1263,4 @@ Open as a draft, then mark ready once the self-review's findings are pushed and 
 
 The 24 `Common.assertJsonCodec` sites that build JSON by `<>` concatenation are untouched. They are not literals, and the `init baseCardJson <> ",…"` family depends on the last character being `}` — shrinking them is a separate cleanup with its own hazard.
 
-An issue does not exist for this work yet. File it before Task 1 and use its number in Task 10's `Closes #N`.
+The tracking issue is **#629**; Task 13's PR body closes it.
