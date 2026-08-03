@@ -12,10 +12,11 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TurnWindow as TurnWindow
 
 -- | R7's one case for MkDelayedTrigger's single constructor, at CR 603.7a/603.7b's
--- default (both notBefore and expiry absent), plus the two elision biconditional
--- cases each stated field takes when present. 'bindings' carries a minimal
+-- default (an unrestricted window and no expiry), plus the case each of those two
+-- fields takes when the card does restrict it. 'bindings' carries a minimal
 -- Binding rather than one with a `copy` snapshot (Pawl.Codec.BindingSpec is
 -- already total over every Binding field on its own); 'ability' reuses
 -- 'CardSpec.minimalTriggeredAbility' rather than building a second one by hand.
@@ -26,7 +27,7 @@ entry =
       DelayedTrigger.source = ObjectId.MkObjectId 4,
       DelayedTrigger.controller = PlayerId.MkPlayerId 0,
       DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.empty {Binding.amount = Just 9}),
-      DelayedTrigger.notBefore = Nothing,
+      DelayedTrigger.window = TurnWindow.AnyTurn,
       DelayedTrigger.expiry = Nothing
     }
 
@@ -35,7 +36,7 @@ entryJson =
   "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
     <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
     <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
-    <> "\"notBefore\":null,\"expiry\":null}"
+    <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":null}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
@@ -52,16 +53,19 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
           <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
           <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
-          <> "\"notBefore\":null,\"expiry\":{\"type\":\"AtCleanup\"}}"
+          <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"}}"
       )
+  -- CR 603.7a: an onset gate, at the arm Meandering Towershell's entry is stored
+  -- with before its turn arrives. Pawl.Codec.TurnWindowSpec is total over the
+  -- other two arms.
   Spec.it s "MkDelayedTrigger, an onset gate (CR 603.7a)" $
     Common.assertJsonCodec
       s
       DelayedTrigger.toJson
       DelayedTrigger.fromJson
-      entry {DelayedTrigger.notBefore = Just 7}
+      entry {DelayedTrigger.window = TurnWindow.ControllersNextTurn}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
           <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
           <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
-          <> "\"notBefore\":7,\"expiry\":null}"
+          <> "\"window\":{\"type\":\"ControllersNextTurn\"},\"expiry\":null}"
       )

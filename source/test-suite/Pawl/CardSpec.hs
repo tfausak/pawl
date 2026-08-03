@@ -664,18 +664,17 @@ activatedAbilityOffends ability =
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
 --
--- Pawl.Types.Onset.FromYourNextTurn enforces only the NEXT half of that phrase:
--- Resolve turns it into a turn NUMBER (DelayedTrigger.notBefore) and
--- Event.delayedPending compares the live turn number against it, so the entry
--- cannot fire on the turn that created it. A number cannot say WHOSE turn it is.
--- The YOUR half is delivered by the delayed ability's own
--- TriggerCondition.StepBegins carrying TurnScope.ControllersTurn.
+-- Pawl.Types.Onset.FromYourNextTurn carries BOTH halves of that phrase on its
+-- own: Event.armOnset stores TurnWindow.ControllersNextTurn and
+-- Event.settleOnsets pins the entry to the one turn that turns out to be, whose
+-- active player is the entry's controller. So the ability's own
+-- TriggerCondition.StepBegins carrying TurnScope.ControllersTurn is redundant
+-- for FIRING.
 --
--- The two collaborate and neither is redundant -- the scope alone admits the
--- arming turn itself (an extra combat phase would fire the ability early), and
--- the onset alone admits an intervening opponent's turn -- so a card that arms
--- with the onset but scopes with EachTurn has a delayed ability whose printed
--- "your" is a lie. That is what this rejects.
+-- It is not redundant in the DATA, which is what this lint is about: a card that
+-- arms with the onset but scopes with EachTurn has printed an "each" the window
+-- would silently narrow to the controller's turn, so its text would mean
+-- something the card does not say. That is what this rejects.
 --
 -- A dangling name (an onset naming an ability the card does not declare) is
 -- ALSO an offence here, and deliberately not silently accepted: the neighbouring

@@ -44,6 +44,8 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.Onset (Onset)
+import qualified Pawl.Types.Onset as Onset
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import Pawl.Types.PlayerId (PlayerId)
@@ -62,6 +64,8 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import Pawl.Types.TurnWindow (TurnWindow)
+import qualified Pawl.Types.TurnWindow as TurnWindow
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
@@ -1788,12 +1792,13 @@ functionsInGraveyard cond = case cond of
 -- question about a rule 603 condition and never reaches the ability's payload.
 --
 -- Its customer is the card lint (CardSpec's "every delayed ability armed for
--- YOUR next turn is controller-scoped"). Pawl.Types.Onset.FromYourNextTurn
--- delivers only the NEXT half of "your next turn": it becomes a turn NUMBER
--- (DelayedTrigger.notBefore) and a number cannot say whose turn it is. The YOUR
--- half is this -- so an onset paired with a condition that answers False here
--- would fire on an intervening opponent's turn, and the lint rejects that
--- pairing rather than leaving the two fields to agree by luck.
+-- YOUR next turn is controller-scoped"). Pawl.Types.Onset.FromYourNextTurn now
+-- delivers BOTH halves of "your next turn" on its own -- settleOnsets pins the
+-- entry to the controller's next turn and to no other -- so this no longer
+-- guards the firing. It guards the DATA: a card that armed that onset over an
+-- EachTurn condition would have its printed "each" silently narrowed by the
+-- window, and the lint rejects the pairing rather than letting card text mean
+-- something the card does not say.
 --
 -- Exhaustive with no wildcard, for eventBindingSlots' reason: a new condition
 -- must force a decision rather than defaulting to False, which for the arms that
@@ -1943,11 +1948,20 @@ delayedPending events gs =
   let -- CR 603.7a's floor -- "a delayed triggered ability won't trigger until it
       -- has actually been created, even if its trigger event occurred just
       -- beforehand" -- is the watermark's job, and is all an ordinary entry
-      -- (notBefore = Nothing) needs. This is the card's OWN further restriction:
-      -- an ability printed "on your next turn" (Pawl.Types.Onset) is not armed
-      -- on the turn it was created, whatever its condition matches. Read against
-      -- the LIVE turn number, so an entry with no onset is untouched.
-      armed entry = maybe True (GameState.turnNumber gs >=) (DelayedTrigger.notBefore entry)
+      -- (TurnWindow.AnyTurn) needs. This is the card's OWN further restriction:
+      -- an ability printed "on your next turn" (Pawl.Types.Onset) fires on that
+      -- one turn and no other, whatever its condition matches. Read against the
+      -- LIVE turn number, so an entry with no onset is untouched.
+      armed entry = case DelayedTrigger.window entry of
+        TurnWindow.AnyTurn -> True
+        -- The turn the printed phrase names has not begun yet, so no occurrence
+        -- of the trigger event counts -- including one in the turn that armed
+        -- the ability, which is the whole reason the onset exists.
+        TurnWindow.ControllersNextTurn -> False
+        -- EQUALITY, not a floor: CR 603.7a's "other events that happen earlier
+        -- may make the trigger event impossible" is a claim about ONE named
+        -- turn, so the window has an upper end and not merely a lower one.
+        TurnWindow.OnTurn n -> n == GameState.turnNumber gs
       fires entry =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
          in armed entry && any (matchesTrigger gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
@@ -1961,6 +1975,71 @@ delayedPending events gs =
       -- Firing spends the one shot only for an entry with no stated duration.
       spent entry = fires entry && Maybe.isNothing (DelayedTrigger.expiry entry)
    in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . spent) store)
+
+-- CR 603.7a: the printed Pawl.Types.Onset as the game first stores it. The
+-- delayed-trigger twin of Pawl.Engine.Expiry.arm, and deliberately blind to the
+-- board: unlike a duration, an onset has nothing to bake in at the moment the
+-- ability is created. "Your next turn" is a boundary that has not happened yet,
+-- and the turn number it turns out to be is settleOnsets' answer, below.
+armOnset :: Onset -> TurnWindow
+armOnset onset = case onset of
+  Onset.Immediately -> TurnWindow.AnyTurn
+  Onset.FromYourNextTurn -> TurnWindow.ControllersNextTurn
+
+-- CR 603.7a: a turn has BEGUN, so settle every delayed entry waiting for one and
+-- drop every entry whose turn is now over. Engine.beginTurnOf calls this after
+-- the new turn's number and active player are in place, and only for a turn that
+-- actually begins. That is CR 614.10a's "anything scheduled for the 'next'
+-- occurrence of something waits for the first occurrence that isn't skipped",
+-- read on the turn axis: CR 800.4k's turn that a departed seat never begins is
+-- walked past here without settling anything, and a whole-turn skip would be too
+-- if pawl had one (Pawl.Types.PhaseSelector names steps and phases only).
+--
+-- The turn handoff is the ONLY moment either transition can be made, which is
+-- what makes this a boundary sweep rather than something derived on demand. Two
+-- of them, in this order:
+--
+-- 1. WAITING -> THIS TURN, for an entry whose controller is the player whose turn
+--    this is (CR 603.7d-f baked that player in at arming). The number is sampled
+--    here because nothing in GameState remembers which player each earlier turn
+--    belonged to -- GameState.events is cleared at this very handoff -- so
+--    "the first turn of mine after the one I was armed on" is not a question the
+--    live board can answer later. Sampled once and thereafter only ever cleared,
+--    never re-derived.
+--
+-- 2. THIS TURN -> GONE, for an entry whose settled turn is now behind us. Its
+--    trigger event cannot occur again, so CR 603.7a's "other events that happen
+--    earlier may make the trigger event impossible" has already decided the
+--    matter: the ability never triggers. Dropping it rather than leaving it to
+--    fail delayedPending's comparison forever is hygiene -- an entry that can
+--    never fire and states no duration would otherwise outlive the game.
+--
+-- Ordered settle-then-drop within one pass, which is exactly what the composition
+-- below does: an entry settled onto THIS turn carries this turn's number, and the
+-- drop only removes numbers strictly behind it.
+--
+-- CR 603.7b's one shot is untouched: this ends entries by the CALENDAR, and
+-- firing still ends them in delayedPending. An entry with a stated duration is
+-- dropped here too, and rightly -- a duration keeps an ability armed for the next
+-- occurrence of its event, not for a turn its printed text never named.
+settleOnsets :: GameState -> GameState
+settleOnsets gs =
+  let settled entry = case DelayedTrigger.window entry of
+        -- The turn that is beginning IS the one the printed phrase named exactly
+        -- when it belongs to the entry's controller (CR 603.7d-f).
+        TurnWindow.ControllersNextTurn
+          | DelayedTrigger.controller entry == GameState.activePlayer gs ->
+              entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
+        -- Anyone else's turn, including an intervening opponent's: still waiting.
+        TurnWindow.ControllersNextTurn -> entry
+        TurnWindow.AnyTurn -> entry
+        -- Already settled, and this is a later turn -- `live` is what ends it.
+        TurnWindow.OnTurn _ -> entry
+      live entry = case DelayedTrigger.window entry of
+        TurnWindow.AnyTurn -> True
+        TurnWindow.ControllersNextTurn -> True
+        TurnWindow.OnTurn n -> n >= GameState.turnNumber gs
+   in gs {GameState.delayedTriggers = Seq.filter live (fmap settled (GameState.delayedTriggers gs))}
 
 -- Everything that has triggered and is not yet on the stack, from all three
 -- sources, plus the delayed store as it stands afterwards. One function, so

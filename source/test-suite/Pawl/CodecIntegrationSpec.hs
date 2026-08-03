@@ -225,8 +225,8 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
 -- populated at once, exercising Subtype.fromJsonPair) and its toJsonMap/
 -- fromJsonMap sort-by-slot-name proof live in Pawl.Codec.BindingSpec now.
 -- DelayedTrigger's own per-constructor coverage (CR 603.7a/603.7b's default,
--- and each of notBefore/expiry present) lives in Pawl.Codec.DelayedTriggerSpec
--- now. Neither needed a registry fixture -- a synthetic Binding/Card stand-in
+-- and each of a restricted window and a stated expiry) lives in
+-- Pawl.Codec.DelayedTriggerSpec now. Neither needed a registry fixture -- a synthetic Binding/Card stand-in
 -- proves the shape just as well.
 
 -- Count's own per-constructor coverage (in a zone, over the event history,

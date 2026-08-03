@@ -144,6 +144,7 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -3239,11 +3240,14 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
         atExtra = runToTurnStep 1 (Phase.Combat CombatStep.DeclareAttackers) S.aggressiveAnswer resolved
         afterExtra = snd (Engine.runGamePure S.aggressiveAnswer atExtra Engine.runStep)
     Spec.assertEqWith s "the return is armed" (length armed) 1
+    -- Waiting for a BOUNDARY, not for a turn number: which turn alice's next one
+    -- is cannot be known here (Pawl.Types.TurnWindow), and this same turn is not
+    -- it whatever number it carries.
     Spec.assertEqWith
       s
-      "and gated to a turn after the one it was armed on"
-      (fmap DelayedTrigger.notBefore (Foldable.toList armed))
-      [Just 2]
+      "and gated to alice's next turn, which has not begun"
+      (fmap DelayedTrigger.window (Foldable.toList armed))
+      [TurnWindow.ControllersNextTurn]
     Spec.assertEqWith s "the extra combat's declare attackers step really happened" (GameState.phase atExtra) (Phase.Combat CombatStep.DeclareAttackers)
     Spec.assertEqWith s "it is still in exile" (S.countOnBattlefieldByName towershellName S.alice afterExtra) 0
     Spec.assertEqWith s "and still armed, unspent" (length (GameState.delayedTriggers afterExtra)) 1
@@ -3260,6 +3264,84 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
     Spec.assertEqWith s "alice's next turn is turn 3" (GameState.turnNumber atNextTurn) 3
     Spec.assertEqWith s "and there it does return" (S.countOnBattlefieldByName towershellName S.alice atNextTurn) 1
     Spec.assertEqWith s "spending the one shot (CR 603.7b)" (length (GameState.delayedTriggers atNextTurn)) 0
+
+-- CR 603.7a's last sentence -- "Other events that happen earlier may make the
+-- trigger event impossible" -- with both halves already in the pool: Meandering
+-- Towershell's return, armed for alice's NEXT turn, and Stonehorn Dignitary
+-- taking that very turn's combat phase away before it arrives.
+--
+-- The printed phrase names ONE turn. A gate that only said "not before turn n"
+-- would leave the entry armed past it and fire the return on the FOLLOWING turn
+-- of alice's -- a turn the card does not name -- which is what the second case
+-- here discriminates.
+towershellSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+towershellSkipSpec s registry = Spec.describe s "DelayedOnsetSkipped" $ do
+  let boardOf = do
+        towershell <- S.printingOf s registry "Meandering Towershell"
+        island <- S.printingOf s registry "Island"
+        plains <- S.printingOf s registry "Plains"
+        stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
+        pure (towershellStonehornBoard towershell island plains stonehorn)
+      towershellName = CardName.MkCardName $ Text.pack "Meandering Towershell"
+      -- CR 603.2b: the combat steps of pid's turn that actually BEGAN. A skipped
+      -- phase leaves none, which is CR 614.6's "if an event is replaced, it never
+      -- happens" -- and is why this is read before the turn ends, since
+      -- Engine.handoffTurn clears the log.
+      combatStepsOf pid gs =
+        [ph | GameEvent.StepBegan ph@(Phase.Combat _) who <- Foldable.toList (GameState.events gs), who == pid]
+  -- The control that makes the case below discriminating: the same board and the
+  -- same line of play with the Dignitary never cast. S.aggressiveAnswer takes no
+  -- action at all, and S.fightAnswer is exactly it plus casting what it can
+  -- afford -- so the ONE difference between the two runs is that combat phase.
+  Spec.it s "CR 603.7 with alice's next turn intact the Towershell returns on it" $ do
+    gs <- boardOf
+    let turn3 = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
+    -- All five of CR 506.1's steps, because the returning Towershell is "put
+    -- onto the battlefield attacking" -- CR 508.8's other half, which is what
+    -- keeps the declare blockers and combat damage steps from being skipped.
+    Spec.assertEqWith s "alice's turn 3 ran all five combat steps (CR 506.1)" (length (combatStepsOf S.alice turn3)) 5
+    Spec.assertEqWith s "and the Towershell returned there" (S.countOnBattlefieldByName towershellName S.alice turn3) 1
+    Spec.assertEqWith s "spending the one shot (CR 603.7b)" (length (GameState.delayedTriggers turn3)) 0
+  -- THE PROVING CASE. bob's Dignitary, cast on turn 2, takes alice's turn-3
+  -- combat phase away -- so the declare attackers step the return watches for
+  -- never happens on the one turn "your next turn" named, and CR 603.7a's "other
+  -- events that happen earlier may make the trigger event impossible" is the
+  -- whole of what follows: the ability never triggers.
+  Spec.it s "CR 603.7a a skipped combat phase on the named turn makes the return impossible, not late" $ do
+    gs <- boardOf
+    let turn3 = runToTurnStep 3 Phase.PostcombatMain S.fightAnswer gs
+        turn5 = runToTurnStep 5 Phase.PostcombatMain S.fightAnswer turn3
+    Spec.assertEqWith s "no combat step of alice's turn 3 began (CR 500.11)" (combatStepsOf S.alice turn3) []
+    Spec.assertEqWith s "so the Towershell did not return on the turn its ability named" (S.countOnBattlefieldByName towershellName S.alice turn3) 0
+    -- CR 614.10a spends the skip on ONE occurrence, so alice's turn 5 has a
+    -- combat phase of its own -- and with it the very step the return watches
+    -- for. That is what makes the assertions below about the ABILITY rather than
+    -- about the board: the trigger event does occur here, and an entry left armed
+    -- would fire on it and return the Towershell on a turn the card never named.
+    -- Not all five steps: alice declares no attackers, so CR 508.8 skips the
+    -- declare blockers and combat damage steps.
+    Spec.assertBool
+      s
+      (List.elem (Phase.Combat CombatStep.DeclareAttackers) (combatStepsOf S.alice turn5))
+      "alice's turn 5 declare attackers step happens (CR 614.10a)"
+    Spec.assertEqWith s "and the return never fires at all" (S.countOnBattlefieldByName towershellName S.alice turn5) 0
+    Spec.assertEqWith s "nor is it left in the store forever" (length (GameState.delayedTriggers turn5)) 0
+
+-- alice at her declare attackers step on turn 1 with one Meandering Towershell;
+-- bob has four untapped Plains (exactly Stonehorn Dignitary's {3}{W}) and the
+-- Dignitary in hand, and nothing else. Both libraries hold Islands so the draw
+-- steps of the five turns these cases run through cannot empty one (CR 104.3c).
+towershellStonehornBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  GameState.GameState
+towershellStonehornBoard towershell island plains stonehorn =
+  let (base, _, _) = S.combatBoardOf [towershell] []
+      withLands = List.foldl' (\g _ -> snd (S.addCreature plains S.bob g)) base [1 :: Int .. 4]
+      stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 8]
+   in snd (S.addHandCard stonehorn S.bob (stock S.bob (stock S.alice withLands)))
 
 -- alice at her declare attackers step with one Meandering Towershell, four
 -- untapped Mountains (exactly Relentless Assault's {2}{R}{R}) and the Assault in
@@ -3315,6 +3397,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   historySpec s registry
   delayedSpec s registry
   towershellOnsetSpec s registry
+  towershellSkipSpec s registry
   orderingSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
