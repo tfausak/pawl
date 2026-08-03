@@ -382,15 +382,21 @@ affects source oid a partial gs = case a of
         -- calls THIS function for any Matching set. So this call is safe only
         -- because `perspective` is an unforced thunk until a filter conjunct
         -- actually needs it (ControlledBy is the only one that does), and no
-        -- SetLandSubtype -- static OR stored, setLandSubtypeEffects gathers
-        -- both -- in the pool pairs Matching with ControlledBy. A stored one
+        -- subtype-setting effect in the pool -- static OR stored,
+        -- setLandSubtypeEffects gathers both -- pairs Matching with
+        -- ControlledBy: of the two static examples, Blood Moon's Matching
+        -- filter has none, and Convincing Mirage's set is Affected.Attached,
+        -- not a Matching filter at all (its `affects` arm above reads the
+        -- source's attachment and never calls controllerOf). A stored one
         -- is additionally safe today because Pawl.Engine.Resolve constructs every
         -- stored ContinuousEffect with Affected.TheseObjects, never Matching;
         -- that is a fact about Resolve's current call sites, not something
         -- this fold enforces. That is a laziness accident, not a structural
         -- guarantee -- such a card would force `perspective`, which recurses
         -- back into controllerOf -> controlGrants -> this same liveness gate,
-        -- and hangs rather than answering wrong (#197).
+        -- and hangs rather than answering wrong (#197). This IS the call site
+        -- where that forcing would happen -- controlGrants' INVARIANT block and
+        -- the AttachedPlayerControls arm below only restate why it is safe.
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
@@ -879,9 +885,9 @@ definesColorless = Set.member Keyword.Devoid
 -- the seed and layer 5 ADDS a keyword. The only pre-layer-5 modifications that
 -- touch the map are the two that set a land subtype at Layer.Type, and both go
 -- through setLandSubtypeTo, which only ever EMPTIES it (CR 305.7); a removal
--- cannot introduce a non-characteristic-defining source. So the rule holds by construction rather than by a test, and a future
--- text-changing effect that granted a keyword would land inside CR 604.3a(2)
--- rather than outside it.
+-- cannot introduce a non-characteristic-defining source. So the rule holds by
+-- construction rather than by a test, and a future text-changing effect that
+-- granted a keyword would land inside CR 604.3a(2) rather than outside it.
 --
 -- Humility therefore cannot remove it: LoseAllAbilities is layer 6, after this.
 --
@@ -1057,9 +1063,10 @@ quantitiesOf m = case m of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
--- Every SetLandSubtype effect in the game, each with its source and affected set
--- (from stored effects and battlefield permanents' static abilities). This is a
--- legitimate case-on-Modification -- Projection is its sole home.
+-- Every SetLandSubtype and SetLandSubtypeToChosen effect in the game, each with
+-- its source and affected set (from stored effects and battlefield permanents'
+-- static abilities). This is a legitimate case-on-Modification -- Projection is
+-- its sole home.
 setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
   let isSet m = case m of
@@ -1118,11 +1125,10 @@ setLandSubtypeEffects gs =
 -- ability has to be kept out of its reader's candidate list rather than erased
 -- from the bearer's own projection afterwards. Every other kind of rules-text
 -- ability is stripped inside the fold instead, by setLandSubtypeTo. So an
--- object's static abilities are
--- live unless a live subtype-setting effect applies to it -- either kind, the
--- printed SetLandSubtype (Blood Moon) or the chosen SetLandSubtypeToChosen
--- (Convincing Mirage), since setLandSubtypeEffects gathers both and CR 305.7
--- does not distinguish them. "Live" recurses on the
+-- object's static abilities are live unless a live subtype-setting effect
+-- applies to it -- either kind, the printed SetLandSubtype (Blood Moon) or the
+-- chosen SetLandSubtypeToChosen (Convincing Mirage), since setLandSubtypeEffects
+-- gathers both and CR 305.7 does not distinguish them. "Live" recurses on the
 -- stripper's own source; "applies to" reads BASE characteristics (nonbasic is a
 -- printed supertype, and card-type Land is read off the printed type line here),
 -- so nothing recurses into the projection and the result is order-INDEPENDENT. A
@@ -1156,11 +1162,12 @@ setLandSubtypeEffects gs =
 staticAbilitiesLive :: ObjectId -> GameState -> Bool
 staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) Set.empty oid gs
 
--- The liveness fixpoint given the game's SetLandSubtype effects PRECOMPUTED. The
--- list is hoisted here (rather than recomputed inside) so gather can compute it
--- once per projection instead of once per permanent -- recomputing it per
--- permanent made project O(permanents^3) per state-based-action sweep. An empty
--- list means no stripper exists, so any strips [] is False and oid is live.
+-- The liveness fixpoint given the game's SetLandSubtype and
+-- SetLandSubtypeToChosen effects PRECOMPUTED. The list is hoisted here (rather
+-- than recomputed inside) so gather can compute it once per projection instead
+-- of once per permanent -- recomputing it per permanent made project
+-- O(permanents^3) per state-based-action sweep. An empty list means no
+-- stripper exists, so any strips [] is False and oid is live.
 liveGiven :: [(ObjectId, Affected.Affected)] -> Set ObjectId -> ObjectId -> GameState -> Bool
 liveGiven setEffs visited oid gs =
   Set.member oid visited
@@ -1712,14 +1719,17 @@ filterReads f = case f of
 -- Which aspects a Modification writes -- the other half of the pair above, and
 -- another legitimate case-on-Modification that Projection is the sole home of.
 --
--- THREE arms write Keywords, and each of them writes PC.keywords in
+-- FOUR arms write Keywords, and each of them writes PC.keywords in
 -- applyModification above: GainKeyword adds one (CR 613.1f), LoseAllAbilities
--- empties the map (CR 613.1f again -- Humility), and SetLandSubtype empties it
--- too, because CR 305.7's second sentence says a land whose subtype is set "loses
--- all abilities generated from its rules text". Filter.HasKeyword reads that map,
--- so all three can move an affected set and CR 613.8a has to see them. Keyword
--- COUNTERS need no arm of their own: counterGathered mints CounterKind.Keyword as
--- a synthetic GainKeyword candidate, so it arrives here as one.
+-- empties the map (CR 613.1f again -- Humility), and SetLandSubtype and
+-- SetLandSubtypeToChosen both empty it, because CR 305.7's second sentence says
+-- a land whose subtype is set "loses all abilities generated from its rules
+-- text" -- true whether the new subtype is printed on the source (SetLandSubtype)
+-- or chosen as the source entered (SetLandSubtypeToChosen, CR 614.1c).
+-- Filter.HasKeyword reads that map, so all four can move an affected set and
+-- CR 613.8a has to see them. Keyword COUNTERS need no arm of their own:
+-- counterGathered mints CounterKind.Keyword as a synthetic GainKeyword
+-- candidate, so it arrives here as one.
 --
 -- An ability change can also matter to CR 613.8 by changing an effect's
 -- EXISTENCE, which is a different clause of CR 613.8a and still lives in
@@ -2441,8 +2451,8 @@ data ControlGrant = MkControlGrant
 -- has none and Convincing Mirage's Affected.Attached is not a Matching filter at
 -- all (its `affects` arm reads the source's attachment and never calls
 -- controllerOf), and every stored ContinuousEffect Pawl.Engine.Resolve
--- constructs carries Affected.TheseObjects rather than Matching at all. See #197 for the card
--- shape that would break this and the deferred structural fix.
+-- constructs carries Affected.TheseObjects rather than Matching at all. See
+-- #197 for the card shape that would break this and the deferred structural fix.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let setEffs = setLandSubtypeEffects gs

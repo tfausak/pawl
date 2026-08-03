@@ -108,10 +108,15 @@ data Object = MkObject
     -- object.
     --
     -- NOT a copiable value, unlike the P/T an EntryOption writes into the
-    -- copiable snapshot. CR 707.5: "If the text that's being copied includes any
-    -- abilities that replace the enters-the-battlefield event (such as ... 'as
-    -- [this] enters' abilities), those abilities will take effect" -- so a copy
-    -- of Painter's Servant runs the copied ability and makes its OWN choice.
+    -- copiable snapshot. CR 707.5 is why the ability runs again at all: "If the
+    -- text that's being copied includes any abilities that replace the
+    -- enters-the-battlefield event (such as ... 'as [this] enters' abilities),
+    -- those abilities will take effect." CR 707.6 is the direct authority for
+    -- why the OLD choice doesn't carry over: "When copying a permanent, any
+    -- choices that have been made for that permanent aren't copied. Instead,
+    -- ... the object's controller will get to make any 'as [this] enters the
+    -- battlefield' choices for it" -- so a copy of Painter's Servant runs the
+    -- copied ability and makes its own NEW choice.
     --
     -- Per-incarnation state, like damage and counters: reset by changeZone,
     -- because CR 400.7 makes the moved object a new one.
