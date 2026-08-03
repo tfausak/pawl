@@ -99,11 +99,16 @@ layer m = case m of
 -- applied by applyCharacteristicPT, which builds its context from the
 -- object's OWN controller instead.
 --
--- Falsified by Omnath, Locus of Mana, the first static ability in the pool whose
--- modification carries a player-scoped quantity: its layer-7c pump counts the
--- unspent green mana its OWN controller has, so an opponent floating green must
--- not move it. Pinned by PowerToughnessSpec's "CR 109.5 the count reads Omnath's
--- controller".
+-- Omnath, Locus of Mana is the first static ability in the pool whose
+-- modification carries a player-scoped quantity, and PowerToughnessSpec's "CR
+-- 109.5 the count reads Omnath's controller" pins that the count reads the right
+-- PLAYER -- an opponent floating green does not move it.
+--
+-- Not implemented: that is not a falsifier for THIS line. Omnath's static ability
+-- is on Omnath and modifies Omnath, so `src` and `oid` are one object and both
+-- perspectives resolve to the same controller; swapping the two would not change
+-- its power. Discriminating them needs a source whose controller can differ from
+-- the affected object's -- an Aura on an opponent's creature (#155).
 applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification lyr src cands gs oid m pc =
   let context = Filter.MkContext (controllerOf src gs) (Just src)
