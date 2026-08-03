@@ -200,8 +200,10 @@ durationSlots duration = case duration of
 
 -- Both sides of a Condition are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Set SlotName
-conditionSlots (Condition.Type.MkCondition measured _ threshold) =
-  Set.union (Quantity.slots measured) (Quantity.slots threshold)
+conditionSlots condition =
+  Set.union
+    (Quantity.slots $ Condition.Type.measured condition)
+    (Quantity.slots $ Condition.Type.threshold condition)
 
 -- The comparison is by == and so is shallow: an X nested inside a Plus or a
 -- Count is not detected, unlike slotsOf, which recurses through Quantity.slots

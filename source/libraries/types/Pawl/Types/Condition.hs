@@ -13,12 +13,22 @@ import qualified Pawl.Types.Quantity as Quantity
 -- you control this creature" is a source-restricted count of one
 -- (Filter.IsSource), not a special arm.
 --
--- BOTH SIDES are a Quantity, and symmetrically so -- neither side is "the
--- measured thing" and the other "the threshold". Quantity already embeds
--- `Count` (its Count arm), so this is strictly wider than the Count-on-the-left
--- shape it replaces and no card file changed: Pawl.Codec.Quantity's toJson emits
--- a Count arm as the count's own tag, so the existing `{"type": "Count", ...}`
--- payloads decode unchanged.
+-- BOTH SIDES are a full Quantity. The field names record where the pool happens
+-- to put the constant, not a restriction on either side: every card in
+-- data/cards so far has a Literal `threshold`, but nothing stops it being a
+-- Count, and Pawl.Codec.ConditionSpec round-trips a Literal `measured`.
+-- Quantity already embeds `Count` (its Count arm), so this is strictly wider
+-- than the Count-on-the-left shape it replaces: Pawl.Codec.Quantity's toJson
+-- emits a Count arm as the count's own tag, so a side that is a Count is still
+-- the `{"type": "Count", ...}` payload it always was. Naming the fields changed
+-- only the shape ENCLOSING the three sides, never a side's own payload
+-- (Pawl.Codec.Condition).
+--
+-- The two sides are EVALUATED symmetrically even though they are named
+-- asymmetrically: Pawl.Engine.Condition.holds passes both through
+-- Pawl.Engine.Quantity.evaluate against the same object and the same view, so a
+-- Quantity.Power on either side reads the same object. Only the Comparison is
+-- oriented -- AtLeast means `measured` is at least `threshold`.
 --
 -- The widening is what lets a condition read the OBJECT IT IS EVALUATED AGAINST
 -- rather than a set swept out of a zone. A Count's Scope can only enumerate a
@@ -33,5 +43,9 @@ import qualified Pawl.Types.Quantity as Quantity
 -- InSlot count stored that way outlives its slot binding: Pawl.Engine.Count.playersFor
 -- then yields Nothing, and Pawl.Engine.Condition.holds collapses that to False
 -- silently (#159).
-data Condition = MkCondition Quantity.Quantity Comparison.Comparison Quantity.Quantity
+data Condition = MkCondition
+  { measured :: Quantity.Quantity,
+    comparison :: Comparison.Comparison,
+    threshold :: Quantity.Quantity
+  }
   deriving (Eq, Ord, Show)

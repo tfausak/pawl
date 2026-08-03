@@ -46,19 +46,16 @@
         "type": "SelfDies"
       },
       "intervening": {
-        "type": "Condition",
-        "value": [
-          {
-            "type": "Power"
-          },
-          {
-            "type": "AtLeast"
-          },
-          {
-            "type": "Literal",
-            "value": 3
-          }
-        ]
+        "comparison": {
+          "type": "AtLeast"
+        },
+        "measured": {
+          "type": "Power"
+        },
+        "threshold": {
+          "type": "Literal",
+          "value": 3
+        }
       },
       "modal": {
         "modes": [

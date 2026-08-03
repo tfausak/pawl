@@ -26,15 +26,18 @@ import Pawl.Types.GameState (GameState)
 import Pawl.Types.ObjectId (ObjectId)
 
 holds :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Condition.Type.Condition -> Bool
-holds viewOf context gs oid (Condition.Type.MkCondition measured comparison threshold) =
+holds viewOf context gs oid condition =
   -- Both sides are evaluated against `oid` and with the same view, so a
   -- Quantity.Power on either side reads the same object and a Quantity.Count on
-  -- either side sweeps the same board. That symmetry is the point of the type:
-  -- "its power was 3 or greater" and "the number of Zombies is 0" are the same
-  -- kind of sentence, differing only in which side carries the constant.
-  case (Quantity.evaluate viewOf context gs oid measured, Quantity.evaluate viewOf context gs oid threshold) of
-    (Just n, Just t) -> case comparison of
+  -- either side sweeps the same board. Only the Comparison is oriented -- the
+  -- field names say where the constant usually sits, not what either side may
+  -- be. "its power was 3 or greater" and "the number of Zombies is 0" are the
+  -- same kind of sentence, differing only in which side carries the constant.
+  case (evaluate $ Condition.Type.measured condition, evaluate $ Condition.Type.threshold condition) of
+    (Just n, Just t) -> case Condition.Type.comparison condition of
       Comparison.Exactly -> n == t
       Comparison.AtLeast -> n >= t
       Comparison.AtMost -> n <= t
     _ -> False
+  where
+    evaluate = Quantity.evaluate viewOf context gs oid

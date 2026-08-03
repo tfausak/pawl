@@ -44,7 +44,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.toJson
       TriggerCondition.fromJson
       (TriggerCondition.StateIs (Condition.MkCondition (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
-      "{\"type\":\"StateIs\",\"value\":{\"type\":\"Condition\",\"value\":[{\"type\":\"Literal\",\"value\":0},{\"type\":\"Exactly\"},{\"type\":\"Literal\",\"value\":0}]}}"
+      "{\"type\":\"StateIs\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}"
   -- CR 603.2 / 509-510: the bearer dealt combat damage to a player.
   Spec.it s "SelfDealsCombatDamageToPlayer" $
     Common.assertJsonCodec

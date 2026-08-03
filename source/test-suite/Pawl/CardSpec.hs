@@ -186,8 +186,9 @@ countCounts (Count.Type.MkCount _ _ aggregation) = case aggregation of
 -- Every Count reachable from a Condition: both sides are Quantities, and either
 -- may embed one (Pawl.Types.Condition).
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
-conditionCounts (Condition.Type.MkCondition measured _ threshold) =
-  quantityCounts measured <> quantityCounts threshold
+conditionCounts condition =
+  quantityCounts (Condition.Type.measured condition)
+    <> quantityCounts (Condition.Type.threshold condition)
 
 -- Every Count reachable from a Duration: only ForAsLongAs (CR 611.2b) carries
 -- a Condition.

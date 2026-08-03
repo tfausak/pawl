@@ -33,52 +33,49 @@
                 "type": "SelfReplacement"
               },
               {
-                "type": "Condition",
-                "value": [
-                  {
-                    "type": "Count",
-                    "value": [
-                      {
-                        "type": "InZone",
-                        "value": [
-                          {
-                            "type": "Battlefield"
-                          },
-                          {
-                            "type": "EachPlayer"
+                "comparison": {
+                  "type": "AtLeast"
+                },
+                "measured": {
+                  "type": "Count",
+                  "value": [
+                    {
+                      "type": "InZone",
+                      "value": [
+                        {
+                          "type": "Battlefield"
+                        },
+                        {
+                          "type": "EachPlayer"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Artifact"
                           }
-                        ]
-                      },
-                      {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
-                            }
-                          },
-                          {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "You"
-                            }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
                           }
-                        ]
-                      },
-                      {
-                        "type": "Objects"
-                      }
-                    ]
-                  },
-                  {
-                    "type": "AtLeast"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 3
-                  }
-                ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "Objects"
+                    }
+                  ]
+                },
+                "threshold": {
+                  "type": "Literal",
+                  "value": 3
+                }
               },
               {
                 "type": "DamageR",
