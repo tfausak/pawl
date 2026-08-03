@@ -38,7 +38,6 @@
   "toughness": null,
   "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
     "supertypes": [
       {
         "type": "Legendary"

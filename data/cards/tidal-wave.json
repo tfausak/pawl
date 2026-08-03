@@ -113,7 +113,6 @@
                       "type": "Wall"
                     }
                   ],
-                  "supertypes": [],
                   "types": [
                     {
                       "type": "Creature"
@@ -141,8 +140,6 @@
   "toughness": null,
   "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

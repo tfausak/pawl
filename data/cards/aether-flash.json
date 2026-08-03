@@ -80,8 +80,6 @@
     }
   ],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Enchantment"

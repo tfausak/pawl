@@ -89,8 +89,6 @@
     }
   ],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Land"

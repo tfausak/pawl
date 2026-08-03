@@ -111,7 +111,6 @@
                           "type": "Zombie"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -141,7 +140,6 @@
         "type": "Elf"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

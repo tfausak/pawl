@@ -112,7 +112,6 @@
                           "type": "Soldier"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -148,7 +147,6 @@
         "type": "Knight"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

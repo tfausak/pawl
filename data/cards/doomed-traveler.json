@@ -96,7 +96,6 @@
                           "type": "Spirit"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -126,7 +125,6 @@
         "type": "Soldier"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

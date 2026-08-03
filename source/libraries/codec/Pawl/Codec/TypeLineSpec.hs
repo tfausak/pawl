@@ -2,7 +2,9 @@
 
 module Pawl.Codec.TypeLineSpec where
 
+import qualified Data.Either as Either
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.TypeLine as TypeLine
 import qualified Pawl.Spec as Spec
@@ -30,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.TypeLine" $ do
       TypeLine.toJson
       TypeLine.fromJson
       (TypeLine.MkTypeLine Set.empty (Set.fromList [CardType.Kindred, CardType.Enchantment]) (Set.singleton Subtype.Faerie))
-      """ {"supertypes":[],"types":[{"type":"Enchantment"},{"type":"Kindred"}],"subtypes":[{"type":"Faerie"}]} """
+      """ {"types":[{"type":"Enchantment"},{"type":"Kindred"}],"subtypes":[{"type":"Faerie"}]} """
   -- CR 306.3 / 205.3j: Jace Beleren's, and the first type line whose
   -- subtype is a planeswalker type.
   Spec.it s "MkTypeLine (planeswalker)" $
@@ -40,3 +42,22 @@ spec s = Spec.describe s "Pawl.Codec.TypeLine" $ do
       TypeLine.fromJson
       (TypeLine.MkTypeLine (Set.singleton Supertype.Legendary) (Set.singleton CardType.Planeswalker) (Set.singleton Subtype.Jace))
       """ {"supertypes":[{"type":"Legendary"}],"types":[{"type":"Planeswalker"}],"subtypes":[{"type":"Jace"}]} """
+  -- R6: the typeLine requirement only guards a truncated file if it reaches the
+  -- content. An empty types set is the shape a half-written card file takes.
+  Spec.it s "rejects an empty types set" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"types":[]} """) >>= TypeLine.fromJson))
+      "expected a decode failure"
+  Spec.it s "rejects an absent types key" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {} """) >>= TypeLine.fromJson))
+      "expected a decode failure"
+  Spec.it s "omits empty supertypes and subtypes" $
+    Common.assertJsonCodec
+      s
+      TypeLine.toJson
+      TypeLine.fromJson
+      (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Sorcery) Set.empty)
+      """ {"types":[{"type":"Sorcery"}]} """

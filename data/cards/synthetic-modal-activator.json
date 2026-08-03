@@ -104,8 +104,6 @@
   },
   "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

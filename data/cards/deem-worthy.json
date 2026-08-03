@@ -122,8 +122,6 @@
     }
   ],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

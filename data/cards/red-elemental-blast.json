@@ -81,8 +81,6 @@
   "toughness": null,
   "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

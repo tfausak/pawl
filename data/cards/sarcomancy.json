@@ -86,7 +86,6 @@
                           "type": "Zombie"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -181,8 +180,6 @@
     }
   ],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Enchantment"

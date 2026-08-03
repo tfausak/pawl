@@ -129,7 +129,6 @@
                           "type": "Beast"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -156,7 +155,6 @@
         "type": "Beast"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

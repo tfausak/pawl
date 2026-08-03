@@ -54,7 +54,6 @@
         "type": "Dinosaur"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

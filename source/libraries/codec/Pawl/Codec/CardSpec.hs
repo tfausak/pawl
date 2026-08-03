@@ -118,7 +118,7 @@ baseCard =
 baseCardJson :: String
 baseCardJson =
   "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
-    <> "\"typeLine\":{\"supertypes\":[],\"types\":[{\"type\":\"Creature\"}],\"subtypes\":[]},"
+    <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
     <> "\"keywords\":[],\"staticAbilities\":[],"
     <> "\"spell\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}},"
@@ -161,7 +161,7 @@ populatedCard =
 populatedCardJson :: String
 populatedCardJson =
   "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
-    <> "\"typeLine\":{\"supertypes\":[],\"types\":[{\"type\":\"Creature\"}],\"subtypes\":[]},"
+    <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
     <> "\"keywords\":[{\"type\":\"Deathtouch\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"

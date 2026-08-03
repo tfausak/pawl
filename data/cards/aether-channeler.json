@@ -95,7 +95,6 @@
                           "type": "Bird"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -188,7 +187,6 @@
         "type": "Wizard"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

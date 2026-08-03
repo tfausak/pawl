@@ -114,7 +114,6 @@
         "type": "Zombie"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"
