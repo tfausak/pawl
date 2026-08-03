@@ -1640,16 +1640,14 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   DelayedTrigger.source = source,
                   DelayedTrigger.controller = controller,
                   DelayedTrigger.bindings = captured,
-                  -- CR 603.7a's other end, from Pawl.Types.Onset: Nothing for an
-                  -- ability armed the moment it is created (every card but one),
-                  -- and the NEXT turn number for one printed "on your next turn"
-                  -- -- read off the live board here, because a card cannot know
-                  -- which turn that is. Every turn that begins bumps the counter
-                  -- (Engine.beginTurnOf), extra turns included, so "a later turn
-                  -- than this one" is exactly what the successor names.
-                  DelayedTrigger.notBefore = case onset of
-                    Onset.Immediately -> Nothing
-                    Onset.FromYourNextTurn -> Just (GameState.turnNumber gs + 1),
+                  -- CR 603.7a's other end, from Pawl.Types.Onset: no turn
+                  -- restriction for an ability armed the moment it is created
+                  -- (every card but one), and the BOUNDARY -- not a turn number
+                  -- -- for one printed "on your next turn". Nothing about the
+                  -- live board is read: which turn that phrase names is settled
+                  -- as that turn begins (Event.settleOnsets), because an
+                  -- intervening extra or skipped turn can still move it.
+                  DelayedTrigger.window = Event.armOnset onset,
                   -- CR 603.7b's stated duration, armed the way a continuous
                   -- effect's is. The two Maybes meet here and mean different
                   -- things: the OUTER one is the card printing no duration at
