@@ -380,9 +380,13 @@ data Prompt r where
   -- wants -- an entry carrying the applicable EFFECT alongside its source, so
   -- that two entries are equal exactly when they are interchangeable (#74).
   --
-  -- Asked ONLY when the bucket holds two or more candidates that are not all equal
-  -- as values: with one there is nothing to choose, and among equal values every
-  -- order yields the same board (each still gets its own CR 614.5 opportunity).
+  -- Asked ONLY when the bucket holds two or more candidates that are not all
+  -- indistinguishable: with one there is nothing to choose, and among
+  -- indistinguishable ones every order yields the same board (each still gets its
+  -- own CR 614.5 opportunity). Indistinguishable is equal in the EFFECT, plus --
+  -- for the effects whose application reads the applying candidate, which is
+  -- Pawl.Engine.Replacement.readsApplier's question -- equal in CR 109.5's "you"
+  -- as well.
   ChooseReplacement :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt Natural.Natural
   -- | CR 603.7c: which of several minted tokens a Create's slot binds -- the "it"
   -- that a delayed triggered ability armed in the same resolution will name

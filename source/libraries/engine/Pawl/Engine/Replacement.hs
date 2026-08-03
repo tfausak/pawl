@@ -595,6 +595,71 @@ bucketOfEffect re = case re of
   -- those, so it falls to CR 616.1e's "any of the applicable ... may be chosen".
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
 
+-- Does applying this effect read the CANDIDATE that is applying it -- something
+-- riding the ReplacementCandidate rather than the ReplacementEffect?
+--
+-- A CLASSIFICATION of effects, the same genre of question as bucketOf above and
+-- as layer assignment: it asks what SHAPE an effect has, never which effect it
+-- is. Its sole consumer is `choose` below, which folds CR 109.5's "you" into its
+-- indistinguishability test exactly for the arms that answer True.
+--
+-- Consumption is deliberately NOT what this asks about. Every `apply` arm spends
+-- its own candidate (CR 614.5), so every arm reads the candidate that far; but
+-- the loop gives each candidate its own opportunity in any order, so which one
+-- was spent first is not a difference in the board.
+--
+-- One arm per constructor, no wildcard, and the EntryR arms split per
+-- EntryRewrite -- so a new constructor breaks the build HERE as well as in
+-- bucketOfEffect and `apply`. A wildcard defaulting to False is exactly the
+-- silent second-invariant violation this function exists to retire: an author who
+-- teaches `apply` a new controller-reading rewrite and forgets this function gets
+-- an unasked choice, not a build failure.
+readsApplier :: ReplacementEffect -> Bool
+readsApplier re = case re of
+  -- The destination zone is the effect's own second field, and the pattern is
+  -- matched before `apply` runs. Rest in Peace and Leyline of the Void rewrite
+  -- the same move to the same zone whoever controls the row.
+  ReplacementEffect.ZoneChangeR _ _ -> False
+  -- CR 707.5 / 109.5: Clone's "you" is the ENTERING object's controller, read
+  -- live off the board (Projection.controllerOf) at CR 614.12a's moment, not the
+  -- candidate's -- so two such rows offer the same player the same legal set.
+  ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> False
+  -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
+  -- (Primal Plasma).
+  ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> False
+  -- CR 614.1c's "enters with": the counter kind and count are the effect's own
+  -- fields, and they land on the entering object (CR 306.5b's intrinsic loyalty
+  -- included).
+  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> False
+  -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2: the whole rewrite is "it
+  -- enters under YOUR control instead", and that "you" is CR 109.5's -- the
+  -- candidate's own `controller`, baked when the row was installed. Two Gather
+  -- Specimens are one card, so their `effect` values are identical while their
+  -- controllers are not, and applying one puts the permanent somewhere applying
+  -- the other does not.
+  ReplacementEffect.EntryR _ EntryRewrite.UnderSourceControl -> True
+  -- The rewritten amount is the effect's (Galvanic Blast's 4, Furnace of Rath's
+  -- doubling), and a prevention prevents the same event whoever's row it is
+  -- (Fog). The event keeps its own source and recipient either way.
+  ReplacementEffect.DamageR _ _ -> False
+  -- CR 701.19a acts on the creature being destroyed -- heal, tap, remove from
+  -- combat -- and names no player.
+  ReplacementEffect.DestructionR _ -> False
+  -- The scaling is the effect's, and it rewrites the count on the object the
+  -- event already named (Hardened Scales, Doubling Season).
+  ReplacementEffect.CounterR _ _ -> False
+  -- CR 614.16, the same shape one event class over: the scaling is the
+  -- effect's, and the player the tokens are created FOR rides the EVENT
+  -- (WouldCreateTokens' own PlayerId), not the candidate, so Doubling Season
+  -- doubles the same player's tokens whoever's row applies.
+  ReplacementEffect.TokenR _ _ -> False
+  -- CR 614.10: a skip replaces the step or phase with nothing, so there is
+  -- nothing for a controller to colour. The player it is ABOUT is not the
+  -- candidate's controller either: Fatigue's named player is baked into
+  -- PhasePattern.whosePhase, on the EFFECT, where this comparison already sees
+  -- it.
+  ReplacementEffect.PhaseR _ -> False
+
 -- CR 616.1: "the affected object's controller (or its owner if it has no
 -- controller) or the affected player chooses one to apply."
 --
@@ -602,31 +667,38 @@ bucketOfEffect re = case re of
 --
 --   * ONE candidate -- there is nothing to choose, and where the rules leave
 --     nothing to ask, don't prompt.
---   * several candidates EQUAL AS VALUES -- each still gets its own CR 614.5
+--   * several candidates INDISTINGUISHABLE -- each still gets its own CR 614.5
 --     opportunity, so every order produces the same board. Only the PROMPT is
 --     elided, never an application.
 --
--- The second elision's soundness rests on a premise `apply` must keep true:
--- applying a candidate is independent of its `source` field. Candidates equal
--- in `effect` can still differ in `source` (matchesController and the
--- ChooseReplacement payload both read it), so "equal as values" only implies
--- "every order yields the same board" as long as no `apply` arm branches on, or
--- mutates state keyed by, which source is applying.
+-- Indistinguishable is `distinguishing` below: equal in `effect`, plus -- for the
+-- effects whose application READS the applying candidate -- equal in CR 109.5's
+-- "you". Candidates equal in `effect` can still differ in `source` and in
+-- `controller` (matchesController, matchesEntering and the ChooseReplacement
+-- payload each read one or the other), so "equal in `effect`" implies "every
+-- order yields the same board" only for effects that apply the same way whoever
+-- is applying them. readsApplier is the classification that separates those two,
+-- and EntryRewrite.UnderSourceControl is the one arm it answers True for. The
+-- three-seat leg of ReplacementSpec's Gather Specimens group is the board that
+-- proves it: two rows equal in `effect` hand the entering creature to different
+-- players, so carol is asked and her answer decides who keeps it.
 --
--- Not implemented: that premise is BROKEN, by the EntryRewrite.UnderSourceControl
--- arm -- its whole effect is the candidate's own `controller`, so two Gather
--- Specimens are value-equal here and apply to different boards. Unreachable at
--- two seats (a permanent has one controller, so at most one such row can see it
--- as an opponent's) and unfixed above two (#593).
+-- Folding `controller` in UNCONDITIONALLY would be sound as well, and wrong the
+-- other way: two Rest in Peace under different controllers exile the same card to
+-- the same zone whichever applies, so asking about them would raise a question
+-- the rules leave nothing to decide. `source` is folded in nowhere for the same
+-- reason -- every use of it above is a test run BEFORE `apply`, not a branch
+-- inside it.
 --
--- Not implemented: the comparison reads `effect` alone, so two floating rows
--- alike in it but differing in `expiry` or `uses` are treated as
--- indistinguishable even though `consume` spends only the one that applied (#490).
+-- Not implemented: the comparison reads `effect` and, where it matters,
+-- `controller`, so two floating rows alike in both but differing in `expiry` or
+-- `uses` are treated as indistinguishable even though `consume` spends only the
+-- one that applied (#490).
 --
 -- `origin` is NOT such a hole. highestBucket has already partitioned by bucket
 -- before this runs, and CR 616.1a's bucket is exactly "origin is
 -- SelfReplacement", so every candidate reaching this comparison shares one
--- origin and comparing `effect` alone can never conflate two that differ in it.
+-- origin and leaving it out can never conflate two that differ in it.
 --
 -- Anything else prompts. The pure fold has silently picked list order since M3f;
 -- that is the second-invariant violation this phase exists to retire, and unlike
@@ -635,7 +707,7 @@ choose :: GameState -> ProposedEvent -> [ReplacementCandidate] -> Game (Maybe Re
 choose gs event candidates = case candidates of
   [] -> pure Nothing
   first : rest ->
-    if all (\c -> ReplacementCandidate.effect c == ReplacementCandidate.effect first) rest
+    if all (\c -> distinguishing c == distinguishing first) rest
       then pure (Just first)
       else case chooserOf gs event of
         -- No chooser: the affected object is gone. Apply the canonical first
@@ -649,6 +721,14 @@ choose gs event candidates = case candidates of
           -- out-of-range index leaves the canonical first standing rather than
           -- dropping the event or crashing.
           pure (Just (at candidates answer first))
+  where
+    -- What two candidates must agree on to be interchangeable here.
+    distinguishing c =
+      ( ReplacementCandidate.effect c,
+        if readsApplier (ReplacementCandidate.effect c)
+          then ReplacementCandidate.controller c
+          else Nothing
+      )
 
 -- Total index into a list, with a fallback.
 at :: [a] -> Natural -> a -> a
