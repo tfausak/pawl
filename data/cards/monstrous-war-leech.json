@@ -1,0 +1,87 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "characteristicPT": {
+    "type": "Count",
+    "value": {
+      "aggregation": {
+        "type": "Greatest",
+        "value": {
+          "type": "ManaValue"
+        }
+      },
+      "filter": {
+        "type": "And",
+        "value": []
+      },
+      "scope": {
+        "type": "InZone",
+        "value": [
+          {
+            "type": "Graveyard"
+          },
+          {
+            "type": "Relative",
+            "value": {
+              "type": "You"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Monstrous War-Leech",
+  "power": {
+    "type": "Star"
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Star"
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Horror"
+      },
+      {
+        "type": "Leech"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

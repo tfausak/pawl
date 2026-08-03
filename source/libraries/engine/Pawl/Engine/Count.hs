@@ -51,8 +51,10 @@ type QuantityOf quantity = ObjectId -> quantity -> Maybe Integer
 
 -- Nothing when the count cannot be determined -- an unresolvable PlayerRef, or
 -- (Aggregation.Greatest only) a maximum over a set that is empty or holds a
--- member with no value. It propagates; CR 208.2a's "use 0 instead of that
--- number" is a different rule and is not implemented here (#65).
+-- member with no value. It propagates, which is what every caller but one wants;
+-- CR 208.2a's "use 0 instead of that number" is a different rule, scoped to a
+-- characteristic-defining ability, and applied by the one caller it is about
+-- (Pawl.Engine.Quantity.determine, for Pawl.Engine.Projection.applyCharacteristicPT).
 evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
 evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   Scope.InZone zone ref -> do
@@ -102,10 +104,13 @@ aggregate quantityOf aggregation members = case aggregation of
   -- the whole maximum undeterminable rather than being dropped, which would
   -- report the maximum of a set the card never named; and an EMPTY matched set
   -- has no maximum at all. Nothing, NOT 0: no rule gives a maximum over nothing
-  -- a value, CR 208.2a's "use 0 instead of that number" is scoped to a
-  -- characteristic-defining ability and unimplemented here anyway (#65), and
-  -- where the CR wants an empty maximum to be 0 it legislates it case by case
-  -- (CR 714.2d, a Saga with no chapter abilities).
+  -- a value, and where the CR wants an empty maximum to be 0 it legislates it
+  -- case by case (CR 714.2d, a Saga with no chapter abilities). CR 208.2a's "use
+  -- 0 instead of that number" is one such case, and it is applied where it is
+  -- scoped -- at the characteristic-defining ability that consumes this count,
+  -- never here: Monstrous War-Leech with an empty graveyard is a 0/0 because
+  -- Pawl.Engine.Quantity.determine substituted the 0, not because this fold
+  -- invented one for One with the Machine's draw as well.
   Aggregation.Greatest quantity -> do
     values <- traverse (\(identity, _) -> identity >>= \oid -> quantityOf oid quantity) members
     case values of

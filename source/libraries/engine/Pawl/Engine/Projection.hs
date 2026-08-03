@@ -1707,13 +1707,26 @@ project oid gs = projectFrom (gather gs) oid gs
 --   * a CDA has no source object and no timestamp, so it has nothing to sort on
 --     under CR 613.7 and does not belong in the candidate list at all.
 --
--- setPT (not a bare assignment) so an unevaluable quantity leaves the value
--- alone, the powerOf posture used throughout this module.
+-- Quantity.determine rather than Quantity.evaluate, and a BARE ASSIGNMENT rather
+-- than setPT, because of CR 208.2a's last sentence: "If the ability needs to use
+-- a number that can't be determined, including inside a calculation, use 0
+-- instead of that number." A CDA therefore always produces a number, and setPT's
+-- keep-the-base arm is left with no case to handle. The difference is a board
+-- difference: Monstrous War-Leech cast with an empty graveyard has no greatest
+-- mana value to take, so it is a 0/0 that CR 704.5f buries rather than a creature
+-- with no P/T at all that survives. Pawl.PowerToughnessSpec casts it and proves
+-- that.
 --
--- NOTE: CR 208.2a has a stricter rule for that case -- "If the ability needs to
--- use a number that can't be determined, including inside a calculation, use 0
--- instead of that number" -- which neither setPT nor a bare assignment
--- implements, and neither does its CR 208.5 sibling at the read points (#65).
+-- setPT stays where the other caller is, layer 7b
+-- (Modification.SetBasePowerToughness, CR 613.4b), because that is a different
+-- rule: a stored effect that sets base P/T is not a characteristic-defining
+-- ability, so CR 208.2a does not reach it and a quantity it cannot evaluate
+-- determines nothing rather than 0.
+--
+-- NOTE: CR 208.5, CR 208.2a's sibling -- "If a creature somehow has no value for
+-- its power, its power is 0. The same is true for toughness" -- is a rule about
+-- the READ POINTS and is still not implemented: powerOf and toughnessOf return
+-- Nothing for a creature with no value rather than 0 (#65).
 --
 -- CR 604.3a(3): a characteristic-defining ability does not directly affect the
 -- characteristics of any OTHER object, so the built Filter.Context is the
@@ -1730,8 +1743,8 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
     let context = Filter.MkContext (controllerOf oid gs) (Just oid)
         viewOf = viewUpTo lyr cands gs
      in pc
-          { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
-            PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
+          { PC.power = Just (Quantity.determine viewOf context gs oid p),
+            PC.toughness = Just (Quantity.determine viewOf context gs oid t)
           }
 
 -- Project one object against a PRECOMBINED candidate list, applying only the
