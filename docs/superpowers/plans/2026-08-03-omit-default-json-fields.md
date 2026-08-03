@@ -34,8 +34,8 @@ The corpus's canonical form stops being "what `jq --sort-keys` prints" and becom
 - Modify: `source/executable/Main.hs` (currently `main = pure ()`)
 
 **Interfaces:**
-- Consumes: `Registry.defaultRoot :: IO FilePath`, `Registry.cardPath :: FilePath -> Slug.Slug -> FilePath`, `Registry.fileRegistry :: FilePath -> IO (Registry IO)`, `Common.render :: Value.Value -> Text.Text`, `Printing.toJson :: Printing.Printing -> Value.Value`
-- Produces: a `pawl` executable that rewrites every file in `data/cards/` through the codec. Tasks 3–6 each re-run it.
+- Consumes: `Registry.defaultRoot :: IO FilePath`, `Common.parse :: Text.Text -> Either Text.Text Value.Value`, `Common.render :: Value.Value -> Text.Text`, `Printing.toJson :: Printing.Printing -> Value.Value`, `Printing.fromJson :: Value.Value -> Either Text.Text Printing.Printing` (the last two from `Pawl.Codec.Printing`)
+- Produces: a `pawl` executable that rewrites every file in `data/cards/` through the codec. Tasks 3, 4, 5, 7, 8 and 9 each re-run it.
 
 - [ ] **Step 1: Write the formatter**
 
