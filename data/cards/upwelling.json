@@ -21,7 +21,10 @@
   "playerAbilities": [
     {
       "effect": {
-        "type": "DontLoseUnspentMana"
+        "type": "DontLoseUnspentMana",
+        "value": {
+          "type": "Any"
+        }
       },
       "scope": {
         "type": "EachPlayer"

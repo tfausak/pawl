@@ -4,6 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.PlayerScope as PlayerScope
 
 -- | CR 611.1's third clause: a continuous effect that "affects players or the
@@ -47,8 +48,9 @@ data PlayerEffect
     ReduceSpellCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost
   | -- | CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
-  | -- | CR 500.5 / 703.4q / Upwelling: this player does not lose the unspent mana
-    -- in their mana pool as a step or phase ends.
+  | -- | CR 500.5 / 703.4q / Upwelling, Omnath Locus of Mana: this player does not
+    -- lose the mana the filter names, out of the unspent mana in their mana pool,
+    -- as a step or phase ends.
     --
     -- CR 106.4 supplies the verb: "Each player's mana pool empties at the end of
     -- each step and phase, and the player is said to LOSE this mana." That is the
@@ -56,12 +58,16 @@ data PlayerEffect
     -- and phases end"), and it is why this is stated as a player-axis effect at
     -- all rather than as a property of the pool.
     --
-    -- Carries NOTHING, deliberately. Upwelling keeps every type of mana for
-    -- everyone, so there is nothing to parameterize; Omnath, Locus of Mana keeps
-    -- only green, which is a mana-type argument this constructor does not have
-    -- (#351). Shizuko and Karn, Legacy Reforged keep only the mana they just
-    -- added, which is not a player-axis property at all (#352).
-    DontLoseUnspentMana
+    -- The filter is what separates the two producers, on the axis this
+    -- constructor owns: Upwelling keeps every type of mana (ManaFilter.Any) and
+    -- Omnath keeps only green (ManaFilter.OfType). WHOSE mana is the other axis
+    -- and is the carrier's, not this constructor's -- Upwelling is
+    -- PlayerScope.EachPlayer and Omnath is PlayerScope.You.
+    --
+    -- Shizuko and Karn, Legacy Reforged keep only the mana they just added, which
+    -- is not a player-axis property at all and so is not reachable by widening
+    -- this filter (#352).
+    DontLoseUnspentMana ManaFilter.ManaFilter
   | -- | CR 702.18a / 702.11c: this player can't be the target of spells or
     -- abilities controlled by the players the scope names. Ivory Mask ("You have
     -- shroud") and Leyline of Sanctity ("You have hexproof") are the two

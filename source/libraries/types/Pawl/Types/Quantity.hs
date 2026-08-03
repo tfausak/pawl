@@ -1,6 +1,7 @@
 module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | A number that may not be a literal number.
@@ -102,4 +103,12 @@ data Quantity
     -- module cycle. Structural, not a recursive call -- evaluating a Greatest
     -- descends into a strictly smaller Quantity, so the fold terminates.
     Count (Count.Count Quantity)
+  | -- | A quantity that counts a MANA POOL (CR 106.4) -- Omnath, Locus of Mana's
+    -- "for each unspent green mana you have". See Pawl.Types.ManaCount for why
+    -- the pool cannot be a Count's Scope and why the payload is its own type
+    -- rather than a second shape of Count.
+    --
+    -- Not part of the knot Count above ties: a ManaCount holds no Quantity, so
+    -- this arm is a LEAF and the recursion this type has does not reach it.
+    ManaCount ManaCount.ManaCount
   deriving (Eq, Ord, Show)

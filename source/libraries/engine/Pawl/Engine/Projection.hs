@@ -99,8 +99,11 @@ layer m = case m of
 -- applied by applyCharacteristicPT, which builds its context from the
 -- object's OWN controller instead.
 --
--- No card in the pool is a static ability carrying a Count, so this corrected
--- branch has no producer and no test exercises it (#155).
+-- Falsified by Omnath, Locus of Mana, the first static ability in the pool whose
+-- modification carries a player-scoped quantity: its layer-7c pump counts the
+-- unspent green mana its OWN controller has, so an opponent floating green must
+-- not move it. Pinned by PowerToughnessSpec's "CR 109.5 the count reads Omnath's
+-- controller".
 applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification lyr src cands gs oid m pc =
   let context = Filter.MkContext (controllerOf src gs) (Just src)

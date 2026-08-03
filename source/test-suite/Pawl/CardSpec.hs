@@ -172,6 +172,11 @@ quantityCounts quantity = case quantity of
   Quantity.Type.Star -> []
   Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b
   Quantity.Type.Count count -> count : countCounts count
+  -- A fold over a MANA POOL (CR 106.4), not over a zone: it holds no
+  -- Pawl.Types.Count and no Pawl.Types.Filter, so the lints below -- which are
+  -- about the Filters a card authors -- have nothing to sweep here. See
+  -- Pawl.Types.ManaCount.
+  Quantity.Type.ManaCount _ -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this
@@ -1041,7 +1046,9 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantCastMoreThan _ -> []
   PlayerEffect.NoMaximumHandSize -> []
-  PlayerEffect.DontLoseUnspentMana -> []
+  -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
+  -- this traversal is about the spells a cost modifier matches.
+  PlayerEffect.DontLoseUnspentMana _ -> []
   -- CR 702.18a / 702.11c carry a PlayerScope, not a Filter: the set they name is
   -- players, and this traversal is about the spells a cost modifier matches.
   PlayerEffect.CantBeTargetedBy _ -> []

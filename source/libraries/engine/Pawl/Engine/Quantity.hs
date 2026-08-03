@@ -6,6 +6,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -100,6 +101,12 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- Greatest's payload is a strictly smaller subterm of `quantity`, and the value
   -- came from finite card data.
   Quantity.Count c -> Count.evaluate viewOf (evaluateFor viewOf context gs announcedOn) context gs c
+  -- CR 106.4: the mana-pool fold (Pawl.Engine.ManaCount). Takes neither
+  -- injection the Count arm above does: a mana unit has no characteristics for
+  -- the ViewOf to describe, and a ManaCount holds no inner Quantity for the
+  -- reader to evaluate. It still needs the CONTEXT, which is what resolves its
+  -- CR 109.5 "you" -- Omnath, Locus of Mana counts its own controller's pool.
+  Quantity.ManaCount c -> ManaCount.evaluate context gs c
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
 -- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.
@@ -113,6 +120,7 @@ substituteStar star quantity = case quantity of
   Quantity.X -> quantity
   Quantity.InSlot _ -> quantity
   Quantity.Count _ -> quantity
+  Quantity.ManaCount _ -> quantity
 
 -- The binding slots a quantity READS. Part of the read half of the D4 dataflow
 -- lint (Resolve.slotsOf calls this for every Quantity an opcode carries), whose
@@ -136,6 +144,11 @@ slots quantity = case quantity of
   -- Terminating for the reason evaluate's Count arm is: a Greatest's payload is a
   -- strictly smaller subterm.
   Quantity.Count c -> Count.slots slots c
+  -- A ManaCount holds a PlayerRef and a ManaFilter, and neither contributes an
+  -- AMOUNT slot: a ManaFilter names no slot at all, and PlayerRef.InSlot names a
+  -- TARGET slot, which is Resolve's other half of the D4 lint and not this one.
+  -- Count's Scope is in exactly that position too.
+  Quantity.ManaCount _ -> Set.empty
 
 -- CR 202.3: the mana value is "the total amount of mana in its mana cost,
 -- regardless of color" -- each generic symbol contributes its number, each

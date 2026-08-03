@@ -213,16 +213,12 @@ isManaAbility ab =
   not (null (Maybe.mapMaybe ManaAbility.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
     && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
 
--- CR 106.4. Absent from the map means an empty pool.
-poolOf :: PlayerId -> GameState -> Mana
-poolOf pid gs = Map.findWithDefault (Mana.MkMana []) pid (GameState.manaPool gs)
-
 setPool :: PlayerId -> Mana -> GameState -> GameState
 setPool pid pool gs = gs {GameState.manaPool = Map.insert pid pool (GameState.manaPool gs)}
 
 addMana :: PlayerId -> [ManaUnit] -> GameState -> GameState
 addMana pid units gs =
-  let Mana.MkMana existing = poolOf pid gs
+  let Mana.MkMana existing = Game.poolOf pid gs
    in setPool pid (Mana.MkMana (existing <> units)) gs
 
 -- CR 500.5: as a step or phase ends, any unspent mana left in a player's mana
@@ -240,18 +236,29 @@ addMana pid units gs =
 -- mana that is belongs to the action. Engine.runStepThatBegan stays a line that
 -- says only WHEN.
 --
--- Asked PER PLAYER, off the CR 613.11 player-axis carrier, through a typed
--- question (PlayerEffect.keepsUnspentMana) that never reveals which effect
--- answered it. Absent from the map already means an empty pool (poolOf), so
--- filtering the map is the whole action: a player who keeps their mana keeps the
--- entry, and everyone else's is dropped.
+-- Asked PER PLAYER and then PER UNIT, off the CR 613.11 player-axis carrier,
+-- through a typed question (PlayerEffect.keepsUnspentMana) that never reveals
+-- which effect answered it. Per unit rather than per pool because a card may name
+-- only some of the mana: Upwelling keeps every type, Omnath, Locus of Mana keeps
+-- only green out of the same pool.
+--
+-- The per-player question is asked ONCE and its predicate applied to that
+-- player's units, rather than re-resolving the applicable effects for each unit
+-- -- the shape keepsUnspentMana's argument order is built for.
+--
+-- A player left with nothing is DROPPED from the map rather than left holding an
+-- empty pool: absent already means an empty pool (Game.poolOf), so keeping the
+-- key would give the same state two spellings.
 --
 -- `gs` is the state as the step ends, so the effect is read at that moment and
 -- never captured earlier -- an Upwelling that left the battlefield during the
 -- step is simply not there to find.
 emptyManaPools :: GameState -> GameState
 emptyManaPools gs =
-  gs {GameState.manaPool = Map.filterWithKey (\pid _ -> PlayerEffect.keepsUnspentMana pid gs) (GameState.manaPool gs)}
+  let retain pid pool = case filter (PlayerEffect.keepsUnspentMana pid gs) (Mana.unwrap pool) of
+        [] -> Nothing
+        kept -> Just (Mana.MkMana kept)
+   in gs {GameState.manaPool = Map.mapMaybeWithKey retain (GameState.manaPool gs)}
 
 -- Untapped permanents this player controls that can produce mana (CR 109.4a:
 -- a mana ability's controller is determined as though it were on the stack --
@@ -638,7 +645,7 @@ payCost pid cost = do
     tapUntilPaid = do
       gs <- State.get
       let budget = Maybe.fromMaybe 0 (lifeNeeded pid cost gs)
-      case spend budget cost (poolOf pid gs) of
+      case spend budget cost (Game.poolOf pid gs) of
         Just (left, life) -> do
           State.put (payLife pid life (setPool pid left gs))
           pure True
@@ -960,7 +967,7 @@ sourceOptions yields =
 -- at all.
 payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutions pid committed cost gs =
-  let Mana.MkMana units = poolOf pid gs
+  let Mana.MkMana units = Game.poolOf pid gs
       -- The SAME board manaSources is judged against serves the per-source
       -- yields too, rather than a fresh projection per source on top of the sweep
       -- (#200); see manaSources above for the hoist and its snapshot argument.

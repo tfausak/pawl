@@ -15,6 +15,11 @@ import qualified Pawl.Types.Scope as Scope
 -- Pawl.Types.CountSpec), which is the identity-casing the project's central
 -- invariant forbids.
 --
+-- Counts OBJECTS, and only objects. A count over a MANA POOL is
+-- Pawl.Types.ManaCount, a parallel type rather than a second shape of this one:
+-- see its haddock for why neither the Scope, the Filter nor the Aggregation here
+-- can be made to reach a mana unit.
+--
 -- The `quantity` parameter is passed straight through to the Aggregation, which
 -- is where it is actually used and where the reason for it is written. Every
 -- customer but Pawl.Types.Quantity instantiates it concretely as

@@ -55,6 +55,8 @@ import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
+import qualified Pawl.Codec.ManaCountSpec
+import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
@@ -261,6 +263,8 @@ spec s registry = do
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
+  Pawl.Codec.ManaCountSpec.spec s
+  Pawl.Codec.ManaFilterSpec.spec s
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s

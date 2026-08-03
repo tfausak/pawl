@@ -1206,8 +1206,9 @@ runStepThatBegan phase = do
         Foldable.traverse_ (State.modify' . Expiry.dropAtEndOf) (Turn.phaseEndingAt phase)
         -- CR 703.4q: emptying the pool is a turn-based action that does not use
         -- the stack, and CR 500.5's "Then" puts it AFTER the expiries above. This
-        -- line says only WHEN; WHOSE mana empties is the action itself, and
-        -- Mana.emptyManaPools decides it per player (Upwelling).
+        -- line says only WHEN; WHICH mana empties is the action itself, and
+        -- Mana.emptyManaPools decides it per player and per unit (Upwelling's
+        -- whole pool, Omnath Locus of Mana's green).
         --
         -- The ordering is observable, and Pawl.ExpirySpec's "CR 500.5 an
         -- end-of-combat retention effect expires BEFORE the pool empties" is

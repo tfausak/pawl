@@ -7,6 +7,10 @@ import qualified Pawl.Types.SlotName as SlotName
 -- other zones are shared by all players." This says WHOSE zone a scope folds
 -- over.
 --
+-- And whose MANA POOL: CR 106.4 attaches a pool to a player exactly as CR 400.1
+-- attaches a library, so Pawl.Types.ManaCount names its player with this same
+-- type and Pawl.Engine.Count.playersFor resolves both.
+--
 -- Deliberately NOT Pawl.Types.PlayerScope, which is You | Opponents | EachPlayer
 -- and looks like the same type. PlayerScope is resolved against a perspective and
 -- nothing else (Pawl.Engine.PlayerEffect.inScope); this can also name a binding slot,

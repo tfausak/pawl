@@ -126,7 +126,7 @@ pikerCost :: ManaCost.ManaCost
 pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
 
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
-poolSize pid gs = case Mana.poolOf pid gs of
+poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
 
 manaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -190,7 +190,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         Spec.assertEqWith
           s
           "pool"
-          (Mana.poolOf S.alice after)
+          (Game.poolOf S.alice after)
           (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}])
 
   Spec.it s "two Mountains can pay {1}{R}" $ do
@@ -451,8 +451,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         after = S.runPure S.identityAnswer gs0 (Mana.tapForMana oid)
         manaUnitsOf pool = case pool of
           Mana.Type.MkMana units -> units
-    Spec.assertBool s (not (null (manaUnitsOf (Mana.poolOf S.alice after)))) "alice received a mana unit"
-    Spec.assertBool s (null (manaUnitsOf (Mana.poolOf S.bob after))) "bob received none"
+    Spec.assertBool s (not (null (manaUnitsOf (Game.poolOf S.alice after)))) "alice received a mana unit"
+    Spec.assertBool s (null (manaUnitsOf (Game.poolOf S.bob after))) "bob received none"
 
 -- Answers Prompt.ChooseManaYield with the ONE-UNIT yield of `wanted` whenever it
 -- is on offer, and defers everything else to S.identityAnswer. The
@@ -485,7 +485,7 @@ castOffBoard answer permanents spell =
 -- `answer` -- the observable that says WHAT a source produced: which type, where
 -- it offers several, and how much, where one activation adds more than one.
 tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> [ManaType.ManaType]
-tappedFor answer oid gs = case Mana.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
+tappedFor answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
 
 anyColorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -698,6 +698,72 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
     Spec.assertEqWith s "and nothing new was tapped" (S.tappedCount S.alice spent) 2
     Spec.assertEqWith s "Unsummon is on the stack" (length (GameState.stack spent)) 1
 
+-- CR 500.5 / 106.4 again, one granularity up. Omnath, Locus of Mana ({2}{G}
+-- Legendary Creature -- Elemental) says "You don't lose unspent green mana as
+-- steps and phases end", which differs from Upwelling on both axes the carrier
+-- has: it names a MANA TYPE (CR 106.1a), so the rest of the pool still empties,
+-- and its CR 613.11 scope is PlayerScope.You, so an opponent's pool still
+-- empties. Each axis has its own falsifier below. Oracle text verified against
+-- Scryfall.
+--
+-- The other half of the card -- "Omnath gets +1/+1 for each unspent green mana
+-- you have" -- is Pawl.PowerToughnessSpec's, since the module under test there
+-- is the projection.
+omnathSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
+  -- The type axis. Alice floats one green and one blue; only the green is hers
+  -- to keep. A whole-pool retention keeps both and fails the second assertion.
+  Spec.it s "CR 106.1a Omnath keeps the green mana and loses the rest" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (_, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (forestId, g2) = S.addCreature forest S.alice g1
+        (islandId, g3) = S.addCreature island S.alice g2
+        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Mana.tapForMana forestId)) (Mana.tapForMana islandId)
+        ended = Mana.emptyManaPools floated
+    Spec.assertEqWith s "two floated" (poolSize S.alice floated) 2
+    Spec.assertEqWith s "one survives the step's end" (poolSize S.alice ended) 1
+    Spec.assertEqWith
+      s
+      "and it is the green one"
+      (fmap ManaUnit.manaType (poolUnits ended))
+      [ManaType.Colored Color.Green]
+
+  -- The scope axis, and the mirror image of Upwelling's symmetry test above:
+  -- alice controls the Omnath and BOB's green still empties, because CR 613.11's
+  -- carrier here is PlayerScope.You. An EachPlayer implementation passes the
+  -- test above and fails this one.
+  Spec.it s "CR 613.11 Omnath is You-scoped: an opponent's green mana still empties" $ do
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (_, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (alicesForest, g2) = S.addCreature forest S.alice g1
+        (bobsForest, g3) = S.addCreature forest S.bob g2
+        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Mana.tapForMana alicesForest)) (Mana.tapForMana bobsForest)
+        ended = Mana.emptyManaPools floated
+    Spec.assertEqWith s "alice keeps hers" (poolSize S.alice ended) 1
+    Spec.assertEqWith s "bob loses his" (poolSize S.bob ended) 0
+
+  -- The gameplay-level proof (design.md section 4) that the two halves of the
+  -- card are one card, end to end through Engine.runStep: the green mana Omnath
+  -- keeps across CR 500.5's turn-based action is the same mana Omnath's own
+  -- layer-7c pump is still counting on the other side of the boundary, while the
+  -- blue that emptied stops counting for the payment that follows.
+  Spec.it s "CR 500.5/613.4c whole card: the green Omnath keeps is the green that keeps it big" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (forestId, g2) = S.addCreature forest S.alice g1
+        (islandId, g3) = S.addCreature island S.alice g2
+        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Mana.tapForMana forestId)) (Mana.tapForMana islandId)
+        afterStep = S.runPure S.identityAnswer floated Engine.runStep
+    Spec.assertEqWith s "before: two floating, and only the green pumps" (Projection.powerOf omnathId floated) (Just 2)
+    Spec.assertEqWith s "the blue is gone" (poolSize S.alice afterStep) 1
+    Spec.assertEqWith s "the green survived the step boundary" (Projection.powerOf omnathId afterStep) (Just 2)
+    Spec.assertEqWith s "and the toughness with it" (Projection.toughnessOf omnathId afterStep) (Just 2)
+
 -- CR 605.3b: one activation of one mana ability, adding TWO mana. Sol Ring ({1}
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
 -- unit, and it is what separates "the types this source could produce" from "the
@@ -908,6 +974,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   dismemberSpec s registry
   moltensteelSpec s registry
   upwellingSpec s registry
+  omnathSpec s registry
   snowSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
@@ -919,7 +986,7 @@ snowCost = ManaCost.MkManaCost [ManaSymbol.Snow]
 -- The units of Alice's pool, so a test can look at a mana's TAGS and not only at
 -- its type -- which is the whole of what CR 107.4h reads.
 poolUnits :: GameState.GameState -> [ManaUnit.ManaUnit]
-poolUnits gs = case Mana.poolOf S.alice gs of
+poolUnits gs = case Game.poolOf S.alice gs of
   Mana.Type.MkMana units -> units
 
 -- One red mana, produced by a snow source and by a nonsnow one. These are what
