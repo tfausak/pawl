@@ -1264,12 +1264,19 @@ addCounter kind n oid gs =
 -- every printing a caller passes is real. Type-agnostic on purpose: CR 400.7's
 -- reset is a property of the field, so the CR 400.7 test does not need an Aura.
 --
--- Tagged ToCreature, which is the tag the real attach paths would store: every
--- Aura in this pool has a Pool.Creatures enchant spec, and Target's candidates
--- for that pool are ToCreature -- so an SBA that re-checks the attachment against
--- the spec (Pawl.Engine.Sba.stillLegalEnchant) sees what casting would have left. The
--- callers that attach to a non-creature are testing rules that read only WHICH
--- object is named (CR 704.5n, CR 704.5p, CR 400.7), never the tag.
+-- Tagged ToCreature, which is the tag the real attach paths store for a
+-- CREATURE-enchanting Aura: those have a Pool.Creatures enchant spec, and
+-- Target's candidates for that pool are ToCreature -- so an SBA that re-checks
+-- the attachment against the spec (Pawl.Engine.Sba.stillLegalEnchant) sees what
+-- casting would have left.
+--
+-- WRONG for Convincing Mirage, whose "Enchant land" is a Pool.Permanents spec
+-- narrowed by a Land filter, and whose candidates are therefore ToObject. That
+-- costs nothing for a rule that reads only WHICH object is named -- CR 704.5n,
+-- CR 704.5p, CR 400.7, and Affected.Attached, which goes through
+-- Recipient.objectOf -- which is every caller that attaches to a non-creature
+-- today. A test that puts Convincing Mirage in front of stillLegalEnchant must
+-- CAST it instead; Pawl.AuraSpec's whole-card case is that cast.
 attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 attach rider host = attachTo rider (Recipient.ToCreature host)
 

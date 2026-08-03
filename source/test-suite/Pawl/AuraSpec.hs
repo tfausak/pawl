@@ -7,6 +7,10 @@
 -- attachment substrate that shares Object.attachedTo: Pawl.Engine.Resolve's Attach
 -- opcode (CR 701.3) and Pawl.Engine.Sba's three attachment state-based actions
 -- (CR 704.5m, 704.5n, 704.5p).
+--
+-- Also Pawl.Engine.Replacement's CR 614.1c as-enters basic-land-type choice,
+-- since the pool's one producer of it is an Aura (Convincing Mirage) and
+-- proving it needs a real cast through this file's machinery.
 module Pawl.AuraSpec where
 
 import qualified Data.Map.Strict as Map
@@ -20,6 +24,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
@@ -32,11 +37,13 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Printing as Printing
@@ -44,6 +51,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
@@ -436,6 +444,60 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   reattachSpec s registry
   auraGraftSpec s registry
   enchantPlayerSpec s registry
+  chosenLandTypeSpec s registry
+
+-- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
+-- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
+-- its CR 614.1c as-enters basic land type. aimRecipient above answers only the
+-- first, and the entry choice is the whole point of this card.
+mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
+mirageOn landId subtype p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject landId)) sets
+  Prompt.ChooseBasicLandType {} -> subtype
+  _ -> S.identityAnswer p
+
+-- CR 614.1c's as-enters choice, whose value is a SUBTYPE rather than a colour,
+-- and CR 305.7's set reading it back off the Aura. Convincing Mirage is the
+-- pool's only producer of either, and the only Aura in the pool that enchants
+-- something other than a creature.
+chosenLandTypeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
+  -- The gameplay-level proof design.md section 4 asks for: cast the Aura, answer
+  -- its as-enters prompt for real, let it resolve, and see the enchanted land
+  -- tap for the CHOSEN colour.
+  --
+  -- Run TWICE with different answers on one board. Once would only prove the
+  -- choice was made; a modification that ignored Object.chosenSubtype and
+  -- conjured a fixed type would still pass a single half. Two halves that
+  -- disagree can only be told apart by reading the choice.
+  Spec.it s "CR 614.1c whole card: Convincing Mirage makes a Mountain the chosen basic land type" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    convincingMirage <- S.printingOf s registry "Convincing Mirage"
+    -- The Islands pay {1}{U}; the Mountain is the host, and is added last so it
+    -- is never the head of a mana-source candidate list.
+    let base0 = S.landsInPlay island 4
+        (landId, base1) = S.addCreature mountain S.alice base0
+        (withAura, auraSpell) = S.handOne convincingMirage base1
+        run pick =
+          let cast = snd (Engine.runGamePure (mirageOn landId pick) withAura (Cast.castSpell S.alice auraSpell))
+           in snd (Engine.runGamePure (mirageOn landId pick) cast Stack.resolveTop)
+        asIsland = run Subtype.Island
+        asSwamp = run Subtype.Swamp
+    Spec.assertEqWith s "before: a plain Mountain" (Projection.subtypesOf landId withAura) (Set.singleton Subtype.Mountain)
+    Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf landId withAura) "and it taps for red"
+    -- CR 303.4: the Aura entered attached to what its enchant slot named, so it
+    -- really did resolve -- without this a failed cast would look like a failed
+    -- type change.
+    Spec.assertBool s (not (null (attachedTo landId asIsland))) "the Aura entered attached to the land"
+    -- CR 305.7: "the land no longer has its old land type". CR 305.6: a land
+    -- with a basic land type has the intrinsic "{T}: Add [mana symbol]".
+    Spec.assertEqWith s "choosing Island: only an Island" (Projection.subtypesOf landId asIsland) (Set.singleton Subtype.Island)
+    Spec.assertBool s (ManaType.Colored Color.Blue `elem` Mana.manaTypesOf landId asIsland) "so it taps for blue"
+    Spec.assertBool s (ManaType.Colored Color.Red `notElem` Mana.manaTypesOf landId asIsland) "and no longer for red"
+    -- The same board, the other answer.
+    Spec.assertEqWith s "choosing Swamp: only a Swamp" (Projection.subtypesOf landId asSwamp) (Set.singleton Subtype.Swamp)
+    Spec.assertBool s (ManaType.Colored Color.Black `elem` Mana.manaTypesOf landId asSwamp) "so it taps for black"
 
 -- Answers every target slot with one fixed recipient, deferring everything else
 -- to S.identityAnswer. aimAt above does the same for a Pool.Permanents slot
@@ -480,10 +542,16 @@ attachments gs =
 -- The battlefield permanents attached to `host`. How a test finds the Aura a
 -- resolved Aura SPELL entered as: CR 400.7 mints a fresh id for the battlefield
 -- incarnation, so the spell's own id names nothing afterwards.
+--
+-- Compared through Recipient.objectOf rather than against a fixed tag, because
+-- the tag is the enchant spec's, not the host's: a Pool.Creatures slot stores
+-- ToCreature and Convincing Mirage's Pool.Permanents slot stores ToObject. This
+-- read only wants to know WHICH object is named, which is exactly the question
+-- Affected.Attached asks (Pawl.Engine.Projection.affects).
 attachedTo :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
 attachedTo host gs =
   filter
-    (\oid -> fmap Object.attachedTo (Game.lookupObject oid gs) == Just (Just (Recipient.ToCreature host)))
+    (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
     (Set.toList (GameState.battlefield gs))
 
 -- Crown of the Ages' one target slot, read off its printed activated ability --
