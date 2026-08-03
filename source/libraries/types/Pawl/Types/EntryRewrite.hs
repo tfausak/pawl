@@ -4,13 +4,12 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
 
--- | CR 614.1c-d: how an entry replacement modifies the entry.
--- AsCopy is Clone (CR 707.5, and a real "may" -- declining is legal); ChoiceOf
--- is Primal Plasma (CR 208.2b); ChooseColor is Painter's Servant (CR 105.1);
--- WithCounters is CR 306.5b's intrinsic loyalty;
--- UnderSourceControl is Gather Specimens (CR 616.1b).
--- AsCopy and ChoiceOf write into the object's COPIABLE snapshot,
--- which is what makes CR 707.2 fall out with no further machinery: the rule says
+-- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
+-- (CR 707.5, and a real "may" -- declining is legal); ChoiceOf is Primal Plasma
+-- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c); WithCounters is CR
+-- 306.5b's intrinsic loyalty; UnderSourceControl is Gather Specimens (CR
+-- 616.1b). AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which
+-- is what makes CR 707.2 fall out with no further machinery: the rule says
 -- copiable values are the printed values as modified by copy effects and by
 -- "as ... enters" abilities that set power and toughness.
 --

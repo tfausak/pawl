@@ -2327,7 +2327,8 @@ data ControlGrant = MkControlGrant
 -- NOT `gather`. This must not project, and cannot: Projection.affects reads
 -- controllerOf to supply CR 109.5's "you" when matching a Filter, so a
 -- controllerOf built on gather would be mutually recursive with it. That
--- restriction is exactly why Affected.Matching is unsupported below (#195).
+-- restriction is exactly why Affected.Matching and Affected.MatchingAnywhere are
+-- unsupported below (#195).
 --
 -- Hoisted for the reason liveGiven's list is hoisted: controllerOf feeds combat,
 -- priority, mana and Projection.controls, and `controls` calls it once per

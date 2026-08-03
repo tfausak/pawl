@@ -596,6 +596,9 @@ bucketOfEffect re = case re of
   -- racing Furnace of Rath, and that Gather Specimens board.
   ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
+  -- CR 616.1a-d name self-replacement, entering under a control effect,
+  -- entering as a copy and entering with the back face up; Painter's Servant's
+  -- as-enters colour choice is none of those, so CR 616.1e is what applies.
   ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> ReplacementBucket.Other
   -- CR 616.1a-d name self-replacement, entering under a control effect,
   -- entering as a copy and entering with the back face up; entering with

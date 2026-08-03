@@ -3,9 +3,10 @@
 -- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
 -- 702.114a devoid, CR 613.3's characteristic-defining-ability-first ordering
 -- within layer 5, and CR 111.3 token colour), Pawl.Engine.Target (the "target
--- nonblack creature" and "target blue spell" filters below) and the P3a colour
--- gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder,
--- Indigo Faerie, Painter's Servant), plus the CR 608.2b colour-change fizzle.
+-- nonblack creature" and "target blue spell" filters below), the P3a colour
+-- gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder) and
+-- this phase's own CR 613.3 gates (Indigo Faerie, Painter's Servant), plus the
+-- CR 608.2b colour-change fizzle.
 -- Mostly gameplay-level: a card is cast or resolved through the stack and the
 -- resulting game state is asserted on. The rest assert on a projection over a
 -- hand-built board, either because no card in the pool produces the effect
