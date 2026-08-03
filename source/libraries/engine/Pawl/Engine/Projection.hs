@@ -2355,21 +2355,9 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
       then Just (defaultControllerOf obj)
       else
         let visited' = Set.insert oid visited
-            -- Does an affected set carried by `source` name `oid`? Parameterized
-            -- by the source because Affected.Attached is a question about the
-            -- SOURCE's state, and the stored and derived paths carry different
-            -- sources.
-            namesFrom source a = case a of
-              Affected.TheseObjects s -> Set.member oid s
-              -- CR 303.4m: the source's own attachment. No projection needed,
-              -- which is what keeps this fold lean.
-              Affected.Attached -> (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
-              -- Needs a projection to evaluate, and this fold must not project
-              -- (see controlGrants). No card produces one (#195).
-              Affected.Matching _ -> False
-              -- Worse than Matching: this one would re-enter controllerOf, which
-              -- is the fold now running. No card produces one either (#195).
-              Affected.AttachedPlayerControls _ -> False
+            -- Does an affected set carried by `source` name `oid`? `controlNames`
+            -- below is the enumeration this membership test reads off.
+            namesFrom source a = Set.member oid (controlNames gs source a)
             storedSetter eff = case ContinuousEffect.modification eff of
               Modification.SetController pid
                 | namesFrom (ContinuousEffect.source eff) (ContinuousEffect.affected eff) ->
@@ -2386,6 +2374,49 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
          in case stored <> derived of
               [] -> Just (defaultControllerOf obj)
               setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
+
+-- Which objects an affected set NAMES, for the CR 613.1b layer-2 control fold.
+-- Parameterized by the source because Affected.Attached is a question about the
+-- SOURCE's state, and the stored and derived paths carry different sources.
+--
+-- Deliberately a total case with no wildcard, and two of its four arms are
+-- empty: this fold must not project (see controlGrants), which rules out
+-- Matching, and AttachedPlayerControls would re-enter controllerOf, which is the
+-- fold that reads this. No card produces either (#195).
+controlNames :: GameState -> ObjectId -> Affected.Affected -> Set ObjectId
+controlNames gs source a = case a of
+  Affected.TheseObjects s -> s
+  -- CR 303.4m: the source's own attachment. No projection needed, which is what
+  -- keeps the fold reading this lean.
+  Affected.Attached -> maybe Set.empty Set.singleton (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf)
+  Affected.Matching _ -> Set.empty
+  Affected.AttachedPlayerControls _ -> Set.empty
+
+-- CR 603.3a: every object whose controller a CR 613.1b layer-2 effect currently
+-- OVERRIDES, and who it says controls it -- the sample Event.recordEvent takes
+-- so that a trigger scanned at the CR 117.5 boundary can still be credited to
+-- whoever controlled its source at the event. See GameState.controlWhenTriggered
+-- for why the objects NOT named here need no entry.
+--
+-- Both of controllerOfGiven's two setter sources are enumerated, in the same
+-- order it consults them: the stored continuous effects (Effect.GainControl's
+-- baked SetController) and the control-granting static abilities (Control
+-- Magic's derived SetControllerToSource). The VALUE is controllerOfGiven's own
+-- answer rather than a re-derivation, so the CR 613.7 timestamp contest between
+-- them is settled once, in the one place that knows how.
+--
+-- Cheap on the board that has no control effect at all -- the common case --
+-- where `named` is empty and the only cost is `controlGrants`' battlefield walk.
+controlOverrides :: GameState -> Map ObjectId PlayerId.PlayerId
+controlOverrides gs =
+  let grants = controlGrants gs
+      fromStored eff = case ContinuousEffect.modification eff of
+        Modification.SetController _ -> controlNames gs (ContinuousEffect.source eff) (ContinuousEffect.affected eff)
+        _ -> Set.empty
+      fromGrant g = controlNames gs (cgSource g) (cgAffected g)
+      named = Set.unions (fmap fromStored (GameState.continuousEffects gs) <> fmap fromGrant grants)
+      entry oid = fmap ((,) oid) (controllerOfGiven grants Set.empty oid gs)
+   in Map.fromList (Maybe.mapMaybe entry (Set.toList named))
 
 -- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES.
 --

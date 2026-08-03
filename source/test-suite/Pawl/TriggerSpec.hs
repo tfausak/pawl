@@ -38,6 +38,10 @@
 -- through the ordinary Pool + Filter target machinery, with Bitterblossom --
 -- `kindredSpec`. CR 701.9a's discard trigger, and CR 702.29d's
 -- "only once when a card is cycled", with Megrim -- `discardTriggerSpec`.
+-- CR 603.3a's controller read AT THE TRIGGER MOMENT rather than at the CR 117.5
+-- scan, with a Megrim stolen until end of turn by Zealous Conscripts and handed
+-- back by CR 514.2 before CR 514.3a places the trigger --
+-- `controllerAtTriggerSpec`.
 -- CR 701.6a's countering trigger, and the CR 113.6g gate that keeps it silent,
 -- with Baral, Chief of Compliance -- `counterTriggerSpec`. CR 603.6c's OTHER
 -- written form, "leaves the battlefield" for any destination, and the CR 400.7e
@@ -81,6 +85,7 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -1738,6 +1743,114 @@ discardTriggerSpec s registry =
       Spec.assertEqWith s "and costs alice nothing either" (S.lifeOf S.alice (settle byBob)) (S.lifeOf S.alice gs)
       Spec.assertEqWith s "bob's discard put nothing on the stack at all" (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority)) []
 
+-- alice is the active player in her postcombat main phase, holding a Zealous
+-- Conscripts and eight uncastable Goblin Pikers, with five Mountains out; bob
+-- controls a Megrim and nothing else. Nothing is in either library, so no draw
+-- can happen. Returns bob's Megrim, alice's first Mountain (the other thing the
+-- Conscripts can be aimed at) and the Conscripts in her hand.
+--
+-- Nine cards in hand, so that casting the Conscripts leaves exactly eight and CR
+-- 514.1 discards exactly one: the whole board turns on that single discard.
+conscriptBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+conscriptBoard mountain piker megrim conscripts =
+  let (megrimId, g1) = S.addCreature megrim S.bob (Setup.emptyGame S.bothPlayers)
+      (landId, g2) = S.addCreature mountain S.alice g1
+      g3 = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) g2 [1 .. (4 :: Int)]
+      (conscriptsId, g4) = S.addHandCard conscripts S.alice g3
+      g5 = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) g4 [1 .. (8 :: Int)]
+   in ( megrimId,
+        landId,
+        conscriptsId,
+        g5
+          { GameState.activePlayer = S.alice,
+            GameState.turnNumber = 1,
+            GameState.phase = Phase.PostcombatMain,
+            GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+          }
+      )
+
+-- Cast exactly `spell` when it is offered and nothing else, aim every target at
+-- `victim`, and otherwise answer as S.identityAnswer does (which passes, and
+-- discards the cards CR 514.1 offers in the order it offers them).
+--
+-- Casting is pinned to the one card rather than left to S.castAnswer because the
+-- eight Pikers padding alice's hand are castable in principle; a leg that spent
+-- her Mountains on one of them would never reach the Conscripts.
+aimedCast :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedCast spell victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe (Set.lookupMin . Set.filter ((== Just victim) . Recipient.objectOf)) sets
+  Prompt.ChooseAction _ _ actions -> case filter (== A.Cast spell) actions of
+    action : _ -> action
+    [] -> A.Pass
+  _ -> S.identityAnswer p
+
+-- Run out the three steps conscriptBoard leaves scheduled -- the postcombat main
+-- phase, the end step and the cleanup step -- so that every leg observes the same
+-- board after CR 514.3a has had its say.
+toCleanup :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+toCleanup answer gs = List.foldl' (\g _ -> S.runPure answer g Engine.runStep) gs [1 .. (3 :: Int)]
+
+-- CR 603.3a: "A triggered ability is controlled by the player who controlled its
+-- source at the time it triggered." AT THE TIME IT TRIGGERED -- which is not the
+-- CR 117.5 boundary where Event.eventTriggers does the scanning, and the cleanup
+-- step is where the pool can tell the two apart. CR 514.1 discards down to
+-- maximum hand size; CR 514.2 then ends every "until end of turn" effect,
+-- control effects included; and only then does CR 514.3a put the waiting
+-- triggers on the stack. A permanent stolen until end of turn is therefore back
+-- with its owner by the time the scan asks who controls it, one whole turn-based
+-- action after the discard that fired its ability.
+--
+-- Zealous Conscripts, {4}{R} Creature -- Human Warrior 3/3: "Haste. When this
+-- creature enters, gain control of target permanent until end of turn. Untap
+-- that permanent. It gains haste until end of turn." TARGET PERMANENT is what
+-- makes it the producer -- Act of Treason and Ray of Command, the pool's other
+-- two "until end of turn" thefts, can only name a creature, and the only card in
+-- the pool that triggers on a discard is an enchantment.
+--
+-- Megrim, {2}{B} Enchantment: "Whenever an opponent discards a card, this
+-- enchantment deals 2 damage to that player." CR 109.5 fixes its "an opponent"
+-- against "the controller of the object when the ability triggered", so with
+-- alice holding it at CR 514.1 her own discard is not an opponent's and the
+-- ability does not trigger at all. Reading control at the boundary instead makes
+-- it bob's again, alice an opponent, and deals her 2 -- a trigger that the rules
+-- say never happened.
+--
+-- Three legs on one board, one target apart: the theft, the same cast aimed at
+-- alice's own Mountain instead, and the same board with nothing cast.
+controllerAtTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+controllerAtTriggerSpec s registry =
+  Spec.describe s "ControllerAtTrigger" $ do
+    Spec.it s "CR 603.3a whole cards: a Megrim stolen until end of turn does not fire on its new controller's own cleanup discard" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      megrim <- S.printingOf s registry "Megrim"
+      conscripts <- S.printingOf s registry "Zealous Conscripts"
+      let (megrimId, _, conscriptsId, gs) = conscriptBoard mountain piker megrim conscripts
+          after = toCleanup (aimedCast conscriptsId megrimId) gs
+      Spec.assertEqWith s "CR 514.1 trimmed alice to her maximum hand size, so a discard really happened" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
+      Spec.assertEqWith s "CR 514.2 gave the Megrim back, which is what the boundary read would have seen" (Projection.controllerOf megrimId after) (Just S.bob)
+      Spec.assertEqWith s "CR 603.3a alice controlled it at CR 514.1, so 'an opponent' was bob and nothing triggered" (S.lifeOf S.alice after) (Just 20)
+      Spec.assertEqWith s "and bob, who discarded nothing, is untouched" (S.lifeOf S.bob after) (Just 20)
+    Spec.it s "CR 109.5 the twin: the same cast aimed at alice's own Mountain leaves the Megrim with bob, and her discard costs her 2" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      megrim <- S.printingOf s registry "Megrim"
+      conscripts <- S.printingOf s registry "Zealous Conscripts"
+      let (megrimId, landId, conscriptsId, gs) = conscriptBoard mountain piker megrim conscripts
+          after = toCleanup (aimedCast conscriptsId landId) gs
+      Spec.assertEqWith s "the same one discard" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
+      Spec.assertEqWith s "bob held the Megrim throughout" (Projection.controllerOf megrimId after) (Just S.bob)
+      Spec.assertEqWith s "so alice's discard IS an opponent's, and the trigger deals her 2" (S.lifeOf S.alice after) (Just 18)
+    Spec.it s "the control leg: no Conscripts cast at all, and the Megrim still fires" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      megrim <- S.printingOf s registry "Megrim"
+      conscripts <- S.printingOf s registry "Zealous Conscripts"
+      let (_, _, _, gs) = conscriptBoard mountain piker megrim conscripts
+          after = toCleanup S.identityAnswer gs
+      Spec.assertEqWith s "alice kept the Conscripts, so she discards two down to seven" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
+      Spec.assertEqWith s "two discards, two triggers, 4 damage" (S.lifeOf S.alice after) (Just 16)
+
 -- CR 701.6a: "to counter a spell or ability means to cancel it, removing it from
 -- the stack. It doesn't resolve and none of its effects occur. A countered spell
 -- is put into its owner's graveyard." Nothing in the pool triggered on that
@@ -3218,4 +3331,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   aetherFlashSpec s registry
   kindredSpec s registry
   discardTriggerSpec s registry
+  controllerAtTriggerSpec s registry
   counterTriggerSpec s registry

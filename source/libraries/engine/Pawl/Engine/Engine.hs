@@ -360,6 +360,14 @@ runTurnBasedActions phase = do
       -- CR 514.2: damage wears off AND until-end-of-turn effects end,
       -- simultaneously. One sweep over both carriers (Pawl.Engine.Expiry). NOT
       -- guarded: CR 703.4p is the game's action, not the active player's.
+      --
+      -- This is the pool's one reachable CR 603.3a window, and the reason
+      -- GameState.controlWhenTriggered exists: the discard above has already
+      -- fired a rule 701.9a trigger, CR 514.3a does not place it until after this
+      -- line, and an "until end of turn" control effect the sweep ends here would
+      -- otherwise have the scan credit that trigger to whoever got the permanent
+      -- BACK. Pawl.TriggerSpec's controllerAtTriggerSpec is the proof, with a
+      -- Megrim stolen by Zealous Conscripts.
       State.modify' Damage.removeAllDamage
       State.modify' Expiry.dropAtCleanup
     _ -> pure ()
@@ -394,15 +402,29 @@ runTurnBasedActions phase = do
 -- PendingTrigger whose controller has left never appears in `ordered` and
 -- `placeOne` never sees it. Under the pipeline `orderPending` feeds --
 -- `apnapPlayers` -> `orderFor` -> `permute`, none of which can ever
--- INTRODUCE an entry -- a delayed ability is the only carrier that can reach
--- this with a departed controller (once more than two players are seated,
--- Departure.continuesAfterDeparture; at two, CR 800.4a's clauses never run
--- and CR 104.2a ends the game before an end step returns, so the question is
--- moot there, and apnapPlayers's filter would catch it regardless if it
--- somehow arose) -- see Pawl.Engine.Departure's objectsLeaveWith haddock -- because
--- eventTriggers/stateTriggers re-derive the controller live from
--- Projection.controllerOf, and a departed player controls nothing after CR
--- 800.4a. The entry is still CONSUMED regardless: `surviving` above already
+-- INTRODUCE an entry. TWO carriers can reach this with a departed controller,
+-- and only ever once more than two players are seated
+-- (Departure.continuesAfterDeparture; at two, CR 800.4a's clauses never run and
+-- CR 104.2a ends the game before an end step returns, so the question is moot
+-- there, and apnapPlayers's filter would catch either of them regardless if it
+-- somehow arose) -- see Pawl.Engine.Departure's objectsLeaveWith haddock:
+--
+--   * a DELAYED ability, whose controller CR 603.7d fixed as the spell that
+--     created it resolved ("the player who controlled that spell as it
+--     resolved"), which is why it can outlive that player.
+--   * an OBJECT-BORNE ability out of Event.eventTriggers, which reads CR 603.3a's
+--     controller from GameState.controlWhenTriggered -- who controlled the source
+--     when it TRIGGERED -- rather than live. A player who controlled it then and
+--     has left the game since is exactly the case CR 800.4d's second sentence
+--     describes, and dropping the trigger is what that rule asks for; the live
+--     read this replaced would instead have placed it under whoever CR 800.4a
+--     handed the permanent back to, an ability CR 603.3a says was never theirs.
+--     No board in the pool reaches it (#604).
+--
+-- Event.stateTriggers is not a third: CR 603.8 evaluates a state trigger AT this
+-- scan, so its live read is the right moment by construction.
+--
+-- The DELAYED entry is still CONSUMED regardless: `surviving` above already
 -- dropped it from delayedTriggers, because CR 603.7b spends the one shot on
 -- the trigger event, which happened. The monarch's `inherent` triggers go
 -- through the same filter, since they are merged into the batch before
@@ -459,6 +481,11 @@ placePendingTriggers = do
   State.put
     gs
       { GameState.scannedThrough = Natural.length (GameState.events gs),
+        -- CR 603.3a's sample is spent with the batch it was taken for. Cleared
+        -- rather than left standing, so the next event to open a batch takes a
+        -- fresh one (Event.recordEvent samples only when nothing is unscanned)
+        -- and a stale reading can never outlive the events it described.
+        GameState.controlWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
   ordered <- orderPending (pending <> inherent)
@@ -974,6 +1001,10 @@ beginTurnOf pid gs =
           -- this, so nothing unscanned is discarded.
           GameState.events = Seq.empty,
           GameState.scannedThrough = 0,
+          -- Cleared with the log it describes: the settle Engine.advance runs
+          -- immediately before this leaves nothing unscanned, so the sample has
+          -- no batch left to answer for.
+          GameState.controlWhenTriggered = Map.empty,
           GameState.damageScannedThrough = 0,
           -- GameState.lastKnown is deliberately NOT cleared alongside them. The
           -- log's one-turn scope is a choice about what "look back in time"

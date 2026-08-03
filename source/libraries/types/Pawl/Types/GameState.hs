@@ -80,6 +80,23 @@ data GameState = MkGameState
     -- | CR 117.5: how far the trigger scan has consumed. Everything at or after
     -- this index is unscanned. Consumption is an index bump; the record stays.
     scannedThrough :: Natural.Natural,
+    -- | CR 603.3a: "A triggered ability is controlled by the player who
+    -- controlled its source at the time it triggered." The trigger scan runs at
+    -- the CR 117.5 boundary rather than at each event, so by the time it asks,
+    -- control may already have moved -- CR 514.2 ends an "until end of turn"
+    -- control effect between CR 514.1's discard and CR 514.3a's placement. This
+    -- is the answer as of the moment the OLDEST UNSCANNED event was recorded:
+    -- every object a CR 613.1b layer-2 control effect named then, and the player
+    -- it named it for. Written by Event.recordEvent when it opens a batch,
+    -- cleared by Engine.placePendingTriggers when the batch is consumed, and read
+    -- by Event.eventTriggers in preference to the live projection.
+    --
+    -- OVERRIDES ONLY, not the whole battlefield: an object no layer-2 effect
+    -- names has its CR 110.2 default controller, which cannot change while it
+    -- stays on the battlefield, so an absent id is answered live and gets the
+    -- same answer. That also keeps the map empty on the overwhelming majority of
+    -- boards, where nothing changes control at all.
+    controlWhenTriggered :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | CR 704.5h ("since the last state-based action check"): how far the
     -- state-based-action damage read has consumed.
     damageScannedThrough :: Natural.Natural,

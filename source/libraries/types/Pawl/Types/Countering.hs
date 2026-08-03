@@ -65,8 +65,9 @@ data Countering = MkCountering
     --     as of the DEPARTURE rather than as of the countering.
     --
     -- Even for a source that is still there, re-deriving would read control at
-    -- the scan boundary rather than at the event -- #47's elision, which this
-    -- field simply does not have.
+    -- the scan boundary rather than at the event -- the divergence
+    -- GameState.controlWhenTriggered exists to close for the objects the scan
+    -- walks, and which this field simply does not have.
     controller :: PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)
