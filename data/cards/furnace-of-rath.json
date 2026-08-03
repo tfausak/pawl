@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -36,7 +33,6 @@
     }
   ],
   "name": "Furnace of Rath",
-  "power": null,
   "replacementEffects": [
     {
       "type": "DamageR",
@@ -58,14 +54,6 @@
       ]
     }
   ],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

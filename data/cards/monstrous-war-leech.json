@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "characteristicPT": {
     "type": "Count",
     "value": {
@@ -30,7 +28,6 @@
       }
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -50,17 +47,9 @@
   "power": {
     "type": "Star"
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Star"
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

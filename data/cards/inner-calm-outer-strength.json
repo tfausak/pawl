@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,8 +15,6 @@
     }
   ],
   "name": "Inner Calm, Outer Strength",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -104,9 +99,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

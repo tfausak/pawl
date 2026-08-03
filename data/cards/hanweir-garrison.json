@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -22,13 +19,6 @@
     "type": "Literal",
     "value": 2
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 3
@@ -53,32 +43,20 @@
                     "value": 2
                   },
                   {
-                    "activatedAbilities": [],
-                    "castingPermissions": [],
                     "colorIndicator": [
                       {
                         "type": "Red"
                       }
                     ],
-                    "keywords": [],
-                    "manaCost": null,
                     "name": "Human Token",
                     "power": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "replacementEffects": [],
-                    "spell": {
-                      "modes": [
-                        {}
-                      ]
-                    },
-                    "staticAbilities": [],
                     "toughness": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "triggeredAbilities": [],
                     "typeLine": {
                       "subtypes": [
                         {

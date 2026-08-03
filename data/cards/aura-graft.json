@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,8 +15,6 @@
     }
   ],
   "name": "Aura Graft",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -70,9 +65,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Cycling",
@@ -43,8 +41,6 @@
     }
   ],
   "name": "Deem Worthy",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -73,8 +69,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {

@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "characteristicPT": {
     "type": "Count",
     "value": {
@@ -61,17 +59,9 @@
   "power": {
     "type": "Star"
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Star"
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

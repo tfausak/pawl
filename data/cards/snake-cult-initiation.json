@@ -1,12 +1,9 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "enchant": {
     "pool": {
       "type": "Creatures"
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -23,13 +20,6 @@
     }
   ],
   "name": "Snake Cult Initiation",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -46,8 +36,6 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -27,13 +24,6 @@
     }
   ],
   "name": "Living Plane",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -68,8 +58,6 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "supertypes": [
       {

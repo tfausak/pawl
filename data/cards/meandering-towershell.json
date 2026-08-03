@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "delayedAbilities": [
     {
       "ability": {
@@ -85,13 +83,6 @@
     "type": "Literal",
     "value": 5
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 9

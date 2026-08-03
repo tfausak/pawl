@@ -1,13 +1,10 @@
 {
-  "activatedAbilities": [],
   "additionalCosts": [
     {
       "type": "DiscardCards",
       "value": 2
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -24,8 +21,6 @@
     }
   ],
   "name": "Cathartic Reunion",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -49,9 +44,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -31,20 +31,7 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
-  "manaCost": null,
   "name": "Seat of the Synod",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

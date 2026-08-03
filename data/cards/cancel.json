@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -27,8 +24,6 @@
     }
   ],
   "name": "Cancel",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -51,9 +46,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -72,8 +72,6 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -90,16 +88,6 @@
     }
   ],
   "name": "Aggravated Assault",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

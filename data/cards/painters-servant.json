@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -26,11 +23,6 @@
       ]
     }
   ],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -51,7 +43,6 @@
     "type": "Literal",
     "value": 3
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

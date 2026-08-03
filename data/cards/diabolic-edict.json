@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,8 +15,6 @@
     }
   ],
   "name": "Diabolic Edict",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -54,9 +49,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

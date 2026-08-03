@@ -76,20 +76,7 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
-  "manaCost": null,
   "name": "Labyrinth of Skophos",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

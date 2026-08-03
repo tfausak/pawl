@@ -28,19 +28,7 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
-  "manaCost": null,
   "name": "Radiant Fountain",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {

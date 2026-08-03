@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "enchant": {
     "filter": {
       "type": "HasCardType",
@@ -12,7 +10,6 @@
       "type": "Permanents"
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -29,7 +26,6 @@
     }
   ],
   "name": "Convincing Mirage",
-  "power": null,
   "replacementEffects": [
     {
       "type": "EntryR",
@@ -43,11 +39,6 @@
       ]
     }
   ],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -60,8 +51,6 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

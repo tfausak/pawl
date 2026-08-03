@@ -1,10 +1,7 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "counterability": {
     "type": "CantBeCountered"
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -17,8 +14,6 @@
     }
   ],
   "name": "Rending Volley",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -64,9 +59,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

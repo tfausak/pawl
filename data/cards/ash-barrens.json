@@ -28,7 +28,6 @@
       }
     }
   ],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Cycling",
@@ -62,18 +61,7 @@
       ]
     }
   ],
-  "manaCost": null,
   "name": "Ash Barrens",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

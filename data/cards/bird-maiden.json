@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Flying"
@@ -26,18 +24,10 @@
     "type": "Literal",
     "value": 1
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 2
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

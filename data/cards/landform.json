@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -14,8 +11,6 @@
     }
   ],
   "name": "Landform",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -55,9 +50,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

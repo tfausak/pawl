@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -22,13 +19,6 @@
     "type": "Literal",
     "value": 2
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 2
@@ -62,32 +52,20 @@
                     "value": 1
                   },
                   {
-                    "activatedAbilities": [],
-                    "castingPermissions": [],
                     "colorIndicator": [
                       {
                         "type": "Black"
                       }
                     ],
-                    "keywords": [],
-                    "manaCost": null,
                     "name": "Zombie Berserker Token",
                     "power": {
                       "type": "Literal",
                       "value": 2
                     },
-                    "replacementEffects": [],
-                    "spell": {
-                      "modes": [
-                        {}
-                      ]
-                    },
-                    "staticAbilities": [],
                     "toughness": {
                       "type": "Literal",
                       "value": 2
                     },
-                    "triggeredAbilities": [],
                     "typeLine": {
                       "subtypes": [
                         {

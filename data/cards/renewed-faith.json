@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Cycling",
@@ -43,8 +41,6 @@
     }
   ],
   "name": "Renewed Faith",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -68,8 +64,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {

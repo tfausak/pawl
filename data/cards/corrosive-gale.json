@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Variable"
@@ -14,8 +11,6 @@
     }
   ],
   "name": "Corrosive Gale",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -49,9 +44,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

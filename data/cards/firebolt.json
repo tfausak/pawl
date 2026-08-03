@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Flashback",
@@ -36,8 +34,6 @@
     }
   ],
   "name": "Firebolt",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -66,9 +62,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

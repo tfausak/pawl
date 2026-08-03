@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "castingRestrictions": [
     {
       "type": "DuringPhase",
@@ -15,7 +13,6 @@
       "type": "AttackedThisStep"
     }
   ],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -28,8 +25,6 @@
     }
   ],
   "name": "Rally the Troops",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -58,9 +53,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "MonocoloredHybrid",
@@ -32,8 +29,6 @@
     }
   ],
   "name": "Flame Javelin",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -62,9 +57,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

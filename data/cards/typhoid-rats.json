@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Deathtouch"
@@ -22,18 +20,10 @@
     "type": "Literal",
     "value": 1
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 1
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

@@ -1,5 +1,4 @@
 {
-  "activatedAbilities": [],
   "blockRequirements": [
     {
       "attacker": {
@@ -7,13 +6,11 @@
       }
     }
   ],
-  "castingPermissions": [],
   "enchant": {
     "pool": {
       "type": "Creatures"
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -39,16 +36,6 @@
     }
   ],
   "name": "Lure",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

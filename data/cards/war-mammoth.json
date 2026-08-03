@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Trample"
@@ -26,18 +24,10 @@
     "type": "Literal",
     "value": 3
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 3
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

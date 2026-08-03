@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,8 +15,6 @@
     }
   ],
   "name": "Angelic Edict",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -64,9 +59,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

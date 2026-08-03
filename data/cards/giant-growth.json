@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -14,8 +11,6 @@
     }
   ],
   "name": "Giant Growth",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -56,9 +51,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

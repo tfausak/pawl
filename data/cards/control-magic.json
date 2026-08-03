@@ -1,12 +1,9 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "enchant": {
     "pool": {
       "type": "Creatures"
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -32,13 +29,6 @@
     }
   ],
   "name": "Control Magic",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -51,8 +41,6 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

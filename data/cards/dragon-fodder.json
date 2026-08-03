@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,8 +15,6 @@
     }
   ],
   "name": "Dragon Fodder",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -32,32 +27,20 @@
                 "value": 2
               },
               {
-                "activatedAbilities": [],
-                "castingPermissions": [],
                 "colorIndicator": [
                   {
                     "type": "Red"
                   }
                 ],
-                "keywords": [],
-                "manaCost": null,
                 "name": "Goblin Token",
                 "power": {
                   "type": "Literal",
                   "value": 1
                 },
-                "replacementEffects": [],
-                "spell": {
-                  "modes": [
-                    {}
-                  ]
-                },
-                "staticAbilities": [],
                 "toughness": {
                   "type": "Literal",
                   "value": 1
                 },
-                "triggeredAbilities": [],
                 "typeLine": {
                   "subtypes": [
                     {
@@ -77,9 +60,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -14,15 +11,6 @@
     }
   ],
   "name": "Sarcomancy",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {
@@ -40,32 +28,20 @@
                     "value": 1
                   },
                   {
-                    "activatedAbilities": [],
-                    "castingPermissions": [],
                     "colorIndicator": [
                       {
                         "type": "Black"
                       }
                     ],
-                    "keywords": [],
-                    "manaCost": null,
                     "name": "Zombie Token",
                     "power": {
                       "type": "Literal",
                       "value": 2
                     },
-                    "replacementEffects": [],
-                    "spell": {
-                      "modes": [
-                        {}
-                      ]
-                    },
-                    "staticAbilities": [],
                     "toughness": {
                       "type": "Literal",
                       "value": 2
                     },
-                    "triggeredAbilities": [],
                     "typeLine": {
                       "subtypes": [
                         {

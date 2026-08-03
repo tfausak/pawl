@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Phyrexian",
@@ -11,8 +8,6 @@
     }
   ],
   "name": "Mutagenic Growth",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -53,9 +48,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,15 +15,6 @@
     }
   ],
   "name": "Bitterblossom",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {
@@ -70,8 +58,6 @@
                     "value": 1
                   },
                   {
-                    "activatedAbilities": [],
-                    "castingPermissions": [],
                     "colorIndicator": [
                       {
                         "type": "Black"
@@ -82,24 +68,15 @@
                         "type": "Flying"
                       }
                     ],
-                    "manaCost": null,
                     "name": "Faerie Rogue Token",
                     "power": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "replacementEffects": [],
-                    "spell": {
-                      "modes": [
-                        {}
-                      ]
-                    },
-                    "staticAbilities": [],
                     "toughness": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "triggeredAbilities": [],
                     "typeLine": {
                       "subtypes": [
                         {

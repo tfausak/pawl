@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -27,8 +24,6 @@
     }
   ],
   "name": "Savor the Moment",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -59,9 +54,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

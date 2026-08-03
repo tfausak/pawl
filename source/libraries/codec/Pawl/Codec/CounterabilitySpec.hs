@@ -23,9 +23,3 @@ spec s = Spec.describe s "Pawl.Codec.Counterability" $ do
       Counterability.fromJson
       Counterability.CantBeCountered
       """ {"type":"CantBeCountered"} """
-  Spec.describe s "fromJsonDefault" $ do
-    -- CR 113.6g is printed text, so an absent key means Counterable.
-    Spec.it s "absent key decodes as Counterable" $
-      Common.assertFromJson s Counterability.fromJsonDefault "null" Counterability.Counterable
-    Spec.it s "CantBeCountered still decodes explicitly" $
-      Common.assertFromJson s Counterability.fromJsonDefault "{\"type\":\"CantBeCountered\"}" Counterability.CantBeCountered

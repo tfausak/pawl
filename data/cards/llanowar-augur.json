@@ -83,8 +83,6 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -101,18 +99,10 @@
     "type": "Literal",
     "value": 0
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 3
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

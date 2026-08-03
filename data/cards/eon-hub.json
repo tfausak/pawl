@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -9,7 +6,6 @@
     }
   ],
   "name": "Eon Hub",
-  "power": null,
   "replacementEffects": [
     {
       "type": "PhaseR",
@@ -27,14 +23,6 @@
       }
     }
   ],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

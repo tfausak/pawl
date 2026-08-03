@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Defender"
@@ -16,12 +14,6 @@
   "power": {
     "type": "Literal",
     "value": 0
-  },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
   },
   "staticAbilities": [
     {
@@ -59,7 +51,6 @@
     "type": "Literal",
     "value": 3E+1
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

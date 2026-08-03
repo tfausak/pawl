@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "combatRestrictions": [
     {
       "type": "CantAttack",
@@ -127,7 +125,6 @@
       }
     }
   ],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -148,18 +145,10 @@
     "type": "Literal",
     "value": 4
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 3
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

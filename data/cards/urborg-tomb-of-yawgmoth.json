@@ -1,16 +1,5 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
-  "manaCost": null,
   "name": "Urborg, Tomb of Yawgmoth",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -32,8 +21,6 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "supertypes": [
       {

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CardSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -115,14 +117,46 @@ baseCard =
       Card.counterability = Counterability.Counterable
     }
 
+-- | Every field at the default an omitted key means, which is what the minimal
+-- JSON above has to decode to.
+minimalCard :: Card.Card
+minimalCard =
+  Card.MkCard
+    { Card.name = CardName.MkCardName (Text.pack "Mountain"),
+      Card.manaCost = Nothing,
+      Card.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Land) Set.empty,
+      Card.power = Nothing,
+      Card.toughness = Nothing,
+      Card.loyalty = Nothing,
+      Card.keywords = Set.empty,
+      Card.colorIndicator = Set.empty,
+      Card.characteristicPT = Nothing,
+      Card.staticAbilities = [],
+      Card.spell = Card.defaultSpell,
+      Card.activatedAbilities = [],
+      Card.replacementEffects = [],
+      Card.triggeredAbilities = [],
+      Card.delayedAbilities = Map.empty,
+      Card.castingPermissions = [],
+      Card.castingRestrictions = [],
+      Card.enchant = Nothing,
+      Card.counterability = Counterability.Counterable,
+      Card.additionalCosts = [],
+      Card.alternativeCosts = [],
+      Card.playerAbilities = [],
+      Card.blockRequirements = [],
+      Card.attackRequirements = [],
+      Card.combatRestrictions = [],
+      Card.attackCosts = [],
+      Card.mulliganAction = [],
+      Card.openingHandAction = []
+    }
+
 baseCardJson :: String
 baseCardJson =
   "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
     <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
-    <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
-    <> "\"keywords\":[],\"staticAbilities\":[],"
-    <> "\"spell\":{\"modes\":[{}]},"
-    <> "\"activatedAbilities\":[],\"replacementEffects\":[],\"triggeredAbilities\":[],\"castingPermissions\":[]}"
+    <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}"
 
 -- | 'baseCard' with every field populated at once, including the sixteen
 -- defaulted/elided ones and the recursive card-in-card fields (spell,
@@ -165,7 +199,6 @@ populatedCardJson =
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
     <> "\"keywords\":[{\"type\":\"Deathtouch\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
-    <> "\"spell\":{\"modes\":[{}]},"
     <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[],\"components\":[]},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}],"
@@ -190,6 +223,15 @@ populatedCardJson =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Card" $ do
+  -- R6: name and typeLine are the only required keys, and a card that says
+  -- nothing else is a vanilla card rather than a malformed file.
+  Spec.it s "a minimal card carries only name and typeLine" $
+    Common.assertJsonCodec
+      s
+      Card.toJson
+      Card.fromJson
+      minimalCard
+      """ {"name":"Mountain","typeLine":{"types":[{"type":"Land"}]}} """
   -- R7's one case for MkCard's single constructor, and simultaneously the
   -- absent-key proof for all sixteen defaulted/elided fields at once: see
   -- 'baseCard's haddock for why one round trip suffices for both.

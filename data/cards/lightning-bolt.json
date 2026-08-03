@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -14,8 +11,6 @@
     }
   ],
   "name": "Lightning Bolt",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -44,9 +39,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

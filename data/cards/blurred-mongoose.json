@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "counterability": {
     "type": "CantBeCountered"
   },
@@ -29,18 +27,10 @@
     "type": "Literal",
     "value": 2
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 1
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

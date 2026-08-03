@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -23,8 +20,6 @@
     }
   ],
   "name": "Sign in Blood",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -69,9 +64,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,7 +15,6 @@
     }
   ],
   "name": "Doubling Season",
-  "power": null,
   "replacementEffects": [
     {
       "type": "TokenR",
@@ -54,14 +50,6 @@
       ]
     }
   ],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

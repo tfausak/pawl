@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -18,13 +15,6 @@
     "type": "Literal",
     "value": 1
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 1
@@ -46,8 +36,6 @@
                     "value": 1
                   },
                   {
-                    "activatedAbilities": [],
-                    "castingPermissions": [],
                     "colorIndicator": [
                       {
                         "type": "White"
@@ -58,24 +46,15 @@
                         "type": "Flying"
                       }
                     ],
-                    "manaCost": null,
                     "name": "Spirit Token",
                     "power": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "replacementEffects": [],
-                    "spell": {
-                      "modes": [
-                        {}
-                      ]
-                    },
-                    "staticAbilities": [],
                     "toughness": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "triggeredAbilities": [],
                     "typeLine": {
                       "subtypes": [
                         {

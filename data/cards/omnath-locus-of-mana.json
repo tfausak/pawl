@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -40,12 +37,6 @@
   "power": {
     "type": "Literal",
     "value": 1
-  },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
   },
   "staticAbilities": [
     {
@@ -108,7 +99,6 @@
     "type": "Literal",
     "value": 1
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

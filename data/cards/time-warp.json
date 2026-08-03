@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -27,8 +24,6 @@
     }
   ],
   "name": "Time Warp",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -57,9 +52,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

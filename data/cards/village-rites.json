@@ -1,5 +1,4 @@
 {
-  "activatedAbilities": [],
   "additionalCosts": [
     {
       "type": "Sacrifice",
@@ -14,8 +13,6 @@
       ]
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -28,8 +25,6 @@
     }
   ],
   "name": "Village Rites",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -53,9 +48,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -1,5 +1,4 @@
 {
-  "activatedAbilities": [],
   "attackRequirements": [
     {
       "subject": {
@@ -13,13 +12,11 @@
       }
     }
   ],
-  "castingPermissions": [],
   "enchant": {
     "pool": {
       "type": "Players"
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -36,16 +33,6 @@
     }
   ],
   "name": "Curse of the Nightly Hunt",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

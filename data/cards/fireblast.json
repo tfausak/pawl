@@ -1,5 +1,4 @@
 {
-  "activatedAbilities": [],
   "alternativeCosts": [
     {
       "components": [
@@ -19,8 +18,6 @@
       "mana": []
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -46,8 +43,6 @@
     }
   ],
   "name": "Fireblast",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -76,9 +71,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {

@@ -113,8 +113,6 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "loyalty": 3,
   "manaCost": [
     {
@@ -141,16 +139,6 @@
     }
   ],
   "name": "Jace Beleren",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {}
-    ]
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

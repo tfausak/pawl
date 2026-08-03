@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "delayedAbilities": [
     {
       "ability": {
@@ -34,7 +32,6 @@
       "name": "sacrifice it"
     }
   ],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -51,8 +48,6 @@
     }
   ],
   "name": "Tidal Wave",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -65,8 +60,6 @@
                 "value": 1
               },
               {
-                "activatedAbilities": [],
-                "castingPermissions": [],
                 "colorIndicator": [
                   {
                     "type": "Blue"
@@ -77,24 +70,15 @@
                     "type": "Defender"
                   }
                 ],
-                "manaCost": null,
                 "name": "Wall Token",
                 "power": {
                   "type": "Literal",
                   "value": 5
                 },
-                "replacementEffects": [],
-                "spell": {
-                  "modes": [
-                    {}
-                  ]
-                },
-                "staticAbilities": [],
                 "toughness": {
                   "type": "Literal",
                   "value": 5
                 },
-                "triggeredAbilities": [],
                 "typeLine": {
                   "subtypes": [
                     {
@@ -119,9 +103,6 @@
       }
     ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "types": [
       {
