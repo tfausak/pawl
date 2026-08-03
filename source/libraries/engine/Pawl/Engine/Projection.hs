@@ -411,11 +411,14 @@ affects source oid a partial gs = case a of
   -- Unlike that arm's `perspective`, this call is FORCED on every candidate, so
   -- the #197 hazard is worth stating rather than inheriting: controllerOf ->
   -- controlGrants -> liveGiven -> affectsBase re-enters this function, which would
-  -- loop if a SetLandSubtype effect (the only kind liveGiven feeds) ever carried
-  -- an AttachedPlayerControls set. None does -- the pool's one static example is
-  -- Blood Moon, and Pawl.Engine.Resolve stores every ContinuousEffect with
-  -- Affected.TheseObjects -- and controllerOfGiven's own namesFrom answers False
-  -- for this arm rather than recursing.
+  -- loop if a subtype-setting effect (the only kind liveGiven feeds) ever carried
+  -- an AttachedPlayerControls set. None does -- the pool's two static examples
+  -- are Blood Moon, whose set is Matching, and Convincing Mirage, whose set is
+  -- Affected.Attached and NOT this arm (the two names differ by one word and are
+  -- different sets: Attached names the source's own host, this names what an
+  -- enchanted PLAYER controls), and Pawl.Engine.Resolve stores every
+  -- ContinuousEffect with Affected.TheseObjects -- and controllerOfGiven's own
+  -- namesFrom answers False for this arm rather than recursing.
   --
   -- The Filter's perspective is the Matching arm's, not the enchanted player's:
   -- CR 109.5 fixes "you" as the effect's source's controller, and being the set
@@ -1061,6 +1064,17 @@ setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
   let isSet m = case m of
         Modification.SetLandSubtype _ -> True
+        -- CR 305.7 does not care WHERE the type came from: a type chosen as the
+        -- source entered (CR 614.1c) strips the land's rules text exactly as a
+        -- printed one does. Convincing Mirage.
+        --
+        -- Answering False here would strip the land INSIDE the fold
+        -- (setLandSubtypeTo) while leaving its static abilities in the candidate
+        -- list -- the two halves of one rule disagreeing, since this predicate
+        -- classifies by CONSTRUCTOR and the wildcard below means the compiler
+        -- cannot name a new arm that needs to be here. Pawl.ProjectionSpec's
+        -- "Convincing Mirage strips Urborg's static ability" is what catches it.
+        Modification.SetLandSubtypeToChosen -> True
         -- Not the CR 305.7 land-subtype "set" this predicate gates (a control
         -- op, not a type change); the existing wildcard already covers it, but
         -- named explicitly per Modification's exhaustiveness discipline.
@@ -1080,9 +1094,12 @@ setLandSubtypeEffects gs =
       -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
       -- 612's word swap to the same ability's (#624). So a text-changed source
       -- would have this gate and the layer fold disagreeing about which
-      -- permanents it names. Unreachable: the pool's only SetLandSubtype is
-      -- Blood Moon, which selects by card type and supertype and so carries no
-      -- land-type word for a swap to reach. Rewriting here is not free either --
+      -- permanents it names. Unreachable twice over. The pool's two
+      -- subtype-setting statics are Blood Moon, which selects by card type and
+      -- supertype and so carries no land-type word for a swap to reach, and
+      -- Convincing Mirage, whose Affected.Attached names no word at all -- and
+      -- rewriteAffected's Attached arm is the identity, so a text change could
+      -- not move it even if one reached here. Rewriting here is not free either --
       -- textChangesAffecting folds the whole effect list, and this function is
       -- hoisted out of gather's walk precisely to avoid per-permanent cost
       -- (#584).
@@ -1100,9 +1117,12 @@ setLandSubtypeEffects gs =
 -- Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.instances -- since such an
 -- ability has to be kept out of its reader's candidate list rather than erased
 -- from the bearer's own projection afterwards. Every other kind of rules-text
--- ability is stripped inside the fold instead, by applyModification's
--- SetLandSubtype arm. So an object's static abilities are
--- live unless a live SetLandSubtype applies to it. "Live" recurses on the
+-- ability is stripped inside the fold instead, by setLandSubtypeTo. So an
+-- object's static abilities are
+-- live unless a live subtype-setting effect applies to it -- either kind, the
+-- printed SetLandSubtype (Blood Moon) or the chosen SetLandSubtypeToChosen
+-- (Convincing Mirage), since setLandSubtypeEffects gathers both and CR 305.7
+-- does not distinguish them. "Live" recurses on the
 -- stripper's own source; "applies to" reads BASE characteristics (nonbasic is a
 -- printed supertype, and card-type Land is read off the printed type line here),
 -- so nothing recurses into the projection and the result is order-INDEPENDENT. A
@@ -2415,11 +2435,13 @@ data ControlGrant = MkControlGrant
 -- `controlGrants` -- so if that Matching filter's evaluation ever forces
 -- `affects`'s `perspective` thunk (a ControlledBy conjunct is the only thing
 -- that does), this loops rather than answering wrong. Nothing here prevents
--- that; it holds only because no SetLandSubtype in the pool -- static OR
+-- that; it holds only because no subtype-setting effect in the pool -- static OR
 -- stored, setLandSubtypeEffects gathers both -- carries a Matching filter with
--- ControlledBy in it: the pool's one static example (Blood Moon) has none, and
--- every stored ContinuousEffect Pawl.Engine.Resolve constructs carries
--- Affected.TheseObjects rather than Matching at all. See #197 for the card
+-- ControlledBy in it: of the two static examples, Blood Moon's Matching filter
+-- has none and Convincing Mirage's Affected.Attached is not a Matching filter at
+-- all (its `affects` arm reads the source's attachment and never calls
+-- controllerOf), and every stored ContinuousEffect Pawl.Engine.Resolve
+-- constructs carries Affected.TheseObjects rather than Matching at all. See #197 for the card
 -- shape that would break this and the deferred structural fix.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
