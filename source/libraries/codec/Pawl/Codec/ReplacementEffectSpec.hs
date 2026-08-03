@@ -105,8 +105,8 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       s
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
-      (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat, DamagePattern.whichSource = SourceRelation.AnySource} DamageRewrite.PreventAll)
-      "{\"type\":\"DamageR\",\"value\":[{\"whichKind\":{\"type\":\"Combat\"},\"whichSource\":{\"type\":\"AnySource\"}},{\"type\":\"PreventAll\"}]}"
+      (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat, DamagePattern.whichSource = SourceRelation.AnySource, DamagePattern.whichRecipient = Nothing} DamageRewrite.PreventAll)
+      "{\"type\":\"DamageR\",\"value\":[{\"whichKind\":{\"type\":\"Combat\"},\"whichRecipient\":null,\"whichSource\":{\"type\":\"AnySource\"}},{\"type\":\"PreventAll\"}]}"
   -- CR 614.15 / 614.1a: Galvanic Blast's metalcraft clause -- source-scoped, any
   -- kind, and a flat instead-amount rather than a prevention.
   Spec.it s "DamageR (this source's damage, set to a flat amount)" $
@@ -114,16 +114,16 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       s
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
-      (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whichSource = SourceRelation.TheSource} (DamageRewrite.SetAmount 4))
-      "{\"type\":\"DamageR\",\"value\":[{\"whichKind\":null,\"whichSource\":{\"type\":\"TheSource\"}},{\"type\":\"SetAmount\",\"value\":4}]}"
+      (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whichSource = SourceRelation.TheSource, DamagePattern.whichRecipient = Nothing} (DamageRewrite.SetAmount 4))
+      "{\"type\":\"DamageR\",\"value\":[{\"whichKind\":null,\"whichRecipient\":null,\"whichSource\":{\"type\":\"TheSource\"}},{\"type\":\"SetAmount\",\"value\":4}]}"
   -- Furnace of Rath's "it deals double that damage ... instead".
   Spec.it s "DamageR (any source's damage, doubled)" $
     Common.assertJsonCodec
       s
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
-      (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whichSource = SourceRelation.AnySource} (DamageRewrite.Scale (Scaling.Multiply 2)))
-      "{\"type\":\"DamageR\",\"value\":[{\"whichKind\":null,\"whichSource\":{\"type\":\"AnySource\"}},{\"type\":\"Scale\",\"value\":{\"type\":\"Multiply\",\"value\":2}}]}"
+      (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whichSource = SourceRelation.AnySource, DamagePattern.whichRecipient = Nothing} (DamageRewrite.Scale (Scaling.Multiply 2)))
+      "{\"type\":\"DamageR\",\"value\":[{\"whichKind\":null,\"whichRecipient\":null,\"whichSource\":{\"type\":\"AnySource\"}},{\"type\":\"Scale\",\"value\":{\"type\":\"Multiply\",\"value\":2}}]}"
   -- CR 614.8: regeneration, DestructionR's sole producer today.
   Spec.it s "DestructionR (regenerate)" $
     Common.assertJsonCodec

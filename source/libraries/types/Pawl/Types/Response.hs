@@ -91,6 +91,14 @@ data Response
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as a
     -- permutation of the offered indices, serialized so a DecisionLog replays it.
     OrderedTriggers [Natural.Natural]
+  | -- | CR 615.7: the order a shielded player (or a shielded permanent's
+    -- controller) chose for the simultaneous damage events one prevention shield
+    -- may cover, as a permutation of the offered indices, serialized so a
+    -- DecisionLog replays it. Its own constructor rather than a reuse of
+    -- OrderedTriggers: decode must return Nothing for a response that does not
+    -- match the prompt being asked, and two prompts sharing a constructor cannot
+    -- do that.
+    OrderedDamage [Natural.Natural]
   | -- | CR 616.1: the index of the replacement effect a player chose to apply next,
     -- serialized so a DecisionLog replays a replacement race deterministically.
     ChoseReplacement Natural.Natural

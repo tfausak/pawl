@@ -56,6 +56,7 @@ encode p answer = case p of
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
+  Prompt.OrderDamage {} -> Response.OrderedDamage answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
@@ -146,6 +147,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderTriggers {} -> case response of
     Response.OrderedTriggers order -> Just order
+    _ -> Nothing
+  Prompt.OrderDamage {} -> case response of
+    Response.OrderedDamage order -> Just order
     _ -> Nothing
   Prompt.ChooseReplacement {} -> case response of
     Response.ChoseReplacement n -> Just n
@@ -288,6 +292,9 @@ defaultAnswer p = case p of
   -- CR 603.3b: the canonical order is always a legal answer, and is the least
   -- eventful fallback when a transcript runs short.
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  -- CR 615.7: likewise -- the canonical order is a legal permutation, and is
+  -- what the batch was gathered in.
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   -- CR 616.1: index 0 is always a legal answer (the bucket is non-empty when this
   -- is asked), and is the least eventful fallback when a transcript runs short.
   Prompt.ChooseReplacement {} -> 0

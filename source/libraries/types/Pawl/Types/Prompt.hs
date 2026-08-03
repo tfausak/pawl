@@ -11,6 +11,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -374,6 +375,33 @@ data Prompt r where
   -- is vacuous while no condition triggers on another ability triggering; this
   -- carries the note, not the machinery.
   OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerEntry.TriggerEntry] -> Prompt [Natural.Natural]
+  -- | CR 615.7: "If damage would be dealt to the shielded permanent or player by
+  -- two or more applicable sources at the same time, the player or the
+  -- controller of the permanent chooses which damage the shield prevents." The
+  -- [DamageEvent] is the simultaneous events this player's shields are contested
+  -- over -- every one of them addressed to a permanent or player they shield --
+  -- in the engine's canonical order; the answer is a permutation of their
+  -- INDICES, giving the order the shields are offered them.
+  --
+  -- An ORDER rather than a pick, and that is the rule read closely rather than a
+  -- convenience. Within the event a shield is applied to, CR 615.7 leaves
+  -- nothing to choose -- "each 1 damage that would be dealt ... is prevented",
+  -- so the shield covers as much of that event as it can and no more -- and the
+  -- shield goes on to the next event with whatever is left. So the only freedom
+  -- the rule grants is WHICH event is covered first, and repeatedly asking that
+  -- is an order. It is one question rather than one per event for the same
+  -- reason OrderTriggers is.
+  --
+  -- The whole DamageEvent is on the wire, not just each event's source: the
+  -- amounts are what the answer turns on (a shield of 4 against a 5 and a 3
+  -- covers one of them completely or neither), and the riders decide what
+  -- surviving damage will do.
+  --
+  -- Asked ONLY when the order is observable -- two or more events one shield
+  -- admits, and a remaining amount that is neither 0 nor enough to cover all of
+  -- them. A shield that covers everything prevents everything whatever the
+  -- order, and where the rules leave nothing to ask, don't prompt.
+  OrderDamage :: Decider.Decider -> PlayerId.PlayerId -> [DamageEvent.DamageEvent] -> Prompt [Natural.Natural]
   -- | CR 616.1: with two or more applicable replacement or prevention effects in
   -- the highest non-empty bucket, the affected object's controller (or its owner,
   -- or the affected player) chooses which to apply NEXT -- and then the process

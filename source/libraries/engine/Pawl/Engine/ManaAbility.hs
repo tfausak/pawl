@@ -60,6 +60,7 @@ manaProduced effect = case effect of
   Effect.Create {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
+  Effect.PreventNextDamage {} -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing

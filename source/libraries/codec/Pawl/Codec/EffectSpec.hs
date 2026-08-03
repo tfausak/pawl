@@ -324,9 +324,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           Uses.Once
           ReplacementOrigin.SelfReplacement
           (Just (Condition.MkCondition (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3)))
-          (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource) (DamageRewrite.SetAmount 4))
+          (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing) (DamageRewrite.SetAmount 4))
       )
-      "{\"type\":\"Replace\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"Once\"},{\"type\":\"SelfReplacement\"},{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"aggregation\":{\"type\":\"Objects\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":3}},{\"type\":\"DamageR\",\"value\":[{\"whichKind\":null,\"whichSource\":{\"type\":\"TheSource\"}},{\"type\":\"SetAmount\",\"value\":4}]}]}"
+      "{\"type\":\"Replace\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"Once\"},{\"type\":\"SelfReplacement\"},{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"aggregation\":{\"type\":\"Objects\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":3}},{\"type\":\"DamageR\",\"value\":[{\"whichKind\":null,\"whichRecipient\":null,\"whichSource\":{\"type\":\"TheSource\"}},{\"type\":\"SetAmount\",\"value\":4}]}]}"
   -- CR 614.10a: Fatigue's slot read, plus Stonehorn Dignitary's whole-phase
   -- selector -- the arm a Phase alone cannot spell (CR 500.1, "a turn consists
   -- of five phases").
@@ -343,6 +343,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase)
       "{\"type\":\"SkipNextPhase\",\"value\":[{\"type\":\"InSlot\",\"value\":\"target\"},{\"type\":\"CombatPhase\"}]}"
+  -- CR 615.7: Mending Hands' whole text -- "Prevent the next 4 damage that would
+  -- be dealt to any target this turn."
+  Spec.it s "PreventNextDamage" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4))
+      "{\"type\":\"PreventNextDamage\",\"value\":[{\"type\":\"UntilEndOfTurn\"},\"target\",{\"type\":\"Literal\",\"value\":4}]}"
   -- CR 113.9: this same opcode now also counters an ABILITY (Stifle), not only
   -- a spell (Cancel) -- the type is unchanged, so the wire shape is too.
   Spec.it s "Counter" $
