@@ -225,6 +225,7 @@ modificationCounts modification = case modification of
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
   Modification.AddColor _ -> []
+  Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
 -- Every Count reachable from a TriggerCondition: only StateIs (CR 603.8, a
@@ -1066,6 +1067,7 @@ modificationFilters modification = case modification of
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
   Modification.AddColor _ -> []
+  Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
 staticAbilityFilters :: StaticAbility.StaticAbility -> [Filter.Type.Filter Keyword.Keyword]

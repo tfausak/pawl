@@ -77,6 +77,7 @@ layer m = case m of
   Modification.SetControllerToSource -> Layer.Control
   Modification.SetColor _ -> Layer.Color
   Modification.AddColor _ -> Layer.Color
+  Modification.AddChosenColor -> Layer.Color
   Modification.SwitchPowerToughness -> Layer.SwitchPT
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
@@ -255,6 +256,13 @@ applyModification lyr src cands gs oid m pc =
         -- object's existing colours rather than replacing them.
         Modification.AddColor cs ->
           pc {PC.colors = Set.union cs (PC.colors pc)}
+        -- CR 105.3's parenthetical again, with the colour read off the SOURCE's
+        -- own entry choice. An unchosen source (malformed data, or an entry that
+        -- never ran the rewrite) adds nothing rather than guessing a colour.
+        Modification.AddChosenColor ->
+          case Game.lookupObject src gs >>= Object.chosenColor of
+            Nothing -> pc
+            Just c -> pc {PC.colors = Set.insert c (PC.colors pc)}
         -- CR 613.4d: "take the value of power and apply it to the creature's
         -- toughness, and take the value of toughness and apply it to the
         -- creature's power."
@@ -976,6 +984,7 @@ freezeQuantities gs oid you m =
         Modification.SetControllerToSource -> Just m
         Modification.SetColor _ -> Just m
         Modification.AddColor _ -> Just m
+        Modification.AddChosenColor -> Just m
         Modification.SwitchPowerToughness -> Just m
 
 -- Every Quantity a modification carries, in the order it carries them. Another
@@ -1001,6 +1010,7 @@ quantitiesOf m = case m of
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
   Modification.AddColor _ -> []
+  Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
 -- Every SetLandSubtype effect in the game, each with its source and affected set
@@ -1320,6 +1330,7 @@ removesAbilities m = case m of
   Modification.AddCardType _ -> False
   Modification.SetColor _ -> False
   Modification.AddColor _ -> False
+  Modification.AddChosenColor -> False
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
 
@@ -1658,6 +1669,7 @@ modificationWrites m = case m of
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors
   Modification.AddColor _ -> Set.singleton Colors
+  Modification.AddChosenColor -> Set.singleton Colors
   Modification.SetController _ -> Set.singleton Controller
   Modification.SetControllerToSource -> Set.singleton Controller
 

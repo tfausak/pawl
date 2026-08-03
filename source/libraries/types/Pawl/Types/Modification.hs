@@ -78,6 +78,17 @@ data Modification
     -- colors" -- so this unions where SetColor replaces. Indigo Faerie's
     -- "target permanent becomes blue in addition to its other colors".
     AddColor (Set.Set Color.Color)
+  | -- | layer 5, CR 613.1e / 105.3: this object gains, IN ADDITION to its other
+    -- colours, the colour chosen for THIS effect's SOURCE as that source entered
+    -- (Object.chosenColor). Painter's Servant's "the chosen color".
+    --
+    -- Payload-free because the colour is DERIVED at projection time from the
+    -- source rather than baked into card data -- the same posture
+    -- SetControllerToSource takes toward CR 109.5's "you", and two constructors
+    -- for the same reason that AddColor above carries a literal set and this
+    -- does not. A static ability's modification is card data and cannot name a
+    -- colour a player will choose.
+    AddChosenColor
   | -- | layer 7d, CR 613.4d: switch this object's power and toughness. Takes the
     -- value of power and applies it to toughness, and vice versa -- so it acts on
     -- whatever 7a, 7b and 7c already produced, not on the printed box. Carries no
