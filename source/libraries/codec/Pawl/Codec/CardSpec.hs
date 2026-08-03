@@ -77,13 +77,14 @@ minimalTriggeredAbility =
 
 -- | Every required field set to a simple value, and every defaulted/elided
 -- field at its Haskell default (Nothing, empty, or Counterable). Its JSON has
--- none of the sixteen optional keys -- 'baseCardJson' below -- which is what
--- lets the single round-trip assertion in the first test prove BOTH halves of
--- every one of those fields' elision at once: 'Card.toJson' would emit an
--- extra key if any field's encoder mis-omitted its default, and
--- 'Card.fromJson' would land on the wrong value if any field's decoder
--- mis-defaulted an absent key, and either failure would break the equality
--- check.
+-- none of the 23 defaulted keys this fixture leaves at their default (of 26
+-- total; manaCost, power and toughness are the other three, set to
+-- non-default values above) -- 'baseCardJson' below -- which is what lets the
+-- single round-trip assertion in the first test prove BOTH halves of every one
+-- of those fields' elision at once: 'Card.toJson' would emit an extra key if
+-- any field's encoder mis-omitted its default, and 'Card.fromJson' would land
+-- on the wrong value if any field's decoder mis-defaulted an absent key, and
+-- either failure would break the equality check.
 baseCard :: Card.Card
 baseCard =
   Card.MkCard
@@ -158,13 +159,16 @@ baseCardJson =
     <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}"
 
--- | 'baseCard' with every field populated at once, including the sixteen
--- defaulted/elided ones and the recursive card-in-card fields (spell,
--- activatedAbilities, triggeredAbilities, delayedAbilities) -- the shape a
--- reviewer would otherwise have to piece together from sixteen separate single-
--- field cases. Its JSON, 'populatedCardJson', was produced by running
--- 'Card.toJson' on this exact value (not transcribed by hand) and pasted back in,
--- per the recipe's "derive every JSON literal by reading the encoder" rule.
+-- | 'baseCard' with every field populated at once, except 'Card.spell' -- left
+-- at 'Card.defaultSpell' since nothing here overrides it, which is why
+-- 'populatedCardJson' has no @"spell"@ key. Covers the other 25 of the 26
+-- defaulted keys, plus the recursive card-in-card fields that do get
+-- populated (activatedAbilities, triggeredAbilities, delayedAbilities) -- the
+-- shape a reviewer would otherwise have to piece together from sixteen
+-- separate single-field cases. Its JSON, 'populatedCardJson', was produced by
+-- running 'Card.toJson' on this exact value (not transcribed by hand) and
+-- pasted back in, per the recipe's "derive every JSON literal by reading the
+-- encoder" rule.
 populatedCard :: Card.Card
 populatedCard =
   baseCard
@@ -233,16 +237,20 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
       minimalCard
       """ {"name":"Mountain","typeLine":{"types":[{"type":"Land"}]}} """
   -- R7's one case for MkCard's single constructor, and simultaneously the
-  -- absent-key proof for all sixteen defaulted/elided fields at once: see
-  -- 'baseCard's haddock for why one round trip suffices for both.
+  -- absent-key proof for the 23 fields 'baseCard' leaves at their default, all
+  -- at once: see 'baseCard's haddock for why one round trip suffices for both.
   Spec.it s "MkCard, every required field present and every optional field absent" $
     Common.assertJsonCodec s Card.toJson Card.fromJson baseCard baseCardJson
-  -- Each defaulted field gets its own explicit absent-key assertion too, not
-  -- just the aggregate proof above: a decoder that defaulted the WRONG field
+  -- 16 of the 26 defaulted fields also get their own explicit absent-key
+  -- assertion below, not just the aggregate proofs above (the 'baseCard' round
+  -- trip and 'minimalCard's): a decoder that defaulted the WRONG field
   -- (swapping two Maybe fields of the same underlying type, say) could still
-  -- pass the aggregate 'baseCard' equality by accident if the two defaults
+  -- pass one of those aggregate equalities by accident if the two defaults
   -- happened to collide; reading each field back out individually rules that
-  -- out.
+  -- out. The other ten (keywords, staticAbilities, spell, activatedAbilities,
+  -- replacementEffects, triggeredAbilities, castingPermissions, manaCost,
+  -- power, toughness) have no individual case -- covered by the aggregate
+  -- proofs alone, not by a weaker guarantee.
   Spec.describe s "each defaulted field takes its default when its key is absent from the JSON" $ do
     Spec.it s "loyalty (CR 306.5) defaults to Nothing" $ do
       v <- Common.assertJson s baseCardJson

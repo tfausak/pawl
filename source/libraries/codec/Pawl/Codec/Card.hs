@@ -89,7 +89,8 @@ toJson c =
       Common.optionalPair "alternativeCosts" [] (Common.encodeList (Cost.toJson Keyword.toJson)) (Card.alternativeCosts c),
       Common.optionalPair "mulliganAction" [] (Common.encodeList (Effect.toJson toJson)) (Card.mulliganAction c),
       Common.optionalPair "openingHandAction" [] (Common.encodeList (Effect.toJson toJson)) (Card.openingHandAction c),
-      -- R2: Counterable is the absence of a restriction (CR 701.5).
+      -- CR 113.6g: Counterable is the absence of a card stating it can't be
+      -- countered.
       Common.optionalPair "counterability" Counterability.Counterable Counterability.toJson (Card.counterability c)
     ]
 
