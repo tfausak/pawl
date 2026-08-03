@@ -55,7 +55,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) (PlayerId.MkPlayerId 0))
       "{\"type\":\"StepBegan\",\"value\":[{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},0]}"
   Spec.it s "SpellCast" $
-    Common.assertJsonCodec s GameEvent.toJson GameEvent.fromJson (GameEvent.SpellCast (PlayerId.MkPlayerId 0)) "{\"type\":\"SpellCast\",\"value\":0}"
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.SpellCast (PlayerId.MkPlayerId 0))
+      "{\"type\":\"SpellCast\",\"value\":0}"
   Spec.it s "BecameMonarch" $
     Common.assertJsonCodec
       s

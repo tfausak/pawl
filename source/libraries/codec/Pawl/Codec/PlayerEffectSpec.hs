@@ -18,7 +18,12 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
   -- CR 601.3 / Silence.
   Spec.it s "CantCastSpells" $
-    Common.assertJsonCodec s PlayerEffect.toJson PlayerEffect.fromJson PlayerEffect.CantCastSpells "{\"type\":\"CantCastSpells\"}"
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantCastSpells
+      "{\"type\":\"CantCastSpells\"}"
   -- CR 601.3 / Rule of Law.
   Spec.it s "CantCastMoreThan" $
     Common.assertJsonCodec
@@ -57,7 +62,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       "{\"type\":\"ReduceSpellCost\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Cleric\"}},[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}]]}"
   -- CR 402.2 / Reliquary Tower.
   Spec.it s "NoMaximumHandSize" $
-    Common.assertJsonCodec s PlayerEffect.toJson PlayerEffect.fromJson PlayerEffect.NoMaximumHandSize "{\"type\":\"NoMaximumHandSize\"}"
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.NoMaximumHandSize
+      "{\"type\":\"NoMaximumHandSize\"}"
   -- CR 500.5 / 703.4q / Upwelling: no mana type named.
   Spec.it s "DontLoseUnspentMana, Upwelling's whole pool" $
     Common.assertJsonCodec

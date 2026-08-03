@@ -11,7 +11,12 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ManaFilter" $ do
   -- Upwelling's "unspent mana", with no type named.
   Spec.it s "Any" $
-    Common.assertJsonCodec s ManaFilter.toJson ManaFilter.fromJson ManaFilter.Any "{\"type\":\"Any\"}"
+    Common.assertJsonCodec
+      s
+      ManaFilter.toJson
+      ManaFilter.fromJson
+      ManaFilter.Any
+      "{\"type\":\"Any\"}"
   -- CR 106.1a / Omnath, Locus of Mana's "unspent green mana".
   Spec.it s "OfType, a colour" $
     Common.assertJsonCodec

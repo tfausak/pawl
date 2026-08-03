@@ -8,4 +8,9 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.DestructionRewrite" . Spec.it s "Regenerate" $
-    Common.assertJsonCodec s DestructionRewrite.toJson DestructionRewrite.fromJson DestructionRewrite.Regenerate "{\"type\":\"Regenerate\"}"
+    Common.assertJsonCodec
+      s
+      DestructionRewrite.toJson
+      DestructionRewrite.fromJson
+      DestructionRewrite.Regenerate
+      "{\"type\":\"Regenerate\"}"

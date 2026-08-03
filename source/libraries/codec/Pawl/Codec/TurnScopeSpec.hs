@@ -8,6 +8,16 @@ import qualified Pawl.Types.TurnScope as TurnScope
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TurnScope" $ do
   Spec.it s "EachTurn" $
-    Common.assertJsonCodec s TurnScope.toJson TurnScope.fromJson TurnScope.EachTurn "{\"type\":\"EachTurn\"}"
+    Common.assertJsonCodec
+      s
+      TurnScope.toJson
+      TurnScope.fromJson
+      TurnScope.EachTurn
+      "{\"type\":\"EachTurn\"}"
   Spec.it s "ControllersTurn" $
-    Common.assertJsonCodec s TurnScope.toJson TurnScope.fromJson TurnScope.ControllersTurn "{\"type\":\"ControllersTurn\"}"
+    Common.assertJsonCodec
+      s
+      TurnScope.toJson
+      TurnScope.fromJson
+      TurnScope.ControllersTurn
+      "{\"type\":\"ControllersTurn\"}"

@@ -23,13 +23,33 @@ fromJson = CostComponent.fromJson Keyword.fromJson
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
   Spec.it s "TapThis" $
-    Common.assertJsonCodec s toJson fromJson CostComponent.TapThis "{\"type\":\"TapThis\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      CostComponent.TapThis
+      "{\"type\":\"TapThis\"}"
   Spec.it s "UntapThis" $
-    Common.assertJsonCodec s toJson fromJson CostComponent.UntapThis "{\"type\":\"UntapThis\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      CostComponent.UntapThis
+      "{\"type\":\"UntapThis\"}"
   Spec.it s "SacrificeThis" $
-    Common.assertJsonCodec s toJson fromJson CostComponent.SacrificeThis "{\"type\":\"SacrificeThis\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      CostComponent.SacrificeThis
+      "{\"type\":\"SacrificeThis\"}"
   Spec.it s "PayLife" $
-    Common.assertJsonCodec s toJson fromJson (CostComponent.PayLife 2) "{\"type\":\"PayLife\",\"value\":2}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (CostComponent.PayLife 2)
+      "{\"type\":\"PayLife\",\"value\":2}"
   -- Village Rites' one creature: the count and the Filter both ride the
   -- payload, positionally.
   Spec.it s "Sacrifice" $
@@ -47,9 +67,19 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       (CostComponent.DiscardCards 2)
       "{\"type\":\"DiscardCards\",\"value\":2}"
   Spec.it s "DiscardThis" $
-    Common.assertJsonCodec s toJson fromJson CostComponent.DiscardThis "{\"type\":\"DiscardThis\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      CostComponent.DiscardThis
+      "{\"type\":\"DiscardThis\"}"
   Spec.it s "PayEnergy" $
-    Common.assertJsonCodec s toJson fromJson (CostComponent.PayEnergy 2) "{\"type\":\"PayEnergy\",\"value\":2}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (CostComponent.PayEnergy 2)
+      "{\"type\":\"PayEnergy\",\"value\":2}"
   -- CR 606.4's two halves, Jace Beleren's +2 and -1.
   Spec.it s "AddLoyaltyToThis" $
     Common.assertJsonCodec

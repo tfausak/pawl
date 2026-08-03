@@ -16,23 +16,48 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   Spec.it s "Literal" $
-    Common.assertJsonCodec s Quantity.toJson Quantity.fromJson (Quantity.Literal 5) "{\"type\":\"Literal\",\"value\":5}"
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.Literal 5)
+      "{\"type\":\"Literal\",\"value\":5}"
   Spec.it s "ManaValue" $
-    Common.assertJsonCodec s Quantity.toJson Quantity.fromJson Quantity.ManaValue "{\"type\":\"ManaValue\"}"
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.ManaValue
+      "{\"type\":\"ManaValue\"}"
   -- CR 208.1, Ghitu Fire-Eater's "damage equal to its power". Nullary like
   -- ManaValue, and NOT to be confused with the Power newtype, which wraps a
   -- printed power/toughness box.
   Spec.it s "Power" $
-    Common.assertJsonCodec s Quantity.toJson Quantity.fromJson Quantity.Power "{\"type\":\"Power\"}"
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.Power
+      "{\"type\":\"Power\"}"
   Spec.it s "X" $
-    Common.assertJsonCodec s Quantity.toJson Quantity.fromJson Quantity.X "{\"type\":\"X\"}"
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.X
+      "{\"type\":\"X\"}"
   -- Bane of Progress' "for each permanent destroyed this way": a number an
   -- earlier effect of the same resolution bound into a slot. Unlike X, it
   -- carries the slot name on the wire -- nested under Plus, since composition
   -- is where a recursive decoder loses a payload.
   Spec.it s "InSlot, bare and nested" $ do
     let slot = SlotName.MkSlotName (Text.pack "destroyed")
-    Common.assertJsonCodec s Quantity.toJson Quantity.fromJson (Quantity.InSlot slot) "{\"type\":\"InSlot\",\"value\":\"destroyed\"}"
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.InSlot slot)
+      "{\"type\":\"InSlot\",\"value\":\"destroyed\"}"
     Common.assertJsonCodec
       s
       Quantity.toJson
@@ -40,7 +65,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       (Quantity.Plus (Quantity.Literal 1) (Quantity.InSlot slot))
       "{\"type\":\"Plus\",\"value\":[{\"type\":\"Literal\",\"value\":1},{\"type\":\"InSlot\",\"value\":\"destroyed\"}]}"
   Spec.it s "Star" $
-    Common.assertJsonCodec s Quantity.toJson Quantity.fromJson Quantity.Star "{\"type\":\"Star\"}"
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.Star
+      "{\"type\":\"Star\"}"
   Spec.it s "Plus" $
     Common.assertJsonCodec
       s

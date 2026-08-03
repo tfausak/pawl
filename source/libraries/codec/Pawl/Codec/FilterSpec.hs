@@ -83,21 +83,61 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       (Filter.IsPlayer PlayerRelation.Opponent)
       "{\"type\":\"IsPlayer\",\"value\":{\"type\":\"Opponent\"}}"
   Spec.it s "IsSource" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsSource "{\"type\":\"IsSource\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsSource
+      "{\"type\":\"IsSource\"}"
   Spec.it s "IsAttacking" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsAttacking "{\"type\":\"IsAttacking\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttacking
+      "{\"type\":\"IsAttacking\"}"
   Spec.it s "IsBlocking" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsBlocking "{\"type\":\"IsBlocking\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsBlocking
+      "{\"type\":\"IsBlocking\"}"
   Spec.it s "AttackedThisTurn" $
-    Common.assertJsonCodec s toJson fromJson Filter.AttackedThisTurn "{\"type\":\"AttackedThisTurn\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.AttackedThisTurn
+      "{\"type\":\"AttackedThisTurn\"}"
   Spec.it s "IsAttachedToCreature" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsAttachedToCreature "{\"type\":\"IsAttachedToCreature\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttachedToCreature
+      "{\"type\":\"IsAttachedToCreature\"}"
   Spec.it s "IsAttachedToPermanent" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsAttachedToPermanent "{\"type\":\"IsAttachedToPermanent\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttachedToPermanent
+      "{\"type\":\"IsAttachedToPermanent\"}"
   Spec.it s "CanHostSubject" $
-    Common.assertJsonCodec s toJson fromJson Filter.CanHostSubject "{\"type\":\"CanHostSubject\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.CanHostSubject
+      "{\"type\":\"CanHostSubject\"}"
   Spec.it s "IsToken" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsToken "{\"type\":\"IsToken\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsToken
+      "{\"type\":\"IsToken\"}"
   Spec.it s "And" $
     Common.assertJsonCodec
       s

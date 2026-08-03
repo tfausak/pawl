@@ -16,4 +16,9 @@ spec s = Spec.describe s "Pawl.Codec.ManaType" $ do
       (ManaType.Colored Color.Red)
       "{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}"
   Spec.it s "Colorless" $
-    Common.assertJsonCodec s ManaType.toJson ManaType.fromJson ManaType.Colorless "{\"type\":\"Colorless\"}"
+    Common.assertJsonCodec
+      s
+      ManaType.toJson
+      ManaType.fromJson
+      ManaType.Colorless
+      "{\"type\":\"Colorless\"}"

@@ -20,4 +20,9 @@ spec s = Spec.describe s "Pawl.Codec.ManaCost" $ do
   -- CR 118.5a: {0} is a real, payable cost, and ManaCost's empty list IS {0} --
   -- so the empty array has to round-trip, not just a nonempty one.
   Spec.it s "MkManaCost []" $
-    Common.assertJsonCodec s ManaCost.toJson ManaCost.fromJson (ManaCost.MkManaCost []) "[]"
+    Common.assertJsonCodec
+      s
+      ManaCost.toJson
+      ManaCost.fromJson
+      (ManaCost.MkManaCost [])
+      "[]"

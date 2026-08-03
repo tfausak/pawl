@@ -10,7 +10,12 @@ import qualified Pawl.Types.ManaType as ManaType
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
   Spec.it s "Generic" $
-    Common.assertJsonCodec s ManaSymbol.toJson ManaSymbol.fromJson (ManaSymbol.Generic 2) "{\"type\":\"Generic\",\"value\":2}"
+    Common.assertJsonCodec
+      s
+      ManaSymbol.toJson
+      ManaSymbol.fromJson
+      (ManaSymbol.Generic 2)
+      "{\"type\":\"Generic\",\"value\":2}"
   Spec.it s "OfType" $
     Common.assertJsonCodec
       s
@@ -44,6 +49,16 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
       "{\"type\":\"Phyrexian\",\"value\":{\"type\":\"Green\"}}"
   -- CR 107.4h's {S}: nullary, unlike every other payload-carrying arm above.
   Spec.it s "Snow" $
-    Common.assertJsonCodec s ManaSymbol.toJson ManaSymbol.fromJson ManaSymbol.Snow "{\"type\":\"Snow\"}"
+    Common.assertJsonCodec
+      s
+      ManaSymbol.toJson
+      ManaSymbol.fromJson
+      ManaSymbol.Snow
+      "{\"type\":\"Snow\"}"
   Spec.it s "Variable" $
-    Common.assertJsonCodec s ManaSymbol.toJson ManaSymbol.fromJson ManaSymbol.Variable "{\"type\":\"Variable\"}"
+    Common.assertJsonCodec
+      s
+      ManaSymbol.toJson
+      ManaSymbol.fromJson
+      ManaSymbol.Variable
+      "{\"type\":\"Variable\"}"

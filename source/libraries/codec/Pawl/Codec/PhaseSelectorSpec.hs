@@ -17,8 +17,23 @@ spec s = Spec.describe s "Pawl.Codec.PhaseSelector" $ do
       (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep))
       "{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"DrawStep\"}}}"
   Spec.it s "BeginningPhase" $
-    Common.assertJsonCodec s PhaseSelector.toJson PhaseSelector.fromJson PhaseSelector.BeginningPhase "{\"type\":\"BeginningPhase\"}"
+    Common.assertJsonCodec
+      s
+      PhaseSelector.toJson
+      PhaseSelector.fromJson
+      PhaseSelector.BeginningPhase
+      "{\"type\":\"BeginningPhase\"}"
   Spec.it s "CombatPhase" $
-    Common.assertJsonCodec s PhaseSelector.toJson PhaseSelector.fromJson PhaseSelector.CombatPhase "{\"type\":\"CombatPhase\"}"
+    Common.assertJsonCodec
+      s
+      PhaseSelector.toJson
+      PhaseSelector.fromJson
+      PhaseSelector.CombatPhase
+      "{\"type\":\"CombatPhase\"}"
   Spec.it s "EndingPhase" $
-    Common.assertJsonCodec s PhaseSelector.toJson PhaseSelector.fromJson PhaseSelector.EndingPhase "{\"type\":\"EndingPhase\"}"
+    Common.assertJsonCodec
+      s
+      PhaseSelector.toJson
+      PhaseSelector.fromJson
+      PhaseSelector.EndingPhase
+      "{\"type\":\"EndingPhase\"}"

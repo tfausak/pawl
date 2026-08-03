@@ -19,7 +19,12 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- CR 603.6a: "when this ... enters [the battlefield]".
   Spec.it s "SelfEnters" $
-    Common.assertJsonCodec s TriggerCondition.toJson TriggerCondition.fromJson TriggerCondition.SelfEnters "{\"type\":\"SelfEnters\"}"
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfEnters
+      "{\"type\":\"SelfEnters\"}"
   -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that spells
   -- Soul Warden's "another creature" has to survive the trip.
   Spec.it s "PermanentEnters round-trips with its Filter" $
@@ -64,7 +69,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
   -- pay an activation cost of a cycling ability.'"
   Spec.it s "SelfCycled" $
-    Common.assertJsonCodec s TriggerCondition.toJson TriggerCondition.fromJson TriggerCondition.SelfCycled "{\"type\":\"SelfCycled\"}"
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfCycled
+      "{\"type\":\"SelfCycled\"}"
   -- CR 701.9a's discard, Megrim's "whenever an OPPONENT discards a card". Both
   -- relations, since the PlayerRelation is the whole content of that phrasing.
   Spec.it s "PlayerDiscards round-trips both relations" $ do
@@ -109,7 +119,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- CR 603.6c's second written form (Doomed Traveler's), abbreviated by CR 700.4
   -- to "dies".
   Spec.it s "SelfDies" $
-    Common.assertJsonCodec s TriggerCondition.toJson TriggerCondition.fromJson TriggerCondition.SelfDies "{\"type\":\"SelfDies\"}"
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfDies
+      "{\"type\":\"SelfDies\"}"
   -- The same written form read by a bystander (Meren of Clan Nel Toth's
   -- "whenever another creature you control dies"), which carries a Filter where
   -- SelfDies above carries nothing -- so it is a separate tag, and the "another"

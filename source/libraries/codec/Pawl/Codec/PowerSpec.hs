@@ -9,4 +9,9 @@ import qualified Pawl.Types.Quantity as Quantity
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.Power" . Spec.it s "MkPower delegates to Quantity" $
-    Common.assertJsonCodec s Power.toJson Power.fromJson (Power.MkPower (Quantity.Literal 2)) "{\"type\":\"Literal\",\"value\":2}"
+    Common.assertJsonCodec
+      s
+      Power.toJson
+      Power.fromJson
+      (Power.MkPower (Quantity.Literal 2))
+      "{\"type\":\"Literal\",\"value\":2}"

@@ -13,9 +13,19 @@ import qualified Pawl.Types.TurnScope as TurnScope
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivationTiming" $ do
   Spec.it s "AnyTime" $
-    Common.assertJsonCodec s ActivationTiming.toJson ActivationTiming.fromJson ActivationTiming.AnyTime "{\"type\":\"AnyTime\"}"
+    Common.assertJsonCodec
+      s
+      ActivationTiming.toJson
+      ActivationTiming.fromJson
+      ActivationTiming.AnyTime
+      "{\"type\":\"AnyTime\"}"
   Spec.it s "SorcerySpeed" $
-    Common.assertJsonCodec s ActivationTiming.toJson ActivationTiming.fromJson ActivationTiming.SorcerySpeed "{\"type\":\"SorcerySpeed\"}"
+    Common.assertJsonCodec
+      s
+      ActivationTiming.toJson
+      ActivationTiming.fromJson
+      ActivationTiming.SorcerySpeed
+      "{\"type\":\"SorcerySpeed\"}"
   -- Desert's own rider (CR 511.1), a stepped window alongside it (CR 500.1):
   -- Pawl.Types.PhaseSelector spans both, so the arm has to carry both.
   Spec.it s "DuringPhase, Desert's end-of-combat rider" $

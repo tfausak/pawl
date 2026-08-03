@@ -24,7 +24,12 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       "{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Deathtouch\"}}"
   -- layer 6 (Humility).
   Spec.it s "LoseAllAbilities" $
-    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.LoseAllAbilities "{\"type\":\"LoseAllAbilities\"}"
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      Modification.LoseAllAbilities
+      "{\"type\":\"LoseAllAbilities\"}"
   -- layer 7b (Humility 1/1; Opalescence mana value).
   Spec.it s "SetBasePowerToughness" $
     Common.assertJsonCodec
@@ -52,7 +57,12 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
   -- Nullary: the subtype is read from the effect's source at projection time
   -- (Object.chosenSubtype), so there is nothing on the wire. Convincing Mirage.
   Spec.it s "SetLandSubtypeToChosen" $
-    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.SetLandSubtypeToChosen "{\"type\":\"SetLandSubtypeToChosen\"}"
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      Modification.SetLandSubtypeToChosen
+      "{\"type\":\"SetLandSubtypeToChosen\"}"
   -- layer 4, CR 305.7 add (Urborg -> Swamp).
   Spec.it s "AddLandSubtype" $
     Common.assertJsonCodec
@@ -98,7 +108,12 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
   -- control with, since the controller is DERIVED at projection time rather
   -- than baked. Payload-free, and must not decode as SetController.
   Spec.it s "SetControllerToSource" $
-    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.SetControllerToSource "{\"type\":\"SetControllerToSource\"}"
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      Modification.SetControllerToSource
+      "{\"type\":\"SetControllerToSource\"}"
   -- layer 5, CR 613.1e / 105.3: a SET, not an add.
   Spec.it s "SetColor carries its colour set" $
     Common.assertJsonCodec
@@ -120,7 +135,17 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
   -- the colour is read at projection time off the effect's source
   -- (Object.chosenColor), so there is nothing on the wire. Painter's Servant.
   Spec.it s "AddChosenColor" $
-    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.AddChosenColor "{\"type\":\"AddChosenColor\"}"
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      Modification.AddChosenColor
+      "{\"type\":\"AddChosenColor\"}"
   -- layer 7d, CR 613.4d: switches power and toughness. Payload-free.
   Spec.it s "SwitchPowerToughness" $
-    Common.assertJsonCodec s Modification.toJson Modification.fromJson Modification.SwitchPowerToughness "{\"type\":\"SwitchPowerToughness\"}"
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      Modification.SwitchPowerToughness
+      "{\"type\":\"SwitchPowerToughness\"}"

@@ -51,7 +51,12 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       )
       "{\"type\":\"Matching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}}"
   Spec.it s "Attached" $
-    Common.assertJsonCodec s Affected.toJson Affected.fromJson Affected.Attached "{\"type\":\"Attached\"}"
+    Common.assertJsonCodec
+      s
+      Affected.toJson
+      Affected.fromJson
+      Affected.Attached
+      "{\"type\":\"Attached\"}"
   -- CR 303.4m through a player: Curse of Death's Hold's shape.
   Spec.it s "AttachedPlayerControls" $
     Common.assertJsonCodec

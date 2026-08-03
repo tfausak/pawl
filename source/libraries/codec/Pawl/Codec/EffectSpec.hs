@@ -126,9 +126,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       (Effect.Search (Filter.HasCardType CardType.Land) SearchDestination.BattlefieldTapped)
       "{\"type\":\"Search\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},{\"type\":\"BattlefieldTapped\"}]}"
   Spec.it s "ExileAllGraveyards" $
-    Common.assertJsonCodec s toJson fromJson Effect.ExileAllGraveyards "{\"type\":\"ExileAllGraveyards\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.ExileAllGraveyards
+      "{\"type\":\"ExileAllGraveyards\"}"
   Spec.it s "RestartGame" $
-    Common.assertJsonCodec s toJson fromJson Effect.RestartGame "{\"type\":\"RestartGame\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.RestartGame
+      "{\"type\":\"RestartGame\"}"
   Spec.it s "ControlPlayerNextTurn" $
     Common.assertJsonCodec
       s
@@ -499,7 +509,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells)
       "{\"type\":\"AffectPlayers\",\"value\":[{\"type\":\"UntilEndOfTurn\"},{\"type\":\"Opponents\"},{\"type\":\"CantCastSpells\"}]}"
   Spec.it s "CreateEmblem" $
-    Common.assertJsonCodec s toJson fromJson (Effect.CreateEmblem (Text.pack "Goblin Piker")) "{\"type\":\"CreateEmblem\",\"value\":\"Goblin Piker\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.CreateEmblem (Text.pack "Goblin Piker"))
+      "{\"type\":\"CreateEmblem\",\"value\":\"Goblin Piker\"}"
   -- The `card` payload comes only from the caller-supplied codec, exactly like
   -- Create's above -- proven at two different `card` values through the SAME
   -- constant codec, so a leak straight to the constructor (bypassing the codec
@@ -533,9 +548,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       (Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser")))
       "{\"type\":\"PlaySubgame\",\"value\":\"loser\"}"
   Spec.it s "ExileHandThenDraw" $
-    Common.assertJsonCodec s toJson fromJson Effect.ExileHandThenDraw "{\"type\":\"ExileHandThenDraw\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.ExileHandThenDraw
+      "{\"type\":\"ExileHandThenDraw\"}"
   Spec.it s "Proliferate" $
-    Common.assertJsonCodec s toJson fromJson Effect.Proliferate "{\"type\":\"Proliferate\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Proliferate
+      "{\"type\":\"Proliferate\"}"
   Spec.it s "PlayerSacrifices" $
     Common.assertJsonCodec
       s

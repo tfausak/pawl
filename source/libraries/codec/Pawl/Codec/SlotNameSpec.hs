@@ -9,4 +9,9 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.SlotName" . Spec.it s "MkSlotName" $
-    Common.assertJsonCodec s SlotName.toJson SlotName.fromJson (SlotName.MkSlotName (Text.pack "target")) "\"target\""
+    Common.assertJsonCodec
+      s
+      SlotName.toJson
+      SlotName.fromJson
+      (SlotName.MkSlotName (Text.pack "target"))
+      "\"target\""

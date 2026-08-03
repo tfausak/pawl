@@ -18,7 +18,12 @@ spec s = Spec.describe s "Pawl.Codec.Phase" $ do
       (Phase.Beginning BeginningStep.Upkeep)
       "{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}}"
   Spec.it s "PrecombatMain" $
-    Common.assertJsonCodec s Phase.toJson Phase.fromJson Phase.PrecombatMain "{\"type\":\"PrecombatMain\"}"
+    Common.assertJsonCodec
+      s
+      Phase.toJson
+      Phase.fromJson
+      Phase.PrecombatMain
+      "{\"type\":\"PrecombatMain\"}"
   Spec.it s "Combat" $
     Common.assertJsonCodec
       s
@@ -27,7 +32,12 @@ spec s = Spec.describe s "Pawl.Codec.Phase" $ do
       (Phase.Combat CombatStep.DeclareBlockers)
       "{\"type\":\"Combat\",\"value\":{\"type\":\"DeclareBlockers\"}}"
   Spec.it s "PostcombatMain" $
-    Common.assertJsonCodec s Phase.toJson Phase.fromJson Phase.PostcombatMain "{\"type\":\"PostcombatMain\"}"
+    Common.assertJsonCodec
+      s
+      Phase.toJson
+      Phase.fromJson
+      Phase.PostcombatMain
+      "{\"type\":\"PostcombatMain\"}"
   Spec.it s "Ending" $
     Common.assertJsonCodec
       s
