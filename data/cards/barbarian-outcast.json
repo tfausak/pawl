@@ -112,13 +112,13 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Human"
+        "type": "Barbarian"
       },
       {
         "type": "Beast"
       },
       {
-        "type": "Barbarian"
+        "type": "Human"
       }
     ],
     "supertypes": [],

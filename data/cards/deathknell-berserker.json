@@ -105,10 +105,10 @@
                     "typeLine": {
                       "subtypes": [
                         {
-                          "type": "Zombie"
+                          "type": "Berserker"
                         },
                         {
-                          "type": "Berserker"
+                          "type": "Zombie"
                         }
                       ],
                       "supertypes": [],
@@ -135,10 +135,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Elf"
+        "type": "Berserker"
       },
       {
-        "type": "Berserker"
+        "type": "Elf"
       }
     ],
     "supertypes": [],

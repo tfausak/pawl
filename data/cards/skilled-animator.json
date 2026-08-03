@@ -234,10 +234,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Human"
+        "type": "Artificer"
       },
       {
-        "type": "Artificer"
+        "type": "Human"
       }
     ],
     "supertypes": [],

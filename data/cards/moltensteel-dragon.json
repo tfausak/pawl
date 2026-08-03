@@ -100,10 +100,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Phyrexian"
+        "type": "Dragon"
       },
       {
-        "type": "Dragon"
+        "type": "Phyrexian"
       }
     ],
     "supertypes": [],

@@ -117,10 +117,10 @@
                     "typeLine": {
                       "subtypes": [
                         {
-                          "type": "Rogue"
+                          "type": "Faerie"
                         },
                         {
-                          "type": "Faerie"
+                          "type": "Rogue"
                         }
                       ],
                       "supertypes": [],

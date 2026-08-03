@@ -79,10 +79,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Shapeshifter"
+        "type": "Elemental"
       },
       {
-        "type": "Elemental"
+        "type": "Shapeshifter"
       }
     ],
     "supertypes": [],

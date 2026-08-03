@@ -82,10 +82,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Nightmare"
+        "type": "Horse"
       },
       {
-        "type": "Horse"
+        "type": "Nightmare"
       }
     ],
     "supertypes": [],

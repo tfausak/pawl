@@ -7,205 +7,353 @@ module Pawl.Engine.Subtype where
 
 import qualified Pawl.Types.Subtype as Subtype
 
--- CR 205.3i: "Lands have their own unique set of subtypes; these subtypes are
--- called land types. The land types are Cave, Desert, Forest, Gate, Island,
--- Lair, Locus, Mine, Mountain, Plains, Planet, Power-Plant, Sphere, Swamp,
--- Tower, Town, and Urza's."
---
--- CR 205.3c gives each subtype exactly one card type it is "correlated to", and
--- CR 205.3d forbids gaining one that does not match, so the families named by CR
--- 205.3g-205.3m are disjoint: a subtype is a land type or it is not. Every other
--- constructor is therefore a False a new subtype must decide deliberately --
--- hence total, with no wildcard.
---
--- Six of CR 205.3i's seventeen exist in this type today. Five of them are the
--- BASIC land types (CR 305.6) and Desert is not, which is what keeps this
--- function distinct from Pawl.Engine.Mana.subtypeMana: that one asks the CR 305.6
--- question ("which mana does this basic land type make?") and answers Nothing
--- for Desert, while this one answers True.
+-- | CR 205.3i
 isLandType :: Subtype.Subtype -> Bool
 isLandType subtype = case subtype of
-  Subtype.Mountain -> True
-  Subtype.Swamp -> True
-  Subtype.Forest -> True
-  Subtype.Island -> True
-  Subtype.Plains -> True
+  Subtype.Cave -> True
   Subtype.Desert -> True
-  -- CR 205.3m: creature types.
-  Subtype.Goblin -> False
-  Subtype.Warrior -> False
-  Subtype.Human -> False
-  Subtype.Bird -> False
-  Subtype.Ogre -> False
-  Subtype.Centaur -> False
-  Subtype.Cat -> False
-  Subtype.Dinosaur -> False
-  Subtype.Beast -> False
-  Subtype.Rat -> False
-  Subtype.Elephant -> False
-  Subtype.Myr -> False
-  Subtype.Skeleton -> False
-  Subtype.Wall -> False
-  Subtype.Wizard -> False
-  Subtype.Shapeshifter -> False
-  Subtype.Lhurgoyf -> False
-  -- CR 205.3k: a spell type.
-  Subtype.Arcane -> False
-  Subtype.Barbarian -> False
-  Subtype.Zombie -> False
-  Subtype.Fungus -> False
-  Subtype.Elemental -> False
-  Subtype.Rogue -> False
-  Subtype.Hag -> False
-  Subtype.Warlock -> False
-  Subtype.Soldier -> False
-  Subtype.Phyrexian -> False
-  Subtype.Elf -> False
-  Subtype.Nightmare -> False
-  Subtype.Horse -> False
-  -- CR 205.3h: an enchantment type.
-  Subtype.Aura -> False
-  -- CR 301.5: an artifact type.
-  Subtype.Equipment -> False
-  Subtype.Scout -> False
-  Subtype.Artificer -> False
-  Subtype.Troll -> False
-  Subtype.Nomad -> False
-  Subtype.Shaman -> False
-  Subtype.Demon -> False
-  Subtype.Cleric -> False
-  Subtype.Illusion -> False
-  Subtype.Spirit -> False
-  Subtype.Angel -> False
-  Subtype.Insect -> False
-  Subtype.Berserker -> False
-  Subtype.Thopter -> False
-  Subtype.Dragon -> False
-  Subtype.Unicorn -> False
-  -- CR 205.3h: an enchantment type.
-  Subtype.Curse -> False
-  -- CR 205.3m: a creature type -- and, per CR 308.2, a kindred subtype too,
-  -- since those are the same set. Still not a land type either way, which is the
-  -- only question this function asks.
-  Subtype.Faerie -> False
-  Subtype.Rhino -> False
-  -- CR 205.3j: a planeswalker type. CR 205.3c -- "each subtype is correlated to
-  -- its appropriate card type" -- is why it is never a land type.
-  Subtype.Jace -> False
-  -- CR 205.3m: a creature type (Bog Wraith's). Not a land type -- which is worth
-  -- saying out loud here, because Bog Wraith is also the pool's first card with
-  -- landwalk, and the land type its keyword NAMES is Swamp rather than this.
-  Subtype.Wraith -> False
-  -- CR 205.3m: a creature type (Icehide Golem's), even though the card is an
-  -- artifact too -- CR 205.3g's artifact types are Equipment and the rest, and
-  -- Golem is not one of them. Not a land type either way.
-  Subtype.Golem -> False
-  -- CR 205.3m: a creature type (Meandering Towershell's). Not a land type --
-  -- worth saying out loud for the same reason Wraith is: the Towershell prints
-  -- ISLANDWALK, and the land type its keyword names is Island rather than this.
-  Subtype.Turtle -> False
-  -- CR 205.3m: a creature type (Blurred Mongoose's).
-  Subtype.Mongoose -> False
-  -- CR 205.3m: a creature type (the one Turn to Frog sets). Not a land type,
-  -- which is exactly what isCreatureType below is for: setting a creature type
-  -- must leave an animated permanent's land type standing.
-  Subtype.Frog -> False
-  -- CR 205.3m: a creature type (Child of Night's). Not a land type.
-  Subtype.Vampire -> False
-  Subtype.Dryad -> False
-  -- CR 205.3m: a creature type (Hero of Bladehold's). Not a land type.
-  Subtype.Knight -> False
+  Subtype.Forest -> True
+  Subtype.Gate -> True
+  Subtype.Island -> True
+  Subtype.Lair -> True
+  Subtype.Locus -> True
+  Subtype.Mine -> True
+  Subtype.Mountain -> True
+  Subtype.Plains -> True
+  Subtype.Planet -> True
+  Subtype.PowerPlant -> True
+  Subtype.Sphere -> True
+  Subtype.Swamp -> True
+  Subtype.Tower -> True
+  Subtype.Town -> True
+  Subtype.Urzas -> True
+  _ -> False
 
--- CR 205.3m: "Creatures and kindreds share their lists of subtypes; these
--- subtypes are called creature types." The rulebook owns that list by name, so
--- this is the same kind of classification isLandType is, and it answers CR
--- 205.1a's question for the layer-4 arm that SETS one: "when an effect sets one
--- or more of an object's subtypes, the new subtype(s) replaces any existing
--- subtypes from the appropriate set (creature types, land types, artifact types,
--- enchantment types, planeswalker types, or spell types)". The appropriate set
--- for Modification.SetCreatureSubtype is the True arms below, and nothing else
--- may be swept away with them.
---
--- CR 205.3c/205.3d make the families disjoint, exactly as isLandType's comment
--- says, so this is the complement of the five non-creature families rather than
--- an independent judgement -- and it is total, with no wildcard, so a new
--- subtype has to decide.
---
--- CR 308.2 makes the KINDRED subtypes the same set, which is why a Kindred
--- Enchantment -- Faerie answers True here: Faerie is a creature type wherever it
--- appears.
+-- | CR 205.3m
 isCreatureType :: Subtype.Subtype -> Bool
 isCreatureType subtype = case subtype of
-  -- CR 205.3i: land types.
-  Subtype.Mountain -> False
-  Subtype.Swamp -> False
-  Subtype.Forest -> False
-  Subtype.Island -> False
-  Subtype.Plains -> False
-  Subtype.Desert -> False
-  -- CR 205.3k: a spell type.
-  Subtype.Arcane -> False
-  -- CR 205.3h: enchantment types.
-  Subtype.Aura -> False
-  Subtype.Curse -> False
-  -- CR 205.3g: an artifact type.
-  Subtype.Equipment -> False
-  -- CR 205.3j: a planeswalker type.
-  Subtype.Jace -> False
-  -- CR 205.3m: creature types, every one of them named in that rule's list.
-  Subtype.Goblin -> True
-  Subtype.Warrior -> True
-  Subtype.Human -> True
-  Subtype.Bird -> True
-  Subtype.Ogre -> True
-  Subtype.Centaur -> True
-  Subtype.Cat -> True
-  Subtype.Dinosaur -> True
-  Subtype.Beast -> True
-  Subtype.Rat -> True
-  Subtype.Elephant -> True
-  Subtype.Myr -> True
-  Subtype.Skeleton -> True
-  Subtype.Wall -> True
-  Subtype.Wizard -> True
-  Subtype.Shapeshifter -> True
-  Subtype.Lhurgoyf -> True
-  Subtype.Barbarian -> True
-  Subtype.Zombie -> True
-  Subtype.Fungus -> True
-  Subtype.Elemental -> True
-  Subtype.Rogue -> True
-  Subtype.Hag -> True
-  Subtype.Warlock -> True
-  Subtype.Soldier -> True
-  Subtype.Phyrexian -> True
-  Subtype.Elf -> True
-  Subtype.Nightmare -> True
-  Subtype.Horse -> True
-  Subtype.Scout -> True
-  Subtype.Artificer -> True
-  Subtype.Troll -> True
-  Subtype.Nomad -> True
-  Subtype.Shaman -> True
-  Subtype.Demon -> True
-  Subtype.Cleric -> True
-  Subtype.Illusion -> True
-  Subtype.Spirit -> True
+  Subtype.Advisor -> True
+  Subtype.Aetherborn -> True
+  Subtype.Alien -> True
+  Subtype.Ally -> True
   Subtype.Angel -> True
-  Subtype.Insect -> True
+  Subtype.Antelope -> True
+  Subtype.Ape -> True
+  Subtype.Archer -> True
+  Subtype.Archon -> True
+  Subtype.Armadillo -> True
+  Subtype.Army -> True
+  Subtype.Artificer -> True
+  Subtype.Assassin -> True
+  Subtype.AssemblyWorker -> True
+  Subtype.Astartes -> True
+  Subtype.Atog -> True
+  Subtype.Aurochs -> True
+  Subtype.Avatar -> True
+  Subtype.Azra -> True
+  Subtype.Badger -> True
+  Subtype.Balloon -> True
+  Subtype.Barbarian -> True
+  Subtype.Bard -> True
+  Subtype.Basilisk -> True
+  Subtype.Bat -> True
+  Subtype.Bear -> True
+  Subtype.Beast -> True
+  Subtype.Beaver -> True
+  Subtype.Beeble -> True
+  Subtype.Beholder -> True
   Subtype.Berserker -> True
-  Subtype.Thopter -> True
+  Subtype.Bird -> True
+  Subtype.Bison -> True
+  Subtype.Blinkmoth -> True
+  Subtype.Boar -> True
+  Subtype.Bringer -> True
+  Subtype.Brushwagg -> True
+  Subtype.Camarid -> True
+  Subtype.Camel -> True
+  Subtype.Capybara -> True
+  Subtype.Caribou -> True
+  Subtype.Carrier -> True
+  Subtype.Cat -> True
+  Subtype.Centaur -> True
+  Subtype.Child -> True
+  Subtype.Chimera -> True
+  Subtype.Citizen -> True
+  Subtype.Cleric -> True
+  Subtype.Clown -> True
+  Subtype.Cockatrice -> True
+  Subtype.Construct -> True
+  Subtype.Coward -> True
+  Subtype.Coyote -> True
+  Subtype.Crab -> True
+  Subtype.Crocodile -> True
+  Subtype.Ctan -> True
+  Subtype.Custodes -> True
+  Subtype.Cyberman -> True
+  Subtype.Cyclops -> True
+  Subtype.Dalek -> True
+  Subtype.Dauthi -> True
+  Subtype.Demigod -> True
+  Subtype.Demon -> True
+  Subtype.Deserter -> True
+  Subtype.Detective -> True
+  Subtype.Devil -> True
+  Subtype.Dinosaur -> True
+  Subtype.Djinn -> True
+  Subtype.Doctor -> True
+  Subtype.Dog -> True
   Subtype.Dragon -> True
-  Subtype.Unicorn -> True
-  Subtype.Faerie -> True
-  Subtype.Rhino -> True
-  Subtype.Wraith -> True
-  -- CR 205.3m lists Golem, and CR 205.3g's artifact types do not -- so Icehide
-  -- Golem's subtype is a creature type even though the card is an artifact too.
-  Subtype.Golem -> True
-  Subtype.Turtle -> True
-  Subtype.Mongoose -> True
-  Subtype.Frog -> True
-  Subtype.Vampire -> True
+  Subtype.Drake -> True
+  Subtype.Dreadnought -> True
+  Subtype.Drix -> True
+  Subtype.Drone -> True
+  Subtype.Druid -> True
   Subtype.Dryad -> True
+  Subtype.Dwarf -> True
+  Subtype.Echidna -> True
+  Subtype.Efreet -> True
+  Subtype.Egg -> True
+  Subtype.Elder -> True
+  Subtype.Eldrazi -> True
+  Subtype.Elemental -> True
+  Subtype.Elephant -> True
+  Subtype.Elf -> True
+  Subtype.Elk -> True
+  Subtype.Employee -> True
+  Subtype.Eternal -> True
+  Subtype.Eye -> True
+  Subtype.Faerie -> True
+  Subtype.Ferret -> True
+  Subtype.Fish -> True
+  Subtype.Flagbearer -> True
+  Subtype.Fox -> True
+  Subtype.Fractal -> True
+  Subtype.Frog -> True
+  Subtype.Fungus -> True
+  Subtype.Gamer -> True
+  Subtype.Gamma -> True
+  Subtype.Gargoyle -> True
+  Subtype.Germ -> True
+  Subtype.Giant -> True
+  Subtype.Giraffe -> True
+  Subtype.Gith -> True
+  Subtype.Glimmer -> True
+  Subtype.Gnoll -> True
+  Subtype.Gnome -> True
+  Subtype.Goat -> True
+  Subtype.Goblin -> True
+  Subtype.God -> True
+  Subtype.Golem -> True
+  Subtype.Gorgon -> True
+  Subtype.Graveborn -> True
+  Subtype.Gremlin -> True
+  Subtype.Griffin -> True
+  Subtype.Guest -> True
+  Subtype.Hag -> True
+  Subtype.Halfling -> True
+  Subtype.Hamster -> True
+  Subtype.Harpy -> True
+  Subtype.Hedgehog -> True
+  Subtype.Hellion -> True
+  Subtype.Hero -> True
+  Subtype.Hippo -> True
+  Subtype.Hippogriff -> True
+  Subtype.Homarid -> True
+  Subtype.Homunculus -> True
+  Subtype.Horror -> True
+  Subtype.Horse -> True
+  Subtype.Human -> True
+  Subtype.Hydra -> True
+  Subtype.Hyena -> True
+  Subtype.Illusion -> True
+  Subtype.Imp -> True
+  Subtype.Incarnation -> True
+  Subtype.Inhuman -> True
+  Subtype.Inkling -> True
+  Subtype.Inquisitor -> True
+  Subtype.Insect -> True
+  Subtype.Jackal -> True
+  Subtype.Jellyfish -> True
+  Subtype.Juggernaut -> True
+  Subtype.Kangaroo -> True
+  Subtype.Kavu -> True
+  Subtype.Kirin -> True
+  Subtype.Kithkin -> True
   Subtype.Knight -> True
+  Subtype.Kobold -> True
+  Subtype.Kor -> True
+  Subtype.Kraken -> True
+  Subtype.Kree -> True
+  Subtype.Llama -> True
+  Subtype.Lamia -> True
+  Subtype.Lammasu -> True
+  Subtype.Leech -> True
+  Subtype.Lemur -> True
+  Subtype.Leviathan -> True
+  Subtype.Lhurgoyf -> True
+  Subtype.Licid -> True
+  Subtype.Lizard -> True
+  Subtype.Lobster -> True
+  Subtype.Manticore -> True
+  Subtype.Masticore -> True
+  Subtype.Mercenary -> True
+  Subtype.Merfolk -> True
+  Subtype.Metathran -> True
+  Subtype.Minion -> True
+  Subtype.Minotaur -> True
+  Subtype.Mite -> True
+  Subtype.Mole -> True
+  Subtype.Monger -> True
+  Subtype.Mongoose -> True
+  Subtype.Monk -> True
+  Subtype.Monkey -> True
+  Subtype.Moogle -> True
+  Subtype.Moonfolk -> True
+  Subtype.Mount -> True
+  Subtype.Mouse -> True
+  Subtype.Mutant -> True
+  Subtype.Myr -> True
+  Subtype.Mystic -> True
+  Subtype.Nautilus -> True
+  Subtype.Necron -> True
+  Subtype.Nephilim -> True
+  Subtype.Nightmare -> True
+  Subtype.Nightstalker -> True
+  Subtype.Ninja -> True
+  Subtype.Noble -> True
+  Subtype.Noggle -> True
+  Subtype.Nomad -> True
+  Subtype.Nymph -> True
+  Subtype.Octopus -> True
+  Subtype.Ogre -> True
+  Subtype.Ooze -> True
+  Subtype.Orb -> True
+  Subtype.Orc -> True
+  Subtype.Orgg -> True
+  Subtype.Otter -> True
+  Subtype.Ouphe -> True
+  Subtype.Ox -> True
+  Subtype.Oyster -> True
+  Subtype.Pangolin -> True
+  Subtype.Peasant -> True
+  Subtype.Pegasus -> True
+  Subtype.Pentavite -> True
+  Subtype.Performer -> True
+  Subtype.Pest -> True
+  Subtype.Phelddagrif -> True
+  Subtype.Phoenix -> True
+  Subtype.Phyrexian -> True
+  Subtype.Pilot -> True
+  Subtype.Pincher -> True
+  Subtype.Pirate -> True
+  Subtype.Plant -> True
+  Subtype.Platypus -> True
+  Subtype.Porcupine -> True
+  Subtype.Possum -> True
+  Subtype.Praetor -> True
+  Subtype.Primarch -> True
+  Subtype.Prism -> True
+  Subtype.Processor -> True
+  Subtype.Qu -> True
+  Subtype.Rabbit -> True
+  Subtype.Raccoon -> True
+  Subtype.Ranger -> True
+  Subtype.Rat -> True
+  Subtype.Rebel -> True
+  Subtype.Reflection -> True
+  Subtype.Rhino -> True
+  Subtype.Rigger -> True
+  Subtype.Robot -> True
+  Subtype.Rogue -> True
+  Subtype.Sable -> True
+  Subtype.Salamander -> True
+  Subtype.Samurai -> True
+  Subtype.Sand -> True
+  Subtype.Saproling -> True
+  Subtype.Satyr -> True
+  Subtype.Scarecrow -> True
+  Subtype.Scientist -> True
+  Subtype.Scion -> True
+  Subtype.Scorpion -> True
+  Subtype.Scout -> True
+  Subtype.Sculpture -> True
+  Subtype.Seal -> True
+  Subtype.Serf -> True
+  Subtype.Serpent -> True
+  Subtype.Servo -> True
+  Subtype.Shade -> True
+  Subtype.Shaman -> True
+  Subtype.Shapeshifter -> True
+  Subtype.Shark -> True
+  Subtype.Sheep -> True
+  Subtype.Shiar -> True
+  Subtype.Siren -> True
+  Subtype.Skeleton -> True
+  Subtype.Skrull -> True
+  Subtype.Skunk -> True
+  Subtype.Slith -> True
+  Subtype.Sliver -> True
+  Subtype.Sloth -> True
+  Subtype.Slug -> True
+  Subtype.Snail -> True
+  Subtype.Snake -> True
+  Subtype.Soldier -> True
+  Subtype.Soltari -> True
+  Subtype.Sorcerer -> True
+  Subtype.Spawn -> True
+  Subtype.Specter -> True
+  Subtype.Spellshaper -> True
+  Subtype.Sphinx -> True
+  Subtype.Spider -> True
+  Subtype.Spike -> True
+  Subtype.Spirit -> True
+  Subtype.Splinter -> True
+  Subtype.Sponge -> True
+  Subtype.Spy -> True
+  Subtype.Squid -> True
+  Subtype.Squirrel -> True
+  Subtype.Starfish -> True
+  Subtype.Surrakar -> True
+  Subtype.Survivor -> True
+  Subtype.Symbiote -> True
+  Subtype.Synth -> True
+  Subtype.Tentacle -> True
+  Subtype.Tetravite -> True
+  Subtype.Thalakos -> True
+  Subtype.Thopter -> True
+  Subtype.Thrull -> True
+  Subtype.Tiefling -> True
+  Subtype.TimeLord -> True
+  Subtype.Toy -> True
+  Subtype.Treefolk -> True
+  Subtype.Trilobite -> True
+  Subtype.Triskelavite -> True
+  Subtype.Troll -> True
+  Subtype.Turtle -> True
+  Subtype.Tyranid -> True
+  Subtype.Unicorn -> True
+  Subtype.Utrom -> True
+  Subtype.Vampire -> True
+  Subtype.Varmint -> True
+  Subtype.Vedalken -> True
+  Subtype.Villain -> True
+  Subtype.Volver -> True
+  Subtype.Wall -> True
+  Subtype.Walrus -> True
+  Subtype.Warlock -> True
+  Subtype.Warrior -> True
+  Subtype.Weasel -> True
+  Subtype.Weird -> True
+  Subtype.Werewolf -> True
+  Subtype.Whale -> True
+  Subtype.Wizard -> True
+  Subtype.Wolf -> True
+  Subtype.Wolverine -> True
+  Subtype.Wombat -> True
+  Subtype.Worm -> True
+  Subtype.Wraith -> True
+  Subtype.Wurm -> True
+  Subtype.Yeti -> True
+  Subtype.Zombie -> True
+  Subtype.Zubera -> True
+  _ -> False

@@ -48,10 +48,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Human"
+        "type": "Bird"
       },
       {
-        "type": "Bird"
+        "type": "Human"
       }
     ],
     "supertypes": [],
