@@ -225,9 +225,33 @@ data Prompt r where
   --
   -- Named for the CR 612 word REPLACEMENT it performs rather than for counting
   -- its payload: a name that says "basic land types" and means "two of them"
-  -- reads as a near-namesake of any prompt that asks for one, and the pair is
-  -- not what makes this prompt what it is -- the swap is.
+  -- reads as a near-namesake of ChooseBasicLandType below, which asks for one.
+  -- The pair is not what makes this prompt what it is -- the swap is.
   ChooseLandTypeSwap :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Prompt (Subtype.Subtype, Subtype.Subtype)
+  -- | CR 614.1c: as an object enters, its controller chooses ONE basic land
+  -- type ("As this Aura enters, choose a basic land type" -- Convincing
+  -- Mirage). The ObjectId is the entering object.
+  --
+  -- Singular, and deliberately not ChooseLandTypeSwap above. That prompt
+  -- answers with a PAIR because CR 612's word swap needs two words (Magical
+  -- Hack's "one basic land type" and the "another" replacing it); this is a
+  -- single choice, made at a different moment (entry, not resolution) and by a
+  -- different subsystem (Pawl.Engine.Replacement, not Pawl.Engine.Resolve).
+  -- Answering it with a pair and dropping half would be the engine deciding
+  -- something no player was asked.
+  --
+  -- No candidate list: CR 305.6 fixes the five basic land types ("The basic
+  -- land types are Plains, Island, Swamp, Mountain, and Forest") the way CR
+  -- 105.1 fixes the five colours for ChooseColor, and no card in the pool
+  -- narrows them. Asked whenever the entering object has a controller to ask --
+  -- five types are five distinguishable options, so there is no one-option case
+  -- to elide. Pawl.Engine.Replacement's arm has an unreachable no-controller
+  -- fallback beside it; see there.
+  --
+  -- No SlotName, unlike ChooseLandTypeSwap: that prompt names the spell's
+  -- text-change slot, and this choice is bound into no slot at all -- it is
+  -- written to Object.chosenSubtype on the entering permanent.
+  ChooseBasicLandType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
   -- | CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
   -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
   -- find," always permitted for a search of one's own library for a quality.

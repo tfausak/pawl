@@ -252,6 +252,7 @@ identityAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -314,6 +315,7 @@ castAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -369,6 +371,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -458,6 +461,7 @@ playLandAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0

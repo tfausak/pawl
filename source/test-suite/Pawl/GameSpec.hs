@@ -353,6 +353,7 @@ recordingAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
   Prompt.ChooseColor {} -> pure Color.White
+  Prompt.ChooseBasicLandType {} -> pure Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
   Prompt.ChooseReplacement {} -> pure 0
@@ -1500,6 +1501,7 @@ slaveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0

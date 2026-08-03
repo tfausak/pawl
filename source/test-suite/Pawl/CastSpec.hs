@@ -440,6 +440,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -1563,6 +1564,7 @@ castFirstOption p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -1624,6 +1626,7 @@ castPanglacial p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0

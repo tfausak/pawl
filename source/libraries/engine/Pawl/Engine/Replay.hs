@@ -57,6 +57,7 @@ encode p answer = case p of
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
+  Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
@@ -149,6 +150,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
+    _ -> Nothing
+  Prompt.ChooseBasicLandType {} -> case response of
+    Response.ChoseBasicLandType t -> Just t
     _ -> Nothing
   Prompt.OrderTriggers {} -> case response of
     Response.OrderedTriggers order -> Just order
@@ -297,6 +301,10 @@ defaultAnswer p = case p of
   -- CR 105.1: any of the five colours is a legal answer, and white is the least
   -- eventful fallback when a transcript runs short.
   Prompt.ChooseColor {} -> Color.White
+  -- CR 305.6: any of the five basic land types is a legal answer. Mountain is
+  -- what the ChooseLandTypeSwap arm above already falls back to, so the two
+  -- agree on which type a short transcript conjures.
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   -- CR 603.3b: the canonical order is always a legal answer, and is the least
   -- eventful fallback when a transcript runs short.
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
