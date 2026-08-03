@@ -12,5 +12,7 @@ module Pawl.Types.DamageKind where
 -- ("the lifelink rules function no matter what zone an object with lifelink
 -- deals damage from"). Toxic is the one that IS scoped -- CR 120.3g says
 -- "combat damage dealt to a player" -- which is the whole contrast.
-data DamageKind = Combat | Noncombat
+data DamageKind
+  = Combat
+  | Noncombat
   deriving (Eq, Ord, Show)
