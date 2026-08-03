@@ -36,6 +36,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Color as Color
 import Pawl.Types.ControllerRelation (ControllerRelation)
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -595,6 +596,7 @@ bucketOfEffect re = case re of
   -- racing Furnace of Rath, and that Gather Specimens board.
   ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> ReplacementBucket.Other
   -- CR 616.1a-d name self-replacement, entering under a control effect,
   -- entering as a copy and entering with the back face up; entering with
   -- counters is none of those, so CR 616.1e is what applies.
@@ -649,6 +651,9 @@ readsApplier re = case re of
   -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
   -- (Primal Plasma).
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> False
+  -- Same chooser again, and there is no payload at all: CR 105.1's five colours
+  -- are the whole offer whoever's row is applying (Painter's Servant).
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> False
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's intrinsic loyalty
   -- included).
@@ -902,6 +907,28 @@ apply batch candidate event =
             consume (ReplacementCandidate.identity candidate)
             State.modify' (applyEntryOption oid picked)
             pure (Just event)
+      -- CR 614.1c: Painter's Servant's "As this creature enters, choose a
+      -- color". Unlike ChoiceOf above, this is always asked: CR 105.1's five
+      -- colours are always all legal and always distinguishable, so there is no
+      -- one-option case to elide.
+      --
+      -- Written to Object.chosenColor, NOT to the copiable snapshot -- see
+      -- EntryRewrite.ChooseColor.
+      EntryRewrite.ChooseColor -> do
+        gs <- State.get
+        picked <- case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for ChoiceOf's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner.
+          Nothing -> pure Color.White
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            Trans.lift (Program.prompt (Prompt.ChooseColor decider controller oid))
+        consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenColor = Just picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
       -- CR 306.5b via CR 614.1c: "[This permanent] enters with N counters."
       -- Through Event.putCounters, the CR 122.6 funnel, and NOT a direct write to
       -- Object.counters: CR 614.16's second sentence makes a counter-scaling
@@ -932,9 +959,10 @@ apply batch candidate event =
       -- live board and the object IS the event's payload. Keeping it there is
       -- also what makes CR 616.2 fall out: the loop's next iteration re-collects
       -- and re-matches against a board where the control has already changed,
-      -- which a value parked on the event would not show it. All three arms
+      -- which a value parked on the event would not show it. All four arms
       -- above land on the object for the same reason -- AsCopy and ChoiceOf in
-      -- the copiable snapshot, WithCounters through the CR 122.6 funnel.
+      -- the copiable snapshot, ChooseColor in Object.chosenColor, WithCounters
+      -- through the CR 122.6 funnel.
       --
       -- No prompt, and none is owed: CR 616.1b's rewrite has no choice in it,
       -- and the choice the rule DOES describe -- which of several
