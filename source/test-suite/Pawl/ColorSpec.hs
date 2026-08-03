@@ -33,6 +33,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -42,6 +43,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -342,3 +344,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         after = snd (Engine.runGamePure (aimAtObject droneId) activated Stack.resolveTop)
     Spec.assertEqWith s "colourless before" (Projection.colorsOf droneId board) Set.empty
     Spec.assertEqWith s "blue after" (Projection.colorsOf droneId after) $ Set.singleton Color.Blue
+
+  Spec.it s "CR 613.3 devoid applies at the START of layer 5, so layers 2-4 read the mana cost" $ do
+    -- CR 613.3 applies characteristic-defining abilities first WITHIN a layer,
+    -- and devoid's layer is 5 (CR 613.1e). A layer-2, -3 or -4 effect whose
+    -- affected set is colour-keyed therefore sees the mana cost's black, not
+    -- the colourless devoid produces. Seeding devoid gets this wrong (#35).
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (droneId, gs) = S.addCreature slaughterDrone S.alice gs0
+        cands = Projection.gather gs
+        below = Projection.projectUpTo Layer.Color cands droneId gs
+    Spec.assertEqWith s "black below layer 5" (PC.colors below) $ Set.singleton Color.Black
+    Spec.assertEqWith s "colourless once layer 5 has applied" (Projection.colorsOf droneId gs) Set.empty

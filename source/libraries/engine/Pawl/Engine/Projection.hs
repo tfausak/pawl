@@ -543,17 +543,24 @@ viewUpTo bound cands gs oid =
 -- The characteristics view of a PRINTED card off the battlefield (a card in a
 -- library/graveyard/hand being matched by a search). No projection exists off the
 -- battlefield, so every axis is read from the printed card: types/supertypes/
--- subtypes from the type line, colours from baseColorsOf (devoid -> empty), and
--- power/controller are Nothing (a card in a library has neither under the rules
--- that matter here). This is what lets a Filter read an object's colour outside
--- the battlefield without a projection that does not exist there.
+-- subtypes from the type line, colours from printedColorsOf with devoid applied on
+-- top, and power/controller are Nothing (a card in a library has neither under the
+-- rules that matter here). This is what lets a Filter read an object's colour
+-- outside the battlefield without a projection that does not exist there.
 viewOfCard :: Card.Type.Card -> Filter.View
 viewOfCard card =
   let typeLine = Card.Type.typeLine card
    in Filter.MkView
         { Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
-          Filter.colors = baseColorsOf card,
+          -- CR 604.3 / 702.114a: a characteristic-defining ability functions in
+          -- ALL zones, and nothing off the battlefield is projected (viewUpTo
+          -- falls back here, #160) -- so devoid is applied here rather than
+          -- inherited from a fold this object never enters.
+          Filter.colors =
+            if definesColorless (Card.Type.keywords card)
+              then Set.empty
+              else printedColorsOf card,
           Filter.subtypes = TypeLine.subtypes typeLine,
           -- CR 702: read straight off the printed card, like the type line above
           -- it and for the same reason -- no projection exists off the
@@ -747,7 +754,20 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
             -- seed's count is 1 apiece. Multiplicity is what layer-6 grants add
             -- on top (CR 702.164b).
             PC.keywords = Map.fromSet (const 1) (Card.Type.keywords card),
-            PC.colors = baseColorsOf card,
+            PC.colors = printedColorsOf card,
+            -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
+            -- instead" belongs to a characteristic-defining ability, and a
+            -- printed Star with no CDA behind it has none, so it evaluates to
+            -- Nothing here. Primal Plasma (P5) is the pool's one such card --
+            -- its star is given a value by an as-enters REPLACEMENT (CR 208.2b),
+            -- not by a CDA -- so it projects no power or toughness until that
+            -- entry choice applies. Unobservable on the battlefield, where the
+            -- entry loop always applies the choice before the Moved event
+            -- exists, but a Primal Plasma CARD in a hand, library or graveyard
+            -- reports Nothing where CR 208.2b says 0 (#76). A star that DOES
+            -- have a CDA behind it is Nothing here too, and stays Nothing only
+            -- until layer 7a: seedCharacteristicPT put the substituted pair in
+            -- PC.characteristicPT, and applyCharacteristicPT determines it there.
             PC.power = case Card.Type.power card of
               Nothing -> Nothing
               Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
@@ -770,74 +790,51 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 -- denotes. CR 202.2b: an object with no coloured mana symbols and no indicator is
 -- colourless.
 --
--- CR 702.114a: devoid is a CHARACTERISTIC-DEFINING ability meaning "this object is
--- colourless", and it wins over both sources above.
+-- No devoid here. CR 702.114a makes devoid a CHARACTERISTIC-DEFINING ability, and
+-- CR 613.3 puts characteristic-defining abilities at the START of their layer --
+-- layer 5 for colour (CR 613.1e) -- not before the fold begins. applyColorDefining
+-- is where it lands; see projectWith.
+printedColorsOf :: Card.Type.Card -> Set Color.Color
+printedColorsOf card =
+  Set.union
+    (Card.Type.colorIndicator card)
+    (manaCostColors (Card.Type.manaCost card))
+
+-- CR 702.114a: "Devoid is a characteristic-defining ability. 'Devoid' means
+-- 'This object is colorless.'" THE one place that decides what devoid means, so
+-- the fold and the off-battlefield card view cannot drift apart on it.
+definesColorless :: Set Keyword -> Bool
+definesColorless = Set.member Keyword.Devoid
+
+-- CR 613.3 / 613.1e: the object's own colour-defining ability, applied at the
+-- START of layer 5 -- "within layers 2-6, apply effects from characteristic-
+-- defining abilities first, then all other effects in timestamp order".
 --
--- Devoid is applied HERE, at the seed, rather than as a CDA inside layer 5. CR
--- 613.3 says that within layers 2-6 characteristic-defining abilities apply first
--- and only then other effects in timestamp order, which would mean a precedence
--- key on Gathered. That machinery is not built because the two orderings are
--- observably indistinguishable for everything IN THE CARD POOL TODAY (not
--- "everything this engine can reach" -- see the fifth bullet, which names the
--- gap the first four don't cover):
+-- Folded IN PLACE rather than emitted as a synthetic Gathered, for
+-- applyCharacteristicPT's three reasons, which transfer word for word: a CDA
+-- affects only the object it is on (CR 604.3a(3)) so it has no affected set to
+-- gather over; CR 604.3 makes it function in ALL zones while gather walks the
+-- battlefield only; and it has no source object and no timestamp, so it has
+-- nothing to sort on under CR 613.7.
 --
---   * every layer-5 effect in the vocabulary is SetColor, which REPLACES (CR
---     105.3), so "CDA first, then the replacers" and "CDA before layer 5, then the
---     replacers" agree on the final set, always;
---   * a copy of a devoid object snapshots the printed Devoid keyword among its
---     copiable values (CR 613.2c), so the copy recomputes colourless from its own
---     seed;
---   * Humility's LoseAllAbilities is layer 6, AFTER layer 5, and CR 613.8a scopes
---     dependency to effects in the same layer -- so a Humility'd devoid object
---     stays colourless under either ordering;
---   * CR 604.3: a CDA functions in ALL zones. The seed is computed from the card
---     and is zone-independent; a battlefield-only gather pass would not be.
---   * the four bullets above all reason about what WRITES colour. None covers
---     what READS it. Seeding devoid also moves it earlier relative to colour
---     READERS: under CR 613.3, devoid applies at the START of layer 5, so at
---     layers 2, 3 and 4 the CR says a devoid object with {B} in its mana cost is
---     still black, while this seed-based implementation already says colourless.
---     A Matching (And [HasCardType Creature, HasColor c]) affected set
---     (this phase's Affected/Filter) makes that gap expressible open-half data
---     TODAY: a card pairing {"affected": {"type":"Matching", ...}} with a
---     layer-4 AddCardType, a layer-3 ChangeSubtypeWord, or a layer-2 SetController
---     would have its affected set evaluated against PC.colors with devoid already
---     applied, which is the wrong answer per 613.3. No card in the pool does
---     this, so it stays unobserved -- but it is the case that retires this
---     shortcut, not a hypothetical.
+-- Read from the PARTIAL projection's keywords rather than from the card. At
+-- layer 5 that map holds the printed keywords, those a copy effect brought in at
+-- layer 1, and those a text-changing effect wrote at layer 3 -- and it cannot yet
+-- hold a layer-6 grant, because layer 6 has not been applied. That is exactly CR
+-- 604.3a(2)'s list of what makes a static ability characteristic-defining, so the
+-- rule holds by construction rather than by a test.
 --
--- The CR 613.3 CDA-vs-timestamp precedence key this would need is not built, and
--- neither is the colour-keyed-affected-set path of the fifth bullet (#35). P3a's
--- spec section 2.2 carries the full argument.
+-- Humility therefore cannot remove it: LoseAllAbilities is layer 6, after this.
 --
--- P3b does NOT reopen this question. Devoid is a CONSTANT CDA (its value doesn't
--- depend on game state), so seeding it is sound: a copy snapshot recomputes the
--- same constant. Tarmogoyf's characteristic-defining P/T (P3b, layer 7a) is a
--- DYNAMIC CDA -- it reads the graveyards' card types, which change over time.
--- Seeding a dynamic CDA would freeze it into Binding.copy at entry (see
--- Engine.hs's as-enters drain, which snapshots Projection.copiableCharacteristics)
--- -- a Clone of a Tarmogoyf would keep whatever P/T the graveyards held at the
--- moment it entered, instead of recomputing, which violates CR 707.2 (a copy
--- acquires the ABILITY, not its computed value). So P3b must fold Tarmogoyf's
--- CDA in-place at Layer.CharacteristicPT (7a, which already exists in
--- Pawl.Types.Layer as the CR's own dedicated sublayer for this), not at the seed.
--- The precedent below (baseCharacteristics already evaluating a printed `*` P/T
--- at the seed via Quantity.evaluate) is harmless ONLY for the one card that
--- has `*` P/T with NO characteristic-defining ability behind it -- Primal Plasma
--- (P5), whose star is given its value by an as-enters REPLACEMENT (CR 208.2b),
--- not by a CDA. Quantity.evaluate returns Nothing for a bare Star, so such a card
--- projects NO power or toughness until its entry choice applies, where CR 208.2b
--- says to use 0. That is unobservable on the battlefield -- the entry loop always
--- applies the choice before the Moved event exists -- but a Primal Plasma CARD in
--- a hand, library or graveyard reports Nothing where the rule says 0 (#76).
-baseColorsOf :: Card.Type.Card -> Set Color.Color
-baseColorsOf card =
-  if Set.member Keyword.Devoid (Card.Type.keywords card)
-    then Set.empty
-    else
-      Set.union
-        (Card.Type.colorIndicator card)
-        (manaCostColors (Card.Type.manaCost card))
+-- Not implemented: a devoid GRANTED by a layer-6 effect does nothing to colour.
+-- Per CR 604.3a(2) such a grant is not characteristic-defining, so it would be an
+-- ordinary layer-5 colour effect timestamped when granted (CR 613.7a), which this
+-- does not build (#622).
+applyColorDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
+applyColorDefining pc =
+  if definesColorless (Map.keysSet (PC.keywords pc))
+    then pc {PC.colors = Set.empty}
+    else pc
 
 -- CR 202.1b: a land has no mana cost at all, so it contributes no colours.
 manaCostColors :: Maybe ManaCost.ManaCost -> Set Color.Color
@@ -1724,6 +1721,16 @@ project oid gs = projectFrom (gather gs) oid gs
 --   * a CDA has no source object and no timestamp, so it has nothing to sort on
 --     under CR 613.7 and does not belong in the candidate list at all.
 --
+-- A fourth reason applies to this CDA and not to applyColorDefining's: this one
+-- is DYNAMIC. Devoid's value is a constant, so computing it early would still
+-- give the right answer; Tarmogoyf's P/T reads the graveyards' card types, which
+-- change over time. Computing it before the fold would freeze the computed NUMBER
+-- into Binding.copy at entry (Engine.hs's as-enters drain snapshots
+-- copiableCharacteristics), so a Clone of a Tarmogoyf would keep whatever P/T the
+-- graveyards held the moment it entered. CR 707.2 makes a copy acquire the values
+-- derived from the printed TEXT -- the ability itself -- so the copy has to
+-- recompute, and folding here is what makes it.
+--
 -- Quantity.determine rather than Quantity.evaluate, and a BARE ASSIGNMENT rather
 -- than setPT, because of CR 208.2a's last sentence: "If the ability needs to use
 -- a number that can't be determined, including inside a calculation, use 0
@@ -1785,7 +1792,12 @@ projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> Project
 -- instead of rebuilding it per object.
 projectWith admits cands = forObject
   where
-    layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))
+    -- Layer 5 and layer 7a are ALWAYS visited, even when no gathered effect
+    -- lives there: an object's own characteristic-defining abilities are not
+    -- gathered candidates (applyColorDefining, applyCharacteristicPT). For an
+    -- object with neither, each extra pass is an identity function over an empty
+    -- candidate filter.
+    layers = filter admits (Set.toAscList (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands)))))
     -- The layers CR 613.8 could reorder anything in: those holding an effect with
     -- a Matching set, the only kind another effect can move. Bound HERE, before
     -- the object, so a whole-board sweep pays for it once for the board rather
@@ -1800,10 +1812,13 @@ projectWith admits cands = forObject
     movableLayers = Set.fromList (fmap gLayer (filter staticallyMovable cands))
     forObject oid gs =
       let applyLayer (partial, decided) lyr =
-            let seeded =
-                  if lyr == Layer.CharacteristicPT
-                    then applyCharacteristicPT lyr cands gs oid partial
-                    else partial
+            let seeded = case lyr of
+                  -- CR 613.3: characteristic-defining abilities first, within
+                  -- the layer they define. Colour is layer 5 (CR 613.1e), P/T is
+                  -- layer 7a (CR 613.4a).
+                  Layer.Color -> applyColorDefining partial
+                  Layer.CharacteristicPT -> applyCharacteristicPT lyr cands gs oid partial
+                  _ -> partial
                 -- CR 613.6: "If an effect starts to apply in one layer and/or
                 -- sublayer, it will continue to be applied to the same set of objects
                 -- in each other applicable layer." The affected set is therefore asked
@@ -1983,10 +1998,11 @@ projectWith admits cands = forObject
 -- oid-independent, so a whole-board sweep gathers once and folds each object
 -- (projectAll) instead of re-gathering per object.
 --
--- Layer 7a is ALWAYS in the layer list, even when no gathered effect lives there:
--- an object's own characteristic-defining ability is not a gathered candidate
--- (see applyCharacteristicPT). For an object with no CDA the extra pass is an
--- identity function over an empty candidate filter.
+-- Layers 5 and 7a are ALWAYS in the layer list, even when no gathered effect
+-- lives there: an object's own characteristic-defining abilities are not gathered
+-- candidates (see applyColorDefining and applyCharacteristicPT). For an object
+-- with no CDA each extra pass is an identity function over an empty candidate
+-- filter.
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom = projectWith (const True)
 
