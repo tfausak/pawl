@@ -135,6 +135,50 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
       )
       Nothing
 
+  -- CR 208.2a's last sentence, the characteristic-defining ability's own
+  -- evaluator: "If the ability needs to use a number that can't be determined,
+  -- including inside a calculation, use 0 instead of that number." determine is
+  -- total where evaluate is partial.
+  Spec.it s "CR 208.2a determine substitutes 0 for a number that cannot be determined" $ do
+    Spec.assertEq
+      s
+      ( Quantity.determine
+          noView
+          noContext
+          (Setup.emptyGame S.bothPlayers)
+          (ObjectId.MkObjectId 0)
+          Quantity.Type.Star
+      )
+      0
+
+  Spec.it s "CR 208.2a the 0 goes INSIDE the calculation, so 1+* is 1 and not 0" $ do
+    -- THE FALSIFIER for substituting at the top of the quantity instead of at
+    -- the number that cannot be determined: Tarmogoyf's printed box is */1+*,
+    -- and CR 208.2a replaces the count, not the sum. Compare the Plus test just
+    -- above, where evaluate answers Nothing for the same quantity.
+    Spec.assertEq
+      s
+      ( Quantity.determine
+          noView
+          noContext
+          (Setup.emptyGame S.bothPlayers)
+          (ObjectId.MkObjectId 0)
+          (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+      )
+      1
+
+  Spec.it s "determine agrees with evaluate wherever the number IS determined" $ do
+    Spec.assertEq
+      s
+      ( Quantity.determine
+          noView
+          noContext
+          (Setup.emptyGame S.bothPlayers)
+          (ObjectId.MkObjectId 0)
+          (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))
+      )
+      3
+
   Spec.it s "substituteStar replaces Star everywhere, including inside Plus" $ do
     Spec.assertEq
       s

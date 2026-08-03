@@ -2276,17 +2276,17 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     Spec.assertEqWith s "alice drew one, not seven" (S.handSize S.alice after) 1
   -- The empty matched set. No rule in the CR gives a maximum over nothing a
   -- value: CR 208.2a's "use 0 instead of that number" is scoped to a
-  -- characteristic-defining ability (#65), and where the CR does want an
-  -- empty maximum to be 0 it says so card-by-card (CR 714.2d, a Saga with no
-  -- chapter abilities). So the fold answers Nothing -- undeterminable, the
-  -- posture this codebase propagates everywhere -- and Resolve's Draw arm
-  -- draws nothing for it.
+  -- characteristic-defining ability, which One with the Machine's draw is not,
+  -- and where the CR does want an empty maximum to be 0 it says so card-by-card
+  -- (CR 714.2d, a Saga with no chapter abilities). So the fold answers Nothing
+  -- -- undeterminable, the posture this codebase propagates everywhere -- and
+  -- Resolve's Draw arm draws nothing for it.
   --
   -- OBSERVATIONALLY, Nothing and 0 are the same here, and the Gatherer
   -- ruling on Rishkar's Expertise ("if you control no creatures with power
   -- greater than 0 ... you draw no cards") is what this matches either way.
   -- Pawl.CountSpec pins the distinction where it IS visible, at the fold.
-  Spec.it s "CR 208.2a / #65 controlling no artifacts draws nothing rather than substituting 0" $ do
+  Spec.it s "CR 208.2a controlling no artifacts draws nothing rather than substituting 0" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     oneWithTheMachine <- S.printingOf s registry "One with the Machine"

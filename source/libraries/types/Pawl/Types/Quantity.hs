@@ -75,18 +75,20 @@ data Quantity
     -- resolves it at the seed by substituting Card.characteristicPT, so a Star
     -- is meant to never survive into a projection -- but that is a CONVENTION the
     -- card data must honour, not something this type guarantees. Two cases reach
-    -- evaluate anyway, both benign (evaluate returns Nothing, setPT keeps the
-    -- base):
+    -- the evaluator anyway, both benign:
     --
     --   * a card whose OWN characteristicPT itself contained a Star -- the seed
     --     substitutes Star for the printed characteristicPT without
     --     re-descending into the replacement, and the codec accepts Star in any
-    --     Quantity position. Hypothetical: no card in the pool does this; the
-    --     Pawl.CardSpec `cardOffends` lint family is where that check would live
-    --     if it is ever added.
+    --     Quantity position. The star reaches the CDA's evaluator, which is
+    --     Quantity.determine, so CR 208.2a makes the undeterminable value 0.
+    --     Hypothetical: no card in the pool does this; the Pawl.CardSpec
+    --     `cardOffends` lint family is where that check would live if it is ever
+    --     added.
     --   * a card with printed Star power/toughness and NO characteristicPT at
     --     all, so there is nothing for the seed to substitute and the Star
-    --     reaches evaluate directly. Real: Primal Plasma (P5) is exactly this --
+    --     reaches evaluate directly, at the seed, where CR 208.2a's substitution
+    --     does not apply (there is no CDA). Real: Primal Plasma (P5) is exactly this --
     --     its star gets a value from an as-enters REPLACEMENT (CR 208.2b), not a
     --     CDA. See Pawl.Engine.Projection's doc comment above `baseColorsOf` for the
     --     consequence in full (#76).

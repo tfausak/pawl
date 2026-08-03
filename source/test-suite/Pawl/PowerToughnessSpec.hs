@@ -1,14 +1,18 @@
 -- Covers: Pawl.Engine.Projection (CR 613 layer 7 -- 7a characteristic-defined P/T, the
 -- CR 608.2h freeze that 7b's stored effects owe, and 7d P/T switching), Pawl.Engine.Quantity
--- (the counting quantity) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer
--- Strength, Twisted Image, Nightmare). Gameplay-level: each card is cast or resolved
--- through the stack and the resulting game state is asserted on.
+-- (the counting quantity, and CR 208.2a's substitution of 0 for a number a CDA
+-- cannot determine) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer
+-- Strength, Twisted Image, Nightmare, Monstrous War-Leech). Gameplay-level: each
+-- card is cast or resolved through the stack and the resulting game state is
+-- asserted on.
 module Pawl.PowerToughnessSpec where
 
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -16,16 +20,28 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
+import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
+
+-- The battlefield objects whose printed card is Monstrous War-Leech. Found by
+-- name rather than tracked by id: CR 400.7 makes an object that changes zones a
+-- new object, and pawl gives each one a fresh ObjectId, so the id the cast was
+-- handed names nothing on the battlefield (the Pawl.CopySpec precedent).
+leechesOnBattlefield :: GameState.GameState -> [ObjectId]
+leechesOnBattlefield gs = filter isLeech (Set.toList (GameState.battlefield gs))
+  where
+    isLeech oid = maybe False (\c -> Card.Type.name c == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.cardOf oid gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
@@ -470,3 +486,46 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         attached = S.attach aura creature withAura
     Spec.assertEqWith s "unattached, the ability names nothing" (Projection.powerOf creature withAura, Projection.toughnessOf creature withAura) (Just 2, Just 1)
     Spec.assertEqWith s "attached, +2/+1" (Projection.powerOf creature attached, Projection.toughnessOf creature attached) (Just 4, Just 2)
+  -- CR 208.2a's last sentence: "If the ability needs to use a number that can't
+  -- be determined, including inside a calculation, use 0 instead of that
+  -- number." Monstrous War-Leech's power and toughness are each the greatest
+  -- mana value among cards in YOUR graveyard, and an empty graveyard has no
+  -- greatest -- Pawl.Engine.Count.aggregate says so, honestly, with Nothing.
+  -- The number cannot be determined, so the CDA uses 0.
+  --
+  -- Monstrous War-Leech's other two sentences -- its kicker, and the as-enters
+  -- mill that kicking turns on -- are not modelled (#610), so the graveyard
+  -- these fixtures read is only ever the one they set up.
+  Spec.it s "CR 208.2a an undeterminable CDA number is 0: an empty graveyard makes the Leech a 0/0" $ do
+    leech <- S.printingOf s registry "Monstrous War-Leech"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (leechId, gs) = S.addCreature leech S.alice gs0
+    Spec.assertEqWith s "0 power, not absent" (Projection.powerOf leechId gs) (Just 0)
+    Spec.assertEqWith s "0 toughness, not absent" (Projection.toughnessOf leechId gs) (Just 0)
+  Spec.it s "CR 208.2a only the undeterminable number is replaced: one Lightning Bolt in the graveyard makes it 1/1" $ do
+    -- The other side of the same fixture, so the 0/0 above is the RULE and not
+    -- a CDA that never computes anything: Lightning Bolt's mana value is 1
+    -- (CR 202.3), so the greatest among a one-card graveyard is 1.
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    leech <- S.printingOf s registry "Monstrous War-Leech"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
+        (leechId, gs) = S.addCreature leech S.alice withBolt
+    Spec.assertEqWith s "1 power" (Projection.powerOf leechId gs) (Just 1)
+    Spec.assertEqWith s "1 toughness" (Projection.toughnessOf leechId gs) (Just 1)
+  Spec.it s "CR 704.5f the 0/0 Leech dies: cast with an empty graveyard, it never survives entry" $ do
+    -- THE PROVING CASE, at gameplay level: alice casts Monstrous War-Leech off
+    -- four Swamps with nothing in her graveyard. It resolves, enters as a 0/0
+    -- (CR 208.2a), and the settle boundary buries it (CR 704.5f, "if a creature
+    -- has toughness 0 or less, it's put into its owner's graveyard"). Without
+    -- CR 208.2a's substitution the CDA determines nothing, the Leech has NO
+    -- toughness at all, Pawl.Engine.Sba.zeroToughness reads Nothing and the
+    -- creature survives -- the board difference this test exists to falsify.
+    swamp <- S.printingOf s registry "Swamp"
+    leech <- S.printingOf s registry "Monstrous War-Leech"
+    let base = S.landsInPlay swamp 4
+        (gs, leechId) = S.handOne leech base
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice leechId))
+        settled = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
+    Spec.assertEqWith s "the spell left the stack" (GameState.stack settled) []
+    Spec.assertEqWith s "no Leech on the battlefield" (leechesOnBattlefield settled) []

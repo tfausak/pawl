@@ -1,5 +1,6 @@
 module Pawl.Engine.Quantity where
 
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
@@ -100,6 +101,32 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- Greatest's payload is a strictly smaller subterm of `quantity`, and the value
   -- came from finite card data.
   Quantity.Count c -> Count.evaluate viewOf (evaluateFor viewOf context gs announcedOn) context gs c
+
+-- CR 208.2a, last sentence: "If the ability needs to use a number that can't be
+-- determined, including inside a calculation, use 0 instead of that number."
+-- TOTAL where evaluate is partial -- an Integer, never a Maybe.
+--
+-- The recursion through Plus is what "including inside a calculation" buys, and
+-- it is not the same answer as substituting at the top: Tarmogoyf's printed 1+*
+-- is 1 when its count cannot be determined, because it is the COUNT that becomes
+-- 0 and not the sum. Plus is the only calculation Pawl.Types.Quantity has; every
+-- other arm is a leaf here and gets the 0 whole.
+--
+-- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, which is what CR 208.2a is
+-- scoped to: Pawl.Engine.Projection.applyCharacteristicPT is the only caller,
+-- and every other reader of a quantity -- a resolving effect, a condition,
+-- layer 7b's stored SetBasePowerToughness -- must keep evaluate's honest
+-- Nothing, since no rule tells those to invent a number.
+--
+-- It does NOT descend into a Count. It does not need to: a count that cannot be
+-- determined IS the number CR 208.2a is talking about -- "the greatest mana
+-- value among cards in your graveyard" when the graveyard is empty -- so the 0
+-- goes in whole, right here, and Pawl.Engine.Count.aggregate is left free to
+-- keep answering Nothing for the readers that are not CDAs.
+determine :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Quantity -> Integer
+determine viewOf context gs oid quantity = case quantity of
+  Quantity.Plus a b -> determine viewOf context gs oid a + determine viewOf context gs oid b
+  _ -> Maybe.fromMaybe 0 (evaluate viewOf context gs oid quantity)
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
 -- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.
