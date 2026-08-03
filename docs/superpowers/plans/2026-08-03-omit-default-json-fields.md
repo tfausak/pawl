@@ -95,15 +95,30 @@ The `pawl` executable stanza in `pawl.cabal` inherits the `executable` import; i
 Run: `direnv exec . cabal build all`
 Expected: warning-free.
 
-- [ ] **Step 3: Prove it faithful — run it and see nothing change**
+- [ ] **Step 3: Prove it faithful — run it and account for every change**
 
 ```bash
 direnv exec . cabal run pawl
 direnv exec . script/format-json.sh fix data/cards/*.json
 git status --short data/cards
+git diff --stat data/cards
 ```
 
-Expected: **empty output.** The encoder writes exactly what is committed today, so a faithful formatter is a no-op. If any file changes, stop — the formatter is wrong, or the corpus was not canonical, and either way that must be understood before it is used to migrate 226 files.
+Expected: **exactly two files change** — `data/cards/jace-beleren.json` and
+`data/cards/the-walls-of-ba-sing-se.json` — and the only lines that differ are
+multiples of ten re-rendered in exponent notation: `10` → `1E+1`, `20` → `2E+1`,
+`30` → `3E+1`.
+
+That is a known, accepted pre-existing behavior, not a defect in this task.
+`Decimal.mkDecimal` normalizes trailing zeros into the exponent so that `Eq` is
+structural (`mkDecimal 10 0` is mantissa 1, exponent 1), and `Pawl.Json.Number.encode`
+renders any nonzero exponent as e-notation — `NumberSpec` asserts that
+`mkDecimal 345 2` encodes as `"345e2"`. `1E+1` parses back to exactly 10, so
+nothing is lost; the corpus is simply less pretty in two places. **The owner
+ruled that this is the new canonical form**, so commit the two files.
+
+**Any other file changing, or any change that is not a multiple of ten in
+exponent notation, means the formatter is wrong — stop and report it.**
 
 - [ ] **Step 4: Run the suite**
 
@@ -113,9 +128,9 @@ Expected: PASS, 2598 tests.
 - [ ] **Step 5: Commit**
 
 ```bash
-direnv exec . git add source/executable/Main.hs pawl.cabal
+direnv exec . git add source/executable/Main.hs pawl.cabal data/cards
 direnv exec . hooky fix
-direnv exec . git add source/executable/Main.hs pawl.cabal
+direnv exec . git add source/executable/Main.hs pawl.cabal data/cards
 direnv exec . hooky run
 direnv exec . git commit -m "Add a corpus formatter that rewrites cards through the codec"
 ```
@@ -1256,6 +1271,13 @@ Per CONTRIBUTING: re-check every CR citation added by this branch against `docs/
 - [ ] **Step 7: Open the PR**
 
 Open as a draft, then mark ready once the self-review's findings are pushed and the suite is green. Do not wait for CI. The body carries: what changed and why, with `Closes #N` as plain text (backticks break the link); the CR citations, each checked; the design calls made and rejected — per-field defaults over structurally-empty-only, regenerate-from-encoder over hand-stripping, and what the latter costs; how it was verified, including the Task 13 before/after result, the suite count before → after, and the corpus line delta; an explicit "no" on whether the diff makes the rules core case on an effect's identity; and what was deferred.
+
+Call out one thing reviewers will notice in the corpus diff: `jace-beleren.json`
+and `the-walls-of-ba-sing-se.json` now render multiples of ten as `1E+1`, `2E+1`
+and `3E+1`. That is `Decimal.mkDecimal`'s trailing-zero normalization meeting
+`Pawl.Json.Number.encode`'s e-notation, it predates this branch, it is
+value-preserving, and the owner accepted it as canonical rather than fix the
+`json` sublibrary inside this work.
 
 ---
 
