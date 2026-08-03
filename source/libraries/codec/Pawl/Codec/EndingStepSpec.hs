@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.EndingStepSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.EndingStep" $ do
       EndingStep.toJson
       EndingStep.fromJson
       EndingStep.EndStep
-      "{\"type\":\"EndStep\"}"
+      """ {"type":"EndStep"} """
   Spec.it s "Cleanup" $
     Common.assertJsonCodec
       s
       EndingStep.toJson
       EndingStep.fromJson
       EndingStep.Cleanup
-      "{\"type\":\"Cleanup\"}"
+      """ {"type":"Cleanup"} """

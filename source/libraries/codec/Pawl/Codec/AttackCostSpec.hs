@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.AttackCostSpec where
 
 import qualified Pawl.Codec.AttackCost as AttackCost
@@ -25,4 +27,4 @@ spec s =
           (Affected.Matching (Filter.HasCardType CardType.Creature))
           (ManaCost.MkManaCost [ManaSymbol.Generic 2])
       )
-      "{\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}],\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}"
+      """ {"perAttacker":[{"type":"Generic","value":2}],"subject":{"type":"Matching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """

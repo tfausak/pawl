@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.DamageKindSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.DamageKind" $ do
       DamageKind.toJson
       DamageKind.fromJson
       DamageKind.Combat
-      "{\"type\":\"Combat\"}"
+      """ {"type":"Combat"} """
   Spec.it s "Noncombat" $
     Common.assertJsonCodec
       s
       DamageKind.toJson
       DamageKind.fromJson
       DamageKind.Noncombat
-      "{\"type\":\"Noncombat\"}"
+      """ {"type":"Noncombat"} """

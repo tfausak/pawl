@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PlayerIdSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,4 +15,4 @@ spec s =
       PlayerId.toJson
       PlayerId.fromJson
       (PlayerId.MkPlayerId 1)
-      "1"
+      """ 1 """

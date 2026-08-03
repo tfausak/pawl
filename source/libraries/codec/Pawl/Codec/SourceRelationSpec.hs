@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.SourceRelationSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.SourceRelation" $ do
       SourceRelation.toJson
       SourceRelation.fromJson
       SourceRelation.AnySource
-      "{\"type\":\"AnySource\"}"
+      """ {"type":"AnySource"} """
   Spec.it s "TheSource" $
     Common.assertJsonCodec
       s
       SourceRelation.toJson
       SourceRelation.fromJson
       SourceRelation.TheSource
-      "{\"type\":\"TheSource\"}"
+      """ {"type":"TheSource"} """

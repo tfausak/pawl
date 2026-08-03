@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.SlotNameSpec where
 
 import qualified Data.Text as Text
@@ -14,4 +16,4 @@ spec s =
       SlotName.toJson
       SlotName.fromJson
       (SlotName.MkSlotName (Text.pack "target"))
-      "\"target\""
+      """ "target" """

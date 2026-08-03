@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CounterPatternSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -22,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.whose = ControllerRelation.Yours,
           CounterPattern.onWhat = Filter.HasCardType CardType.Creature
         }
-      "{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
+      """ {"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}} """
   -- Doubling Season: whichKind = Nothing means ANY kind (an explicit JSON
   -- null), never "no kind" -- and the trivial filter matching every permanent.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
@@ -35,4 +37,4 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.whose = ControllerRelation.Yours,
           CounterPattern.onWhat = Filter.And []
         }
-      "{\"whichKind\":null,\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}}"
+      """ {"whichKind":null,"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.OnsetSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.Onset" $ do
       Onset.toJson
       Onset.fromJson
       Onset.Immediately
-      "{\"type\":\"Immediately\"}"
+      """ {"type":"Immediately"} """
   Spec.it s "FromYourNextTurn" $
     Common.assertJsonCodec
       s
       Onset.toJson
       Onset.fromJson
       Onset.FromYourNextTurn
-      "{\"type\":\"FromYourNextTurn\"}"
+      """ {"type":"FromYourNextTurn"} """

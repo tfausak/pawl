@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.BindingSpec where
 
 import qualified Data.Map.Strict as Map
@@ -23,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       Binding.toJson
       Binding.fromJson
       Binding.empty
-      "{\"target\":null,\"amount\":null,\"modes\":null,\"copy\":null}"
+      """ {"target":null,"amount":null,"modes":null,"copy":null} """
   -- The codec is meant to be total over every Binding field -- amount, modes
   -- and copy too -- so round-trip a Binding with all four populated at once. No
   -- real slot ever carries all four together (copy lives only under the

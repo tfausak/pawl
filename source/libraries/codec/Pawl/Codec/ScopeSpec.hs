@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ScopeSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -16,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
       Scope.toJson
       Scope.fromJson
       (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-      "{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]}"
+      """ {"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]} """
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "InHistory" $
     Common.assertJsonCodec
@@ -24,4 +26,4 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
       Scope.toJson
       Scope.fromJson
       (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
-      "{\"type\":\"InHistory\",\"value\":{\"type\":\"MovedBetween\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"Graveyard\"}]}}"
+      """ {"type":"InHistory","value":{"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]}} """

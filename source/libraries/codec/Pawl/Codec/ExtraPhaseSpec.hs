@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ExtraPhaseSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.ExtraPhase" $ do
       ExtraPhase.toJson
       ExtraPhase.fromJson
       ExtraPhase.ExtraCombat
-      "{\"type\":\"ExtraCombat\"}"
+      """ {"type":"ExtraCombat"} """
   Spec.it s "ExtraMain" $
     Common.assertJsonCodec
       s
       ExtraPhase.toJson
       ExtraPhase.fromJson
       ExtraPhase.ExtraMain
-      "{\"type\":\"ExtraMain\"}"
+      """ {"type":"ExtraMain"} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ModeSelectionSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,4 +15,4 @@ spec s =
       ModeSelection.toJson
       ModeSelection.fromJson
       (ModeSelection.ChooseExactly 1)
-      "{\"type\":\"ChooseExactly\",\"value\":1}"
+      """ {"type":"ChooseExactly","value":1} """

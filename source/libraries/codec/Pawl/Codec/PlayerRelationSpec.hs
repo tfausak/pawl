@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PlayerRelationSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRelation" $ do
       PlayerRelation.toJson
       PlayerRelation.fromJson
       PlayerRelation.You
-      "{\"type\":\"You\"}"
+      """ {"type":"You"} """
   Spec.it s "Opponent" $
     Common.assertJsonCodec
       s
       PlayerRelation.toJson
       PlayerRelation.fromJson
       PlayerRelation.Opponent
-      "{\"type\":\"Opponent\"}"
+      """ {"type":"Opponent"} """

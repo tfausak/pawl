@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.DestructionRewriteSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,4 +15,4 @@ spec s =
       DestructionRewrite.toJson
       DestructionRewrite.fromJson
       DestructionRewrite.Regenerate
-      "{\"type\":\"Regenerate\"}"
+      """ {"type":"Regenerate"} """

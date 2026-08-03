@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PlayerScopeSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,18 +15,18 @@ spec s = Spec.describe s "Pawl.Codec.PlayerScope" $ do
       PlayerScope.toJson
       PlayerScope.fromJson
       PlayerScope.You
-      "{\"type\":\"You\"}"
+      """ {"type":"You"} """
   Spec.it s "Opponents" $
     Common.assertJsonCodec
       s
       PlayerScope.toJson
       PlayerScope.fromJson
       PlayerScope.Opponents
-      "{\"type\":\"Opponents\"}"
+      """ {"type":"Opponents"} """
   Spec.it s "EachPlayer" $
     Common.assertJsonCodec
       s
       PlayerScope.toJson
       PlayerScope.fromJson
       PlayerScope.EachPlayer
-      "{\"type\":\"EachPlayer\"}"
+      """ {"type":"EachPlayer"} """

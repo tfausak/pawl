@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ManaSymbolSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -15,14 +17,14 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
       ManaSymbol.toJson
       ManaSymbol.fromJson
       (ManaSymbol.Generic 2)
-      "{\"type\":\"Generic\",\"value\":2}"
+      """ {"type":"Generic","value":2} """
   Spec.it s "OfType" $
     Common.assertJsonCodec
       s
       ManaSymbol.toJson
       ManaSymbol.fromJson
       (ManaSymbol.OfType (ManaType.Colored Color.Red))
-      "{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}}"
+      """ {"type":"OfType","value":{"type":"Colored","value":{"type":"Red"}}} """
   -- CR 107.4e's two-halves shape, e.g. {W/U}.
   Spec.it s "Hybrid" $
     Common.assertJsonCodec
@@ -30,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
       ManaSymbol.toJson
       ManaSymbol.fromJson
       (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Blue))
-      "{\"type\":\"Hybrid\",\"value\":[{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}},{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}]}"
+      """ {"type":"Hybrid","value":[{"type":"Colored","value":{"type":"White"}},{"type":"Colored","value":{"type":"Blue"}}]} """
   -- CR 107.4e's {2/B} shape.
   Spec.it s "MonocoloredHybrid" $
     Common.assertJsonCodec
@@ -38,7 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
       ManaSymbol.toJson
       ManaSymbol.fromJson
       (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black))
-      "{\"type\":\"MonocoloredHybrid\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}"
+      """ {"type":"MonocoloredHybrid","value":{"type":"Colored","value":{"type":"Black"}}} """
   -- CR 107.4f: {G/P}, colored not by a ManaType but by a bare Color.
   Spec.it s "Phyrexian" $
     Common.assertJsonCodec
@@ -46,7 +48,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
       ManaSymbol.toJson
       ManaSymbol.fromJson
       (ManaSymbol.Phyrexian Color.Green)
-      "{\"type\":\"Phyrexian\",\"value\":{\"type\":\"Green\"}}"
+      """ {"type":"Phyrexian","value":{"type":"Green"}} """
   -- CR 107.4h's {S}: nullary, unlike every other payload-carrying arm above.
   Spec.it s "Snow" $
     Common.assertJsonCodec
@@ -54,11 +56,11 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
       ManaSymbol.toJson
       ManaSymbol.fromJson
       ManaSymbol.Snow
-      "{\"type\":\"Snow\"}"
+      """ {"type":"Snow"} """
   Spec.it s "Variable" $
     Common.assertJsonCodec
       s
       ManaSymbol.toJson
       ManaSymbol.fromJson
       ManaSymbol.Variable
-      "{\"type\":\"Variable\"}"
+      """ {"type":"Variable"} """

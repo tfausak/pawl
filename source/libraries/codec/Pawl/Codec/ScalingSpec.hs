@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ScalingSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.Scaling" $ do
       Scaling.toJson
       Scaling.fromJson
       (Scaling.Multiply 2)
-      "{\"type\":\"Multiply\",\"value\":2}"
+      """ {"type":"Multiply","value":2} """
   Spec.it s "AddMore" $
     Common.assertJsonCodec
       s
       Scaling.toJson
       Scaling.fromJson
       (Scaling.AddMore 1)
-      "{\"type\":\"AddMore\",\"value\":1}"
+      """ {"type":"AddMore","value":1} """

@@ -3,6 +3,7 @@
   - name:
     - FlexibleContexts
     - GADTs
+    - MultilineStrings
     - RankNTypes
 
 # Prefer `f . g $ h x` over `f $ g $ h x`.

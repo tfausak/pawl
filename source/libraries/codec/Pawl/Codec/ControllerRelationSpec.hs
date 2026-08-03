@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ControllerRelationSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,18 +15,18 @@ spec s = Spec.describe s "Pawl.Codec.ControllerRelation" $ do
       ControllerRelation.toJson
       ControllerRelation.fromJson
       ControllerRelation.Yours
-      "{\"type\":\"Yours\"}"
+      """ {"type":"Yours"} """
   Spec.it s "Anyones" $
     Common.assertJsonCodec
       s
       ControllerRelation.toJson
       ControllerRelation.fromJson
       ControllerRelation.Anyones
-      "{\"type\":\"Anyones\"}"
+      """ {"type":"Anyones"} """
   Spec.it s "Opponents" $
     Common.assertJsonCodec
       s
       ControllerRelation.toJson
       ControllerRelation.fromJson
       ControllerRelation.Opponents
-      "{\"type\":\"Opponents\"}"
+      """ {"type":"Opponents"} """

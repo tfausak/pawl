@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TriggeredAbilitySpec where
 
 import qualified Data.Map.Strict as Map
@@ -70,7 +72,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             TriggeredAbility.intervening = Nothing
           }
       )
-      "{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"Create\",\"value\":[{\"type\":\"Literal\",\"value\":1},\"Zombie Token\"]}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}"
+      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},"Zombie Token"]}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
   -- CR 603.4's intervening "if" clause: emitted only when the ability states
   -- one, so Sarcomancy's upkeep trigger ("if no Zombies") writes the key and
   -- the case above (which states none) omits it.
@@ -94,7 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 )
           }
       )
-      "{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},{\"type\":\"ControllersTurn\"}]},\"intervening\":{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Zombie\"}},\"aggregation\":{\"type\":\"Objects\"}}},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"DealDamage\",\"value\":[\"you\",{\"type\":\"Literal\",\"value\":1}]}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}"
+      """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"intervening":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Objects"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}},"modal":{"modes":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
   -- CR 603.7: Card.delayedAbilities is a name-keyed map, rendered as a sorted
   -- array of entries so the render is deterministic and the file byte-stable
   -- (Pawl.Codec.TargetSpec.toJsonMap's own comment, and Pawl.Codec.Binding's).
@@ -130,4 +132,4 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             )
           ]
       )
-      "[{\"name\":\"each combat\",\"ability\":{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Combat\",\"value\":{\"type\":\"BeginningOfCombat\"}},{\"type\":\"EachTurn\"}]},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"Untap\",\"value\":{\"type\":\"AttackedThisTurn\"}}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}},{\"name\":\"sacrifice it\",\"ability\":{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},{\"type\":\"EachTurn\"}]},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"Sacrifice\",\"value\":\"token\"}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}}]"
+      """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Untap","value":{"type":"AttackedThisTurn"}}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Sacrifice","value":"token"}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}}}] """

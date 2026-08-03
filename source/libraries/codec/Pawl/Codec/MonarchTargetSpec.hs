@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.MonarchTargetSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.MonarchTarget" $ do
       MonarchTarget.toJson
       MonarchTarget.fromJson
       MonarchTarget.TheController
-      "{\"type\":\"TheController\"}"
+      """ {"type":"TheController"} """
   Spec.it s "ControllerOfSource" $
     Common.assertJsonCodec
       s
       MonarchTarget.toJson
       MonarchTarget.fromJson
       MonarchTarget.ControllerOfSource
-      "{\"type\":\"ControllerOfSource\"}"
+      """ {"type":"ControllerOfSource"} """

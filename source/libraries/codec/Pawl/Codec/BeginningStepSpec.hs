@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.BeginningStepSpec where
 
 import qualified Pawl.Codec.BeginningStep as BeginningStep
@@ -13,18 +15,18 @@ spec s = Spec.describe s "Pawl.Codec.BeginningStep" $ do
       BeginningStep.toJson
       BeginningStep.fromJson
       BeginningStep.Untap
-      "{\"type\":\"Untap\"}"
+      """ {"type":"Untap"} """
   Spec.it s "Upkeep" $
     Common.assertJsonCodec
       s
       BeginningStep.toJson
       BeginningStep.fromJson
       BeginningStep.Upkeep
-      "{\"type\":\"Upkeep\"}"
+      """ {"type":"Upkeep"} """
   Spec.it s "DrawStep" $
     Common.assertJsonCodec
       s
       BeginningStep.toJson
       BeginningStep.fromJson
       BeginningStep.DrawStep
-      "{\"type\":\"DrawStep\"}"
+      """ {"type":"DrawStep"} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.OptionalitySpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,14 +15,14 @@ spec s = Spec.describe s "Pawl.Codec.Optionality" $ do
       Optionality.toJson
       Optionality.fromJson
       Optionality.Mandatory
-      "{\"type\":\"Mandatory\"}"
+      """ {"type":"Mandatory"} """
   Spec.it s "Optional" $
     Common.assertJsonCodec
       s
       Optionality.toJson
       Optionality.fromJson
       Optionality.Optional
-      "{\"type\":\"Optional\"}"
+      """ {"type":"Optional"} """
   Spec.describe s "fromJsonDefault" $ do
     -- CR 603.5's "may" is printed text, so an absent key means Mandatory.
     Spec.it s "absent key decodes as Mandatory" $

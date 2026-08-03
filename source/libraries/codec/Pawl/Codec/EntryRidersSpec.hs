@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.EntryRidersSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -14,14 +16,14 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       EntryRiders.toJson
       EntryRiders.fromJson
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}
-      "{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true}"
+      """ {"tapped":{"type":"Tapped"},"attacking":true} """
   Spec.it s "MkEntryRiders, the CR 110.5b default written out explicitly" $
     Common.assertJsonCodec
       s
       EntryRiders.toJson
       EntryRiders.fromJson
       EntryRiders.defaultValue
-      "{\"tapped\":{\"type\":\"Untapped\"},\"attacking\":false}"
+      """ {"tapped":{"type":"Untapped"},"attacking":false} """
   Spec.describe s "defaultValue" $ do
     Spec.it s "is untapped and not attacking" $
       Spec.assertEq s EntryRiders.defaultValue EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False}

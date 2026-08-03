@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CombatRestrictionSpec where
 
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
@@ -28,7 +30,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.toJson
       CombatRestriction.fromJson
       (CombatRestriction.CantAttack Affected.Attached Nothing)
-      "{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}"
+      """ {"type":"CantAttack","value":{"affected":{"type":"Attached"}}} """
   -- CR 509.1b: Pacifism's second half, "... or block".
   Spec.it s "CantBlock carries its Affected" $
     Common.assertJsonCodec
@@ -36,7 +38,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.toJson
       CombatRestriction.fromJson
       (CombatRestriction.CantBlock Affected.Attached Nothing)
-      "{\"type\":\"CantBlock\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}"
+      """ {"type":"CantBlock","value":{"affected":{"type":"Attached"}}} """
   -- CR 508.1c's SECOND clause, "or that it can't attack unless some condition is
   -- met" -- Blind-Spot Giant's "unless you control another Giant", in miniature.
   Spec.it s "CantAttack carries its condition" $

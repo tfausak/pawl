@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CostSpec where
 
 import qualified Data.Text as Text
@@ -32,7 +34,7 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
         { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
           Cost.components = [CostComponent.TapThis, CostComponent.SacrificeThis]
         }
-      "{\"mana\":[{\"type\":\"Generic\",\"value\":4}],\"components\":[{\"type\":\"TapThis\"},{\"type\":\"SacrificeThis\"}]}"
+      """ {"mana":[{"type":"Generic","value":4}],"components":[{"type":"TapThis"},{"type":"SacrificeThis"}]} """
   -- CR 118.5a: {0} is a real, payable cost, and ManaCost's empty list IS {0}.
   -- This is the shape every migrated ability now carries.
   Spec.it s "MkCost, {0} and no components" $
@@ -41,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
       toJson
       fromJson
       Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
-      "{\"mana\":[],\"components\":[]}"
+      """ {"mana":[],"components":[]} """
   -- CR 118.6: an ABSENT mana field is an UNPAYABLE cost, not {0}. This is the
   -- footgun the corpus migration exists to avoid, pinned so a future card file
   -- cannot lose its mana field unnoticed.

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.DurationSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -16,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.toJson
       Duration.fromJson
       Duration.UntilEndOfTurn
-      "{\"type\":\"UntilEndOfTurn\"}"
+      """ {"type":"UntilEndOfTurn"} """
   -- CR 611.2a: "lasts until the end of the game" (Magical Hack).
   Spec.it s "Indefinite" $
     Common.assertJsonCodec
@@ -24,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.toJson
       Duration.fromJson
       Duration.Indefinite
-      "{\"type\":\"Indefinite\"}"
+      """ {"type":"Indefinite"} """
   -- CR 611.2a: "until your next turn" (Hag of Inner Weakness).
   Spec.it s "UntilYourNextTurn" $
     Common.assertJsonCodec
@@ -32,7 +34,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.toJson
       Duration.fromJson
       Duration.UntilYourNextTurn
-      "{\"type\":\"UntilYourNextTurn\"}"
+      """ {"type":"UntilYourNextTurn"} """
   -- CR 611.2b: "for as long as ...", carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertJsonCodec
@@ -40,7 +42,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.toJson
       Duration.fromJson
       (Duration.ForAsLongAs (Condition.MkCondition (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
-      "{\"type\":\"ForAsLongAs\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}"
+      """ {"type":"ForAsLongAs","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}} """
   -- CR 500.5a: "until end of combat" (Jade Statue).
   Spec.it s "UntilEndOfCombat" $
     Common.assertJsonCodec
@@ -48,4 +50,4 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.toJson
       Duration.fromJson
       Duration.UntilEndOfCombat
-      "{\"type\":\"UntilEndOfCombat\"}"
+      """ {"type":"UntilEndOfCombat"} """

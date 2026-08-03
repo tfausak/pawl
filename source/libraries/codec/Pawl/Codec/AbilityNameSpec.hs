@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.AbilityNameSpec where
 
 import qualified Data.Text as Text
@@ -14,11 +16,11 @@ spec s = Spec.describe s "Pawl.Codec.AbilityName" $ do
       AbilityName.toJson
       AbilityName.fromJson
       (AbilityName.MkAbilityName $ Text.pack "a")
-      "\"a\""
+      """ "a" """
   Spec.it s "MkAbilityName \"b\"" $
     Common.assertJsonCodec
       s
       AbilityName.toJson
       AbilityName.fromJson
       (AbilityName.MkAbilityName $ Text.pack "b")
-      "\"b\""
+      """ "b" """

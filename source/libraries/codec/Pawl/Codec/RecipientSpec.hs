@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.RecipientSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -15,7 +17,7 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
       Recipient.toJson
       Recipient.fromJson
       (Recipient.ToCreature (ObjectId.MkObjectId 1))
-      "{\"type\":\"ToCreature\",\"value\":1}"
+      """ {"type":"ToCreature","value":1} """
   -- CR 120.3c's recipient tag is a different arm of Recipient from ToObject
   -- (see Pawl.Types.Recipient's comment on it), so it gets its own case.
   Spec.it s "ToPlaneswalker" $
@@ -24,18 +26,18 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
       Recipient.toJson
       Recipient.fromJson
       (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2))
-      "{\"type\":\"ToPlaneswalker\",\"value\":2}"
+      """ {"type":"ToPlaneswalker","value":2} """
   Spec.it s "ToPlayer" $
     Common.assertJsonCodec
       s
       Recipient.toJson
       Recipient.fromJson
       (Recipient.ToPlayer (PlayerId.MkPlayerId 3))
-      "{\"type\":\"ToPlayer\",\"value\":3}"
+      """ {"type":"ToPlayer","value":3} """
   Spec.it s "ToObject" $
     Common.assertJsonCodec
       s
       Recipient.toJson
       Recipient.fromJson
       (Recipient.ToObject (ObjectId.MkObjectId 4))
-      "{\"type\":\"ToObject\",\"value\":4}"
+      """ {"type":"ToObject","value":4} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ModeIndexSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,4 +15,4 @@ spec s =
       ModeIndex.toJson
       ModeIndex.fromJson
       (ModeIndex.MkModeIndex 2)
-      "2"
+      """ 2 """

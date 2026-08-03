@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TurnScopeSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.TurnScope" $ do
       TurnScope.toJson
       TurnScope.fromJson
       TurnScope.EachTurn
-      "{\"type\":\"EachTurn\"}"
+      """ {"type":"EachTurn"} """
   Spec.it s "ControllersTurn" $
     Common.assertJsonCodec
       s
       TurnScope.toJson
       TurnScope.fromJson
       TurnScope.ControllersTurn
-      "{\"type\":\"ControllersTurn\"}"
+      """ {"type":"ControllersTurn"} """

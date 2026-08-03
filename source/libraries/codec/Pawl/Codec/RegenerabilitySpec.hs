@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.RegenerabilitySpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.Regenerability" $ do
       Regenerability.toJson
       Regenerability.fromJson
       Regenerability.Regenerable
-      "{\"type\":\"Regenerable\"}"
+      """ {"type":"Regenerable"} """
   Spec.it s "CantBeRegenerated" $
     Common.assertJsonCodec
       s
       Regenerability.toJson
       Regenerability.fromJson
       Regenerability.CantBeRegenerated
-      "{\"type\":\"CantBeRegenerated\"}"
+      """ {"type":"CantBeRegenerated"} """

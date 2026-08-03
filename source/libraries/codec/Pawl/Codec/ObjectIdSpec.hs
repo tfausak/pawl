@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ObjectIdSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,4 +15,4 @@ spec s =
       ObjectId.toJson
       ObjectId.fromJson
       (ObjectId.MkObjectId 7)
-      "7"
+      """ 7 """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.UsesSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.Uses" $ do
       Uses.toJson
       Uses.fromJson
       Uses.Unlimited
-      "{\"type\":\"Unlimited\"}"
+      """ {"type":"Unlimited"} """
   Spec.it s "Once" $
     Common.assertJsonCodec
       s
       Uses.toJson
       Uses.fromJson
       Uses.Once
-      "{\"type\":\"Once\"}"
+      """ {"type":"Once"} """

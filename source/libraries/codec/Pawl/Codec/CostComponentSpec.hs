@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CostComponentSpec where
 
 import qualified Data.Text as Text
@@ -28,28 +30,28 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       toJson
       fromJson
       CostComponent.TapThis
-      "{\"type\":\"TapThis\"}"
+      """ {"type":"TapThis"} """
   Spec.it s "UntapThis" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       CostComponent.UntapThis
-      "{\"type\":\"UntapThis\"}"
+      """ {"type":"UntapThis"} """
   Spec.it s "SacrificeThis" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       CostComponent.SacrificeThis
-      "{\"type\":\"SacrificeThis\"}"
+      """ {"type":"SacrificeThis"} """
   Spec.it s "PayLife" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (CostComponent.PayLife 2)
-      "{\"type\":\"PayLife\",\"value\":2}"
+      """ {"type":"PayLife","value":2} """
   -- Village Rites' one creature: the count and the Filter both ride the
   -- payload, positionally.
   Spec.it s "Sacrifice" $
@@ -58,28 +60,28 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       toJson
       fromJson
       (CostComponent.Sacrifice 2 (Filter.HasSubtype Subtype.Mountain))
-      "{\"type\":\"Sacrifice\",\"value\":[2,{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}]}"
+      """ {"type":"Sacrifice","value":[2,{"type":"HasSubtype","value":{"type":"Mountain"}}]} """
   Spec.it s "DiscardCards" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (CostComponent.DiscardCards 2)
-      "{\"type\":\"DiscardCards\",\"value\":2}"
+      """ {"type":"DiscardCards","value":2} """
   Spec.it s "DiscardThis" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       CostComponent.DiscardThis
-      "{\"type\":\"DiscardThis\"}"
+      """ {"type":"DiscardThis"} """
   Spec.it s "PayEnergy" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (CostComponent.PayEnergy 2)
-      "{\"type\":\"PayEnergy\",\"value\":2}"
+      """ {"type":"PayEnergy","value":2} """
   -- CR 606.4's two halves, Jace Beleren's +2 and -1.
   Spec.it s "AddLoyaltyToThis" $
     Common.assertJsonCodec
@@ -87,11 +89,11 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       toJson
       fromJson
       (CostComponent.AddLoyaltyToThis 2)
-      "{\"type\":\"AddLoyaltyToThis\",\"value\":2}"
+      """ {"type":"AddLoyaltyToThis","value":2} """
   Spec.it s "RemoveLoyaltyFromThis" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (CostComponent.RemoveLoyaltyFromThis 1)
-      "{\"type\":\"RemoveLoyaltyFromThis\",\"value\":1}"
+      """ {"type":"RemoveLoyaltyFromThis","value":1} """

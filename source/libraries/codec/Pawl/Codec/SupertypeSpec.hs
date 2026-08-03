@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.SupertypeSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.Supertype" $ do
       Supertype.toJson
       Supertype.fromJson
       Supertype.Basic
-      "{\"type\":\"Basic\"}"
+      """ {"type":"Basic"} """
 
   Spec.it s "Legendary" $
     Common.assertJsonCodec
@@ -21,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.Supertype" $ do
       Supertype.toJson
       Supertype.fromJson
       Supertype.Legendary
-      "{\"type\":\"Legendary\"}"
+      """ {"type":"Legendary"} """
 
   Spec.it s "Ongoing" $
     Common.assertJsonCodec
@@ -29,7 +31,7 @@ spec s = Spec.describe s "Pawl.Codec.Supertype" $ do
       Supertype.toJson
       Supertype.fromJson
       Supertype.Ongoing
-      "{\"type\":\"Ongoing\"}"
+      """ {"type":"Ongoing"} """
 
   Spec.it s "Snow" $
     Common.assertJsonCodec
@@ -37,7 +39,7 @@ spec s = Spec.describe s "Pawl.Codec.Supertype" $ do
       Supertype.toJson
       Supertype.fromJson
       Supertype.Snow
-      "{\"type\":\"Snow\"}"
+      """ {"type":"Snow"} """
 
   Spec.it s "World" $
     Common.assertJsonCodec
@@ -45,4 +47,4 @@ spec s = Spec.describe s "Pawl.Codec.Supertype" $ do
       Supertype.toJson
       Supertype.fromJson
       Supertype.World
-      "{\"type\":\"World\"}"
+      """ {"type":"World"} """

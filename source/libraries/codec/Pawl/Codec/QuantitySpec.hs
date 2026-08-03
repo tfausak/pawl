@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.QuantitySpec where
 
 import qualified Data.Text as Text
@@ -21,14 +23,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.toJson
       Quantity.fromJson
       (Quantity.Literal 5)
-      "{\"type\":\"Literal\",\"value\":5}"
+      """ {"type":"Literal","value":5} """
   Spec.it s "ManaValue" $
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
       Quantity.ManaValue
-      "{\"type\":\"ManaValue\"}"
+      """ {"type":"ManaValue"} """
   -- CR 208.1, Ghitu Fire-Eater's "damage equal to its power". Nullary like
   -- ManaValue, and NOT to be confused with the Power newtype, which wraps a
   -- printed power/toughness box.
@@ -38,14 +40,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.toJson
       Quantity.fromJson
       Quantity.Power
-      "{\"type\":\"Power\"}"
+      """ {"type":"Power"} """
   Spec.it s "X" $
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
       Quantity.X
-      "{\"type\":\"X\"}"
+      """ {"type":"X"} """
   -- Bane of Progress' "for each permanent destroyed this way": a number an
   -- earlier effect of the same resolution bound into a slot. Unlike X, it
   -- carries the slot name on the wire -- nested under Plus, since composition
@@ -57,27 +59,27 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.toJson
       Quantity.fromJson
       (Quantity.InSlot slot)
-      "{\"type\":\"InSlot\",\"value\":\"destroyed\"}"
+      """ {"type":"InSlot","value":"destroyed"} """
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
       (Quantity.Plus (Quantity.Literal 1) (Quantity.InSlot slot))
-      "{\"type\":\"Plus\",\"value\":[{\"type\":\"Literal\",\"value\":1},{\"type\":\"InSlot\",\"value\":\"destroyed\"}]}"
+      """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"InSlot","value":"destroyed"}]} """
   Spec.it s "Star" $
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
       Quantity.Star
-      "{\"type\":\"Star\"}"
+      """ {"type":"Star"} """
   Spec.it s "Plus" $
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
       (Quantity.Plus (Quantity.Literal 1) Quantity.Star)
-      "{\"type\":\"Plus\",\"value\":[{\"type\":\"Literal\",\"value\":1},{\"type\":\"Star\"}]}"
+      """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"Star"}]} """
   -- Quantity.Count's arm is tagged here and nowhere else: Pawl.Codec.Count
   -- writes a bare object, so this pins the one "Count" tag in the encoding --
   -- the arm reads like every other arm, and a Count payload can never be
@@ -94,7 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
               Aggregation.DistinctCardTypes
           )
       )
-      "{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Graveyard\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"DistinctCardTypes\"}}}"
+      """ {"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Graveyard"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}} """
   -- The arm that proves the Greatest payload is a whole Quantity rather than a
   -- nullary tag: a Greatest whose per-member quantity is itself a Count
   -- round-trips, which is the recursion Pawl.Types.Quantity's parameter exists
@@ -119,7 +121,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
               )
           )
       )
-      "{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"Greatest\",\"value\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Graveyard\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"DistinctCardTypes\"}}}}}}"
+      """ {"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"Greatest","value":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Graveyard"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}}}}} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s

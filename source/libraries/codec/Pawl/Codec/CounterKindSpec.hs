@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CounterKindSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -14,14 +16,14 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       CounterKind.toJson
       CounterKind.fromJson
       CounterKind.PlusOnePlusOne
-      "{\"type\":\"PlusOnePlusOne\"}"
+      """ {"type":"PlusOnePlusOne"} """
   Spec.it s "MinusOneMinusOne" $
     Common.assertJsonCodec
       s
       CounterKind.toJson
       CounterKind.fromJson
       CounterKind.MinusOneMinusOne
-      "{\"type\":\"MinusOneMinusOne\"}"
+      """ {"type":"MinusOneMinusOne"} """
   -- CR 122.1b's keyword counter carries the keyword it grants.
   Spec.it s "Keyword carries its keyword" $
     Common.assertJsonCodec
@@ -29,7 +31,7 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       CounterKind.toJson
       CounterKind.fromJson
       (CounterKind.Keyword Keyword.Flying)
-      "{\"type\":\"Keyword\",\"value\":{\"type\":\"Flying\"}}"
+      """ {"type":"Keyword","value":{"type":"Flying"}} """
   -- CR 122.1e, the first kind that modifies no characteristic.
   Spec.it s "Loyalty" $
     Common.assertJsonCodec
@@ -37,4 +39,4 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       CounterKind.toJson
       CounterKind.fromJson
       CounterKind.Loyalty
-      "{\"type\":\"Loyalty\"}"
+      """ {"type":"Loyalty"} """

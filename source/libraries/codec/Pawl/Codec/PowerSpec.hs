@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PowerSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -14,4 +16,4 @@ spec s =
       Power.toJson
       Power.fromJson
       (Power.MkPower (Quantity.Literal 2))
-      "{\"type\":\"Literal\",\"value\":2}"
+      """ {"type":"Literal","value":2} """

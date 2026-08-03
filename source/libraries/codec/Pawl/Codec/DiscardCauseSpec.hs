@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.DiscardCauseSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.DiscardCause" $ do
       DiscardCause.toJson
       DiscardCause.fromJson
       DiscardCause.Ordinary
-      "{\"type\":\"Ordinary\"}"
+      """ {"type":"Ordinary"} """
   Spec.it s "ToPayCyclingCost" $
     Common.assertJsonCodec
       s
       DiscardCause.toJson
       DiscardCause.fromJson
       DiscardCause.ToPayCyclingCost
-      "{\"type\":\"ToPayCyclingCost\"}"
+      """ {"type":"ToPayCyclingCost"} """

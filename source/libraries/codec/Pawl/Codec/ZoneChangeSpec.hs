@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ZoneChangeSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -15,4 +17,4 @@ spec s =
       ZoneChange.toJson
       ZoneChange.fromJson
       (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 1) Zone.Battlefield Zone.Graveyard)
-      "{\"departed\":1,\"object\":1,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}}"
+      """ {"departed":1,"object":1,"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}} """

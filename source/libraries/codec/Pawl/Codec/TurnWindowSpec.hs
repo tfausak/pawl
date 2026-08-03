@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TurnWindowSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -16,18 +18,18 @@ spec s = Spec.describe s "Pawl.Codec.TurnWindow" $ do
       TurnWindow.toJson
       TurnWindow.fromJson
       TurnWindow.AnyTurn
-      "{\"type\":\"AnyTurn\"}"
+      """ {"type":"AnyTurn"} """
   Spec.it s "ControllersNextTurn" $
     Common.assertJsonCodec
       s
       TurnWindow.toJson
       TurnWindow.fromJson
       TurnWindow.ControllersNextTurn
-      "{\"type\":\"ControllersNextTurn\"}"
+      """ {"type":"ControllersNextTurn"} """
   Spec.it s "OnTurn carries the settled turn number" $
     Common.assertJsonCodec
       s
       TurnWindow.toJson
       TurnWindow.fromJson
       (TurnWindow.OnTurn 7)
-      "{\"type\":\"OnTurn\",\"value\":7}"
+      """ {"type":"OnTurn","value":7} """

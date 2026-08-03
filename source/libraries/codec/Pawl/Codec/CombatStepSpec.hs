@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CombatStepSpec where
 
 import qualified Pawl.Codec.CombatStep as CombatStep
@@ -13,32 +15,32 @@ spec s = Spec.describe s "Pawl.Codec.CombatStep" $ do
       CombatStep.toJson
       CombatStep.fromJson
       CombatStep.BeginningOfCombat
-      "{\"type\":\"BeginningOfCombat\"}"
+      """ {"type":"BeginningOfCombat"} """
   Spec.it s "DeclareAttackers" $
     Common.assertJsonCodec
       s
       CombatStep.toJson
       CombatStep.fromJson
       CombatStep.DeclareAttackers
-      "{\"type\":\"DeclareAttackers\"}"
+      """ {"type":"DeclareAttackers"} """
   Spec.it s "DeclareBlockers" $
     Common.assertJsonCodec
       s
       CombatStep.toJson
       CombatStep.fromJson
       CombatStep.DeclareBlockers
-      "{\"type\":\"DeclareBlockers\"}"
+      """ {"type":"DeclareBlockers"} """
   Spec.it s "CombatDamage" $
     Common.assertJsonCodec
       s
       CombatStep.toJson
       CombatStep.fromJson
       CombatStep.CombatDamage
-      "{\"type\":\"CombatDamage\"}"
+      """ {"type":"CombatDamage"} """
   Spec.it s "EndOfCombat" $
     Common.assertJsonCodec
       s
       CombatStep.toJson
       CombatStep.fromJson
       CombatStep.EndOfCombat
-      "{\"type\":\"EndOfCombat\"}"
+      """ {"type":"EndOfCombat"} """

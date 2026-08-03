@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TokenPatternSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -14,4 +16,4 @@ spec s =
       TokenPattern.toJson
       TokenPattern.fromJson
       TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours}
-      "{\"whose\":{\"type\":\"Yours\"}}"
+      """ {"whose":{"type":"Yours"}} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ConditionSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -30,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
       Condition.toJson
       Condition.fromJson
       (Condition.MkCondition (Quantity.Literal 3) Comparison.AtLeast (Quantity.Literal 5))
-      "{\"measured\":{\"type\":\"Literal\",\"value\":3},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":5}}"
+      """ {"measured":{"type":"Literal","value":3},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":5}} """
   -- Moved from Pawl.CodecSpec's "count + condition (M5.5 T2)" group: every
   -- Comparison, including both sides non-Count -- which the Count-on-the-left
   -- shape this type replaced could not say at all (Deathknell Berserker's "if

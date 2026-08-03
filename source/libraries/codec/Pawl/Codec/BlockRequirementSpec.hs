@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.BlockRequirementSpec where
 
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
@@ -16,4 +18,4 @@ spec s =
       BlockRequirement.toJson
       BlockRequirement.fromJson
       (BlockRequirement.MkBlockRequirement Affected.Attached)
-      "{\"attacker\":{\"type\":\"Attached\"}}"
+      """ {"attacker":{"type":"Attached"}} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ZoneChangeSubjectSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeSubject" $ do
       ZoneChangeSubject.toJson
       ZoneChangeSubject.fromJson
       ZoneChangeSubject.AnyObject
-      "{\"type\":\"AnyObject\"}"
+      """ {"type":"AnyObject"} """
   Spec.it s "TheSource" $
     Common.assertJsonCodec
       s
       ZoneChangeSubject.toJson
       ZoneChangeSubject.fromJson
       ZoneChangeSubject.TheSource
-      "{\"type\":\"TheSource\"}"
+      """ {"type":"TheSource"} """

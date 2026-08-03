@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TapStateSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.TapState" $ do
       TapState.toJson
       TapState.fromJson
       TapState.Untapped
-      "{\"type\":\"Untapped\"}"
+      """ {"type":"Untapped"} """
   Spec.it s "Tapped" $
     Common.assertJsonCodec
       s
       TapState.toJson
       TapState.fromJson
       TapState.Tapped
-      "{\"type\":\"Tapped\"}"
+      """ {"type":"Tapped"} """

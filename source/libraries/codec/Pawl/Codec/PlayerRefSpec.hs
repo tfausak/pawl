@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PlayerRefSpec where
 
 import qualified Data.Text as Text
@@ -16,18 +18,18 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.toJson
       PlayerRef.fromJson
       PlayerRef.EachPlayer
-      "{\"type\":\"EachPlayer\"}"
+      """ {"type":"EachPlayer"} """
   Spec.it s "Relative" $
     Common.assertJsonCodec
       s
       PlayerRef.toJson
       PlayerRef.fromJson
       (PlayerRef.Relative PlayerRelation.You)
-      "{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}"
+      """ {"type":"Relative","value":{"type":"You"}} """
   Spec.it s "InSlot" $
     Common.assertJsonCodec
       s
       PlayerRef.toJson
       PlayerRef.fromJson
       (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
-      "{\"type\":\"InSlot\",\"value\":\"target\"}"
+      """ {"type":"InSlot","value":"target"} """

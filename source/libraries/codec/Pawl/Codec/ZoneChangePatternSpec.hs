@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ZoneChangePatternSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -22,4 +24,4 @@ spec s =
           ZoneChangePattern.whichObject = ZoneChangeSubject.AnyObject,
           ZoneChangePattern.whoseObject = ControllerRelation.Anyones
         }
-      "{\"whenDestination\":{\"type\":\"Graveyard\"},\"whichObject\":{\"type\":\"AnyObject\"},\"whoseObject\":{\"type\":\"Anyones\"}}"
+      """ {"whenDestination":{"type":"Graveyard"},"whichObject":{"type":"AnyObject"},"whoseObject":{"type":"Anyones"}} """

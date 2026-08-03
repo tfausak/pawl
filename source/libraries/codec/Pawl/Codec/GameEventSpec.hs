@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.GameEventSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -53,21 +55,21 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.toJson
       GameEvent.fromJson
       (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) (PlayerId.MkPlayerId 0))
-      "{\"type\":\"StepBegan\",\"value\":[{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},0]}"
+      """ {"type":"StepBegan","value":[{"type":"Ending","value":{"type":"EndStep"}},0]} """
   Spec.it s "SpellCast" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
       (GameEvent.SpellCast (PlayerId.MkPlayerId 0))
-      "{\"type\":\"SpellCast\",\"value\":0}"
+      """ {"type":"SpellCast","value":0} """
   Spec.it s "BecameMonarch" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
       (GameEvent.BecameMonarch (PlayerId.MkPlayerId 0))
-      "{\"type\":\"BecameMonarch\",\"value\":0}"
+      """ {"type":"BecameMonarch","value":0} """
   -- CR 702.29c/d's two-descriptions-one-event shape: ToPayCyclingCost is the
   -- payload that ALSO satisfies a "cycles or discards" trigger once, not twice.
   Spec.it s "Discarded" $
@@ -76,7 +78,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.toJson
       GameEvent.fromJson
       (GameEvent.Discarded (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) DiscardCause.ToPayCyclingCost)
-      "{\"type\":\"Discarded\",\"value\":[0,7,{\"type\":\"ToPayCyclingCost\"}]}"
+      """ {"type":"Discarded","value":[0,7,{"type":"ToPayCyclingCost"}]} """
   Spec.it s "Revealed" $
     Common.assertJsonCodec
       s
@@ -90,18 +92,18 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.toJson
       GameEvent.fromJson
       (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3))
-      "{\"type\":\"AttackerDeclared\",\"value\":3}"
+      """ {"type":"AttackerDeclared","value":3} """
   Spec.it s "SpellCountered" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
       (GameEvent.SpellCountered (Countering.MkCountering (ObjectId.MkObjectId 4) (ObjectId.MkObjectId 5) (PlayerId.MkPlayerId 1)))
-      "{\"type\":\"SpellCountered\",\"value\":{\"spell\":4,\"source\":5,\"controller\":1}}"
+      """ {"type":"SpellCountered","value":{"spell":4,"source":5,"controller":1}} """
   Spec.it s "LoyaltyAbilityActivated" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
       (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7))
-      "{\"type\":\"LoyaltyAbilityActivated\",\"value\":7}"
+      """ {"type":"LoyaltyAbilityActivated","value":7} """

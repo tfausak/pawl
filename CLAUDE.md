@@ -128,8 +128,10 @@ project-specific rules it doesn't cover:
   functions and modules, split or merge them, change signatures freely — never
   add deprecation shims or compat re-exports.
 - **One type per module** under `Pawl.Types.<TypeName>`, holding the type and its
-  instances only; cross-type logic lives in other `Pawl.*` modules. Only `GADTs`
-  and `RankNTypes` are permitted, for the suspension core.
+  instances only; cross-type logic lives in other `Pawl.*` modules.
+- **Language extensions come from the allowlist in `.hlint.yaml`**, which is the
+  list — this file does not restate it. Using one the allowlist doesn't name
+  means adding it there in the same change, with the reason it earned a place.
 - **Constructors take a `Mk` prefix and never pun the type name** —
   `newtype Name = MkName Text`, `data Foo = MkFoo {…}`. A type whose smart
   constructor maintains an invariant uses `UnsafeX` instead, to mark that the

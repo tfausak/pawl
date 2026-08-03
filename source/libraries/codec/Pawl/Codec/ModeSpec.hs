@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ModeSpec where
 
 import qualified Data.Map.Strict as Map
@@ -47,7 +49,7 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
           (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
           Optionality.Mandatory
       )
-      "{\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}],\"targetSpecs\":[{\"slot\":\"target\",\"spec\":{\"pool\":{\"type\":\"Creatures\"},\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}]}"
+      """ {"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]} """
   -- CR 603.5: an Optional mode is what a printed "may" encodes to, and the key
   -- is emitted only for that value.
   Spec.it s "an Optional mode's optionality key is present" $
@@ -56,7 +58,7 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       toJson
       fromJson
       (Mode.MkMode Seq.empty Map.empty Optionality.Optional)
-      "{\"effects\":[],\"targetSpecs\":[],\"optionality\":{\"type\":\"Optional\"}}"
+      """ {"effects":[],"targetSpecs":[],"optionality":{"type":"Optional"}} """
   -- The byte-identity guarantee for every card file that prints no "may": a
   -- Mandatory mode emits no key, and a mode with no key decodes back to
   -- Mandatory -- the Counterability precedent.
@@ -66,4 +68,4 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       toJson
       fromJson
       (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)
-      "{\"effects\":[],\"targetSpecs\":[]}"
+      """ {"effects":[],"targetSpecs":[]} """

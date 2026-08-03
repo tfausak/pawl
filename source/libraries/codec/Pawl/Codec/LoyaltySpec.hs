@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.LoyaltySpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,4 +15,4 @@ spec s =
       Loyalty.toJson
       Loyalty.fromJson
       (Loyalty.MkLoyalty 3)
-      "3"
+      """ 3 """

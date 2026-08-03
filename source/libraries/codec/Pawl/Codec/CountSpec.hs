@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CountSpec where
 
 import qualified Data.Text as Text
@@ -32,7 +34,7 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
           (Filter.And [Filter.HasSubtype Subtype.Swamp, Filter.ControlledBy PlayerRelation.You])
           Aggregation.Objects
       )
-      "{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"aggregation\":{\"type\":\"Objects\"}}"
+      """ {"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Swamp"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Objects"}} """
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "MkCount, scoped to the event history" $
     Common.assertJsonCodec
@@ -44,7 +46,7 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
           (Filter.HasCardType CardType.Creature)
           Aggregation.DistinctCardTypes
       )
-      "{\"scope\":{\"type\":\"InHistory\",\"value\":{\"type\":\"MovedBetween\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"Graveyard\"}]}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"aggregation\":{\"type\":\"DistinctCardTypes\"}}"
+      """ {"scope":{"type":"InHistory","value":{"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]}},"filter":{"type":"HasCardType","value":{"type":"Creature"}},"aggregation":{"type":"DistinctCardTypes"}} """
   Spec.it s "MkCount, scoped to a slot" $
     Common.assertJsonCodec
       s
@@ -55,4 +57,4 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
           (Filter.And [])
           Aggregation.Objects
       )
-      "{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Hand\"},{\"type\":\"InSlot\",\"value\":\"target\"}]},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"Objects\"}}"
+      """ {"scope":{"type":"InZone","value":[{"type":"Hand"},{"type":"InSlot","value":"target"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"Objects"}} """

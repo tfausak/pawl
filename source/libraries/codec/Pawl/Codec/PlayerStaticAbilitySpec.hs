@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PlayerStaticAbilitySpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -15,4 +17,4 @@ spec s =
       PlayerStaticAbility.toJson
       PlayerStaticAbility.fromJson
       (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1))
-      "{\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}}"
+      """ {"scope":{"type":"EachPlayer"},"effect":{"type":"CantCastMoreThan","value":1}} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TriggerFrequencySpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.TriggerFrequency" $ do
       TriggerFrequency.toJson
       TriggerFrequency.fromJson
       TriggerFrequency.EveryTime
-      "{\"type\":\"EveryTime\"}"
+      """ {"type":"EveryTime"} """
   Spec.it s "FirstTimeEachTurn" $
     Common.assertJsonCodec
       s
       TriggerFrequency.toJson
       TriggerFrequency.fromJson
       TriggerFrequency.FirstTimeEachTurn
-      "{\"type\":\"FirstTimeEachTurn\"}"
+      """ {"type":"FirstTimeEachTurn"} """

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.SearchDestinationSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.SearchDestination" $ do
       SearchDestination.toJson
       SearchDestination.fromJson
       SearchDestination.BattlefieldTapped
-      "{\"type\":\"BattlefieldTapped\"}"
+      """ {"type":"BattlefieldTapped"} """
   Spec.it s "RevealThenHand" $
     Common.assertJsonCodec
       s
       SearchDestination.toJson
       SearchDestination.fromJson
       SearchDestination.RevealThenHand
-      "{\"type\":\"RevealThenHand\"}"
+      """ {"type":"RevealThenHand"} """

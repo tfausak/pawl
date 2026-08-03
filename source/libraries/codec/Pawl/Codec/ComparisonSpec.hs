@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ComparisonSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -13,18 +15,18 @@ spec s = Spec.describe s "Pawl.Codec.Comparison" $ do
       Comparison.toJson
       Comparison.fromJson
       Comparison.Exactly
-      "{\"type\":\"Exactly\"}"
+      """ {"type":"Exactly"} """
   Spec.it s "AtLeast" $
     Common.assertJsonCodec
       s
       Comparison.toJson
       Comparison.fromJson
       Comparison.AtLeast
-      "{\"type\":\"AtLeast\"}"
+      """ {"type":"AtLeast"} """
   Spec.it s "AtMost" $
     Common.assertJsonCodec
       s
       Comparison.toJson
       Comparison.fromJson
       Comparison.AtMost
-      "{\"type\":\"AtMost\"}"
+      """ {"type":"AtMost"} """

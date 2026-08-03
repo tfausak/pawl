@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ModalSpec where
 
 import qualified Data.Map.Strict as Map
@@ -55,7 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
           )
           (ModeSelection.ChooseExactly 1)
       )
-      "{\"modes\":[{\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}],\"targetSpecs\":[{\"slot\":\"target\",\"spec\":{\"pool\":{\"type\":\"Creatures\"},\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}"
+      """ {"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}],"selection":{"type":"ChooseExactly","value":1}} """
   -- CR 700.2's non-modal payload is a single Mode: a modal PAYLOAD has at
   -- least one mode by invariant, so an empty `modes` array is a decode
   -- failure, not a spell that offers no choices.

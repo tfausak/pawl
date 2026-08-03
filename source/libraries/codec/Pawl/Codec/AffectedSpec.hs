@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.AffectedSpec where
 
 import qualified Data.Set as Set
@@ -18,21 +20,21 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       Affected.toJson
       Affected.fromJson
       (Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]))
-      "{\"type\":\"TheseObjects\",\"value\":[1,2]}"
+      """ {"type":"TheseObjects","value":[1,2]} """
   Spec.it s "Matching" $
     Common.assertJsonCodec
       s
       Affected.toJson
       Affected.fromJson
       (Affected.Matching (Filter.HasCardType CardType.Creature))
-      "{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
+      """ {"type":"Matching","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   Spec.it s "MatchingAnywhere" $
     Common.assertJsonCodec
       s
       Affected.toJson
       Affected.fromJson
       (Affected.MatchingAnywhere (Filter.HasCardType CardType.Creature))
-      "{\"type\":\"MatchingAnywhere\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
+      """ {"type":"MatchingAnywhere","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   -- Opalescence's shape: its own "each other" card text (not a rule) as Not
   -- IsSource, nested inside Matching -- the composed form a bare atom case
   -- above would not exercise.
@@ -49,14 +51,14 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
               ]
           )
       )
-      "{\"type\":\"Matching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}}"
+      """ {"type":"Matching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Enchantment"}},{"type":"Not","value":{"type":"HasSubtype","value":{"type":"Mountain"}}},{"type":"Not","value":{"type":"IsSource"}}]}} """
   Spec.it s "Attached" $
     Common.assertJsonCodec
       s
       Affected.toJson
       Affected.fromJson
       Affected.Attached
-      "{\"type\":\"Attached\"}"
+      """ {"type":"Attached"} """
   -- CR 303.4m through a player: Curse of Death's Hold's shape.
   Spec.it s "AttachedPlayerControls" $
     Common.assertJsonCodec
@@ -64,4 +66,4 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       Affected.toJson
       Affected.fromJson
       (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature))
-      "{\"type\":\"AttachedPlayerControls\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
+      """ {"type":"AttachedPlayerControls","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
