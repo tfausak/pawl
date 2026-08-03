@@ -644,6 +644,23 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (piker, g2) = S.addCreature pikerPrinting S.bob g1
         asked = answersFor S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
     Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
+  -- The other side of Replacement.readsApplier, and the reason it exists rather
+  -- than a blanket "compare the controller too". Rest in Peace's pattern is
+  -- ZoneChangeSubject.AnyObject under ControllerRelation.Anyones, so alice's copy
+  -- and bob's are both applicable to bob's dying Piker at once, equal in `effect`
+  -- and differing only in who controls the row. Applying either exiles the same
+  -- card, so there is nothing to decide and nothing to ask -- where comparing
+  -- `(effect, controller)` unconditionally would have started prompting.
+  Spec.it s "CR 616.1 value-equal candidates under DIFFERENT controllers still elide" $ do
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g1) = S.addCreature restInPeace S.bob g0
+        (piker, g2) = S.addCreature pikerPrinting S.bob g1
+        after = S.runPure S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
+        asked = answersFor S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
+    Spec.assertEqWith s "the Piker was exiled, not buried" (Set.size (GameState.exile after)) 1
+    Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
   -- CR 704.3: "the game checks for any of the listed conditions for
   -- state-based actions, then performs all applicable state-based actions
   -- simultaneously as a single event." So the put-into-graveyard batch one
@@ -1392,6 +1409,52 @@ specimenBoard island pikerPrinting gatherSpecimens bobsHand =
         piker
       )
 
+-- CR 800.1: specimenBoard's three-seat twin, and the smallest board on which two
+-- control-on-entry replacements can race for one creature. alice and bob each
+-- control six untapped Islands (Gather Specimens is {3}{U}{U}{U}) and hold one
+-- Gather Specimens; carol controls two and holds one card of `creature`. It is
+-- alice's precombat main phase with priority. Returns the state, alice's spell
+-- id, bob's, and carol's card.
+threeSeatSpecimenBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+threeSeatSpecimenBoard island gatherSpecimens creature =
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature island pid acc)) g [1 .. n :: Int]
+      base = addLands S.carol 2 (addLands S.bob 6 (addLands S.alice 6 (Setup.emptyGame S.threePlayers)))
+      (aliceGather, g1) = S.addHandCard gatherSpecimens S.alice base
+      (bobGather, g2) = S.addHandCard gatherSpecimens S.bob g1
+      (carols, g3) = S.addHandCard creature S.carol g2
+   in ( g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        aliceGather,
+        bobGather,
+        carols
+      )
+
+-- The SOURCE of the floating row `who` installed, so an answer can name a CR
+-- 616.1 candidate by whose row it is rather than by list position -- the same
+-- reason raceAnswer takes an ObjectId.
+rowSourceOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe ObjectId.ObjectId
+rowSourceOf who gs =
+  Maybe.listToMaybe
+    [ ActiveReplacement.source active
+    | active <- GameState.replacements gs,
+      ActiveReplacement.controller active == who
+    ]
+
+-- Name the candidate whose source is `preferred`, but only when CR 616.1's race
+-- is put to `who`; every other prompt takes the default. The readout for WHICH
+-- player the choice was handed to: an engine that asked anyone else would take
+-- the canonical first for both preferences, and the two runs would converge on
+-- one board instead of disagreeing.
+replaceIfAskedOf :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+replaceIfAskedOf who preferred p = case p of
+  Prompt.ChooseReplacement _ asked sources
+    | asked == who ->
+        maybe 0 Int.toNaturalSaturating (List.elemIndex preferred sources)
+  _ -> S.identityAnswer p
+
 -- Copy `wanted` if and only if the copy choice is offered to `who`, and decline
 -- otherwise. The readout for WHICH player held Clone's own CR 109.5 "you" when
 -- the copy choice was made: the copy lands (a 2/1) only when the engine asked
@@ -1538,14 +1601,15 @@ gatherSpecimensSpec s registry =
     --   3. Nothing is left in that bucket, so CR 616.1c's copy choice follows,
     --      offered to bob.
     --
-    -- Without the relation both rows are applicable at step 1, they are EQUAL AS
-    -- VALUES (one card, one filter -- only the baked CR 109.5 controller
-    -- differs, and that rides the candidate rather than the effect), so
-    -- Replacement.choose elides the choice and applies the canonical first --
-    -- bob's, the newest floating row -- as a no-op. Alice's then applies at step
-    -- 2 and the creature is HERS. So the assertion is bob-not-alice, and the
-    -- prompt count is unchanged either way: this leg reads the board, not the
-    -- questions.
+    -- Without the relation both rows are applicable at step 1, and CR 616.1b's
+    -- "one of them must be chosen" would have something to choose between: they
+    -- are equal in `effect` (one card, one filter) but differ in the baked CR
+    -- 109.5 controller, which Replacement.readsApplier makes a distinguishing
+    -- field for this rewrite. So bob would be ASKED, take the canonical first --
+    -- his own, the newest floating row -- as a no-op, and alice's would apply at
+    -- step 2, leaving the creature HERS. The assertion is therefore
+    -- bob-not-alice, and the prompt assertion below discriminates too: with the
+    -- relation each step has one candidate and nothing is asked.
     Spec.it s "CR 614.1d/616.1f duelling Gather Specimens: alice takes it, then bob takes it back" $ do
       island <- S.printingOf s registry "Island"
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -1573,6 +1637,50 @@ gatherSpecimensSpec s registry =
                   -- must be chosen" to choose between.
                   Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
         _ -> Spec.assertFailure s "fixture did not deal bob two cards"
+    -- THREE SEATS, where CR 616.1b's "one of them must be chosen" finally has
+    -- something to choose between -- the case the duelling leg above cannot
+    -- reach. alice and bob each resolve a Gather Specimens and CAROL casts a
+    -- creature: it would enter under carol's control, carol is an opponent of
+    -- both, so BOTH rows are applicable in the SAME iteration of CR 616.1f. Two
+    -- seats cannot produce that (a permanent has one controller, so at most one
+    -- such row can see it as an opponent's), which is why the leg above sees a
+    -- forced order instead.
+    --
+    -- The two rows are equal in `effect` -- one card, one filter -- and differ
+    -- only in the CR 109.5 controller each baked, which rides the CANDIDATE.
+    -- That is precisely what Replacement.readsApplier answers True for, so the
+    -- pair is not indistinguishable and CR 616.1 owes the question to the
+    -- affected object's controller: carol.
+    --
+    -- Her answer decides the board, and INVERTS it. The row she names applies
+    -- now; CR 616.1f then re-collects, where the other row is newly applicable
+    -- (from its controller's side the creature is an opponent's again) and the
+    -- named one is spent by CR 614.5. So the creature settles with the player
+    -- she did NOT name, and the two runs disagree -- which is the whole point:
+    -- before this was fixed both rows were elided as value-equal and the
+    -- floating store's newest-first order decided the board with nobody asked.
+    Spec.it s "CR 616.1b three seats: carol is asked WHICH Gather Specimens takes her creature" $ do
+      island <- S.printingOf s registry "Island"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      narcomoeba <- S.printingOf s registry "Narcomoeba"
+      let (gs, aliceGather, bobGather, moeba) = threeSeatSpecimenBoard island gatherSpecimens narcomoeba
+          resolveFor pid oid g = S.runPure S.identityAnswer g (Cast.castSpell pid oid >> Stack.resolveTop)
+          armed = resolveFor S.bob bobGather (resolveFor S.alice aliceGather gs)
+          entry = Cast.castSpell S.carol moeba >> Stack.resolveTop
+          asked = answersFor S.identityAnswer armed entry
+          moebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
+      Spec.assertEqWith s "two floating replacements are live" (length (GameState.replacements armed)) 2
+      Spec.assertBool s (wasAskedToReplace asked) "a ChooseReplacement was raised"
+      case (rowSourceOf S.alice armed, rowSourceOf S.bob armed) of
+        (Just aliceRow, Just bobRow) ->
+          let namedAlice = S.runPure (replaceIfAskedOf S.carol aliceRow) armed entry
+              namedBob = S.runPure (replaceIfAskedOf S.carol bobRow) armed entry
+           in case (newestNamed moebaName namedAlice, newestNamed moebaName namedBob) of
+                (Just afterAlice, Just afterBob) -> do
+                  Spec.assertEqWith s "carol named alice's row, so bob's applies second and keeps it" (Projection.controllerOf afterAlice namedAlice) (Just S.bob)
+                  Spec.assertEqWith s "carol named bob's row, so alice's applies second and keeps it" (Projection.controllerOf afterBob namedBob) (Just S.alice)
+                _ -> Spec.assertFailure s "the creature did not reach the battlefield"
+        _ -> Spec.assertFailure s "both Gather Specimens rows should be floating"
 
 -- Galvanic Blast's metalcraft clause as a floating row: the damage THIS source is
 -- dealing, whatever its kind, becomes 4 (CR 614.15 / 614.1a). Uses.Unlimited
