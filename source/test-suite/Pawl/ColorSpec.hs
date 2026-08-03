@@ -3,9 +3,12 @@
 -- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
 -- 702.114a devoid and CR 111.3 token colour), Pawl.Engine.Target (NonblackCreatureTarget)
 -- and the P3a colour gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon,
--- Dragon Fodder), plus the CR 608.2b colour-change fizzle. Gameplay-level: each
--- card is cast or resolved through the stack and the resulting game state is
--- asserted on.
+-- Dragon Fodder), plus the CR 608.2b colour-change fizzle. Mostly gameplay-level:
+-- a card is cast or resolved through the stack and the resulting game state is
+-- asserted on. The rest assert on a projection over a hand-built board, either
+-- because no card in the pool produces the effect (S.withEffect) or because the
+-- claim is about a layer BOUNDARY and only projectUpTo can see one (the CR 613.3
+-- devoid case at the end).
 module Pawl.ColorSpec where
 
 import qualified Data.Map.Strict as Map
@@ -120,7 +123,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         gs = S.withEffect ratsId (Modification.SetColor Set.empty) board
     Spec.assertEq s (Projection.colorsOf ratsId gs) Set.empty
 
-  Spec.it s "CR 613.1e a layer-5 colour change beats the CR 702.114a devoid seed" $ do
+  Spec.it s "CR 613.3 within layer 5 the CR 702.114a devoid CDA applies first, then the timestamped colour change" $ do
+    -- Both live in layer 5 (CR 613.1e). CR 613.3 orders them: devoid, the
+    -- characteristic-defining ability, clears the colours at the start of the
+    -- layer, and the stored SetColor then applies in timestamp order on top --
+    -- so the drone ends up black, not colourless.
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
         (droneId, board) = S.addCreature slaughterDrone S.alice gs0

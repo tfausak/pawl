@@ -810,19 +810,23 @@ definesColorless = Set.member Keyword.Devoid
 -- START of layer 5 -- "within layers 2-6, apply effects from characteristic-
 -- defining abilities first, then all other effects in timestamp order".
 --
--- Folded IN PLACE rather than emitted as a synthetic Gathered, for
--- applyCharacteristicPT's three reasons, which transfer word for word: a CDA
--- affects only the object it is on (CR 604.3a(3)) so it has no affected set to
--- gather over; CR 604.3 makes it function in ALL zones while gather walks the
--- battlefield only; and it has no source object and no timestamp, so it has
--- nothing to sort on under CR 613.7.
+-- Folded IN PLACE rather than emitted as a synthetic Gathered -- the same shape
+-- applyCharacteristicPT takes, for these three reasons: a CDA affects only the
+-- object it is on (CR 604.3a(3)) so it has no affected set to gather over; CR
+-- 604.3 makes it function in ALL zones while gather walks the battlefield only;
+-- and it has no source object and no timestamp, so it has nothing to sort on
+-- under CR 613.7. NOT applyCharacteristicPT's Humility reason, which is the one
+-- that does not transfer -- see below.
 --
 -- Read from the PARTIAL projection's keywords rather than from the card. At
 -- layer 5 that map holds the printed keywords, those a copy effect brought in at
 -- layer 1, and those a text-changing effect wrote at layer 3 -- and it cannot yet
--- hold a layer-6 grant, because layer 6 has not been applied. That is exactly CR
--- 604.3a(2)'s list of what makes a static ability characteristic-defining, so the
--- rule holds by construction rather than by a test.
+-- hold a layer-6 grant, because layer 6 has not been applied. Those are CR
+-- 604.3a(2)'s ways for a static ability to be characteristic-defining, minus the
+-- token clause, which pawl covers at the seed instead. The one other pre-layer-5
+-- writer is Modification.SetLandSubtype at Layer.Type, and it only ever EMPTIES
+-- the map (CR 305.7) -- a removal cannot introduce a non-characteristic-defining
+-- source, so the rule still holds by construction rather than by a test.
 --
 -- Humility therefore cannot remove it: LoseAllAbilities is layer 6, after this.
 --
@@ -1725,8 +1729,9 @@ project oid gs = projectFrom (gather gs) oid gs
 -- is DYNAMIC. Devoid's value is a constant, so computing it early would still
 -- give the right answer; Tarmogoyf's P/T reads the graveyards' card types, which
 -- change over time. Computing it before the fold would freeze the computed NUMBER
--- into Binding.copy at entry (Engine.hs's as-enters drain snapshots
--- copiableCharacteristics), so a Clone of a Tarmogoyf would keep whatever P/T the
+-- into Binding.copy at entry -- Replacement.apply's EntryRewrite.AsCopy arm
+-- stamps Binding.setCopy with copiableCharacteristics, and applyEntryOption does
+-- the same for CR 208.2b -- so a Clone of a Tarmogoyf would keep whatever P/T the
 -- graveyards held the moment it entered. CR 707.2 makes a copy acquire the values
 -- derived from the printed TEXT -- the ability itself -- so the copy has to
 -- recompute, and folding here is what makes it.
@@ -1912,8 +1917,9 @@ projectWith admits cands = forObject
                         -- could interact at all, `b` writing an aspect `a` reads.
                         --
                         -- Clause (c)'s characteristic-defining exclusion needs no test:
-                        -- a CDA is never a candidate (applyCharacteristicPT folds it at
-                        -- 7a, outside this list), so no pair here is CDA-vs-non-CDA.
+                        -- a CDA is never a candidate -- both in-place folds sit outside
+                        -- this list (applyColorDefining at layer 5, applyCharacteristicPT
+                        -- at 7a) -- so no pair here is CDA-vs-non-CDA.
                         -- Clause (b)'s "text" and "what it does to" halves are not
                         -- implemented and have no producer; "existence" is handled by
                         -- staticAbilitiesLive. The CR decides all of this over an
