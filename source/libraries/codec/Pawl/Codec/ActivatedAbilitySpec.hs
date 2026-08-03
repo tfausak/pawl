@@ -68,7 +68,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           )
           ActivationTiming.SorcerySpeed
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":1}],"components":[]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"timing":{"type":"SorcerySpeed"}} """
+      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"timing":{"type":"SorcerySpeed"}} """
   -- CR 307.5: AnyTime is the default for every ability but equip, so its key
   -- stays out of the JSON -- the same posture Mode's Optionality.Mandatory
   -- takes.
@@ -82,4 +82,4 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
           ActivationTiming.AnyTime
       )
-      """ {"cost":{"mana":null,"components":[]},"modal":{"modes":[{}]}} """
+      """ {"cost":{},"modal":{"modes":[{}]}} """

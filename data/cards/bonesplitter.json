@@ -2,7 +2,6 @@
   "activatedAbilities": [
     {
       "cost": {
-        "components": [],
         "mana": [
           {
             "type": "Generic",

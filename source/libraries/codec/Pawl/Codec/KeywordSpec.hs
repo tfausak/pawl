@@ -176,13 +176,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.toJson
       Keyword.fromJson
       (Keyword.Cycling cost Nothing)
-      """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}],"components":[]},null]} """
+      """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}]},null]} """
     Common.assertJsonCodec
       s
       Keyword.toJson
       Keyword.fromJson
       (Keyword.Cycling cost (Just (Filter.HasCardType CardType.Land)))
-      """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}],"components":[]},{"type":"HasCardType","value":{"type":"Land"}}]} """
+      """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"HasCardType","value":{"type":"Land"}}]} """
   -- CR 702.34a's payload is a whole Cost, not a number -- the first keyword
   -- whose parameter is itself a composite.
   Spec.it s "Flashback carries its cost" $ do
@@ -192,7 +192,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.toJson
       Keyword.fromJson
       (flashback 1)
-      """ {"type":"Flashback","value":{"mana":[{"type":"Generic","value":1}],"components":[]}} """
+      """ {"type":"Flashback","value":{"mana":[{"type":"Generic","value":1}]}} """
     Spec.assertBool s (Keyword.toJson (flashback 1) /= Keyword.toJson (flashback 4)) "the cost is part of the encoding"
   Spec.it s "Fear" $
     Common.assertJsonCodec
@@ -211,7 +211,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.toJson
       Keyword.fromJson
       (entwine 1)
-      """ {"type":"Entwine","value":{"mana":[{"type":"Generic","value":1}],"components":[]}} """
+      """ {"type":"Entwine","value":{"mana":[{"type":"Generic","value":1}]}} """
     Spec.assertBool s (Keyword.toJson (entwine 1) /= Keyword.toJson (flashbackOf 1)) "entwine {1} is not flashback {1}"
   -- CR 702.70a's N rides the constructor the same way. The two payloaded
   -- keywords must not share a tag, or Snake Cult Initiation would decode as

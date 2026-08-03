@@ -34,7 +34,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
             EntryOption.MkEntryOption {EntryOption.power = 1, EntryOption.toughness = 6, EntryOption.keywords = Set.singleton Keyword.Defender}
           ]
       )
-      """ {"type":"ChoiceOf","value":[{"power":3,"toughness":3,"keywords":[]},{"power":1,"toughness":6,"keywords":[{"type":"Defender"}]}]} """
+      """ {"type":"ChoiceOf","value":[{"power":3,"toughness":3},{"power":1,"toughness":6,"keywords":[{"type":"Defender"}]}]} """
   -- CR 614.1c / 105.1: Painter's Servant's as-enters colour choice, payload-free
   -- because the five colours are always the whole offer.
   Spec.it s "ChooseColor (Painter's Servant)" $

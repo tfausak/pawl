@@ -203,7 +203,7 @@ populatedCardJson =
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
     <> "\"keywords\":[{\"type\":\"Deathtouch\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
-    <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[],\"components\":[]},"
+    <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[]},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
@@ -218,7 +218,7 @@ populatedCardJson =
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
-    <> "\"alternativeCosts\":[{\"mana\":[],\"components\":[]}],"
+    <> "\"alternativeCosts\":[{\"mana\":[]}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
     <> "\"mulliganAction\":[{\"type\":\"ExileHandThenDraw\"}],"
     <> "\"openingHandAction\":[{\"type\":\"ExileHandThenDraw\"}],"
@@ -390,7 +390,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
         Card.toJson
         Card.fromJson
         baseCard {Card.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []]}
-        (init baseCardJson <> ",\"alternativeCosts\":[{\"mana\":[],\"components\":[]}]}")
+        (init baseCardJson <> ",\"alternativeCosts\":[{\"mana\":[]}]}")
     Spec.it s "counterability" $
       Common.assertJsonCodec
         s

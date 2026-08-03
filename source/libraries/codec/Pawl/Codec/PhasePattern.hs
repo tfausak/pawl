@@ -18,13 +18,13 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 toJson :: PhasePattern.PhasePattern -> Value.Value
 toJson p =
   Common.object
-    [ Common.pair "whichPhase" (PhaseSelector.toJson (PhasePattern.whichPhase p)),
-      Common.pair "whosePhase" (Common.encodeMaybe PlayerId.toJson (PhasePattern.whosePhase p))
-    ]
+    ( Common.requiredPair "whichPhase" PhaseSelector.toJson (PhasePattern.whichPhase p)
+        <> Common.optionalPair "whosePhase" Nothing (Common.encodeMaybe PlayerId.toJson) (PhasePattern.whosePhase p)
+    )
 
 fromJson :: Value.Value -> Either Text.Text PhasePattern.PhasePattern
 fromJson value = do
   ps <- Common.asObject value
   p <- Common.field "whichPhase" ps >>= PhaseSelector.fromJson
-  w <- Common.field "whosePhase" ps >>= Common.decodeMaybe PlayerId.fromJson
+  w <- Common.defaultedField "whosePhase" Nothing (Common.decodeMaybe PlayerId.fromJson) ps
   pure PhasePattern.MkPhasePattern {PhasePattern.whichPhase = p, PhasePattern.whosePhase = w}

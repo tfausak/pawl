@@ -22,7 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryOption" $ do
       EntryOption.toJson
       EntryOption.fromJson
       (EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty})
-      """ {"power":3,"toughness":3,"keywords":[]} """
+      """ {"power":3,"toughness":3} """
   Spec.it s "MkEntryOption round-trips with its keyword set" $
     Common.assertJsonCodec
       s

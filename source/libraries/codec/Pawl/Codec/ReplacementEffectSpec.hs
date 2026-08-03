@@ -88,7 +88,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
               ]
           )
       )
-      """ {"type":"EntryR","value":[{"type":"IsSource"},{"type":"ChoiceOf","value":[{"power":3,"toughness":3,"keywords":[]},{"power":1,"toughness":6,"keywords":[{"type":"Defender"}]}]}]} """
+      """ {"type":"EntryR","value":[{"type":"IsSource"},{"type":"ChoiceOf","value":[{"power":3,"toughness":3},{"power":1,"toughness":6,"keywords":[{"type":"Defender"}]}]}]} """
   -- CR 614.1d / 616.1b: Gather Specimens -- the other-objects form, whose Filter
   -- is a real characteristic predicate rather than an identity test.
   Spec.it s "EntryR (Gather Specimens, an opponent's creature + UnderSourceControl)" $
@@ -184,7 +184,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
       (ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep), PhasePattern.whosePhase = Nothing})
-      """ {"type":"PhaseR","value":{"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}},"whosePhase":null}} """
+      """ {"type":"PhaseR","value":{"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}}}} """
   -- Fatigue's baked player-scoped whosePhase = Just, the shape only Resolve's
   -- SkipNextPhase arm produces (never authored on a card, #437) -- covered
   -- here for the same reason SetController's PlayerId is: the codec has to

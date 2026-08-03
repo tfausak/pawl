@@ -24,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.PhasePattern" $ do
       PhasePattern.toJson
       PhasePattern.fromJson
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep), PhasePattern.whosePhase = Nothing}
-      """ {"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}},"whosePhase":null} """
+      """ {"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}}} """
   -- Fatigue's baked "TARGET PLAYER skips their next draw step": the only Just
   -- Resolve's SkipNextPhase arm produces, never authored on a card (#437).
   Spec.it s "Fatigue's player-scoped whosePhase = Just" $

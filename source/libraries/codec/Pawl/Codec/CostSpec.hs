@@ -43,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
       toJson
       fromJson
       Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
-      """ {"mana":[],"components":[]} """
+      """ {"mana":[]} """
   -- CR 118.6: an ABSENT mana field is an UNPAYABLE cost, not {0}. This is the
   -- footgun the corpus migration exists to avoid, pinned so a future card file
   -- cannot lose its mana field unnoticed.

@@ -34,8 +34,8 @@ entry =
 entryJson :: String
 entryJson =
   "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
-    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
-    <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":null}"
+    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
+    <> "\"window\":{\"type\":\"AnyTurn\"}}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
@@ -50,7 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.fromJson
       entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
           <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"}}"
       )
   -- CR 603.7a: an onset gate, at the arm Meandering Towershell's entry is stored
@@ -63,6 +63,6 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.fromJson
       entry {DelayedTrigger.window = TurnWindow.ControllersNextTurn}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
-          <> "\"window\":{\"type\":\"ControllersNextTurn\"},\"expiry\":null}"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
+          <> "\"window\":{\"type\":\"ControllersNextTurn\"}}"
       )
