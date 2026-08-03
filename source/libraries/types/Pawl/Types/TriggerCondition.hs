@@ -134,7 +134,7 @@ data TriggerCondition
     -- and NOT the whole of CR 603.6c, whose first clause is "a permanent moves
     -- from the battlefield to another zone", any zone at all. A card that says
     -- "leaves the battlefield" must not be conflated with one that says "dies",
-    -- so the wider condition is SelfLeavesTheBattlefield just below rather than
+    -- so the wider condition is SelfLeavesTheBattlefield below rather than
     -- a widening of this one.
     --
     -- Self-scoped like SelfEnters and SelfCycled: the scan visits every
@@ -165,6 +165,43 @@ data TriggerCondition
     -- battlefield), and reads the ARRIVING incarnation; this one is battlefield
     -- to graveyard, functions on the battlefield, and reads the DEPARTING one.
     SelfDies
+  | -- | The SAME written form as SelfDies above -- CR 603.6c's "Whenever
+    -- [something] is put into a graveyard from the battlefield", narrowed by CR
+    -- 700.4's "dies" to the battlefield-to-graveyard pair -- read by a BYSTANDER
+    -- rather than by the permanent that died. Meren of Clan Nel Toth's "whenever
+    -- another creature you control dies".
+    --
+    -- The relation to SelfDies is exactly PermanentEnters' to SelfEnters, and
+    -- for the same reason that pair is two constructors: that one is a bare
+    -- comparison of ids, while this one has to READ the dead permanent's
+    -- characteristics, and reading them can come up empty for a permanent that
+    -- ceased without a zone change ever filing last known information (see
+    -- Pawl.Engine.Event.matchesTrigger). Nothing about the bearer is part of the
+    -- match; the bearer is the Filter.Context's source, and its controller is
+    -- the perspective CR 109.5 gives "you" in "a creature YOU control".
+    --
+    -- Named for the rule, NOT "AnotherPermanentDies": "another" is
+    -- Filter.Not Filter.IsSource inside the Filter, the one spelling
+    -- Filter.IsSource's own haddock fixes for that word (#163), never a second
+    -- exclusion mechanism here. A card that watches EVERY creature die, its own
+    -- included, is the same constructor with a wider Filter.
+    --
+    -- The candidate the Filter is matched against is ZoneChange.departed and
+    -- NOT ZoneChange.object -- the permanent as it was on the battlefield,
+    -- read from CR 608.2h last known information. That is CR 603.10a again
+    -- ("some zone-change triggers look back in time. These are
+    -- leaves-the-battlefield abilities"), and it is what makes "you control"
+    -- answerable CORRECTLY: by the CR 117.5 boundary the candidate is a card in
+    -- a graveyard, CR 108.4 says "a card doesn't have a controller unless that
+    -- card represents a permanent or spell", and CR 108.4a would hand back its
+    -- OWNER instead -- a different player for anything its controller had
+    -- stolen.
+    --
+    -- Nothing about the DEAD permanent is bound for the payload to name, so a
+    -- card that says "return that creature card to your hand" is not
+    -- expressible through this condition (#616). Meren's payload names only
+    -- its own controller.
+    PermanentDies (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6c's FIRST written form -- "When [this object] leaves the
     -- battlefield, . . ." -- which is the rule's own first clause taken whole:
     -- "Leaves-the-battlefield abilities trigger when a permanent moves from the

@@ -110,6 +110,17 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- to "dies".
   Spec.it s "SelfDies" $
     Common.assertJsonCodec s TriggerCondition.toJson TriggerCondition.fromJson TriggerCondition.SelfDies "{\"type\":\"SelfDies\"}"
+  -- The same written form read by a bystander (Meren of Clan Nel Toth's
+  -- "whenever another creature you control dies"), which carries a Filter where
+  -- SelfDies above carries nothing -- so it is a separate tag, and the "another"
+  -- lives inside that Filter.
+  Spec.it s "PermanentDies round-trips with its Filter" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PermanentDies (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsSource]))
+      "{\"type\":\"PermanentDies\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}}"
   -- CR 603.6c's first written form (Thragtusk's), a separate tag from SelfDies
   -- above: the two must never decode to each other.
   Spec.it s "SelfLeavesTheBattlefield" $

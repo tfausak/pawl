@@ -1087,6 +1087,58 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
+  -- The same rule and the same zone pair as SelfDies just above -- CR 603.6c's
+  -- "whenever [something] is put into a graveyard from the battlefield",
+  -- narrowed by CR 700.4 -- watched by a BYSTANDER. The bearer frames the match
+  -- rather than being it, exactly as it does for PermanentEnters: it is the
+  -- Filter.Context's source (so `Not IsSource` is Meren of Clan Nel Toth's
+  -- "another"), and its controller is the perspective CR 109.5 gives "you" in
+  -- "a creature YOU control".
+  --
+  -- Matched on `departed`, and the candidate's characteristics come from CR
+  -- 608.2h last known information rather than from a live read. Both are CR
+  -- 603.10a ("some zone-change triggers look back in time. These are
+  -- leaves-the-battlefield abilities ...") read through CR 603.10's own
+  -- definition of looking back: "using the existence of those abilities and the
+  -- appearance of objects immediately prior to the event." The
+  -- PermanentEnters arm's live reading is the OPPOSITE choice, and rightly so --
+  -- CR 603.6b puts an entrant's continuous effects on the moment it is on the
+  -- battlefield -- but a dead permanent has no live reading left to take, and
+  -- reading the graveyard card instead would answer "you control" WRONG rather
+  -- than not at all: CR 108.4 says "a card doesn't have a controller unless that
+  -- card represents a permanent or spell", and CR 108.4a substitutes its OWNER,
+  -- so a creature its controller had stolen would be credited back to the player
+  -- who no longer had it when it died.
+  --
+  -- viewWithLastKnown aimed at the deceased twice over, which is how that
+  -- function is asked for the snapshot: it takes the last-known branch only for
+  -- the id it is anchored to, and only once that id is gone. Live whenever the
+  -- id still resolves -- a synthetic death event for a permanent still on the
+  -- battlefield reads the board -- and the CR 608.2h record once changeZone has
+  -- deleted it, which is every real death.
+  --
+  -- Nothing is a permanent that is gone AND filed no last known information
+  -- (Game.cease, Departure.objectsLeaveWith remove an object without a zone
+  -- change running over it). Nothing is known about what died, so no Filter can
+  -- honestly admit it -- the same answer, for the same reason, the
+  -- PermanentEnters arm gives an entrant that vanished.
+  TriggerCondition.PermanentDies f -> case event of
+    GameEvent.Moved zc _
+      | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
+          let deceased = ZoneChange.departed zc
+           in case Projection.viewWithLastKnown deceased gs deceased of
+                Nothing -> False
+                Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
   -- CR 603.6c taken whole: "leaves-the-battlefield abilities trigger when a
   -- permanent moves from the battlefield to another zone". The `from` half is
   -- the same as the SelfDies arm's; the `to` half is where the two part company,
@@ -1334,7 +1386,17 @@ eventBindingSlots cond = case cond of
   -- CR 400.7e: the incarnation the card became, which CR 603.10a's look-back
   -- keeps out of the source slot.
   TriggerCondition.SelfDies -> Set.singleton Binding.became
-  -- The same slot, and the same rule, but bound only for a PUBLIC destination
+  -- Empty, and NOT PermanentEnters' `became` even though the two conditions are
+  -- the same bystander shape pointed at opposite zone changes. CR 400.7e would
+  -- happily supply the name -- a graveyard is public (CR 400.2) -- but no card
+  -- in the pool says anything about the permanent that died: Meren of Clan Nel
+  -- Toth's payload speaks only about its own controller. Binding a slot nothing
+  -- reads is the speculative construction the project forbids, so the card that
+  -- says "return that creature card to your hand" is the one that adds it
+  -- (#616).
+  TriggerCondition.PermanentDies _ -> Set.empty
+  -- The same slot as SelfDies two arms up, and the same rule, but bound only
+  -- for a PUBLIC destination
   -- (CR 400.7e's proviso, over CR 400.2's hidden hand and library) -- so the
   -- guaranteed floor this function answers is empty. The consequence is that a
   -- card whose leaves-the-battlefield payload names `became` is rejected by the
@@ -1435,6 +1497,11 @@ isPlayerRecipient r = case r of
 -- The reverse direction is not reconstructed: a permanent that ENTERED later in
 -- the batch and left before the boundary is offered as a candidate for the
 -- batch's earlier events too, which CR 603.10 would not have it be (#441).
+--
+-- Nor is the direction that mirrors `bystanders` itself: a permanent that
+-- DEPARTED earlier in the batch is a candidate for no later event in it, so a CR
+-- 603.10a look-back condition borne by a permanent that dies alongside the
+-- permanent it is watching answers by object id (#615).
 --
 -- Events outer, permanents inner (ascending by id): a deterministic canonical
 -- order, which is what the CR 603.3b ordering prompt indexes into.
@@ -1766,8 +1833,13 @@ functionsInGraveyard cond = case cond of
   -- NOT, or the ability would be read off the graveyard card's printed text and
   -- credited to its owner instead of its last controller.
   TriggerCondition.SelfDies -> False
-  -- The same answer as SelfDies just above, and for the same CR 603.10a reason:
-  -- a leaves-the-battlefield ability triggers from the battlefield, read
+  -- The same answer, for the same reason, and one step further: this
+  -- condition's bearer is not the permanent that died at all. Meren of Clan Nel
+  -- Toth watches from the battlefield, so CR 113.6k's "can't trigger from the
+  -- battlefield" never reaches it, and a Meren in a graveyard sees nothing.
+  TriggerCondition.PermanentDies _ -> False
+  -- The same answer as both dies conditions above, and for the same CR 603.10a
+  -- reason: a leaves-the-battlefield ability triggers from the battlefield, read
   -- through the look-back, so CR 113.6k never reaches it. This condition makes
   -- the point harder to miss -- its destination may be a hand or a library, and
   -- an ability found in a GRAVEYARD could not be what fired for a permanent that
@@ -1823,6 +1895,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfDies -> False
+  TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
 
@@ -1902,6 +1975,7 @@ stateTriggers gs =
                 TriggerCondition.PlayerDiscards _ -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
                 TriggerCondition.SelfDies -> False
+                TriggerCondition.PermanentDies _ -> False
                 TriggerCondition.SelfLeavesTheBattlefield -> False
                 TriggerCondition.SpellOrAbilityCounters _ -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
