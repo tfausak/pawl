@@ -11,6 +11,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -90,6 +91,7 @@ alwaysPass p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -140,6 +142,7 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -191,6 +194,7 @@ fightAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0

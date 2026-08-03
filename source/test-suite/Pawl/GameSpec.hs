@@ -39,6 +39,7 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
@@ -350,6 +351,7 @@ recordingAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (List.genericTake count (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
+  Prompt.ChooseColor {} -> pure Color.White
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
   Prompt.ChooseReplacement {} -> pure 0
@@ -1495,6 +1497,7 @@ slaveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0

@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -88,6 +89,9 @@ data Response
   | -- | CR 208.2b: the index of the entry shape a player chose as an object entered,
     -- serialized so a DecisionLog replays it deterministically.
     ChoseEntryOption Natural.Natural
+  | -- | CR 614.1c: the colour a player chose as an object entered, serialized so
+    -- a DecisionLog replays it deterministically.
+    ChoseColor Color.Color
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as a
     -- permutation of the offered indices, serialized so a DecisionLog replays it.
     OrderedTriggers [Natural.Natural]

@@ -332,6 +332,14 @@ data Prompt r where
   --
   -- Asked only when two or more options are offered; one option is not a choice.
   ChooseEntryOption :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [EntryOption.EntryOption] -> Prompt Natural.Natural
+  -- | CR 614.1c: as an object enters, its controller chooses a colour
+  -- ("As this creature enters, choose a color" -- Painter's Servant). The
+  -- ObjectId is the entering object.
+  --
+  -- No candidate list: CR 105.1 fixes the five colours and no card in the pool
+  -- narrows them. Always asked -- five colours are five distinguishable options,
+  -- so there is nothing here the engine may decide for a player.
+  ChooseColor :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Color.Color
   -- | CR 603.3b: "each player, in APNAP order, puts each triggered ability they
   -- control ... on the stack in any order they choose." The [TriggerEntry]
   -- is that player's pending triggers, each entry naming what the ability hangs
