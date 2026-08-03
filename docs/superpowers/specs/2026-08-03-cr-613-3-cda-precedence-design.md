@@ -92,8 +92,10 @@ no layer-5 candidate must still reach the layer. For everything else that pass i
 `Map.member` over an empty candidate filter — the cost 7a already pays.
 
 **Read from the partial, not from the card.** At layer 5 `PC.keywords` holds the
-printed keywords and those a copy effect brought in at layer 1 — and it structurally
-*cannot* hold a layer-6 grant, because layer 6 has not been applied. Those are CR
+printed keywords and those a copy effect brought in — both arrive in the seed
+(`Projection.copiableCharacteristics`, CR 613.1a's copiable value) — and it
+structurally *cannot* hold a layer-6 grant, because layer 6 has not been
+applied. Those are CR
 604.3a(2)'s list of what makes a static ability characteristic-defining: "it is
 printed on the card it affects, it was granted to the token it affects by the effect
 that created the token, or it was acquired by the object it affects as the result of

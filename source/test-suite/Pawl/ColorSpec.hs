@@ -449,6 +449,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- top: the drone is BLUE. Blue rather than black, so nothing here can be
     -- confused with the drone's printed {B}.
     --
+    -- Red Elemental Blast's cast below has only ONE fillable mode -- nothing is
+    -- on the stack for "counter target blue spell" to name, so
+    -- Target.fillableModes reports only the destroy mode and Cast.castSpell
+    -- elides Prompt.ChooseModes (#50). This test does not exercise the mode
+    -- choice; the ChooseModes prompt itself is exercised by the stack test
+    -- below ("CR 604.3 Red Elemental Blast counters a devoid SPELL...").
+    --
     -- CAST rather than S.addCreature, because the colour choice happens only on
     -- the entry path (Replacement.runEntry): a Servant placed straight onto the
     -- battlefield has chosenColor = Nothing and its AddChosenColor adds nothing.
@@ -489,12 +496,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- colours first and the Servant's blue lands on top -- and Red Elemental
     -- Blast's "counter target blue spell" mode can then name it.
     --
-    -- This is also the one test that exercises the card's MODE ORDER: with the
-    -- Servant and the Mountains all blue, both of the blast's modes are
-    -- fillable, so CR 601.2b's ChooseModes is really asked and mode 0 is really
-    -- chosen. Swap the two modes in the JSON and mode 0 becomes "destroy target
-    -- blue permanent", which cannot name a spell on the stack -- the cast
-    -- no-ops and the drone resolves.
+    -- This is also the one test that exercises the CHOOSEMODES PROMPT itself:
+    -- with the Servant and the Mountains all blue, both of the blast's modes
+    -- are fillable, so CR 601.2b's ChooseModes is really asked here rather than
+    -- elided (contrast the gate test above, where only one mode is fillable),
+    -- and mode 0 is really chosen. Mode ORDER is not unique to this test --
+    -- Indigo Faerie's `modeSpec ... destroyMode` reads by index too and would
+    -- also fail if the two modes were swapped -- but swapping them here makes
+    -- mode 0 "destroy target blue permanent", which cannot name a spell on the
+    -- stack, so the cast no-ops and the drone resolves.
     mountain <- S.printingOf s registry "Mountain"
     paintersServant <- S.printingOf s registry "Painter's Servant"
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
