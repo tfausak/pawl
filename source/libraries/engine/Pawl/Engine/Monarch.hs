@@ -156,7 +156,7 @@ placeInherent pending = do
       -- take, not [0 .. modeCount - 1]: a ModeIndex counts in Natural, and
       -- Natural subtraction underflows when there are no modes at all.
       allModes = Set.fromList (fmap ModeIndex.MkModeIndex (take modeCount [0 ..]))
-      bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Map.empty Nothing allModes))
+      bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Nothing allModes))
       obj =
         Object.MkObject
           { Object.owner = controller,

@@ -34,7 +34,7 @@ entryJson :: String
 entryJson =
   "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
     <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
-    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
     <> "\"notBefore\":null,\"expiry\":null}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -51,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
           <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
           <> "\"notBefore\":null,\"expiry\":{\"type\":\"AtCleanup\"}}"
       )
   Spec.it s "MkDelayedTrigger, an onset gate (CR 603.7a)" $
@@ -62,6 +62,6 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       entry {DelayedTrigger.notBefore = Just 7}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
           <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
           <> "\"notBefore\":7,\"expiry\":null}"
       )

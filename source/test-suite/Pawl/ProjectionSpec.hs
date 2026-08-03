@@ -1562,21 +1562,21 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 114.4 an emblem's anthem buffs the controller's creatures from the command zone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (creature, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature creature S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
+        withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature creature S.alice Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
     Spec.assertEqWith s "piker is 2/1 -> 3/2" (Projection.powerOf creature withEmblem) (Just 3)
 
   Spec.it s "CR 114.4 the anthem is scoped to the controller's creatures" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (mine, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (theirs, gs1) = S.addCreature piker S.bob gs0
-        withEmblem = S.runPure S.identityAnswer gs1 (Resolve.applyEffect mine mine S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
+        withEmblem = S.runPure S.identityAnswer gs1 (Resolve.applyEffect mine mine S.alice Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
     Spec.assertEqWith s "alice's creature buffed" (Projection.powerOf mine withEmblem) (Just 3)
     Spec.assertEqWith s "bob's creature untouched" (Projection.powerOf theirs withEmblem) (Just 2)
 
   Spec.it s "CR 114.5 the emblem survives a battlefield wipe and buffs a fresh token" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (creature, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature creature S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
+        withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature creature S.alice Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
         wiped = withEmblem {GameState.battlefield = mempty, GameState.objects = Map.filterWithKey (\oid _ -> Set.member oid (GameState.command withEmblem)) (GameState.objects withEmblem)}
         (token, afterToken) = S.addCreature piker S.alice wiped
     Spec.assertEqWith s "emblem still buffs the new creature" (Projection.powerOf token afterToken) (Just 3)

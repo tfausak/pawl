@@ -7,7 +7,6 @@ import qualified Pawl.Codec.ModeIndex as ModeIndex
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.SlotName as SlotName
-import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.SlotName as SlotName
@@ -19,7 +18,6 @@ toJson :: Binding.Binding -> Value.Value
 toJson b =
   Common.object
     [ Common.pair "target" . Common.encodeMaybe Recipient.toJson $ Binding.target b,
-      Common.pair "subtypes" . Common.encodeMaybe (\(f, t) -> Common.array [Subtype.toJson f, Subtype.toJson t]) $ Binding.subtypes b,
       Common.pair "amount" . Common.encodeMaybe Common.encodeNatural $ Binding.amount b,
       Common.pair "modes" . Common.encodeMaybe (Common.encodeSet ModeIndex.toJson) $ Binding.modes b,
       Common.pair "copy" . Common.encodeMaybe ProjectedCharacteristics.toJson $ Binding.copy b
@@ -29,14 +27,12 @@ fromJson :: Value.Value -> Either Text.Text Binding.Binding
 fromJson value = do
   ps <- Common.asObject value
   t <- Common.decodeMaybe Recipient.fromJson (Common.nullableField "target" ps)
-  s <- Common.decodeMaybe Subtype.fromJsonPair (Common.nullableField "subtypes" ps)
   a <- Common.decodeMaybe Common.decodeNatural (Common.nullableField "amount" ps)
   m <- Common.decodeMaybe (Common.decodeSet ModeIndex.fromJson) (Common.nullableField "modes" ps)
   c <- Common.decodeMaybe ProjectedCharacteristics.fromJson (Common.nullableField "copy" ps)
   pure
     Binding.MkBinding
       { Binding.target = t,
-        Binding.subtypes = s,
         Binding.amount = a,
         Binding.modes = m,
         Binding.copy = c

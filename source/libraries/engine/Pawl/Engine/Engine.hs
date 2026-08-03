@@ -581,7 +581,7 @@ placeBorne srcId pending = do
       -- X for the delayed ability's own -- unobserved by any test to date only
       -- because Tidal Wave and its one delayed ability both ever choose mode
       -- 0.
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.union (Binding.fromChoices chosen Map.empty Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.union (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
 
 -- CR 101.4 / 603.3b: the players who control a pending trigger, active player
 -- first and then the rest in turn order. Replaces M3f's apnapOrder, which sorted

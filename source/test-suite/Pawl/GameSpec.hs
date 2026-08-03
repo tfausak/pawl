@@ -181,29 +181,13 @@ gameSpec s registry = Spec.describe s "Game" $ do
           base
             { GameState.objects =
                 Map.adjust
-                  (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Map.empty Nothing Set.empty})
+                  (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Nothing Set.empty})
                   (ObjectId.MkObjectId 0)
                   (GameState.objects base)
             }
         moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
         landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
     Spec.assertEqWith s "reset" (fmap Object.bindings landed) [Map.empty]
-
-  Spec.it s "CR 400.7 changeZone resets a word-swap binding" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    let base = S.oneMountainState mountain Phase.PrecombatMain
-        slot = SlotName.MkSlotName (Text.pack "target")
-        stamped =
-          base
-            { GameState.objects =
-                Map.adjust
-                  (\o -> o {Object.bindings = Binding.fromChoices Map.empty (Map.singleton slot (Subtype.Mountain, Subtype.Island)) Nothing Set.empty})
-                  (ObjectId.MkObjectId 0)
-                  (GameState.objects base)
-            }
-        moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
-        newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
-    Spec.assertEqWith s "reset to empty" (fmap Object.bindings newObj) (Just Map.empty)
 
   Spec.it s "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1757,7 +1741,7 @@ restartOnStack mountain =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled S.bob,
-            Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+            Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.timestamp = ts

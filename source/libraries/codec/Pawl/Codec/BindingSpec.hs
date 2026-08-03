@@ -12,7 +12,6 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.Subtype as Subtype
 
 -- | R7's one case for MkBinding's single constructor, at its all-Nothing unit
 -- (Binding.empty).
@@ -24,13 +23,12 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       Binding.toJson
       Binding.fromJson
       Binding.empty
-      "{\"target\":null,\"subtypes\":null,\"amount\":null,\"modes\":null,\"copy\":null}"
-  -- The codec is meant to be total over every Binding field -- subtypes,
-  -- amount, modes, and copy too -- so round-trip a Binding with all five
-  -- populated at once, exercising Subtype.fromJsonPair along the way. No real
-  -- slot ever carries all five together (copy lives only under the dedicated
-  -- copySource slot in practice); this is a codec totality check, not a claim
-  -- about a reachable game state.
+      "{\"target\":null,\"amount\":null,\"modes\":null,\"copy\":null}"
+  -- The codec is meant to be total over every Binding field -- amount, modes
+  -- and copy too -- so round-trip a Binding with all four populated at once. No
+  -- real slot ever carries all four together (copy lives only under the
+  -- dedicated copySource slot in practice); this is a codec totality check, not
+  -- a claim about a reachable game state.
   -- 'ProjectedCharacteristicsSpec.testCharacteristics' is the stand-in for a
   -- real snapshot -- this sublibrary cannot reach the registry or the
   -- engine's own Projection.project.
@@ -41,13 +39,12 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       Binding.fromJson
       ( Binding.MkBinding
           { Binding.target = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 0)),
-            Binding.subtypes = Just (Subtype.Mountain, Subtype.Island),
             Binding.amount = Just 3,
             Binding.modes = Just (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]),
             Binding.copy = Just ProjectedCharacteristicsSpec.testCharacteristics
           }
       )
-      ( "{\"target\":{\"type\":\"ToPlayer\",\"value\":0},\"subtypes\":[{\"type\":\"Mountain\"},{\"type\":\"Island\"}],"
+      ( "{\"target\":{\"type\":\"ToPlayer\",\"value\":0},"
           <> "\"amount\":3,\"modes\":[0,2],\"copy\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> "}"
@@ -69,6 +66,6 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
             (SlotName.MkSlotName (Text.pack "a-slot"), Binding.empty {Binding.amount = Just 2})
           ]
       )
-      ( "[{\"slot\":\"a-slot\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":2,\"modes\":null,\"copy\":null}},"
-          <> "{\"slot\":\"z-slot\",\"binding\":{\"target\":null,\"subtypes\":null,\"amount\":1,\"modes\":null,\"copy\":null}}]"
+      ( "[{\"slot\":\"a-slot\",\"binding\":{\"target\":null,\"amount\":2,\"modes\":null,\"copy\":null}},"
+          <> "{\"slot\":\"z-slot\",\"binding\":{\"target\":null,\"amount\":1,\"modes\":null,\"copy\":null}}]"
       )

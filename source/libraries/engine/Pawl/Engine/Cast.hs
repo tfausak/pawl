@@ -16,7 +16,6 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
@@ -672,14 +671,6 @@ castSpell pid oid = do
               let keysAgree = Map.keysSet chosen == Map.keysSet sets
                   eachLegal = and (Map.intersectionWith Set.member chosen sets)
               Monad.when (keysAgree && eachLegal) $ do
-                -- CR 612 binding: choose the basic land types for each
-                -- text-change slot. Always answerable (the five basics), so no
-                -- castability gate.
-                let textSlots = Resolve.textChangeSlots card
-                    ask slot = do
-                      pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
-                      pure (slot, pair)
-                bound <- fmap Map.fromList (traverse ask textSlots)
                 -- CR 601.2b then 601.2f: substitute X and announce the Phyrexian
                 -- symbols (both above), then compute the total cost. The object is
                 -- still in HAND here, one step before 601.2a moves it to the
@@ -710,7 +701,7 @@ castSpell pid oid = do
                           moved
                             { GameState.objects =
                                 Map.adjust
-                                  (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount chosenModes})
+                                  (\o -> o {Object.bindings = Binding.fromChoices chosen mAmount chosenModes})
                                   top
                                   (GameState.objects moved)
                             }

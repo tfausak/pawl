@@ -520,8 +520,9 @@ handInPlay printing board =
         oid
       )
 
--- Casts, targeting a permanent (lookupMin picks the lowest ToObject id) and
--- hacking Mountain -> Island.
+-- Targets a permanent (lookupMin picks the lowest ToObject id) and hacks
+-- Mountain -> Island. The word swap is announced at RESOLUTION (CR 608.2d), so
+-- this has to drive the resolution as well as the cast.
 hackAnswer :: Prompt.Prompt r -> r
 hackAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
@@ -541,7 +542,7 @@ magicalHackSpec s registry = Spec.describe s "MagicalHack" $ do
         (islandId, g1) = S.addCreature island S.alice g0
         (gs, hackId) = handInPlay magicalHack g1
         cast = snd (Engine.runGamePure hackAnswer gs (Cast.castSpell S.alice hackId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        resolved = snd (Engine.runGamePure hackAnswer cast Stack.resolveTop)
     Spec.assertBool s (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf islandId resolved)) "island untouched, still blue"
     Spec.assertEqWith s "hacked Mountain projects Island" (Projection.subtypesOf mountainId resolved) (Set.singleton Subtype.Island)
     Spec.assertBool s (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf mountainId resolved)) "hacked Mountain taps blue"

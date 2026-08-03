@@ -496,7 +496,7 @@ activateAbility pid srcId ability = do
               -- and not the source permanent -- Cinder Elemental sacrifices that
               -- permanent to pay, so it is the only holder still there to read at
               -- resolution (Quantity.evaluateFor).
-              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty mAmount chosenModes)}) abilId (GameState.objects g)})
+              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes)}) abilId (GameState.objects g)})
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the components.
               -- activatable pre-checks payability (payableCost, which is pure) and the
               -- gate above re-checks it at the announced X, so an ability that reaches

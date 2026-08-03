@@ -70,7 +70,6 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
             equip
             equip
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature creature))
             (Effect.Attach slot)
@@ -107,7 +106,6 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
             equip
             equip
             S.alice
-            Map.empty
             (Map.singleton slot True)
             (Map.singleton slot (Recipient.ToCreature second))
             (Effect.Attach slot)
@@ -168,7 +166,6 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
               equip
               equip
               S.alice
-              Map.empty
               (Map.singleton slot True)
               (Map.singleton slot (Recipient.ToCreature t))
               (Effect.Attach slot)
@@ -608,7 +605,6 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               crownObj
               crownObj
               S.alice
-              Map.empty
               (Map.singleton slot True)
               (Map.singleton slot (Recipient.ToObject aura))
               (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
@@ -636,7 +632,6 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               crownObj
               crownObj
               S.alice
-              Map.empty
               (Map.singleton slot True)
               (Map.singleton slot (Recipient.ToObject aura))
               (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
@@ -676,7 +671,6 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               crownObj
               crownObj
               S.alice
-              Map.empty
               (Map.singleton slot True)
               (Map.singleton slot (Recipient.ToObject aura))
               -- `And []` matches everything, so the land is offered as a

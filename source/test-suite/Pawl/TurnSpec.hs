@@ -976,7 +976,7 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
           S.runPure
             S.identityAnswer
             gs
-            (Resolve.applyEffect source source S.bob Map.empty Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer Set.empty))
+            (Resolve.applyEffect source source S.bob Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer Set.empty))
     Spec.assertEqWith s "added in APNAP order, so taken in reverse" (takersOf after) [S.alice, S.bob]
 
 -- alice in her precombat main phase with priority, eight untapped Islands

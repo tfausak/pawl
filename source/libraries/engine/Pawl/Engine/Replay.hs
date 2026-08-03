@@ -264,7 +264,7 @@ defaultAnswer p = case p of
   -- slot with no legal recipient stays unfilled -- casting rejects that answer.
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   -- A canonical identity hack (Mountain -> Mountain changes nothing): the fallback
-  -- when a transcript runs short on a text-changer's binding.
+  -- when a transcript runs short on a text-changer's word swap.
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   -- CR 701.23b: failing to find is always legal, and is the least eventful
   -- fallback when a transcript runs short on a search.

@@ -82,10 +82,10 @@ data Effect card
     -- (Destroy, Untap) are under CR 608.2c/608.2f instead, and store nothing.
     ModifyTarget Duration.Duration Modification.Modification ObjectRef.ObjectRef
   | -- | CR 612: rewrite basic-land-type words in the target spell or permanent. The
-    -- SlotName is the target slot; the two basic land types are read from the
-    -- caster's binding (Binding.subtypes on Object.bindings) and baked into a
-    -- stored ChangeSubtypeWord continuous effect. Resolve stores it; Projection
-    -- applies it.
+    -- SlotName is the target slot; the two basic land types are announced as this
+    -- effect is applied (CR 608.2d, Prompt.ChooseBasicLandTypes) and baked into a
+    -- stored ChangeSubtypeWord continuous effect. Resolve asks and stores;
+    -- Projection applies.
     ChangeText SlotName.SlotName
   | -- | CR 605: add one unit of mana, of the type the ManaProduction names -- one
     -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
