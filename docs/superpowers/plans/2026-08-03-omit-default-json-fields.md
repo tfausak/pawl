@@ -231,7 +231,7 @@ Leave `nullableField` and the `decode*Default` family in place for now — they 
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `direnv exec . cabal build all && direnv exec . cabal test`
-Expected: PASS, 2598 + 9 = 2607 tests.
+Expected: PASS, 2598 + 8 = 2606 tests (three `optionalPair` cases, one `requiredPair`, four `defaultedField`).
 
 - [ ] **Step 5: Make a failing `assertToJson` say what the encoder wrote**
 
