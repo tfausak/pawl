@@ -34,10 +34,6 @@
                   {
                     "whichKind": {
                       "type": "Combat"
-                    },
-                    "whichRecipient": null,
-                    "whichSource": {
-                      "type": "AnySource"
                     }
                   },
                   {

@@ -37,13 +37,7 @@
     {
       "type": "DamageR",
       "value": [
-        {
-          "whichKind": null,
-          "whichRecipient": null,
-          "whichSource": {
-            "type": "AnySource"
-          }
-        },
+        {},
         {
           "type": "Scale",
           "value": {

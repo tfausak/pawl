@@ -48,7 +48,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
             }
           Zone.Exile
       )
-      """ {"type":"ZoneChangeR","value":[{"whenDestination":{"type":"Graveyard"},"whichObject":{"type":"AnyObject"},"whoseObject":{"type":"Anyones"}},{"type":"Exile"}]} """
+      """ {"type":"ZoneChangeR","value":[{"whenDestination":{"type":"Graveyard"}},{"type":"Exile"}]} """
   -- Leyline of the Void's shape: the relation that distinguishes it from
   -- Rest in Peace has to survive the wire too.
   Spec.it s "ZoneChangeR (Leyline of the Void, Opponents)" $
@@ -64,7 +64,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
             }
           Zone.Exile
       )
-      """ {"type":"ZoneChangeR","value":[{"whenDestination":{"type":"Graveyard"},"whichObject":{"type":"AnyObject"},"whoseObject":{"type":"Opponents"}},{"type":"Exile"}]} """
+      """ {"type":"ZoneChangeR","value":[{"whenDestination":{"type":"Graveyard"},"whoseObject":{"type":"Opponents"}},{"type":"Exile"}]} """
   -- CR 614.1c: EntryR's pattern is a bare Filter, and "as [THIS PERMANENT]
   -- enters" is Filter.IsSource. AsCopy pins the payload-free rewrite beside it.
   Spec.it s "EntryR (Clone, IsSource + AsCopy)" $
@@ -108,7 +108,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
       (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat, DamagePattern.whichSource = SourceRelation.AnySource, DamagePattern.whichRecipient = Nothing} DamageRewrite.PreventAll)
-      """ {"type":"DamageR","value":[{"whichKind":{"type":"Combat"},"whichRecipient":null,"whichSource":{"type":"AnySource"}},{"type":"PreventAll"}]} """
+      """ {"type":"DamageR","value":[{"whichKind":{"type":"Combat"}},{"type":"PreventAll"}]} """
   -- CR 614.15 / 614.1a: Galvanic Blast's metalcraft clause -- source-scoped, any
   -- kind, and a flat instead-amount rather than a prevention.
   Spec.it s "DamageR (this source's damage, set to a flat amount)" $
@@ -117,7 +117,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
       (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whichSource = SourceRelation.TheSource, DamagePattern.whichRecipient = Nothing} (DamageRewrite.SetAmount 4))
-      """ {"type":"DamageR","value":[{"whichKind":null,"whichRecipient":null,"whichSource":{"type":"TheSource"}},{"type":"SetAmount","value":4}]} """
+      """ {"type":"DamageR","value":[{"whichSource":{"type":"TheSource"}},{"type":"SetAmount","value":4}]} """
   -- Furnace of Rath's "it deals double that damage ... instead".
   Spec.it s "DamageR (any source's damage, doubled)" $
     Common.assertJsonCodec
@@ -125,7 +125,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
       (ReplacementEffect.DamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whichSource = SourceRelation.AnySource, DamagePattern.whichRecipient = Nothing} (DamageRewrite.Scale (Scaling.Multiply 2)))
-      """ {"type":"DamageR","value":[{"whichKind":null,"whichRecipient":null,"whichSource":{"type":"AnySource"}},{"type":"Scale","value":{"type":"Multiply","value":2}}]} """
+      """ {"type":"DamageR","value":[{},{"type":"Scale","value":{"type":"Multiply","value":2}}]} """
   -- CR 614.8: regeneration, DestructionR's sole producer today.
   Spec.it s "DestructionR (regenerate)" $
     Common.assertJsonCodec
@@ -149,9 +149,10 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
           (Scaling.AddMore 1)
       )
       """ {"type":"CounterR","value":[{"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}},{"type":"AddMore","value":1}]} """
-  -- Doubling Season: whichKind = Nothing is an explicit JSON null (any kind),
-  -- never "no kind", and the trivial filter matches every permanent.
-  Spec.it s "CounterR (Doubling Season, explicit JSON null)" $
+  -- Doubling Season: whichKind = Nothing means any kind, never "no kind", and
+  -- the trivial filter matches every permanent. The absent whichKind key is
+  -- what that Nothing means (R1).
+  Spec.it s "CounterR (Doubling Season, whichKind omitted)" $
     Common.assertJsonCodec
       s
       ReplacementEffect.toJson
@@ -164,7 +165,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
             }
           (Scaling.Multiply 2)
       )
-      """ {"type":"CounterR","value":[{"whichKind":null,"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}},{"type":"Multiply","value":2}]} """
+      """ {"type":"CounterR","value":[{"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}},{"type":"Multiply","value":2}]} """
   -- Pattern and scaling are both DATA, so both have to survive the trip.
   Spec.it s "TokenR (Doubling Season, tokens)" $
     Common.assertJsonCodec

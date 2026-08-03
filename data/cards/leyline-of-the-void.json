@@ -43,9 +43,6 @@
           "whenDestination": {
             "type": "Graveyard"
           },
-          "whichObject": {
-            "type": "AnyObject"
-          },
           "whoseObject": {
             "type": "Opponents"
           }

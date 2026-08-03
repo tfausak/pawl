@@ -38,7 +38,6 @@
             "type": "And",
             "value": []
           },
-          "whichKind": null,
           "whose": {
             "type": "Yours"
           }

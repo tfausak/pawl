@@ -25,8 +25,9 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWhat = Filter.HasCardType CardType.Creature
         }
       """ {"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}} """
-  -- Doubling Season: whichKind = Nothing means ANY kind (an explicit JSON
-  -- null), never "no kind" -- and the trivial filter matching every permanent.
+  -- Doubling Season: whichKind = Nothing means ANY kind, never "no kind" -- and
+  -- the trivial filter matching every permanent. The omitted key is what an
+  -- absent whichKind means (R1), same as an explicit JSON null would.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
     Common.assertJsonCodec
       s
@@ -37,4 +38,4 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.whose = ControllerRelation.Yours,
           CounterPattern.onWhat = Filter.And []
         }
-      """ {"whichKind":null,"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}} """
+      """ {"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}} """

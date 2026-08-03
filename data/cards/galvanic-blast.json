@@ -76,8 +76,6 @@
                 "type": "DamageR",
                 "value": [
                   {
-                    "whichKind": null,
-                    "whichRecipient": null,
                     "whichSource": {
                       "type": "TheSource"
                     }
