@@ -86,3 +86,37 @@ spec s = Spec.describe s "Pawl.Codec.Common" $ do
   Spec.describe s "assertToJson"
     . Spec.it s "ignores object key order"
     $ Common.assertToJson s id (Common.object [Common.pair "b" (Common.integer 1), Common.pair "a" (Common.integer 2)]) "{\"a\":2,\"b\":1}"
+
+  Spec.describe s "optionalPair" $ do
+    Spec.it s "omits a field equal to its default" $
+      Spec.assertEq s (Common.optionalPair "k" (0 :: Integer) Common.integer 0) []
+    Spec.it s "writes a field differing from its default" $
+      Spec.assertEq s (Common.optionalPair "k" (0 :: Integer) Common.integer 1) [Common.pair "k" (Common.integer 1)]
+    -- The default is not required to be the type's zero: R2's enum defaults are
+    -- ordinary values, and a field equal to one of those is the omitted case.
+    Spec.it s "omits a non-zero default" $
+      Spec.assertEq s (Common.optionalPair "k" (7 :: Integer) Common.integer 7) []
+
+  Spec.describe s "requiredPair"
+    . Spec.it s "always writes the field"
+    $ Spec.assertEq s (Common.requiredPair "k" Common.integer (0 :: Integer)) [Common.pair "k" (Common.integer 0)]
+
+  Spec.describe s "defaultedField" $ do
+    Spec.it s "supplies the default for an absent key" $
+      Spec.assertEq s (Common.defaultedField "k" (0 :: Integer) Common.asInteger []) (Right 0)
+    Spec.it s "decodes a present key" $
+      Spec.assertEq s (Common.defaultedField "k" (0 :: Integer) Common.asInteger [Common.pair "k" (Common.integer 1)]) (Right 1)
+    -- R7: a present null goes to the decoder rather than short-circuiting to the
+    -- default, which is what lets decodeMaybe keep accepting an explicit null.
+    Spec.it s "hands a present null to the decoder" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" (Just (1 :: Integer)) (Common.decodeMaybe Common.asInteger) [Common.pair "k" Common.null])
+        (Right Nothing)
+    -- The round trip the two halves have to agree on, stated once here so the
+    -- per-codec cases in Task 11 are checking a property this pins down.
+    Spec.it s "round-trips the default through an omitted field" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" (7 :: Integer) Common.asInteger (Common.optionalPair "k" 7 Common.integer 7))
+        (Right 7)

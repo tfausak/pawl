@@ -177,6 +177,32 @@ withValue mv f = case mv of
   Just v -> f v
   Nothing -> Left $ Text.pack "missing tagged value"
 
+-- | A field that is always written, whatever its value. The singleton list is
+-- so that 'Common.object . concat' can take required and defaulted fields in one
+-- list, with which is which readable down the left edge.
+requiredPair :: String -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
+requiredPair k f x = [pair k (f x)]
+
+-- | A field written only when it differs from the default that an absent key
+-- means. The default passed here and the one 'defaultedField' supplies must be
+-- the same binding: that is the whole guarantee that a codec's two halves agree.
+optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
+optionalPair k d f x = if x == d then [] else [pair k (f x)]
+
+-- | Reads a field that may be absent, supplying the default 'optionalPair'
+-- omits. A key that is present but null goes to the decoder rather than
+-- short-circuiting, so composing with 'decodeMaybe' accepts an absent key, an
+-- explicit null, and a value alike (R7).
+defaultedField ::
+  String ->
+  a ->
+  (Value.Value -> Either Text.Text a) ->
+  [Pair.Pair Value.Value] ->
+  Either Text.Text a
+defaultedField k d f ps = case lookupPair k ps of
+  Nothing -> Right d
+  Just v -> f v
+
 -- Combinators ----------------------------------------------------------------
 --
 -- Generic over the element codec, which is taken as an argument.
@@ -250,11 +276,12 @@ decodeNatural value = do
     Just x -> Right x
     Nothing -> Left . Text.pack $ "expected natural but got " <> show n
 
--- Defaults -------------------------------------------------------------------
+-- Defaults (legacy) ------------------------------------------------------------
 --
--- An omitted field decodes to the empty or default value, which lets an
--- all-default field stay OUT of the committed JSON so existing card files remain
--- byte-identical.
+-- Superseded by 'defaultedField' and 'optionalPair', which pair a decoder with
+-- an explicit default rather than overloading @null@ to mean "take the
+-- default". Callers still exist in codec modules that later tasks convert;
+-- Task 10 removes this section once they're gone.
 
 decodeListDefault :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text [a]
 decodeListDefault f value = case value of
@@ -304,7 +331,9 @@ assertFromJson s f j x = do
   Spec.assertEq s (f v) (Right x)
 
 -- | Compares 'sortKeys'-normalized values, because JSON objects are unordered
--- and key order is not a property the codec has.
+-- and key order is not a property the codec has. The failure renders both sides
+-- as JSON rather than as 'Value.Value', so a mismatch can be read — and pasted
+-- back into the literal — without translating a Show instance by hand.
 assertToJson ::
   (Stack.HasCallStack, Monad m) =>
   Spec.Spec m n ->
@@ -314,7 +343,10 @@ assertToJson ::
   m ()
 assertToJson s f x j = do
   v <- assertJson s j
-  Spec.assertEq s (sortKeys (f x)) (sortKeys v)
+  Spec.assertBool
+    s
+    (sortKeys (f x) == sortKeys v)
+    ("encoded " <> Text.unpack (render (f x)) <> " but the literal says " <> j)
 
 -- | Goes through 'parse' rather than parsing itself, so a literal with trailing
 -- garbage is a test failure instead of silently parsing as its prefix.
