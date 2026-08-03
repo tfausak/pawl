@@ -164,6 +164,10 @@ library codec
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
     Pawl.Codec.ManaCostSpec
+    Pawl.Codec.ManaCount
+    Pawl.Codec.ManaCountSpec
+    Pawl.Codec.ManaFilter
+    Pawl.Codec.ManaFilterSpec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaProductionSpec
     Pawl.Codec.ManaSymbol
@@ -325,6 +329,8 @@ library engine
     Pawl.Engine.Keyword
     Pawl.Engine.Mana
     Pawl.Engine.ManaAbility
+    Pawl.Engine.ManaCount
+    Pawl.Engine.ManaFilter
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.Mulligan
@@ -539,6 +545,8 @@ library types
     Pawl.Types.Loyalty
     Pawl.Types.Mana
     Pawl.Types.ManaCost
+    Pawl.Types.ManaCount
+    Pawl.Types.ManaFilter
     Pawl.Types.ManaProduction
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType

@@ -9,6 +9,8 @@ import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
+import Pawl.Types.Mana (Mana)
+import qualified Pawl.Types.Mana as Mana
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -21,6 +23,17 @@ import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Timestamp as Timestamp
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
+
+-- CR 106.4: this player's mana pool. Absent from the map means an empty pool,
+-- which is why every reader goes through here rather than through the Map.
+--
+-- Here rather than in Pawl.Engine.Mana because Pawl.Engine.ManaCount reads a
+-- pool too (Omnath, Locus of Mana), and Pawl.Engine.Mana sits far above it: Mana
+-- imports Pawl.Engine.Projection, which imports Pawl.Engine.Quantity, which is
+-- what ties the ManaCount arm. The "absent means empty" convention must have one
+-- home, so the accessor moved to the module both halves can see.
+poolOf :: PlayerId -> GameState -> Mana
+poolOf pid gs = Map.findWithDefault (Mana.MkMana []) pid (GameState.manaPool gs)
 
 lookupObject :: ObjectId -> GameState -> Maybe Object
 lookupObject oid gs = Map.lookup oid (GameState.objects gs)

@@ -7,6 +7,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -57,9 +58,24 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
   -- CR 402.2 / Reliquary Tower.
   Spec.it s "NoMaximumHandSize" $
     Common.assertJsonCodec s PlayerEffect.toJson PlayerEffect.fromJson PlayerEffect.NoMaximumHandSize "{\"type\":\"NoMaximumHandSize\"}"
-  -- CR 500.5 / 703.4q / Upwelling.
-  Spec.it s "DontLoseUnspentMana" $
-    Common.assertJsonCodec s PlayerEffect.toJson PlayerEffect.fromJson PlayerEffect.DontLoseUnspentMana "{\"type\":\"DontLoseUnspentMana\"}"
+  -- CR 500.5 / 703.4q / Upwelling: no mana type named.
+  Spec.it s "DontLoseUnspentMana, Upwelling's whole pool" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.DontLoseUnspentMana ManaFilter.Any)
+      "{\"type\":\"DontLoseUnspentMana\",\"value\":{\"type\":\"Any\"}}"
+  -- CR 106.1a / Omnath, Locus of Mana: the OTHER filter, which is the whole
+  -- difference between the two producers -- so a codec that dropped the payload
+  -- would round-trip one of these and not both.
+  Spec.it s "DontLoseUnspentMana, Omnath's green only" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.DontLoseUnspentMana (ManaFilter.OfType (ManaType.Colored Color.Green)))
+      "{\"type\":\"DontLoseUnspentMana\",\"value\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}}"
   -- CR 702.18a / Ivory Mask: shroud names no player, so the scope is everybody.
   Spec.it s "CantBeTargetedBy, shroud's EachPlayer" $
     Common.assertJsonCodec

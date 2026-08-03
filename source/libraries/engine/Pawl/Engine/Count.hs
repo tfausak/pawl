@@ -117,9 +117,10 @@ aggregate quantityOf aggregation members = case aggregation of
       [] -> Nothing
       value : rest -> Just (Foldable.foldl' max value rest)
 
--- CR 400.1: whose copy of the zone. Nothing when the reference cannot be
--- resolved -- a Relative with no perspective, or a slot that is unbound or bound
--- to something that is not a player.
+-- CR 400.1: whose copy of the zone -- and, for Pawl.Engine.ManaCount, whose mana
+-- pool, which CR 106.4 attaches to a player the same way. Nothing when the
+-- reference cannot be resolved -- a Relative with no perspective, or a slot that
+-- is unbound or bound to something that is not a player.
 --
 -- CR 102.1: "A player is one of the people in the game." A player who has left
 -- keeps their row in GameState.players -- Player.status turns Departed, the key

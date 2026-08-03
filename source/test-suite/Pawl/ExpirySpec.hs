@@ -42,6 +42,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
@@ -871,7 +872,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
            in S.addPlayerEffect
                 expiry
                 PlayerScope.EachPlayer
-                PlayerEffect.DontLoseUnspentMana
+                (PlayerEffect.DontLoseUnspentMana ManaFilter.Any)
                 S.alice
                 floated
                   { GameState.activePlayer = S.alice,
@@ -1010,7 +1011,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     Spec.assertEqWith s "so it never attacked" (S.lifeOf S.bob after) (Just 20)
 
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
-poolSize pid gs = case Mana.poolOf pid gs of
+poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

@@ -1,18 +1,21 @@
 -- Covers: Pawl.Engine.Projection (CR 613 layer 7 -- 7a characteristic-defined P/T, the
--- CR 608.2h freeze that 7b's stored effects owe, and 7d P/T switching), Pawl.Engine.Quantity
--- (the counting quantity, and CR 208.2a's substitution of 0 for a number a CDA
--- cannot determine) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer
--- Strength, Twisted Image, Nightmare, Monstrous War-Leech). Gameplay-level: each
--- card is cast or resolved through the stack and the resulting game state is
--- asserted on.
+-- CR 608.2h freeze that 7b's stored effects owe, 7c modification and 7d P/T
+-- switching), Pawl.Engine.Quantity and Pawl.Engine.ManaCount (the counting
+-- quantities, and CR 208.2a's substitution of 0 for a number a CDA cannot
+-- determine) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer Strength,
+-- Twisted Image, Nightmare, Monstrous War-Leech, Omnath Locus of Mana).
+-- Gameplay-level: each card is cast or resolved through the stack and the
+-- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
 
+import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -27,7 +30,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
-import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -38,7 +41,7 @@ import qualified Pawl.Types.Zone as Zone
 -- name rather than tracked by id: CR 400.7 makes an object that changes zones a
 -- new object, and pawl gives each one a fresh ObjectId, so the id the cast was
 -- handed names nothing on the battlefield (the Pawl.CopySpec precedent).
-leechesOnBattlefield :: GameState.GameState -> [ObjectId]
+leechesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
 leechesOnBattlefield gs = filter isLeech (Set.toList (GameState.battlefield gs))
   where
     isLeech oid = maybe False (\c -> Card.Type.name c == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.cardOf oid gs)
@@ -529,3 +532,100 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         settled = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
     Spec.assertEqWith s "the spell left the stack" (GameState.stack settled) []
     Spec.assertEqWith s "no Leech on the battlefield" (leechesOnBattlefield settled) []
+  omnathSpec s registry
+
+-- Omnath, Locus of Mana ({2}{G} Legendary Creature -- Elemental), second line:
+-- "Omnath gets +1/+1 for each unspent green mana you have." Oracle text verified
+-- against Scryfall.
+--
+-- CR 613.4c layer 7c -- a MODIFICATION, not a characteristic-defining ability:
+-- the printed box says 1/1, so there is no CR 208.2a star for a CDA to define and
+-- the pump rides on the static ability instead. That is why these tests read
+-- Projection.powerOf and never PC.characteristicPT, unlike Tarmogoyf's and
+-- Nightmare's above.
+--
+-- The magnitude is a Quantity.ManaCount, which counts a MANA POOL rather than a
+-- zone: CR 400.1 lists seven zones and the pool is none of them, and CR 106.4
+-- gives it its own existence attached to a player.
+omnathSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
+  Spec.it s "CR 613.4c an empty pool adds nothing, so Omnath is its printed 1/1" $ do
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (omnathId, gs) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "power" (Projection.powerOf omnathId gs) (Just 1)
+    Spec.assertEqWith s "toughness" (Projection.toughnessOf omnathId gs) (Just 1)
+  Spec.it s "CR 613.4c Omnath gets +1/+1 for each unspent green mana you have" $ do
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (first, g2) = S.addCreature forest S.alice g1
+        (second, g3) = S.addCreature forest S.alice g2
+        floated = tapAll [first, second] g3
+    Spec.assertEqWith s "two green floating: 1+2 power" (Projection.powerOf omnathId floated) (Just 3)
+    Spec.assertEqWith s "and 1+2 toughness" (Projection.toughnessOf omnathId floated) (Just 3)
+  -- THE LIVENESS FALSIFIER, and the reason the count belongs in the projection
+  -- rather than in a sampled or stored value. CR 106.4's pool changes whenever a
+  -- mana ability resolves, which CR 605.3a lets happen any time its controller
+  -- has priority and CR 605.3b has happen immediately, off the stack -- so there
+  -- is no state-based action (CR 704.3) and no priority pass between tapping the
+  -- Forest and Omnath being bigger. Nothing here calls
+  -- Engine.settleForPriority, and the assertions bracket a single tap.
+  --
+  -- The base characteristics are asserted unchanged alongside, which is what
+  -- rules out the pump having been baked into the seed: the printed 1/1 is still
+  -- 1/1 at layer 7a while the projection reads 4/4.
+  Spec.it s "CR 106.4 the count is live: tapping a Forest grows Omnath with nothing settled in between" $ do
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (first, g2) = S.addCreature forest S.alice g1
+        (second, g3) = S.addCreature forest S.alice g2
+        (third, board) = S.addCreature forest S.alice g3
+        one = tapAll [first] board
+        two = tapAll [second] one
+        three = tapAll [third] two
+    Spec.assertEqWith s "nothing tapped yet" (Projection.powerOf omnathId board) (Just 1)
+    Spec.assertEqWith s "one Forest" (Projection.powerOf omnathId one) (Just 2)
+    Spec.assertEqWith s "two Forests" (Projection.powerOf omnathId two) (Just 3)
+    Spec.assertEqWith s "three Forests" (Projection.powerOf omnathId three) (Just 4)
+    Spec.assertEqWith s "the seed still says 1" (PC.power (Projection.baseCharacteristics omnathId three)) (Just 1)
+    Spec.assertBool s (null (GameState.continuousEffects three)) "no continuous effect was stored for the pump"
+  -- CR 106.1a: only GREEN mana counts. An Island's {U} floats in the same pool
+  -- and is invisible to the count -- the falsifier for a ManaCount that ignores
+  -- its filter and just measures the pool's size.
+  Spec.it s "CR 106.1a blue mana in the same pool does not pump Omnath" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (islandId, g2) = S.addCreature island S.alice g1
+        (forestId, g3) = S.addCreature forest S.alice g2
+        blueOnly = tapAll [islandId] g3
+        both = tapAll [forestId] blueOnly
+    Spec.assertEqWith s "one blue floating, still 1/1" (Projection.powerOf omnathId blueOnly) (Just 1)
+    Spec.assertEqWith s "the green one is what moves it" (Projection.powerOf omnathId both) (Just 2)
+  -- CR 109.5: "you" in a static ability's text is the ability's SOURCE's
+  -- controller. THE FALSIFIER for reading the affected object's controller (or
+  -- no perspective at all): Omnath is the affected object here as well as the
+  -- source, so the two coincide -- what separates them is BOB's pool, which a
+  -- PlayerRef.EachPlayer fold would add in.
+  --
+  -- This is the first static ability in the pool whose modification carries a
+  -- player-scoped quantity, so it is also the first test of
+  -- Projection.applyModification's context (#155).
+  Spec.it s "CR 109.5 the count reads Omnath's controller: an opponent's green mana does not pump it" $ do
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (bobsForest, g2) = S.addCreature forest S.bob g1
+        (alicesForest, g3) = S.addCreature forest S.alice g2
+        bobFloats = tapAll [bobsForest] g3
+        bothFloat = tapAll [alicesForest] bobFloats
+    Spec.assertEqWith s "bob's green is not alice's" (Projection.powerOf omnathId bobFloats) (Just 1)
+    Spec.assertEqWith s "alice's own green is" (Projection.powerOf omnathId bothFloat) (Just 2)
+
+-- Tap each permanent for mana in turn, threading the state. Every source here is
+-- a basic land with one mana ability and one colour, so CR 605.3a's activation
+-- asks nothing that S.identityAnswer has to choose between.
+tapAll :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+tapAll oids gs = List.foldl' (\g oid -> S.runPure S.identityAnswer g (Mana.tapForMana oid)) gs oids

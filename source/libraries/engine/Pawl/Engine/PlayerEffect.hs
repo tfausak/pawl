@@ -24,6 +24,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.Card as Card
@@ -32,6 +33,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.ManaCost (ManaCost)
+import Pawl.Types.ManaUnit (ManaUnit)
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -202,7 +204,7 @@ prohibitsCasting pid gs =
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.DontLoseUnspentMana -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
         -- shroud may cast anything, and Pawl.Engine.Target.targetable is where the
         -- restriction lands (CR 115.4's "any target" and CR 601.2c's choosing).
@@ -244,7 +246,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.DontLoseUnspentMana -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
@@ -252,7 +254,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.DontLoseUnspentMana -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
       effects = applying pid gs
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
@@ -297,7 +299,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.DontLoseUnspentMana -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
    in any stops (applying pid gs)
 
 -- CR 402.2: "each player has a maximum hand size, which is normally seven
@@ -318,35 +320,45 @@ maximumHandSize pid gs =
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
-        PlayerEffect.DontLoseUnspentMana -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
    in if any removes (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
 
--- CR 500.5 / 106.4 / 613.11: does this player keep the unspent mana in their
--- mana pool as a step or phase ends (Upwelling)? The typed question
--- Pawl.Engine.Mana.emptyManaPools asks, so the turn-based action of CR 703.4q never
--- learns which effect answered it.
+-- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
+-- they keep as a step or phase ends (Upwelling, Omnath Locus of Mana)? The typed
+-- question Pawl.Engine.Mana.emptyManaPools asks, so the turn-based action of CR
+-- 703.4q never learns which effect answered it.
 --
--- A Bool about the WHOLE pool, which is exactly as much as today's carrier can
--- say. A card that keeps only mana of a stated type (Omnath, Locus of Mana)
--- needs this to become a per-unit predicate (#351), and one that keeps only the
--- mana it just added (Shizuko, Karn) needs the retention to leave this carrier
--- altogether (#352).
+-- A PER-UNIT predicate rather than a Bool about the whole pool, because CR 106.4
+-- says the player loses "this mana" and a card may name only some of it: Omnath,
+-- Locus of Mana keeps green and drops the rest of the same pool. The pid and the
+-- state are taken FIRST so a caller sweeping a pool resolves the applicable
+-- effects once and asks the units afterwards.
+--
+-- A DISJUNCTION over the applicable effects: two retention effects that name
+-- different mana are not in conflict, so a unit either effect keeps is kept, and
+-- an empty list keeps nothing. CR 613.11's timestamp order has nothing to order
+-- here -- unlike a cost adjustment, no answer here depends on which ran first.
 --
 -- Read LIVE through `applying`, like every other question here, so an Upwelling
 -- destroyed earlier in the step is simply not found and the pools empty with
 -- nothing to unwind (CR 604.2). Pinned by ManaSpec's "CR 604.2 destroying
 -- Upwelling restores the emptying in the same step".
-keepsUnspentMana :: PlayerId -> GameState -> Bool
+--
+-- Not the finest granularity the pool asks for. A card that keeps only the mana
+-- it just added (Shizuko, Karn) needs the retention to leave this player-axis
+-- carrier altogether (#352).
+keepsUnspentMana :: PlayerId -> GameState -> ManaUnit -> Bool
 keepsUnspentMana pid gs =
   let keeps effect = case effect of
-        PlayerEffect.DontLoseUnspentMana -> True
-        PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost _ _ -> False
-        PlayerEffect.ReduceSpellCost _ _ -> False
-        PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.CantBeTargetedBy _ -> False
-   in any keeps (applying pid gs)
+        PlayerEffect.DontLoseUnspentMana f -> Just f
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.IncreaseSpellCost _ _ -> Nothing
+        PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+      filters = Maybe.mapMaybe keeps (applying pid gs)
+   in \unit -> any (\f -> ManaFilter.matches f unit) filters
