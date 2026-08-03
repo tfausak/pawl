@@ -1,0 +1,186 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "combatRestrictions": [
+    {
+      "type": "CantAttack",
+      "value": {
+        "affected": {
+          "type": "Matching",
+          "value": {
+            "type": "IsSource"
+          }
+        },
+        "unless": {
+          "comparison": {
+            "type": "AtLeast"
+          },
+          "measured": {
+            "type": "Count",
+            "value": {
+              "aggregation": {
+                "type": "Objects"
+              },
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Giant"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Not",
+                    "value": {
+                      "type": "IsSource"
+                    }
+                  }
+                ]
+              },
+              "scope": {
+                "type": "InZone",
+                "value": [
+                  {
+                    "type": "Battlefield"
+                  },
+                  {
+                    "type": "EachPlayer"
+                  }
+                ]
+              }
+            }
+          },
+          "threshold": {
+            "type": "Literal",
+            "value": 1
+          }
+        }
+      }
+    },
+    {
+      "type": "CantBlock",
+      "value": {
+        "affected": {
+          "type": "Matching",
+          "value": {
+            "type": "IsSource"
+          }
+        },
+        "unless": {
+          "comparison": {
+            "type": "AtLeast"
+          },
+          "measured": {
+            "type": "Count",
+            "value": {
+              "aggregation": {
+                "type": "Objects"
+              },
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Giant"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Not",
+                    "value": {
+                      "type": "IsSource"
+                    }
+                  }
+                ]
+              },
+              "scope": {
+                "type": "InZone",
+                "value": [
+                  {
+                    "type": "Battlefield"
+                  },
+                  {
+                    "type": "EachPlayer"
+                  }
+                ]
+              }
+            }
+          },
+          "threshold": {
+            "type": "Literal",
+            "value": 1
+          }
+        }
+      }
+    }
+  ],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Blind-Spot Giant",
+  "power": {
+    "type": "Literal",
+    "value": 4
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Giant"
+      },
+      {
+        "type": "Warrior"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}
