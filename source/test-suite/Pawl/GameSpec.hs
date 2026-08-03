@@ -169,6 +169,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
+              Object.chosenSubtype = Nothing,
               -- changeZone draws a fresh timestamp; oneMountainState's
               -- nextTimestamp starts at 1 (object 0 already holds 0).
               Object.timestamp = Timestamp.MkTimestamp 1
@@ -1439,6 +1440,7 @@ handBobBolt lightningBolt gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
@@ -1752,6 +1754,7 @@ restartOnStack mountain =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in g4

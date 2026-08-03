@@ -345,9 +345,10 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- per-incarnation field, so the new object enters under its
               -- owner's control until a CR 616.1b replacement says otherwise --
               -- Replacement.runEntry's loop, below, is the only thing that ever
-              -- writes it. `chosenColor` is reset for the same reason and
-              -- rewritten by the same loop (CR 614.1c).
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.timestamp = ts}
+              -- writes it. The two as-enters choice fields, `chosenColor` and
+              -- `chosenSubtype`, are reset for the same reason and rewritten by
+              -- the same loop (CR 614.1c).
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.timestamp = ts}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -733,6 +734,7 @@ createTokens controller card n tapped = do
                     Object.counters = Map.empty,
                     Object.attachedTo = Nothing,
                     Object.chosenColor = Nothing,
+                    Object.chosenSubtype = Nothing,
                     Object.timestamp = ts
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
