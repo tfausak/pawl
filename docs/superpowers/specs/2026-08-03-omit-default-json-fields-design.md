@@ -99,11 +99,23 @@ use), while `supertypes` and `subtypes` default to empty. Every other `Card` fie
 becomes omissible, including `spell`, whose default is one empty `Mode` with
 `ChooseExactly 1`.
 
-**R7 — the verbose form stays legal.** Omission becomes *permitted*, never
-*required*, on input. Every file and literal that loads today still loads
-afterward. This is what makes the corpus migration a rewrite rather than a flag
-day, and it falls out of keeping `Common.decodeMaybe`: an explicit `null` decodes
-to `Nothing` exactly as an absent key does.
+**R7 — the verbose form stays legal, with one deliberate narrowing.** Omission
+becomes *permitted*, never *required*, on input: every key a card file spells out
+today is still read tomorrow, which is what makes the corpus migration a rewrite
+rather than a flag day. A `Maybe` field keeps accepting an explicit `null` as
+`Nothing`, because `Common.decodeMaybe` stays.
+
+The narrowing is that an explicit `null` on a *non-`Maybe`* defaulted field —
+`"keywords": null`, `"optionality": null` — stops decoding as the default and
+becomes an error. That acceptance was never a contract; it was an artifact of how
+absence used to be spelled. `nullableField` turned an **absent** key into
+`Value.Null`, so the `decode*Default` family had to read `null` as "say nothing
+and take the default". `defaultedField` reads absence directly, so nothing needs
+`null` to mean absence any more, and a file that says `"keywords": null` is
+malformed rather than empty — better rejected than silently read as `[]`.
+
+No committed card is affected: every `null` in the corpus sits on a `Maybe`
+field (`power`, `toughness`, `manaCost`, `whichKind`, `whichRecipient`).
 
 ## The mechanism
 

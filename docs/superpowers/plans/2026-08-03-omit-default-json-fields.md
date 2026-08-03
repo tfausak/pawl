@@ -1184,7 +1184,19 @@ In `CommonSpec.hs`, one case per shape of default:
         s
         (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Common.pair "k" (Common.array [])])
         (Right ([] :: [Integer]))
+    -- R7's narrowing, pinned so it cannot drift back by accident: an explicit
+    -- null on a NON-Maybe defaulted field is an error, not the default. It used
+    -- to be the default only because `nullableField` spelled an absent key as
+    -- null; `defaultedField` reads absence directly, so a file that says
+    -- `"keywords": null` is malformed rather than empty.
+    Spec.it s "an explicit null on a non-Maybe defaulted field is an error" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Common.pair "k" Common.null]))
+        "expected a decode failure"
 ```
+
+`CommonSpec.hs` needs `import qualified Data.Either as Either` for that case.
 
 - [ ] **Step 2: Run**
 
