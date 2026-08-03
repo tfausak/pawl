@@ -360,6 +360,14 @@ runTurnBasedActions phase = do
       -- CR 514.2: damage wears off AND until-end-of-turn effects end,
       -- simultaneously. One sweep over both carriers (Pawl.Engine.Expiry). NOT
       -- guarded: CR 703.4p is the game's action, not the active player's.
+      --
+      -- This is the pool's one reachable CR 603.3a window, and the reason
+      -- GameState.controlWhenTriggered exists: the discard above has already
+      -- fired a rule 701.9a trigger, CR 514.3a does not place it until after this
+      -- line, and an "until end of turn" control effect the sweep ends here would
+      -- otherwise have the scan credit that trigger to whoever got the permanent
+      -- BACK. Pawl.TriggerSpec's controllerAtTriggerSpec is the proof, with a
+      -- Megrim stolen by Zealous Conscripts.
       State.modify' Damage.removeAllDamage
       State.modify' Expiry.dropAtCleanup
     _ -> pure ()
@@ -459,6 +467,11 @@ placePendingTriggers = do
   State.put
     gs
       { GameState.scannedThrough = Natural.length (GameState.events gs),
+        -- CR 603.3a's sample is spent with the batch it was taken for. Cleared
+        -- rather than left standing, so the next event to open a batch takes a
+        -- fresh one (Event.recordEvent samples only when nothing is unscanned)
+        -- and a stale reading can never outlive the events it described.
+        GameState.controlWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
   ordered <- orderPending (pending <> inherent)
@@ -974,6 +987,10 @@ beginTurnOf pid gs =
           -- this, so nothing unscanned is discarded.
           GameState.events = Seq.empty,
           GameState.scannedThrough = 0,
+          -- Cleared with the log it describes: the settle Engine.advance runs
+          -- immediately before this leaves nothing unscanned, so the sample has
+          -- no batch left to answer for.
+          GameState.controlWhenTriggered = Map.empty,
           GameState.damageScannedThrough = 0,
           -- GameState.lastKnown is deliberately NOT cleared alongside them. The
           -- log's one-turn scope is a choice about what "look back in time"

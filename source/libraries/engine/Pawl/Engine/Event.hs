@@ -71,8 +71,41 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- Engine.handoffTurn clears the log at turn end, Setup.emptyGame and the test
 -- fixture Support.oneMountainState both seed it empty, and the test helper
 -- Support.withEvents sets it directly; none of those append.
+--
+-- Being the single append point is also what lets this be where CR 603.3a's
+-- controller is sampled. An event that OPENS a batch -- one recorded while
+-- nothing is unscanned -- takes GameState.controlWhenTriggered from the board as
+-- it stands, before whatever runs between here and the CR 117.5 scan can move
+-- control. Nothing is sampled mid-batch, and the sample is read from the
+-- PRE-APPEND state, which is the same board: appending to the log changes no
+-- object's controller.
+--
+-- One sample per BATCH, not per event, and the two coincide today. They would
+-- differ only for a batch whose own events straddle a control change -- one
+-- resolution that records an event and THEN moves control, or a CR 704.3
+-- state-based-action batch that does both. No effect in this pool records an
+-- event and changes control in the same resolution, and the only control change
+-- an SBA batch can make (CR 704.5m's Aura fall-off, CR 800.4a's departure)
+-- reverts a permanent that the batch's own Moved events cannot name a trigger
+-- on. See #603 for the per-event stamp that would drop the caveat.
+--
+-- ON A HOT PATH, and paid once per batch rather than once per event, which is
+-- what keeps it off the bottom of it: Projection.controlOverrides costs one
+-- controlGrants walk plus one controllerOfGiven per object a layer-2 effect
+-- names, and the board with no control effect at all -- the common case -- names
+-- none. Measured on the tasty-bench suite, this same tree with the sample
+-- replaced by Map.empty vs. with it (goldfish / casting / fighting /
+-- fighting-aura / fighting-no-aura, 2p): 21.1/166/33.0/672/386 ms ->
+-- 20.8/166/31.3/659/384 ms -- every move inside the benchmark's own run-to-run
+-- stddev (+-1.2 to +-43 ms on those means), and three of the five nominally
+-- FASTER with the sample, which is what a change below the noise floor looks
+-- like.
 recordEvent :: GameEvent -> GameState -> GameState
-recordEvent event gs = gs {GameState.events = GameState.events gs Seq.|> event}
+recordEvent event gs =
+  let recorded = gs {GameState.events = GameState.events gs Seq.|> event}
+   in if GameState.scannedThrough gs < Natural.length (GameState.events gs)
+        then recorded
+        else recorded {GameState.controlWhenTriggered = Projection.controlOverrides gs}
 
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
@@ -1428,15 +1461,37 @@ eventTriggers events gs =
                   -- the same GameState.battlefield set this list walks, so every
                   -- oid drawn from that set has an entry.
                   Nothing -> Nothing
-                  -- CR 603.3a: controlled by whoever controls the source when it
-                  -- triggers. Projection.controllerOfGiven reads control AT THE SCAN
-                  -- BOUNDARY, not at the moment the underlying event fired (#47) --
-                  -- unobservable today because nothing changes control between an
-                  -- event and the CR 117.5 boundary.
+                  -- CR 603.3a: "A triggered ability is controlled by the player
+                  -- who controlled its source at the time it triggered." AT THE
+                  -- TIME IT TRIGGERED, not at this scan -- so the sample
+                  -- Event.recordEvent took when the batch opened
+                  -- (GameState.controlWhenTriggered) is consulted FIRST, and the
+                  -- live projection answers only for an id it does not name.
+                  --
+                  -- The two disagree for exactly one board shape, which is the
+                  -- one this exists for: a layer-2 control effect that was in
+                  -- force at the event and is gone by the scan. CR 514.2 is where
+                  -- the pool reaches it -- an "until end of turn" control effect
+                  -- ends there, after CR 514.1's discard has already fired a
+                  -- discard trigger and before CR 514.3a places it.
+                  --
+                  -- Falling back LIVE rather than to the CR 110.2 default is not
+                  -- a shortcut either. An id the sample does not name had no
+                  -- layer-2 controller when the batch opened, which for a
+                  -- permanent that was already there means its default -- the
+                  -- same answer. For one that ARRIVED mid-batch it means the
+                  -- controller it arrived with, and CR 603.10's first sentence
+                  -- ("objects that exist immediately after an event are checked")
+                  -- asks for exactly that: a Control Magic whose own entry is the
+                  -- event grants control as part of that entry, so the live
+                  -- reading is the one the rule wants.
                   Just pc ->
                     fmap
                       (\ctrl -> (oid, (ctrl, abilitiesOf pc)))
-                      (Projection.controllerOfGiven grants Set.empty oid gs)
+                      ( case Map.lookup oid (GameState.controlWhenTriggered gs) of
+                          Just who -> Just who
+                          Nothing -> Projection.controllerOfGiven grants Set.empty oid gs
+                      )
               )
               (Set.toAscList (GameState.battlefield gs))
           )
@@ -1532,11 +1587,13 @@ eventTriggers events gs =
       --
       -- CR 603.3a's controller, and the abilities themselves, are the ones the
       -- permanent had as it LEFT -- one moment after the event that triggered
-      -- them, not at it. That is #47's elision, on a nearer boundary than the
-      -- live path's: `onBattlefield` reads both at the CR 117.5 scan, and this
-      -- reads them at the departure, which is somewhere between the event and
-      -- the scan. Nothing in this pool moves control or grants an ability in
-      -- that window, which is why the two coincide today.
+      -- them, not at it (#603). The distinction is this source's alone:
+      -- `leftBattlefield` serves the departure event ITSELF, where CR 603.10a
+      -- makes the departure the trigger moment and last known information is
+      -- exactly right, while this union serves the EARLIER events, for which the
+      -- permanent's departure is one moment late. Nothing in this pool moves
+      -- control or grants an ability in that window, which is why the two
+      -- coincide today.
       bystanders = drop 1 (List.scanr (\event acc -> Map.union (leftBattlefield event) acc) Map.empty events)
       -- CR 702.29c: the card that was just cycled, wherever it landed. The
       -- candidate source that is neither on the battlefield nor a permanent that
