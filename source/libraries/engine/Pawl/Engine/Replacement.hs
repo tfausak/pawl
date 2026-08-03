@@ -648,6 +648,10 @@ readsApplier re = case re of
   -- The scaling is the effect's, and it rewrites the count on the object the
   -- event already named (Hardened Scales, Doubling Season).
   ReplacementEffect.CounterR _ _ -> False
+  -- CR 614.16, the same shape one event class over: the scaling is the
+  -- effect's, and the player the tokens are created FOR rides the EVENT
+  -- (WouldCreateTokens' own PlayerId), not the candidate, so Doubling Season
+  -- doubles the same player's tokens whoever's row applies.
   ReplacementEffect.TokenR _ _ -> False
   -- CR 614.10: a skip replaces the step or phase with nothing, so there is
   -- nothing for a controller to colour. The player it is ABOUT is not the
