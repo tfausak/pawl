@@ -37,9 +37,10 @@ toJson = Modal.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (Modal.Modal Text.Text)
 fromJson = Modal.fromJson cardFromJson
 
--- One constructor (MkModal), so two cases: a populated payload (Bonesplitter's
+-- One constructor (MkModal), so three cases: a populated payload (Bonesplitter's
 -- Equip, CR 702.6a/700.2's non-modal shape -- one Mode with no alternative),
--- and the empty-modes decode failure moved from Pawl.CodecSpec.
+-- every field defaulted at once, and the empty-modes decode failure moved from
+-- Pawl.CodecSpec.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Modal" $ do
   Spec.it s "MkModal, Bonesplitter's Equip payload" $
@@ -57,7 +58,14 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
           )
           (ModeSelection.ChooseExactly 1)
       )
-      """ {"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}],"selection":{"type":"ChooseExactly","value":1}} """
+      """ {"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]} """
+  Spec.it s "omits a ChooseExactly 1 selection" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) Modal.defaultSelection)
+      """ {"modes":[{}]} """
   -- CR 700.2's non-modal payload is a single Mode: a modal PAYLOAD has at
   -- least one mode by invariant, so an empty `modes` array is a decode
   -- failure, not a spell that offers no choices.

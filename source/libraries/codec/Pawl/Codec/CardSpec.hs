@@ -121,7 +121,7 @@ baseCardJson =
     <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
     <> "\"keywords\":[],\"staticAbilities\":[],"
-    <> "\"spell\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}},"
+    <> "\"spell\":{\"modes\":[{}]},"
     <> "\"activatedAbilities\":[],\"replacementEffects\":[],\"triggeredAbilities\":[],\"castingPermissions\":[]}"
 
 -- | 'baseCard' with every field populated at once, including the sixteen
@@ -165,16 +165,16 @@ populatedCardJson =
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
     <> "\"keywords\":[{\"type\":\"Deathtouch\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
-    <> "\"spell\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}},"
+    <> "\"spell\":{\"modes\":[{}]},"
     <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[],\"components\":[]},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}],"
+    <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}],"
+    <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
     <> "\"loyalty\":3,\"colorIndicator\":[{\"type\":\"White\"}],\"characteristicPT\":{\"type\":\"ManaValue\"},"
     <> "\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}}],"
+    <> "\"modal\":{\"modes\":[{}]}}}],"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
@@ -290,7 +290,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
         baseCard {Card.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility}
         ( init baseCardJson
             <> ",\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-            <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}}]}"
+            <> "\"modal\":{\"modes\":[{}]}}}]}"
         )
     Spec.it s "playerAbilities" $
       Common.assertJsonCodec

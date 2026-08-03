@@ -7,13 +7,20 @@ import qualified Pawl.Codec.Mode as Mode
 import qualified Pawl.Codec.ModeSelection as ModeSelection
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.ModeSelection as ModeSelection
 
-toJson :: (card -> Value.Value) -> Modal.Modal card -> Value.Value
+-- | CR 700.2 via Pawl.Types.Modal's header: "A non-modal payload is one Mode
+-- with ChooseExactly 1", so this is what a card that says nothing about modes
+-- means.
+defaultSelection :: ModeSelection.ModeSelection
+defaultSelection = ModeSelection.ChooseExactly 1
+
+toJson :: (Eq card) => (card -> Value.Value) -> Modal.Modal card -> Value.Value
 toJson codec m =
   Common.object
-    [ Common.pair "modes" (Common.encodeSeq (Mode.toJson codec) (Modal.modes m)),
-      Common.pair "selection" (ModeSelection.toJson (Modal.selection m))
-    ]
+    ( Common.requiredPair "modes" (Common.encodeSeq (Mode.toJson codec)) (Modal.modes m)
+        <> Common.optionalPair "selection" defaultSelection ModeSelection.toJson (Modal.selection m)
+    )
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Modal.Modal card)
 fromJson decode value = do
@@ -22,5 +29,5 @@ fromJson decode value = do
   if Seq.null ms
     then Left (Text.pack "modal has no modes")
     else do
-      sel <- Common.field "selection" ps >>= ModeSelection.fromJson
+      sel <- Common.defaultedField "selection" defaultSelection ModeSelection.fromJson ps
       pure (Modal.MkModal ms sel)

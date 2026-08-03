@@ -60,15 +60,8 @@
   "replacementEffects": [],
   "spell": {
     "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+      {}
+    ]
   },
   "staticAbilities": [],
   "toughness": {
@@ -115,14 +108,9 @@
             ],
             "optionality": {
               "type": "Optional"
-            },
-            "targetSpecs": []
+            }
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],

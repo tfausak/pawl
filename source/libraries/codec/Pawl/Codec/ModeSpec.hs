@@ -35,8 +35,8 @@ fromJson :: Value.Value -> Either Text.Text (Mode.Mode Text.Text)
 fromJson = Mode.fromJson cardFromJson
 
 -- One constructor (MkMode), so the three cases below cover: a populated mode
--- (Bonesplitter's Equip payload, CR 702.6a), and the two elision directions of
--- CR 603.5's `optionality` flag, moved from Pawl.CodecSpec.
+-- (Bonesplitter's Equip payload, CR 702.6a), CR 603.5's `optionality` flag when
+-- it is present (a printed "may"), and every field defaulted at once.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Mode" $ do
   Spec.it s "MkMode, Bonesplitter's Equip payload" $
@@ -58,14 +58,14 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       toJson
       fromJson
       (Mode.MkMode Seq.empty Map.empty Optionality.Optional)
-      """ {"effects":[],"targetSpecs":[],"optionality":{"type":"Optional"}} """
+      """ {"optionality":{"type":"Optional"}} """
   -- The byte-identity guarantee for every card file that prints no "may": a
-  -- Mandatory mode emits no key, and a mode with no key decodes back to
-  -- Mandatory -- the Counterability precedent.
-  Spec.it s "a Mandatory mode's optionality key is omitted, and an absent key decodes to Mandatory" $
+  -- Mandatory mode with no effects or targetSpecs is what a card that says
+  -- nothing extra means, and it round-trips through the empty object.
+  Spec.it s "omits every default field" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)
-      """ {"effects":[],"targetSpecs":[]} """
+      """ {} """

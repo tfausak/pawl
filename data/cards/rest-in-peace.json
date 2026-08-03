@@ -42,15 +42,8 @@
   ],
   "spell": {
     "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+      {}
+    ]
   },
   "staticAbilities": [],
   "toughness": null,
@@ -66,14 +59,9 @@
               {
                 "type": "ExileAllGraveyards"
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],

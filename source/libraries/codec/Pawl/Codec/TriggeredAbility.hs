@@ -11,7 +11,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
-toJson :: (card -> Value.Value) -> TriggeredAbility.TriggeredAbility card -> Value.Value
+toJson :: (Eq card) => (card -> Value.Value) -> TriggeredAbility.TriggeredAbility card -> Value.Value
 toJson codec ta =
   Common.object
     ( [ Common.pair "condition" (TriggerCondition.toJson (TriggeredAbility.condition ta)),
@@ -38,7 +38,7 @@ fromJson decode value = do
 
 -- A name-keyed map as a sorted array of entries, so the render is deterministic
 -- and the file byte-stable.
-toJsonDelayed :: (card -> Value.Value) -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card) -> Value.Value
+toJsonDelayed :: (Eq card) => (card -> Value.Value) -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card) -> Value.Value
 toJsonDelayed codec m =
   Common.encodeList
     (\(k, v) -> Common.object [Common.pair "name" (AbilityName.toJson k), Common.pair "ability" (toJson codec v)])

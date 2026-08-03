@@ -64,14 +64,9 @@
               }
             ]
           }
-        ],
-        "targetSpecs": []
+        ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
   "staticAbilities": [],
   "toughness": null,
@@ -102,14 +97,9 @@
             ],
             "optionality": {
               "type": "Optional"
-            },
-            "targetSpecs": []
+            }
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],

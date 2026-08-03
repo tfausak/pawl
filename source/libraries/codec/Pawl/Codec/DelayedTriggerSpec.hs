@@ -33,8 +33,7 @@ entry =
 
 entryJson :: String
 entryJson =
-  "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
-    <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
+  "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
     <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
     <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":null}"
 
@@ -50,8 +49,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.toJson
       DelayedTrigger.fromJson
       entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
-      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
-          <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
+      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
           <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
           <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"}}"
       )
@@ -64,8 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.toJson
       DelayedTrigger.fromJson
       entry {DelayedTrigger.window = TurnWindow.ControllersNextTurn}
-      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
-          <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
+      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
           <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
           <> "\"window\":{\"type\":\"ControllersNextTurn\"},\"expiry\":null}"
       )

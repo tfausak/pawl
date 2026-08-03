@@ -25,15 +25,8 @@
   "replacementEffects": [],
   "spell": {
     "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+      {}
+    ]
   },
   "staticAbilities": [],
   "toughness": {
@@ -77,15 +70,8 @@
                     "replacementEffects": [],
                     "spell": {
                       "modes": [
-                        {
-                          "effects": [],
-                          "targetSpecs": []
-                        }
-                      ],
-                      "selection": {
-                        "type": "ChooseExactly",
-                        "value": 1
-                      }
+                        {}
+                      ]
                     },
                     "staticAbilities": [],
                     "toughness": {
@@ -114,14 +100,9 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],

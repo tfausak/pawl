@@ -10,7 +10,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 
-toJson :: (card -> Value.Value) -> ActivatedAbility.ActivatedAbility card -> Value.Value
+toJson :: (Eq card) => (card -> Value.Value) -> ActivatedAbility.ActivatedAbility card -> Value.Value
 toJson codec aa =
   Common.object $
     [ Common.pair "cost" (Cost.toJson Keyword.toJson (ActivatedAbility.cost aa)),

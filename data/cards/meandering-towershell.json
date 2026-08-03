@@ -37,14 +37,9 @@
                     }
                   ]
                 }
-              ],
-              "targetSpecs": []
+              ]
             }
-          ],
-          "selection": {
-            "type": "ChooseExactly",
-            "value": 1
-          }
+          ]
         }
       },
       "name": "return it"
@@ -93,15 +88,8 @@
   "replacementEffects": [],
   "spell": {
     "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+      {}
+    ]
   },
   "staticAbilities": [],
   "toughness": {
@@ -140,14 +128,9 @@
                   null
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],

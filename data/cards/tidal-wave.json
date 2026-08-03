@@ -26,14 +26,9 @@
                   "type": "Sacrifice",
                   "value": "token"
                 }
-              ],
-              "targetSpecs": []
+              ]
             }
-          ],
-          "selection": {
-            "type": "ChooseExactly",
-            "value": 1
-          }
+          ]
         }
       },
       "name": "sacrifice it"
@@ -91,15 +86,8 @@
                 "replacementEffects": [],
                 "spell": {
                   "modes": [
-                    {
-                      "effects": [],
-                      "targetSpecs": []
-                    }
-                  ],
-                  "selection": {
-                    "type": "ChooseExactly",
-                    "value": 1
-                  }
+                    {}
+                  ]
                 },
                 "staticAbilities": [],
                 "toughness": {
@@ -127,14 +115,9 @@
             "type": "ArmDelayedTrigger",
             "value": "sacrifice it"
           }
-        ],
-        "targetSpecs": []
+        ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
   "staticAbilities": [],
   "toughness": null,

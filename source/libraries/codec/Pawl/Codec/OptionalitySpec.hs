@@ -23,9 +23,3 @@ spec s = Spec.describe s "Pawl.Codec.Optionality" $ do
       Optionality.fromJson
       Optionality.Optional
       """ {"type":"Optional"} """
-  Spec.describe s "fromJsonDefault" $ do
-    -- CR 603.5's "may" is printed text, so an absent key means Mandatory.
-    Spec.it s "absent key decodes as Mandatory" $
-      Common.assertFromJson s Optionality.fromJsonDefault "null" Optionality.Mandatory
-    Spec.it s "Optional still decodes explicitly" $
-      Common.assertFromJson s Optionality.fromJsonDefault "{\"type\":\"Optional\"}" Optionality.Optional

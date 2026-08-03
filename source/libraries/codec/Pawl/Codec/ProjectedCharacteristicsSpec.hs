@@ -59,7 +59,7 @@ testCharacteristicsJson =
     <> "\"colors\":[{\"type\":\"Blue\"}],\"power\":1,\"toughness\":2,\"loyalty\":null,\"characteristicPT\":null,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],\"activatedAbilities\":[],"
     <> "\"replacementEffects\":[],\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}]}"
+    <> "\"modal\":{\"modes\":[{}]}}]}"
 
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
