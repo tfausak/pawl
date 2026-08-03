@@ -402,15 +402,29 @@ runTurnBasedActions phase = do
 -- PendingTrigger whose controller has left never appears in `ordered` and
 -- `placeOne` never sees it. Under the pipeline `orderPending` feeds --
 -- `apnapPlayers` -> `orderFor` -> `permute`, none of which can ever
--- INTRODUCE an entry -- a delayed ability is the only carrier that can reach
--- this with a departed controller (once more than two players are seated,
--- Departure.continuesAfterDeparture; at two, CR 800.4a's clauses never run
--- and CR 104.2a ends the game before an end step returns, so the question is
--- moot there, and apnapPlayers's filter would catch it regardless if it
--- somehow arose) -- see Pawl.Engine.Departure's objectsLeaveWith haddock -- because
--- eventTriggers/stateTriggers re-derive the controller live from
--- Projection.controllerOf, and a departed player controls nothing after CR
--- 800.4a. The entry is still CONSUMED regardless: `surviving` above already
+-- INTRODUCE an entry. TWO carriers can reach this with a departed controller,
+-- and only ever once more than two players are seated
+-- (Departure.continuesAfterDeparture; at two, CR 800.4a's clauses never run and
+-- CR 104.2a ends the game before an end step returns, so the question is moot
+-- there, and apnapPlayers's filter would catch either of them regardless if it
+-- somehow arose) -- see Pawl.Engine.Departure's objectsLeaveWith haddock:
+--
+--   * a DELAYED ability, whose controller CR 603.7d fixed as the spell that
+--     created it resolved ("the player who controlled that spell as it
+--     resolved"), which is why it can outlive that player.
+--   * an OBJECT-BORNE ability out of Event.eventTriggers, which reads CR 603.3a's
+--     controller from GameState.controlWhenTriggered -- who controlled the source
+--     when it TRIGGERED -- rather than live. A player who controlled it then and
+--     has left the game since is exactly the case CR 800.4d's second sentence
+--     describes, and dropping the trigger is what that rule asks for; the live
+--     read this replaced would instead have placed it under whoever CR 800.4a
+--     handed the permanent back to, an ability CR 603.3a says was never theirs.
+--     No board in the pool reaches it (#604).
+--
+-- Event.stateTriggers is not a third: CR 603.8 evaluates a state trigger AT this
+-- scan, so its live read is the right moment by construction.
+--
+-- The DELAYED entry is still CONSUMED regardless: `surviving` above already
 -- dropped it from delayedTriggers, because CR 603.7b spends the one shot on
 -- the trigger event, which happened. The monarch's `inherent` triggers go
 -- through the same filter, since they are merged into the batch before
