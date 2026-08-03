@@ -104,10 +104,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Warrior"
+        "type": "Human"
       },
       {
-        "type": "Human"
+        "type": "Warrior"
       }
     ],
     "supertypes": [],

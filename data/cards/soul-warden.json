@@ -91,10 +91,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Human"
+        "type": "Cleric"
       },
       {
-        "type": "Cleric"
+        "type": "Human"
       }
     ],
     "supertypes": [],

@@ -5,4 +5,4 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 
-type Game a = State.StateT GameState.GameState (Program.Program Prompt.Prompt) a
+type Game = State.StateT GameState.GameState (Program.Program Prompt.Prompt)

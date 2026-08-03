@@ -4,5 +4,6 @@ module Pawl.Types.DestructionRewrite where
 -- Regenerate is "instead, tap it, remove all damage from it, and remove it from
 -- combat" -- the destruction itself does not happen, so nothing downstream of it
 -- (a put-into-graveyard, and therefore Rest in Peace) ever runs.
-data DestructionRewrite = Regenerate
+data DestructionRewrite
+  = Regenerate
   deriving (Eq, Ord, Show)

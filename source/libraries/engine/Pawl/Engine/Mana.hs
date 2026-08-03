@@ -50,9 +50,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 
--- CR 305.6: a basic land's mana ability is granted intrinsically by its subtype,
--- not printed in its text box. This is a classification of the type line -- it
--- never reads the card's identity.
+-- | CR 305.6
 subtypeMana :: Subtype -> Maybe ManaType
 subtypeMana subtype = case subtype of
   Subtype.Mountain -> Just (ManaType.Colored Color.Red)
@@ -60,106 +58,7 @@ subtypeMana subtype = case subtype of
   Subtype.Forest -> Just (ManaType.Colored Color.Green)
   Subtype.Island -> Just (ManaType.Colored Color.Blue)
   Subtype.Plains -> Just (ManaType.Colored Color.White)
-  Subtype.Goblin -> Nothing
-  Subtype.Warrior -> Nothing
-  Subtype.Human -> Nothing
-  Subtype.Bird -> Nothing
-  Subtype.Ogre -> Nothing
-  Subtype.Centaur -> Nothing
-  Subtype.Cat -> Nothing
-  Subtype.Dinosaur -> Nothing
-  Subtype.Beast -> Nothing
-  Subtype.Rat -> Nothing
-  Subtype.Elephant -> Nothing
-  Subtype.Myr -> Nothing
-  Subtype.Skeleton -> Nothing
-  Subtype.Wall -> Nothing
-  Subtype.Wizard -> Nothing
-  Subtype.Shapeshifter -> Nothing
-  Subtype.Lhurgoyf -> Nothing
-  Subtype.Arcane -> Nothing
-  Subtype.Barbarian -> Nothing
-  Subtype.Zombie -> Nothing
-  Subtype.Fungus -> Nothing
-  -- CR 205.3m: Elemental is a creature type, not a basic land type, so CR
-  -- 305.6's intrinsic mana ability never applies to it.
-  Subtype.Elemental -> Nothing
-  -- CR 205.3m: Rogue is a creature type, not a basic land type, so CR 305.6's
-  -- intrinsic mana ability never applies to it.
-  Subtype.Rogue -> Nothing
-  -- CR 205.3m: Hag is a creature type, not a basic land type, so CR 305.6's
-  -- intrinsic mana ability never applies to it.
-  Subtype.Hag -> Nothing
-  -- CR 205.3m: Warlock is a creature type, not a basic land type, so CR
-  -- 305.6's intrinsic mana ability never applies to it.
-  Subtype.Warlock -> Nothing
-  -- CR 205.3m: Soldier is a creature type, not a basic land type, so CR 305.6's
-  -- intrinsic mana ability never applies to it.
-  Subtype.Soldier -> Nothing
-  -- CR 205.3m: Phyrexian is a creature type, not a basic land type, so CR
-  -- 305.6's intrinsic mana ability never applies to it.
-  Subtype.Phyrexian -> Nothing
-  -- CR 205.3m: Elf is a creature type, not a basic land type, so CR 305.6's
-  -- intrinsic mana ability never applies to it.
-  Subtype.Elf -> Nothing
-  -- CR 205.3m: Nightmare is a creature type, not a basic land type, so CR
-  -- 305.6's intrinsic mana ability never applies to it.
-  Subtype.Nightmare -> Nothing
-  -- CR 205.3m: Horse is a creature type, not a basic land type, so CR 305.6's
-  -- intrinsic mana ability never applies to it.
-  Subtype.Horse -> Nothing
-  -- CR 205.3h: Aura is an enchantment type. CR 305.6's intrinsic mana ability is
-  -- a property of BASIC LAND types only, so this is Nothing for the same reason
-  -- every creature type above is.
-  Subtype.Aura -> Nothing
-  -- CR 301.5: Equipment is an ARTIFACT type, so CR 305.6's intrinsic mana ability
-  -- never applies to it either.
-  Subtype.Equipment -> Nothing
-  Subtype.Scout -> Nothing
-  Subtype.Artificer -> Nothing
-  Subtype.Troll -> Nothing
-  Subtype.Nomad -> Nothing
-  Subtype.Shaman -> Nothing
-  Subtype.Demon -> Nothing
-  Subtype.Cleric -> Nothing
-  Subtype.Illusion -> Nothing
-  -- CR 205.3m: Spirit is a creature type, not a basic land type, so CR 305.6's
-  -- intrinsic mana ability never applies to it.
-  Subtype.Spirit -> Nothing
-  Subtype.Angel -> Nothing
-  Subtype.Insect -> Nothing
-  Subtype.Berserker -> Nothing
-  Subtype.Thopter -> Nothing
-  Subtype.Dragon -> Nothing
-  Subtype.Unicorn -> Nothing
-  Subtype.Curse -> Nothing
-  -- CR 205.3i: Desert IS a land type, and the first one here that is not a BASIC
-  -- land type -- "Of that list, Forest, Island, Mountain, Plains, and Swamp are
-  -- the basic land types." CR 305.6 grants its intrinsic ability to "an object
-  -- with the land card type and a basic land type", so a Desert gets nothing
-  -- from its type line and prints its own "{T}: Add {C}" instead. This is the
-  -- constructor Pawl.Engine.Subtype.isLandType answers True for and this one Nothing:
-  -- the two questions finally differ.
-  Subtype.Desert -> Nothing
-  -- CR 205.3m: Faerie is a creature type (and, per CR 308.2, a kindred subtype),
-  -- not a basic land type, so CR 305.6's intrinsic mana ability never applies to
-  -- it.
-  Subtype.Faerie -> Nothing
-  Subtype.Rhino -> Nothing
-  -- CR 205.3j: a planeswalker type, so CR 305.6's intrinsic mana ability --
-  -- which reaches "an object with the land card type and a basic land type" --
-  -- never applies to it.
-  Subtype.Jace -> Nothing
-  Subtype.Wraith -> Nothing
-  -- CR 205.3m: Golem is a creature type (Icehide Golem's), not a basic land
-  -- type, so CR 305.6's intrinsic mana ability never applies to it.
-  Subtype.Golem -> Nothing
-  Subtype.Turtle -> Nothing
-  Subtype.Mongoose -> Nothing
-  Subtype.Frog -> Nothing
-  Subtype.Vampire -> Nothing
-  Subtype.Dryad -> Nothing
-  Subtype.Knight -> Nothing
+  _ -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an

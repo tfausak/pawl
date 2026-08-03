@@ -16,20 +16,24 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- mirroring how optional fields are encoded elsewhere. CR 601.2c's "another" is
 -- a Not IsSource conjunct inside that filter, not a key of its own (#163).
 toJson :: TargetSpec.TargetSpec -> Value.Value
-toJson (TargetSpec.MkTargetSpec pool restriction) =
+toJson spec =
   Common.object $
-    Common.pair "pool" (Pool.toJson pool) : case restriction of
+    Common.pair "pool" (Pool.toJson (TargetSpec.pool spec)) : case TargetSpec.filter spec of
       Nothing -> []
       Just f -> [Common.pair "filter" (Filter.toJson Keyword.toJson f)]
 
 fromJson :: Value.Value -> Either Text.Text TargetSpec.TargetSpec
 fromJson value = do
   ps <- Common.asObject value
-  pool <- Common.field "pool" ps >>= Pool.fromJson
-  restriction <- case Common.optionalField "filter" ps of
+  p <- Common.field "pool" ps >>= Pool.fromJson
+  f <- case Common.optionalField "filter" ps of
     Nothing -> Right Nothing
     Just v -> Just <$> Filter.fromJson Keyword.fromJson v
-  pure (TargetSpec.MkTargetSpec pool restriction)
+  pure
+    TargetSpec.MkTargetSpec
+      { TargetSpec.pool = p,
+        TargetSpec.filter = f
+      }
 
 -- A name-keyed map as a sorted array of entries, so the render is deterministic
 -- and the file byte-stable.

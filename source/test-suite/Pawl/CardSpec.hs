@@ -178,7 +178,7 @@ quantityCounts quantity = case quantity of
 -- descent the shared-zone lint below would sweep past a misauthored inner
 -- scope.
 countCounts :: Count.Type.Count Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
-countCounts (Count.Type.MkCount _ _ aggregation) = case aggregation of
+countCounts count = case Count.Type.aggregation count of
   Aggregation.Objects -> []
   Aggregation.DistinctCardTypes -> []
   Aggregation.Greatest quantity -> quantityCounts quantity
@@ -186,8 +186,9 @@ countCounts (Count.Type.MkCount _ _ aggregation) = case aggregation of
 -- Every Count reachable from a Condition: both sides are Quantities, and either
 -- may embed one (Pawl.Types.Condition).
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
-conditionCounts (Condition.Type.MkCondition measured _ threshold) =
-  quantityCounts measured <> quantityCounts threshold
+conditionCounts condition =
+  quantityCounts (Condition.Type.measured condition)
+    <> quantityCounts (Condition.Type.threshold condition)
 
 -- Every Count reachable from a Duration: only ForAsLongAs (CR 611.2b) carries
 -- a Condition.
@@ -370,7 +371,7 @@ scopeOffends scope = case scope of
 
 cardOffendsSharedZoneScope :: Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
-  any (\(Count.Type.MkCount scope _ _) -> scopeOffends scope) (cardCounts card)
+  any (scopeOffends . Count.Type.scope) (cardCounts card)
 
 -- The shared shape of all three ability read lints: every slot an effect of ONE
 -- MODE reads must be bound for that mode, given `abilityBound` -- the slots the
@@ -955,7 +956,7 @@ costComponentFilters component = case component of
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSpec too.
 targetSpecFilters :: TargetSpec.TargetSpec -> [Filter.Type.Filter Keyword.Keyword]
-targetSpecFilters (TargetSpec.MkTargetSpec _ mFilter) = Maybe.maybeToList mFilter
+targetSpecFilters = Maybe.maybeToList . TargetSpec.filter
 
 -- A continuous effect's affected set (Pawl.Types.Affected), wherever one is
 -- written -- a static ability, a combat restriction, an attack or block
@@ -980,7 +981,7 @@ objectRefFilters ref = case ref of
 -- holds. That reuse is also the one seam here that -Werror does not police -- a
 -- Count added to a NEW carrier has to be added there, not here.
 countFilters :: [Count.Type.Count Quantity.Type.Quantity] -> [Filter.Type.Filter Keyword.Keyword]
-countFilters counts = [f | Count.Type.MkCount _ f _ <- counts]
+countFilters = fmap Count.Type.filter
 
 quantityFilters :: Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
 quantityFilters = countFilters . quantityCounts
@@ -1336,8 +1337,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (cardSlotNamesCollide fused) "Dream's Grip with both modes on one slot is rejected"
     Spec.assertBool s (not (collides dreamsGrip)) "and the real card, naming them 'tapped' and 'untapped', is accepted"
   Spec.it s "every file in data/cards loads, and its card is named by its file name" $ do
-    -- The registry checks name-against-file-name on each load
-    -- (Pawl.Registry.loadFile), so sweeping the listing is the whole assertion:
+    -- Name-against-file-name is checked on each load
+    -- (Pawl.Registry.parseCard), so sweeping the listing is the whole assertion:
     -- a stray file, a file whose card was renamed, and a file that no test
     -- happens to name all fail here. A hand-kept list is exactly what forgets
     -- the file nobody loads.

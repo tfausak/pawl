@@ -97,27 +97,24 @@ isSorcery c = Set.member CardType.Sorcery (TypeLine.types (Card.typeLine c))
 isLegendary :: Card.Card -> Bool
 isLegendary c = Set.member Supertype.Legendary (TypeLine.supertypes (Card.typeLine c))
 
--- CR 110.1: the permanent card types. An enumeration -- closed half, finite.
+-- | CR 110.4
 isPermanentType :: CardType.CardType -> Bool
 isPermanentType cardType = case cardType of
-  CardType.Land -> True
-  CardType.Creature -> True
-  CardType.Instant -> False
-  CardType.Enchantment -> True
   CardType.Artifact -> True
-  -- CR 307 / 608.3: a sorcery is not a permanent; it goes to the graveyard.
-  CardType.Sorcery -> False
-  -- CR 110.4: kindred is not one of the six permanent types -- "some kindred
-  -- cards can enter the battlefield and some can't, depending on their other
-  -- card types". False here is therefore not "a kindred card is never a
-  -- permanent": isPermanent below asks `any` over the whole type set, so
-  -- Bitterblossom is a permanent through its Enchantment, which is exactly what
-  -- CR 308.1 says.
+  CardType.Battle -> True
+  CardType.Conspiracy -> False
+  CardType.Creature -> True
+  CardType.Dungeon -> False
+  CardType.Enchantment -> True
+  CardType.Instant -> False
   CardType.Kindred -> False
-  -- CR 110.4 / CR 306.2: a planeswalker is one of the six permanent types, and
-  -- "when a planeswalker spell resolves, its controller puts it onto the
-  -- battlefield under their control".
+  CardType.Land -> True
+  CardType.Phenomenon -> False
+  CardType.Plane -> False
   CardType.Planeswalker -> True
+  CardType.Scheme -> False
+  CardType.Sorcery -> False
+  CardType.Vanguard -> False
 
 -- The classification resolution dispatches on (CR 608.3). This is the whole
 -- reason the engine never needs to know WHICH card is resolving.

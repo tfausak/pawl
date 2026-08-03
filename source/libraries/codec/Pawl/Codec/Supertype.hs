@@ -9,6 +9,7 @@ toJson :: Supertype.Supertype -> Value.Value
 toJson s = Common.nullary $ case s of
   Supertype.Basic -> "Basic"
   Supertype.Legendary -> "Legendary"
+  Supertype.Ongoing -> "Ongoing"
   Supertype.Snow -> "Snow"
   Supertype.World -> "World"
 
@@ -18,6 +19,7 @@ fromJson =
     "Supertype"
     [ ("Basic", Supertype.Basic),
       ("Legendary", Supertype.Legendary),
+      ("Ongoing", Supertype.Ongoing),
       ("Snow", Supertype.Snow),
       ("World", Supertype.World)
     ]

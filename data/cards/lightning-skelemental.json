@@ -127,10 +127,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Skeleton"
+        "type": "Elemental"
       },
       {
-        "type": "Elemental"
+        "type": "Skeleton"
       }
     ],
     "supertypes": [],

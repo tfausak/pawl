@@ -45,52 +45,49 @@
       "condition": {
         "type": "StateIs",
         "value": {
-          "type": "Condition",
-          "value": [
-            {
-              "type": "Count",
-              "value": [
-                {
-                  "type": "InZone",
-                  "value": [
-                    {
-                      "type": "Battlefield"
-                    },
-                    {
-                      "type": "EachPlayer"
+          "comparison": {
+            "type": "Exactly"
+          },
+          "measured": {
+            "type": "Count",
+            "value": {
+              "aggregation": {
+                "type": "Objects"
+              },
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Swamp"
                     }
-                  ]
-                },
-                {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasSubtype",
-                      "value": {
-                        "type": "Swamp"
-                      }
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "You"
-                      }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
                     }
-                  ]
-                },
-                {
-                  "type": "Objects"
-                }
-              ]
-            },
-            {
-              "type": "Exactly"
-            },
-            {
-              "type": "Literal",
-              "value": 0
+                  }
+                ]
+              },
+              "scope": {
+                "type": "InZone",
+                "value": [
+                  {
+                    "type": "Battlefield"
+                  },
+                  {
+                    "type": "EachPlayer"
+                  }
+                ]
+              }
             }
-          ]
+          },
+          "threshold": {
+            "type": "Literal",
+            "value": 0
+          }
         }
       },
       "modal": {
@@ -115,13 +112,13 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Human"
+        "type": "Barbarian"
       },
       {
         "type": "Beast"
       },
       {
-        "type": "Barbarian"
+        "type": "Human"
       }
     ],
     "supertypes": [],

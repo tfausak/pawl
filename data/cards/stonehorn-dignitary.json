@@ -90,10 +90,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Soldier"
+        "type": "Rhino"
       },
       {
-        "type": "Rhino"
+        "type": "Soldier"
       }
     ],
     "supertypes": [],

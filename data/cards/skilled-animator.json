@@ -55,38 +55,35 @@
                   {
                     "type": "ForAsLongAs",
                     "value": {
-                      "type": "Condition",
-                      "value": [
-                        {
-                          "type": "Count",
-                          "value": [
-                            {
-                              "type": "InZone",
-                              "value": [
-                                {
-                                  "type": "Battlefield"
-                                },
-                                {
-                                  "type": "EachPlayer"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "IsSource"
-                            },
-                            {
-                              "type": "Objects"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "Exactly"
-                        },
-                        {
-                          "type": "Literal",
-                          "value": 1
+                      "comparison": {
+                        "type": "Exactly"
+                      },
+                      "measured": {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "IsSource"
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Battlefield"
+                              },
+                              {
+                                "type": "EachPlayer"
+                              }
+                            ]
+                          }
                         }
-                      ]
+                      },
+                      "threshold": {
+                        "type": "Literal",
+                        "value": 1
+                      }
                     }
                   },
                   {
@@ -104,38 +101,35 @@
                   {
                     "type": "ForAsLongAs",
                     "value": {
-                      "type": "Condition",
-                      "value": [
-                        {
-                          "type": "Count",
-                          "value": [
-                            {
-                              "type": "InZone",
-                              "value": [
-                                {
-                                  "type": "Battlefield"
-                                },
-                                {
-                                  "type": "EachPlayer"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "IsSource"
-                            },
-                            {
-                              "type": "Objects"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "Exactly"
-                        },
-                        {
-                          "type": "Literal",
-                          "value": 1
+                      "comparison": {
+                        "type": "Exactly"
+                      },
+                      "measured": {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "IsSource"
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Battlefield"
+                              },
+                              {
+                                "type": "EachPlayer"
+                              }
+                            ]
+                          }
                         }
-                      ]
+                      },
+                      "threshold": {
+                        "type": "Literal",
+                        "value": 1
+                      }
                     }
                   },
                   {
@@ -153,38 +147,35 @@
                   {
                     "type": "ForAsLongAs",
                     "value": {
-                      "type": "Condition",
-                      "value": [
-                        {
-                          "type": "Count",
-                          "value": [
-                            {
-                              "type": "InZone",
-                              "value": [
-                                {
-                                  "type": "Battlefield"
-                                },
-                                {
-                                  "type": "EachPlayer"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "IsSource"
-                            },
-                            {
-                              "type": "Objects"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "Exactly"
-                        },
-                        {
-                          "type": "Literal",
-                          "value": 1
+                      "comparison": {
+                        "type": "Exactly"
+                      },
+                      "measured": {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "IsSource"
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Battlefield"
+                              },
+                              {
+                                "type": "EachPlayer"
+                              }
+                            ]
+                          }
                         }
-                      ]
+                      },
+                      "threshold": {
+                        "type": "Literal",
+                        "value": 1
+                      }
                     }
                   },
                   {
@@ -243,10 +234,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Human"
+        "type": "Artificer"
       },
       {
-        "type": "Artificer"
+        "type": "Human"
       }
     ],
     "supertypes": [],

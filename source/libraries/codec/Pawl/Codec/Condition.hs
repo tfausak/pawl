@@ -4,23 +4,42 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Comparison as Comparison
 import qualified Pawl.Codec.Quantity as Quantity
-import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Condition as Condition
 
--- | Both sides go through Quantity.toJson, and that is BACKWARD COMPATIBLE with
--- the Count-on-the-left shape rather than merely similar to it: Quantity.toJson's
--- Count arm delegates to Count.toJson and emits no wrapper of its own, so a
--- `Quantity.Count c` is byte-for-byte the JSON `Count.toJson c` used to produce.
--- Every committed card file that carries a condition therefore round-trips
--- untouched.
+-- | A BARE OBJECT keyed by the record's field names, which is what every
+-- single-constructor record in this codec writes (Pawl.Codec.Countering,
+-- Pawl.Codec.Mode, Pawl.Codec.TriggeredAbility, ...). Common.tagged is for sum
+-- types, where the tag picks a constructor; Condition has exactly one, so a tag
+-- would carry no information and every parent that holds a Condition
+-- (TriggerCondition.StateIs, Duration.ForAsLongAs, an ability's intervening
+-- "if") is already tagged itself.
+--
+-- Naming the sides on the wire is what the positional array could not do: the
+-- first and third elements were both a Quantity, so a card file that swapped
+-- them decoded silently into the wrong condition. "measured" and "threshold"
+-- cannot be swapped by accident.
+--
+-- Both sides go through Quantity.toJson and nothing here spells out how a
+-- Quantity is written, so a side that is a Count is Pawl.Codec.Quantity's tagged
+-- Count arm and this module never has to know it.
 toJson :: Condition.Condition -> Value.Value
-toJson (Condition.MkCondition m cmp q) =
-  Common.tagged "Condition" . Just . Common.array $ [Quantity.toJson m, Comparison.toJson cmp, Quantity.toJson q]
+toJson condition =
+  Common.object
+    [ Common.pair "measured" . Quantity.toJson $ Condition.measured condition,
+      Common.pair "comparison" . Comparison.toJson $ Condition.comparison condition,
+      Common.pair "threshold" . Quantity.toJson $ Condition.threshold condition
+    ]
 
 fromJson :: Value.Value -> Either Text.Text Condition.Condition
 fromJson value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("Condition", Just (Value.Array (Array.MkArray [m, cmp, q]))) -> Condition.MkCondition <$> Quantity.fromJson m <*> Comparison.fromJson cmp <*> Quantity.fromJson q
-    _ -> Left . Text.pack $ "unknown Condition: " <> t
+  ps <- Common.asObject value
+  m <- Common.field "measured" ps >>= Quantity.fromJson
+  c <- Common.field "comparison" ps >>= Comparison.fromJson
+  t <- Common.field "threshold" ps >>= Quantity.fromJson
+  pure
+    Condition.MkCondition
+      { Condition.measured = m,
+        Condition.comparison = c,
+        Condition.threshold = t
+      }

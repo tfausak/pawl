@@ -14,6 +14,11 @@
 -- Enumerating the pool is deliberately NOT here. Every caller that wanted it was
 -- linting the corpus pawl ships, which is a claim about the data rather than a
 -- question for a registry; that lives in the test suite now.
+--
+-- What that test suite DOES borrow is cardPath and parseCard: where a card file
+-- lives and what its bytes mean are facts about the on-disk format, not about
+-- looking a card up, and the corpus lint reads the same files. Only HOW the
+-- bytes are obtained differs -- see loadFile.
 module Pawl.Registry where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -95,7 +100,16 @@ memoized root cache name =
             result <- loadFile root name slug
             pure (either (const entries) (const (Map.insert slug result entries)) result, result)
 
--- Read and parse one file.
+-- Where one card's file lives: one file per card, named by the slug of the
+-- card's own name.
+cardPath :: FilePath -> Slug.Slug -> FilePath
+cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
+
+-- What a card file's bytes mean. PURE, and separate from reading them, because
+-- that is the whole of what this module and the test suite's Pawl.Corpus agree
+-- about: a lookup and a corpus-wide lint disagree about how to obtain the bytes
+-- and about what a failure to obtain them means, and agree entirely from here
+-- on. `path` is carried only to name the file in the error.
 --
 -- Read as bytes and decoded as UTF-8 explicitly, not via Data.Text.IO.readFile:
 -- that decodes using the locale encoding, which is ASCII under LC_ALL=C (a
@@ -103,35 +117,35 @@ memoized root cache name =
 -- character (khabal-ghoul.json's "a") would fail with an unhelpful "invalid byte
 -- sequence" instead of naming the offending file.
 --
--- The name check is the one thing a per-card load can assert that no sweep has
--- to: a file's own `name` field must slugify back to the name it is filed under,
--- or a lookup would quietly serve a different card than it was asked for.
+-- The name check: a file's own `name` field must slugify back to the name it is
+-- filed under, or a lookup would quietly serve a different card than it was
+-- asked for. Both callers inherit it, which is half the point of sharing this --
+-- a corpus lint that enforced something other than what a lookup enforces would
+-- pass on a pool that cannot be looked up.
+parseCard :: CardName.CardName -> Slug.Slug -> FilePath -> ByteString.ByteString -> Either CardError.CardError Card.Card
+parseCard name slug path bytes = do
+  contents <- either (\err -> invalid ("not valid UTF-8: " <> show err)) Right (Encoding.decodeUtf8' bytes)
+  card <- either (invalid . Text.unpack) Right (Common.parse contents >>= Card.fromJson)
+  let actual = Slug.fromText . CardName.unwrap $ Card.name card
+  if actual == slug
+    then Right card
+    else invalid ("is named " <> show (Card.name card) <> ", which files under " <> show actual)
+  where
+    invalid reason = Left (CardError.Invalid name (path <> ": " <> reason))
+
+-- Read one file, and say what a failure to read it means. The registry's half of
+-- the split described on parseCard: it asks for one named card, so a file that
+-- is not there is an answer (CardError.Missing) rather than a crash.
 loadFile :: FilePath -> CardName.CardName -> Slug.Slug -> IO (Either CardError.CardError Card.Card)
-loadFile root name slug =
-  let path = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
-      invalid reason = Left (CardError.Invalid name (path <> ": " <> reason))
-   in do
-        result <- IOError.tryIOError (ByteString.readFile path)
-        case result of
-          -- Only a missing file is a Missing card. A permission error or a bad
-          -- mount is neither that nor an unusable card, so it passes through as
-          -- the IOError it already is.
-          Left err ->
-            if IOError.isDoesNotExistError err
-              then pure (Left (CardError.Missing name))
-              else Exception.throwIO err
-          Right bytes -> pure $ case Encoding.decodeUtf8' bytes of
-            Left err -> invalid ("not valid UTF-8: " <> show err)
-            Right contents -> case Common.parse contents >>= Card.fromJson of
-              Left err -> invalid (Text.unpack err)
-              Right card ->
-                let actual = Slug.fromText . CardName.unwrap $ Card.name card
-                 in if actual == slug
-                      then Right card
-                      else
-                        invalid
-                          ( "is named "
-                              <> show (Card.name card)
-                              <> ", which files under "
-                              <> show actual
-                          )
+loadFile root name slug = do
+  result <- IOError.tryIOError (ByteString.readFile path)
+  case result of
+    -- Only a missing file is a Missing card. A permission error or a bad mount
+    -- is neither that nor an unusable card, so it passes through as the IOError
+    -- it already is.
+    Left err
+      | IOError.isDoesNotExistError err -> pure (Left (CardError.Missing name))
+      | otherwise -> Exception.throwIO err
+    Right bytes -> pure (parseCard name slug path bytes)
+  where
+    path = cardPath root slug

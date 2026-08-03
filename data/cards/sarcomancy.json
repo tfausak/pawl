@@ -122,41 +122,38 @@
         ]
       },
       "intervening": {
-        "type": "Condition",
-        "value": [
-          {
-            "type": "Count",
-            "value": [
-              {
-                "type": "InZone",
-                "value": [
-                  {
-                    "type": "Battlefield"
-                  },
-                  {
-                    "type": "EachPlayer"
-                  }
-                ]
-              },
-              {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Zombie"
-                }
-              },
-              {
-                "type": "Objects"
+        "comparison": {
+          "type": "Exactly"
+        },
+        "measured": {
+          "type": "Count",
+          "value": {
+            "aggregation": {
+              "type": "Objects"
+            },
+            "filter": {
+              "type": "HasSubtype",
+              "value": {
+                "type": "Zombie"
               }
-            ]
-          },
-          {
-            "type": "Exactly"
-          },
-          {
-            "type": "Literal",
-            "value": 0
+            },
+            "scope": {
+              "type": "InZone",
+              "value": [
+                {
+                  "type": "Battlefield"
+                },
+                {
+                  "type": "EachPlayer"
+                }
+              ]
+            }
           }
-        ]
+        },
+        "threshold": {
+          "type": "Literal",
+          "value": 0
+        }
       },
       "modal": {
         "modes": [

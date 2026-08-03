@@ -17,15 +17,20 @@ import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Condition" $ do
-  -- Condition has exactly one constructor (see Pawl.Types.Condition's comment):
-  -- both sides are a Quantity, symmetrically.
+  -- Condition has exactly one constructor (see Pawl.Types.Condition's comment)
+  -- and both sides are a full Quantity, so it is on the wire as a bare object
+  -- keyed by the record's field names rather than as a tagged one. The measured
+  -- side is 3 and the threshold 5 deliberately: the two are the same type, so
+  -- only an asymmetric fixture would catch a codec that read them in the wrong
+  -- order -- which is exactly what the positional array this replaced could get
+  -- wrong, and what naming the fields makes unsayable.
   Spec.it s "MkCondition" $
     Common.assertJsonCodec
       s
       Condition.toJson
       Condition.fromJson
       (Condition.MkCondition (Quantity.Literal 3) Comparison.AtLeast (Quantity.Literal 5))
-      "{\"type\":\"Condition\",\"value\":[{\"type\":\"Literal\",\"value\":3},{\"type\":\"AtLeast\"},{\"type\":\"Literal\",\"value\":5}]}"
+      "{\"measured\":{\"type\":\"Literal\",\"value\":3},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":5}}"
   -- Moved from Pawl.CodecSpec's "count + condition (M5.5 T2)" group: every
   -- Comparison, including both sides non-Count -- which the Count-on-the-left
   -- shape this type replaced could not say at all (Deathknell Berserker's "if

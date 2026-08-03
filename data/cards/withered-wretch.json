@@ -95,10 +95,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Zombie"
+        "type": "Cleric"
       },
       {
-        "type": "Cleric"
+        "type": "Zombie"
       }
     ],
     "supertypes": [],

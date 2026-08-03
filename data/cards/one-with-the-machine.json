@@ -35,19 +35,14 @@
               },
               {
                 "type": "Count",
-                "value": [
-                  {
-                    "type": "InZone",
-                    "value": [
-                      {
-                        "type": "Battlefield"
-                      },
-                      {
-                        "type": "EachPlayer"
-                      }
-                    ]
+                "value": {
+                  "aggregation": {
+                    "type": "Greatest",
+                    "value": {
+                      "type": "ManaValue"
+                    }
                   },
-                  {
+                  "filter": {
                     "type": "And",
                     "value": [
                       {
@@ -64,13 +59,18 @@
                       }
                     ]
                   },
-                  {
-                    "type": "Greatest",
-                    "value": {
-                      "type": "ManaValue"
-                    }
+                  "scope": {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Battlefield"
+                      },
+                      {
+                        "type": "EachPlayer"
+                      }
+                    ]
                   }
-                ]
+                }
               }
             ]
           }

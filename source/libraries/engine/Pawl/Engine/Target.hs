@@ -99,7 +99,8 @@ admittedRecipients perspective source spec gs = admittedGiven (Projection.projec
 
 admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
 admittedGiven pcs perspective source spec gs =
-  let TargetSpec.MkTargetSpec pool narrowing = spec
+  let pool = TargetSpec.pool spec
+      narrowing = TargetSpec.filter spec
       context = Filter.MkContext perspective (Just source)
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate

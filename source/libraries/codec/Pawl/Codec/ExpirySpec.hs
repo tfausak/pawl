@@ -29,7 +29,7 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       Expiry.toJson
       Expiry.fromJson
       (Expiry.While (PlayerId.MkPlayerId 0) (Condition.MkCondition (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
-      "{\"type\":\"While\",\"value\":[0,{\"type\":\"Condition\",\"value\":[{\"type\":\"Literal\",\"value\":0},{\"type\":\"Exactly\"},{\"type\":\"Literal\",\"value\":0}]}]}"
+      "{\"type\":\"While\",\"value\":[0,{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}]}"
   -- CR 611.2a: "until your next turn", as a concrete player.
   Spec.it s "AtTurnOf carries its player" $
     Common.assertJsonCodec s Expiry.toJson Expiry.fromJson (Expiry.AtTurnOf (PlayerId.MkPlayerId 1)) "{\"type\":\"AtTurnOf\",\"value\":1}"

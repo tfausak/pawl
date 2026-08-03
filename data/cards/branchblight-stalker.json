@@ -49,10 +49,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Phyrexian"
+        "type": "Elf"
       },
       {
-        "type": "Elf"
+        "type": "Phyrexian"
       },
       {
         "type": "Scout"

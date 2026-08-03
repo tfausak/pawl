@@ -26,19 +26,11 @@
               "target",
               {
                 "type": "Count",
-                "value": [
-                  {
-                    "type": "InZone",
-                    "value": [
-                      {
-                        "type": "Battlefield"
-                      },
-                      {
-                        "type": "EachPlayer"
-                      }
-                    ]
+                "value": {
+                  "aggregation": {
+                    "type": "Objects"
                   },
-                  {
+                  "filter": {
                     "type": "And",
                     "value": [
                       {
@@ -55,10 +47,18 @@
                       }
                     ]
                   },
-                  {
-                    "type": "Objects"
+                  "scope": {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Battlefield"
+                      },
+                      {
+                        "type": "EachPlayer"
+                      }
+                    ]
                   }
-                ]
+                }
               }
             ]
           }

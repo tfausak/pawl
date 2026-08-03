@@ -15,5 +15,13 @@ import qualified Pawl.Types.Pool as Pool
 -- own recipient tagging -- a separate field was applied by deleting a
 -- Recipient.ToObject, which never matched the ToCreature tags a Creatures pool
 -- produces, so "another target creature" did not exclude itself.
-data TargetSpec = MkTargetSpec Pool.Pool (Maybe (Filter.Filter Keyword.Keyword))
+--
+-- The two fields are named for the two JSON keys Pawl.Codec.TargetSpec already
+-- wrote, so the wire format is unchanged by their existing. `filter` shadows the
+-- Prelude's, for the reason Pawl.Types.Count's does: every module imports this
+-- one qualified.
+data TargetSpec = MkTargetSpec
+  { pool :: Pool.Pool,
+    filter :: Maybe (Filter.Filter Keyword.Keyword)
+  }
   deriving (Eq, Ord, Show)

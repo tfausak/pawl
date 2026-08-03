@@ -48,10 +48,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Warrior"
+        "type": "Ogre"
       },
       {
-        "type": "Ogre"
+        "type": "Warrior"
       }
     ],
     "supertypes": [],

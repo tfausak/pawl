@@ -8,14 +8,18 @@
 --
 -- So this lives in the test suite. Nothing outside it lints the corpus, and a
 -- library module no consumer calls is dead weight.
+--
+-- Enumeration is what this module ADDS. Where a card file lives and what its
+-- bytes mean are the same facts a lookup needs, so they come from Pawl.Registry
+-- (cardPath, parseCard) rather than being restated here. Importing a registry
+-- module is not the same as going through a registry -- no Registry value is
+-- constructed below, and none should be.
 module Pawl.Corpus where
 
 import qualified Data.ByteString as ByteString
 import qualified Data.List as List
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Encoding
-import qualified Pawl.Codec.Card as Card
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardError as CardError
@@ -48,30 +52,16 @@ loadAll root = do
   found <- slugsIn root
   mapM (\slug -> fmap ((,) slug) (loadOne root slug)) found
 
--- Read as bytes and decoded as UTF-8 explicitly, not via Data.Text.IO.readFile:
--- that decodes using the locale encoding, which is ASCII under LC_ALL=C (a
--- minimal CI container, env -i, cron), so a card whose text has a non-ASCII
--- character (khabal-ghoul.json's "a") would fail with an unhelpful "invalid byte
--- sequence" instead of naming the offending file.
+-- The lint's half of the read/parse split described on Pawl.Registry.parseCard.
+-- No tryIOError, unlike Pawl.Registry.loadFile: every slug here came from
+-- slugsIn listing the directory a moment ago, so a file that is not there is a
+-- broken invariant rather than a card the corpus declines to contain -- and an
+-- exception is the right way for that to surface.
+--
+-- The name is derived from the slug because a sweep has no name to have been
+-- asked for. It only ever reaches the error message.
 loadOne :: FilePath -> Slug.Slug -> IO (Either CardError.CardError Card.Card)
-loadOne root slug =
-  let path = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
-      name = CardName.MkCardName (Slug.unwrap slug)
-      invalid reason = Left (CardError.Invalid name (path <> ": " <> reason))
-   in do
-        bytes <- ByteString.readFile path
-        pure $ case Encoding.decodeUtf8' bytes of
-          Left err -> invalid ("not valid UTF-8: " <> show err)
-          Right contents -> case Common.parse contents >>= Card.fromJson of
-            Left err -> invalid (Text.unpack err)
-            Right card ->
-              let actual = Slug.fromText . CardName.unwrap $ Card.name card
-               in if actual == slug
-                    then Right card
-                    else
-                      invalid
-                        ( "is named "
-                            <> show (Card.name card)
-                            <> ", which files under "
-                            <> show actual
-                        )
+loadOne root slug = do
+  let path = Registry.cardPath root slug
+  bytes <- ByteString.readFile path
+  pure (Registry.parseCard (CardName.MkCardName (Slug.unwrap slug)) slug path bytes)

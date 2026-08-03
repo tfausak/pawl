@@ -48,10 +48,10 @@
   "typeLine": {
     "subtypes": [
       {
-        "type": "Dinosaur"
+        "type": "Beast"
       },
       {
-        "type": "Beast"
+        "type": "Dinosaur"
       }
     ],
     "supertypes": [],
