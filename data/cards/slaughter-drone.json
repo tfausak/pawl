@@ -1,0 +1,106 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [],
+        "mana": [
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colorless"
+            }
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Deathtouch"
+                    }
+                  },
+                  "self"
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Devoid"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Slaughter Drone",
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Drone"
+      },
+      {
+        "type": "Eldrazi"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

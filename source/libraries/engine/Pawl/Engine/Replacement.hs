@@ -36,6 +36,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Color as Color
 import Pawl.Types.ControllerRelation (ControllerRelation)
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -594,10 +595,13 @@ bucketOfEffect re = case re of
   -- CR 616.1a's bucket and CR 616.1b's are both exercised -- Galvanic Blast
   -- racing Furnace of Rath, and that Gather Specimens board.
   ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
+  -- CR 616.1a-d name self-replacement, entering under a control effect, entering
+  -- as a copy and entering with the back face up. None of the next three arms is
+  -- any of those -- Primal Plasma's choice of shape, Painter's Servant's
+  -- as-enters colour choice, entering with counters -- so CR 616.1e is what
+  -- applies to each. One comment rather than three copies of it.
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
-  -- CR 616.1a-d name self-replacement, entering under a control effect,
-  -- entering as a copy and entering with the back face up; entering with
-  -- counters is none of those, so CR 616.1e is what applies.
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
   -- CR 616.1b: "if any of the replacement and/or prevention effects would modify
   -- under whose control an object would enter the battlefield, one of them must
@@ -649,6 +653,9 @@ readsApplier re = case re of
   -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
   -- (Primal Plasma).
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> False
+  -- Same chooser again, and there is no payload at all: CR 105.1's five colours
+  -- are the whole offer whoever's row is applying (Painter's Servant).
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> False
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's intrinsic loyalty
   -- included).
@@ -837,7 +844,7 @@ apply batch candidate event =
     -- The class match is on the OUTER tuple (EntryR rewrite, WouldEnter oid), same
     -- shape as DamageR/DestructionR below, so the INNER `case rewrite of` is what
     -- carries the exhaustiveness obligation -- not a wildcard-bound `_` on the
-    -- outer pattern, which would let a third EntryRewrite constructor fall through
+    -- outer pattern, which would let a sixth EntryRewrite constructor fall through
     -- silently whenever it happened to pair with WouldEnter.
     (ReplacementEffect.EntryR _ rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
       EntryRewrite.AsCopy -> do
@@ -902,6 +909,35 @@ apply batch candidate event =
             consume (ReplacementCandidate.identity candidate)
             State.modify' (applyEntryOption oid picked)
             pure (Just event)
+      -- CR 614.1c: Painter's Servant's "As this creature enters, choose a
+      -- color". Unlike ChoiceOf above, this is asked every time the entering
+      -- object has a controller to ask: CR 105.1's five colours are always all
+      -- legal and always distinguishable, so there is no one-option case to
+      -- elide.
+      --
+      -- Written to Object.chosenColor, NOT to the copiable snapshot -- see
+      -- EntryRewrite.ChooseColor.
+      EntryRewrite.ChooseColor -> do
+        gs <- State.get
+        picked <- case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for ChoiceOf's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner.
+          --
+          -- A WEAKER fallback than ChoiceOf's, and the one place on this path
+          -- the engine would decide something: ChoiceOf falls back to `first`,
+          -- an option the card itself offered, while there is no colour to
+          -- default to that the card named -- white is conjured. It stands only
+          -- because the branch cannot be reached.
+          Nothing -> pure Color.White
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            Trans.lift (Program.prompt (Prompt.ChooseColor decider controller oid))
+        consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenColor = Just picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
       -- CR 306.5b via CR 614.1c: "[This permanent] enters with N counters."
       -- Through Event.putCounters, the CR 122.6 funnel, and NOT a direct write to
       -- Object.counters: CR 614.16's second sentence makes a counter-scaling
@@ -932,9 +968,10 @@ apply batch candidate event =
       -- live board and the object IS the event's payload. Keeping it there is
       -- also what makes CR 616.2 fall out: the loop's next iteration re-collects
       -- and re-matches against a board where the control has already changed,
-      -- which a value parked on the event would not show it. All three arms
+      -- which a value parked on the event would not show it. All four arms
       -- above land on the object for the same reason -- AsCopy and ChoiceOf in
-      -- the copiable snapshot, WithCounters through the CR 122.6 funnel.
+      -- the copiable snapshot, ChooseColor in Object.chosenColor, WithCounters
+      -- through the CR 122.6 funnel.
       --
       -- No prompt, and none is owed: CR 616.1b's rewrite has no choice in it,
       -- and the choice the rule DOES describe -- which of several
@@ -1138,10 +1175,10 @@ legalCopyTargets batch self gs =
 -- strictly stronger than P2's drain, whose observable-equivalence argument this
 -- discharges.
 -- `Monad.void` discards the `Nothing` case `apply`'s doc warns means "the event
--- does not happen." Safe here: every EntryR arm (AsCopy, ChoiceOf, WithCounters,
--- UnderSourceControl) always returns `Just`; only DamageR/DestructionR ever
--- return `Nothing`, and neither pairs with WouldEnter, the only event this loop
--- ever proposes.
+-- does not happen." Safe here: every EntryR arm (AsCopy, ChoiceOf, ChooseColor,
+-- WithCounters, UnderSourceControl) always returns `Just`; only
+-- DamageR/DestructionR ever return `Nothing`, and neither pairs with WouldEnter,
+-- the only event this loop ever proposes.
 --
 -- Always the LIVE board (`Nothing`), even when the zone change containing this
 -- entry belongs to a CR 608.2f batch. Two reasons, both CR: the entering object

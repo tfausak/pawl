@@ -224,6 +224,8 @@ modificationCounts modification = case modification of
   Modification.SetController _ -> []
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
+  Modification.AddColor _ -> []
+  Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
 -- Every Count reachable from a TriggerCondition: only StateIs (CR 603.8, a
@@ -1015,12 +1017,13 @@ targetSpecFilters = Maybe.maybeToList . TargetSpec.filter
 
 -- A continuous effect's affected set (Pawl.Types.Affected), wherever one is
 -- written -- a static ability, a combat restriction, an attack or block
--- requirement. Only the two predicate arms carry a Filter; the fixed id set (CR
--- 611.2c) and CR 303.4m's "enchanted permanent" carry none.
+-- requirement. Only the three predicate arms carry a Filter; the fixed id set
+-- (CR 611.2c) and CR 303.4m's "enchanted permanent" carry none.
 affectedFilters :: Affected.Affected -> [Filter.Type.Filter Keyword.Keyword]
 affectedFilters affected = case affected of
   Affected.TheseObjects _ -> []
   Affected.Matching f -> [f]
+  Affected.MatchingAnywhere f -> [f]
   Affected.Attached -> []
   Affected.AttachedPlayerControls f -> [f]
 
@@ -1063,6 +1066,8 @@ modificationFilters modification = case modification of
   Modification.SetController _ -> []
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
+  Modification.AddColor _ -> []
+  Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
 staticAbilityFilters :: StaticAbility.StaticAbility -> [Filter.Type.Filter Keyword.Keyword]

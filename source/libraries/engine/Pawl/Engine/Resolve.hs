@@ -1865,6 +1865,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               Object.bindings = Map.empty,
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
+              Object.chosenColor = Nothing,
               Object.timestamp = ts
             }
     _ <- Event.placeObject controller mkObj Zone.Command

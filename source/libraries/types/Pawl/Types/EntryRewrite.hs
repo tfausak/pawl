@@ -4,12 +4,12 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
 
--- | CR 614.1c-d: how an entry replacement modifies the entry.
--- AsCopy is Clone (CR 707.5, and a real "may" -- declining is legal); ChoiceOf
--- is Primal Plasma (CR 208.2b); WithCounters is CR 306.5b's intrinsic loyalty;
--- UnderSourceControl is Gather Specimens (CR 616.1b).
--- The first two write into the object's COPIABLE snapshot,
--- which is what makes CR 707.2 fall out with no further machinery: the rule says
+-- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
+-- (CR 707.5, and a real "may" -- declining is legal); ChoiceOf is Primal Plasma
+-- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c); WithCounters is CR
+-- 306.5b's intrinsic loyalty; UnderSourceControl is Gather Specimens (CR
+-- 616.1b). AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which
+-- is what makes CR 707.2 fall out with no further machinery: the rule says
 -- copiable values are the printed values as modified by copy effects and by
 -- "as ... enters" abilities that set power and toughness.
 --
@@ -20,7 +20,7 @@ import qualified Pawl.Types.EntryOption as EntryOption
 -- Primal Plasma run the COPIED "as it enters" choice rather than skip it -- the
 -- CR 616.2 ordering behaviour later tasks in this phase implement.
 --
--- Neither constructor carries a cost: CR 614.12b ("If multiple replacement
+-- No constructor carries a cost: CR 614.12b ("If multiple replacement
 -- effects that require choices from a player would modify how multiple
 -- permanents enter the battlefield simultaneously, that player may not make
 -- choices for those effects that would cause the combined costs of those
@@ -29,6 +29,15 @@ import qualified Pawl.Types.EntryOption as EntryOption
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption.EntryOption]
+  | -- | CR 614.1c's other choosing shape: "As [this permanent] enters, choose a
+    -- color" (Painter's Servant). Nullary -- CR 105.1's five colours are the
+    -- offer, and no card narrows them, so there is nothing to carry.
+    --
+    -- Written to Object.chosenColor rather than into the copiable snapshot
+    -- AsCopy and ChoiceOf write to: CR 707.5's second sentence means a copy runs the
+    -- copied as-enters ability and makes its own choice, so the colour is not a
+    -- copiable value.
+    ChooseColor
   | -- | CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b is
     -- the one producer today -- "A planeswalker has the intrinsic ability 'This
     -- permanent enters with a number of loyalty counters on it equal to its
@@ -36,7 +45,7 @@ data EntryRewrite
     -- rule 614.1c)."
     --
     -- The counters are placed through Pawl.Engine.Replacement.putCounters, the CR 122.6
-    -- funnel, and NOT written into the copiable snapshot the two arms above
+    -- funnel, and NOT written into the copiable snapshot AsCopy and ChoiceOf
     -- write to: counters are not characteristics (CR 122.1, "counters are not
     -- objects and have no characteristics") and CR 707.2 excludes them from the
     -- copiable values outright. Going through the funnel is what makes CR

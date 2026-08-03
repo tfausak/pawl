@@ -273,8 +273,8 @@ data Keyword
     Toxic Natural.Natural
   deriving (Eq, Ord, Show)
 
--- Devoid is read only at the projection SEED (Projection.baseColorsOf), not as a
--- layer-6 GainKeyword grant -- so a Devoid GRANTED by a layer-6 effect does
--- nothing to colour, silently. Expressible open-half data today; no card in the
--- pool does it (#35). See Projection.baseColorsOf's comment for the full
--- argument.
+-- Devoid is folded as a characteristic-defining ability at the start of layer 5
+-- (Projection.applyColorDefining), per CR 613.3. A devoid GRANTED by a layer-6
+-- effect still does nothing to colour: CR 604.3a(2) makes such a grant
+-- non-characteristic-defining, so it would be an ordinary layer-5 effect, which
+-- is not built. No card in the pool grants devoid (#622).

@@ -28,6 +28,10 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
           ]
       )
       "{\"type\":\"ChoiceOf\",\"value\":[{\"power\":3,\"toughness\":3,\"keywords\":[]},{\"power\":1,\"toughness\":6,\"keywords\":[{\"type\":\"Defender\"}]}]}"
+  -- CR 614.1c / 105.1: Painter's Servant's as-enters colour choice, payload-free
+  -- because the five colours are always the whole offer.
+  Spec.it s "ChooseColor (Painter's Servant)" $
+    Common.assertJsonCodec s EntryRewrite.toJson EntryRewrite.fromJson EntryRewrite.ChooseColor "{\"type\":\"ChooseColor\"}"
   -- CR 614.1c / 306.5b: a planeswalker's intrinsic entry-with-counters rewrite.
   Spec.it s "WithCounters (planeswalker loyalty)" $
     Common.assertJsonCodec

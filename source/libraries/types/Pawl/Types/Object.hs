@@ -3,6 +3,7 @@ module Pawl.Types.Object where
 import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
@@ -100,6 +101,20 @@ data Object = MkObject
     -- battlefield, the posture Projection.controls already takes toward control,
     -- so there is no reverse index to keep consistent across zone changes.
     attachedTo :: Maybe Recipient.Recipient,
+    -- | CR 614.1c: a colour this object's controller chose as it entered
+    -- ("As this creature enters, choose a color" -- Painter's Servant). Read by
+    -- Modification.AddChosenColor off the effect's SOURCE, never off the affected
+    -- object.
+    --
+    -- NOT a copiable value, unlike the P/T an EntryOption writes into the
+    -- copiable snapshot. CR 707.5: "If the text that's being copied includes any
+    -- abilities that replace the enters-the-battlefield event (such as ... 'as
+    -- [this] enters' abilities), those abilities will take effect" -- so a copy
+    -- of Painter's Servant runs the copied ability and makes its OWN choice.
+    --
+    -- Per-incarnation state, like damage and counters: reset by changeZone,
+    -- because CR 400.7 makes the moved object a new one.
+    chosenColor :: Maybe Color.Color,
     -- | CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when

@@ -3,6 +3,7 @@
 -- Covers Pawl.Engine.Replay: record/replay transcript round-trips.
 module Pawl.ReplaySpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -166,6 +167,19 @@ combatReplaySpec s =
           let options = [EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}]
               p = Prompt.ChooseEntryOption decider S.alice oid options
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 1)) (Just (1 :: Natural.Natural))
+        -- CR 614.1c / 105.1: a colour chosen as a permanent enters. Every one of
+        -- the five is round-tripped, because a codec that collapsed two of them
+        -- would replay a Painter's Servant naming blue as one naming white --
+        -- and white is exactly what defaultAnswer falls back to, so an
+        -- undistinguished White would hide the bug.
+        Spec.it s "ChooseColor records and replays a Color" $ do
+          let p = Prompt.ChooseColor decider S.alice oid
+          Monad.forM_ [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green] $ \color ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p color)) (Just color)
+        -- CR 105.1: a transcript that runs short still answers with one of the
+        -- five, and it is the one every decider in the suite agrees on.
+        Spec.it s "defaultAnswer chooses white" $
+          Spec.assertEqWith s "white" (Replay.defaultAnswer (Prompt.ChooseColor decider S.alice oid)) Color.White
         Spec.it s "DeclareMulligan records and replays a MulliganDecision" $ do
           let offer = MulliganOffer.MkMulliganOffer {MulliganOffer.taken = 0, MulliganOffer.bottomCount = 1}
               p = Prompt.DeclareMulligan decider S.alice offer

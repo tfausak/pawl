@@ -26,6 +26,8 @@ toJson m = case m of
   Modification.SetController p -> Common.tagged "SetController" . Just $ PlayerId.toJson p
   Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
   Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet Color.toJson cs
+  Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Common.encodeSet Color.toJson cs
+  Modification.AddChosenColor -> Common.nullary "AddChosenColor"
   Modification.SwitchPowerToughness -> Common.nullary "SwitchPowerToughness"
 
 fromJson :: Value.Value -> Either Text.Text Modification.Modification
@@ -47,5 +49,7 @@ fromJson value = do
     "SetController" -> Common.withValue mv (fmap Modification.SetController . PlayerId.fromJson)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
     "SetColor" -> Common.withValue mv (fmap Modification.SetColor . Common.decodeSet Color.fromJson)
+    "AddColor" -> Common.withValue mv (fmap Modification.AddColor . Common.decodeSet Color.fromJson)
+    "AddChosenColor" -> Right Modification.AddChosenColor
     "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness
     _ -> Left . Text.pack $ "unknown Modification: " <> t

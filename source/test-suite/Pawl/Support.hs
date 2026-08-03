@@ -50,6 +50,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
@@ -250,6 +251,7 @@ identityAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -311,6 +313,7 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -365,6 +368,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -453,6 +457,7 @@ playLandAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -492,6 +497,7 @@ addCreature printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -561,13 +567,15 @@ youControlNoSwamps =
 -- in play (S.giveControl's own AtCleanup SetController on the object whose
 -- control moved, which is not what CR 611.2b's "never starts" is about).
 -- Matches every Affected constructor explicitly (no wildcard): a GainControl
--- effect only ever stores TheseObjects, so a dynamic Matching set is correctly
--- False here, but an exhaustive case means a future Affected constructor forces a
--- decision at this site instead of silently reading as "nothing stored".
+-- effect only ever stores TheseObjects, so a dynamic Matching (or
+-- MatchingAnywhere) set is correctly False here, but an exhaustive case means a
+-- future Affected constructor forces a decision at this site instead of
+-- silently reading as "nothing stored".
 continuousEffectAffects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect -> Bool
 continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
   Affected.Matching _ -> False
+  Affected.MatchingAnywhere _ -> False
   Affected.Attached -> False
   Affected.AttachedPlayerControls _ -> False
 
@@ -654,6 +662,7 @@ addToken card pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -680,6 +689,7 @@ addLibraryCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -706,6 +716,7 @@ addGraveyardCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -739,6 +750,7 @@ addExiledCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -779,6 +791,7 @@ addHandCard printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -822,6 +835,7 @@ landsInPlay land n =
                   Object.bindings = Map.empty,
                   Object.counters = Map.empty,
                   Object.attachedTo = Nothing,
+                  Object.chosenColor = Nothing,
                   Object.timestamp = ts
                 }
          in gs2
@@ -847,6 +861,7 @@ handOne printing base =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( gs2
@@ -878,6 +893,7 @@ pikerInHand land piker n ph =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
       gs3 =
@@ -1306,6 +1322,7 @@ oneMountainState mountain ph =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState
@@ -1387,6 +1404,7 @@ spellOnStack printing pid gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in ( oid,

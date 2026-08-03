@@ -91,8 +91,8 @@ data Quantity
     --     reaches evaluate directly, at the seed, where CR 208.2a's substitution
     --     does not apply (there is no CDA). Real: Primal Plasma (P5) is exactly this --
     --     its star gets a value from an as-enters REPLACEMENT (CR 208.2b), not a
-    --     CDA. See Pawl.Engine.Projection's doc comment above `baseColorsOf` for the
-    --     consequence in full (#76).
+    --     CDA. See the note on PC.power in Pawl.Engine.Projection's
+    --     `baseCharacteristics` for the consequence in full (#76).
     Star
   | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity

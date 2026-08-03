@@ -39,6 +39,7 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
@@ -167,6 +168,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.bindings = Map.empty,
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
+              Object.chosenColor = Nothing,
               -- changeZone draws a fresh timestamp; oneMountainState's
               -- nextTimestamp starts at 1 (object 0 already holds 0).
               Object.timestamp = Timestamp.MkTimestamp 1
@@ -349,6 +351,7 @@ recordingAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (List.genericTake count (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
+  Prompt.ChooseColor {} -> pure Color.White
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
   Prompt.ChooseReplacement {} -> pure 0
@@ -1435,6 +1438,7 @@ handBobBolt lightningBolt gs =
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
@@ -1493,6 +1497,7 @@ slaveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseColor {} -> Color.White
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -1746,6 +1751,7 @@ restartOnStack mountain =
             Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
             Object.timestamp = ts
           }
    in g4

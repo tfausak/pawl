@@ -10,13 +10,17 @@ import qualified Pawl.Types.Subtype as Subtype
 
 -- | The open-half continuous-effect vocabulary -- its own leaf family (design.md's
 -- M3g note: "continuous-effect specifications, classified by layer"), distinct
--- from Effect. The ONLY module that may case on a constructor is Pawl.Engine.Projection
--- (Projection.layer classifies it; Projection.applyModification applies it) --
--- the same standing Pawl.Engine.Resolve has over Effect. GainKeyword carries a Keyword,
--- a closed-half CITATION (casing on it is not an invariant violation -- see the
--- M2a spec). P/T constructors carry signed Quantity (+3/+3 or a future -1/-1).
--- No arm adds or removes a SUPERTYPE (#311), the case CR 205.4b is written for;
--- the layer-4 arms below reach card types and subtypes only.
+-- from Effect. Within the RULES CORE, Pawl.Engine.Projection is the sole module
+-- that may case on a constructor (Projection.layer classifies it;
+-- Projection.applyModification applies it) -- the same standing
+-- Pawl.Engine.Resolve has over Effect. Pawl.CardSpec's modificationCounts and
+-- modificationFilters also case on this type, and legitimately so: a test-suite
+-- lint that walks the card pool is not rules core, so it is not the invariant
+-- this comment protects. GainKeyword carries a Keyword, a closed-half CITATION
+-- (casing on it is not an invariant violation -- see the M2a spec). P/T
+-- constructors carry signed Quantity (+3/+3 or a future -1/-1). No arm adds or
+-- removes a SUPERTYPE (#311), the case CR 205.4b is written for; the layer-4
+-- arms below reach card types and subtypes only.
 data Modification
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
   | LoseAllAbilities -- layer 6 (Humility)
@@ -31,11 +35,10 @@ data Modification
     -- any existing creature types". CR 205.3m (Pawl.Engine.Subtype.isCreatureType)
     -- is the list of what that reaches.
     --
-    -- No AddCreatureSubtype beside it. Unlike SetColor's missing AddColor -- a
-    -- RULES answer, since CR 105.3 makes every colour change a replacement --
-    -- adding a creature type is a real thing an effect can do ("in addition to
-    -- its other types"). It is absent only because no card in the pool does it,
-    -- so the constructor would have no producer.
+    -- No AddCreatureSubtype beside it, though AddColor now sits beside SetColor
+    -- below: adding a creature type is a real thing an effect can do ("in
+    -- addition to its other types"), and it is absent only because no card in
+    -- the pool does it, so the constructor would have no producer.
     --
     -- CR 205.1b says "[creature type or types]" and this carries exactly one,
     -- the same narrowing SetLandSubtype takes and for the same reason -- no card
@@ -70,10 +73,26 @@ data Modification
     SetControllerToSource
   | -- | layer 5, CR 613.1e / 105.3: this object becomes exactly these colours. A
     -- SET, not an add: CR 105.3 says a new colour REPLACES all previous colours
-    -- unless the effect says "in addition" -- and no card in the pool does, so
-    -- there is deliberately no AddColor constructor. SetColor with an empty set
-    -- is "becomes colourless" (CR 105.2c).
+    -- unless the effect says "in addition". SetColor with an empty set is
+    -- "becomes colourless" (CR 105.2c).
     SetColor (Set.Set Color.Color)
+  | -- | layer 5, CR 613.1e / 105.3: this object becomes these colours IN
+    -- ADDITION to the ones it already has. CR 105.3's parenthetical -- "unless
+    -- the effect said the object became that color 'in addition' to its other
+    -- colors" -- so this unions where SetColor replaces. Indigo Faerie's
+    -- "target permanent becomes blue in addition to its other colors".
+    AddColor (Set.Set Color.Color)
+  | -- | layer 5, CR 613.1e / 105.3: this object gains, IN ADDITION to its other
+    -- colours, the colour chosen for THIS effect's SOURCE as that source entered
+    -- (Object.chosenColor). Painter's Servant's "the chosen color".
+    --
+    -- Payload-free because the colour is DERIVED at projection time from the
+    -- source rather than baked into card data -- the same posture
+    -- SetControllerToSource takes toward CR 109.5's "you", and two constructors
+    -- for the same reason that AddColor above carries a literal set and this
+    -- does not. A static ability's modification is card data and cannot name a
+    -- colour a player will choose.
+    AddChosenColor
   | -- | layer 7d, CR 613.4d: switch this object's power and toughness. Takes the
     -- value of power and applies it to toughness, and vice versa -- so it acts on
     -- whatever 7a, 7b and 7c already produced, not on the printed box. Carries no

@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import Pawl.Types.Desync (Desync)
 import qualified Pawl.Types.Desync as Desync
@@ -55,6 +56,7 @@ encode p answer = case p of
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
+  Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
@@ -144,6 +146,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseEntryOption {} -> case response of
     Response.ChoseEntryOption n -> Just n
+    _ -> Nothing
+  Prompt.ChooseColor {} -> case response of
+    Response.ChoseColor c -> Just c
     _ -> Nothing
   Prompt.OrderTriggers {} -> case response of
     Response.OrderedTriggers order -> Just order
@@ -289,6 +294,9 @@ defaultAnswer p = case p of
   -- CR 208.2b: the first offered shape is always a legal answer (this is asked
   -- only when the list has two or more), and is the least eventful fallback.
   Prompt.ChooseEntryOption {} -> 0
+  -- CR 105.1: any of the five colours is a legal answer, and white is the least
+  -- eventful fallback when a transcript runs short.
+  Prompt.ChooseColor {} -> Color.White
   -- CR 603.3b: the canonical order is always a legal answer, and is the least
   -- eventful fallback when a transcript runs short.
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries

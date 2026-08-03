@@ -1,0 +1,120 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [],
+        "mana": [
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "AddColor",
+                    "value": [
+                      {
+                        "type": "Blue"
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Flying"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Indigo Faerie",
+  "power": {
+    "type": "Literal",
+    "value": 1
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 1
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Faerie"
+      },
+      {
+        "type": "Wizard"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}
