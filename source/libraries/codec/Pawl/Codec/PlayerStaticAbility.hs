@@ -10,9 +10,9 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 toJson :: PlayerStaticAbility.PlayerStaticAbility -> Value.Value
 toJson pa =
   Common.object
-    [ Common.pair "scope" . PlayerScope.toJson $ PlayerStaticAbility.scope pa,
-      Common.pair "effect" . PlayerEffect.toJson $ PlayerStaticAbility.effect pa
-    ]
+    ( Common.requiredPair "scope" PlayerScope.toJson (PlayerStaticAbility.scope pa)
+        <> Common.requiredPair "effect" PlayerEffect.toJson (PlayerStaticAbility.effect pa)
+    )
 
 fromJson :: Value.Value -> Either Text.Text PlayerStaticAbility.PlayerStaticAbility
 fromJson value = do

@@ -14,9 +14,9 @@ import qualified Pawl.Types.ManaCount as ManaCount
 toJson :: ManaCount.ManaCount -> Value.Value
 toJson count =
   Common.object
-    [ Common.pair "player" . PlayerRef.toJson $ ManaCount.player count,
-      Common.pair "filter" . ManaFilter.toJson $ ManaCount.filter count
-    ]
+    ( Common.requiredPair "player" PlayerRef.toJson (ManaCount.player count)
+        <> Common.requiredPair "filter" ManaFilter.toJson (ManaCount.filter count)
+    )
 
 fromJson :: Value.Value -> Either Text.Text ManaCount.ManaCount
 fromJson value = do

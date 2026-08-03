@@ -8,7 +8,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 
 toJson :: BlockRequirement.BlockRequirement -> Value.Value
 toJson br =
-  Common.object [Common.pair "attacker" (Affected.toJson (BlockRequirement.attacker br))]
+  Common.object (Common.requiredPair "attacker" Affected.toJson (BlockRequirement.attacker br))
 
 fromJson :: Value.Value -> Either Text.Text BlockRequirement.BlockRequirement
 fromJson value = do
