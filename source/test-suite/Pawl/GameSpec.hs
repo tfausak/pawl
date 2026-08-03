@@ -169,6 +169,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
+              Object.chosenSubtype = Nothing,
               -- changeZone draws a fresh timestamp; oneMountainState's
               -- nextTimestamp starts at 1 (object 0 already holds 0).
               Object.timestamp = Timestamp.MkTimestamp 1
@@ -344,7 +345,7 @@ recordingAnswer p = case p of
     pure $ case filter isCast actions of
       h : _ -> h
       [] -> A.Pass
-  Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> pure (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
   Prompt.ChooseX {} -> pure 0
@@ -352,6 +353,7 @@ recordingAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
   Prompt.ChooseColor {} -> pure Color.White
+  Prompt.ChooseBasicLandType {} -> pure Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
   Prompt.ChooseReplacement {} -> pure 0
@@ -1439,6 +1441,7 @@ handBobBolt lightningBolt gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
@@ -1490,7 +1493,7 @@ slaveAnswer p = case p of
     case filter S.isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -1498,6 +1501,7 @@ slaveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -1752,6 +1756,7 @@ restartOnStack mountain =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in g4

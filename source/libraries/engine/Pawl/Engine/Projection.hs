@@ -69,6 +69,7 @@ layer m = case m of
   Modification.SetBasePowerToughness _ _ -> Layer.SetPT
   Modification.ModifyPowerToughness _ _ -> Layer.ModifyPT
   Modification.SetLandSubtype _ -> Layer.Type
+  Modification.SetLandSubtypeToChosen -> Layer.Type
   Modification.AddLandSubtype _ -> Layer.Type
   Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
@@ -173,61 +174,26 @@ applyModification lyr src cands gs oid m pc =
           pc {PC.subtypes = Set.insert s (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
-        -- CR 305.7, second sentence: "It loses all abilities generated from its
-        -- rules text, ITS OLD LAND TYPES, and any copiable effects affecting that
-        -- land, and it gains the appropriate mana ability for each new basic land
-        -- type." Three clauses, and the arm does the first two; the mana ability
-        -- rides the new subtype and is read at the mana call site (CR 305.6).
+        -- CR 305.7's set, with the type written into card data. See
+        -- setLandSubtypeTo below for the whole rule.
+        Modification.SetLandSubtype s -> setLandSubtypeTo s pc
+        -- CR 305.7's set again, with the type read off the SOURCE's own entry
+        -- choice (CR 614.1c) instead. An unchosen source -- malformed data, or
+        -- an entry that never ran the rewrite -- sets nothing and strips
+        -- nothing rather than guessing a type, the posture AddChosenColor below
+        -- takes toward an unchosen colour.
         --
-        -- The SUBTYPE clause takes the land types and nothing else. CR 205.3i
-        -- (Pawl.Engine.Subtype.isLandType) is the list; the fourth sentence -- "Setting
-        -- a land's subtype doesn't add or remove any card types (such as
-        -- creature) or supertypes" -- is why a creature type on an animated
-        -- permanent has to survive.
-        --
-        -- CR 305.7 says "one or more of the basic land types" and this
-        -- modification carries exactly one, which is not a narrowing: no printed
-        -- card SETS a land's subtype to more than one basic type (Blood Moon,
-        -- Magus of the Moon and Zhao all set Mountain alone; the multi-type
-        -- cards -- Urborg, Prismatic Omen -- all ADD).
-        --
-        -- The ABILITY clause takes every kind of ability a card's rules text can
-        -- generate, which is every one this record carries plus the three decided
-        -- outside it. Keywords and the four fields below are stripped here; a
-        -- permanent's static abilities, its player abilities and its block
-        -- requirements are decided before the fold instead, by the CR 305.7 gates
-        -- in gather, Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.
-        -- instances -- all three calling liveGiven -- because an ability whose
-        -- effect lands on OTHER objects has to be kept out of the candidate list
-        -- rather than erased from its own projection. Those gates read BASE
-        -- characteristics and this arm reads the projection, so the two halves do
-        -- not agree on an object that became a land at layer 4 (#391); what this
-        -- arm reaches, it strips completely.
-        --
-        -- CR 305.7's next sentence -- "Note that this doesn't remove any
-        -- abilities that were GRANTED to the land by other effects" -- needs no
-        -- guard here: every field this clears is seeded from the card by
-        -- copiableCharacteristics, and the only granting modification is
-        -- GainKeyword at layer 6, which is applied after this layer-4 arm and so
-        -- lands on an already-emptied map.
-        --
-        -- CR 604.3 makes a characteristic-defining ability a static ability, so
-        -- characteristicPT goes with the rest -- the same reason LoseAllAbilities
-        -- clears it at layer 6. CR 613.6 rescues neither: a CDA would first apply
-        -- at layer 7a, which is after both.
-        --
-        -- Not stripped, and not an oversight: CR 305.7's third clause, "any
-        -- copiable effects affecting that land", is a layer-1 question this
-        -- layer-4 arm cannot answer (#406).
-        Modification.SetLandSubtype s ->
-          pc
-            { PC.subtypes = Set.insert s (Set.filter (not . Subtype.isLandType) (PC.subtypes pc)),
-              PC.keywords = Map.empty,
-              PC.characteristicPT = Nothing,
-              PC.activatedAbilities = [],
-              PC.replacementEffects = [],
-              PC.triggeredAbilities = []
-            }
+        -- That no-op leaves this arm and setLandSubtypeEffects' gate disagreeing
+        -- on such a source, because the gate classifies by CONSTRUCTOR and so
+        -- still strips the land's static abilities. Unreachable -- the only
+        -- producer is an EntryR whose rewrite always writes the field before the
+        -- permanent is on the battlefield to be projected -- and it is the same
+        -- kind of disagreement between the rule's two halves that the gate
+        -- already documents for a different reason (#391).
+        Modification.SetLandSubtypeToChosen ->
+          case Game.lookupObject src gs >>= Object.chosenSubtype of
+            Nothing -> pc
+            Just s -> setLandSubtypeTo s pc
         -- CR 612.1/612.2: a text-changing effect replaces one basic land type
         -- word with another where the word is used AS a land type -- here, in
         -- the projected type line. Layer 3, so it folds before layer 4 (Type):
@@ -268,6 +234,69 @@ applyModification lyr src cands gs oid m pc =
         -- creature's power."
         Modification.SwitchPowerToughness ->
           pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
+
+-- CR 305.7's strip, shared by the TWO modifications that set a land's subtype:
+-- SetLandSubtype (a type written into card data -- Blood Moon) and
+-- SetLandSubtypeToChosen (a type a player chose as the source entered --
+-- Convincing Mirage). One body, so the rule cannot be implemented twice and
+-- drift.
+--
+-- CR 305.7, second sentence: "It loses all abilities generated from its
+-- rules text, ITS OLD LAND TYPES, and any copiable effects affecting that
+-- land, and it gains the appropriate mana ability for each new basic land
+-- type." Three clauses, and this does the first two; the mana ability
+-- rides the new subtype and is read at the mana call site (CR 305.6).
+--
+-- The SUBTYPE clause takes the land types and nothing else. CR 205.3i
+-- (Pawl.Engine.Subtype.isLandType) is the list; the fourth sentence -- "Setting
+-- a land's subtype doesn't add or remove any card types (such as
+-- creature) or supertypes" -- is why a creature type on an animated
+-- permanent has to survive.
+--
+-- CR 305.7 says "one or more of the basic land types" and this takes exactly
+-- one, which is not a narrowing: no printed card SETS a land's subtype to more
+-- than one basic type (Blood Moon, Magus of the Moon and Zhao all set Mountain
+-- alone; Convincing Mirage's CR 305.6 choice is of one type; the multi-type
+-- cards -- Urborg, Prismatic Omen -- all ADD).
+--
+-- The ABILITY clause takes every kind of ability a card's rules text can
+-- generate, which is every one this record carries plus the three decided
+-- outside it. Keywords and the four fields below are stripped here; a
+-- permanent's static abilities, its player abilities and its block
+-- requirements are decided before the fold instead, by the CR 305.7 gates
+-- in gather, Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.
+-- instances -- all three calling liveGiven -- because an ability whose
+-- effect lands on OTHER objects has to be kept out of the candidate list
+-- rather than erased from its own projection. Those gates read BASE
+-- characteristics and this reads the projection, so the two halves do
+-- not agree on an object that became a land at layer 4 (#391); what this
+-- reaches, it strips completely.
+--
+-- CR 305.7's next sentence -- "Note that this doesn't remove any
+-- abilities that were GRANTED to the land by other effects" -- needs no
+-- guard here: every field this clears is seeded from the card by
+-- copiableCharacteristics, and the only granting modification is
+-- GainKeyword at layer 6, which is applied after this layer-4 strip and so
+-- lands on an already-emptied map.
+--
+-- CR 604.3 makes a characteristic-defining ability a static ability, so
+-- characteristicPT goes with the rest -- the same reason LoseAllAbilities
+-- clears it at layer 6. CR 613.6 rescues neither: a CDA would first apply
+-- at layer 7a, which is after both.
+--
+-- Not stripped, and not an oversight: CR 305.7's third clause, "any
+-- copiable effects affecting that land", is a layer-1 question this
+-- layer-4 strip cannot answer (#406).
+setLandSubtypeTo :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
+setLandSubtypeTo s pc =
+  pc
+    { PC.subtypes = Set.insert s (Set.filter (not . Subtype.isLandType) (PC.subtypes pc)),
+      PC.keywords = Map.empty,
+      PC.characteristicPT = Nothing,
+      PC.activatedAbilities = [],
+      PC.replacementEffects = [],
+      PC.triggeredAbilities = []
+    }
 
 -- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
 -- an object with no printed P/T that is set (an Opalescence-animated enchantment)
@@ -353,15 +382,21 @@ affects source oid a partial gs = case a of
         -- calls THIS function for any Matching set. So this call is safe only
         -- because `perspective` is an unforced thunk until a filter conjunct
         -- actually needs it (ControlledBy is the only one that does), and no
-        -- SetLandSubtype -- static OR stored, setLandSubtypeEffects gathers
-        -- both -- in the pool pairs Matching with ControlledBy. A stored one
+        -- subtype-setting effect in the pool -- static OR stored,
+        -- setLandSubtypeEffects gathers both -- pairs Matching with
+        -- ControlledBy: of the two static examples, Blood Moon's Matching
+        -- filter has none, and Convincing Mirage's set is Affected.Attached,
+        -- not a Matching filter at all (its `affects` arm above reads the
+        -- source's attachment and never calls controllerOf). A stored one
         -- is additionally safe today because Pawl.Engine.Resolve constructs every
         -- stored ContinuousEffect with Affected.TheseObjects, never Matching;
         -- that is a fact about Resolve's current call sites, not something
         -- this fold enforces. That is a laziness accident, not a structural
         -- guarantee -- such a card would force `perspective`, which recurses
         -- back into controllerOf -> controlGrants -> this same liveness gate,
-        -- and hangs rather than answering wrong (#197).
+        -- and hangs rather than answering wrong (#197). This IS the call site
+        -- where that forcing would happen -- controlGrants' INVARIANT block and
+        -- the AttachedPlayerControls arm below only restate why it is safe.
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
@@ -382,11 +417,14 @@ affects source oid a partial gs = case a of
   -- Unlike that arm's `perspective`, this call is FORCED on every candidate, so
   -- the #197 hazard is worth stating rather than inheriting: controllerOf ->
   -- controlGrants -> liveGiven -> affectsBase re-enters this function, which would
-  -- loop if a SetLandSubtype effect (the only kind liveGiven feeds) ever carried
-  -- an AttachedPlayerControls set. None does -- the pool's one static example is
-  -- Blood Moon, and Pawl.Engine.Resolve stores every ContinuousEffect with
-  -- Affected.TheseObjects -- and controllerOfGiven's own namesFrom answers False
-  -- for this arm rather than recursing.
+  -- loop if a subtype-setting effect (the only kind liveGiven feeds) ever carried
+  -- an AttachedPlayerControls set. None does -- the pool's two static examples
+  -- are Blood Moon, whose set is Matching, and Convincing Mirage, whose set is
+  -- Affected.Attached and NOT this arm (the two names differ by one word and are
+  -- different sets: Attached names the source's own host, this names what an
+  -- enchanted PLAYER controls), and Pawl.Engine.Resolve stores every
+  -- ContinuousEffect with Affected.TheseObjects -- and controllerOfGiven's own
+  -- namesFrom answers False for this arm rather than recursing.
   --
   -- The Filter's perspective is the Matching arm's, not the enchanted player's:
   -- CR 109.5 fixes "you" as the effect's source's controller, and being the set
@@ -844,12 +882,12 @@ definesColorless = Set.member Keyword.Devoid
 -- object has one and the printed card otherwise. The rule's text-change clause
 -- has no writer at all today -- Layer.Text's one modification is
 -- ChangeSubtypeWord, whose arm touches PC.subtypes alone -- so nothing between
--- the seed and layer 5 ADDS a keyword. The one pre-layer-5 modification that
--- touches the map is Modification.SetLandSubtype at Layer.Type, and it only ever
--- EMPTIES it (CR 305.7); a removal cannot introduce a non-characteristic-defining
--- source. So the rule holds by construction rather than by a test, and a future
--- text-changing effect that granted a keyword would land inside CR 604.3a(2)
--- rather than outside it.
+-- the seed and layer 5 ADDS a keyword. The only pre-layer-5 modifications that
+-- touch the map are the two that set a land subtype at Layer.Type, and both go
+-- through setLandSubtypeTo, which only ever EMPTIES it (CR 305.7); a removal
+-- cannot introduce a non-characteristic-defining source. So the rule holds by
+-- construction rather than by a test, and a future text-changing effect that
+-- granted a keyword would land inside CR 604.3a(2) rather than outside it.
 --
 -- Humility therefore cannot remove it: LoseAllAbilities is layer 6, after this.
 --
@@ -986,6 +1024,7 @@ freezeQuantities gs oid you m =
         Modification.GainKeyword _ -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.SetLandSubtype _ -> Just m
+        Modification.SetLandSubtypeToChosen -> Just m
         Modification.AddLandSubtype _ -> Just m
         Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
@@ -1012,6 +1051,7 @@ quantitiesOf m = case m of
   Modification.GainKeyword _ -> []
   Modification.LoseAllAbilities -> []
   Modification.SetLandSubtype _ -> []
+  Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
@@ -1023,13 +1063,25 @@ quantitiesOf m = case m of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
--- Every SetLandSubtype effect in the game, each with its source and affected set
--- (from stored effects and battlefield permanents' static abilities). This is a
--- legitimate case-on-Modification -- Projection is its sole home.
+-- Every SetLandSubtype and SetLandSubtypeToChosen effect in the game, each with
+-- its source and affected set (from stored effects and battlefield permanents'
+-- static abilities). This is a legitimate case-on-Modification -- Projection is
+-- its sole home.
 setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
   let isSet m = case m of
         Modification.SetLandSubtype _ -> True
+        -- CR 305.7 does not care WHERE the type came from: a type chosen as the
+        -- source entered (CR 614.1c) strips the land's rules text exactly as a
+        -- printed one does. Convincing Mirage.
+        --
+        -- Answering False here would strip the land INSIDE the fold
+        -- (setLandSubtypeTo) while leaving its static abilities in the candidate
+        -- list -- the two halves of one rule disagreeing, since this predicate
+        -- classifies by CONSTRUCTOR and the wildcard below means the compiler
+        -- cannot name a new arm that needs to be here. Pawl.ProjectionSpec's
+        -- "Convincing Mirage strips Urborg's static ability" is what catches it.
+        Modification.SetLandSubtypeToChosen -> True
         -- Not the CR 305.7 land-subtype "set" this predicate gates (a control
         -- op, not a type change); the existing wildcard already covers it, but
         -- named explicitly per Modification's exhaustiveness discipline.
@@ -1049,9 +1101,12 @@ setLandSubtypeEffects gs =
       -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
       -- 612's word swap to the same ability's (#624). So a text-changed source
       -- would have this gate and the layer fold disagreeing about which
-      -- permanents it names. Unreachable: the pool's only SetLandSubtype is
-      -- Blood Moon, which selects by card type and supertype and so carries no
-      -- land-type word for a swap to reach. Rewriting here is not free either --
+      -- permanents it names. Unreachable twice over. The pool's two
+      -- subtype-setting statics are Blood Moon, which selects by card type and
+      -- supertype and so carries no land-type word for a swap to reach, and
+      -- Convincing Mirage, whose Affected.Attached names no word at all -- and
+      -- rewriteAffected's Attached arm is the identity, so a text change could
+      -- not move it even if one reached here. Rewriting here is not free either --
       -- textChangesAffecting folds the whole effect list, and this function is
       -- hoisted out of gather's walk precisely to avoid per-permanent cost
       -- (#584).
@@ -1069,9 +1124,11 @@ setLandSubtypeEffects gs =
 -- Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.instances -- since such an
 -- ability has to be kept out of its reader's candidate list rather than erased
 -- from the bearer's own projection afterwards. Every other kind of rules-text
--- ability is stripped inside the fold instead, by applyModification's
--- SetLandSubtype arm. So an object's static abilities are
--- live unless a live SetLandSubtype applies to it. "Live" recurses on the
+-- ability is stripped inside the fold instead, by setLandSubtypeTo. So an
+-- object's static abilities are live unless a live subtype-setting effect
+-- applies to it -- either kind, the printed SetLandSubtype (Blood Moon) or the
+-- chosen SetLandSubtypeToChosen (Convincing Mirage), since setLandSubtypeEffects
+-- gathers both and CR 305.7 does not distinguish them. "Live" recurses on the
 -- stripper's own source; "applies to" reads BASE characteristics (nonbasic is a
 -- printed supertype, and card-type Land is read off the printed type line here),
 -- so nothing recurses into the projection and the result is order-INDEPENDENT. A
@@ -1105,11 +1162,12 @@ setLandSubtypeEffects gs =
 staticAbilitiesLive :: ObjectId -> GameState -> Bool
 staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) Set.empty oid gs
 
--- The liveness fixpoint given the game's SetLandSubtype effects PRECOMPUTED. The
--- list is hoisted here (rather than recomputed inside) so gather can compute it
--- once per projection instead of once per permanent -- recomputing it per
--- permanent made project O(permanents^3) per state-based-action sweep. An empty
--- list means no stripper exists, so any strips [] is False and oid is live.
+-- The liveness fixpoint given the game's SetLandSubtype and
+-- SetLandSubtypeToChosen effects PRECOMPUTED. The list is hoisted here (rather
+-- than recomputed inside) so gather can compute it once per projection instead
+-- of once per permanent -- recomputing it per permanent made project
+-- O(permanents^3) per state-based-action sweep. An empty list means no
+-- stripper exists, so any strips [] is False and oid is live.
 liveGiven :: [(ObjectId, Affected.Affected)] -> Set ObjectId -> ObjectId -> GameState -> Bool
 liveGiven setEffs visited oid gs =
   Set.member oid visited
@@ -1151,11 +1209,16 @@ rewriteModification pairs m =
         -- land-type case. What cannot reach it is the PAIR: the pool's only
         -- ChangeSubtypeWord producer is Magical Hack, whose text replaces one
         -- basic land type with another and whose pair is answered by
-        -- Prompt.ChooseBasicLandTypes. So `from` is never a creature type and a
+        -- Prompt.ChooseLandTypeSwap. So `from` is never a creature type and a
         -- swap here would be the identity on every board pawl can reach. The
         -- card that would make the difference visible, Artificial Evolution, has
         -- no producer in the pool (#529).
         Modification.SetCreatureSubtype _ -> acc
+        -- Carries no word at all: the type is read off the effect's source at
+        -- projection time (Object.chosenSubtype), not printed on the card, so CR
+        -- 612.1's "words or symbols printed on that object" has nothing here to
+        -- reach. Identity, the treatment SetController gets just below.
+        Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word for CR 612 to rewrite: identity.
         Modification.SetController _ -> acc
         _ -> acc
@@ -1328,6 +1391,9 @@ removesAbilities m = case m of
   -- Answering True here would double-count it into a layer whose ordering it does
   -- not have.
   Modification.SetLandSubtype _ -> False
+  -- CR 305.7's strip, for SetLandSubtype's reason just above: a layer-4 type
+  -- change performed by setLandSubtypeTo and liveGiven, never a layer-6 removal.
+  Modification.SetLandSubtypeToChosen -> False
   -- CR 205.1a/205.1b's creature-type set has no ability clause at all -- CR
   -- 305.7's strip belongs to the LAND arm above, not to setting a subtype -- so
   -- this removes nothing in any layer.
@@ -1653,14 +1719,17 @@ filterReads f = case f of
 -- Which aspects a Modification writes -- the other half of the pair above, and
 -- another legitimate case-on-Modification that Projection is the sole home of.
 --
--- THREE arms write Keywords, and each of them writes PC.keywords in
+-- FOUR arms write Keywords, and each of them writes PC.keywords in
 -- applyModification above: GainKeyword adds one (CR 613.1f), LoseAllAbilities
--- empties the map (CR 613.1f again -- Humility), and SetLandSubtype empties it
--- too, because CR 305.7's second sentence says a land whose subtype is set "loses
--- all abilities generated from its rules text". Filter.HasKeyword reads that map,
--- so all three can move an affected set and CR 613.8a has to see them. Keyword
--- COUNTERS need no arm of their own: counterGathered mints CounterKind.Keyword as
--- a synthetic GainKeyword candidate, so it arrives here as one.
+-- empties the map (CR 613.1f again -- Humility), and SetLandSubtype and
+-- SetLandSubtypeToChosen both empty it, because CR 305.7's second sentence says
+-- a land whose subtype is set "loses all abilities generated from its rules
+-- text" -- true whether the new subtype is printed on the source (SetLandSubtype)
+-- or chosen as the source entered (SetLandSubtypeToChosen, CR 614.1c).
+-- Filter.HasKeyword reads that map, so all four can move an affected set and
+-- CR 613.8a has to see them. Keyword COUNTERS need no arm of their own:
+-- counterGathered mints CounterKind.Keyword as a synthetic GainKeyword
+-- candidate, so it arrives here as one.
 --
 -- An ability change can also matter to CR 613.8 by changing an effect's
 -- EXISTENCE, which is a different clause of CR 613.8a and still lives in
@@ -1673,6 +1742,7 @@ modificationWrites m = case m of
   Modification.ModifyPowerToughness _ _ -> Set.singleton PowerA
   Modification.SwitchPowerToughness -> Set.singleton PowerA
   Modification.SetLandSubtype _ -> Set.fromList [Subtypes, Keywords]
+  Modification.SetLandSubtypeToChosen -> Set.fromList [Subtypes, Keywords]
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.singleton Subtypes
@@ -2375,12 +2445,14 @@ data ControlGrant = MkControlGrant
 -- `controlGrants` -- so if that Matching filter's evaluation ever forces
 -- `affects`'s `perspective` thunk (a ControlledBy conjunct is the only thing
 -- that does), this loops rather than answering wrong. Nothing here prevents
--- that; it holds only because no SetLandSubtype in the pool -- static OR
+-- that; it holds only because no subtype-setting effect in the pool -- static OR
 -- stored, setLandSubtypeEffects gathers both -- carries a Matching filter with
--- ControlledBy in it: the pool's one static example (Blood Moon) has none, and
--- every stored ContinuousEffect Pawl.Engine.Resolve constructs carries
--- Affected.TheseObjects rather than Matching at all. See #197 for the card
--- shape that would break this and the deferred structural fix.
+-- ControlledBy in it: of the two static examples, Blood Moon's Matching filter
+-- has none and Convincing Mirage's Affected.Attached is not a Matching filter at
+-- all (its `affects` arm reads the source's attachment and never calls
+-- controllerOf), and every stored ContinuousEffect Pawl.Engine.Resolve
+-- constructs carries Affected.TheseObjects rather than Matching at all. See
+-- #197 for the card shape that would break this and the deferred structural fix.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let setEffs = setLandSubtypeEffects gs

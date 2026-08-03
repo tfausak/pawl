@@ -244,7 +244,7 @@ identityAnswer p = case p of
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -252,6 +252,7 @@ identityAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -306,7 +307,7 @@ castAnswer p = case p of
           [] -> case filter isPlay actions of
             h : _ -> h
             [] -> A.Pass
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -314,6 +315,7 @@ castAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -361,7 +363,7 @@ aggressiveAnswer p = case p of
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -369,6 +371,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -450,7 +453,7 @@ playLandAnswer p = case p of
      in case filter isPlay actions of
           h : _ -> h
           [] -> A.Pass
-  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -458,6 +461,7 @@ playLandAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   Prompt.ChooseReplacement {} -> 0
@@ -498,6 +502,7 @@ addCreature printing pid gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -596,6 +601,33 @@ withEffectAt oid ts m gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
+-- withEffectAt, but naming a REAL source instead of the 998 stand-in. Needed
+-- because a modification can read its own source's state: Modification's
+-- SetLandSubtypeToChosen reads Object.chosenSubtype off the effect's source, and
+-- a source that names no object answers Nothing for every board. Pair it with
+-- withChosenSubtype below.
+withEffectFromAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffectFromAt src oid ts m gs =
+  let eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = src,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
+            ContinuousEffect.modification = m,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
+
+-- CR 614.1c: stamp the basic land type a permanent's controller would have
+-- chosen as it entered, without running the entry loop. A STATE fixture, the
+-- shape `attach` and `withEffect` already have -- the cast-it-for-real proof
+-- that the choice is actually MADE is Pawl.AuraSpec's whole-card Convincing
+-- Mirage test, and this exists so a projection test does not have to cast.
+withChosenSubtype :: Subtype.Subtype -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withChosenSubtype subtype oid gs =
+  let set obj = obj {Object.chosenSubtype = Just subtype}
+   in gs {GameState.objects = Map.adjust set oid (GameState.objects gs)}
+
 -- withEffectAt, allocating its own fresh timestamp -- the convenience shape for
 -- a caller that doesn't care which timestamp the effect lands at.
 withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameState -> GameState.GameState
@@ -663,6 +695,7 @@ addToken card pid gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -690,6 +723,7 @@ addLibraryCard printing pid gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -717,6 +751,7 @@ addGraveyardCard printing pid gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -751,6 +786,7 @@ addExiledCard printing pid gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -792,6 +828,7 @@ addHandCard printing pid gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -836,6 +873,7 @@ landsInPlay land n =
                   Object.counters = Map.empty,
                   Object.attachedTo = Nothing,
                   Object.chosenColor = Nothing,
+                  Object.chosenSubtype = Nothing,
                   Object.timestamp = ts
                 }
          in gs2
@@ -862,6 +900,7 @@ handOne printing base =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( gs2
@@ -894,6 +933,7 @@ pikerInHand land piker n ph =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
       gs3 =
@@ -1224,12 +1264,19 @@ addCounter kind n oid gs =
 -- every printing a caller passes is real. Type-agnostic on purpose: CR 400.7's
 -- reset is a property of the field, so the CR 400.7 test does not need an Aura.
 --
--- Tagged ToCreature, which is the tag the real attach paths would store: every
--- Aura in this pool has a Pool.Creatures enchant spec, and Target's candidates
--- for that pool are ToCreature -- so an SBA that re-checks the attachment against
--- the spec (Pawl.Engine.Sba.stillLegalEnchant) sees what casting would have left. The
--- callers that attach to a non-creature are testing rules that read only WHICH
--- object is named (CR 704.5n, CR 704.5p, CR 400.7), never the tag.
+-- Tagged ToCreature, which is the tag the real attach paths store for a
+-- CREATURE-enchanting Aura: those have a Pool.Creatures enchant spec, and
+-- Target's candidates for that pool are ToCreature -- so an SBA that re-checks
+-- the attachment against the spec (Pawl.Engine.Sba.stillLegalEnchant) sees what
+-- casting would have left.
+--
+-- WRONG for Convincing Mirage, whose "Enchant land" is a Pool.Permanents spec
+-- narrowed by a Land filter, and whose candidates are therefore ToObject. That
+-- costs nothing for a rule that reads only WHICH object is named -- CR 704.5n,
+-- CR 704.5p, CR 400.7, and Affected.Attached, which goes through
+-- Recipient.objectOf -- which is every caller that attaches to a non-creature
+-- today. A test that puts Convincing Mirage in front of stillLegalEnchant must
+-- CAST it instead; Pawl.AuraSpec's whole-card case is that cast.
 attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 attach rider host = attachTo rider (Recipient.ToCreature host)
 
@@ -1323,6 +1370,7 @@ oneMountainState mountain ph =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState
@@ -1405,6 +1453,7 @@ spellOnStack printing pid gs =
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
    in ( oid,

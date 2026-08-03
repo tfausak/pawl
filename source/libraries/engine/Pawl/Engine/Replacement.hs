@@ -76,6 +76,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SourceRelation as SourceRelation
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.Uses as Uses
@@ -602,6 +603,7 @@ bucketOfEffect re = case re of
   -- applies to each. One comment rather than three copies of it.
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> ReplacementBucket.Other
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
   -- CR 616.1b: "if any of the replacement and/or prevention effects would modify
   -- under whose control an object would enter the battlefield, one of them must
@@ -656,6 +658,7 @@ readsApplier re = case re of
   -- Same chooser again, and there is no payload at all: CR 105.1's five colours
   -- are the whole offer whoever's row is applying (Painter's Servant).
   ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> False
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> False
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's intrinsic loyalty
   -- included).
@@ -938,6 +941,34 @@ apply batch candidate event =
           let stamp o = o {Object.chosenColor = Just picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
+      -- CR 614.1c: Convincing Mirage's "As this Aura enters, choose a basic land
+      -- type". Asked every time the entering object has a controller to ask, for
+      -- ChooseColor's reason just above: CR 305.6's five basic land types are
+      -- always all legal and always distinguishable, so there is no one-option
+      -- case to elide.
+      --
+      -- Written to Object.chosenSubtype, NOT to the copiable snapshot -- see
+      -- EntryRewrite.ChooseBasicLandType.
+      EntryRewrite.ChooseBasicLandType -> do
+        gs <- State.get
+        picked <- case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for ChoiceOf's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner.
+          --
+          -- The same WEAKER fallback ChooseColor's arm carries, and for the same
+          -- reason: there is no type to default to that the card named, so
+          -- Mountain is conjured. It stands only because the branch cannot be
+          -- reached.
+          Nothing -> pure Subtype.Mountain
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            Trans.lift (Program.prompt (Prompt.ChooseBasicLandType decider controller oid))
+        consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenSubtype = Just picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
       -- CR 306.5b via CR 614.1c: "[This permanent] enters with N counters."
       -- Through Event.putCounters, the CR 122.6 funnel, and NOT a direct write to
       -- Object.counters: CR 614.16's second sentence makes a counter-scaling
@@ -968,10 +999,11 @@ apply batch candidate event =
       -- live board and the object IS the event's payload. Keeping it there is
       -- also what makes CR 616.2 fall out: the loop's next iteration re-collects
       -- and re-matches against a board where the control has already changed,
-      -- which a value parked on the event would not show it. All four arms
+      -- which a value parked on the event would not show it. All five arms
       -- above land on the object for the same reason -- AsCopy and ChoiceOf in
-      -- the copiable snapshot, ChooseColor in Object.chosenColor, WithCounters
-      -- through the CR 122.6 funnel.
+      -- the copiable snapshot, ChooseColor in Object.chosenColor,
+      -- ChooseBasicLandType in Object.chosenSubtype, WithCounters through the
+      -- CR 122.6 funnel.
       --
       -- No prompt, and none is owed: CR 616.1b's rewrite has no choice in it,
       -- and the choice the rule DOES describe -- which of several
@@ -1176,7 +1208,7 @@ legalCopyTargets batch self gs =
 -- discharges.
 -- `Monad.void` discards the `Nothing` case `apply`'s doc warns means "the event
 -- does not happen." Safe here: every EntryR arm (AsCopy, ChoiceOf, ChooseColor,
--- WithCounters, UnderSourceControl) always returns `Just`; only
+-- ChooseBasicLandType, WithCounters, UnderSourceControl) always returns `Just`; only
 -- DamageR/DestructionR ever return `Nothing`, and neither pairs with WouldEnter,
 -- the only event this loop ever proposes.
 --

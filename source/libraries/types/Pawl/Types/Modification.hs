@@ -27,6 +27,23 @@ data Modification
   | SetBasePowerToughness Quantity.Quantity Quantity.Quantity -- layer 7b (Humility 1/1; Opalescence mana value)
   | ModifyPowerToughness Quantity.Quantity Quantity.Quantity -- layer 7c (Giant Growth +3/+3)
   | SetLandSubtype Subtype.Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
+  | -- | layer 4, CR 613.1d / 305.7: set this object's land subtype to the basic
+    -- land type chosen for THIS effect's SOURCE as that source entered
+    -- (Object.chosenSubtype). Convincing Mirage's "enchanted land is the chosen
+    -- type".
+    --
+    -- Payload-free because the subtype is DERIVED at projection time from the
+    -- source rather than baked into card data -- the posture AddChosenColor
+    -- takes toward Object.chosenColor, and SetControllerToSource toward CR
+    -- 109.5's "you". A static ability's modification is card data and cannot
+    -- name a type a player will choose, which is why this is a second
+    -- constructor rather than a field on SetLandSubtype above.
+    --
+    -- Carries CR 305.7's ability strip in full, exactly as SetLandSubtype does:
+    -- Pawl.Engine.Projection routes both through setLandSubtypeTo, and its
+    -- setLandSubtypeEffects answers True for both, so the fold half and the
+    -- candidate-list-gate half of that rule cannot drift apart.
+    SetLandSubtypeToChosen
   | AddLandSubtype Subtype.Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
   | -- | layer 4, CR 205.1a/205.1b set (Turn to Frog -> Frog). A SET over the
     -- CREATURE types only, which is narrower than either land arm above: CR

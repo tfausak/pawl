@@ -10,6 +10,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
@@ -107,14 +108,44 @@ data Object = MkObject
     -- object.
     --
     -- NOT a copiable value, unlike the P/T an EntryOption writes into the
-    -- copiable snapshot. CR 707.5: "If the text that's being copied includes any
-    -- abilities that replace the enters-the-battlefield event (such as ... 'as
-    -- [this] enters' abilities), those abilities will take effect" -- so a copy
-    -- of Painter's Servant runs the copied ability and makes its OWN choice.
+    -- copiable snapshot. CR 707.5 is why the ability runs again at all: "If the
+    -- text that's being copied includes any abilities that replace the
+    -- enters-the-battlefield event (such as ... 'as [this] enters' abilities),
+    -- those abilities will take effect." CR 707.6 is the direct authority for
+    -- why the OLD choice doesn't carry over: "When copying a permanent, any
+    -- choices that have been made for that permanent aren't copied. Instead,
+    -- ... the object's controller will get to make any 'as [this] enters the
+    -- battlefield' choices for it" -- so a copy of Painter's Servant runs the
+    -- copied ability and makes its own NEW choice.
     --
     -- Per-incarnation state, like damage and counters: reset by changeZone,
     -- because CR 400.7 makes the moved object a new one.
+    --
+    -- One of TWO as-enters choice fields; chosenSubtype below is the other.
     chosenColor :: Maybe Color.Color,
+    -- | CR 614.1c: a basic land type this object's controller chose as it
+    -- entered ("As this Aura enters, choose a basic land type" -- Convincing
+    -- Mirage). Read by Modification.SetLandSubtypeToChosen off the effect's
+    -- SOURCE, never off the affected object -- the same direction
+    -- Modification.AddChosenColor reads chosenColor above.
+    --
+    -- A sibling of chosenColor rather than one generalized choice map: the two
+    -- carry different types and are read by different modifications, and a
+    -- sum-typed value would make every reader re-narrow what the field already
+    -- knows. A THIRD as-enters choice of a third type would be the thing that
+    -- changes that call.
+    --
+    -- NOT a copiable value, for chosenColor's reason (CR 707.5) and for CR
+    -- 707.6, which says it outright: "When copying a permanent, any choices that
+    -- have been made for that permanent aren't copied. Instead, if an object
+    -- enters the battlefield as a copy of another permanent, the object's
+    -- controller will get to make any 'as [this] enters the battlefield' choices
+    -- for it." Its worked example is an "As this creature enters, choose a
+    -- creature type" card, which is this field's shape exactly.
+    --
+    -- Per-incarnation state: reset by changeZone, because CR 400.7 makes the
+    -- moved object a new one.
+    chosenSubtype :: Maybe Subtype.Subtype,
     -- | CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when

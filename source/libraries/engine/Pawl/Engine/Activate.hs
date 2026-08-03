@@ -383,6 +383,7 @@ activateAbility pid srcId ability = do
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
             Object.timestamp = ts
           }
       onStack =

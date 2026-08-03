@@ -78,15 +78,17 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- UNEVALUATED quantities (power, toughness) with the printed star already
     -- substituted. Seeded from the card, so it rides copiableCharacteristics and a
     -- Clone acquires the ability rather than the number (CR 707.2a); emptied by
-    -- LoseAllAbilities at layer 6 and by CR 305.7's SetLandSubtype at layer 4,
-    -- both of which are BEFORE 7a.
+    -- LoseAllAbilities at layer 6 and by CR 305.7's strip at layer 4
+    -- (Pawl.Engine.Projection.setLandSubtypeTo, which both land-subtype-setting
+    -- modifications route through), both of which are BEFORE 7a.
     characteristicPT :: Maybe (Quantity.Quantity, Quantity.Quantity),
     cardTypes :: Set.Set CardType.CardType,
     subtypes :: Set.Set Subtype.Subtype,
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer
     -- system. Seeded from the card; emptied by LoseAllAbilities (Humility) and
-    -- by CR 305.7's SetLandSubtype at layer 4 (Blood Moon), as are the three
-    -- ability fields around it.
+    -- by CR 305.7's strip at layer 4 (Pawl.Engine.Projection.setLandSubtypeTo --
+    -- Blood Moon, Convincing Mirage), as are the three ability fields around
+    -- it.
     activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card],
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two.

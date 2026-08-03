@@ -622,6 +622,31 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.SetLandSubtype Subtype.Type.Mountain) gs0
     Spec.assertEqWith s "only Mountain" (Projection.subtypesOf landId gs) (Set.singleton Subtype.Type.Mountain)
 
+  -- CR 305.7's set, with the type read off the effect's SOURCE rather than
+  -- carried by the modification. THE FALSIFIER for a subtype baked into card
+  -- data: this modification has no payload at all, so the Island can only have
+  -- come from Object.chosenSubtype on the source -- which is where CR 614.1c's
+  -- as-enters choice is written. Two sources with different choices, on one
+  -- board, so a constructor that ignored the source and conjured one type could
+  -- not pass both halves.
+  Spec.it s "CR 305.7 SetLandSubtypeToChosen reads the SOURCE's entry choice" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let gs0 = S.landsInPlay forest 2
+        (landA, landB) = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+          i : j : _ -> (i, j)
+          _ -> (ObjectId.MkObjectId 998, ObjectId.MkObjectId 999)
+        -- Two ordinary permanents standing in for two Aura sources; all this
+        -- arm reads off a source is Object.chosenSubtype.
+        (srcA, g1) = S.addCreature piker S.alice gs0
+        (srcB, g2) = S.addCreature piker S.alice g1
+        withChoices = S.withChosenSubtype Subtype.Type.Swamp srcB (S.withChosenSubtype Subtype.Type.Island srcA g2)
+        gs =
+          S.withEffectFromAt srcB landB (Timestamp.MkTimestamp 101) Modification.SetLandSubtypeToChosen $
+            S.withEffectFromAt srcA landA (Timestamp.MkTimestamp 100) Modification.SetLandSubtypeToChosen withChoices
+    Spec.assertEqWith s "the Island source's land is only an Island" (Projection.subtypesOf landA gs) (Set.singleton Subtype.Type.Island)
+    Spec.assertEqWith s "the Swamp source's land is only a Swamp" (Projection.subtypesOf landB gs) (Set.singleton Subtype.Type.Swamp)
+
   -- Turn to Frog {1}{U}: "Until end of turn, target creature loses all
   -- abilities and becomes a blue Frog with base power and toughness 1/1."
   -- Four layers at once -- 4 (Frog), 5 (blue), 6 (loses all abilities) and 7b
@@ -756,6 +781,32 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let (_, urborgId, gs) = bloodMoonUrborg forest urborg bloodMoon True
     Spec.assertEqWith s "Urborg subtypes, order-independent" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Mountain)
+
+  -- CR 305.7's GATE half, which applyModification structurally cannot do:
+  -- Urborg's ability lands on OTHER objects, so a stripped Urborg has to be kept
+  -- out of the gather's candidate list (setLandSubtypeEffects -> liveGiven)
+  -- rather than erased from its own projection.
+  --
+  -- Convincing Mirage is the first CHOSEN-subtype effect to reach that gate, and
+  -- the pool's second static producer after Blood Moon. The gate classifies by
+  -- CONSTRUCTOR, behind a wildcard the compiler cannot police -- so a
+  -- subtype-setting modification missing from it leaves the two halves of one
+  -- rule disagreeing, with the enchanted land's own projection stripped and its
+  -- static ability still firing at everything else. The Forest is what shows it.
+  Spec.it s "CR 305.7 Convincing Mirage strips Urborg's static ability, so no land is a Swamp" $ do
+    forest <- S.printingOf s registry "Forest"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    convincingMirage <- S.printingOf s registry "Convincing Mirage"
+    let gs0 = S.landsInPlay forest 1
+        forestId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+          i : _ -> i
+          [] -> ObjectId.MkObjectId 999
+        (urborgId, g1) = S.addCreature urborg S.alice gs0
+        (mirageId, g2) = S.addCreature convincingMirage S.alice g1
+        gs = S.withChosenSubtype Subtype.Type.Island mirageId (S.attach mirageId urborgId g2)
+    Spec.assertEqWith s "before: Urborg makes the Forest a Swamp too" (Projection.subtypesOf forestId g2) (Set.fromList [Subtype.Type.Forest, Subtype.Type.Swamp])
+    Spec.assertEqWith s "Urborg itself is only an Island now" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Island)
+    Spec.assertEqWith s "and the Forest is a plain Forest again" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
 
   Spec.it s "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Blood Moon older)" $ do
     forest <- S.printingOf s registry "Forest"

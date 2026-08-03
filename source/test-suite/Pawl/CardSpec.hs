@@ -217,6 +217,7 @@ modificationCounts modification = case modification of
   Modification.SetBasePowerToughness p t -> quantityCounts p <> quantityCounts t
   Modification.ModifyPowerToughness p t -> quantityCounts p <> quantityCounts t
   Modification.SetLandSubtype _ -> []
+  Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
@@ -1059,6 +1060,7 @@ modificationFilters modification = case modification of
   Modification.ModifyPowerToughness p t -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
   Modification.SetLandSubtype _ -> []
+  Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCardType _ -> []

@@ -258,6 +258,23 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf towerId gs) "red available (CR 305.6, from the new Mountain type)"
     Spec.assertBool s (ManaType.Colorless `notElem` Mana.manaTypesOf towerId gs) "colorless gone (the printed {T}: Add {C} was stripped)"
 
+  -- CR 305.7's strip again, with the new type CHOSEN as an Aura entered (CR
+  -- 614.1c) rather than printed on the stripper. Reliquary Tower's "{T}: Add
+  -- {C}" is an activated ability, so this is the sharpest witness that the
+  -- strip reaches a land's whole rules text whichever modification performed
+  -- it -- the same claim the Blood Moon case above makes, now for the arm that
+  -- reads Object.chosenSubtype. Pawl.AuraSpec's whole-card case is what proves
+  -- the choice is really MADE; this proves what it costs the land.
+  Spec.it s "CR 305.6/305.7 a Convincing Mirage'd Reliquary Tower taps for the chosen colour" $ do
+    reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+    convincingMirage <- S.printingOf s registry "Convincing Mirage"
+    let base = Setup.emptyGame S.bothPlayers
+        (towerId, g1) = S.addCreature reliquaryTower S.alice base
+        (mirageId, g2) = S.addCreature convincingMirage S.alice g1
+        gs = S.withChosenSubtype Subtype.Plains mirageId (S.attach mirageId towerId g2)
+    Spec.assertBool s (ManaType.Colored Color.White `elem` Mana.manaTypesOf towerId gs) "white available (CR 305.6, from the chosen Plains)"
+    Spec.assertBool s (ManaType.Colorless `notElem` Mana.manaTypesOf towerId gs) "colorless gone (the printed {T}: Add {C} was stripped)"
+
   -- The same strip, on a land whose rules text is not a mana ability at all.
   Spec.it s "CR 305.7 a Blood Moon'd Evolving Wilds has no activated ability left" $ do
     evolvingWilds <- S.printingOf s registry "Evolving Wilds"

@@ -19,6 +19,7 @@ toJson m = case m of
   Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Common.array $ [Quantity.toJson p, Quantity.toJson t]
   Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Common.array $ [Quantity.toJson p, Quantity.toJson t]
   Modification.SetLandSubtype s -> Common.tagged "SetLandSubtype" . Just $ Subtype.toJson s
+  Modification.SetLandSubtypeToChosen -> Common.nullary "SetLandSubtypeToChosen"
   Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Subtype.toJson s
   Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Subtype.toJson s
   Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
@@ -42,6 +43,7 @@ fromJson value = do
     "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
     "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
     "SetLandSubtype" -> Common.withValue mv (fmap Modification.SetLandSubtype . Subtype.fromJson)
+    "SetLandSubtypeToChosen" -> Right Modification.SetLandSubtypeToChosen
     "AddLandSubtype" -> Common.withValue mv (fmap Modification.AddLandSubtype . Subtype.fromJson)
     "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Subtype.fromJson)
     "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . CardType.fromJson)

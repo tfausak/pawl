@@ -1,0 +1,85 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "enchant": {
+    "filter": {
+      "type": "HasCardType",
+      "value": {
+        "type": "Land"
+      }
+    },
+    "pool": {
+      "type": "Permanents"
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Convincing Mirage",
+  "power": null,
+  "replacementEffects": [
+    {
+      "type": "EntryR",
+      "value": [
+        {
+          "type": "IsSource"
+        },
+        {
+          "type": "ChooseBasicLandType"
+        }
+      ]
+    }
+  ],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "Attached"
+      },
+      "modifications": [
+        {
+          "type": "SetLandSubtypeToChosen"
+        }
+      ]
+    }
+  ],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Aura"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

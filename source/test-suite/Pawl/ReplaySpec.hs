@@ -51,6 +51,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -180,6 +181,19 @@ combatReplaySpec s =
         -- five, and it is the one every decider in the suite agrees on.
         Spec.it s "defaultAnswer chooses white" $
           Spec.assertEqWith s "white" (Replay.defaultAnswer (Prompt.ChooseColor decider S.alice oid)) Color.White
+        -- CR 614.1c / 305.6: a basic land type chosen as a permanent enters. All
+        -- five are round-tripped for the ChooseColor test's reason -- a codec
+        -- that collapsed two would replay a Convincing Mirage naming Island as
+        -- one naming Mountain, and Mountain is exactly what defaultAnswer falls
+        -- back to, so an undistinguished Mountain would hide the bug.
+        Spec.it s "ChooseBasicLandType records and replays a Subtype" $ do
+          let p = Prompt.ChooseBasicLandType decider S.alice oid
+          Monad.forM_ [Subtype.Plains, Subtype.Island, Subtype.Swamp, Subtype.Mountain, Subtype.Forest] $ \subtype ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p subtype)) (Just subtype)
+        -- CR 305.6: a transcript that runs short still answers with one of the
+        -- five, and it is the one ChooseLandTypeSwap's fallback already names.
+        Spec.it s "defaultAnswer chooses Mountain" $
+          Spec.assertEqWith s "Mountain" (Replay.defaultAnswer (Prompt.ChooseBasicLandType decider S.alice oid)) Subtype.Mountain
         Spec.it s "DeclareMulligan records and replays a MulliganDecision" $ do
           let offer = MulliganOffer.MkMulliganOffer {MulliganOffer.taken = 0, MulliganOffer.bottomCount = 1}
               p = Prompt.DeclareMulligan decider S.alice offer
