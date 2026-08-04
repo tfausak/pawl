@@ -1,6 +1,6 @@
 # Multi-face cards: the face/layout split, and CR 709 split cards
 
-Issue: #648. Follow-up on naming: #649.
+Issue: #648. Follow-ups on naming: #649 (registry lookup), #650 (plural names).
 
 ## 1. The problem
 
@@ -86,7 +86,8 @@ Two closed-half functions in `Pawl.Engine.Card`, both casing on `Layout`:
   in every zone except the stack. Under `Split`: the union of the faces'
   supertypes, types, subtypes (CR 709.4c), keywords and abilities, and the
   concatenation of their mana costs (CR 709.4b), from which colours and mana
-  value fall out. Under `Normal`: the sole face.
+  value fall out. The name is the face names joined by `//` — see §4.1. Under
+  `Normal`: the sole face.
 - **`castableFaces :: Card -> [(CardName, Face Card)]`** — CR 709.3a, the faces
   a player may propose to cast.
 
@@ -99,6 +100,37 @@ cards land.
 The two seams where a card becomes characteristics — `Projection.baseCharacteristics`
 and `Projection.viewOfCard` — take the face from the object rather than the card,
 and fall back to `combined` when the object names none.
+
+### 4.1 The combined name is the face names joined by `//`
+
+The comprehensive rules never state this, but they do it: all four places the CR
+names a split card in its own prose it writes the halves joined without spaces —
+"Fire//Ice" three times and "Assault//Battery" once. Every external card source
+does the same, modulo spacing.
+
+So `combined` joins. It beats taking the first face's name, which would privilege
+one half for no rules reason, and it is what a log or a player view should show.
+
+Three properties worth stating, because they are what keep the join cheap:
+
+- **It is derived, never stored.** A card file carries per-face names only; there
+  is nowhere to write a combined name, so the joined string and the filename slug
+  cannot drift apart. It also means the separator is a one-line decision, not a
+  data migration.
+- **The slug is indifferent to it.** `Pawl.Slug.fromText` maps `/` to a space and
+  splits on words, so `"Wax//Wane"` and `"Wax // Wane"` both slugify to
+  `wax-wane`. Sourcing a card from Scryfall, which spaces its separator, cannot
+  produce a different filename.
+- **It does not reach the stack.** CR 709.3b gives a spell only the
+  characteristics of the half being cast, so a Wax on the stack is named "Wax".
+  The join lives inside `combined` and nowhere else.
+
+What the join does *not* do is satisfy CR 709.4a, which says the card has two
+names and that an object has a chosen name if *one of its names* is the chosen
+name. "Wax//Wane" is not one of them. A single string cannot answer that
+question, and the joined one is wrong in a more symmetric and more legible way
+than the alternative rather than being right. #650 carries the plural-names gap,
+and is deliberately not #649: this is a characteristic, that is a lookup.
 
 ## 5. Faces are referenced by name, not by index
 
@@ -122,8 +154,15 @@ Three consequences:
 2. **Prototype (CR 718) is not a layout.** CR 718.2's alternative set is mana
    cost, power and toughness only, with no name of its own — a prototyped Rust
    Goliath is still named Rust Goliath — so two faces would collide with the lint
-   above. CR 702.160 makes prototype a *keyword ability*, which the closed half
-   may case on. It stays a single-face card, and is out of scope here either way.
+   above.
+
+   CR 702.160a is the positive account: "Prototype is a static ability that
+   appears on prototype cards that have a secondary set of power, toughness, and
+   mana cost characteristics. A player who casts a spell with prototype can
+   choose to cast that card 'prototyped.'" That is an alternative cost with a P/T
+   rider — the shape `Card.alternativeCosts` (CR 118.9) already has — rather than
+   a second set of characteristics the way an Adventure is. It stays a
+   single-face card, and is out of scope here either way.
 
 3. **The reference resolves against the object's stored card, never a projected
    one.** `Projection.rewriteCard` does rename a card under CR 612.2a, but only
@@ -162,8 +201,10 @@ check stays green.
 A flat encoding retained for single-face cards was rejected: it would give one
 type two encodings and force the codec to decide which to emit.
 
-`wax-wane.json` holds both faces. `Registry.parseCard`'s identity check becomes
-"the face names, joined, slugify to the filename". A lookup that misses lists
+`wax-wane.json` holds both faces. `Registry.parseCard`'s identity check is
+unchanged in form — the card's combined name must slugify back to the filename it
+was filed under — because §4.1 makes that combined name the joined one. Nothing
+in the check special-cases arity. A lookup that misses lists
 directory *filenames* and parses only those whose slug contains the requested
 slug as a whole hyphen-separated run, confirming the hit by face name rather than
 by filename guessing — so `named registry "Wane"` resolves `wax-wane.json`.
@@ -175,8 +216,9 @@ consumer is a card that instructs a player to choose a card name.
 ## 8. Deferred within CR 709
 
 - **CR 709.4a's two names.** `ProjectedCharacteristics.name` stays a single
-  `CardName`, the first face's. Nothing in the pool asks a player to choose a
-  card name, so the difference is unobservable today. Tracked by #649.
+  `CardName` — the joined one of §4.1 — where the rule gives the card two.
+  Nothing in the pool asks a player to choose a card name and no multi-face
+  permanent exists, so the difference is unobservable today. Tracked by #650.
 - **CR 709.5 Room cards** — shared type lines, unlock designations, unlock costs
   as special actions. Its own issue.
 - **CR 702.102 fuse**, and CR 709.4d's fused-spell characteristics. Its own issue.
@@ -201,6 +243,7 @@ Gameplay-level tests, per `design.md` §4:
 3. Both halves are offered as legal actions from one card in hand, and each is
    priced from its own face (CR 709.3a).
 4. In hand and in the graveyard the card is both green and white with mana value
-   2, and has both halves' abilities (CR 709.4b, CR 709.4c) — the combined view.
+   2, has both halves' abilities (CR 709.4b, CR 709.4c) and is named "Wax//Wane"
+   — the combined view — while the Wax on the stack is named "Wax" (CR 709.3b).
 5. `named registry "Wax"` and `named registry "Wane"` both resolve the one card.
 6. The corpus lint holds that every card's face names are pairwise distinct.
