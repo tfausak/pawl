@@ -29,8 +29,12 @@ import qualified Pawl.Types.Zone as Zone
 -- the land's name and stops one card while leaving the rest playable.
 playableLands :: PlayerId -> GameState -> [ObjectId]
 playableLands pid gs =
-  let -- The land's own face, which answers both questions this asks: whether it
-      -- is a land at all (CR 305.1) and what it is named (CR 201.1).
+  let -- The hand card's COMBINED face (CR 709.4), which answers both questions
+      -- this asks: whether it is a land at all (CR 305.1) and what it is named
+      -- (CR 201.1). Combined and not a chosen half, because Action.Play carries
+      -- no face -- see Pawl.Engine.Stack.resolveTopWith for why that is safe
+      -- until CR 712.12's modal double-faced card lands. A land with several
+      -- names would want a set here rather than one name (#650).
       faceOfHandCard oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Just (Card.combined (Printing.card printing))

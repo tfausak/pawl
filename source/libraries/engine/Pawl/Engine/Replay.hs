@@ -215,12 +215,12 @@ decode p response = case p of
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
 -- degrades into a deterministic default rather than crashing.
 --
--- Every arm below is a legal answer, and most are the LEAST EVENTFUL one -- but
--- "least eventful" is a statement about the choice, never a promise that the
--- game plays out the same. 'replay' therefore reports the first prompt that
--- reached this function (Pawl.Types.Desync); a caller that ignores the report
--- is reading a different game's final state. Each arm below notes only why its
--- answer is legal.
+-- Every arm below is a legal answer but one, and most are the LEAST EVENTFUL
+-- one -- but "least eventful" is a statement about the choice, never a promise
+-- that the game plays out the same. 'replay' therefore reports the first prompt
+-- that reached this function (Pawl.Types.Desync); a caller that ignores the
+-- report is reading a different game's final state. Each arm below notes only
+-- why its answer is legal, and ChooseCardName says why it deliberately is not.
 defaultAnswer :: Prompt r -> r
 defaultAnswer p = case p of
   Prompt.Shuffle ids -> ids
@@ -298,12 +298,13 @@ defaultAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
-  -- CR 201.2a: an object with no name doesn't have the same name as any other
-  -- object, so the empty name is the answer that prohibits nothing. NOT a legal
-  -- answer under CR 201.4 -- no card in the Oracle card reference is called it
-  -- -- and deliberately so: this arm is reached only by a transcript that ran
-  -- out, which 'replay' reports as a desync, and conjuring a real card's name
-  -- would silently prohibit that card instead.
+  -- THE ONE ILLEGAL ANSWER, deliberately. CR 201.4 offers every card in the
+  -- Oracle card reference and no card is called "", so this names nothing -- and
+  -- CR 201.2a is why naming nothing is harmless: an object with no name doesn't
+  -- have the same name as any other object, so the prompt's asker prohibits
+  -- nothing. Every arm reaching here is already a reported desync (the
+  -- transcript ran out or did not match), and conjuring a REAL card's name would
+  -- silently prohibit that card in the replay instead.
   Prompt.ChooseCardName {} -> CardName.MkCardName Text.empty
   -- Every candidate is an opponent the card's own text offered, and the prompt
   -- is raised only when there are two or more.

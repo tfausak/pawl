@@ -11,7 +11,9 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 -- Gathered LIVE from every battlefield permanent by Pawl.Engine.PlayerEffect.applying on
 -- every read, never captured -- so Rule of Law leaving the battlefield lifts its
 -- restriction with nothing to unwind. Rule of Law, Thalia, Sapphire Medallion and
--- Reliquary Tower each declare exactly one.
+-- Reliquary Tower each declare one; Null Chamber declares two, because CR 305.1
+-- makes playing a land a special action and its one printed sentence therefore
+-- prohibits on two different axes.
 data PlayerStaticAbility = MkPlayerStaticAbility
   { scope :: PlayerScope.PlayerScope,
     effect :: PlayerEffect.PlayerEffect

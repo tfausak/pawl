@@ -98,7 +98,8 @@ ruleOfLawAfterFirst plains ruleOfLaw =
 -- more than one spell" (Rule of Law) do not depend on WHICH spell, so their
 -- arms ignore this; naming a card in the test's own hand would suggest a
 -- dependence those rules do not have. Null Chamber's arm, which does depend on
--- the name, is exercised through Cast.castable instead.
+-- the name, passes a real card's name in nullChamberSpec below -- to this
+-- function directly, and through Cast.castable and Action.legalActions.
 anySpell :: CardName.CardName
 anySpell = CardName.MkCardName (Text.pack "any spell")
 
@@ -1319,7 +1320,7 @@ nullChamberBoard plains mountain nullChamber =
 
 -- CR 201.4 answered PER CHOOSER, which is the whole of what makes Null Chamber
 -- worth testing: `pick` is asked WHO is choosing, so a case can put the
--- controller's name and the opponent's on different cards. `opponent` settles CR
+-- controller's name and the opponent's on different cards. `opponent` settles
 -- the card's other open choice -- which opponent is asked at all -- and is never
 -- reached at two seats. Everything else is the shared interpreter.
 chamberAnswer :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> Prompt.Prompt r -> r
@@ -1472,9 +1473,13 @@ nullChamberSpec s registry =
       Spec.assertBool s (notElem (Action.Type.Play barrensId) (Action.legalActions S.alice gs)) "while the Barrens is not"
 
     -- CR 604.2: the effect is re-derived from the battlefield on every read, so
-    -- destroying the Chamber lifts both halves with nothing to unwind -- and the
-    -- names go with it, because CR 400.7 gives the graveyard card a new
-    -- incarnation whose chosenNames is empty.
+    -- destroying the Chamber lifts both halves with nothing to unwind.
+    --
+    -- The names go with it too -- CR 400.7 mints a new incarnation in the
+    -- graveyard and Event.changeZone empties its chosenNames -- but that is a
+    -- separate fact and NOT what this case observes: `applying` walks only the
+    -- battlefield, so both prohibitions would lift here even if the names had
+    -- survived the move.
     Spec.it s "CR 604.2 destroying the Chamber lifts both prohibitions" $ do
       plains <- S.printingOf s registry "Plains"
       mountain <- S.printingOf s registry "Mountain"

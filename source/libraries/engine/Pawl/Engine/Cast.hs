@@ -433,10 +433,11 @@ permissionsOf face =
 --
 -- The prohibition is NOT omitted, and that is the point: CR 601.3 is one sentence
 -- with two halves, and the Panglacial permission excepts only the timing one, so
--- a Rule of Law still stops a cast from the library, and a Null Chamber that
--- named this card stops this one. CR 205.4e's restriction rides along for the
--- same reason. Unobservable in this pool and written anyway, because the
--- alternative is a cast the rules forbid.
+-- a Rule of Law still stops a cast from the library, and so does a Null Chamber
+-- that named the Wurm. CR 205.4e's restriction rides along for the same reason,
+-- and THAT one is unobservable in this pool -- Panglacial Wurm is a creature and
+-- never a legendary sorcery -- and is written anyway, because the alternative is
+-- a cast the rules forbid.
 --
 -- printedRestrictionsOk rides along too, and it is the closest call of the three:
 -- a "Cast this spell only during the declare attackers step" IS about timing, so

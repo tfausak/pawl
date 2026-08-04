@@ -29,9 +29,10 @@ data PlayerEffect
     -- chosen names can't be cast").
     --
     -- NULLARY, carrying no name, for UnderSourceControl's reason on the entry
-    -- side: a card cannot write a CardName any more than it can write a
-    -- PlayerId, because the name is not known until CR 614.1c's choice is made.
-    -- The names come from Object.chosenNames on the source, which is how
+    -- side: a card can write a CardName (its own face's, a token definition's)
+    -- but not THIS one, which is not known until CR 614.1c's choice is made --
+    -- the same reason that arm carries no PlayerId. The names come from
+    -- Object.chosenNames on the source instead, which is how
     -- Modification.AddChosenColor already reads a colour.
     --
     -- The quality is the SPELL's name, which makes this CR 601.3a's shape rather

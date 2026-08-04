@@ -96,8 +96,8 @@ playersInScope perspective gs scope =
 -- lets a rules-modifying effect reach objects that were not affected when it
 -- began, so no set is ever frozen on this axis.
 --
--- The (controller, scope, effect) triples are local: nothing outside this
--- function ever sees one.
+-- The (source, controller, scope, effect) rows are local: nothing outside this
+-- function sees more than the (source, effect) pair it returns.
 --
 -- The SOURCE rides out alongside the effect, and only because CR 601.3a's
 -- quality-bearing prohibitions read it: Null Chamber's "the chosen names" are
@@ -193,7 +193,9 @@ castsThisTurn pid gs =
 -- (#650).
 --
 -- A NAME rather than the spell's object id, because the name is the whole of
--- what the three arms read, and the caller already has it -- it takes the name
+-- what the three arms read ABOUT THE SPELL -- the other two read the player's
+-- cast count and the source's own choice -- and the caller already has it: it
+-- takes the name
 -- off the chosen face, which is the only place it could come from, since pawl
 -- projects nothing off the battlefield and the card is still in the zone it is
 -- cast from (#160). A criterion over more of the spell than its name is what
