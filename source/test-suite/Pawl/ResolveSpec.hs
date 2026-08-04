@@ -558,10 +558,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
     Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
   Spec.it s "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
-    -- This gate rides a labelled synthetic: no real instant or sorcery sets a
-    -- land's subtype, and every real card with the effect is an Aura, whose
-    -- modification is a static ability and so exercises a different reader
-    -- (#631).
+    -- This gate rides a labeled synthetic: no real instant or sorcery SETS a
+    -- land's subtype. Aquitect's Will only ADDS one, and needs a flood counter
+    -- kind plus a counter-reading Duration.ForAsLongAs; every other real card
+    -- with the effect is an Aura, whose modification is a static ability and
+    -- so exercises Projection.gatherStatic rather than this stored-effect
+    -- read (#631).
     -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
     -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
     -- (Swamp -> Mountain) it is SetLandSubtype Mountain -> {Mountain}.
