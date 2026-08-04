@@ -656,7 +656,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- And hacked, the word swap moves which lands the filter admits.
     Spec.assertBool s (not (onBattlefield forestId hacked)) "hacked, the Forest dies"
     Spec.assertBool s (onBattlefield islandId hacked) "hacked, the Island lives"
-  Spec.it s "CR 400.7 hacking Blood Moon on the stack is lost when it resolves" $ do
+  Spec.it s "CR 400.7a hacking Blood Moon on the stack carries onto the permanent" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
@@ -685,9 +685,13 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             }
         hacked = S.withEffectAt bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g3
         after = snd (Engine.runGamePure S.identityAnswer hacked Stack.resolveTop)
-    -- Blood Moon entered as a NEW object; the hack (locked to the spell id)
-    -- no longer names it, so nonbasic lands are Mountains, not Islands.
-    Spec.assertEqWith s "hack lost: nonbasic land is Mountain" (Projection.subtypesOf nonbasicId after) (Set.singleton Subtype.Mountain)
+    -- CR 400.7 mints a NEW object for the permanent, but CR 400.7a is the
+    -- exception: an effect that changes a PERMANENT SPELL's characteristics
+    -- keeps applying to the permanent that spell becomes, and rules text is a
+    -- characteristic (CR 109.3). So the hacked Blood Moon reads "Nonbasic lands
+    -- are Islands" on the battlefield, and Urborg -- a nonbasic land -- is an
+    -- Island. Stack.carryOverTo is what re-keys the stored effect.
+    Spec.assertEqWith s "hack carried over: nonbasic land is Island" (Projection.subtypesOf nonbasicId after) (Set.singleton Subtype.Island)
   Spec.it s "CR 608.2n a resolving ability deals its damage and ceases" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)

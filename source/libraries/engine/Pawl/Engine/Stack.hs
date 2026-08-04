@@ -3,6 +3,7 @@ module Pawl.Engine.Stack where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -14,6 +15,8 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -55,7 +58,7 @@ resolveTopWith runSubgame = do
                 then Resolve.resolveSpellWith runSubgame oid
                 else
                   if not (Card.isAura card)
-                    then Event.changeZone oid Zone.Battlefield
+                    then carryOver oid =<< Event.changeZoneReturning oid Zone.Battlefield
                     else -- CR 303.4a made this spell target, so CR 608.2b applies to
                     -- it -- the first PERMANENT spell in this pool for which that
                     -- is true. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
@@ -68,7 +71,7 @@ resolveTopWith runSubgame = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          Monad.void (Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped)
+                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped
         -- A token is never on the stack (created onto the battlefield, never cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
@@ -116,6 +119,44 @@ resolveTopWith runSubgame = do
           let chosen = Binding.modesOf (Object.bindings obj)
               modal = TriggeredAbility.modal ability
            in Resolve.resolveModes oid oid (Modal.chosenModes chosen modal)
+
+-- CR 400.7a: "Effects from spells, activated abilities, and triggered abilities
+-- that change the characteristics or controller of a permanent spell on the
+-- stack continue to apply to the permanent that spell becomes." CR 400.7's
+-- general rule mints a fresh id for the permanent, so an effect stored against
+-- the SPELL's id would stop naming it; this re-keys the ones that do onto the
+-- new incarnation. Nothing when the move did not happen (a cancelled CR 616.1
+-- replacement), in which case the spell's id is still the live one and there is
+-- nothing to move.
+--
+-- THE INVARIANT: no case on any effect's identity. Every stored
+-- ContinuousEffect qualifies for CR 400.7a by CLASSIFICATION -- Projection.layerOf
+-- puts each modification in one of CR 613.1's layers, and every layer either
+-- changes a characteristic (CR 109.3 lists rules text, subtype, colour,
+-- abilities and P/T among them) or, at layer 2 (CR 613.1b), the controller.
+-- Those are exactly the two things this rule carries over.
+--
+-- Only Affected.TheseObjects is re-keyed, because that is the only arm a
+-- resolution effect ever stores (CR 611.2c locks the set); the dynamic arms
+-- belong to static abilities, are re-derived each projection, and so follow the
+-- new object without help.
+--
+-- Scoped to the two permanent-spell branches above. CR 400.7b (static-ability
+-- ability grants) and CR 400.7c (prevention effects) are separate exceptions
+-- with separate carriers and are not claimed here (#634).
+carryOver :: ObjectId -> Maybe ObjectId -> Game ()
+carryOver _ Nothing = pure ()
+carryOver oldId (Just newId) = State.modify' $ \gs ->
+  gs {GameState.continuousEffects = fmap (reanchor oldId newId) (GameState.continuousEffects gs)}
+
+-- carryOver's per-effect half: swap oldId for newId in a locked affected set that
+-- names it, and leave every other effect alone.
+reanchor :: ObjectId -> ObjectId -> ContinuousEffect.ContinuousEffect -> ContinuousEffect.ContinuousEffect
+reanchor oldId newId eff = case ContinuousEffect.affected eff of
+  Affected.TheseObjects oids
+    | Set.member oldId oids ->
+        eff {ContinuousEffect.affected = Affected.TheseObjects (Set.insert newId (Set.delete oldId oids))}
+  _ -> eff
 
 -- The no-subgame resolve-top (every existing caller and test): a resolving spell
 -- with a PlaySubgame effect would draw. Engine's live loop uses resolveTopWith.
