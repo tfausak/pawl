@@ -122,6 +122,24 @@ blasting idx oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   _ -> S.identityAnswer p
 
+-- `blasting`, except that it aims at the SPELL BEING CAST whenever the engine
+-- offers that as a choice -- the prompt names the object whose targets are being
+-- announced, which since CR 601.2a is the blast's own stack incarnation. CR
+-- 115.5 says it must never be in the offered set, so this answer must never get
+-- to take it, and the fallback `oid` is what really gets targeted.
+--
+-- A greedy answer rather than an assertion on the set, because the set is
+-- reached only from inside the cast and the id it would be checked against does
+-- not exist until CR 601.2a has minted it (CR 400.7).
+blastingSelfIfOffered :: ModeIndex.ModeIndex -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+blastingSelfIfOffered idx oid p = case p of
+  Prompt.ChooseModes {} -> Set.singleton idx
+  Prompt.ChooseTargets _ _ self sets ->
+    fmap
+      (\set -> if Set.member (Recipient.ToObject self) set then Recipient.ToObject self else Recipient.ToObject oid)
+      sets
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 202.2 a mono-black card's colour is black" $ do
@@ -530,3 +548,34 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
           "and a legal 'target blue spell'"
     Spec.assertBool s (notElem spellId (GameState.stack after)) "the drone spell is off the stack"
     Spec.assertEqWith s "countered into its owner's graveyard, so it never entered the battlefield" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+
+  Spec.it s "CR 115.5 the blast is a blue spell on the stack and still cannot counter itself" $ do
+    -- The board above, answered GREEDILY: CR 601.2a puts Red Elemental Blast on
+    -- the stack before CR 601.2b's modes and CR 601.2c's targets, and Painter's
+    -- Servant's MatchingAnywhere blue reaches a stack object (the case above
+    -- proves it does), so the blast IS a blue spell in its own "counter target
+    -- blue spell" pool. CR 115.5 -- "a spell or ability on the stack is an
+    -- illegal target for itself" -- is the only thing that takes it back out, and
+    -- Red Elemental Blast's slot carries no "another" clause to do the job
+    -- instead.
+    --
+    -- So the answer below reaches for itself and cannot have it: the drone is
+    -- countered exactly as it is above. Without rule 115.5 the blast would
+    -- counter itself here and the drone would resolve onto the battlefield.
+    mountain <- S.printingOf s registry "Mountain"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
+    let base = S.landsInPlay mountain 3
+        (inHand, psId) = S.handOne paintersServant base
+        cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
+        withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
+        (spellId, withSpell) = S.spellOnStack slaughterDrone S.alice withPainter
+        (rebId, gs) = S.addHandCard redElementalBlast S.alice withSpell
+        answer :: Prompt.Prompt r -> r
+        answer = blastingSelfIfOffered counterMode spellId
+        blasted = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice rebId))
+        after = snd (Engine.runGamePure answer blasted Stack.resolveTop)
+    Spec.assertEqWith s "the blast really was cast" (length (Game.zoneMembers Zone.Hand S.alice blasted)) 0
+    Spec.assertBool s (notElem spellId (GameState.stack after)) "the DRONE is what got countered"
+    Spec.assertEqWith s "both spells are in the graveyard: neither countered itself" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2

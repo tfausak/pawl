@@ -34,7 +34,25 @@ import qualified Pawl.Types.Zone as Zone
 -- CR 115: a target slot's legal recipients -- the set its spec admits
 -- (admittedRecipients below), less every candidate rule 702 forbids TARGETING
 -- (targetable below, where shroud, hexproof and the restrictions after them
--- live).
+-- live), less CR 115.5's one candidate: "A spell or ability on the stack is an
+-- illegal target for itself."
+--
+-- Rule 115.5 is subtracted HERE and not in admittedGiven because it is a
+-- TARGETING rule, exactly as rule 702's restrictions are: what an enchant spec
+-- admits (CR 303.4c, Sba.stillLegalEnchant) is a different question and asks no
+-- targeting question at all. Both of CR 115's moments therefore honour it, since
+-- both route through this function -- CR 601.2c's choosing and CR 608.2b's
+-- re-validation.
+--
+-- ITS GATE IS THE RULE'S OWN WORDS, "on the stack": `source` is the object the
+-- targeting is relative to, and it is the object on the stack only for a SPELL
+-- (Cast.castSpell, and Resolve's CR 608.2b re-check, which pass the spell
+-- object). A permanent's activated ability passes the source PERMANENT, which is
+-- on the battlefield, so this subtracts nothing there -- and that is the right
+-- answer rather than a happy accident: the ability, not the permanent, is the
+-- object rule 115.5 speaks of, so Prodigal Sorcerer may still ping itself
+-- (TargetSpec proves it). An ability targeting ITSELF is the case this cannot
+-- reach, because the ability object's own id is not in this frame at all (#638).
 --
 -- The two frames are SEPARATE, and keeping them apart is the whole point:
 --
@@ -69,7 +87,13 @@ legalRecipients perspective source spec gs =
   -- The SAME thunk both halves read, so the whole-board projection is still
   -- taken at most once per slot (admittedGiven's own note).
   let pcs = Projection.projectAll gs
-   in Set.filter (targetable pcs perspective gs) (admittedGiven pcs perspective source spec gs)
+      -- CR 115.5's gate, hoisted out of the fold: one scan of the stack per
+      -- slot rather than one per candidate.
+      sourceOnStack = elem source (GameState.stack gs)
+      keep recipient =
+        not (sourceOnStack && Recipient.objectOf recipient == Just source)
+          && targetable pcs perspective gs recipient
+   in Set.filter keep (admittedGiven pcs perspective source spec gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures and
@@ -444,7 +468,9 @@ stillAdmitted perspective source recipient spec gs = Set.member recipient (admit
 -- source permanent for an ability. CR 601.2c's "another" needs no separate pass:
 -- a slot that excludes its source says so with Not IsSource, and a slot that
 -- does not is untouched, so Prodigal Sorcerer may still target itself with
--- AnyTarget (CR 115.4).
+-- AnyTarget (CR 115.4). CR 115.5's self-exclusion is a DIFFERENT rule and is not
+-- that clause: it is unconditional, and it fires only where its own words do,
+-- for a source that is itself on the stack -- see legalRecipients.
 legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
 legalSets perspective source specs gs = fmap (\spec -> legalRecipients perspective source spec gs) specs
 

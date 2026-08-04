@@ -132,6 +132,18 @@ instantSpeed card = Card.isInstant card || Keyword.hasFlash (Card.Type.keywords 
 -- slot is measured against is the player CASTING the spell, who becomes its
 -- controller the moment it is put on the stack. Taken as a parameter rather than
 -- read off the card, which is in a hand and has no controller at all.
+--
+-- MEASURED BEFORE THE MOVE, which castSpell no longer is, and that is
+-- structural rather than an oversight: this is an OFFER, computed by
+-- Action.legalActions while every card is still where it was, and there is no
+-- honest way to ask it of a stack incarnation that does not exist -- simulating
+-- CR 601.2a per card in hand would mint an id, run the CR 616.1 replacement loop
+-- and can prompt. The two agree for every card in this pool, because the only
+-- object whose stack membership the move changes is the spell itself and CR
+-- 115.5 takes that one back out of every stack pool (Target.legalRecipients); a
+-- card whose cost or targeting genuinely differs between hand and stack is what
+-- would split them, and is #89's own expiry trigger. castableWhileSearching
+-- reads the same pre-move projection for the same reason.
 targetable :: PlayerId -> ObjectId -> GameState -> Bool
 targetable pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
@@ -220,8 +232,9 @@ affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid o
 -- Three conditions, and each is a different rule:
 --
 --   1. The card HAS entwine. Rule 702.42a is a static ability of the spell
---      itself, so it is read off the card's printed keywords (Keyword.entwineCost)
---      one step before CR 601.2a moves it to the stack.
+--      itself, so it is read off the card's printed keywords
+--      (Keyword.entwineCost) and not through the CR 613 projection of the stack
+--      object CR 601.2a has already made.
 --   2. Every printed mode is LEGAL. CR 700.2a: "If one of the modes would be
 --      illegal (due to an inability to choose legal targets, for example), that
 --      mode can't be chosen." Choosing ALL modes is therefore not open when one
@@ -243,15 +256,20 @@ affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid o
 -- WHICH candidate will carry the cost is not decided here: this answers only
 -- whether SOME route pays it, and castSpell narrows the candidates to the routes
 -- that really do once the answer is in.
-entwineOffer :: PlayerId -> ObjectId -> GameState -> Maybe (Cost Keyword)
-entwineOffer pid oid gs = case Game.cardOf oid gs of
+--
+-- `candidates` is handed in rather than read from `Cost.costsFor oid gs`: by the
+-- time castSpell asks, CR 601.2a has already moved the card to the stack, and
+-- pawl offers a candidate cost BY ZONE (flashback's only from a graveyard), so
+-- the list has to come from the proposal. See castSpell.
+entwineOffer :: PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
+entwineOffer pid oid candidates gs = case Game.cardOf oid gs of
   Nothing -> Nothing
   Just card -> do
     cost <- Keyword.entwineCost (Card.Type.keywords card)
     let modal = Card.Type.spell card
         legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
-    Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) (Cost.costsFor oid gs))
+    Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
 
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
@@ -517,195 +535,263 @@ castWhileSearching pid = do
             castSpell pid oid
             castWhileSearching pid
 
--- CR 601.2b then 601.2c: choose modes, THEN targets (601.2c), pay (601.2f-h),
--- move to the stack (601.2a), stamp the choices on the NEW stack incarnation
--- (CR 400.7). Prompting before payment is 601.2's own order; there is no rewind
--- for mid-announcement failure (#56), and legalActions only offers affordable,
--- fully-fillable casts -- so every prompt below is answerable.
+-- CR 601.2's own order, walked in it: 601.2a moves the card to the stack FIRST,
+-- then 601.2b chooses the modes and the cost and announces X and the Phyrexian
+-- symbols, then 601.2c chooses the targets, then 601.2f-h totals the cost and
+-- pays it, and 601.2i records that the spell has been cast. The spell is a stack
+-- object for the whole of its own announcement, which is what rule 601.2a's "a
+-- player first moves that card (or that copy of a card) from where it is to the
+-- stack" says, and it is what makes every read below -- a cost criterion's
+-- projection, a target pool -- see the CR 400.7 incarnation the rules put there
+-- rather than the card still sitting in a hand (#89's casting half).
 --
--- A legal answer CAN still fail after the prompt, and one class of it is
--- deliberate: castability asks whether SOME sequence of choices pays the cost,
--- and the mana window then asks the player to make them. A player who taps their
--- only Birds of Paradise for the wrong colour cannot pay, and Mana.payCost's own
--- haddock argues at length that the engine must let them. What must NOT happen is
--- pawl offering a route it can already see the total cost cannot pay, which is why
--- Cost.announce is handed CR 601.2f's totalling below.
+-- CR 115.5 is what keeps that from being a new bug rather than a fix: the spell
+-- now appears in its OWN Pool.Spells, and "a spell or ability on the stack is an
+-- illegal target for itself" is what takes it back out (Target.legalRecipients).
+-- With a Painter's Servant naming blue, a Red Elemental Blast on the stack is a
+-- blue spell, and its "counter target blue spell" mode must not offer it itself.
 --
--- An illegal answer at ANY step makes the
--- whole cast a no-op: reject-not-repair, the AssignCombatDamage posture. A
--- spell with no slots (in its chosen modes) asks nothing.
+-- TWO things are read from `before`, one step ahead of the move, because CR
+-- 400.7 mints an incarnation with no memory of where it came from:
+--
+--   * the zone the cast was proposed FROM, which armCastFromGraveyard needs;
+--   * the CANDIDATE COSTS, which pawl offers by zone -- Cost.costsFor gives
+--     flashback's cost only from a graveyard. CR 601.2b's "the mana cost or
+--     alternative cost (as determined in rule 601.2b)" is determined by the
+--     proposal, so locking the candidates in at the proposal is the rule's own
+--     reading rather than a workaround for the move.
+--
+-- REJECT-NOT-REPAIR, now as a genuine rewind: an illegal answer at any step
+-- restores `before`, which is what undoes the CR 601.2a move. That is CR 601.2's
+-- own remedy -- "the casting of the spell is illegal; the game returns to the
+-- moment before the casting of that spell was proposed" -- and the posture
+-- Activate.activateAbility already takes towards the ability object it puts on
+-- the stack. What the restore does NOT undo is a prompt already issued (#56).
+--
+-- Every prompt below is answerable: legalActions only offers affordable,
+-- fully-fillable casts. A legal answer CAN still fail after the prompt, and one
+-- class of it is deliberate: castability asks whether SOME sequence of choices
+-- pays the cost, and the mana window then asks the player to make them. A player
+-- who taps their only Birds of Paradise for the wrong colour cannot pay, and
+-- Mana.payCost's own haddock argues at length that the engine must let them.
+-- What must NOT happen is pawl offering a route it can already see the total
+-- cost cannot pay, which is why Cost.announce is handed CR 601.2f's totalling
+-- below.
+--
+-- A spell with no slots (in its chosen modes) asks nothing.
 castSpell :: PlayerId -> ObjectId -> Game ()
 castSpell pid oid = do
-  gs <- State.get
-  case Game.cardOf oid gs of
+  before <- State.get
+  case Game.cardOf oid before of
     Nothing -> pure ()
     Just card -> do
-      let decider = Decide.deciderFor pid gs
-          modal = Card.Type.spell card
-          legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) modal gs
-      -- CR 702.42a: entwine, asked FIRST -- before the mode choice CR 601.2b
-      -- lists first -- because rule 702.42a states the widened selection and the
-      -- extra payment as ONE decision ("You may choose all modes of this spell
-      -- instead of just the number specified. If you do, you pay an additional
-      -- [cost]"). A player who entwines has thereby announced their mode choice,
-      -- so there is nothing left for ChooseModes to ask; a player who declines
-      -- is asked the ordinary question one line below, in 601.2b's own order.
+      let castFrom = fmap Object.zone (Game.lookupObject oid before)
+          candidates = Cost.costsFor oid before
+      -- CR 601.2a. Nothing means the id was unknown or the CR 616.1 replacement
+      -- loop cancelled the move, and a proposal whose first step did not happen
+      -- is one the game returns from (CR 601.2).
+      moved <- Event.changeZoneReturning oid Zone.Stack
+      case moved of
+        Nothing -> State.put before
+        Just sid -> castProposed pid sid card castFrom candidates before
+
+-- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
+-- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), which is
+-- the object every step below announces for, targets relative to, is projected
+-- from and stamps its choices onto; `before` is the state to return to.
+--
+-- Split out so the whole announcement reads one state and one id: castSpell's
+-- own two bindings are the only things that outlive the move.
+castProposed :: PlayerId -> ObjectId -> Card.Type.Card -> Maybe Zone.Zone -> [Cost Keyword] -> GameState -> Game ()
+castProposed pid sid card castFrom candidates before = do
+  gs <- State.get
+  let decider = Decide.deciderFor pid gs
+      modal = Card.Type.spell card
+      legal = Target.fillableModes (Just pid) sid (Card.enchantSpecs card) modal gs
+      -- CR 601.2e: "If the proposed spell is illegal, the game returns to the
+      -- moment before the casting of that spell was proposed" -- which is the
+      -- state before CR 601.2a's move. CR 601.6 says the same for a permission
+      -- lost after the proposal completes.
+      reject :: Game ()
+      reject = State.put before
+  -- CR 702.42a: entwine, asked FIRST -- before the mode choice CR 601.2b lists
+  -- first -- because rule 702.42a states the widened selection and the extra
+  -- payment as ONE decision ("You may choose all modes of this spell instead of
+  -- just the number specified. If you do, you pay an additional [cost]"). A
+  -- player who entwines has thereby announced their mode choice, so there is
+  -- nothing left for ChooseModes to ask; a player who declines is asked the
+  -- ordinary question one line below, in 601.2b's own order.
+  --
+  -- The choice is never made for them. entwineOffer answers Nothing only where
+  -- there is no option to offer -- no entwine, an illegal mode (CR 700.2a), or
+  -- no payable route -- and where there IS one, both answers go to the player
+  -- and the engine takes neither.
+  --
+  -- The answer is carried as the additional Cost itself rather than as a flag,
+  -- so the two things it changes -- the mode count just below and the candidate
+  -- costs further down -- read the same value.
+  entwined <- case entwineOffer pid sid candidates gs of
+    Nothing -> pure Nothing
+    Just extra -> do
+      decision <- Trans.lift (Program.prompt (Prompt.ChooseEntwine decider pid sid extra))
+      pure $ case decision of
+        EntwineDecision.Entwines -> Just extra
+        EntwineDecision.Declines -> Nothing
+  -- CR 700.2 normally, CR 702.42a's "all modes" when the entwine cost is being
+  -- paid. The printed ModeSelection is untouched either way: entwine overrides
+  -- the count for this ONE cast, it does not reprint the card.
+  let count = case entwined of
+        Just _ -> Modal.modeCount modal
+        Nothing -> Modal.selectionCount modal
+  -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
+  -- unprompted) exactly when there is nothing to choose -- as many legal modes
+  -- as the selection demands or fewer (a non-modal card's one mode, or a modal
+  -- card whose only-just-fillable modes leave no real choice), #50. An entwined
+  -- cast is always in that case: entwineOffer has already established that every
+  -- mode is legal, so `legal` has exactly `count` members and CR 702.42a's "all
+  -- modes" is the only answer.
+  chosenModes <-
+    if Natural.length legal <= count
+      then pure legal
+      else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid sid legal count))
+  -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
+  -- modes rewinds the whole cast, guarding every step below.
+  if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
+    then reject
+    else do
+      -- CR 601.2b: the cost to be paid is announced after the modes and before X
+      -- and targets. Only PAYABLE candidates are offered (CR 118.9b makes an
+      -- alternative optional, so a player who can afford both is really
+      -- choosing); one payable candidate is forced and unprompted.
+      -- Reject-not-repair: an answer outside the offered set rewinds the cast.
       --
-      -- The choice is never made for them. entwineOffer answers Nothing only
-      -- where there is no option to offer -- no entwine, an illegal mode (CR
-      -- 700.2a), or no payable route -- and where there IS one, both answers go
-      -- to the player and the engine takes neither.
-      --
-      -- The answer is carried as the additional Cost itself rather than as a
-      -- flag, so the two things it changes -- the mode count just below and the
-      -- candidate costs further down -- read the same value.
-      entwined <- case entwineOffer pid oid gs of
-        Nothing -> pure Nothing
-        Just extra -> do
-          decision <- Trans.lift (Program.prompt (Prompt.ChooseEntwine decider pid oid extra))
-          pure $ case decision of
-            EntwineDecision.Entwines -> Just extra
-            EntwineDecision.Declines -> Nothing
-      -- CR 700.2 normally, CR 702.42a's "all modes" when the entwine cost is
-      -- being paid. The printed ModeSelection is untouched either way: entwine
-      -- overrides the count for this ONE cast, it does not reprint the card.
-      let count = case entwined of
-            Just _ -> Modal.modeCount modal
-            Nothing -> Modal.selectionCount modal
-      -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
-      -- unprompted) exactly when there is nothing to choose -- as many legal
-      -- modes as the selection demands or fewer (a non-modal card's one mode,
-      -- or a modal card whose only-just-fillable modes leave no real
-      -- choice), #50. An entwined cast is always in that case: entwineOffer has
-      -- already established that every mode is legal, so `legal` has exactly
-      -- `count` members and CR 702.42a's "all modes" is the only answer.
-      chosenModes <-
-        if Natural.length legal <= count
-          then pure legal
-          else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid oid legal count))
-      -- Reject-not-repair: an answer that is not a size-`count` subset of the
-      -- legal modes makes the whole cast a no-op, guarding every step below.
-      Monad.when (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count) $ do
-        -- CR 601.2b: the cost to be paid is announced after the modes and
-        -- before X and targets. Only PAYABLE candidates are offered (CR
-        -- 118.9b makes an alternative optional, so a player who can afford both
-        -- is really choosing); one payable candidate is forced and unprompted.
-        -- Reject-not-repair: an answer outside the offered set makes the whole
-        -- cast a no-op.
-        --
-        -- CR 601.2f: "The total cost is the mana cost or alternative cost (as
-        -- determined in rule 601.2b), plus all additional costs and cost
-        -- increases". An announced entwine is added to every candidate BEFORE
-        -- the payability filter, so the routes offered are the ones that can
-        -- actually pay it -- and CR 118.9d is what makes it apply to an
-        -- alternative cost as readily as to the printed one. What the caster
-        -- then chooses between, and what is finally paid, already carries it.
-        let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
-            payable = filter (payableCost pid oid gs) (fmap withEntwine (Cost.costsFor oid gs))
-        Monad.unless (null payable) $ do
+      -- CR 601.2f: "The total cost is the mana cost or alternative cost (as
+      -- determined in rule 601.2b), plus all additional costs and cost
+      -- increases". An announced entwine is added to every candidate BEFORE the
+      -- payability filter, so the routes offered are the ones that can actually
+      -- pay it -- and CR 118.9d is what makes it apply to an alternative cost as
+      -- readily as to the printed one. What the caster then chooses between, and
+      -- what is finally paid, already carries it.
+      let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
+          payable = filter (payableCost pid sid gs) (fmap withEntwine candidates)
+      if null payable
+        then reject
+        else do
           chosenCost <- case payable of
             [only] -> pure only
-            _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid oid payable))
-          Monad.when (elem chosenCost payable) $ do
-            let sets = Target.legalSets (Just pid) oid (Card.modesTargetSpecs chosenModes card) gs
-            -- CR 601.2b's announcement is free -- any Natural -- but the player
-            -- making it is told what the board can pay. The bound rides the
-            -- CHOSEN cost, so an alternative cost or a CR 601.2f adjustment moves
-            -- it, and nothing filters the answer against it: an unaffordable
-            -- announcement still reverses the whole cast (#417).
-            mAmount <-
-              if Cost.hasVariable chosenCost
-                then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid (affordableX pid oid gs chosenCost))))
-                else pure Nothing
-            -- CR 601.2: "If a player is unable to comply with the requirements of
-            -- a step listed below while performing that step, the casting of the
-            -- spell is illegal; the game returns to the moment before the casting
-            -- of that spell was proposed." The X the player just named is where
-            -- that can first become true, and this is the step it becomes true in:
-            -- every candidate offered above passed payableCost at CR 601.2b's X=0
-            -- FLOOR, which is the only value castability can measure before the
-            -- announcement exists.
-            --
-            -- Asked with the same predicate the floor was asked with, on the cost
-            -- carrying the announced value, so a gate and an announcement cannot
-            -- disagree about what a cost is. That matters beyond tidiness: CR
-            -- 118.13a's Phyrexian announcement below runs on this cost, and on a
-            -- {X}{G/P} (Corrosive Gale) a large enough X leaves NEITHER of CR
-            -- 107.4f's two routes payable -- whereupon Mana.announcePhyrexian has
-            -- no offer to make and would have to invent one. This gate is what
-            -- keeps that arm out of reach, and its haddock says so.
-            --
-            -- Reject-not-repair, the posture every other step here takes: the
-            -- announcement is NOT clamped to affordableX (CR 601.2b lets the
-            -- player announce the value of the variable freely), it is honoured
-            -- and then loses the spell. Reversing here rather than at CR 601.2h's
-            -- failed payment costs the player nothing, since everything between
-            -- is undone by the same reversal -- and it is the posture castability
-            -- itself already takes, measuring payability at CR 601.2b instead of
-            -- waiting for the payment to fail (#56 is the prompts that reversal
-            -- still owes).
-            --
-            -- Asked unconditionally rather than only when there is an {X}: for a
-            -- cost with none, `announcedAtX` IS the chosen candidate and this
-            -- re-asks a question already answered above, which costs a payability
-            -- check and buys one predicate over one cost instead of two spellings
-            -- of when the gate applies.
-            let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
-            Monad.when (payableCost pid oid gs announcedAtX) $ do
-              -- CR 601.2b's own order puts the Phyrexian announcement AFTER the
-              -- value of X and before CR 601.2c's targets: "If a cost that will be
-              -- paid as the spell is being cast includes Phyrexian mana symbols,
-              -- the player announces whether they intend to pay 2 life or a
-              -- corresponding colored mana cost for each of those symbols." CR
-              -- 118.13a is what forbids deferring it to payment time.
+            _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid sid payable))
+          if notElem chosenCost payable
+            then reject
+            else do
+              let sets = Target.legalSets (Just pid) sid (Card.modesTargetSpecs chosenModes card) gs
+              -- CR 601.2b's announcement is free -- any Natural -- but the player
+              -- making it is told what the board can pay. The bound rides the
+              -- CHOSEN cost, so an alternative cost or a CR 601.2f adjustment
+              -- moves it, and nothing filters the answer against it: an
+              -- unaffordable announcement still reverses the whole cast (#417).
+              mAmount <-
+                if Cost.hasVariable chosenCost
+                  then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost))))
+                  else pure Nothing
+              -- CR 601.2: "If a player is unable to comply with the requirements
+              -- of a step listed below while performing that step, the casting of
+              -- the spell is illegal; the game returns to the moment before the
+              -- casting of that spell was proposed." The X the player just named
+              -- is where that can first become true, and this is the step it
+              -- becomes true in: every candidate offered above passed payableCost
+              -- at CR 601.2b's X=0 FLOOR, which is the only value castability can
+              -- measure before the announcement exists.
               --
-              -- Cost.totalMana is handed in so that the routes offered are the ones
-              -- CR 601.2f's total can pay -- the same adjusted cost payableCost
-              -- gated this cast on, and read from the same `gs` the total below is
-              -- (ManaSpec's Mana.TotalCost group).
-              announcedCost <- Cost.announce pid oid (Cost.totalMana pid oid gs) announcedAtX
-              chosen <-
-                if Map.null sets
-                  then pure Map.empty
-                  else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
-              let keysAgree = Map.keysSet chosen == Map.keysSet sets
-                  eachLegal = and (Map.intersectionWith Set.member chosen sets)
-              Monad.when (keysAgree && eachLegal) $ do
-                -- CR 601.2b then 601.2f: substitute X and announce the Phyrexian
-                -- symbols (both above), then compute the total cost. The object is
-                -- still in HAND here, one step before 601.2a moves it to the
-                -- stack, so a criterion is read against its hand projection (#89).
-                let paidCost = Cost.total pid oid announcedCost gs
-                payment <- Cost.pay pid oid paidCost
-                case payment of
-                  Payment.Unpaid -> pure ()
-                  -- Which of the candidate costs was paid is not recorded past
-                  -- this point (#101); the chosen Cost is discarded once paid.
-                  Payment.Paid -> do
-                    -- Read BEFORE the move, which is the last moment the zone the
-                    -- spell was cast from is knowable: CR 400.7 mints a new
-                    -- incarnation on the stack with no memory of where it came
-                    -- from. Read from the LIVE state rather than the `gs` this
-                    -- cast opened with, so nothing a cost payment did is missed.
-                    castFrom <- State.gets (fmap Object.zone . Game.lookupObject oid)
-                    Event.changeZone oid Zone.Stack
-                    -- CR 601.2i: the spell has been cast. Emitted here, AFTER
-                    -- the last step that can fail, so a rejected announcement
-                    -- records nothing.
-                    State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
-                    moved <- State.get
-                    case GameState.stack moved of
-                      [] -> pure ()
-                      top : _ -> do
-                        State.put
-                          moved
-                            { GameState.objects =
-                                Map.adjust
-                                  (\o -> o {Object.bindings = Binding.fromChoices chosen mAmount chosenModes})
-                                  top
-                                  (GameState.objects moved)
-                            }
-                        Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid card top)
+              -- Asked with the same predicate the floor was asked with, on the
+              -- cost carrying the announced value, so a gate and an announcement
+              -- cannot disagree about what a cost is. That matters beyond
+              -- tidiness: CR 118.13a's Phyrexian announcement below runs on this
+              -- cost, and on a {X}{G/P} (Corrosive Gale) a large enough X leaves
+              -- NEITHER of CR 107.4f's two routes payable -- whereupon
+              -- Mana.announcePhyrexian has no offer to make and would have to
+              -- invent one. This gate is what keeps that arm out of reach, and its
+              -- haddock says so.
+              --
+              -- Reject-not-repair, the posture every other step here takes: the
+              -- announcement is NOT clamped to affordableX (CR 601.2b lets the
+              -- player announce the value of the variable freely), it is honoured
+              -- and then loses the spell. Reversing here rather than at CR
+              -- 601.2h's failed payment costs the player nothing, since everything
+              -- between is undone by the same reversal -- and it is the posture
+              -- castability itself already takes, measuring payability at CR
+              -- 601.2b instead of waiting for the payment to fail (#56 is the
+              -- prompts that reversal still owes).
+              --
+              -- Asked unconditionally rather than only when there is an {X}: for a
+              -- cost with none, `announcedAtX` IS the chosen candidate and this
+              -- re-asks a question already answered above, which costs a
+              -- payability check and buys one predicate over one cost instead of
+              -- two spellings of when the gate applies.
+              let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
+              if not (payableCost pid sid gs announcedAtX)
+                then reject
+                else do
+                  -- CR 601.2b's own order puts the Phyrexian announcement AFTER
+                  -- the value of X and before CR 601.2c's targets: "If a cost that
+                  -- will be paid as the spell is being cast includes Phyrexian
+                  -- mana symbols, the player announces whether they intend to pay
+                  -- 2 life or a corresponding colored mana cost for each of those
+                  -- symbols." CR 118.13a is what forbids deferring it to payment
+                  -- time.
+                  --
+                  -- Cost.totalMana is handed in so that the routes offered are the
+                  -- ones CR 601.2f's total can pay -- the same adjusted cost
+                  -- payableCost gated this cast on, and read from the same `gs`
+                  -- the total below is (ManaSpec's Mana.TotalCost group).
+                  announcedCost <- Cost.announce pid sid (Cost.totalMana pid sid gs) announcedAtX
+                  -- CR 601.2c, and the spell is on the stack for it: `sets` above
+                  -- was computed from the same post-move `gs`, so the pool a
+                  -- "target spell" slot draws from is the one rule 601.2a built --
+                  -- with this spell in it, and CR 115.5 taking it back out.
+                  chosen <-
+                    if Map.null sets
+                      then pure Map.empty
+                      else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid sid sets))
+                  let keysAgree = Map.keysSet chosen == Map.keysSet sets
+                      eachLegal = and (Map.intersectionWith Set.member chosen sets)
+                  if not (keysAgree && eachLegal)
+                    then reject
+                    else do
+                      -- CR 601.2b then 601.2f: substitute X and announce the
+                      -- Phyrexian symbols (both above), then compute the total
+                      -- cost. CR 601.2a has already moved the spell, so a
+                      -- criterion is read against its STACK incarnation, which is
+                      -- the projection rule 601.2f's total is owed (#89's casting
+                      -- half).
+                      let paidCost = Cost.total pid sid announcedCost gs
+                      payment <- Cost.pay pid sid paidCost
+                      case payment of
+                        -- CR 601.2h: the payment failed, so the cast is illegal
+                        -- and CR 601.2 returns the game to before it was proposed
+                        -- -- which is what takes the spell back off the stack.
+                        Payment.Unpaid -> reject
+                        -- Which of the candidate costs was paid is not recorded
+                        -- past this point (#101); the chosen Cost is discarded
+                        -- once paid.
+                        Payment.Paid -> do
+                          -- CR 601.2i: the spell has been cast. Emitted here,
+                          -- AFTER the last step that can fail, so a rejected
+                          -- announcement records nothing.
+                          State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
+                          -- Stamped on `sid` itself, the incarnation CR 601.2a
+                          -- put on the stack, rather than on whatever is on top
+                          -- of it now.
+                          State.modify'
+                            ( \g ->
+                                g
+                                  { GameState.objects =
+                                      Map.adjust
+                                        (\o -> o {Object.bindings = Binding.fromChoices chosen mAmount chosenModes})
+                                        sid
+                                        (GameState.objects g)
+                                  }
+                            )
+                          Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid card sid)
 
 -- CR 702.34a's SECOND static ability -- "exile this card instead of putting it
 -- anywhere else any time it would leave the stack" -- installed onto the spell's
@@ -716,10 +802,11 @@ castSpell pid oid = do
 -- WHY IT IS ARMED HERE rather than re-derived from the card while the spell sits
 -- on the stack: rule 702.34a conditions the ability on "if the flashback cost
 -- was paid", and nothing downstream records which cost was paid (#101). This is
--- the one point in the engine that knows -- the object was in a graveyard one
--- line ago, and Pawl.Engine.Cost.costsFor offers no candidate but the flashback cost
--- from there, so for every card in this pool "was cast from the graveyard" and
--- "the flashback cost was paid" are the same fact. NOT the general rule: a card
+-- the one point in the engine that knows -- castSpell read the proposing zone
+-- one step ahead of CR 601.2a's move, and Pawl.Engine.Cost.costsFor offers no candidate
+-- but the flashback cost from a graveyard, so for every card in this pool "was
+-- cast from the graveyard" and "the flashback cost was paid" are the same fact.
+-- NOT the general rule: a card
 -- cast from a graveyard under some other permission would be exiled here when
 -- rule 702.34a says it should not be, which is precisely #101's gap and not a
 -- claim this function makes.
@@ -728,7 +815,7 @@ castSpell pid oid = do
 -- exactly once, and the ability has no duration -- it stops mattering because its
 -- subject is gone, which is what the store spells Uses.Once.
 armCastFromGraveyard :: PlayerId -> Card.Type.Card -> ObjectId -> Game ()
-armCastFromGraveyard caster card top =
+armCastFromGraveyard caster card spellId =
   let arm re = State.modify' $ \gs ->
         let (ts, gs1) = Game.freshTimestamp gs
             active =
@@ -736,7 +823,7 @@ armCastFromGraveyard caster card top =
                 { ActiveReplacement.effect = re,
                   -- CR 113.7: the source is the spell itself, which is also what
                   -- the pattern's TheSource subject is compared against.
-                  ActiveReplacement.source = top,
+                  ActiveReplacement.source = spellId,
                   -- CR 109.5: the caster. Nothing reads it -- rule 702.34a's
                   -- exile is a ZoneChangeR whose subject is TheSource, an
                   -- identity test with no relation to resolve -- but the row

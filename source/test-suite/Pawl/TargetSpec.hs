@@ -345,6 +345,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertBool s (elem spellId (GameState.stack resolved)) "and is still on the stack, uncountered"
     Spec.assertEqWith s "Cancel resolved into alice's graveyard regardless" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
 
+  -- CR 115.5: "A spell or ability on the stack is an illegal target for itself."
+  -- Cancel's "counter target spell" draws from Pool.Spells with no Filter at
+  -- all, so the rule is the ONLY thing that can exclude the Cancel itself --
+  -- there is no "another" for a Not IsSource clause to carry.
+  --
+  -- The second spell is the control: the exclusion has to be the ONE object the
+  -- rule names, not an emptied pool.
+  Spec.it s "CR 115.5 a Cancel on the stack is not a legal target for itself, though another spell there is" $ do
+    island <- S.printingOf s registry "Island"
+    cancel <- S.printingOf s registry "Cancel"
+    mongoose <- S.printingOf s registry "Blurred Mongoose"
+    let base = S.landsInPlay island 3
+        (victimId, withVictim) = S.spellOnStack mongoose S.bob base
+        (cancelId, gs) = S.spellOnStack cancel S.alice withVictim
+    case soleTargetSpec (Card.Type.spell (Printing.card cancel)) of
+      Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
+      Just theSpec -> do
+        let legal = Target.legalRecipients (Just S.alice) cancelId theSpec gs
+        Spec.assertBool
+          s
+          (not (Set.member (Recipient.ToObject cancelId) legal))
+          "CR 115.5: the Cancel is an illegal target for itself"
+        Spec.assertBool
+          s
+          (Set.member (Recipient.ToObject victimId) legal)
+          "and the OTHER spell on the stack is still legal"
+
+  -- The counterweight, and the reason CR 115.5's gate is "is the source on the
+  -- STACK" rather than "is the candidate the source": rule 115.5 speaks of the
+  -- object ON THE STACK, which for an activated ability is the ability, not the
+  -- permanent it was activated from. Prodigal Sorcerer's "{T}: This creature
+  -- deals 1 damage to any target" may therefore still name the Sorcerer, which
+  -- is the reading Target.legalSets' own note takes for CR 601.2c's "another"
+  -- (a slot that excludes its source says so with Not IsSource).
+  Spec.it s "CR 115.5 does not stop Prodigal Sorcerer's ability targeting its own source" $ do
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (sorcererId, gs) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
+    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Card.Type.activatedAbilities (Printing.card sorcerer)) of
+      [theSpec] ->
+        Spec.assertBool
+          s
+          (Set.member (Recipient.ToCreature sorcererId) (Target.legalRecipients (Just S.alice) sorcererId theSpec gs))
+          "the Sorcerer is a legal target of its own ability"
+      _ -> Spec.assertFailure s "Prodigal Sorcerer should print one ability with one target slot"
+
   -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
   -- targets are still legal. ... If all its targets, for every instance of the
   -- word 'target,' are now illegal, the spell or ability doesn't resolve."
