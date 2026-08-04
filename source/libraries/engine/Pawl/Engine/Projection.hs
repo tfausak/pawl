@@ -1522,8 +1522,8 @@ rewriteCard pairs card = List.foldl' apply1 card pairs
 -- CR 111.4's derived name is the subtypes PLUS the word "Token" and a two-type
 -- token's name holds two of them ("Faerie Rogue Token"). It matches a substring
 -- rather than a whole word, so a name holding this word inside a longer one
--- would be over-reached; no name in this pool does, and rewriteCard's type-line
--- gate already keeps every name pawl was not asked to change out of reach.
+-- would be over-reached (#644); rewriteCard's type-line gate already keeps every
+-- name pawl was not asked to change out of reach.
 rewriteTokenName :: Subtype.Type.Subtype -> Subtype.Type.Subtype -> CardName.CardName -> CardName.CardName
 rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.creatureTypeWord to) of
   (Just f, Just t) -> CardName.MkCardName (Text.replace f t (CardName.unwrap name))
