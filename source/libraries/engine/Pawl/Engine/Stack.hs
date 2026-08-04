@@ -3,6 +3,7 @@ module Pawl.Engine.Stack where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -53,7 +54,13 @@ resolveTopWith runSubgame = do
       Nothing -> State.put gs {GameState.stack = rest}
       Just obj -> case Object.source obj of
         Source.OfCard printing ->
-          let face = Card.combined (Printing.card printing)
+          -- CR 709.3b: if this spell has a face singled out, its classification
+          -- is read off THAT half, not the two combined -- Game.faceOf is the
+          -- one seam every characteristic read goes through, resolution's
+          -- is-it-a-permanent/is-it-an-Aura check included. Falls back to the
+          -- combined view for parity with faceOf's own fallback; unreachable
+          -- here since `obj` already resolved via this same `oid`.
+          let face = Maybe.fromMaybe (Card.combined (Printing.card printing)) (Game.faceOf oid gs)
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
                 else

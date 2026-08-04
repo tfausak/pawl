@@ -288,8 +288,11 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- per-incarnation field, so the new object enters under its owner's
               -- control until a CR 616.1b replacement says otherwise --
               -- Replacement.runEntry is the only writer. `chosenColor` and
-              -- `chosenSubtype` are reset for the same reason (CR 614.1c).
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.timestamp = ts}
+              -- `chosenSubtype` are reset for the same reason (CR 614.1c). So is
+              -- `face` (CR 400.7): the moved object is a new one, and whichever
+              -- half CR 709.3b singled out belonged only to the incarnation that
+              -- left -- a face named in the new zone is Game.faceOf's business.
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.timestamp = ts, Object.face = Nothing}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -568,7 +571,8 @@ createTokens controller card n tapped = do
                     Object.attachedTo = Nothing,
                     Object.chosenColor = Nothing,
                     Object.chosenSubtype = Nothing,
-                    Object.timestamp = ts
+                    Object.timestamp = ts,
+                    Object.face = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids

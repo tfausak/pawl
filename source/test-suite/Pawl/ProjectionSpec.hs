@@ -14,6 +14,8 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
@@ -35,6 +37,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Condition as Condition.Type
@@ -1812,6 +1815,24 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       "bounded at 7c does not"
       (PC.power (Projection.projectUpTo Layer.ModifyPT cands pikerId gs))
       (Just 2)
+
+  -- No split card exists in the pool until Task 5, so this fixture is built by
+  -- hand (Pawl.CardSpec.splitCard: two Instant halves, Wax {G} and Wane {W}) and
+  -- put on the stack directly (S.spellOnStack), with Object.face set by hand --
+  -- the caster naming a half is Task 4's job, not this one's.
+  Spec.it s "CR 709.3b a split spell on the stack has only the half being cast" $ do
+    let wax = CardName.MkCardName (Text.pack "Wax")
+        card = CardSpec.splitCard
+        (oid, gs0) = S.spellOnStack (Printing.MkPrinting card) S.alice (Setup.emptyGame S.bothPlayers)
+        showing n g = g {GameState.objects = Map.adjust (\o -> o {Object.face = Just n}) oid (GameState.objects g)}
+    -- CR 709.3b: "While on the stack, only the characteristics of the half being
+    -- cast exist. The other half's characteristics are treated as though they
+    -- didn't exist." Green alone, NOT the green-and-white CR 709.4 gives the
+    -- card in every other zone.
+    Spec.assertEqWith s "green alone" (Projection.colorsOf oid (showing wax gs0)) (Set.singleton Color.Green)
+    -- Falsifier: an engine that always answered with the combined view would
+    -- report both colours here and pass every other case in this task.
+    Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
   keywordCounterSpec s registry
 

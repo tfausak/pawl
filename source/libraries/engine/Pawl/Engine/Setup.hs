@@ -116,7 +116,8 @@ createCard pid printing = do
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
       gs3 =
         gs2

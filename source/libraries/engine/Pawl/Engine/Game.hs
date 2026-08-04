@@ -2,6 +2,7 @@ module Pawl.Engine.Game where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
@@ -194,11 +195,22 @@ cardOfSource mSource = case mSource of
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).
 --
--- The seam every characteristic read goes through. Today it is always the
--- combined view; what will narrow it to one half on the stack (CR 709.3b) is
--- the object, not this function.
+-- The seam every characteristic read goes through. When the object has not
+-- singled out a face, the layout answers (CR 709.4 / 712.8a): a split card's
+-- characteristics are its two halves combined in every zone but the stack. When
+-- it has (CR 709.3b), only the named half's characteristics exist -- looked up
+-- against the object's own STORED card, never a projected one.
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
-faceOf oid gs = fmap Card.combined (cardOf oid gs)
+faceOf oid gs = do
+  card <- cardOf oid gs
+  case lookupObject oid gs >>= Object.face of
+    Nothing -> Just (Card.combined card)
+    -- A name that does not resolve falls back to the combined view rather than
+    -- failing. Pawl.CardSpec's "face names are pairwise distinct" lint is what
+    -- makes faceNamed's answer unique whenever the name IS one of the card's
+    -- own faces; nothing yet writes any other kind of name here (Task 4 is
+    -- what will), so this arm is unreachable in practice today.
+    Just n -> Just (Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card))
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
 -- fallback, for its reasons (CR 608.2h).

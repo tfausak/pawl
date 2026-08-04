@@ -508,7 +508,8 @@ addCreature printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -701,7 +702,8 @@ addToken card pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -729,7 +731,8 @@ addLibraryCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -757,7 +760,8 @@ addGraveyardCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -792,7 +796,8 @@ addExiledCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -834,7 +839,8 @@ addHandCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -879,7 +885,8 @@ landsInPlay land n =
                   Object.attachedTo = Nothing,
                   Object.chosenColor = Nothing,
                   Object.chosenSubtype = Nothing,
-                  Object.timestamp = ts
+                  Object.timestamp = ts,
+                  Object.face = Nothing
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -906,7 +913,8 @@ handOne printing base =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -939,7 +947,8 @@ pikerInHand land piker n ph =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
       gs3 =
         gs2
@@ -1394,7 +1403,8 @@ oneMountainState mountain ph =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = Timestamp.MkTimestamp 0
+            Object.timestamp = Timestamp.MkTimestamp 0,
+            Object.face = Nothing
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1477,7 +1487,8 @@ spellOnStack printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
