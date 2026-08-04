@@ -301,7 +301,7 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- stack", so a stack-to-battlefield move must CARRY the face
               -- rather than drop it. Not implemented; no double-faced card is in
               -- the pool to reach it (#657).
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.chosenNames = Set.empty, Object.timestamp = ts, Object.face = Nothing}
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.chosenNames = Set.empty, Object.timestamp = ts, Object.face = Nothing, Object.playableFromExileBy = Nothing}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -582,7 +582,8 @@ createTokens controller card n tapped = do
                     Object.chosenSubtype = Nothing,
                     Object.chosenNames = Set.empty,
                     Object.timestamp = ts,
-                    Object.face = Nothing
+                    Object.face = Nothing,
+                    Object.playableFromExileBy = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids

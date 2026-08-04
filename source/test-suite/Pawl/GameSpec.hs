@@ -176,7 +176,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.timestamp = Timestamp.MkTimestamp 1,
               -- CR 400.7: changeZone clears any singled-out face along with
               -- every other per-incarnation field.
-              Object.face = Nothing
+              Object.face = Nothing,
+              Object.playableFromExileBy = Nothing
             }
       )
 
@@ -1451,7 +1452,8 @@ handBobBolt lightningBolt gs =
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
-            Object.face = Nothing
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1771,7 +1773,8 @@ restartOnStack mountain =
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
-            Object.face = Nothing
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

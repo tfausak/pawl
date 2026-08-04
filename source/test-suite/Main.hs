@@ -1,6 +1,7 @@
 import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
 import qualified Pawl.ActivateSpec
+import qualified Pawl.AdventureSpec
 import qualified Pawl.AuraSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec
@@ -213,6 +214,7 @@ testTree registry =
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = do
   Pawl.ActivateSpec.spec s registry
+  Pawl.AdventureSpec.spec s registry
   Pawl.AuraSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardSpec.spec s registry

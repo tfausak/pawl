@@ -564,7 +564,8 @@ handInPlay printing board =
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
-            Object.face = Nothing
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),
