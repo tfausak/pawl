@@ -18,12 +18,15 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -60,7 +63,9 @@ import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- CR 613.1: the layer a modification applies in. THE ABI classification the
@@ -207,17 +212,17 @@ applyModification lyr src cands gs oid m pc =
         -- The type-line half is CR 612.1's "the text that appears in its type
         -- line"; absent `from` is a no-op there. The rules-text half is its
         -- "that object's rules text (which appears in its text box)", and the
-        -- activated-ability list is where that text lives -- so a hacked Tidal
-        -- Warrior's "{T}: Target land becomes an Island" hands out an ability
-        -- that says Swamp. Applied unconditionally rather than under the same
+        -- ability lists are where that text lives -- so a hacked Tidal Warrior's
+        -- "{T}: Target land becomes an Island" hands out an ability that says
+        -- Swamp, and a hacked Barbarian Outcast's "when you control no Swamps"
+        -- asks about Islands. Applied unconditionally rather than under the same
         -- Set.member guard, because the word being swapped in the text box has
         -- nothing to do with whether the type line carries it: Tidal Warrior is
         -- a Merfolk Warrior with no land type at all.
         --
-        -- Not implemented: the swap does not reach PC.triggeredAbilities or
-        -- PC.replacementEffects, which are the other two carriers of the same
-        -- text box, nor a mode's targetSpecs, nor an activated ability's cost
-        -- (#635).
+        -- Not implemented: the swap does not reach PC.replacementEffects, the
+        -- remaining carrier of that same text box, nor a mode's targetSpecs, nor
+        -- an activated ability's cost (#635).
         --
         -- Done HERE, where the layer-3 effect is folded, rather than at
         -- baseCharacteristics' seed: the seed predates every layer, and this way
@@ -226,7 +231,12 @@ applyModification lyr src cands gs oid m pc =
         -- fold is what #584/#624 hoisted out of gather's per-permanent walk, and
         -- the gathered candidate already carries this pair.
         Modification.ChangeSubtypeWord from to ->
-          let pc' = pc {PC.activatedAbilities = fmap (rewriteActivatedAbility [(from, to)]) (PC.activatedAbilities pc)}
+          let pairs = [(from, to)]
+              pc' =
+                pc
+                  { PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
+                    PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc)
+                  }
            in if Set.member from (PC.subtypes pc')
                 then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
                 else pc'
@@ -1372,18 +1382,125 @@ rewriteObjectRef pairs ref = case ref of
 -- activated ability is printed in that box, so a hacked Tidal Warrior's
 -- "{T}: Target land becomes an Island" becomes "... becomes a Swamp".
 --
--- EFFECTS only, matching Resolve.modesOf: CR 612's word swap has nothing to say
--- about a mode's optionality. Not implemented: a mode's target SPECS and the
--- ability's activation COST are left unrewritten (#635).
+-- The MODAL payload only, through rewriteModal below. Not implemented: the
+-- ability's activation COST is left unrewritten (#635).
 --
 -- Proved end to end by Pawl.ActivateSpec's Tidal Warrior chain, and at the
 -- projection by Pawl.ProjectionSpec's "hacking Tidal Warrior swaps the land type
 -- inside its activated ability".
 rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ActivatedAbility.ActivatedAbility Card.Type.Card
 rewriteActivatedAbility pairs ability =
+  ability {ActivatedAbility.modal = rewriteModal pairs (ActivatedAbility.modal ability)}
+
+-- Read-point 4's sibling list (CR 612.1): the same word swap over a TRIGGERED
+-- ability printed on a permanent. The rule's text box holds this exactly as it
+-- holds an activated ability, so a hacked Barbarian Outcast's "When you control
+-- no Swamps, sacrifice this creature" becomes "no Islands".
+--
+-- THREE parts, not just the payload. The CONDITION is where the pool's word
+-- actually is -- Barbarian Outcast's CR 603.8 state trigger counts
+-- `HasSubtype Swamp` -- so a rewrite that reached only Mode.effects would leave
+-- the card asking the printed question. CR 603.4's intervening "if" is the same
+-- vocabulary read at a different moment and goes through the same
+-- rewriteCondition.
+--
+-- Proved end to end by Pawl.TriggerSpec's "CR 612.1 whole card: a hacked Outcast
+-- asks about ISLANDS, fires and sacrifices itself", through
+-- Pawl.Engine.Event.stateTriggers -- which reads
+-- Projection.triggeredAbilitiesOf, i.e. this list.
+rewriteTriggeredAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggeredAbility Card.Type.Card -> TriggeredAbility Card.Type.Card
+rewriteTriggeredAbility pairs ability =
+  ability
+    { TriggeredAbility.condition = rewriteTriggerCondition pairs (TriggeredAbility.condition ability),
+      TriggeredAbility.intervening = fmap (rewriteCondition pairs) (TriggeredAbility.intervening ability),
+      TriggeredAbility.modal = rewriteModal pairs (TriggeredAbility.modal ability)
+    }
+
+-- The modal payload both abilities carry, rewritten once so the two cannot
+-- drift. EFFECTS only, matching Resolve.modesOf: CR 612's word swap has nothing
+-- to say about a mode's optionality or its selection. Not implemented: a mode's
+-- target SPECS (#635).
+rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card -> Modal.Modal Card.Type.Card
+rewriteModal pairs modal =
   let rewriteMode m = m {Mode.effects = fmap (rewriteEffect pairs) (Mode.effects m)}
-      modal = ActivatedAbility.modal ability
-   in ability {ActivatedAbility.modal = modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}}
+   in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
+
+-- CR 612.1 through a trigger's own condition. EXHAUSTIVE rather than a
+-- wildcard, so a later condition carrying a Filter fails to compile here instead
+-- of silently keeping the printed word.
+--
+-- The two Filter-carrying arms go through Filter.rewrite, the same call
+-- rewriteAffected and rewriteEffect make; StateIs carries CR 603.8's whole
+-- Condition. Everything else names a phase and a turn scope, a player relation,
+-- a trigger frequency, or nothing at all -- no basic-land-type word for the swap
+-- to reach.
+rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggerCondition.TriggerCondition -> TriggerCondition.TriggerCondition
+rewriteTriggerCondition pairs condition = case condition of
+  TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
+  TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
+  TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
+  TriggerCondition.SelfEnters -> condition
+  TriggerCondition.StepBegins _ _ -> condition
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
+  TriggerCondition.SelfCycled -> condition
+  TriggerCondition.PlayerDiscards _ -> condition
+  TriggerCondition.SelfAttacks _ -> condition
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
+  TriggerCondition.SelfDies -> condition
+  TriggerCondition.SelfLeavesTheBattlefield -> condition
+  TriggerCondition.SpellOrAbilityCounters _ -> condition
+
+-- CR 612.1 through the predicate vocabulary Pawl.Types.Condition documents, at
+-- the two customers a printed triggered ability has: a CR 603.8 state trigger's
+-- condition and a CR 603.4 intervening "if". (Its third customer, a CR 611.2b
+-- "for as long as" duration, is stored on a continuous effect rather than
+-- printed on an object, so no text change reaches it here.)
+--
+-- BOTH SIDES are rewritten, because both are full Quantities -- the type's own
+-- note says the field names record where the pool happens to put the constant,
+-- not a restriction on either side.
+rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
+rewriteCondition pairs condition =
+  condition
+    { Condition.Type.measured = rewriteQuantity pairs (Condition.Type.measured condition),
+      Condition.Type.threshold = rewriteQuantity pairs (Condition.Type.threshold condition)
+    }
+
+-- CR 612.1 through a Quantity. A Count's Filter is where the land-type word
+-- hides -- Barbarian Outcast counts `HasSubtype Swamp` controlled by you -- and
+-- its Aggregation may name a further Quantity (Aggregation.Greatest), which is
+-- the knot Pawl.Types.Quantity ties in the data; the descent is structural and
+-- terminates for the same reason evaluation does.
+--
+-- A Count's SCOPE names a zone or an EventShape, neither of which carries a
+-- subtype word. Every remaining arm is a leaf: a number, a characteristic read,
+-- a slot, CR 208.2's star, or a mana-pool count.
+rewriteQuantity :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Quantity.Type.Quantity -> Quantity.Type.Quantity
+rewriteQuantity pairs quantity = case quantity of
+  Quantity.Type.Count c ->
+    Quantity.Type.Count
+      c
+        { Count.Type.filter = Filter.rewrite pairs (Count.Type.filter c),
+          Count.Type.aggregation = rewriteAggregation pairs (Count.Type.aggregation c)
+        }
+  Quantity.Type.Plus x y -> Quantity.Type.Plus (rewriteQuantity pairs x) (rewriteQuantity pairs y)
+  Quantity.Type.Literal _ -> quantity
+  Quantity.Type.ManaValue -> quantity
+  Quantity.Type.Power -> quantity
+  Quantity.Type.X -> quantity
+  Quantity.Type.InSlot _ -> quantity
+  Quantity.Type.Star -> quantity
+  Quantity.Type.ManaCount _ -> quantity
+
+-- rewriteQuantity's other half of the knot: Greatest is the only Aggregation
+-- carrying a Quantity ("the greatest mana value among artifacts you control"),
+-- and the set it aggregates over is the Count's own Filter, rewritten there.
+rewriteAggregation :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Aggregation.Aggregation Quantity.Type.Quantity -> Aggregation.Aggregation Quantity.Type.Quantity
+rewriteAggregation pairs aggregation = case aggregation of
+  Aggregation.Greatest q -> Aggregation.Greatest (rewriteQuantity pairs q)
+  Aggregation.Objects -> aggregation
+  Aggregation.DistinctCardTypes -> aggregation
 
 -- Every continuous effect in the game: stored resolution effects, plus the
 -- static abilities of every battlefield permanent (CR 613.7a: with the

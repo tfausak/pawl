@@ -38,8 +38,10 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -64,6 +66,8 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
@@ -614,6 +618,41 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "unhacked, the ability sets Island" (setsTo plain) [Subtype.Type.Island]
     -- And hacked, the ability the projection hands out carries the new word.
     Spec.assertEqWith s "hacked, the ability sets Swamp" (setsTo hacked) [Subtype.Type.Swamp]
+
+  -- CR 612.1 through the next carrier of that same text box: a TRIGGERED
+  -- ability. The rule draws no distinction between the kinds of ability printed
+  -- there, so the word swaps in a trigger exactly as it does in the activated
+  -- ability just above.
+  --
+  -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2, "When you
+  -- control no Swamps, sacrifice this creature." (checked against Scryfall) is
+  -- the card, and the word is in the CONDITION rather than in the payload: its
+  -- CR 603.8 state trigger counts permanents matching `HasSubtype Swamp`. A
+  -- rewrite that reached only Mode.effects would leave this assertion at Swamp.
+  --
+  -- Pawl.TriggerSpec's whole-card case is the end-to-end proof, through
+  -- Pawl.Engine.Event.stateTriggers.
+  Spec.it s "CR 612.1 hacking Barbarian Outcast swaps the land type inside its triggered ability" $ do
+    barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+    let base = Setup.emptyGame S.bothPlayers
+        (outcastId, plain) = S.addCreature barbarianOutcast S.alice base
+        hacked = S.withEffectAt outcastId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island) plain
+        asksAbout gs = case Projection.triggeredAbilitiesOf outcastId gs of
+          ability : _ -> case TriggeredAbility.condition ability of
+            TriggerCondition.StateIs condition -> countedSubtypes (Condition.Type.measured condition)
+            _ -> []
+          [] -> []
+        countedSubtypes quantity = case quantity of
+          Quantity.Count count -> filterSubtypes (Count.Type.filter count)
+          _ -> []
+        filterSubtypes predicate = case predicate of
+          Filter.Type.HasSubtype st -> [st]
+          Filter.Type.And fs -> concatMap filterSubtypes fs
+          _ -> []
+    -- The control: unhacked, the printed word stands.
+    Spec.assertEqWith s "unhacked, the trigger counts Swamps" (asksAbout plain) [Subtype.Type.Swamp]
+    -- And hacked, the trigger the projection hands out asks the new question.
+    Spec.assertEqWith s "hacked, the trigger counts Islands" (asksAbout hacked) [Subtype.Type.Island]
 
   -- CR 613.8a: Kormus Bell's affected set READS subtypes at layer 4, and
   -- Urborg's AddLandSubtype WRITES them at layer 4 -- so the two are dependent
