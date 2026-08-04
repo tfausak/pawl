@@ -245,6 +245,7 @@ identityAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -308,6 +309,7 @@ castAnswer p = case p of
             h : _ -> h
             [] -> A.Pass
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -364,6 +366,7 @@ aggressiveAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -454,6 +457,7 @@ playLandAnswer p = case p of
           h : _ -> h
           [] -> A.Pass
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0

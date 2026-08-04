@@ -89,6 +89,7 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -130,7 +131,7 @@ slotsOf effect = case effect of
   -- slip past the lint entirely.
   Effect.ModifyTarget duration modification ref ->
     Set.unions [objectRefSlots ref, foldMap Quantity.slots (Projection.quantitiesOf modification), durationSlots duration]
-  Effect.ChangeText slot -> Set.singleton slot
+  Effect.ChangeText _ _ slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
   Effect.Search _ _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
@@ -222,7 +223,7 @@ readsX = any effectReadsX
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
       Effect.ModifyTarget _ modification _ -> elem Quantity.Type.X (Projection.quantitiesOf modification)
-      Effect.ChangeText _ -> False
+      Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
       Effect.Search _ _ -> False
       Effect.ExileAllGraveyards -> False
@@ -272,7 +273,7 @@ searchesLibrary effect = case effect of
   Effect.PlayerSacrifices {} -> False
   Effect.DealDamage _ _ -> False
   Effect.ModifyTarget {} -> False
-  Effect.ChangeText _ -> False
+  Effect.ChangeText {} -> False
   Effect.AddMana _ -> False
   Effect.ExileAllGraveyards -> False
   Effect.ExileHandThenDraw -> False
@@ -945,21 +946,31 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                  in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
   -- CR 608.2d: "if an effect of a spell or ability offers any choices other than
   -- choices already made as part of casting the spell ... the player announces
-  -- these while applying the effect." Magical Hack's two basic land types are
-  -- such a choice. CR 601.2b-d is the exhaustive list of what casting announces
-  -- -- the modes, spliced cards, the alternative and additional costs, X, the
-  -- hybrid and Phyrexian equivalents, the targets, and a division -- and a
-  -- basic-land-type word swap is none of them. So the ask is HERE, at the moment
-  -- the effect is applied, and not at cast; the difference is observable,
-  -- because a countered Magical Hack is then never asked at all
-  -- (Pawl.ResolveSpec's MagicalHackTiming group proves both directions).
-  Effect.ChangeText slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+  -- these while applying the effect." Magical Hack's two basic land types, and
+  -- Artificial Evolution's two creature types, are such a choice. CR 601.2b-d is
+  -- the exhaustive list of what casting announces -- the modes, spliced cards,
+  -- the alternative and additional costs, X, the hybrid and Phyrexian
+  -- equivalents, the targets, and a division -- and a subtype word swap is none
+  -- of them. So the ask is HERE, at the moment the effect is applied, and not at
+  -- cast; the difference is observable, because a countered Magical Hack is then
+  -- never asked at all (Pawl.ResolveSpec's MagicalHackTiming group proves both
+  -- directions).
+  Effect.ChangeText family forbidden slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
     (Just recipient, True) -> case Recipient.objectOf recipient of
       Nothing -> pure ()
       Just target -> do
         gs0 <- State.get
         let decider = Decide.deciderFor controller gs0
-        (from, to) <- Trans.lift (Program.prompt (Prompt.ChooseLandTypeSwap decider controller resolving slot))
+            -- CR 612.2: which words the player is offered is which words the
+            -- card's own text names. A CLASSIFICATION of the effect (which
+            -- family) and not its identity -- there is nothing here that
+            -- belongs to Artificial Evolution as opposed to Magical Hack, and
+            -- the "can't be Wall" restriction rides in from the data as
+            -- `forbidden`.
+            ask = case family of
+              SubtypeFamily.BasicLandType -> Prompt.ChooseLandTypeSwap decider controller resolving slot forbidden
+              SubtypeFamily.CreatureType -> Prompt.ChooseCreatureTypeSwap decider controller resolving slot forbidden
+        (from, to) <- Trans.lift (Program.prompt ask)
         State.modify' $ \gs ->
           -- CR 611.2a: the opcode states no duration, so the effect "lasts
           -- until the end of the game" -- Duration.Indefinite, armed through
@@ -988,9 +999,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- CR 608.2b: an illegal target "won't be affected by parts of a resolving
     -- spell's effect for which they're illegal", so this part does not happen --
     -- and CR 608.2d's announcement belongs to an effect that IS applied, so
-    -- nothing is asked either. Unreachable for Magical Hack, whose only target
-    -- is this slot: with it illegal, CR 608.2b's fizzle stops the resolution
-    -- before any effect is applied.
+    -- nothing is asked either. Unreachable for both text-changers in the pool,
+    -- whose only target is this slot: with it illegal, CR 608.2b's fizzle stops
+    -- the resolution before any effect is applied.
     _ -> pure ()
   -- CR 605.3b: a mana ability never resolves on the stack. AddMana is applied by
   -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability

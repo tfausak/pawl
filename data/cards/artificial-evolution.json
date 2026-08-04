@@ -10,7 +10,7 @@
       }
     }
   ],
-  "name": "Magical Hack",
+  "name": "Artificial Evolution",
   "spell": {
     "modes": [
       {
@@ -19,9 +19,13 @@
             "type": "ChangeText",
             "value": [
               {
-                "type": "BasicLandType"
+                "type": "CreatureType"
               },
-              [],
+              [
+                {
+                  "type": "Wall"
+                }
+              ],
               "target"
             ]
           }

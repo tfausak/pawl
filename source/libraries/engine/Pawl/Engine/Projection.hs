@@ -60,6 +60,7 @@ import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
+import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
@@ -203,14 +204,29 @@ applyModification lyr src cands gs oid m pc =
           case Game.lookupObject src gs >>= Object.chosenSubtype of
             Nothing -> pc
             Just s -> setLandSubtypeTo s pc
-        -- CR 612.1/612.2: a text-changing effect replaces one basic land type
-        -- word with another where the word is used AS a land type -- in the
+        -- CR 612.1/612.2: a text-changing effect replaces one subtype word with
+        -- another where the word is used AS that kind of subtype -- in the
         -- projected type line, and in the object's rules text. Layer 3, so it
         -- folds before layer 4 (Type): a hacked basic Mountain is an Island by
         -- the time mana (CR 305.6) reads its subtypes.
         --
         -- The type-line half is CR 612.1's "the text that appears in its type
-        -- line"; absent `from` is a no-op there. The rules-text half is its
+        -- line"; absent `from` is a no-op there. CR 612.2's family gate needs no
+        -- statement HERE, unlike in rewriteModification: this position is a set
+        -- of subtype words of every family at once, so the family a word is used
+        -- as is the family the word itself belongs to. The membership test is
+        -- therefore already CR 612.2's question -- a land pair finds a land type
+        -- here or nothing, a creature pair a creature type or nothing, and there
+        -- is no third answer to get wrong.
+        --
+        -- What this half does NOT reach is a subtype another effect GRANTED: the
+        -- swap is layer 3 and a subtype grant is layer 4 (CR 613.1c/613.1d), so
+        -- Ashaya's Forest is not yet on the Bog Wraith when a Forest -> Island
+        -- pair looks for it. That is CR 612.1's "words or symbols PRINTED on
+        -- that object" falling out of the layer order rather than being checked
+        -- for, and Pawl.ProjectionSpec pins it.
+        --
+        -- The rules-text half is its
         -- "that object's rules text (which appears in its text box)", and the
         -- ability lists are where that text lives -- so a hacked Tidal Warrior's
         -- "{T}: Target land becomes an Island" hands out an ability that says
@@ -1140,7 +1156,7 @@ setLandSubtypeEffects gs =
       -- would have this gate and the layer fold disagreeing about which
       -- permanents it names. Unreachable twice over. The pool's two
       -- subtype-setting statics are Blood Moon, which selects by card type and
-      -- supertype and so carries no land-type word for a swap to reach, and
+      -- supertype and so carries no subtype word for a swap to reach, and
       -- Convincing Mirage, whose Affected.Attached names no word at all -- and
       -- rewriteAffected's Attached arm is the identity, so a text change could
       -- not move it even if one reached here. Rewriting here is not free either --
@@ -1214,8 +1230,10 @@ liveGiven setEffs visited oid gs =
                && affectsBase src oid aff gs
         in not (any strips setEffs)
 
--- Every basic-land-type pair a ChangeSubtypeWord continuous effect imposes on
--- `oid` (CR 612). Stored resolution effects only (a text-change is stored by
+-- Every subtype-word pair a ChangeSubtypeWord continuous effect imposes on
+-- `oid` (CR 612), of whichever family the words themselves belong to -- CR
+-- 612.2's gate is applied where a pair meets a word, not here. Stored resolution
+-- effects only (a text-change is stored by
 -- Resolve's ChangeText, never a static ability at M3d); read against BASE
 -- characteristics since ChangeSubtypeWord always uses a TheseObjects fixed set,
 -- so no projection recursion is needed and nothing loops.
@@ -1229,28 +1247,43 @@ textChangesAffecting oid gs =
         _ -> Nothing
    in Maybe.mapMaybe pairOf (GameState.continuousEffects gs)
 
--- Apply text-changes to a modification's basic-land-type words (CR 612.1/612.2):
--- SetLandSubtype/AddLandSubtype carry a land-type word. SetCreatureSubtype
--- carries a subtype word too and is deliberately NOT rewritten -- see its arm --
--- and every other modification carries none at all. Projection's charter (it cases
--- on Modification); it is delegated to by Resolve.rewriteEffect for the inner
--- modification of ModifyTarget.
+-- Apply text-changes to a modification's subtype words (CR 612.1/612.2):
+-- SetLandSubtype/AddLandSubtype carry a land-type word, SetCreatureSubtype
+-- carries a creature-type one, and every other modification carries none at all.
+-- Projection's charter (it cases on Modification); it is delegated to by
+-- rewriteEffect for the inner modification of ModifyTarget.
+--
+-- CR 612.2 IS THE GATE on each of those arms: "a text-changing effect changes
+-- only those words that are used in the correct way (for example ... a land type
+-- word used as a land type, or a creature type word used as a creature type)."
+-- So a pair naming land types may rewrite only a land-type position and a pair
+-- naming creature types only a creature-type one, which is what
+-- Subtype.isLandType / Subtype.isCreatureType say here. The arm's own family is
+-- fixed by the constructor; the PAIR's family is read off the word being
+-- replaced, which is why no family tag rides along on the stored
+-- ChangeSubtypeWord.
+--
+-- The gate is not merely the exact-match test restated. `swap` already requires
+-- `s == from` on its own, and pawl's two families share no word (Pawl.Engine.Subtype's two
+-- classifications have no constructor in common), so for card data whose
+-- SetCreatureSubtype really does name a creature type the gate changes no
+-- answer. What it removes is the dependence on that: the rule is stated here
+-- rather than inferred from the payload, and malformed data cannot smuggle a
+-- cross-family rewrite through.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
 rewriteModification pairs m =
-  let swap from to s = if s == from then to else s
+  let -- `inFamily from` is CR 612.2's gate: the pair's family, read off the word
+      -- being replaced, has to be the family of the position it is applied to.
+      swap inFamily from to s = if s == from && inFamily from then to else s
       apply1 acc (from, to) = case acc of
-        Modification.SetLandSubtype s -> Modification.SetLandSubtype (swap from to s)
-        Modification.AddLandSubtype s -> Modification.AddLandSubtype (swap from to s)
-        -- Carries a subtype word, and CR 612.2 does contemplate rewriting one --
-        -- it names "a creature type word used as a creature type" beside the
-        -- land-type case. What cannot reach it is the PAIR: the pool's only
-        -- ChangeSubtypeWord producer is Magical Hack, whose text replaces one
-        -- basic land type with another and whose pair is answered by
-        -- Prompt.ChooseLandTypeSwap. So `from` is never a creature type and a
-        -- swap here would be the identity on every board pawl can reach. The
-        -- card that would make the difference visible, Artificial Evolution, has
-        -- no producer in the pool (#529).
-        Modification.SetCreatureSubtype _ -> acc
+        Modification.SetLandSubtype s -> Modification.SetLandSubtype (swap Subtype.isLandType from to s)
+        Modification.AddLandSubtype s -> Modification.AddLandSubtype (swap Subtype.isLandType from to s)
+        -- CR 612.2's other named example, and the half Artificial Evolution
+        -- reaches: "replacing all instances of one creature type with another"
+        -- rewrites a Turn to Frog's Frog on the stack, so the spell that
+        -- resolves makes its target the new type. Pawl.ResolveSpec's
+        -- ArtificialEvolution group proves it end to end.
+        Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
         -- Carries no word at all: the type is read off the effect's source at
         -- projection time (Object.chosenSubtype), not printed on the card, so CR
         -- 612.1's "words or symbols printed on that object" has nothing here to
@@ -1273,7 +1306,7 @@ rewriteModification pairs m =
 -- missing.
 --
 -- EXHAUSTIVE over Affected, not a wildcard: the three arms that carry a Filter
--- are the three that could hide a land-type word, and a new arm carrying one
+-- are the three that could hide a subtype word, and a new arm carrying one
 -- must break this build rather than silently keep the old word.
 rewriteAffected :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Affected.Affected -> Affected.Affected
 rewriteAffected pairs a = case a of
@@ -1285,11 +1318,10 @@ rewriteAffected pairs a = case a of
   Affected.TheseObjects _ -> a
   Affected.Attached -> a
 
--- CR 612's basic-land-type word swap, over an effect's AST. rewriteModification's
+-- CR 612's subtype word swap, over an effect's AST. rewriteModification's
 -- sibling one level up: it delegates the inner Modification of ModifyTarget to
 -- rewriteModification and every carried Filter to Filter.rewrite, so no module
--- touches another's constructors. ChangeText carries no rewritable land-type
--- word.
+-- touches another's constructors.
 --
 -- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
 -- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
@@ -1310,7 +1342,21 @@ rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification ref ->
     Effect.ModifyTarget duration (rewriteModification pairs modification) (rewriteObjectRef pairs ref)
   Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
-  Effect.ChangeText _ -> effect
+  -- A text-changer's OWN restriction clause is text like any other. Artificial
+  -- Evolution's "The new creature type can't be Wall" names a creature type word
+  -- used as a creature type (CR 612.2), and CR 612.1 reaches "any words or
+  -- symbols printed on that object" -- Wizards' own Artificial Evolution ruling
+  -- says the swap "alters all occurrences of the chosen word in the text box and
+  -- the type line of the given card". So an Evolution aimed at an Evolution on
+  -- the stack leaves a spell that forbids the NEW word instead.
+  --
+  -- The family gate is CR 612.2 again, read here off the ChangeText's own family
+  -- rather than off a constructor: these words are the family the card's text
+  -- names, so only a pair of that family may reach them. Nothing else in the
+  -- opcode is a subtype word -- the SlotName is a target slot, and the family
+  -- itself is not a word on the card.
+  Effect.ChangeText family forbidden slot ->
+    Effect.ChangeText family (Set.map (swapWordIn family pairs) forbidden) slot
   Effect.AddMana _ -> effect
   Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
@@ -1326,46 +1372,55 @@ rewriteEffect pairs effect = case effect of
   Effect.Draw {} -> effect
   Effect.Mill {} -> effect
   Effect.Discard {} -> effect
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.LoseLife {} -> effect
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.GainLife {} -> effect
-  -- A text-changer does not reach a token's embedded card here (spec section 8).
+  -- Not implemented: the swap does not reach the token's embedded card, whose
+  -- type line carries the creature types CR 612.2a names (#640).
   Effect.Create {} -> effect
   Effect.Replace {} -> effect
-  -- A Phase carries no basic-land-type word for CR 612 to rewrite.
+  -- A Phase carries no subtype word for CR 612 to rewrite.
   Effect.SkipNextPhase {} -> effect
   -- Nor does a shield: its recipient is baked at resolution and its Quantity
-  -- names no land type.
+  -- names no subtype.
   Effect.PreventNextDamage {} -> effect
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.GainPlayerCounters {} -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
-  -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
+  -- CR 500.8's added phases carry no subtype word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
   Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger {} -> effect
-  -- A player effect carries no basic-land-type word for CR 612 to rewrite.
+  -- A player effect carries no subtype word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
-  -- An emblem's embedded card carries no basic-land-type word here (as Create's
-  -- token does not; spec section 8).
+  -- Not implemented either: an emblem's embedded card is Create's token one
+  -- level over, and goes unrewritten for the same reason (#640).
   Effect.CreateEmblem {} -> effect
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.BecomeMonarch {} -> effect
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.PlaySubgame _ -> effect
-  -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
+  -- CR 500.7's added turns carry no subtype word for CR 612 to rewrite.
   Effect.TakeExtraTurn {} -> effect
-  -- No rewritable land-type word.
+  -- No rewritable subtype word.
   Effect.ShuffleIntoLibrary _ -> effect
+
+-- CR 612.2 over ONE word sitting in a position whose family a card's text names
+-- rather than a constructor -- the forbidden-word set of a ChangeText. Each pair
+-- applies in turn, and only a pair naming that family's words may reach it.
+swapWordIn :: SubtypeFamily.SubtypeFamily -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Subtype.Type.Subtype -> Subtype.Type.Subtype
+swapWordIn family pairs word = List.foldl' step word pairs
+  where
+    step s (from, to) = if s == from && Subtype.inFamily family from then to else s
 
 -- CR 612.1 through an ObjectRef. InSlot names an object CHOSEN at cast time, not
 -- a word on the card, so there is nothing in it to rewrite; EachMatching's
@@ -1432,7 +1487,7 @@ rewriteModal pairs modal =
 -- The two Filter-carrying arms go through Filter.rewrite, the same call
 -- rewriteAffected and rewriteEffect make; StateIs carries CR 603.8's whole
 -- Condition. Everything else names a phase and a turn scope, a player relation,
--- a trigger frequency, or nothing at all -- no basic-land-type word for the swap
+-- a trigger frequency, or nothing at all -- no subtype word for the swap
 -- to reach.
 rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggerCondition.TriggerCondition -> TriggerCondition.TriggerCondition
 rewriteTriggerCondition pairs condition = case condition of
@@ -1467,7 +1522,7 @@ rewriteCondition pairs condition =
       Condition.Type.threshold = rewriteQuantity pairs (Condition.Type.threshold condition)
     }
 
--- CR 612.1 through a Quantity. A Count's Filter is where the land-type word
+-- CR 612.1 through a Quantity. A Count's Filter is where the subtype word
 -- hides -- Barbarian Outcast counts `HasSubtype Swamp` controlled by you -- and
 -- its Aggregation may name a further Quantity (Aggregation.Greatest), which is
 -- the knot Pawl.Types.Quantity ties in the data; the descent is structural and
@@ -1735,7 +1790,7 @@ abilitiesRemoved cands gs oid =
 -- ability is asked once by construction and carries no key at all.
 --
 -- Read-point 2 (CR 612): the text-changes affecting the SOURCE rewrite each
--- part's basic-land-type words before the part is folded onto any other object.
+-- part's subtype words before the part is folded onto any other object.
 -- Hack Blood Moon's SetLandSubtype Mountain -> SetLandSubtype Island.
 --
 -- `stripped` is CR 613.1f's answer for the SOURCE (abilitiesRemoved): were its

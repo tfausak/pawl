@@ -73,6 +73,12 @@ data Response
     -- Named for the swap rather than for the pair, matching
     -- Prompt.ChooseLandTypeSwap; see there.
     ChoseLandTypeSwap (Subtype.Subtype, Subtype.Subtype)
+  | -- | CR 612 again, for the creature-type half: the (from, to) creature types
+    -- Artificial Evolution's caster chose. Its own constructor rather than a
+    -- reuse of ChoseLandTypeSwap above, for ChoseAttackTarget's reason -- decode
+    -- must return Nothing for a response that does not match the prompt being
+    -- asked, and two prompts sharing a constructor cannot do that.
+    ChoseCreatureTypeSwap (Subtype.Subtype, Subtype.Subtype)
   | -- | CR 614.1c: the basic land type a player chose as an object entered,
     -- serialized so a DecisionLog replays it deterministically. Singular, and
     -- distinct from ChoseLandTypeSwap above for Prompt.ChooseBasicLandType's

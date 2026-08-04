@@ -6,6 +6,20 @@
 module Pawl.Engine.Subtype where
 
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
+
+-- | CR 612.2's question -- is this word one of the family's? -- where the family
+-- is named by a card's text rather than fixed by a constructor.
+--
+-- BasicLandType answers with the whole of CR 205.3i, not CR 305.6's five: the
+-- narrowing to basics is on what a player may CHOOSE, while the family a swap
+-- may reach is the land types. The difference is unobservable while the only
+-- basic-land text-changer offers the five (a chosen basic is a land type either
+-- way), and stating the family is what CR 612.2 actually says.
+inFamily :: SubtypeFamily.SubtypeFamily -> Subtype.Subtype -> Bool
+inFamily family = case family of
+  SubtypeFamily.BasicLandType -> isLandType
+  SubtypeFamily.CreatureType -> isCreatureType
 
 -- | CR 205.3i
 isLandType :: Subtype.Subtype -> Bool

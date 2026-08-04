@@ -62,7 +62,7 @@ data Modification
     -- in the pool sets more than one.
     SetCreatureSubtype Subtype.Subtype
   | AddCardType CardType.CardType -- layer 4 (Opalescence -> Creature)
-  | ChangeSubtypeWord Subtype.Subtype Subtype.Subtype -- layer 3, CR 612 (Magical Hack: from -> to)
+  | ChangeSubtypeWord Subtype.Subtype Subtype.Subtype -- layer 3, CR 612 (Magical Hack, Artificial Evolution: from -> to)
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is
     -- the effect's source's controller, never chosen. Applied only by

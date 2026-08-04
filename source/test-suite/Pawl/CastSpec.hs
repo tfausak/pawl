@@ -433,6 +433,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> lastN n ids
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -1558,6 +1559,7 @@ castFirstOption p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
@@ -1621,6 +1623,7 @@ castPanglacial p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing

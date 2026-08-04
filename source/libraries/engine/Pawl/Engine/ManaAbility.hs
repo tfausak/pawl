@@ -40,7 +40,7 @@ manaProduced effect = case effect of
   Effect.AddMana production -> Just production
   Effect.DealDamage _ _ -> Nothing
   Effect.ModifyTarget {} -> Nothing
-  Effect.ChangeText _ -> Nothing
+  Effect.ChangeText {} -> Nothing
   Effect.Search _ _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing

@@ -260,7 +260,7 @@ effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count Quantity.Type.
 effectCounts effect = case effect of
   Effect.DealDamage _ quantity -> quantityCounts quantity
   Effect.ModifyTarget duration modification _ -> durationCounts duration <> modificationCounts modification
-  Effect.ChangeText _ -> []
+  Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   Effect.Search _ _ -> []
   Effect.ExileAllGraveyards -> []
@@ -491,7 +491,7 @@ effectReplacements effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
-  Effect.ChangeText _ -> []
+  Effect.ChangeText {} -> []
 
 -- #437: does this replacement carry a PhasePattern with a BAKED player in it?
 --
@@ -1159,7 +1159,7 @@ effectFilters effect = case effect of
   Effect.DealDamage ref quantity -> unframed (objectRefFilters ref <> quantityFilters quantity)
   Effect.ModifyTarget duration modification ref ->
     unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
-  Effect.ChangeText _ -> []
+  Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   Effect.Search f _ -> unframed [f]
   Effect.ExileAllGraveyards -> []

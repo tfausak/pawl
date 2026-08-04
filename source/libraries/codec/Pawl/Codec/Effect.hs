@@ -27,6 +27,8 @@ import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Codec.SearchDestination as SearchDestination
 import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Codec.Subtype as Subtype
+import qualified Pawl.Codec.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Codec.Uses as Uses
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Array as Array
@@ -38,7 +40,9 @@ toJson :: (card -> Value.Value) -> Effect.Effect card -> Value.Value
 toJson codec e = case e of
   Effect.DealDamage r q -> Common.tagged "DealDamage" (Just (Common.array [ObjectRef.toJson r, Quantity.toJson q]))
   Effect.ModifyTarget d m r -> Common.tagged "ModifyTarget" (Just (Common.array [Duration.toJson d, Modification.toJson m, ObjectRef.toJson r]))
-  Effect.ChangeText s -> Common.tagged "ChangeText" (Just (SlotName.toJson s))
+  Effect.ChangeText family forbidden s ->
+    Common.tagged "ChangeText" . Just . Common.array $
+      [SubtypeFamily.toJson family, Common.encodeSet Subtype.toJson forbidden, SlotName.toJson s]
   Effect.AddMana production -> Common.tagged "AddMana" (Just (ManaProduction.toJson production))
   Effect.Search f d -> Common.tagged "Search" (Just (Common.array [Filter.toJson Keyword.toJson f, SearchDestination.toJson d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
@@ -130,7 +134,10 @@ fromJson decode value = do
     "ModifyTarget" -> case mv of
       Just (Value.Array (Array.MkArray [d, m, r])) -> Effect.ModifyTarget <$> Duration.fromJson d <*> Modification.fromJson m <*> ObjectRef.fromJson r
       _ -> Left . Text.pack $ "ModifyTarget expects [duration, modification, objectRef]"
-    "ChangeText" -> Common.withValue mv (fmap Effect.ChangeText . SlotName.fromJson)
+    "ChangeText" -> case mv of
+      Just (Value.Array (Array.MkArray [fv, xv, sv])) ->
+        Effect.ChangeText <$> SubtypeFamily.fromJson fv <*> Common.decodeSet Subtype.fromJson xv <*> SlotName.fromJson sv
+      _ -> Left . Text.pack $ "ChangeText expects [subtypeFamily, forbiddenSubtypes, slot]"
     "AddMana" -> Common.withValue mv (fmap Effect.AddMana . ManaProduction.fromJson)
     "Search" -> case mv of
       Just (Value.Array (Array.MkArray [f, d])) -> Effect.Search <$> Filter.fromJson Keyword.fromJson f <*> SearchDestination.fromJson d
