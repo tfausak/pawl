@@ -1,83 +1,87 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "One with the Machine",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "One with the Machine",
+      "spell": {
+        "modes": [
           {
-            "type": "Draw",
-            "value": [
+            "effects": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Count",
-                "value": {
-                  "aggregation": {
-                    "type": "Greatest",
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
                     "value": {
-                      "type": "ManaValue"
+                      "type": "You"
                     }
                   },
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasCardType",
+                  {
+                    "type": "Count",
+                    "value": {
+                      "aggregation": {
+                        "type": "Greatest",
                         "value": {
-                          "type": "Artifact"
+                          "type": "ManaValue"
                         }
                       },
-                      {
-                        "type": "ControlledBy",
-                        "value": {
-                          "type": "You"
-                        }
-                      }
-                    ]
-                  },
-                  "scope": {
-                    "type": "InZone",
-                    "value": [
-                      {
-                        "type": "Battlefield"
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Artifact"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        ]
                       },
-                      {
-                        "type": "EachPlayer"
+                      "scope": {
+                        "type": "InZone",
+                        "value": [
+                          {
+                            "type": "Battlefield"
+                          },
+                          {
+                            "type": "EachPlayer"
+                          }
+                        ]
                       }
-                    ]
+                    }
                   }
-                }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

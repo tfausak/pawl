@@ -9,6 +9,7 @@
 module Pawl.Support where
 
 import qualified Control.Exception as Exception
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -65,6 +66,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -165,6 +167,14 @@ pikerJson :: IO Text.Text
 pikerJson = do
   root <- Registry.defaultRoot
   TextIO.readFile (root <> "/goblin-piker.json")
+
+-- The committed Wax // Wane file, pikerJson's two-faced counterpart: the only
+-- card in the pool whose faces have names of their own (CR 709.4a), and so the
+-- one a throwaway corpus needs to exercise a by-either-name lookup.
+waxWaneJson :: IO Text.Text
+waxWaneJson = do
+  root <- Registry.defaultRoot
+  TextIO.readFile (root <> "/wax-wane.json")
 
 printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
 printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
@@ -298,7 +308,7 @@ castAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
-          A.Cast _ -> True
+          A.Cast {} -> True
           _ -> False
         isPlay a = case a of
           A.Play _ -> True
@@ -451,7 +461,7 @@ playLandAnswer p = case p of
     let isPlay a = case a of
           A.Play _ -> True
           A.Pass -> False
-          A.Cast _ -> False
+          A.Cast {} -> False
           A.Activate _ _ -> False
      in case filter isPlay actions of
           h : _ -> h
@@ -507,7 +517,8 @@ addCreature printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -700,7 +711,8 @@ addToken card pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -728,7 +740,8 @@ addLibraryCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -756,7 +769,8 @@ addGraveyardCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -791,7 +805,8 @@ addExiledCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -833,7 +848,8 @@ addHandCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2
@@ -856,7 +872,7 @@ spellTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
 spellTargetSpec printing =
   Map.lookup
     (SlotName.MkSlotName (Text.pack "target"))
-    (Modal.allTargetSpecs (Card.Type.spell (Printing.card printing)))
+    (Modal.allTargetSpecs (Face.spell (Card.combined (Printing.card printing))))
 
 -- alice controls n untapped basic lands of one printing, nothing else.
 landsInPlay :: Printing.Printing -> Int -> GameState.GameState
@@ -878,7 +894,8 @@ landsInPlay land n =
                   Object.attachedTo = Nothing,
                   Object.chosenColor = Nothing,
                   Object.chosenSubtype = Nothing,
-                  Object.timestamp = ts
+                  Object.timestamp = ts,
+                  Object.face = Nothing
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -905,7 +922,8 @@ handOne printing base =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -938,7 +956,8 @@ pikerInHand land piker n ph =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
       gs3 =
         gs2
@@ -1086,21 +1105,40 @@ creaturesInPlay pid gs =
   let isCreatureObject oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.isCreature (Printing.card printing)
-          Source.OfToken card -> Card.isCreature card
+          Source.OfCard printing -> Card.isCreature (combinedFace printing)
+          Source.OfToken card -> Card.isCreature (Card.combined card)
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
           Source.OfEmblem _ -> False
           Source.OfInherentTrigger _ _ -> False
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
+-- The name on a card's combined face, which for every card in this pool is its
+-- only face and so its only name. NOT "the name a card answers to" in general:
+-- CR 709.4a gives a split card two names and no combined one, so a card that
+-- prints two faces needs the joined name rather than this (#650). Every caller
+-- here is comparing against a one-faced card's printed name.
+nameOf :: Card.Type.Card -> CardName.CardName
+nameOf = Face.name . Card.combined
+
+-- The printed characteristics a PRINTING carries, which is the seam every test
+-- that reaches past Printing.card goes through. Card.combined for nameOf's
+-- reason: a characteristic belongs to a face, and which face a card shows is
+-- Pawl.Engine.Card's question.
+--
+-- Named for the view it builds. Pawl.Engine.Game.faceOf answers a DIFFERENT
+-- question -- which face is this OBJECT showing (CR 709.3b) -- and the two
+-- carried one name between them.
+combinedFace :: Printing.Printing -> Face.Face Card.Type.Card
+combinedFace = Card.combined . Printing.card
+
 countByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countByName wanted pid gs =
   let named oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
-          Source.OfToken card -> Card.Type.name card == wanted
+          Source.OfCard printing -> nameOf (Printing.card printing) == wanted
+          Source.OfToken card -> nameOf card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
           Source.OfEmblem _ -> False
@@ -1115,8 +1153,8 @@ countOnBattlefieldByName wanted pid gs =
   let named oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
-          Source.OfToken card -> Card.Type.name card == wanted
+          Source.OfCard printing -> nameOf (Printing.card printing) == wanted
+          Source.OfToken card -> nameOf card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
           Source.OfEmblem _ -> False
@@ -1334,17 +1372,20 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 -- are inert for a command-zone object (never projected as a permanent). (#125)
 anthemEmblemCard :: Printing.Printing -> Card.Type.Card
 anthemEmblemCard piker =
-  (Printing.card piker)
-    { Card.Type.staticAbilities =
-        [ StaticAbility.MkStaticAbility
-            { StaticAbility.affected =
-                Affected.Matching
-                  (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
-              StaticAbility.modifications =
-                NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
-            }
-        ]
-    }
+  let card = Printing.card piker
+      anthem face =
+        face
+          { Face.staticAbilities =
+              [ StaticAbility.MkStaticAbility
+                  { StaticAbility.affected =
+                      Affected.Matching
+                        (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
+                    StaticAbility.modifications =
+                      NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
+                  }
+              ]
+          }
+   in card {Card.Type.faces = fmap anthem (Card.Type.faces card)}
 
 -- The cards M2a adds, paired with the single keyword each must carry. Named
 -- rather than loaded here so Pawl.Support stays pure: the caller loads them.
@@ -1375,7 +1416,8 @@ oneMountainState mountain ph =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = Timestamp.MkTimestamp 0
+            Object.timestamp = Timestamp.MkTimestamp 0,
+            Object.face = Nothing
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1422,6 +1464,50 @@ oneMountainState mountain ph =
 drawStep :: Game.Type.Game ()
 drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 
+-- CR 709.3's half-choice, made where the card leaves exactly one answer: the
+-- name of the object's sole castable face. Read off that card's own data, so it
+-- is never a stand-in for a name a test failed to give.
+--
+-- A card with SEVERAL halves is a real choice, and this refuses to make it --
+-- LOUDLY, naming the card. A helper that quietly did nothing is how a future
+-- multi-face test would pass while exercising nothing. Such a test names the
+-- half and calls Pawl.Engine.Cast directly.
+soleFaceName :: ObjectId.ObjectId -> GameState.GameState -> CardName.CardName
+soleFaceName oid gs = case Cast.soleCastableFace oid gs of
+  Just face -> Face.name face
+  Nothing ->
+    error
+      ( "Pawl.Support: "
+          <> show (fmap nameOf (Game.cardOf oid gs))
+          <> " does not offer exactly one castable half -- name the half and call Pawl.Engine.Cast directly"
+      )
+
+-- Pawl.Engine.Cast.castSpell of that one half.
+cast :: PlayerId.PlayerId -> ObjectId.ObjectId -> Game.Type.Game ()
+cast pid oid = do
+  gs <- State.get
+  Cast.castSpell pid oid (soleFaceName oid gs)
+
+-- `cast`'s predicate half: Pawl.Engine.Cast.castable asked of that same half.
+castable :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
+castable pid oid gs = Cast.castable pid oid (soleFaceName oid gs) gs
+
+-- The name a single-face printing carries -- what a test naming the half of an
+-- A.Cast action holds in scope.
+printingName :: Printing.Printing -> CardName.CardName
+printingName = nameOf . Printing.card
+
+-- Is this action a cast of that object, whichever half? An answerer that pins
+-- a cast to one CARD asks this rather than building the action, since CR
+-- 709.3's choice among a card's halves is a separate question it has no answer
+-- for.
+isCastOf :: ObjectId.ObjectId -> A.Action -> Bool
+isCastOf oid action = case action of
+  A.Cast o _ -> o == oid
+  A.Pass -> False
+  A.Play _ -> False
+  A.Activate _ _ -> False
+
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
 -- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only
 -- creature). Returns (pre-cast state, post-cast state, Bolt's hand id).
@@ -1429,7 +1515,7 @@ boltAtBobsPiker :: Printing.Printing -> Printing.Printing -> Printing.Printing -
 boltAtBobsPiker piker land bolt =
   let (_, withPiker) = addCreature piker bob (landsInPlay land 1)
       (gs, oid) = handOne bolt withPiker
-   in (gs, snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid)), oid)
+   in (gs, snd (Engine.runGamePure identityAnswer gs (cast alice oid)), oid)
 
 -- The single creature bob controls in a fixture built by (addCreature piker bob).
 pikerOf :: GameState.GameState -> ObjectId.ObjectId
@@ -1458,7 +1544,8 @@ spellOnStack printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in ( oid,
         gs2

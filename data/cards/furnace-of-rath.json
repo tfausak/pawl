@@ -1,58 +1,62 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Furnace of Rath",
-  "replacementEffects": [
-    {
-      "type": "DamageR",
-      "value": [
-        {},
+      "manaCost": [
         {
-          "type": "Scale",
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
           "value": {
-            "type": "Multiply",
-            "value": 2
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
           }
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+      ],
+      "name": "Furnace of Rath",
+      "replacementEffects": [
+        {
+          "type": "DamageR",
+          "value": [
+            {},
+            {
+              "type": "Scale",
+              "value": {
+                "type": "Multiply",
+                "value": 2
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

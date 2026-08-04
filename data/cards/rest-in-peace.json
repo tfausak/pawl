@@ -1,58 +1,62 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    }
-  ],
-  "name": "Rest in Peace",
-  "replacementEffects": [
-    {
-      "type": "ZoneChangeR",
-      "value": [
+      "manaCost": [
         {
-          "whenDestination": {
-            "type": "Graveyard"
-          }
+          "type": "Generic",
+          "value": 1
         },
         {
-          "type": "Exile"
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      ]
-    }
-  ],
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      ],
+      "name": "Rest in Peace",
+      "replacementEffects": [
+        {
+          "type": "ZoneChangeR",
+          "value": [
+            {
+              "whenDestination": {
+                "type": "Graveyard"
+              }
+            },
+            {
+              "type": "Exile"
+            }
+          ]
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "ExileAllGraveyards"
+                "effects": [
+                  {
+                    "type": "ExileAllGraveyards"
+                  }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

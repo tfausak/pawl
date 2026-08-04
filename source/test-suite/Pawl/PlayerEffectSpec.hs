@@ -76,7 +76,7 @@ ruleOfLawAfterFirst :: Printing.Printing -> Printing.Printing -> (ObjectId.Objec
 ruleOfLawAfterFirst plains ruleOfLaw =
   let resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
       (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
-   in (a, b, resolveAll (S.runPure S.identityAnswer board (Cast.castSpell S.alice a)))
+   in (a, b, resolveAll (S.runPure S.identityAnswer board (S.cast S.alice a)))
 
 ruleOfLawSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ruleOfLawSpec s registry =
@@ -86,8 +86,8 @@ ruleOfLawSpec s registry =
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice board)) "not prohibited"
-      Spec.assertBool s (elem (Action.Type.Cast a) (Action.legalActions S.alice board)) "a offered"
-      Spec.assertBool s (elem (Action.Type.Cast b) (Action.legalActions S.alice board)) "b offered"
+      Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw)) (Action.legalActions S.alice board)) "a offered"
+      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw)) (Action.legalActions S.alice board)) "b offered"
 
     -- Ruling: "Rule of Law looks at the entire turn to see if a player has
     -- cast a spell, even if Rule of Law wasn't on the battlefield when that
@@ -131,7 +131,7 @@ ruleOfLawSpec s registry =
               }
       Spec.assertEqWith s "alice is active again" (GameState.activePlayer nextOwnTurn) S.alice
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice nextOwnTurn)) "not prohibited"
-      Spec.assertBool s (elem (Action.Type.Cast b) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
+      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw)) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
 
     -- Ruling: "If you cast a spell that was countered, you can't cast
     -- another spell during the same turn." The counted event is the CAST.
@@ -140,7 +140,7 @@ ruleOfLawSpec s registry =
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, x, _, plain) = ruleOfLawBoard plains ruleOfLaw
           onBoard = snd (S.addCreature ruleOfLaw S.alice plain)
-          cast = S.runPure S.identityAnswer onBoard (Cast.castSpell S.alice x)
+          cast = S.runPure S.identityAnswer onBoard (S.cast S.alice x)
       case GameState.stack cast of
         [] -> Spec.assertFailure s "expected the spell on the stack"
         top : _ -> do
@@ -159,7 +159,7 @@ ruleOfLawSpec s registry =
           gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice castOne) "prohibited while it stands"
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice gone)) "not prohibited once it is gone"
-      Spec.assertBool s (elem (Action.Type.Cast z) (Action.legalActions S.alice gone)) "and a cast is offered again"
+      Spec.assertBool s (elem (Action.Type.Cast z (S.printingName ruleOfLaw)) (Action.legalActions S.alice gone)) "and a cast is offered again"
 
     -- CR 601.3's prohibit half applies to EVERY cast, including a
     -- Panglacial Wurm cast from the library: the Panglacial permission
@@ -188,7 +188,7 @@ ruleOfLawSpec s registry =
 
 isCast :: Action.Type.Action -> Bool
 isCast action = case action of
-  Action.Type.Cast _ -> True
+  Action.Type.Cast {} -> True
   Action.Type.Play _ -> False
   Action.Type.Activate _ _ -> False
   Action.Type.Pass -> False
@@ -386,9 +386,9 @@ thaliaSpec s registry =
       let (boltOne, _, oneLand) = thaliaBoard mountain thalia lightningBolt piker 1
           (boltTwo, _, twoLands) = thaliaBoard mountain thalia lightningBolt piker 2
           (_, pikerTwo, twoLandsAgain) = thaliaBoard mountain thalia lightningBolt piker 2
-      Spec.assertBool s (not (Cast.castable S.alice boltOne oneLand)) "one Mountain is not enough for a taxed Bolt"
-      Spec.assertBool s (Cast.castable S.alice boltTwo twoLands) "two Mountains are"
-      Spec.assertBool s (Cast.castable S.alice pikerTwo twoLandsAgain) "and an untaxed creature spell needs only its printed two"
+      Spec.assertBool s (not (S.castable S.alice boltOne oneLand)) "one Mountain is not enough for a taxed Bolt"
+      Spec.assertBool s (S.castable S.alice boltTwo twoLands) "two Mountains are"
+      Spec.assertBool s (S.castable S.alice pikerTwo twoLandsAgain) "and an untaxed creature spell needs only its printed two"
 
     Spec.it s "CR 601.2f payment spends the total cost" $ do
       mountain <- S.printingOf s registry "Mountain"
@@ -396,9 +396,9 @@ thaliaSpec s registry =
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = thaliaBoard mountain thalia lightningBolt piker 3
-          paid = S.runPure S.identityAnswer gs (Cast.castSpell S.alice bolt)
+          paid = S.runPure S.identityAnswer gs (S.cast S.alice bolt)
           (boltU, gsU) = thaliaUntaxed mountain lightningBolt 3
-          paidU = S.runPure S.identityAnswer gsU (Cast.castSpell S.alice boltU)
+          paidU = S.runPure S.identityAnswer gsU (S.cast S.alice boltU)
       Spec.assertEqWith s "taxed: two lands tapped" (S.tappedCount S.alice paid) 2
       Spec.assertEqWith s "untaxed: one land tapped" (S.tappedCount S.alice paidU) 1
 
@@ -558,8 +558,8 @@ medallionSpec s registry =
                     }
                 )
           (bareDivination, bare) = bareBoard
-      Spec.assertBool s (Cast.castable S.alice divination withMedallion) "castable for {1}{U} with two Islands"
-      Spec.assertBool s (not (Cast.castable S.alice bareDivination bare)) "and not castable for {2}{U} without the Medallion"
+      Spec.assertBool s (S.castable S.alice divination withMedallion) "castable for {1}{U} with two Islands"
+      Spec.assertBool s (not (S.castable S.alice bareDivination bare)) "and not castable for {2}{U} without the Medallion"
 
     -- CR 611.1 / 109.5: the You scope is the effect's controller.
     Spec.it s "CR 109.5 the You scope does not discount an opponent's spell" $ do
@@ -593,7 +593,7 @@ medallionSpec s registry =
         "increase first, then reduce"
         (totalManaCost S.alice unsummon (ManaCost.MkManaCost [blue]) gs)
         (Just (ManaCost.MkManaCost [blue]))
-      Spec.assertBool s (Cast.castable S.alice unsummon gs) "so one Island is enough"
+      Spec.assertBool s (S.castable S.alice unsummon gs) "so one Island is enough"
 
 -- Humility {2}{W}{W} Enchantment: "All creatures lose all abilities and have
 -- base power and toughness 1/1." CR 604.2: a static ability's continuous effect
@@ -644,9 +644,9 @@ humilitySpec s registry =
       humility <- S.printingOf s registry "Humility"
       let (bolt, _, oneLand) = thaliaBoard mountain thalia lightningBolt piker 1
           humbled = S.withHumility humility oneLand
-          paid = S.runPure S.identityAnswer humbled (Cast.castSpell S.alice bolt)
-      Spec.assertBool s (not (Cast.castable S.alice bolt oneLand)) "control: one Mountain cannot pay the taxed Bolt"
-      Spec.assertBool s (Cast.castable S.alice bolt humbled) "under Humility one Mountain is enough"
+          paid = S.runPure S.identityAnswer humbled (S.cast S.alice bolt)
+      Spec.assertBool s (not (S.castable S.alice bolt oneLand)) "control: one Mountain cannot pay the taxed Bolt"
+      Spec.assertBool s (S.castable S.alice bolt humbled) "under Humility one Mountain is enough"
       Spec.assertEqWith s "and paying it taps exactly that one" (S.tappedCount S.alice paid) 1
 
     -- THE DISCRIMINATOR against "Humility silences every player ability".
@@ -853,15 +853,15 @@ edgewalkerSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (discounted, _, withEdgewalker) = edgewalkerBoard plains edgewalker piker 1 3
           (undiscounted, _, bare) = edgewalkerBoard plains edgewalker piker 0 3
-      Spec.assertBool s (not (Cast.castable S.alice undiscounted bare)) "three Plains cannot pay a printed {1}{W}{B}"
-      Spec.assertBool s (Cast.castable S.alice discounted withEdgewalker) "but they can pay the discounted {1}"
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "three Plains cannot pay a printed {1}{W}{B}"
+      Spec.assertBool s (S.castable S.alice discounted withEdgewalker) "but they can pay the discounted {1}"
 
     Spec.it s "CR 601.2f payment spends the total cost" $ do
       plains <- S.printingOf s registry "Plains"
       edgewalker <- S.printingOf s registry "Edgewalker"
       piker <- S.printingOf s registry "Goblin Piker"
       let (spell, _, gs) = edgewalkerBoard plains edgewalker piker 1 3
-          paid = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spell)
+          paid = S.runPure S.identityAnswer gs (S.cast S.alice spell)
       Spec.assertEqWith s "one Plains tapped, not three" (S.tappedCount S.alice paid) 1
 
     -- CR 611.1 / 109.5: the You scope is the effect's controller, and bob
@@ -1118,13 +1118,13 @@ silenceAfter :: Printing.Printing -> Printing.Printing -> Printing.Printing -> P
 silenceAfter plains silence mountain prodigalSorcerer piker =
   let (silenceId, silence2Id, pikerId, landId, before) = silenceBoard plains silence mountain prodigalSorcerer piker
       resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
-      after = resolveAll (S.runPure S.identityAnswer before (Cast.castSpell S.alice silenceId))
+      after = resolveAll (S.runPure S.identityAnswer before (S.cast S.alice silenceId))
    in (silenceId, silence2Id, pikerId, landId, before, after)
 
 isSilenceActivate :: Action.Type.Action -> Bool
 isSilenceActivate action = case action of
   Action.Type.Activate _ _ -> True
-  Action.Type.Cast _ -> False
+  Action.Type.Cast {} -> False
   Action.Type.Play _ -> False
   Action.Type.Pass -> False
 
@@ -1139,7 +1139,7 @@ silenceSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, pikerId, _, before, _) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (elem (Action.Type.Cast pikerId) (Action.legalActions S.bob before)) "offered"
+      Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.bob before)) "offered"
 
     -- CR 611.2c, THE FALSIFIER: nothing bob owns is a spell when Silence
     -- resolves -- the stack holds only Silence itself. Freeze the affected
@@ -1169,7 +1169,7 @@ silenceSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, silence2Id, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice after)) "alice is not prohibited"
-      Spec.assertBool s (Cast.castable S.alice silence2Id after) "and may cast her second Silence"
+      Spec.assertBool s (S.castable S.alice silence2Id after) "and may cast her second Silence"
 
     -- Ruling: "The only thing Silence stops is casting spells. Your
     -- opponents can still activate abilities ... they can still play lands,
@@ -1214,14 +1214,14 @@ silenceSpec s registry =
           -- (thaliaBoard, ruleOfLawBoard's nextOwnTurn).
           bobsTurn = before {GameState.activePlayer = S.bob}
           carolsTurn = before {GameState.activePlayer = S.carol}
-          resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer before (Cast.castSpell S.alice silenceId)) Engine.priorityLoop
+          resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer before (S.cast S.alice silenceId)) Engine.priorityLoop
           resolvedBobsTurn = resolved {GameState.activePlayer = S.bob}
           resolvedCarolsTurn = resolved {GameState.activePlayer = S.carol}
       -- The fixture really is three-seat and both opponents really could cast,
       -- given their own main phase.
       Spec.assertEqWith s "three seats" (length (GameState.turnOrder before)) 3
-      Spec.assertBool s (elem (Action.Type.Cast bobsPiker) (Action.legalActions S.bob bobsTurn)) "bob could cast before it resolved"
-      Spec.assertBool s (elem (Action.Type.Cast carolsPiker) (Action.legalActions S.carol carolsTurn)) "carol could cast before it resolved"
+      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker)) (Action.legalActions S.bob bobsTurn)) "bob could cast before it resolved"
+      Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker)) (Action.legalActions S.carol carolsTurn)) "carol could cast before it resolved"
       Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects resolved)) 1
       -- THE DISCRIMINATOR. carol is the far seat: an Opponents scope resolved as
       -- "the next player in turn order" prohibits bob and leaves carol free, and

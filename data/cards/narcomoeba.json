@@ -1,70 +1,74 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Flying"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "keywords": [
+        {
+          "type": "Flying"
         }
-      }
-    }
-  ],
-  "name": "Narcomoeba",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfPutIntoGraveyardFromLibrary"
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
-              {
-                "type": "MoveToZone",
-                "value": [
-                  "self",
-                  {
-                    "type": "Battlefield"
-                  }
-                ]
-              }
-            ],
-            "optionality": {
-              "type": "Optional"
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
             }
+          }
+        }
+      ],
+      "name": "Narcomoeba",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfPutIntoGraveyardFromLibrary"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": [
+                      "self",
+                      {
+                        "type": "Battlefield"
+                      }
+                    ]
+                  }
+                ],
+                "optionality": {
+                  "type": "Optional"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Illusion"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Illusion"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

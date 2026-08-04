@@ -1,69 +1,73 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 4
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Angelic Edict",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Angelic Edict",
+      "spell": {
+        "modes": [
           {
-            "type": "MoveToZone",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "Exile"
+                "type": "MoveToZone",
+                "value": [
+                  "target",
+                  {
+                    "type": "Exile"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "Or",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Enchantment"
+                        }
+                      }
+                    ]
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "filter": {
-                "type": "Or",
-                "value": [
-                  {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
-                  },
-                  {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Enchantment"
-                    }
-                  }
-                ]
-              },
-              "pool": {
-                "type": "Permanents"
-              }
-            }
+            "type": "Sorcery"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

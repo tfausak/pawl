@@ -1,52 +1,56 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Battlegrowth",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Battlegrowth",
+      "spell": {
+        "modes": [
           {
-            "type": "PutCounters",
-            "value": [
+            "effects": [
               {
-                "type": "PlusOnePlusOne"
-              },
+                "type": "PutCounters",
+                "value": [
+                  {
+                    "type": "PlusOnePlusOne"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
               {
-                "type": "Literal",
-                "value": 1
-              },
-              "target"
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

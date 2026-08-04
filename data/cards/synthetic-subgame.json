@@ -1,33 +1,37 @@
 {
-  "manaCost": [],
-  "name": "Synthetic Subgame",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+  "faces": [
+    {
+      "manaCost": [],
+      "name": "Synthetic Subgame",
+      "spell": {
+        "modes": [
           {
-            "type": "PlaySubgame",
-            "value": "loser"
-          },
-          {
-            "type": "DealDamage",
-            "value": [
-              "loser",
+            "effects": [
               {
-                "type": "Literal",
-                "value": 3
+                "type": "PlaySubgame",
+                "value": "loser"
+              },
+              {
+                "type": "DealDamage",
+                "value": [
+                  "loser",
+                  {
+                    "type": "Literal",
+                    "value": 3
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

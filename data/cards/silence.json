@@ -1,43 +1,47 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Silence",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Silence",
+      "spell": {
+        "modes": [
           {
-            "type": "AffectPlayers",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "Opponents"
-              },
-              {
-                "type": "CantCastSpells"
+                "type": "AffectPlayers",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "Opponents"
+                  },
+                  {
+                    "type": "CantCastSpells"
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

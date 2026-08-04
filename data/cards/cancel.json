@@ -1,56 +1,60 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Cancel",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Counter",
-            "value": "spell"
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "spell",
-            "spec": {
-              "pool": {
-                "type": "Spells"
-              }
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
             }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Cancel",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Counter",
+                "value": "spell"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "spell",
+                "spec": {
+                  "pool": {
+                    "type": "Spells"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

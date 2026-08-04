@@ -1,61 +1,65 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Doom Blade",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Doom Blade",
+      "spell": {
+        "modes": [
           {
-            "type": "Destroy",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "Regenerable"
+                "type": "Destroy",
+                "value": [
+                  "target",
+                  {
+                    "type": "Regenerable"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "Not",
+                    "value": {
+                      "type": "HasColor",
+                      "value": {
+                        "type": "Black"
+                      }
+                    }
+                  },
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "filter": {
-                "type": "Not",
-                "value": {
-                  "type": "HasColor",
-                  "value": {
-                    "type": "Black"
-                  }
-                }
-              },
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

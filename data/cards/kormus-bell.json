@@ -1,58 +1,62 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 4
-    }
-  ],
-  "name": "Kormus Bell",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "HasSubtype",
-          "value": {
-            "type": "Swamp"
-          }
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
         }
-      },
-      "modifications": [
+      ],
+      "name": "Kormus Bell",
+      "staticAbilities": [
         {
-          "type": "AddCardType",
-          "value": {
-            "type": "Creature"
-          }
-        },
-        {
-          "type": "SetColor",
-          "value": [
-            {
-              "type": "Black"
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasSubtype",
+              "value": {
+                "type": "Swamp"
+              }
             }
-          ]
-        },
-        {
-          "type": "SetBasePowerToughness",
-          "value": [
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": 1
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
+              }
             },
             {
-              "type": "Literal",
-              "value": 1
+              "type": "SetColor",
+              "value": [
+                {
+                  "type": "Black"
+                }
+              ]
+            },
+            {
+              "type": "SetBasePowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 1
+                },
+                {
+                  "type": "Literal",
+                  "value": 1
+                }
+              ]
             }
           ]
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

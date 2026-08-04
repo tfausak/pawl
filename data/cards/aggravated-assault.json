@@ -1,97 +1,101 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 3
-          },
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
-              "value": {
-                "type": "Red"
-              }
-            }
-          },
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
-              "value": {
-                "type": "Red"
-              }
-            }
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "Untap",
+                "type": "Generic",
+                "value": 3
+              },
+              {
+                "type": "OfType",
                 "value": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Creature"
-                      }
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "You"
-                      }
-                    }
-                  ]
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
                 }
               },
               {
-                "type": "AddPhases",
-                "value": [
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "ExtraCombat"
+                    "type": "Untap",
+                    "value": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      ]
+                    }
                   },
                   {
-                    "type": "ExtraMain"
+                    "type": "AddPhases",
+                    "value": [
+                      {
+                        "type": "ExtraCombat"
+                      },
+                      {
+                        "type": "ExtraMain"
+                      }
+                    ]
                   }
                 ]
               }
             ]
+          },
+          "timing": {
+            "type": "SorcerySpeed"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Aggravated Assault",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
           }
         ]
-      },
-      "timing": {
-        "type": "SorcerySpeed"
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Aggravated Assault",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

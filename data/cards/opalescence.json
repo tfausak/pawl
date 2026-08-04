@@ -1,86 +1,90 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    }
-  ],
-  "name": "Opalescence",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "And",
-          "value": [
-            {
-              "type": "HasCardType",
-              "value": {
-                "type": "Enchantment"
-              }
-            },
-            {
-              "type": "Not",
-              "value": {
-                "type": "IsSource"
-              }
-            },
-            {
-              "type": "Not",
-              "value": {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Aura"
-                }
-              }
-            }
-          ]
-        }
-      },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "AddCardType",
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
           "value": {
-            "type": "Creature"
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
           }
         },
         {
-          "type": "SetBasePowerToughness",
-          "value": [
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Opalescence",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Enchantment"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Aura"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
             {
-              "type": "ManaValue"
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
+              }
             },
             {
-              "type": "ManaValue"
+              "type": "SetBasePowerToughness",
+              "value": [
+                {
+                  "type": "ManaValue"
+                },
+                {
+                  "type": "ManaValue"
+                }
+              ]
             }
           ]
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

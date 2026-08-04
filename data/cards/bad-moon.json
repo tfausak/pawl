@@ -1,64 +1,68 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Bad Moon",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "And",
-          "value": [
-            {
-              "type": "HasCardType",
-              "value": {
-                "type": "Creature"
-              }
-            },
-            {
-              "type": "HasColor",
-              "value": {
-                "type": "Black"
-              }
-            }
-          ]
-        }
-      },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "ModifyPowerToughness",
-          "value": [
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Bad Moon",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasColor",
+                  "value": {
+                    "type": "Black"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": 1
-            },
-            {
-              "type": "Literal",
-              "value": 1
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 1
+                },
+                {
+                  "type": "Literal",
+                  "value": 1
+                }
+              ]
             }
           ]
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

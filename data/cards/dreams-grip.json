@@ -1,74 +1,78 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Entwine",
-      "value": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 1
-          }
-        ]
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Dream's Grip",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Tap",
-            "value": "tapped"
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "tapped",
-            "spec": {
-              "pool": {
-                "type": "Permanents"
+      "keywords": [
+        {
+          "type": "Entwine",
+          "value": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
               }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
             }
+          }
+        }
+      ],
+      "name": "Dream's Grip",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Tap",
+                "value": "tapped"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "tapped",
+                "spec": {
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "Untap",
+                "value": "untapped"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "untapped",
+                "spec": {
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              }
+            ]
           }
         ]
       },
-      {
-        "effects": [
+      "typeLine": {
+        "types": [
           {
-            "type": "Untap",
-            "value": "untapped"
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "untapped",
-            "spec": {
-              "pool": {
-                "type": "Permanents"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -11,7 +11,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -31,6 +30,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -89,7 +89,7 @@ gateSpec s registry = Spec.describe s "Gate" $ do
         (pikerOid, gs1) = S.addCreature piker S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
-        cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+        cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
     Spec.assertEqWith s "1 damage marked" (S.damageOf pikerOid after) (Just 1)
 
@@ -102,7 +102,7 @@ gateSpec s registry = Spec.describe s "Gate" $ do
         sick = gs1 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) creatureId (GameState.objects gs1)}
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 2) (Recipient.ToCreature creatureId)
-        cast = snd (Engine.runGamePure answer sick (Cast.castSpell S.alice oid))
+        cast = snd (Engine.runGamePure answer sick (S.cast S.alice oid))
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste creatureId after) "projected keywords include Haste"
 
@@ -114,7 +114,7 @@ gateSpec s registry = Spec.describe s "Gate" $ do
         (wallId, gs1) = S.addCreature wallOfStone S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature wallId)
-        cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+        cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
     Spec.assertBool s (not (Set.member wallId (GameState.battlefield after))) "no longer on the battlefield"
     Spec.assertEqWith s "in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
@@ -132,11 +132,11 @@ falsifierSpec s registry = Spec.describe s "Falsifier" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
         (_, gs1) = S.addCreature piker S.bob gs0
-    Spec.assertBool s (Cast.castable S.alice oid gs1) "castable"
+    Spec.assertBool s (S.castable S.alice oid gs1) "castable"
     Spec.assertEqWith
       s
       "the Wall mode (0) is absent from the fillable set"
-      (Target.fillableModes Nothing oid (Card.enchantSpecs (Printing.card chaosCharm)) (Card.Type.spell (Printing.card chaosCharm)) gs1)
+      (Target.fillableModes Nothing oid (Card.enchantSpecs (S.combinedFace chaosCharm)) (Face.spell (S.combinedFace chaosCharm)) gs1)
       (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
@@ -151,7 +151,7 @@ onlyChosenModeSpec s registry = Spec.describe s "OnlyChosenModeTargets" $ do
         (pikerOid, gs1) = S.addCreature piker S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
-        cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+        cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
     case Game.zoneMembers Zone.Stack S.alice cast of
       [] -> Spec.assertFailure s "Chaos Charm never reached the stack"
       stackId : _ -> case Game.lookupObject stackId cast of
@@ -172,7 +172,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         (pikerOid, gs1) = S.addCreature piker S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
-        cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+        cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
         -- CR 400.7: leaving the battlefield mints a new incarnation, so
         -- pikerOid's chosen recipient no longer names a legal target.
         gone = S.runPure S.identityAnswer cast (Event.changeZone pikerOid Zone.Graveyard)
@@ -192,7 +192,7 @@ forcedSpec s registry = Spec.describe s "ForcedNoPrompt" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs0, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
-        cast = snd (Engine.runGamePure neverAskModes gs0 (Cast.castSpell S.alice oid))
+        cast = snd (Engine.runGamePure neverAskModes gs0 (S.cast S.alice oid))
         after = snd (Engine.runGamePure neverAskModes cast Stack.resolveTop)
     Spec.assertEqWith s "alice at 17 (Bolt resolved, forced/unprompted mode selection)" (S.lifeOf S.alice after) (Just 17)
 
@@ -262,7 +262,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
     syntheticModalActivated <- S.printingOf s registry "Synthetic Modal Activator"
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
-    case Card.Type.activatedAbilities (Printing.card syntheticModalActivated) of
+    case Face.activatedAbilities (S.combinedFace syntheticModalActivated) of
       [ability] ->
         let gs0 = S.landsInPlay mountain 1
             (srcId, gs1) = S.addCreature syntheticModalActivated S.alice gs0
@@ -282,7 +282,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
     syntheticModalActivated <- S.printingOf s registry "Synthetic Modal Activator"
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
-    case Card.Type.activatedAbilities (Printing.card syntheticModalActivated) of
+    case Face.activatedAbilities (S.combinedFace syntheticModalActivated) of
       [ability] ->
         let gs0 = S.landsInPlay mountain 1
             (srcId, gs1) = S.addCreature syntheticModalActivated S.alice gs0
@@ -308,7 +308,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
 -- through S.entersWithTrigger's hand-built enters event (the same shape
 -- EventSpec uses), then the placed ability resolves off the stack.
 triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card)
-triggerModalOf acPrinting = case Card.Type.triggeredAbilities (Printing.card acPrinting) of
+triggerModalOf acPrinting = case Face.triggeredAbilities (S.combinedFace acPrinting) of
   [ab] -> Just (TriggeredAbility.modal ab)
   _ -> Nothing
 
@@ -328,7 +328,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
       [tokId] -> do
         -- CR 111.4: Aether Channeler's first mode does not name the token,
         -- so its name is its subtype plus the word "Token".
-        Spec.assertEqWith s "the token is named Bird Token" (fmap Card.Type.name (Game.cardOf tokId resolved)) (Just . CardName.MkCardName $ Text.pack "Bird Token")
+        Spec.assertEqWith s "the token is named Bird Token" (fmap Face.name (Game.faceOf tokId resolved)) (Just . CardName.MkCardName $ Text.pack "Bird Token")
         Spec.assertBool s (Projection.hasKeyword Keyword.Flying tokId resolved) "the Bird has flying (projected)"
       _ -> Spec.assertFailure s "expected exactly one new (Bird token) permanent"
 

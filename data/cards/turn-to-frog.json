@@ -1,109 +1,113 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Turn to Frog",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Turn to Frog",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "LoseAllAbilities"
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
-              {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "SetColor",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Blue"
-                  }
-                ]
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
-              {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "SetCreatureSubtype",
-                "value": {
-                  "type": "Frog"
-                }
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
-              {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "SetBasePowerToughness",
-                "value": [
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "Literal",
-                    "value": 1
-                  }
+                    "type": "LoseAllAbilities"
+                  },
+                  "target"
                 ]
               },
-              "target"
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "SetColor",
+                    "value": [
+                      {
+                        "type": "Blue"
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "SetCreatureSubtype",
+                    "value": {
+                      "type": "Frog"
+                    }
+                  },
+                  "target"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "SetBasePowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

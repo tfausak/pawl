@@ -15,6 +15,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Decider as Decider
 import Pawl.Types.Effect (Effect)
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
@@ -60,14 +61,14 @@ openingHands perform owners = do
 -- performs. A CLASSIFICATION, not an identity test: this asks whether the card
 -- declares an action, never which card it is.
 --
--- Read straight off the card (Game.cardOf) and never through the projection --
--- the Card.castingPermissions precedent: these abilities function in the HAND
+-- Read straight off the face (Game.faceOf) and never through the projection --
+-- the Face.castingPermissions precedent: these abilities function in the HAND
 -- (CR 113.6), which pawl's projection does not reach (#160).
-actionsFor :: (Card.Card -> [Effect Card.Card]) -> PlayerId -> GameState.GameState -> [(ObjectId, [Effect Card.Card])]
+actionsFor :: (Face.Face Card.Card -> [Effect Card.Card]) -> PlayerId -> GameState.GameState -> [(ObjectId, [Effect Card.Card])]
 actionsFor field pid gs =
-  let withAction oid = case Game.cardOf oid gs of
+  let withAction oid = case Game.faceOf oid gs of
         Nothing -> Nothing
-        Just card -> case field card of
+        Just face -> case field face of
           [] -> Nothing
           effects -> Just (oid, effects)
    in Maybe.mapMaybe withAction (Game.zoneMembers Zone.Hand pid gs)
@@ -82,7 +83,7 @@ actionsFor field pid gs =
 -- the pool moves its card out of the hand (CR 103.6a onto the battlefield, CR
 -- 103.5b's into exile), so the candidate list strictly shrinks.
 handWindow ::
-  (Card.Card -> [Effect Card.Card]) ->
+  (Face.Face Card.Card -> [Effect Card.Card]) ->
   (Decider.Decider -> PlayerId -> [ObjectId] -> Prompt.Prompt (Maybe ObjectId)) ->
   HandActionPerformer ->
   PlayerId ->
@@ -112,7 +113,7 @@ handWindow field ask perform pid = do
 -- Game.stillPlayingInOrder, so they get no window and no opening hand.
 openingHandActions :: HandActionPerformer -> [PlayerId] -> Game ()
 openingHandActions perform owners =
-  Monad.forM_ owners (handWindow Card.openingHandAction Prompt.OpeningHandAction perform)
+  Monad.forM_ owners (handWindow Face.openingHandAction Prompt.OpeningHandAction perform)
 
 -- CR 103.5: repeat the declare-all-then-take-all round until no still-deciding
 -- player mulligans. `deciding` is the players who have NOT yet kept -- keeping
@@ -130,7 +131,7 @@ mulliganRounds perform counts deciding = do
     -- would declare", and the declaration follows it. Reading the hand size
     -- after it is load-bearing: an action that empties the hand makes this a
     -- forced keep under CR 103.5's final sentence.
-    handWindow Card.mulliganAction Prompt.MulliganAction perform pid
+    handWindow Face.mulliganAction Prompt.MulliganAction perform pid
     handSize <- State.gets (length . Game.zoneMembers Zone.Hand pid)
     if handSize <= 0
       then pure (pid, MulliganDecision.Keep)

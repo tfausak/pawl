@@ -1,58 +1,62 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          },
-          {
-            "type": "SacrificeThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "Search",
-                "value": [
+                "type": "TapThis"
+              },
+              {
+                "type": "SacrificeThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "And",
+                    "type": "Search",
                     "value": [
                       {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Land"
-                        }
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Basic"
+                            }
+                          }
+                        ]
                       },
                       {
-                        "type": "HasSupertype",
-                        "value": {
-                          "type": "Basic"
-                        }
+                        "type": "BattlefieldTapped"
                       }
                     ]
-                  },
-                  {
-                    "type": "BattlefieldTapped"
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "name": "Evolving Wilds",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
+          }
         ]
       }
     }
-  ],
-  "name": "Evolving Wilds",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+  ]
 }

@@ -1,47 +1,51 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Boil",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Boil",
+      "spell": {
+        "modes": [
           {
-            "type": "Destroy",
-            "value": [
+            "effects": [
               {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Island"
-                }
-              },
-              {
-                "type": "Regenerable"
+                "type": "Destroy",
+                "value": [
+                  {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Island"
+                    }
+                  },
+                  {
+                    "type": "Regenerable"
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

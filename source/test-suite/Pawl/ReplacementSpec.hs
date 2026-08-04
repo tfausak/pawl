@@ -19,7 +19,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -60,6 +59,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -104,7 +104,7 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 -- already duplicate singleModeAbility the same way) rather than centralizing
 -- a helper this small in Support.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
-theAbility p = case Card.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
 
@@ -161,7 +161,7 @@ countersOn kind oid gs =
 
 castAndResolve :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
 castAndResolve answer gs spellId =
-  S.runPure answer gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+  S.runPure answer gs (S.cast S.alice spellId >> Stack.resolveTop)
 
 -- castAndResolve over several of alice's spells in order. Top-level rather than
 -- a `where` binding because the answer is rank-2 and GHC will not infer it.
@@ -200,7 +200,7 @@ enteringAs which p = case p of
 -- The newest battlefield object whose printed card has this name.
 newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
 newestNamed wanted gs =
-  let named oid = fmap Card.name (Game.cardOf oid gs) == Just wanted
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
    in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
 
 -- Leyline of the Void's redirect, as a floating replacement: any card headed for
@@ -474,7 +474,7 @@ castingSkirmishAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 castingSkirmishAnswer victim p = case p of
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
-          Action.Cast _ -> True
+          Action.Cast {} -> True
           _ -> False
      in case filter isCast actions of
           h : _ -> h
@@ -907,7 +907,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         activated = S.runPure (aimObject aura) ready (Activate.activateAbility S.alice coatingId (theAbility coating))
         coated = S.runPure (aimObject aura) activated Stack.resolveTop
         (withSpell, spellId) = S.handOne animator coated
-        entered = S.runPure (aimObject aura) withSpell (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+        entered = S.runPure (aimObject aura) withSpell (S.cast S.alice spellId >> Stack.resolveTop)
         triggered = S.runPure (aimObject aura) entered Engine.settleForPriority
         animated = S.runPure (aimObject aura) triggered Stack.resolveTop
         -- One pass, so the two state-based actions stay separately
@@ -943,7 +943,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (victimA, g1) = S.addCreature pikerPrinting S.bob base
         (victimB, g2) = S.addCreature pikerPrinting S.bob g1
         (g3, fogId) = S.handOne fog g2
-        resolved = S.runPure S.identityAnswer g3 (Cast.castSpell S.alice fogId >> Stack.resolveTop)
+        resolved = S.runPure S.identityAnswer g3 (S.cast S.alice fogId >> Stack.resolveTop)
         -- Hand-built rather than driven through real combat: reaching a real
         -- combat-damage batch would mean driving an entire combat phase, which
         -- this assertion (Fog prevents a whole batch, not just one event) does
@@ -1015,7 +1015,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         -- {R}: Regenerate this creature -- the shield is really activated.
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
         (withTerror, spell) = S.handOne terror armed
-        afterCast = S.runPure S.identityAnswer withTerror (Cast.castSpell S.alice spell)
+        afterCast = S.runPure S.identityAnswer withTerror (S.cast S.alice spell)
         resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
     Spec.assertBool s (not (null (GameState.replacements armed))) "the shield really was created"
     Spec.assertBool s (not (Set.member troll (GameState.battlefield resolved))) "and Terror killed the Troll through it"
@@ -1105,7 +1105,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     let (gs, spellId, mine, _) = counterBoard forest battlegrowth [hardenedScales, corpsejackMenace, pikerPrinting] []
     case mine of
       scales : _ : piker : _ ->
-        let asked = answersFor (raceAnswer scales piker) gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+        let asked = answersFor (raceAnswer scales piker) gs (S.cast S.alice spellId >> Stack.resolveTop)
          in Spec.assertBool s (wasAskedToReplace asked) "a ChooseReplacement was raised"
       _ -> Spec.assertFailure s "fixture did not build three permanents"
   Spec.it s "CR 616.1 one Hardened Scales alone is not asked about (nothing to choose)" $ do
@@ -1117,7 +1117,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     case mine of
       scales : piker : _ ->
         let after = castAndResolve (raceAnswer scales piker) gs spellId
-            asked = answersFor (raceAnswer scales piker) gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+            asked = answersFor (raceAnswer scales piker) gs (S.cast S.alice spellId >> Stack.resolveTop)
          in do
               Spec.assertEqWith s "1 + 1" (countersOn CounterKind.PlusOnePlusOne piker after) 2
               Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
@@ -1131,7 +1131,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     case mine of
       scales : _ : piker : _ ->
         let after = castAndResolve (raceAnswer scales piker) gs spellId
-            asked = answersFor (raceAnswer scales piker) gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+            asked = answersFor (raceAnswer scales piker) gs (S.cast S.alice spellId >> Stack.resolveTop)
          in do
               Spec.assertEqWith s "each gets its own opportunity" (countersOn CounterKind.PlusOnePlusOne piker after) 3
               Spec.assertBool s (not (wasAskedToReplace asked)) "value-equal candidates elide the prompt"
@@ -1166,8 +1166,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (_, withPiker) = S.addCreature pikerPrinting S.alice base
         (gs, cloneId) = S.handOne clone withPiker
         -- S.identityAnswer declines ChooseCopyTarget (Clone's own "may").
-        resolved = S.runPure S.identityAnswer gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop >> Engine.settleForPriority)
-        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
+        resolved = S.runPure S.identityAnswer gs (S.cast S.alice cloneId >> Stack.resolveTop >> Engine.settleForPriority)
+        named = filter (\oid -> fmap Face.name (Game.faceOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
     Spec.assertEqWith s "the 0/0 Clone is gone" named []
   Spec.it s "CR 614.12a the copy choice is locked in BEFORE the enters event exists" $ do
     island <- S.printingOf s registry "Island"
@@ -1177,8 +1177,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (piker, withPiker) = S.addCreature pikerPrinting S.alice base
         (gs, cloneId) = S.handOne clonePrinting withPiker
         -- No settle: the choice must already be made when resolveTop returns.
-        resolved = S.runPure (copyOf piker) gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop)
-        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
+        resolved = S.runPure (copyOf piker) gs (S.cast S.alice cloneId >> Stack.resolveTop)
+        named = filter (\oid -> fmap Face.name (Game.faceOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
     case named of
       [] -> Spec.assertFailure s "Clone did not reach the battlefield"
       clone : _ -> Spec.assertEqWith s "already a 2/1, with no settle run" (Projection.powerOf clone resolved) (Just 2)
@@ -1188,7 +1188,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     let (gs, held) = blueBoard island 4 [primalPlasma]
     case held of
       plasmaCard : _ ->
-        let after = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
+        let after = S.runPure (enteringAs 1) gs (S.cast S.alice plasmaCard >> Stack.resolveTop)
          in case newestNamed (CardName.MkCardName $ Text.pack "Primal Plasma") after of
               Nothing -> Spec.assertFailure s "Primal Plasma did not reach the battlefield"
               Just plasma -> do
@@ -1207,8 +1207,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     let (gs, held) = blueBoard island 8 [primalPlasma, clonePrinting]
     case held of
       plasmaCard : cloneCard : _ ->
-        let withPlasma = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
-            after = S.runPure (enteringAs 2) withPlasma (Cast.castSpell S.alice cloneCard >> Stack.resolveTop)
+        let withPlasma = S.runPure (enteringAs 1) gs (S.cast S.alice plasmaCard >> Stack.resolveTop)
+            after = S.runPure (enteringAs 2) withPlasma (S.cast S.alice cloneCard >> Stack.resolveTop)
          in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
               Nothing -> Spec.assertFailure s "Clone did not reach the battlefield"
               Just clone -> do
@@ -1224,8 +1224,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     let (gs, held) = blueBoard island 8 [primalPlasma, clonePrinting]
     case held of
       plasmaCard : cloneCard : _ ->
-        let withPlasma = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
-            after = S.runPure (enteringAs 0) withPlasma (Cast.castSpell S.alice cloneCard >> Stack.resolveTop)
+        let withPlasma = S.runPure (enteringAs 1) gs (S.cast S.alice plasmaCard >> Stack.resolveTop)
+            after = S.runPure (enteringAs 0) withPlasma (S.cast S.alice cloneCard >> Stack.resolveTop)
          in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
               Nothing -> Spec.assertFailure s "Clone did not reach the battlefield"
               Just clone -> do
@@ -1241,9 +1241,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     let (gs, held) = blueBoard island 12 [primalPlasma, clonePrinting, clonePrinting]
     case held of
       plasmaCard : cloneA : cloneB : _ ->
-        let s1 = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
-            s2 = S.runPure (enteringAs 2) s1 (Cast.castSpell S.alice cloneA >> Stack.resolveTop)
-            s3 = S.runPure (enteringAs 0) s2 (Cast.castSpell S.alice cloneB >> Stack.resolveTop)
+        let s1 = S.runPure (enteringAs 1) gs (S.cast S.alice plasmaCard >> Stack.resolveTop)
+            s2 = S.runPure (enteringAs 2) s1 (S.cast S.alice cloneA >> Stack.resolveTop)
+            s3 = S.runPure (enteringAs 0) s2 (S.cast S.alice cloneB >> Stack.resolveTop)
          in case newestNamed (CardName.MkCardName $ Text.pack "Clone") s3 of
               Nothing -> Spec.assertFailure s "the second Clone did not reach the battlefield"
               Just clone -> do
@@ -1487,7 +1487,7 @@ galvanicBlastSpec s registry =
       galvanicBlast <- S.printingOf s registry "Galvanic Blast"
       let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 3 [furnaceOfRath]
           after = castAndResolve atBob gs spellId
-          asked = answersFor atBob gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+          asked = answersFor atBob gs (S.cast S.alice spellId >> Stack.resolveTop)
       Spec.assertEqWith s "bob takes 8, not the 4 the other order gives" (S.lifeOf S.bob after) (Just 12)
       -- The second half of CR 616.1a: because the self-replacement is alone in
       -- the highest non-empty bucket, there is nothing to choose and the engine
@@ -1538,7 +1538,7 @@ galvanicBlastSpec s registry =
 -- is that the owner and the controller have come apart.
 controlledNamed :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 controlledNamed wanted pid gs =
-  length (filter (\oid -> fmap Card.name (Game.cardOf oid gs) == Just wanted) (Projection.controls pid gs))
+  length (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just wanted) (Projection.controls pid gs))
 
 -- alice controls six untapped Islands (Gather Specimens is {3}{U}{U}{U}) and one
 -- Goblin Piker for a Clone to copy; bob controls ten, enough for a Gather
@@ -1650,11 +1650,11 @@ gatherSpecimensSpec s registry =
       let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting]
       case bobs of
         cloneId : _ ->
-          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
-              after = S.runPure (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+          let armed = S.runPure S.identityAnswer gs (S.cast S.alice gatherId >> Stack.resolveTop)
+              after = S.runPure (copyIfAskedOf S.alice piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
               -- The DISCRIMINATING TWIN: the same cast on the same board with no
               -- Gather Specimens resolved first.
-              alone = S.runPure (copyIfAskedOf S.alice piker) gs (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+              alone = S.runPure (copyIfAskedOf S.alice piker) gs (S.cast S.bob cloneId >> Stack.resolveTop)
            in case (newestNamed (CardName.MkCardName $ Text.pack "Clone") after, newestNamed (CardName.MkCardName $ Text.pack "Clone") alone) of
                 (Just taken, Just untaken) -> do
                   Spec.assertEqWith s "bob's Clone entered under alice's control" (Projection.controllerOf taken after) (Just S.alice)
@@ -1683,10 +1683,10 @@ gatherSpecimensSpec s registry =
       let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting]
       case bobs of
         cloneId : _ ->
-          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
-              askedAlice = S.runPure (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
-              askedBob = S.runPure (copyIfAskedOf S.bob piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
-              asked = answersFor (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+          let armed = S.runPure S.identityAnswer gs (S.cast S.alice gatherId >> Stack.resolveTop)
+              askedAlice = S.runPure (copyIfAskedOf S.alice piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
+              askedBob = S.runPure (copyIfAskedOf S.bob piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
+              asked = answersFor (copyIfAskedOf S.alice piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
            in case (newestNamed (CardName.MkCardName $ Text.pack "Clone") askedAlice, newestNamed (CardName.MkCardName $ Text.pack "Clone") askedBob) of
                 (Just toAlice, Just toBob) -> do
                   Spec.assertEqWith s "alice was offered the copy, and took it" (Projection.powerOf toAlice askedAlice) (Just 2)
@@ -1713,8 +1713,8 @@ gatherSpecimensSpec s registry =
       let (gs, gatherId, bobs, _) = specimenBoard island pikerPrinting gatherSpecimens [coating]
       case bobs of
         coatingId : _ ->
-          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
-              after = S.runPure S.identityAnswer armed (Cast.castSpell S.bob coatingId >> Stack.resolveTop)
+          let armed = S.runPure S.identityAnswer gs (S.cast S.alice gatherId >> Stack.resolveTop)
+              after = S.runPure S.identityAnswer armed (S.cast S.bob coatingId >> Stack.resolveTop)
            in case newestNamed (CardName.MkCardName $ Text.pack "Liquimetal Coating") after of
                 Nothing -> Spec.assertFailure s "the Coating did not reach the battlefield"
                 Just coatingObj -> Spec.assertEqWith s "an artifact is not a creature" (Projection.controllerOf coatingObj after) (Just S.bob)
@@ -1731,9 +1731,9 @@ gatherSpecimensSpec s registry =
       let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting, clonePrinting]
       case bobs of
         firstClone : secondClone : _ ->
-          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice gatherId >> Stack.resolveTop)
-              one = S.runPure (copyIfAskedOf S.alice piker) armed (Cast.castSpell S.bob firstClone >> Stack.resolveTop)
-              two = S.runPure (copyIfAskedOf S.alice piker) one (Cast.castSpell S.bob secondClone >> Stack.resolveTop)
+          let armed = S.runPure S.identityAnswer gs (S.cast S.alice gatherId >> Stack.resolveTop)
+              one = S.runPure (copyIfAskedOf S.alice piker) armed (S.cast S.bob firstClone >> Stack.resolveTop)
+              two = S.runPure (copyIfAskedOf S.alice piker) one (S.cast S.bob secondClone >> Stack.resolveTop)
            in Spec.assertEqWith s "both of bob's Clones are alice's" (controlledNamed (CardName.MkCardName $ Text.pack "Clone") S.alice two) 2
         _ -> Spec.assertFailure s "fixture did not deal bob two cards"
     -- DUELLING GATHER SPECIMENS, and the only board where the filter's
@@ -1774,10 +1774,10 @@ gatherSpecimensSpec s registry =
       let (gs, aliceGather, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [gatherSpecimens, clonePrinting]
       case bobs of
         bobGather : cloneId : _ ->
-          let armed = S.runPure S.identityAnswer gs (Cast.castSpell S.alice aliceGather >> Stack.resolveTop)
-              duelling = S.runPure S.identityAnswer armed (Cast.castSpell S.bob bobGather >> Stack.resolveTop)
-              after = S.runPure (copyIfAskedOf S.bob piker) duelling (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
-              asked = answersFor (copyIfAskedOf S.bob piker) duelling (Cast.castSpell S.bob cloneId >> Stack.resolveTop)
+          let armed = S.runPure S.identityAnswer gs (S.cast S.alice aliceGather >> Stack.resolveTop)
+              duelling = S.runPure S.identityAnswer armed (S.cast S.bob bobGather >> Stack.resolveTop)
+              after = S.runPure (copyIfAskedOf S.bob piker) duelling (S.cast S.bob cloneId >> Stack.resolveTop)
+              asked = answersFor (copyIfAskedOf S.bob piker) duelling (S.cast S.bob cloneId >> Stack.resolveTop)
            in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
                 Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
                 Just clone -> do
@@ -1820,9 +1820,9 @@ gatherSpecimensSpec s registry =
       gatherSpecimens <- S.printingOf s registry "Gather Specimens"
       narcomoeba <- S.printingOf s registry "Narcomoeba"
       let (gs, aliceGather, bobGather, moeba) = threeSeatSpecimenBoard island gatherSpecimens narcomoeba
-          resolveFor pid oid g = S.runPure S.identityAnswer g (Cast.castSpell pid oid >> Stack.resolveTop)
+          resolveFor pid oid g = S.runPure S.identityAnswer g (S.cast pid oid >> Stack.resolveTop)
           armed = resolveFor S.bob bobGather (resolveFor S.alice aliceGather gs)
-          entry = Cast.castSpell S.carol moeba >> Stack.resolveTop
+          entry = S.cast S.carol moeba >> Stack.resolveTop
           asked = answersFor S.identityAnswer armed entry
           moebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
       Spec.assertEqWith s "two floating replacements are live" (length (GameState.replacements armed)) 2

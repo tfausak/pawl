@@ -1,228 +1,232 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Skilled Animator",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
+      ],
+      "name": "Skilled Animator",
+      "power": {
+        "type": "Literal",
+        "value": 1
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "ForAsLongAs",
-                    "value": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "IsSource"
-                          },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Battlefield"
-                              },
-                              {
-                                "type": "EachPlayer"
-                              }
-                            ]
-                          }
-                        }
-                      },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    }
-                  },
-                  {
-                    "type": "AddCardType",
-                    "value": {
-                      "type": "Artifact"
-                    }
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "ForAsLongAs",
-                    "value": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "IsSource"
-                          },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Battlefield"
-                              },
-                              {
-                                "type": "EachPlayer"
-                              }
-                            ]
-                          }
-                        }
-                      },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    }
-                  },
-                  {
-                    "type": "AddCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "ForAsLongAs",
-                    "value": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "IsSource"
-                          },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Battlefield"
-                              },
-                              {
-                                "type": "EachPlayer"
-                              }
-                            ]
-                          }
-                        }
-                      },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    }
-                  },
-                  {
-                    "type": "SetBasePowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Literal",
-                        "value": 5
+                        "type": "ForAsLongAs",
+                        "value": {
+                          "comparison": {
+                            "type": "Exactly"
+                          },
+                          "measured": {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
+                              },
+                              "filter": {
+                                "type": "IsSource"
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Battlefield"
+                                  },
+                                  {
+                                    "type": "EachPlayer"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "threshold": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
                       },
                       {
-                        "type": "Literal",
-                        "value": 5
-                      }
-                    ]
-                  },
-                  "target"
-                ]
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasCardType",
+                        "type": "AddCardType",
                         "value": {
                           "type": "Artifact"
                         }
                       },
-                      {
-                        "type": "ControlledBy",
-                        "value": {
-                          "type": "You"
-                        }
-                      }
+                      "target"
                     ]
                   },
-                  "pool": {
-                    "type": "Permanents"
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "ForAsLongAs",
+                        "value": {
+                          "comparison": {
+                            "type": "Exactly"
+                          },
+                          "measured": {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
+                              },
+                              "filter": {
+                                "type": "IsSource"
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Battlefield"
+                                  },
+                                  {
+                                    "type": "EachPlayer"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "threshold": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "AddCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "ForAsLongAs",
+                        "value": {
+                          "comparison": {
+                            "type": "Exactly"
+                          },
+                          "measured": {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
+                              },
+                              "filter": {
+                                "type": "IsSource"
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Battlefield"
+                                  },
+                                  {
+                                    "type": "EachPlayer"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "threshold": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "SetBasePowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 5
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 5
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
                   }
-                }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Artifact"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
+                  }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Artificer"
+          },
+          {
+            "type": "Human"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Artificer"
-      },
-      {
-        "type": "Human"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

@@ -1,20 +1,24 @@
 {
-  "name": "Swamp",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Swamp"
+  "faces": [
+    {
+      "name": "Swamp",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Swamp"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
       }
-    ],
-    "supertypes": [
-      {
-        "type": "Basic"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+    }
+  ]
 }

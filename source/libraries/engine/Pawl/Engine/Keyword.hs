@@ -210,7 +210,7 @@ cycling cost searchFor =
       Just filter_ -> Effect.Search filter_ SearchDestination.RevealThenHand
 
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
--- A card's own printed permissions (Card.castingPermissions) are a separate,
+-- A card's own printed permissions (Face.castingPermissions) are a separate,
 -- additive list; Pawl.Engine.Cast reads both.
 --
 -- Taken over the card's PRINTED keywords rather than a projection's post-layer

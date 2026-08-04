@@ -1,86 +1,90 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Crimson Wisps",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Crimson Wisps",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "SetColor",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Red"
-                  }
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "SetColor",
+                    "value": [
+                      {
+                        "type": "Red"
+                      }
+                    ]
+                  },
+                  "target"
                 ]
               },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
               {
-                "type": "UntilEndOfTurn"
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Haste"
+                    }
+                  },
+                  "target"
+                ]
               },
               {
-                "type": "GainKeyword",
-                "value": {
-                  "type": "Haste"
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "Draw",
-            "value": [
-              {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 1
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -1,91 +1,95 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 1
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "damaged",
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                ]
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "damaged",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  }
-                }
+                "type": "Generic",
+                "value": 1
               }
             ]
           },
-          {
-            "effects": [
+          "modal": {
+            "modes": [
               {
-                "type": "PutCounters",
-                "value": [
+                "effects": [
                   {
-                    "type": "PlusOnePlusOne"
-                  },
+                    "type": "DealDamage",
+                    "value": [
+                      "damaged",
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  "strengthened"
+                    "slot": "damaged",
+                    "spec": {
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "strengthened"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "strengthened",
+                    "spec": {
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
                 ]
               }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "strengthened",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  }
-                }
-              }
             ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Modal Activator",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    }
-  ],
-  "name": "Synthetic Modal Activator",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

@@ -1,70 +1,78 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Dragon Fodder",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Dragon Fodder",
+      "spell": {
+        "modes": [
           {
-            "type": "Create",
-            "value": [
+            "effects": [
               {
-                "type": "Literal",
-                "value": 2
-              },
-              {
-                "colorIndicator": [
+                "type": "Create",
+                "value": [
                   {
-                    "type": "Red"
+                    "type": "Literal",
+                    "value": 2
+                  },
+                  {
+                    "faces": [
+                      {
+                        "colorIndicator": [
+                          {
+                            "type": "Red"
+                          }
+                        ],
+                        "name": "Goblin Token",
+                        "power": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "toughness": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "typeLine": {
+                          "subtypes": [
+                            {
+                              "type": "Goblin"
+                            }
+                          ],
+                          "types": [
+                            {
+                              "type": "Creature"
+                            }
+                          ]
+                        }
+                      }
+                    ]
                   }
-                ],
-                "name": "Goblin Token",
-                "power": {
-                  "type": "Literal",
-                  "value": 1
-                },
-                "toughness": {
-                  "type": "Literal",
-                  "value": 1
-                },
-                "typeLine": {
-                  "subtypes": [
-                    {
-                      "type": "Goblin"
-                    }
-                  ],
-                  "types": [
-                    {
-                      "type": "Creature"
-                    }
-                  ]
-                }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

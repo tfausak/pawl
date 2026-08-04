@@ -1,119 +1,127 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Bitterblossom",
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "StepBegins",
-        "value": [
-          {
-            "type": "Beginning",
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "Upkeep"
+              "type": "Black"
             }
-          },
-          {
-            "type": "ControllersTurn"
           }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+        }
+      ],
+      "name": "Bitterblossom",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
               {
-                "type": "LoseLife",
-                "value": [
-                  {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                ]
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
               },
               {
-                "type": "Create",
-                "value": [
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "LoseLife",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   },
                   {
-                    "colorIndicator": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "type": "Black"
-                      }
-                    ],
-                    "keywords": [
+                        "type": "Literal",
+                        "value": 1
+                      },
                       {
-                        "type": "Flying"
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "Black"
+                              }
+                            ],
+                            "keywords": [
+                              {
+                                "type": "Flying"
+                              }
+                            ],
+                            "name": "Faerie Rogue Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Faerie"
+                                },
+                                {
+                                  "type": "Rogue"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
                       }
-                    ],
-                    "name": "Faerie Rogue Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Faerie"
-                        },
-                        {
-                          "type": "Rogue"
-                        }
-                      ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
-                    }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Faerie"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          },
+          {
+            "type": "Kindred"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Faerie"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      },
-      {
-        "type": "Kindred"
-      }
-    ]
-  }
+  ]
 }

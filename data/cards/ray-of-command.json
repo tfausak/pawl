@@ -1,77 +1,81 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Ray of Command",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Ray of Command",
+      "spell": {
+        "modes": [
           {
-            "type": "Untap",
-            "value": "target"
-          },
-          {
-            "type": "GainControl",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
-              {
-                "type": "UntilEndOfTurn"
+                "type": "Untap",
+                "value": "target"
               },
               {
-                "type": "GainKeyword",
-                "value": {
-                  "type": "Haste"
+                "type": "GainControl",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  "target"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Haste"
+                    }
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "Opponent"
+                    }
+                  },
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
-              },
-              "target"
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "filter": {
-                "type": "ControlledBy",
-                "value": {
-                  "type": "Opponent"
-                }
-              },
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

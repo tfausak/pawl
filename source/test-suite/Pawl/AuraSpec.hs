@@ -18,7 +18,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -35,11 +34,11 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -132,7 +131,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     let base0 = S.landsInPlay mountain 2 -- {1} to cast, {1} to equip
         (creature, base1) = S.addCreature piker S.alice base0
         (withSpell, spellId) = S.handOne bonesplitter base1
-        cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         equipId = case filter (\oid -> Game.cardOf oid resolved == Just (Printing.card bonesplitter)) (Set.toList (GameState.battlefield resolved)) of
           oid : _ -> Just oid
@@ -140,7 +139,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     case equipId of
       Nothing -> Spec.assertFailure s "Bonesplitter should have resolved onto the battlefield"
       Just equip -> do
-        let ability = case Card.Type.activatedAbilities (Printing.card bonesplitter) of
+        let ability = case Face.activatedAbilities (S.combinedFace bonesplitter) of
               ab : _ -> Just ab
               [] -> Nothing
         case ability of
@@ -252,7 +251,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
         (equip, g2) = S.addCreature bonesplitter S.alice g1
         attached = S.attach equip creature g2
         (withSpell, spellId) = S.handOne animator attached
-        cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- The ETB trigger goes on the stack here, with its target chosen:
         -- Bonesplitter is the only artifact alice controls, so CR 603.3d's
@@ -312,7 +311,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
         (aura, g2) = S.addCreature unholyStrength S.alice g1
         attached = S.attach aura creature g2
         (coatingId, g3) = S.addCreature coating S.alice attached
-        ability = case Card.Type.activatedAbilities (Printing.card coating) of
+        ability = case Face.activatedAbilities (S.combinedFace coating) of
           ab : _ -> Just ab
           [] -> Nothing
     case ability of
@@ -322,7 +321,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
             activated = snd (Engine.runGamePure (aimAt aura) ready (Activate.activateAbility S.alice coatingId coat))
             coated = snd (Engine.runGamePure (aimAt aura) activated Stack.resolveTop)
             (withSpell, spellId) = S.handOne animator coated
-            cast = snd (Engine.runGamePure (aimAt aura) withSpell (Cast.castSpell S.alice spellId))
+            cast = snd (Engine.runGamePure (aimAt aura) withSpell (S.cast S.alice spellId))
             entered = snd (Engine.runGamePure (aimAt aura) cast Stack.resolveTop)
             triggered = snd (Engine.runGamePure (aimAt aura) entered Engine.settleForPriority)
             animated = snd (Engine.runGamePure (aimAt aura) triggered Stack.resolveTop)
@@ -350,7 +349,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
 -- permanents." Curse of Death's Hold is the proving card -- "Enchant player.
 -- Creatures enchanted player controls get -1/-1" -- and it is the one that needs
 -- BOTH halves of an enchant-player Aura: the Pool.Players enchant spec, which
--- Card.enchant could already express, and a static ability whose affected set is
+-- Face.enchant could already express, and a static ability whose affected set is
 -- reached THROUGH the enchanted player (Affected.AttachedPlayerControls).
 enchantPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
@@ -368,7 +367,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
         (hers, withBoth) = S.addCreature piker S.alice withHis
         (gs, spellId) = S.handOne curse withBoth
         answer = aimRecipient (Recipient.ToPlayer S.bob)
-        cast = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
         settled = S.settleSba after
     Spec.assertEqWith s "one attached permanent, and it is attached to bob himself" (attachments after) [Just (Recipient.ToPlayer S.bob)]
@@ -482,7 +481,7 @@ chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
         (landId, base1) = S.addCreature mountain S.alice base0
         (withAura, auraSpell) = S.handOne convincingMirage base1
         run pick =
-          let cast = snd (Engine.runGamePure (mirageOn landId pick) withAura (Cast.castSpell S.alice auraSpell))
+          let cast = snd (Engine.runGamePure (mirageOn landId pick) withAura (S.cast S.alice auraSpell))
            in snd (Engine.runGamePure (mirageOn landId pick) cast Stack.resolveTop)
         asIsland = run Subtype.Island
         asSwamp = run Subtype.Swamp
@@ -560,7 +559,7 @@ attachedTo host gs =
 -- the committed spec, not a restatement of it, so a test asserting what it admits
 -- is asserting what the card really says.
 crownTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
-crownTargetSpec printing = case Card.Type.activatedAbilities (Printing.card printing) of
+crownTargetSpec printing = case Face.activatedAbilities (S.combinedFace printing) of
   ability : _ -> Map.lookup (SlotName.MkSlotName (Text.pack "target")) (Modal.allTargetSpecs (ActivatedAbility.modal ability))
   [] -> Nothing
 
@@ -591,13 +590,13 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         (decoy, base1b) = S.addCreature piker S.alice base1
         (second, base2) = S.addCreature warMammoth S.alice base1b
         (withAura, auraSpell) = S.handOne unholyStrength base2
-        castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) withAura (Cast.castSpell S.alice auraSpell))
+        castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) withAura (S.cast S.alice auraSpell))
         enchanted = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) castAura Stack.resolveTop)
     case attachedTo first enchanted of
       [] -> Spec.assertFailure s "Unholy Strength should have entered attached to the Piker"
       aura : _ -> do
         let (withCrown, crownSpell) = S.handOne crown enchanted
-            castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (Cast.castSpell S.alice crownSpell))
+            castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (S.cast S.alice crownSpell))
             onBattlefield = snd (Engine.runGamePure S.identityAnswer castCrown Stack.resolveTop)
             crownId = case filter (\oid -> Game.cardOf oid onBattlefield == Just (Printing.card crown)) (Set.toList (GameState.battlefield onBattlefield)) of
               oid : _ -> Just oid
@@ -605,7 +604,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         case crownId of
           Nothing -> Spec.assertFailure s "Crown of the Ages should have resolved onto the battlefield"
           Just crownObj -> do
-            let ability = case Card.Type.activatedAbilities (Printing.card crown) of
+            let ability = case Face.activatedAbilities (S.combinedFace crown) of
                   ab : _ -> Just ab
                   [] -> Nothing
             case ability of
@@ -755,7 +754,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     -- state-based actions then punish -- it is still on a legal host.
     Spec.assertBool s (Set.member aura (GameState.battlefield settled)) "and the Aura is not buried afterwards"
   -- CR 303.4j through two printed cards. Setessan Training's "Enchant creature
-  -- you control" is the first Card.enchant in the pool that narrows past
+  -- you control" is the first Face.enchant in the pool that narrows past
   -- "creature" (CR 702.5a: the enchant ability "restricts what an Aura spell can
   -- target and what an Aura can enchant"), and Crown of the Ages' destination
   -- filter is the bare "another creature" -- so the Crown really does offer a
@@ -785,13 +784,13 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         (mine, base2) = S.addCreature warMammoth S.alice base1
         (theirs, base3) = S.addCreature piker S.bob base2
         (withAura, auraSpell) = S.handOne setessanTraining base3
-        castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature host)) withAura (Cast.castSpell S.alice auraSpell))
+        castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature host)) withAura (S.cast S.alice auraSpell))
         enchanted = snd (Engine.runGamePure S.identityAnswer castAura Stack.resolveTop)
         (withCrown, crownSpell) = S.handOne crown enchanted
-        castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (Cast.castSpell S.alice crownSpell))
+        castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (S.cast S.alice crownSpell))
         settledIn = snd (Engine.runGamePure S.identityAnswer castCrown Stack.resolveTop)
         crowns = filter (\oid -> Game.cardOf oid settledIn == Just (Printing.card crown)) (Set.toList (GameState.battlefield settledIn))
-    case (attachedTo host enchanted, crowns, Card.Type.activatedAbilities (Printing.card crown)) of
+    case (attachedTo host enchanted, crowns, Face.activatedAbilities (S.combinedFace crown)) of
       ([aura], [crownObj], [move]) -> do
         let ready = settledIn {GameState.priority = Just S.alice}
             run dest =
@@ -861,7 +860,7 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
         (aura, base4) = S.addCreature controlMagic S.bob base3
         stolen = S.attach aura host base4
         (gs, graft) = S.handOne auraGraft stolen
-        cast = snd (Engine.runGamePure (moveAura aura prize) gs (Cast.castSpell S.alice graft))
+        cast = snd (Engine.runGamePure (moveAura aura prize) gs (S.cast S.alice graft))
         after = snd (Engine.runGamePure (moveAura aura prize) cast Stack.resolveTop)
         settled = S.settleSba (S.settleSba after)
     Spec.assertEqWith s "before: bob's Control Magic holds alice's Piker" (Projection.controllerOf host stolen) (Just S.bob)
@@ -983,7 +982,7 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
         (aura, base4) = S.addCreature unholyStrength S.alice base3
         onPiker = S.attach aura host base4
         (gs, graft) = S.handOne auraGraft onPiker
-        cast = snd (Engine.runGamePure (moveAura aura land) gs (Cast.castSpell S.alice graft))
+        cast = snd (Engine.runGamePure (moveAura aura land) gs (S.cast S.alice graft))
         after = snd (Engine.runGamePure (moveAura aura land) cast Stack.resolveTop)
     Spec.assertEqWith s "before, the Piker carries the +2/+1" (S.powerToughnessOf host onPiker) (Just (4, 2))
     Spec.assertEqWith s "the Aura went to the Mammoth, not the Mountain" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature elsewhere)))
@@ -1011,7 +1010,7 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
         (aura, base4) = S.addCreature setessanTraining S.bob base3
         onHis = S.attach aura host base4
         (gs, graft) = S.handOne auraGraft onHis
-        cast = snd (Engine.runGamePure (moveAura aura his) gs (Cast.castSpell S.alice graft))
+        cast = snd (Engine.runGamePure (moveAura aura his) gs (S.cast S.alice graft))
         after = snd (Engine.runGamePure (moveAura aura his) cast Stack.resolveTop)
     Spec.assertEqWith s "alice controls the Aura" (Projection.controllerOf aura after) (Just S.alice)
     Spec.assertEqWith s "so it moved to HER creature" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature hers)))
@@ -1036,7 +1035,7 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
         (aura, base3) = S.addCreature controlMagic S.bob base2
         stolen = S.attach aura host base3
         (gs, graft) = S.handOne auraGraft stolen
-        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject aura)) gs (Cast.castSpell S.alice graft))
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject aura)) gs (S.cast S.alice graft))
         after = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject aura)) cast Stack.resolveTop)
         stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
     Spec.assertEqWith s "it is still on the only creature there is" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature host)))
@@ -1054,7 +1053,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         auras = filter (\o -> Object.zone o == Zone.Battlefield && Maybe.isJust (Object.attachedTo o)) (Map.elems (GameState.objects after))
     Spec.assertEqWith s "one attached permanent on the battlefield" (length auras) 1
@@ -1070,7 +1069,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         -- The target leaves in response, so no legal target remains at resolution.
         bounced = S.runPure S.identityAnswer cast (Event.changeZone creature Zone.Hand)
         after = snd (Engine.runGamePure S.identityAnswer bounced Stack.resolveTop)
@@ -1129,8 +1128,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         -- attempted draw from an empty library (CR 704.5b).
         (_, base3) = S.addLibraryCard forest S.alice base2
         (gs, spellId) = S.handOne setessanTraining base3
-        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Card.Type.enchant (Printing.card setessanTraining))
-        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mine)) gs (Cast.castSpell S.alice spellId))
+        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Face.enchant (S.combinedFace setessanTraining))
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mine)) gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- CR 704.3: the enters trigger waits until a player would get priority,
         -- which resolveTop alone never reaches.
@@ -1178,13 +1177,13 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         (_, base4) = S.addCreature island S.bob base3
         (_, base5) = S.addCreature island S.bob base4
         (gs, auraSpell) = S.handOne setessanTraining base5
-        castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (Cast.castSpell S.alice auraSpell))
+        castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice auraSpell))
         enchanted = snd (Engine.runGamePure S.identityAnswer castAura Stack.resolveTop)
     case attachedTo creature enchanted of
       [training] -> do
         let (stealId, withSteal) = S.addHandCard controlMagic S.bob enchanted
             ready = withSteal {GameState.priority = Just S.bob, GameState.activePlayer = S.bob}
-            castSteal = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) ready (Cast.castSpell S.bob stealId))
+            castSteal = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) ready (S.cast S.bob stealId))
             stolen = snd (Engine.runGamePure S.identityAnswer castSteal Stack.resolveTop)
             settled = S.settleSba stolen
             survivors = attachedTo creature settled
@@ -1235,7 +1234,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     let base = S.landsInPlay island 4
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne controlMagic withCreature
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice controls bob's creature" (Projection.controllerOf creature after) (Just S.alice)
   -- CR 302.6 across turns (#62): control from an Aura is INDEFINITE, so alice

@@ -1,66 +1,70 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Prologue to Phyresis",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Prologue to Phyresis",
+      "spell": {
+        "modes": [
           {
-            "type": "GainPlayerCounters",
-            "value": [
+            "effects": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "Opponent"
-                }
+                "type": "GainPlayerCounters",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "Opponent"
+                    }
+                  },
+                  {
+                    "type": "Poison"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
               },
               {
-                "type": "Poison"
-              },
-              {
-                "type": "Literal",
-                "value": 1
-              }
-            ]
-          },
-          {
-            "type": "Draw",
-            "value": [
-              {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 1
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -1,80 +1,84 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Titania's Song",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "And",
-          "value": [
+      ],
+      "name": "Titania's Song",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
             {
-              "type": "HasCardType",
+              "type": "LoseAllAbilities"
+            },
+            {
+              "type": "AddCardType",
               "value": {
                 "type": "Artifact"
               }
             },
             {
-              "type": "Not",
+              "type": "AddCardType",
               "value": {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Creature"
-                }
+                "type": "Creature"
               }
-            }
-          ]
-        }
-      },
-      "modifications": [
-        {
-          "type": "LoseAllAbilities"
-        },
-        {
-          "type": "AddCardType",
-          "value": {
-            "type": "Artifact"
-          }
-        },
-        {
-          "type": "AddCardType",
-          "value": {
-            "type": "Creature"
-          }
-        },
-        {
-          "type": "SetBasePowerToughness",
-          "value": [
-            {
-              "type": "ManaValue"
             },
             {
-              "type": "ManaValue"
+              "type": "SetBasePowerToughness",
+              "value": [
+                {
+                  "type": "ManaValue"
+                },
+                {
+                  "type": "ManaValue"
+                }
+              ]
             }
           ]
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

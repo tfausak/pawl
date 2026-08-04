@@ -1,49 +1,53 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Tome Scour",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Tome Scour",
+      "spell": {
+        "modes": [
           {
-            "type": "Mill",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "Literal",
-                "value": 5
+                "type": "Mill",
+                "value": [
+                  "target",
+                  {
+                    "type": "Literal",
+                    "value": 5
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
+            "type": "Sorcery"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

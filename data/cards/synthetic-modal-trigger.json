@@ -1,121 +1,125 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    }
-  ],
-  "name": "Synthetic Modal Trigger",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Modal Trigger",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
-              {
-                "type": "MoveToZone",
-                "value": [
-                  "bounced",
-                  {
-                    "type": "Hand"
-                  }
-                ]
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "bounced",
-                "spec": {
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Land"
-                          }
-                        }
-                      },
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "IsSource"
-                        }
-                      }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
-                }
-              }
-            ]
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
           },
-          {
-            "effects": [
+          "modal": {
+            "modes": [
               {
-                "type": "MoveToZone",
-                "value": [
-                  "exiled",
+                "effects": [
                   {
-                    "type": "Exile"
+                    "type": "MoveToZone",
+                    "value": [
+                      "bounced",
+                      {
+                        "type": "Hand"
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "bounced",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Land"
+                              }
+                            }
+                          },
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "IsSource"
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": [
+                      "exiled",
+                      {
+                        "type": "Exile"
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "exiled",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Land"
+                              }
+                            }
+                          },
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "IsSource"
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
                   }
                 ]
               }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "exiled",
-                "spec": {
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Land"
-                          }
-                        }
-                      },
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "IsSource"
-                        }
-                      }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
-                }
-              }
             ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

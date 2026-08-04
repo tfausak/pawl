@@ -1,43 +1,47 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Trample"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "keywords": [
+        {
+          "type": "Trample"
         }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "War Mammoth",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elephant"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "War Mammoth",
-  "power": {
-    "type": "Literal",
-    "value": 3
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elephant"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

@@ -1,51 +1,55 @@
 {
-  "enchant": {
-    "pool": {
-      "type": "Creatures"
-    }
-  },
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "enchant": {
+        "pool": {
+          "type": "Creatures"
         }
-      }
-    }
-  ],
-  "name": "Snake Cult Initiation",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Attached"
       },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "GainKeyword",
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
           "value": {
-            "type": "Poisonous",
-            "value": 3
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
           }
         }
-      ]
+      ],
+      "name": "Snake Cult Initiation",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Poisonous",
+                "value": 3
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

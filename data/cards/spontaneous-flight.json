@@ -1,81 +1,85 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Spontaneous Flight",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Spontaneous Flight",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              },
+              {
+                "type": "PutCounters",
+                "value": [
+                  {
+                    "type": "Keyword",
+                    "value": {
+                      "type": "Flying"
+                    }
                   },
                   {
                     "type": "Literal",
-                    "value": 2
-                  }
+                    "value": 1
+                  },
+                  "target"
                 ]
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "PutCounters",
-            "value": [
+              }
+            ],
+            "targetSpecs": [
               {
-                "type": "Keyword",
-                "value": {
-                  "type": "Flying"
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
-              },
-              {
-                "type": "Literal",
-                "value": 1
-              },
-              "target"
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

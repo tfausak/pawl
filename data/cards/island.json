@@ -1,20 +1,24 @@
 {
-  "name": "Island",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Island"
+  "faces": [
+    {
+      "name": "Island",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Island"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
       }
-    ],
-    "supertypes": [
-      {
-        "type": "Basic"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+    }
+  ]
 }

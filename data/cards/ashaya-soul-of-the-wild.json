@@ -1,130 +1,134 @@
 {
-  "characteristicPT": {
-    "type": "Count",
-    "value": {
-      "aggregation": {
-        "type": "Objects"
-      },
-      "filter": {
-        "type": "And",
-        "value": [
-          {
-            "type": "HasCardType",
-            "value": {
-              "type": "Land"
-            }
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Objects"
           },
-          {
-            "type": "ControlledBy",
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Land"
+                }
+              },
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              }
+            ]
+          },
+          "scope": {
+            "type": "InZone",
+            "value": [
+              {
+                "type": "Battlefield"
+              },
+              {
+                "type": "EachPlayer"
+              }
+            ]
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "You"
+              "type": "Green"
             }
           }
-        ]
-      },
-      "scope": {
-        "type": "InZone",
-        "value": [
-          {
-            "type": "Battlefield"
-          },
-          {
-            "type": "EachPlayer"
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
           }
-        ]
-      }
-    }
-  },
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Ashaya, Soul of the Wild",
-  "power": {
-    "type": "Star"
-  },
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "And",
-          "value": [
+      ],
+      "name": "Ashaya, Soul of the Wild",
+      "power": {
+        "type": "Star"
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsToken"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
             {
-              "type": "HasCardType",
+              "type": "AddCardType",
               "value": {
-                "type": "Creature"
+                "type": "Land"
               }
             },
             {
-              "type": "ControlledBy",
+              "type": "AddLandSubtype",
               "value": {
-                "type": "You"
-              }
-            },
-            {
-              "type": "Not",
-              "value": {
-                "type": "IsToken"
+                "type": "Forest"
               }
             }
           ]
         }
+      ],
+      "toughness": {
+        "type": "Star"
       },
-      "modifications": [
-        {
-          "type": "AddCardType",
-          "value": {
-            "type": "Land"
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
           }
-        },
-        {
-          "type": "AddLandSubtype",
-          "value": {
-            "type": "Forest"
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
           }
-        }
-      ]
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
     }
-  ],
-  "toughness": {
-    "type": "Star"
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elemental"
-      }
-    ],
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

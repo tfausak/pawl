@@ -1,49 +1,53 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colorless"
+                      }
+                    }
                   }
-                }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "name": "Reliquary Tower",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "NoMaximumHandSize"
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
           }
         ]
       }
     }
-  ],
-  "name": "Reliquary Tower",
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "NoMaximumHandSize"
-      },
-      "scope": {
-        "type": "You"
-      }
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+  ]
 }

@@ -1,74 +1,48 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Cycling",
-      "value": [
+      "keywords": [
         {
-          "mana": [
+          "type": "Cycling",
+          "value": [
             {
-              "type": "Generic",
-              "value": 1
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 1
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "White"
+                    }
+                  }
+                }
+              ]
             },
-            {
-              "type": "OfType",
-              "value": {
-                "type": "Colored",
-                "value": {
-                  "type": "White"
-                }
-              }
-            }
+            null
           ]
-        },
-        null
-      ]
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
         }
-      }
-    }
-  ],
-  "name": "Renewed Faith",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "GainLife",
-            "value": [
-              {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 6
-              }
-            ]
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
           }
-        ]
-      }
-    ]
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfCycled"
-      },
-      "modal": {
+        }
+      ],
+      "name": "Renewed Faith",
+      "spell": {
         "modes": [
           {
             "effects": [
@@ -83,24 +57,54 @@
                   },
                   {
                     "type": "Literal",
-                    "value": 2
+                    "value": 6
                   }
                 ]
               }
-            ],
-            "optionality": {
-              "type": "Optional"
-            }
+            ]
+          }
+        ]
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfCycled"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "GainLife",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ],
+                "optionality": {
+                  "type": "Optional"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+  ]
 }

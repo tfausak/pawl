@@ -1,69 +1,73 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Landwalk",
-      "value": {
-        "type": "And",
-        "value": [
-          {
-            "type": "HasSupertype",
+      "keywords": [
+        {
+          "type": "Landwalk",
+          "value": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasSupertype",
+                "value": {
+                  "type": "Snow"
+                }
+              },
+              {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Swamp"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "Snow"
+              "type": "Black"
             }
-          },
-          {
-            "type": "HasSubtype",
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "Swamp"
+              "type": "Black"
             }
+          }
+        }
+      ],
+      "name": "Legions of Lim-Dûl",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Zombie"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Legions of Lim-Dûl",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Zombie"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

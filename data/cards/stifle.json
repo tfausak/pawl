@@ -1,43 +1,47 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Stifle",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Counter",
-            "value": "ability"
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "ability",
-            "spec": {
-              "pool": {
-                "type": "Abilities"
-              }
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
             }
+          }
+        }
+      ],
+      "name": "Stifle",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Counter",
+                "value": "ability"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "ability",
+                "spec": {
+                  "pool": {
+                    "type": "Abilities"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

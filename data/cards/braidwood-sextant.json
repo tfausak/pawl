@@ -1,69 +1,73 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          },
-          {
-            "type": "SacrificeThis"
-          }
-        ],
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 2
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "Search",
-                "value": [
+                "type": "TapThis"
+              },
+              {
+                "type": "SacrificeThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 2
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "And",
+                    "type": "Search",
                     "value": [
                       {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Land"
-                        }
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Basic"
+                            }
+                          }
+                        ]
                       },
                       {
-                        "type": "HasSupertype",
-                        "value": {
-                          "type": "Basic"
-                        }
+                        "type": "RevealThenHand"
                       }
                     ]
-                  },
-                  {
-                    "type": "RevealThenHand"
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        }
+      ],
+      "name": "Braidwood Sextant",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    }
-  ],
-  "name": "Braidwood Sextant",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

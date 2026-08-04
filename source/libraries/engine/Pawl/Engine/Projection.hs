@@ -30,6 +30,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -339,9 +340,9 @@ affects source oid a partial gs = case a of
 -- CR 205.4a: supertypes are read from the printed type line -- no Modification
 -- arm changes a supertype (#311). Empty when the object has no underlying card.
 printedSupertypes :: ObjectId -> GameState -> Set Supertype.Supertype
-printedSupertypes oid gs = case Game.cardOf oid gs of
+printedSupertypes oid gs = case Game.faceOf oid gs of
   Nothing -> Set.empty
-  Just card -> TypeLine.supertypes (Card.Type.typeLine card)
+  Just face -> TypeLine.supertypes (Face.typeLine face)
 
 -- The characteristics view of a battlefield/stack object: its CR 613 projection,
 -- its printed supertypes (CR 205.4a), and its projected controller (CR 613.1b;
@@ -426,14 +427,14 @@ viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Set.member oid (GameState.battlefield gs)
     then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) gs)
-    else fmap viewOfCard (Game.cardOf oid gs)
+    else fmap viewOfCard (Game.faceOf oid gs)
 
 -- The characteristics view of a printed card off the battlefield, e.g. one being
 -- matched by a search. No projection exists there, so every axis is read from the
--- printed card and power/controller are Nothing.
-viewOfCard :: Card.Type.Card -> Filter.View
-viewOfCard card =
-  let typeLine = Card.Type.typeLine card
+-- printed face and power/controller are Nothing.
+viewOfCard :: Face.Face Card.Type.Card -> Filter.View
+viewOfCard face =
+  let typeLine = Face.typeLine face
    in Filter.MkView
         { Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
@@ -441,12 +442,12 @@ viewOfCard card =
           -- the battlefield is projected (#160), so devoid is applied here
           -- rather than inherited from a fold this object never enters.
           Filter.colors =
-            if definesColorless (Card.Type.keywords card)
+            if definesColorless (Face.keywords face)
               then Set.empty
-              else printedColorsOf card,
+              else printedColorsOf face,
           Filter.subtypes = TypeLine.subtypes typeLine,
-          -- CR 702: read off the printed card, like the type line above.
-          Filter.keywords = Card.Type.keywords card,
+          -- CR 702: read off the printed face, like the type line above.
+          Filter.keywords = Face.keywords face,
           Filter.power = Nothing,
           Filter.controller = Nothing,
           -- Not an object, so no identity for IsSource to compare.
@@ -550,16 +551,16 @@ copiableCharacteristics oid gs =
 -- unless the card declares a CDA *and* has a printed power and toughness box for
 -- the star to sit in (CR 208.1) -- a card with one and not the other is
 -- malformed data, and yields no CDA rather than a partial one.
-seedCharacteristicPT :: Card.Type.Card -> Maybe (Quantity.Type.Quantity, Quantity.Type.Quantity)
-seedCharacteristicPT card =
-  case (Card.Type.characteristicPT card, Card.Type.power card, Card.Type.toughness card) of
+seedCharacteristicPT :: Face.Face Card.Type.Card -> Maybe (Quantity.Type.Quantity, Quantity.Type.Quantity)
+seedCharacteristicPT face =
+  case (Face.characteristicPT face, Face.power face, Face.toughness face) of
     (Just star, Just (Power.MkPower p), Just (Toughness.MkToughness t)) ->
       Just (Quantity.substituteStar star p, Quantity.substituteStar star t)
     _ -> Nothing
 
 -- Printed characteristics before any effect: CR 613.1's starting point.
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
-baseCharacteristics oid gs = case Game.cardOf oid gs of
+baseCharacteristics oid gs = case Game.faceOf oid gs of
   Nothing ->
     PC.MkProjectedCharacteristics
       { -- No card behind this object (an ability on the stack): nothing to seed
@@ -578,7 +579,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.replacementEffects = [],
         PC.triggeredAbilities = []
       }
-  Just card ->
+  Just face ->
     -- The seed predates every layer, so a Count reached from here gets a viewOf
     -- that determines nothing rather than one recursing back into
     -- copiableCharacteristics. The tradeoff is that such a Count folds an empty
@@ -589,12 +590,12 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
     let seedViewOf = const Nothing
         seedContext = Filter.MkContext (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
-          { PC.name = Card.Type.name card,
-            PC.supertypes = TypeLine.supertypes (Card.Type.typeLine card),
+          { PC.name = Face.name face,
+            PC.supertypes = TypeLine.supertypes (Face.typeLine face),
             -- CR 702: a printed keyword appears once, so the seed's count is 1
             -- apiece; layer-6 grants add multiplicity on top (CR 702.164b).
-            PC.keywords = Map.fromSet (const 1) (Card.Type.keywords card),
-            PC.colors = printedColorsOf card,
+            PC.keywords = Map.fromSet (const 1) (Face.keywords face),
+            PC.colors = printedColorsOf face,
             -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
             -- instead" belongs to a CDA, and a printed star with none behind it
             -- evaluates to Nothing. A star given its value by an as-enters
@@ -602,21 +603,21 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
             -- battlefield where that rule says 0 (#76). A star that does have a
             -- CDA is Nothing only until layer 7a, where applyCharacteristicPT
             -- determines the pair seedCharacteristicPT left in characteristicPT.
-            PC.power = case Card.Type.power card of
+            PC.power = case Face.power face of
               Nothing -> Nothing
               Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
-            PC.toughness = case Card.Type.toughness card of
+            PC.toughness = case Face.toughness face of
               Nothing -> Nothing
               Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
             -- CR 306.5a: a literal number, so copied through rather than
             -- evaluated like the two fields above.
-            PC.loyalty = Card.Type.loyalty card,
-            PC.characteristicPT = seedCharacteristicPT card,
-            PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
-            PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
-            PC.activatedAbilities = Card.Type.activatedAbilities card,
-            PC.replacementEffects = Card.Type.replacementEffects card,
-            PC.triggeredAbilities = Card.Type.triggeredAbilities card
+            PC.loyalty = Face.loyalty face,
+            PC.characteristicPT = seedCharacteristicPT face,
+            PC.cardTypes = TypeLine.types (Face.typeLine face),
+            PC.subtypes = TypeLine.subtypes (Face.typeLine face),
+            PC.activatedAbilities = Face.activatedAbilities face,
+            PC.replacementEffects = Face.replacementEffects face,
+            PC.triggeredAbilities = Face.triggeredAbilities face
           }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
@@ -625,11 +626,11 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 -- No devoid here: CR 702.114a makes it a CDA, and CR 613.3 puts CDAs at the start
 -- of their layer (5 for colour, CR 613.1e), not before the fold begins.
 -- applyColorDefining is where it lands.
-printedColorsOf :: Card.Type.Card -> Set Color.Color
-printedColorsOf card =
+printedColorsOf :: Face.Face Card.Type.Card -> Set Color.Color
+printedColorsOf face =
   Set.union
-    (Card.Type.colorIndicator card)
-    (manaCostColors (Card.Type.manaCost card))
+    (Face.colorIndicator face)
+    (manaCostColors (Face.manaCost face))
 
 -- CR 702.114a. The one place that decides what devoid means, so the fold and the
 -- off-battlefield card view cannot drift apart on it.
@@ -806,11 +807,11 @@ setLandSubtypeEffects gs =
       -- reach. Rewriting here is not free either, since textChangesAffecting
       -- folds the whole effect list and this function is hoisted out of gather's
       -- walk to avoid per-permanent cost (#584).
-      fromPerm permId = case Game.cardOf permId gs of
+      fromPerm permId = case Game.faceOf permId gs of
         Nothing -> []
-        Just card ->
+        Just face ->
           fmap (\sa -> (permId, StaticAbility.affected sa)) $
-            filter (any isSet . StaticAbility.modifications) (Card.Type.staticAbilities card)
+            filter (any isSet . StaticAbility.modifications) (Face.staticAbilities face)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
@@ -1007,18 +1008,25 @@ rewriteObjectRef pairs ref = case ref of
 -- Not implemented: the swap does not reach the defined card's ability carriers,
 -- so the card is walked rather than recursed into (#643). That also keeps
 -- rewriteEffect non-recursive.
+--
+-- Every FACE, because a card's printed subtypes and name are per-face (CR
+-- 712.8) and the swap is aimed at the card as a whole; the gate below then
+-- leaves untouched any face whose type line lacks the word.
 rewriteCard :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Card.Type.Card -> Card.Type.Card
-rewriteCard pairs card = List.foldl' apply1 card pairs
+rewriteCard pairs card = card {Card.Type.faces = fmap (rewriteFace pairs) (Card.Type.faces card)}
+
+rewriteFace :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Face.Face Card.Type.Card -> Face.Face Card.Type.Card
+rewriteFace pairs face = List.foldl' apply1 face pairs
   where
-    apply1 c (from, to) =
-      let typeLine = Card.Type.typeLine c
+    apply1 f (from, to) =
+      let typeLine = Face.typeLine f
           subtypes = TypeLine.subtypes typeLine
        in if Set.notMember from subtypes
-            then c
+            then f
             else
-              c
-                { Card.Type.typeLine = typeLine {TypeLine.subtypes = Set.insert to (Set.delete from subtypes)},
-                  Card.Type.name = rewriteTokenName from to (Card.Type.name c)
+              f
+                { Face.typeLine = typeLine {TypeLine.subtypes = Set.insert to (Set.delete from subtypes)},
+                  Face.name = rewriteTokenName from to (Face.name f)
                 }
 
 -- CR 612.2a's name half. Both words are looked up in CR 205.3m's list, since a
@@ -1176,9 +1184,9 @@ gatherGiven stripped gs =
       stored = fmap fromStored (GameState.continuousEffects gs)
       fromPermanent permId = case Game.lookupObject permId gs of
         Nothing -> []
-        Just permObj -> case Game.cardOf permId gs of
+        Just permObj -> case Game.faceOf permId gs of
           Nothing -> []
-          Just card ->
+          Just face ->
             if null setEffs || liveGiven setEffs Set.empty permId gs
               then
                 -- CR 612: rewrite each static ability's subtype words by the text
@@ -1188,20 +1196,20 @@ gatherGiven stripped gs =
                  in -- One thunk per permanent, shared by all its abilities and
                     -- forced by none unless an ability is entirely above layer 6,
                     -- so the projection costs at most one per permanent.
-                    concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Card.Type.staticAbilities card))
+                    concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Face.staticAbilities face))
               else []
       static = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
-        Just emblemObj -> case Game.cardOf emblemId gs of
+        Just emblemObj -> case Game.faceOf emblemId gs of
           Nothing -> []
-          Just card ->
+          Just face ->
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
             -- zone, its effect sharing the emblem's entry timestamp (CR 613.7a).
             -- No liveness or text-change pass and never stripped: the pool's CR
             -- 613.1f removers reach creatures, and an emblem is not one (CR
             -- 114.5).
-            concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Card.Type.staticAbilities card))
+            concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       counters = counterGathered gs
    in stored <> static <> emblems <> counters
@@ -1860,7 +1868,7 @@ keywordsGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState 
 keywordsGiven pcs oid gs = PC.keywords (projectGiven pcs oid gs)
 
 -- CR 105.2 / 613.1e: an object's colours after the layer fold. The sole read
--- point -- the closed half never reads Card.manaCost for colour.
+-- point -- the closed half never reads Face.manaCost for colour.
 colorsOf :: ObjectId -> GameState -> Set Color.Color
 colorsOf = colorsGiven Map.empty
 
@@ -1926,14 +1934,14 @@ intrinsicReplacementsOf pc =
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect)]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
-      baseHas oid = case Game.cardOf oid gs of
+      baseHas oid = case Game.faceOf oid gs of
         Nothing -> False
         -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement inside
         -- the short-circuit: minted from the projection, it appears in no base
-        -- card's list.
-        Just card ->
-          not (null (Card.Type.replacementEffects card))
-            || Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine card))
+        -- face's list.
+        Just face ->
+          not (null (Face.replacementEffects face))
+            || Set.member CardType.Planeswalker (TypeLine.types (Face.typeLine face))
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
@@ -2066,9 +2074,9 @@ controlGrants gs =
   let setEffs = setLandSubtypeEffects gs
       grantsOf permId = case Game.lookupObject permId gs of
         Nothing -> []
-        Just permObj -> case Game.cardOf permId gs of
+        Just permObj -> case Game.faceOf permId gs of
           Nothing -> []
-          Just card ->
+          Just face ->
             -- CR 305.7: a land whose subtype was SET has lost its rules text, so
             -- it grants nothing. Same gate gather applies to every static ability.
             if not (null setEffs) && not (liveGiven setEffs Set.empty permId gs)
@@ -2084,7 +2092,7 @@ controlGrants gs =
                           cgAffected = StaticAbility.affected sa,
                           cgTimestamp = Object.timestamp permObj
                         }
-                 in fmap toGrant (filter isControl (Card.Type.staticAbilities card))
+                 in fmap toGrant (filter isControl (Face.staticAbilities face))
    in concatMap grantsOf (Set.toList (GameState.battlefield gs))
 
 -- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2

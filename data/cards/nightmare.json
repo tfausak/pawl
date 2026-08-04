@@ -1,80 +1,84 @@
 {
-  "characteristicPT": {
-    "type": "Count",
-    "value": {
-      "aggregation": {
-        "type": "Objects"
-      },
-      "filter": {
-        "type": "And",
-        "value": [
-          {
-            "type": "HasSubtype",
-            "value": {
-              "type": "Swamp"
-            }
-          },
-          {
-            "type": "ControlledBy",
-            "value": {
-              "type": "You"
-            }
-          }
-        ]
-      },
-      "scope": {
-        "type": "InZone",
-        "value": [
-          {
-            "type": "Battlefield"
-          },
-          {
-            "type": "EachPlayer"
-          }
-        ]
-      }
-    }
-  },
-  "keywords": [
+  "faces": [
     {
-      "type": "Flying"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 5
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
+      "characteristicPT": {
+        "type": "Count",
         "value": {
-          "type": "Black"
+          "aggregation": {
+            "type": "Objects"
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Swamp"
+                }
+              },
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              }
+            ]
+          },
+          "scope": {
+            "type": "InZone",
+            "value": [
+              {
+                "type": "Battlefield"
+              },
+              {
+                "type": "EachPlayer"
+              }
+            ]
+          }
         }
+      },
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 5
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Nightmare",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Horse"
+          },
+          {
+            "type": "Nightmare"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "Nightmare",
-  "power": {
-    "type": "Star"
-  },
-  "toughness": {
-    "type": "Star"
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Horse"
-      },
-      {
-        "type": "Nightmare"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

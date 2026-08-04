@@ -3,6 +3,7 @@ module Pawl.Types.Object where
 import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -123,6 +124,24 @@ data Object = MkObject
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when
     -- ordering layer 6/7.
-    timestamp :: Timestamp.Timestamp
+    timestamp :: Timestamp.Timestamp,
+    -- | CR 709.3b / 712.8f: which face this object is showing, where the rules
+    -- single one out. Nothing everywhere else, and the layout decides -- see
+    -- Pawl.Engine.Game.faceOf.
+    --
+    -- A CardName rather than a positional index: CR 709.3 has a player choose
+    -- which half they are casting, and CR 709.4a is what gives a card's faces
+    -- names to choose from. Resolved against the object's STORED card, never a
+    -- projected one, so CR 612.2a's rename (which reaches only a
+    -- token-definition card a Create names) cannot dangle it. A name that no
+    -- longer names a face of that card falls back to the combined view
+    -- (Game.resolveFace) rather than failing -- unreachable in practice, since
+    -- Pawl.CardSpec's "a card's face names are pairwise distinct" corpus lint
+    -- holds that of every loadable card, and the only writer of this field draws
+    -- the name from that same card's faces.
+    --
+    -- Per-incarnation state, like damage and counters: cleared by changeZone,
+    -- because CR 400.7 makes the moved object a new one.
+    face :: Maybe CardName.CardName
   }
   deriving (Eq, Ord, Show)

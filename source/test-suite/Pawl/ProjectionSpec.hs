@@ -14,9 +14,10 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -35,7 +36,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Condition as Condition.Type
@@ -46,6 +47,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -80,7 +82,7 @@ giantGrowthOnPiker forest piker giantGrowth =
   let base = S.landsInPlay forest 1
       (pikerId, withPiker) = S.addCreature piker S.alice base
       (gs, ggId) = S.handOne giantGrowth withPiker
-      cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ggId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (pikerId, resolved)
 
@@ -99,7 +101,7 @@ untamedMightOnPiker forest piker untamedMight =
   let base = S.landsInPlay forest 5
       (pikerId, withPiker) = S.addCreature piker S.alice base
       (gs, umId) = S.handOne untamedMight withPiker
-      cast = snd (Engine.runGamePure answerX4 gs (Cast.castSpell S.alice umId))
+      cast = snd (Engine.runGamePure answerX4 gs (S.cast S.alice umId))
       resolved = snd (Engine.runGamePure answerX4 cast Stack.resolveTop)
    in (pikerId, resolved)
 
@@ -138,7 +140,7 @@ aimAtCreature oid p = case p of
 turnToFrogAt :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> GameState.GameState
 turnToFrogAt victimId turnToFrog board =
   let (gs, ttfId) = S.handOne turnToFrog board
-      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (Cast.castSpell S.alice ttfId))
+      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (S.cast S.alice ttfId))
    in snd (Engine.runGamePure (aimAtCreature victimId) cast Stack.resolveTop)
 
 -- The object timestamp of the (single) Humility on the battlefield.
@@ -401,7 +403,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forest <- S.printingOf s registry "Forest"
     giantGrowth <- S.printingOf s registry "Giant Growth"
     let (gs, ggId) = S.handOne giantGrowth (S.landsInPlay forest 1)
-    Spec.assertBool s (not (Cast.castable S.alice ggId gs)) "no legal target, not castable"
+    Spec.assertBool s (not (S.castable S.alice ggId gs)) "no legal target, not castable"
 
   Spec.it s "CR 514.2 an until-end-of-turn effect wears off at cleanup" $ do
     forest <- S.printingOf s registry "Forest"
@@ -472,7 +474,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (pikerId, withPiker) = S.addCreature piker S.alice base
         withHum = S.withHumility humility withPiker
         (gs, ggId) = S.handOne giantGrowth withHum
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ggId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     -- Layer 7b (set 1/1) before 7c (+3/+3): 1 then +3 = 4.
     Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
@@ -488,7 +490,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let base = S.landsInPlay forest 3
         (mammothId, withMammoth) = S.addCreature warMammoth S.alice base
         (gs, sgId) = S.handOne serpentsGift withMammoth
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice sgId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice sgId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertBool s (Projection.hasKeyword Keyword.Trample mammothId resolved) "keeps trample"
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch mammothId resolved) "gains deathtouch"
@@ -1281,7 +1283,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (equip, g2) = S.addCreature bonesplitter S.alice g1
         attached = S.attach equip creature g2
         (withSpell, spellId) = S.handOne march attached
-        cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         after = snd (Engine.runGamePure S.identityAnswer resolved Engine.settleForPriority)
     Spec.assertEqWith s "equipped, the Piker was 4/1" (Projection.powerOf creature attached) (Just 4)
@@ -1595,7 +1597,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
           [] -> ObjectId.MkObjectId 999
         (_, g1) = S.addCreature march S.alice gs0
         (coatingId, g2) = S.addCreature coating S.alice g1
-        ability = case Card.Type.activatedAbilities (Printing.card coating) of
+        ability = case Face.activatedAbilities (S.combinedFace coating) of
           ab : _ -> Just ab
           [] -> Nothing
     case ability of
@@ -1763,8 +1765,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   Spec.it s "viewOfCard reads a printed basic land's supertypes off the battlefield" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let card = Printing.card mountain
-        view = Projection.viewOfCard card
+    let face = S.combinedFace mountain
+        view = Projection.viewOfCard face
     Spec.assertBool s (Set.member CardType.Land (Filter.cardTypes view)) "is a land"
     Spec.assertBool s (Set.member Supertype.Basic (Filter.supertypes view)) "is basic"
     Spec.assertEqWith s "no power off battlefield" (Filter.power view) Nothing
@@ -1812,6 +1814,26 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       "bounded at 7c does not"
       (PC.power (Projection.projectUpTo Layer.ModifyPT cands pikerId gs))
       (Just 2)
+
+  -- Built by hand (Pawl.CardSpec.splitCard: two Instant halves, Wax {G} and
+  -- Wane {W}) and put on the stack directly (S.spellOnStack), with Object.face
+  -- set by hand: this is about how the field is READ, and Pawl.CastSpec's
+  -- CR 709.3a cases are what prove a cast writes it. The printed Wax // Wane
+  -- takes the same reading through a real cast in Pawl.CastSpec's WaxWane
+  -- group; here the point is to reach the read with nothing else moving.
+  Spec.it s "CR 709.3b a split spell on the stack has only the half being cast" $ do
+    let wax = CardName.MkCardName (Text.pack "Wax")
+        card = CardSpec.splitCard
+        (oid, gs0) = S.spellOnStack (Printing.MkPrinting card) S.alice (Setup.emptyGame S.bothPlayers)
+        showing n g = g {GameState.objects = Map.adjust (\o -> o {Object.face = Just n}) oid (GameState.objects g)}
+    -- CR 709.3b: "While on the stack, only the characteristics of the half being
+    -- cast exist. The other half's characteristics are treated as though they
+    -- didn't exist." Green alone, NOT the green-and-white CR 709.4 gives the
+    -- card in every other zone.
+    Spec.assertEqWith s "green alone" (Projection.colorsOf oid (showing wax gs0)) (Set.singleton Color.Green)
+    -- Falsifier: an engine that always answered with the combined view would
+    -- report both colours here and pass every other case in this task.
+    Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
   keywordCounterSpec s registry
 

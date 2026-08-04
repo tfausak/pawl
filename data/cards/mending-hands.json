@@ -1,52 +1,56 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Mending Hands",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Mending Hands",
+      "spell": {
+        "modes": [
           {
-            "type": "PreventNextDamage",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              "target",
+                "type": "PreventNextDamage",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  "target",
+                  {
+                    "type": "Literal",
+                    "value": 4
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
               {
-                "type": "Literal",
-                "value": 4
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "AnyTarget"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "AnyTarget"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

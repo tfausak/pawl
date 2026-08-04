@@ -1,54 +1,58 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Cycling",
-      "value": [
+      "keywords": [
         {
-          "mana": [
+          "type": "Cycling",
+          "value": [
             {
-              "type": "Generic",
-              "value": 2
-            }
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 2
+                }
+              ]
+            },
+            null
           ]
-        },
-        null
-      ]
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 4
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
         }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Barkhide Mauler",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Beast"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "Barkhide Mauler",
-  "power": {
-    "type": "Literal",
-    "value": 4
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 4
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Beast"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

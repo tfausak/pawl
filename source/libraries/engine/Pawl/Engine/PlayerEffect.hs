@@ -25,7 +25,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
-import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -106,9 +106,9 @@ applying pid gs =
       -- has a player ability forces it -- so the ordinary board pays nothing for
       -- the CR 604.2 question below.
       removed = Projection.abilityRemoval gs
-      fromPermanent oid = case Game.cardOf oid gs of
+      fromPermanent oid = case Game.faceOf oid gs of
         Nothing -> []
-        Just card -> case Card.playerAbilities card of
+        Just face -> case Face.playerAbilities face of
           -- The overwhelming majority of permanents: no ability, so no
           -- controller projection and no CR 305.7 check is paid for.
           [] -> []

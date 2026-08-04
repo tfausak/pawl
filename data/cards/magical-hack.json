@@ -1,49 +1,53 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Magical Hack",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Magical Hack",
+      "spell": {
+        "modes": [
           {
-            "type": "ChangeText",
-            "value": [
+            "effects": [
               {
-                "type": "BasicLandType"
-              },
-              [],
-              "target"
+                "type": "ChangeText",
+                "value": [
+                  {
+                    "type": "BasicLandType"
+                  },
+                  [],
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "SpellsAndPermanents"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "SpellsAndPermanents"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

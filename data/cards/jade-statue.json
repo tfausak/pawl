@@ -1,99 +1,103 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 2
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfCombat"
-                  },
-                  {
-                    "type": "AddCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
-                  },
-                  "self"
-                ]
-              },
+                "type": "Generic",
+                "value": 2
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfCombat"
-                  },
-                  {
-                    "type": "SetCreatureSubtype",
-                    "value": {
-                      "type": "Golem"
-                    }
-                  },
-                  "self"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfCombat"
-                  },
-                  {
-                    "type": "SetBasePowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Literal",
-                        "value": 3
+                        "type": "UntilEndOfCombat"
                       },
                       {
-                        "type": "Literal",
-                        "value": 6
-                      }
+                        "type": "AddCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      "self"
                     ]
                   },
-                  "self"
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfCombat"
+                      },
+                      {
+                        "type": "SetCreatureSubtype",
+                        "value": {
+                          "type": "Golem"
+                        }
+                      },
+                      "self"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfCombat"
+                      },
+                      {
+                        "type": "SetBasePowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 3
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 6
+                          }
+                        ]
+                      },
+                      "self"
+                    ]
+                  }
                 ]
               }
             ]
-          }
-        ]
-      },
-      "timing": {
-        "type": "DuringPhase",
-        "value": [
-          {
-            "type": "CombatPhase"
           },
+          "timing": {
+            "type": "DuringPhase",
+            "value": [
+              {
+                "type": "CombatPhase"
+              },
+              {
+                "type": "EachTurn"
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Jade Statue",
+      "typeLine": {
+        "types": [
           {
-            "type": "EachTurn"
+            "type": "Artifact"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 4
-    }
-  ],
-  "name": "Jade Statue",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

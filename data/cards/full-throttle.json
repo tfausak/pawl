@@ -1,97 +1,101 @@
 {
-  "delayedAbilities": [
+  "faces": [
     {
-      "ability": {
-        "condition": {
-          "type": "StepBegins",
-          "value": [
-            {
-              "type": "Combat",
-              "value": {
-                "type": "BeginningOfCombat"
-              }
-            },
-            {
-              "type": "EachTurn"
-            }
-          ]
-        },
-        "modal": {
-          "modes": [
-            {
-              "effects": [
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "StepBegins",
+              "value": [
                 {
-                  "type": "Untap",
+                  "type": "Combat",
                   "value": {
-                    "type": "AttackedThisTurn"
+                    "type": "BeginningOfCombat"
                   }
+                },
+                {
+                  "type": "EachTurn"
+                }
+              ]
+            },
+            "modal": {
+              "modes": [
+                {
+                  "effects": [
+                    {
+                      "type": "Untap",
+                      "value": {
+                        "type": "AttackedThisTurn"
+                      }
+                    }
+                  ]
                 }
               ]
             }
-          ]
+          },
+          "name": "each combat"
         }
-      },
-      "name": "each combat"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 4
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Full Throttle",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Full Throttle",
+      "spell": {
+        "modes": [
           {
-            "type": "AddPhases",
-            "value": [
+            "effects": [
               {
-                "type": "ExtraCombat"
+                "type": "AddPhases",
+                "value": [
+                  {
+                    "type": "ExtraCombat"
+                  },
+                  {
+                    "type": "ExtraCombat"
+                  }
+                ]
               },
               {
-                "type": "ExtraCombat"
-              }
-            ]
-          },
-          {
-            "type": "ArmDelayedTrigger",
-            "value": [
-              "each combat",
-              {
-                "type": "UntilEndOfTurn"
+                "type": "ArmDelayedTrigger",
+                "value": [
+                  "each combat",
+                  {
+                    "type": "UntilEndOfTurn"
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

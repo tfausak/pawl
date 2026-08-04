@@ -16,7 +16,6 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -42,6 +41,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -89,7 +89,7 @@ chooseNoModes p = case p of
 -- empty-ability fallback is unreachable in these fixtures, and honors the
 -- no-partial-functions rule (no `error`).
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
 
@@ -212,7 +212,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
         (g2, inHand) = S.handOne pouncingCheetah g1
         (spellId, gs) = S.spellOnStack piker S.alice g2
     Spec.assertBool s (elem spellId (GameState.stack gs)) "the stack really is occupied"
-    Spec.assertBool s (Cast.castable S.alice inHand gs) "the flash spell is castable in response"
+    Spec.assertBool s (S.castable S.alice inHand gs) "the flash spell is castable in response"
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "but equip is not offered"
 
   -- The control: an UNRESTRICTED ability is unaffected by all three, so the
@@ -520,7 +520,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   Spec.it s "CR 702.29a the minted ability is '{2}, Discard this card: Draw a card'" $ do
     mauler <- S.printingOf s registry "Barkhide Mauler"
     (oid, gs) <- cyclingBoard s registry
-    Spec.assertEqWith s "the card itself prints no activated ability" (Card.Type.activatedAbilities (Printing.card mauler)) []
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.combinedFace mauler)) []
     case Activate.abilitiesFor oid gs of
       [ability] -> do
         Spec.assertEqWith
@@ -1353,7 +1353,7 @@ soleCreatureOf pid gs = case filter (`Projection.isCreatureOf` gs) (Game.zoneMem
   _ -> Nothing
 
 -- The one activated ability the PROJECTION hands out for `oid` -- not
--- Card.Type.activatedAbilities, which is the printed list a text change has not
+-- Face.activatedAbilities, which is the printed list a text change has not
 -- reached. Projection.abilitiesGiven is the list Activate itself offers from, so
 -- this is the same ability a player would be given.
 soleProjectedAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
@@ -1419,19 +1419,19 @@ tidalWarriorChain s registry hackWhere = do
   tidalWarrior <- S.printingOf s registry "Tidal Warrior"
   magicalHack <- S.printingOf s registry "Magical Hack"
   let (forestId, warriorCardId, hackId, g0) = tidalWarriorBoard forest island tidalWarrior magicalHack
-      onStack = S.runPure S.identityAnswer g0 (Cast.castSpell S.alice warriorCardId)
+      onStack = S.runPure S.identityAnswer g0 (S.cast S.alice warriorCardId)
       warriorSpellId = case GameState.stack onStack of
         top : _ -> top
         [] -> ObjectId.MkObjectId 999
       -- Hacking the SPELL: cast the Hack on top of the Warrior spell and resolve
       -- it, so the stored effect names the spell id. Then resolve the Warrior.
-      hackedSpell = S.runPure (hackAt warriorSpellId Subtype.Island Subtype.Swamp) onStack (do Cast.castSpell S.alice hackId; Stack.resolveTop)
+      hackedSpell = S.runPure (hackAt warriorSpellId Subtype.Island Subtype.Swamp) onStack (do S.cast S.alice hackId; Stack.resolveTop)
       resolveWarrior gs = S.runPure S.identityAnswer gs (do Stack.resolveTop; Engine.settleAll S.alice)
       -- Hacking the PERMANENT: resolve the Warrior first, then aim the Hack at
       -- the new incarnation.
       hackPermanent gs = case soleCreatureOf S.alice gs of
         Nothing -> gs
-        Just permId -> S.runPure (hackAt permId Subtype.Island Subtype.Swamp) gs (do Cast.castSpell S.alice hackId; Stack.resolveTop)
+        Just permId -> S.runPure (hackAt permId Subtype.Island Subtype.Swamp) gs (do S.cast S.alice hackId; Stack.resolveTop)
       board = case hackWhere of
         Nothing -> resolveWarrior onStack
         Just OnTheSpell -> resolveWarrior hackedSpell

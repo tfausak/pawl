@@ -20,7 +20,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -38,6 +37,7 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -79,7 +79,7 @@ destroyMode = ModeIndex.MkModeIndex 1
 -- index is out of range or the mode does not declare exactly one slot; the
 -- callers assert on that rather than defaulting to a hand-built spec.
 modeSpec :: Printing.Printing -> ModeIndex.ModeIndex -> Maybe TargetSpec.TargetSpec
-modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (Printing.card printing)) of
+modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (S.combinedFace printing)) of
   Just [only] -> Just only
   _ -> Nothing
 
@@ -88,7 +88,7 @@ modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (Printing.
 -- existing convention of group-local helpers (ActivateSpec, ReplacementSpec)
 -- rather than centralizing a helper this small in Support.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
 
@@ -250,7 +250,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     let base = S.landsInPlay mountain 2
         (_, withMoon) = S.addCreature badMoon S.alice base
         (gs, spellId) = S.handOne dragonFodder withMoon
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     case S.tokensOf after of
       [] -> Spec.assertFailure s "Dragon Fodder made no tokens"
@@ -288,7 +288,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     let base = S.landsInPlay swamp 2
         (_, board) = S.addCreature slaughterDrone S.bob base
         (gs, dbId) = S.handOne doomBlade board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the Drone is gone" (length (Game.zoneMembers Zone.Battlefield S.bob after)) 0
 
@@ -305,7 +305,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (_, withMoon) = S.addCreature badMoon S.alice base
         (ratsId, board) = S.addCreature typhoidRats S.alice withMoon
         (gs, cwId) = S.handOne crimsonWisps board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cwId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cwId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "before: the black Rats are 2/2 under Bad Moon" (Projection.powerOf ratsId board) $ Just 2
     Spec.assertEqWith s "after: red only, not black and red" (Projection.colorsOf ratsId after) $ Set.singleton Color.Red
@@ -324,7 +324,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (_, withMoon) = S.addCreature badMoon S.alice base
         (pikerId, board) = S.addCreature piker S.alice withMoon
         (gs, awId) = S.handOne aphoticWisps board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice awId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice awId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "black only, not red and black" (Projection.colorsOf pikerId after) $ Set.singleton Color.Black
     Spec.assertEqWith s "INTO Bad Moon's set, now 3 power" (Projection.powerOf pikerId after) $ Just 3
@@ -345,8 +345,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (elvesId, board) = S.addCreature llanowarElves S.bob base
         (gs1, dbId) = S.handOne doomBlade board
         (gs2, awId) = S.handOne aphoticWisps gs1
-        castDb = snd (Engine.runGamePure S.identityAnswer gs2 (Cast.castSpell S.alice dbId))
-        castAw = snd (Engine.runGamePure S.identityAnswer castDb (Cast.castSpell S.alice awId))
+        castDb = snd (Engine.runGamePure S.identityAnswer gs2 (S.cast S.alice dbId))
+        castAw = snd (Engine.runGamePure S.identityAnswer castDb (S.cast S.alice awId))
         -- Aphotic Wisps is on top, so it resolves first and turns the green
         -- Elves black; Doom Blade then re-checks its target (CR 608.2b).
         after = snd (Engine.runGamePure S.identityAnswer castAw (Stack.resolveTop >> Stack.resolveTop))
@@ -423,7 +423,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         blued = snd (Engine.runGamePure (aimAtObject droneId) activated Stack.resolveTop)
         answer :: Prompt.Prompt r -> r
         answer = blasting destroyMode droneId
-        cast = snd (Engine.runGamePure answer blued (Cast.castSpell S.alice rebId))
+        cast = snd (Engine.runGamePure answer blued (S.cast S.alice rebId))
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
     Spec.assertEqWith s "colourless before" (Projection.colorsOf droneId gs) Set.empty
     Spec.assertEqWith s "blue after" (Projection.colorsOf droneId blued) $ Set.singleton Color.Blue
@@ -484,14 +484,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- Three Mountains: {2} for the Servant and {R} for the blast.
     let base = S.landsInPlay mountain 3
         (inHand, psId) = S.handOne paintersServant base
-        cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
+        cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
         withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
         (droneId, withDrone) = S.addCreature slaughterDrone S.alice withPainter
         (rebId, gs) = S.addHandCard redElementalBlast S.alice withDrone
         entered = Set.difference (GameState.battlefield withPainter) (GameState.battlefield base)
         answer :: Prompt.Prompt r -> r
         answer = blasting destroyMode droneId
-        blasted = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice rebId))
+        blasted = snd (Engine.runGamePure answer gs (S.cast S.alice rebId))
         after = snd (Engine.runGamePure answer blasted Stack.resolveTop)
     case Set.toList entered of
       [painterId] -> case (Game.lookupObject painterId gs, Game.lookupObject droneId gs) of
@@ -530,13 +530,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- Three Mountains: {2} for the Servant and {R} for the blast.
     let base = S.landsInPlay mountain 3
         (inHand, psId) = S.handOne paintersServant base
-        cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
+        cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
         withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
         (spellId, withSpell) = S.spellOnStack slaughterDrone S.alice withPainter
         (rebId, gs) = S.addHandCard redElementalBlast S.alice withSpell
         answer :: Prompt.Prompt r -> r
         answer = blasting counterMode spellId
-        blasted = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice rebId))
+        blasted = snd (Engine.runGamePure answer gs (S.cast S.alice rebId))
         after = snd (Engine.runGamePure answer blasted Stack.resolveTop)
     Spec.assertEqWith s "the spell is blue" (Projection.colorsOf spellId gs) $ Set.singleton Color.Blue
     case modeSpec redElementalBlast counterMode of
@@ -568,13 +568,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
     let base = S.landsInPlay mountain 3
         (inHand, psId) = S.handOne paintersServant base
-        cast = snd (Engine.runGamePure choosingBlue inHand (Cast.castSpell S.alice psId))
+        cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
         withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
         (spellId, withSpell) = S.spellOnStack slaughterDrone S.alice withPainter
         (rebId, gs) = S.addHandCard redElementalBlast S.alice withSpell
         answer :: Prompt.Prompt r -> r
         answer = blastingSelfIfOffered counterMode spellId
-        blasted = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice rebId))
+        blasted = snd (Engine.runGamePure answer gs (S.cast S.alice rebId))
         after = snd (Engine.runGamePure answer blasted Stack.resolveTop)
     Spec.assertEqWith s "the blast really was cast" (length (Game.zoneMembers Zone.Hand S.alice blasted)) 0
     Spec.assertBool s (notElem spellId (GameState.stack after)) "the DRONE is what got countered"

@@ -1,75 +1,79 @@
 {
-  "enchant": {
-    "pool": {
-      "type": "Players"
-    }
-  },
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Curse of Death's Hold",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "AttachedPlayerControls",
-        "value": {
-          "type": "HasCardType",
-          "value": {
-            "type": "Creature"
-          }
+      "enchant": {
+        "pool": {
+          "type": "Players"
         }
       },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "ModifyPowerToughness",
-          "value": [
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Curse of Death's Hold",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "AttachedPlayerControls",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": -1
-            },
-            {
-              "type": "Literal",
-              "value": -1
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": -1
+                },
+                {
+                  "type": "Literal",
+                  "value": -1
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          },
+          {
+            "type": "Curse"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      },
-      {
-        "type": "Curse"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

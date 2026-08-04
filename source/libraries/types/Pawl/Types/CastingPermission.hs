@@ -5,7 +5,7 @@ module Pawl.Types.CastingPermission where
 -- Wurm's "while you're searching your library, you may cast this from your
 -- library"; a general "cast from the top of your library" (Garruk's Horde) is a
 -- future permission. Only Pawl.Engine.Cast reads it, as a membership test per
--- arm. Two producers: Card.castingPermissions (printed) and
+-- arm. Two producers: Face.castingPermissions (printed) and
 -- Pawl.Engine.Keyword.castingPermissionsOf (what rule 702 gives for a keyword).
 --
 -- OBJECT-scoped throughout: every arm is a permission a CARD grants about

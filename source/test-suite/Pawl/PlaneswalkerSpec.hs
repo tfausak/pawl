@@ -27,7 +27,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Stack as Stack
@@ -40,6 +39,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -53,7 +53,7 @@ import qualified Pawl.Types.Zone as Zone
 -- the first card in the pool with more than one activated ability and CR 606.6 is
 -- a claim about WHICH of them is offered.
 abilityAt :: Int -> Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilityAt i p = take 1 (drop i (Card.Type.activatedAbilities (Printing.card p)))
+abilityAt i p = take 1 (drop i (Face.activatedAbilities (S.combinedFace p)))
 
 -- The Activate action for one of Jace's abilities, as a one-or-zero-element list
 -- so a fixture that finds no such ability produces an assertion failure rather
@@ -81,7 +81,7 @@ useAbility i p oid gs = case abilityAt i p of
 jaceOnBattlefield :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 jaceOnBattlefield island jace =
   let (gs, handId) = S.handOne jace (stockLibraries island (S.landsInPlay island 3))
-      after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+      after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
    in (theJace after, after)
 
 -- Four cards in each library. Jace's abilities all draw, and CR 704.5b would end
@@ -95,7 +95,7 @@ stockLibraries island base =
 -- object as the spell moves and the hand's id does not survive the cast.
 theJace :: GameState.GameState -> ObjectId.ObjectId
 theJace gs =
-  let isJace oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Jace Beleren")
+  let isJace oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Jace Beleren")
    in case filter isJace (Set.toList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> S.noSource
@@ -136,7 +136,7 @@ burnAtJace island mountain jace burn =
 -- How many cards of a given name are in alice's graveyard.
 graveyardCount :: String -> GameState.GameState -> Int
 graveyardCount name gs =
-  let named oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack name)
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack name)
    in length (filter named (Game.zoneMembers Zone.Graveyard S.alice gs))
 
 -- Fill every target slot with the candidate that NAMES `oid`, whatever tag the
@@ -161,7 +161,7 @@ aimedAt oid p = case p of
 burnResolved :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 burnResolved jaceId burnId gs =
   S.runPure (aimedAt jaceId) gs $ do
-    Cast.castSpell S.alice burnId
+    S.cast S.alice burnId
     Stack.resolveTop
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -238,7 +238,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     doublingSeason <- S.printingOf s registry "Doubling Season"
     let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-        after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+        after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
     Spec.assertEqWith s "three doubled to six" (S.counterOf CounterKind.Loyalty (theJace after) after) 6
 
   -- The other half of the same rule, and the reason the two placements are
@@ -250,7 +250,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     doublingSeason <- S.printingOf s registry "Doubling Season"
     let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-        board = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+        board = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
         jaceId = theJace board
         after = useAbility plusTwo jace jaceId board
     Spec.assertEqWith s "six plus two, not six plus four" (S.counterOf CounterKind.Loyalty jaceId after) 8

@@ -6,16 +6,17 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Printing as Printing
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Printing as Printing
 
 slugOf :: Printing.Printing -> Slug.Slug
-slugOf = Slug.fromText . CardName.unwrap . CardT.name . Printing.card
+slugOf = Slug.fromText . CardName.unwrap . Face.name . Card.combined . Printing.card
 
 spec :: Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Cards" $ do

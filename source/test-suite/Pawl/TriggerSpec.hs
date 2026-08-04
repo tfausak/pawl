@@ -70,7 +70,6 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -112,6 +111,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -165,7 +165,7 @@ castWave :: Printing.Printing -> Printing.Printing -> GameState.GameState
 castWave tidalWave island =
   let resolveAll g = snd (Engine.runGamePure S.identityAnswer g Engine.priorityLoop)
       (gs, oid) = S.handOne tidalWave (S.landsInPlay island 3)
-   in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid)))
+   in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
 
 -- CR 608.2i: the log records; it is never emptied by a reader.
 logSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -368,7 +368,7 @@ scanSpec s registry =
           (_, base3) = S.addHandCard piker S.bob base2
           (gs, spellId) = S.handOne ravenousRats base3
           bobBefore = S.handSize S.bob gs
-          cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+          cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
           settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
       Spec.assertEqWith s "CR 704.5f buried the 0/0" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ravenous Rats") S.alice settled) 0
       Spec.assertEqWith s "in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
@@ -385,7 +385,7 @@ scanSpec s registry =
           (_, base2) = S.addHandCard piker S.bob base1
           (gs, spellId) = S.handOne ravenousRats base2
           bobBefore = S.handSize S.bob gs
-          cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+          cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
           settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
       Spec.assertEqWith s "the Rats survived" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ravenous Rats") S.alice settled) 1
       Spec.assertEqWith s "nothing in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 0
@@ -552,7 +552,7 @@ stateTriggerSpec s registry =
               settledBoth = settle gs1
           Spec.assertEqWith s "two instances, one per source" (length (triggerIds settledBoth)) 2
         -- M-4 (review): the state trigger's Condition.holds reads the PROJECTION
-        -- -- CR 613 layer 4 for a subtype -- not Card.typeLine. Pin it with no real Swamp card
+        -- -- CR 613 layer 4 for a subtype -- not Face.typeLine. Pin it with no real Swamp card
         -- anywhere: alice controls only a Mountain, so the Outcast triggers;
         -- adding an AddLandSubtype Swamp modification (the Urborg shape) to
         -- that same Mountain must turn the trigger off.
@@ -626,7 +626,7 @@ outcastHackBoard s registry hacked = do
       (outcastId, gs3) = S.addCreature barbarianOutcast S.alice gs2
       (hackId, gs4) = S.addHandCard magicalHack S.bob gs3
       gs5 = gs4 {GameState.priority = Just S.bob}
-      hackIt g = S.runPure (answerHackAt outcastId Subtype.Swamp Subtype.Island) g (do Cast.castSpell S.bob hackId; Stack.resolveTop)
+      hackIt g = S.runPure (answerHackAt outcastId Subtype.Swamp Subtype.Island) g (do S.cast S.bob hackId; Stack.resolveTop)
       settle g = snd (Engine.runGamePure S.identityAnswer g Engine.settleForPriority)
   pure (outcastId, settle (if hacked then hackIt gs5 else gs5))
 
@@ -799,7 +799,7 @@ delayedSpec s registry =
       castUnderChoice gs oid =
         State.runState
           ( Engine.runGame chooseLastToken gs $ do
-              Cast.castSpell S.alice oid
+              S.cast S.alice oid
               Engine.priorityLoop
           )
           []
@@ -870,7 +870,7 @@ delayedSpec s registry =
           island <- S.printingOf s registry "Island"
           let (gs0, oid) = S.handOne tidalWave (S.landsInPlay island 3)
               inEndStep = settle (beginEndStep gs0)
-              cast = resolveAll (snd (Engine.runGamePure S.identityAnswer inEndStep (Cast.castSpell S.alice oid)))
+              cast = resolveAll (snd (Engine.runGamePure S.identityAnswer inEndStep (S.cast S.alice oid)))
               sameStep = settle cast
               nextStep = resolveAll (settle (beginEndStep sameStep))
           Spec.assertEqWith s "still alive during the step it was armed in" (length (walls sameStep)) 1
@@ -949,7 +949,7 @@ delayedSpec s registry =
               (_, l3) = S.addCreature island S.bob l2
               (waveId, l4) = S.addHandCard tidalWave S.bob l3
               ready = l4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
-              cast = S.runPure S.identityAnswer ready (Cast.castSpell S.bob waveId)
+              cast = S.runPure S.identityAnswer ready (S.cast S.bob waveId)
               armed = S.runPure S.identityAnswer cast Engine.priorityLoop
               gone = Departure.depart Departure.Type.Conceded S.bob armed
               began = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gone {GameState.phase = endStep})
@@ -1014,7 +1014,7 @@ delayedSpec s registry =
           doublingSeason <- S.printingOf s registry "Doubling Season"
           let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
               (gs, waveId) = S.handOne tidalWave base
-              cast = S.runPure chooseUnmintedToken gs (Cast.castSpell S.alice waveId)
+              cast = S.runPure chooseUnmintedToken gs (S.cast S.alice waveId)
               armed = S.runPure chooseUnmintedToken cast Engine.priorityLoop
               after = resolveAll (settle (beginEndStep armed))
           case walls armed of
@@ -1037,7 +1037,7 @@ orderingSpec s registry =
       boardOf tidalWave khabalGhoul island =
         let (gs0, waveId) = S.handOne tidalWave (S.landsInPlay island 3)
             (ghoul, gs1) = S.addCreature khabalGhoul S.alice gs0
-            cast = resolveAll (snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice waveId)))
+            cast = resolveAll (snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice waveId)))
          in (ghoul, beginEndStep cast)
       -- The source of the OTHER pending trigger: Tidal Wave's delayed ability,
       -- whose source is the resolved spell's id rather than any permanent.
@@ -1361,7 +1361,7 @@ zombieTokenOf sarcomancy pikerFallback =
   let created effect = case effect of
         Effect.Create _ card _ _ -> Just card
         _ -> Nothing
-      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card sarcomancy))
+      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace sarcomancy))
    in case Maybe.mapMaybe created abilityEffects of
         card : _ -> card
         [] -> Printing.card pikerFallback
@@ -1507,7 +1507,7 @@ poisonousSpec s registry =
             (gs0, attacker : _, _) -> do
               let withSwamps = foldl (\g _ -> snd (S.addCreature swamp S.alice g)) gs0 (replicate 4 ())
                   (spellId, inHand) = S.addHandCard initiation S.alice withSwamps
-                  cast = S.runPure S.aggressiveAnswer inHand {GameState.priority = Just S.alice} (Cast.castSpell S.alice spellId)
+                  cast = S.runPure S.aggressiveAnswer inHand {GameState.priority = Just S.alice} (S.cast S.alice spellId)
                   resolved = S.runPure S.aggressiveAnswer cast Stack.resolveTop
                   after = S.runCombat S.aggressiveAnswer resolved
               Spec.assertBool s (Projection.hasKeyword (Keyword.Type.Poisonous 3) attacker resolved) "the Aura granted poisonous 3"
@@ -1776,7 +1776,7 @@ discardTriggerSpec s registry =
                 GameState.activePlayer = S.alice,
                 GameState.priority = Just S.alice
               }
-          cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice reunionId)
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice reunionId)
           placed = S.runPure S.identityAnswer cast Engine.settleForPriority
           after = S.runPure S.identityAnswer cast Engine.priorityLoop
       Spec.assertEqWith s "both cards were discarded as the cost was paid" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 2
@@ -1862,7 +1862,7 @@ conscriptBoard mountain piker megrim conscripts =
 aimedCast :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimedCast spell victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe (Set.lookupMin . Set.filter ((== Just victim) . Recipient.objectOf)) sets
-  Prompt.ChooseAction _ _ actions -> case filter (== A.Cast spell) actions of
+  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
     action : _ -> action
     [] -> A.Pass
   _ -> S.identityAnswer p
@@ -1986,7 +1986,7 @@ counterTriggerSpec s registry =
           let (victimId, cancelId, gs) = board piker island cancel baral mountain
               answer :: Prompt.Prompt r -> r
               answer = answerWith victimId
-              cast = S.runPure answer gs (Cast.castSpell S.bob cancelId)
+              cast = S.runPure answer gs (S.cast S.bob cancelId)
               countered = S.runPure answer cast Stack.resolveTop
               placed = S.runPure answer countered Engine.settleForPriority
               after = S.runPure answer placed Stack.resolveTop
@@ -2011,7 +2011,7 @@ counterTriggerSpec s registry =
         -- can't be countered" sits on a creature card: the Mongoose also
         -- prints shroud, and CR 702.18 is not implemented (#488), so it could
         -- not be modelled faithfully. Both cards reach this gate the same way
-        -- -- through Card.counterability, read off the spell on the stack.
+        -- -- through Face.counterability, read off the spell on the stack.
         Spec.it s "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
           island <- S.printingOf s registry "Island"
           cancel <- S.printingOf s registry "Cancel"
@@ -2021,7 +2021,7 @@ counterTriggerSpec s registry =
           let (victimId, cancelId, gs) = board rendingVolley island cancel baral mountain
               answer :: Prompt.Prompt r -> r
               answer = answerWith victimId
-              cast = S.runPure answer gs (Cast.castSpell S.bob cancelId)
+              cast = S.runPure answer gs (S.cast S.bob cancelId)
               resolved = S.runPure answer cast Stack.resolveTop
               placed = S.runPure answer resolved Engine.settleForPriority
           -- CR 101.2 from the other side: the Cancel itself was not stopped.
@@ -2048,7 +2048,7 @@ counterTriggerSpec s registry =
                 Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
                 Prompt.ChooseOptional {} -> OptionalDecision.Exercises
                 _ -> S.identityAnswer p
-              cast = S.runPure answer gs (Cast.castSpell S.bob boltId)
+              cast = S.runPure answer gs (S.cast S.bob boltId)
               resolved = S.runPure answer cast Stack.resolveTop
               placed = S.runPure answer resolved Engine.settleForPriority
           Spec.assertEqWith s "the Bolt really did resolve into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
@@ -2077,7 +2077,7 @@ counterTriggerSpec s registry =
               (cancelId, gs) = S.addHandCard cancel S.alice onStack
               answer :: Prompt.Prompt r -> r
               answer = answerWith victimId
-              cast = S.runPure answer gs (Cast.castSpell S.alice cancelId)
+              cast = S.runPure answer gs (S.cast S.alice cancelId)
               countered = S.runPure answer cast Stack.resolveTop
               placed = S.runPure answer countered Engine.settleForPriority
           -- The countering really happened, so the silence below is the
@@ -2112,7 +2112,7 @@ counterTriggerSpec s registry =
           sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
           piker <- S.printingOf s registry "Goblin Piker"
           mountain <- S.printingOf s registry "Mountain"
-          case Card.Type.activatedAbilities (Printing.card sorcerer) of
+          case Face.activatedAbilities (S.combinedFace sorcerer) of
             [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
             ability : _ -> do
               -- bob: Baral, three Islands, one library card, and both a Cancel
@@ -2128,7 +2128,7 @@ counterTriggerSpec s registry =
                   (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
                   (stifleId, gs) = S.addHandCard stifle S.bob withCancel
                   -- The SPELL run: bob's Cancel at alice's Piker spell.
-                  spellRun = S.runPure (answerWith victimId) gs (Cast.castSpell S.bob cancelId)
+                  spellRun = S.runPure (answerWith victimId) gs (S.cast S.bob cancelId)
                   spellCountered = S.runPure (answerWith victimId) spellRun Stack.resolveTop
                   spellPlaced = S.runPure (answerWith victimId) spellCountered Engine.settleForPriority
                   spellAfter = S.runPure (answerWith victimId) spellPlaced Stack.resolveTop
@@ -2148,7 +2148,7 @@ counterTriggerSpec s registry =
                     Prompt.ChooseOptional {} -> OptionalDecision.Exercises
                     _ -> S.identityAnswer p
                   activated = S.runPure atAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
-                  abilityRun = S.runPure atAbility activated (Cast.castSpell S.bob stifleId)
+                  abilityRun = S.runPure atAbility activated (S.cast S.bob stifleId)
                   abilityCountered = S.runPure atAbility abilityRun Stack.resolveTop
                   abilityPlaced = S.runPure atAbility abilityCountered Engine.settleForPriority
               -- Half one: a countered SPELL. Baral fires, and lands.
@@ -2176,7 +2176,7 @@ counterTriggerSpec s registry =
           let (victimId, cancelId, gs) = board piker island cancel baral mountain
               answer :: Prompt.Prompt r -> r
               answer = answerWith victimId
-              cast = S.runPure answer gs (Cast.castSpell S.bob cancelId)
+              cast = S.runPure answer gs (S.cast S.bob cancelId)
               untapped g =
                 length
                   [ oid
@@ -2211,7 +2211,7 @@ permanentEntersSpec s registry =
           soulWarden <- S.printingOf s registry "Soul Warden"
           let (_, base) = S.addCreature soulWarden S.alice (S.landsInPlay plains 1)
               (gs, spellId) = S.handOne soulWarden base
-              cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+              cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
               settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
           Spec.assertEqWith s "both Wardens are on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Soul Warden") S.alice settled) 2
           Spec.assertEqWith s "alice gained exactly 1" (S.lifeOf S.alice settled) (fmap (+ 1) (S.lifeOf S.alice gs))
@@ -2339,12 +2339,12 @@ graveyardTriggerSpec s registry =
       -- any trigger reaches the stack, then resolve that trigger.
       millSelf :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, GameState.GameState)
       millSelf answer (gs, spellId) =
-        let cast = S.runPure answer gs (Cast.castSpell S.alice spellId)
+        let cast = S.runPure answer gs (S.cast S.alice spellId)
             milled = S.runPure answer cast Stack.resolveTop
             placed = S.runPure answer milled Engine.settleForPriority
          in (placed, S.runPure answer placed Stack.resolveTop)
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       narcomoebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
    in Spec.describe s "GraveyardTrigger" $ do
         -- The gameplay-level proof, cast to resolution.
@@ -2425,17 +2425,17 @@ diesTriggerSpec s registry =
       -- 704.5g's state-based action destroys it and the CR 117.5 settle's OWN
       -- trigger scan must see that death -- then resolve the trigger.
       boltIt (gs, spellId) =
-        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
             damaged = S.runPure S.identityAnswer cast Stack.resolveTop
             settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       spiritsOf pid gs =
         filter
           -- CR 111.4: Doomed Traveler does not specify the token's name, so the
           -- name is its subtype plus the word "Token".
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Spirit Token"))
+          (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Spirit Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
       travelerName = CardName.MkCardName $ Text.pack "Doomed Traveler"
    in Spec.describe s "DiesTrigger" $ do
@@ -2569,7 +2569,7 @@ permanentDiesSpec s registry =
               answer p = case p of
                 Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
                 _ -> S.identityAnswer p
-              cast = S.runPure answer gs (Cast.castSpell S.alice spellId)
+              cast = S.runPure answer gs (S.cast S.alice spellId)
               damaged = S.runPure answer cast Stack.resolveTop
               settled = S.runPure answer damaged Engine.settleForPriority
               after = S.runPure answer settled Stack.resolveTop
@@ -2653,7 +2653,7 @@ permanentDiesSpec s registry =
           Spec.assertEqWith
             s
             "one triggered ability, with that condition"
-            (fmap TriggeredAbility.condition (Card.Type.triggeredAbilities (Printing.card meren)))
+            (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace meren)))
             [TriggerCondition.PermanentDies anotherCreatureYouControl]
 
 -- CR 603.6c's FIRST written form, and the whole of its first clause:
@@ -2707,7 +2707,7 @@ leavesBattlefieldSpec s registry =
       -- departure -- and hand back both the settled state (the trigger on the
       -- stack) and the state after the trigger itself resolves.
       castIt (gs, spellId) =
-        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
             resolved = S.runPure S.identityAnswer cast Stack.resolveTop
             settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
@@ -2715,7 +2715,7 @@ leavesBattlefieldSpec s registry =
         filter
           -- CR 111.4: Thragtusk does not specify the token's name, so the name
           -- is its subtype plus the word "Token".
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Beast Token"))
+          (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Beast Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
       assertOneBeast after =
         case beastsOf S.alice after of
@@ -2728,7 +2728,7 @@ leavesBattlefieldSpec s registry =
           other -> Spec.assertFailure s ("expected exactly one Beast token, got " <> show (length other))
       tuskName = CardName.MkCardName $ Text.pack "Thragtusk"
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       -- Every slot stamped on every object currently on the stack, which for
       -- these boards is the one placed trigger.
       stackSlots gs =
@@ -2781,7 +2781,7 @@ leavesBattlefieldSpec s registry =
           case lookup Binding.became slots of
             Just (Recipient.ToObject graveyardId) -> do
               Spec.assertBool s (graveyardId /= tusk) "became is the CR 400.7 incarnation, a different id"
-              Spec.assertEqWith s "and it is the graveyard card" (fmap Card.Type.name (Game.cardOf graveyardId settled)) (Just tuskName)
+              Spec.assertEqWith s "and it is the graveyard card" (fmap Face.name (Game.faceOf graveyardId settled)) (Just tuskName)
             other -> Spec.assertFailure s ("expected became to name an object, got " <> show other)
         -- THE REGRESSION GUARD. Doomed Traveler prints "dies", not "leaves the
         -- battlefield", and CR 700.4 makes that a graveyard and nothing else. A
@@ -2947,12 +2947,12 @@ becameSlotSpec s registry =
       -- 704.5g destroys it and the same CR 117.5 settle's trigger scan sees the
       -- death -- then resolve the trigger.
       boltIt (gs, spellId) =
-        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
             damaged = S.runPure S.identityAnswer cast Stack.resolveTop
             settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       roachName = CardName.MkCardName $ Text.pack "Endless Cockroaches"
    in Spec.describe s "CR 400.7e the card it became" $ do
         -- The gameplay-level proof, cast to resolution. The discriminating
@@ -2984,7 +2984,7 @@ becameSlotSpec s registry =
           case slotFor Binding.became of
             Just (Recipient.ToObject graveyardId) -> do
               Spec.assertBool s (graveyardId /= roachId) "became is a different id"
-              Spec.assertEqWith s "and it is the graveyard card" (fmap Card.Type.name (Game.cardOf graveyardId settled)) (Just roachName)
+              Spec.assertEqWith s "and it is the graveyard card" (fmap Face.name (Game.faceOf graveyardId settled)) (Just roachName)
               -- The spent Bolt is in that graveyard too, so membership is the
               -- assertion rather than the whole zone.
               Spec.assertBool s (elem graveyardId (Game.zoneMembers Zone.Graveyard S.alice settled)) "in alice's graveyard"
@@ -3062,7 +3062,7 @@ lookBackInterveningSpec s registry =
       -- Lightning Bolt's pool is AnyTarget, so the Berserker is the only
       -- creature and the Bolt finds it.
       boltIt (gs, spellId) =
-        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
             damaged = S.runPure S.identityAnswer cast Stack.resolveTop
             settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
@@ -3070,7 +3070,7 @@ lookBackInterveningSpec s registry =
         filter
           -- CR 111.4: the name is BOTH subtypes plus "Token", which is exactly
           -- the rule's own Dwarven Reinforcements example.
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Zombie Berserker Token"))
+          (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Zombie Berserker Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
    in Spec.describe s "CR 603.4 an intervening if over last known information" $ do
         Spec.it s "CR 603.4 with Bad Moon the Berserker died at power 3 and its trigger fires" $ do
@@ -3085,7 +3085,7 @@ lookBackInterveningSpec s registry =
               -- (CR 613.4c, layer 7c). Asserting the projection rather than
               -- the printed pair is what keeps the two facts from being
               -- confused for one another.
-              Spec.assertEqWith s "printed 2/2" (maybe (Nothing, Nothing) (\c -> (Card.Type.power c, Card.Type.toughness c)) (Game.cardOf token after)) (Just (Power.MkPower (Quantity.Type.Literal 2)), Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+              Spec.assertEqWith s "printed 2/2" (maybe (Nothing, Nothing) (\f -> (Face.power f, Face.toughness f)) (Game.faceOf token after)) (Just (Power.MkPower (Quantity.Type.Literal 2)), Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
               Spec.assertEqWith s "3/3 under Bad Moon" (Projection.powerOf token after, Projection.toughnessOf token after) (Just 3, Just 3)
               Spec.assertEqWith s "black" (Projection.colorsOf token after) (Set.singleton Color.Black)
               Spec.assertEqWith s "Zombie Berserker" (Projection.subtypesOf token after) (Set.fromList [Subtype.Zombie, Subtype.Berserker])
@@ -3271,15 +3271,15 @@ aetherFlashSpec s registry =
         let (flashId, withFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
         pure (flashId, S.handOne entrant withFlash)
       castIt (gs, spellId) =
-        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
          in S.runPure S.identityAnswer cast Engine.priorityLoop
       namesIn zone pid gs =
-        fmap Card.Type.name (Maybe.mapMaybe (\oid -> Game.cardOf oid gs) (Game.zoneMembers zone pid gs))
+        fmap Face.name (Maybe.mapMaybe (\oid -> Game.faceOf oid gs) (Game.zoneMembers zone pid gs))
       damageEventsIn gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events gs))
       -- CR 120.3e's marked damage on the one battlefield permanent with this
       -- name. Nothing if it is not there, or if there is more than one of it.
       markedOn name gs =
-        case filter (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just name) (Set.toList (GameState.battlefield gs)) of
+        case filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just name) (Set.toList (GameState.battlefield gs)) of
           [oid] -> fmap Object.damage (Game.lookupObject oid gs)
           _ -> Nothing
       pikerName = CardName.MkCardName $ Text.pack "Goblin Piker"
@@ -3363,7 +3363,7 @@ aetherFlashSpec s registry =
           let (_, oneFlash) = S.addCreature aetherFlash S.alice (S.landsInPlay mountain 2)
               (_, twoFlashes) = S.addCreature aetherFlash S.alice oneFlash
               (gs, spellId) = S.handOne piker twoFlashes
-              cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+              cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
               -- The creature spell resolves and enters; the settle's CR 117.5
               -- scan places both triggers.
               entered = S.runPure S.identityAnswer cast Stack.resolveTop
@@ -3475,7 +3475,7 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
         armed = GameState.delayedTriggers atMain
         -- "After this main phase, there is an additional combat phase followed
         -- by an additional main phase" (CR 500.8).
-        cast = snd (Engine.runGamePure S.identityAnswer atMain (Cast.castSpell S.alice spell))
+        cast = snd (Engine.runGamePure S.identityAnswer atMain (S.cast S.alice spell))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         atExtra = runToTurnStep 1 (Phase.Combat CombatStep.DeclareAttackers) S.aggressiveAnswer resolved
         afterExtra = snd (Engine.runGamePure S.aggressiveAnswer atExtra Engine.runStep)
@@ -3498,7 +3498,7 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
   Spec.it s "CR 603.7b and the same line of play returns it on alice's next turn" $ do
     (gs, spell) <- boardOf
     let atMain = runToTurnStep 1 Phase.PostcombatMain S.aggressiveAnswer gs
-        cast = snd (Engine.runGamePure S.identityAnswer atMain (Cast.castSpell S.alice spell))
+        cast = snd (Engine.runGamePure S.identityAnswer atMain (S.cast S.alice spell))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         atNextTurn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer resolved
     Spec.assertEqWith s "alice's next turn is turn 3" (GameState.turnNumber atNextTurn) 3

@@ -25,19 +25,18 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
-import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Pool as Pool
-import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
@@ -77,7 +76,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   -- Pawl.Codec.PlayerStaticAbilitySpec now. The playerAbilities/mulliganAction/
   -- openingHandAction round-trip-plus-byte-stability pairs formerly here needed
   -- no registry fixture -- a synthetic Card proves them just as well -- so they
-  -- moved to Pawl.Codec.CardSpec with the rest of Card's own coverage.
+  -- moved to Pawl.Codec.FaceSpec with the rest of a face's own coverage.
   -- TargetSpec's own per-constructor coverage (a bare pool, a filtered pool,
   -- and the Not IsSource conjunct that carries CR 601.2c's "another", #163)
   -- lives in Pawl.Codec.TargetSpecSpec now; Filter's own per-constructor and
@@ -90,8 +89,8 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   -- and CR 118.5a {0} behavior, lives in Pawl.Codec.CostSpec now. The
   -- additionalCosts/alternativeCosts round-trip-plus-byte-stability pairs
   -- formerly here (as "cost (P8)") needed no registry fixture -- a synthetic
-  -- Card proves them just as well -- so they moved to Pawl.Codec.CardSpec
-  -- with the rest of Card's own coverage.
+  -- Card proves them just as well -- so they moved to Pawl.Codec.FaceSpec
+  -- with the rest of a face's own coverage.
   -- ReplacementEffect's own per-constructor coverage -- including the
   -- ZoneChangeR Opponents/Anyones distinction, the CounterR/DamageR/TokenR
   -- "pattern and scaling/rewrite are data" shapes, the CounterR explicit
@@ -104,15 +103,15 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   Spec.describe s "honesty round-trip over allPrintings" $ do
     Spec.it s "P1: Printing.Codec.fromJson . Printing.Codec.toJson == Right" $ do
       ps <- S.allPrintings s
-      mapM_ (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (Printing.Codec.fromJson (Printing.Codec.toJson p)) (Right p)) ps
+      mapM_ (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Printing.Codec.fromJson (Printing.Codec.toJson p)) (Right p)) ps
     Spec.it s "P2: through text" $ do
       ps <- S.allPrintings s
       mapM_
-        (\p -> Spec.assertEqWith s (show (CardT.name (Printing.card p))) (Common.parse (Common.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
+        (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Common.parse (Common.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
         ps
     Spec.it s "M4e Cancel loads as a single Counter effect targeting a spell" $ do
       cancel <- S.printingOf s registry "Cancel"
-      let card = Printing.card cancel
+      let card = S.combinedFace cancel
       Spec.assertEqWith
         s
         "effects"
@@ -134,7 +133,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     -- it to become (hence the Nothing beside Pool.Abilities).
     Spec.it s "CR 113.9 Stifle loads as the same Counter effect over Pool.Abilities" $ do
       stifle <- S.printingOf s registry "Stifle"
-      let card = Printing.card stifle
+      let card = S.combinedFace stifle
       Spec.assertEqWith
         s
         "effects"
@@ -155,12 +154,12 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
       Spec.assertEqWith
         s
         "Rending Volley says it"
-        (CardT.counterability (Printing.card rendingVolley))
+        (Face.counterability (S.combinedFace rendingVolley))
         Counterability.CantBeCountered
       Spec.assertEqWith
         s
         "Cancel does not, and its file has no counterability key"
-        (CardT.counterability (Printing.card cancel))
+        (Face.counterability (S.combinedFace cancel))
         Counterability.Counterable
   Spec.describe s "P4 runtime types" $ do
     -- A real permanent, not a projection of a nonexistent object: Typhoid

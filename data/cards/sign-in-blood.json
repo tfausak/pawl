@@ -1,74 +1,78 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Sign in Blood",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Sign in Blood",
+      "spell": {
+        "modes": [
           {
-            "type": "Draw",
-            "value": [
+            "effects": [
               {
-                "type": "InSlot",
-                "value": "target"
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "InSlot",
+                    "value": "target"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
               },
               {
-                "type": "Literal",
-                "value": 2
+                "type": "LoseLife",
+                "value": [
+                  {
+                    "type": "InSlot",
+                    "value": "target"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
               }
-            ]
-          },
-          {
-            "type": "LoseLife",
-            "value": [
+            ],
+            "targetSpecs": [
               {
-                "type": "InSlot",
-                "value": "target"
-              },
-              {
-                "type": "Literal",
-                "value": 2
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
+            "type": "Sorcery"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -1,62 +1,66 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Variable"
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "Variable"
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Untamed Might",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Untamed Might",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "X"
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "X"
-                  }
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "X"
+                      },
+                      {
+                        "type": "X"
+                      }
+                    ]
+                  },
+                  "target"
                 ]
-              },
-              "target"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

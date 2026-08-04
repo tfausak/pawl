@@ -1,32 +1,36 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 5
-    }
-  ],
-  "name": "Eon Hub",
-  "replacementEffects": [
-    {
-      "type": "PhaseR",
-      "value": {
-        "whichPhase": {
-          "type": "Step",
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 5
+        }
+      ],
+      "name": "Eon Hub",
+      "replacementEffects": [
+        {
+          "type": "PhaseR",
           "value": {
-            "type": "Beginning",
-            "value": {
-              "type": "Upkeep"
+            "whichPhase": {
+              "type": "Step",
+              "value": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              }
             }
           }
         }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

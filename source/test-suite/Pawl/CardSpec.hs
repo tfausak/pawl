@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -24,6 +25,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 -- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
 -- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Engine.Condition may
 -- later be imported and must not collide.
@@ -69,9 +71,11 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -117,49 +121,191 @@ import qualified System.Directory as Directory
 costOf :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
 costOf symbols = Just (ManaCost.MkManaCost symbols)
 
-cardSpec :: (Monad m) => Spec.Spec m n -> n ()
+-- A face carrying nothing but a name and a type line, every other field at the
+-- value an omitted key decodes to. The cases below are about one field apiece,
+-- and a 28-field literal apiece would bury which one.
+vanillaFace :: String -> TypeLine.TypeLine -> Face.Face Card.Type.Card
+vanillaFace name typeLine =
+  Face.MkFace
+    { Face.name = CardName.MkCardName $ Text.pack name,
+      Face.manaCost = Nothing,
+      Face.typeLine = typeLine,
+      Face.power = Nothing,
+      Face.toughness = Nothing,
+      Face.loyalty = Nothing,
+      Face.keywords = Set.empty,
+      Face.colorIndicator = Set.empty,
+      Face.staticAbilities = [],
+      Face.spell = Face.defaultSpell,
+      Face.activatedAbilities = [],
+      Face.replacementEffects = [],
+      Face.triggeredAbilities = [],
+      Face.delayedAbilities = Map.empty,
+      Face.castingPermissions = [],
+      Face.castingRestrictions = [],
+      Face.characteristicPT = Nothing,
+      Face.playerAbilities = [],
+      Face.blockRequirements = [],
+      Face.attackRequirements = [],
+      Face.combatRestrictions = [],
+      Face.attackCosts = [],
+      Face.mulliganAction = [],
+      Face.openingHandAction = [],
+      Face.additionalCosts = [],
+      Face.alternativeCosts = [],
+      Face.enchant = Nothing,
+      Face.counterability = Counterability.Counterable
+    }
+
+-- A spell's printed type line: one card type, plus whatever supertypes and
+-- subtypes sit beside it.
+spellLine :: CardType.CardType -> Set.Set Supertype.Supertype -> Set.Set Subtype.Subtype -> TypeLine.TypeLine
+spellLine cardType supertypes subtypes =
+  TypeLine.MkTypeLine
+    { TypeLine.supertypes = supertypes,
+      TypeLine.types = Set.singleton cardType,
+      TypeLine.subtypes = subtypes
+    }
+
+instantLine :: TypeLine.TypeLine
+instantLine = spellLine CardType.Instant Set.empty Set.empty
+
+-- "You draw this many cards" -- the smallest payload an ability can carry, used
+-- below only so that two abilities can be told apart by their effect.
+youDraw :: Integer -> Effect.Effect Card.Type.Card
+youDraw n = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal n)
+
+-- "This object has [keyword]" as a static ability (CR 604.1), the smallest
+-- carrier Face.staticAbilities takes.
+grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility
+grantsItself keyword =
+  StaticAbility.MkStaticAbility
+    (Affected.Matching Filter.Type.IsSource)
+    (NonEmpty.singleton (Modification.GainKeyword keyword))
+
+-- CR 709.4's fixture: two halves that DIFFER on every axis Pawl.Engine.Card.merge2
+-- unions, so a merge that dropped a union line -- or took one half's value alone
+-- -- fails the group below instead of passing on a value the halves happened to
+-- share. Wax is a green Arcane instant, Wane a white snow Trap sorcery.
+--
+-- Everything past each half's name and mana cost is there to make one merge line
+-- observable, and is deliberately INERT rather than plausible: a combat keyword
+-- on a spell; a static ability on a card no projection ever gathers, since
+-- Pawl.Engine.Projection.gather walks the battlefield and this card only ever
+-- reaches a hand or the stack; and a dies trigger with no permanent to die. What
+-- is under test is CR 709.4c's union, not what either printing would mean.
+--
+-- Built by hand for the faceNamed fixture's reason, which the printed Wax // Wane
+-- does not retire: this group takes no Registry, so a card file is not reachable
+-- from here at all. And the printed card could not stand in even if it were --
+-- its two halves are vanilla instants that share every field but name and cost,
+-- which is exactly the shape that leaves the union lines unexercised.
+splitCard :: Card.Type.Card
+splitCard =
+  Card.Type.MkCard
+    { Card.Type.layout = Layout.Split,
+      Card.Type.faces = waxFace NonEmpty.:| [waneFace]
+    }
+
+-- splitCard's left half, and the one CastSpec casts: {G} buys it with a single
+-- Forest, which is what makes CR 709.3a's per-half pricing observable there.
+waxFace :: Face.Face Card.Type.Card
+waxFace =
+  (vanillaFace "Wax" (spellLine CardType.Instant Set.empty (Set.singleton Subtype.Arcane)))
+    { Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.Green)],
+      Face.keywords = Set.singleton Keyword.Flying,
+      Face.staticAbilities = [grantsItself Keyword.Flying],
+      Face.activatedAbilities = [oneEffectActivated (costOf []) (youDraw 1)],
+      Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 1)]
+    }
+
+-- Wax's opposite number, differing on every field Wax prints: a different card
+-- type, subtype and keyword, a supertype Wax has none of, and abilities that draw
+-- a different number of cards so the concatenation's ORDER is checkable too.
+waneFace :: Face.Face Card.Type.Card
+waneFace =
+  (vanillaFace "Wane" (spellLine CardType.Sorcery (Set.singleton Supertype.Snow) (Set.singleton Subtype.Trap)))
+    { Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.White)],
+      Face.keywords = Set.singleton Keyword.Trample,
+      Face.staticAbilities = [grantsItself Keyword.Trample],
+      Face.activatedAbilities = [oneEffectActivated (costOf []) (youDraw 2)],
+      Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)]
+    }
+
+cardSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 cardSpec s = Spec.describe s "Card" $ do
   Spec.it s "CR 110.1 an instant is not a permanent type" $
-    let instantLine =
-          TypeLine.MkTypeLine
-            { TypeLine.supertypes = Set.empty,
-              TypeLine.types = Set.singleton CardType.Instant,
-              TypeLine.subtypes = Set.empty
-            }
+    let face = vanillaFace "Some Instant" instantLine
+     in do
+          Spec.assertBool s (not (Card.isPermanent face)) "not a permanent"
+          Spec.assertBool s (Card.isInstant face) "an instant"
+  -- CR 709.4a: a card's faces are referred to BY NAME, so this is what a rule or
+  -- a player naming one half resolves through. Built by hand rather than loaded
+  -- because this group takes no Registry, and the fixture is Normal on purpose:
+  -- faceNamed reads Card.faces and never Card.layout, which a Split fixture
+  -- could not distinguish from a lookup that went through the layout first.
+  Spec.it s "CR 709.4a faceNamed finds a two-faced card's faces by their own names" $
+    let wax = vanillaFace "Wax" instantLine
+        wane = vanillaFace "Wane" instantLine
         card =
           Card.Type.MkCard
-            { Card.Type.name = CardName.MkCardName $ Text.pack "Some Instant",
-              Card.Type.manaCost = Nothing,
-              Card.Type.typeLine = instantLine,
-              Card.Type.power = Nothing,
-              Card.Type.toughness = Nothing,
-              Card.Type.loyalty = Nothing,
-              Card.Type.keywords = Set.empty,
-              Card.Type.colorIndicator = Set.empty,
-              Card.Type.staticAbilities = [],
-              Card.Type.spell = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
-              Card.Type.activatedAbilities = [],
-              Card.Type.replacementEffects = [],
-              Card.Type.triggeredAbilities = [],
-              Card.Type.delayedAbilities = Map.empty,
-              Card.Type.castingPermissions = [],
-              Card.Type.castingRestrictions = [],
-              Card.Type.characteristicPT = Nothing,
-              Card.Type.playerAbilities = [],
-              Card.Type.blockRequirements = [],
-              Card.Type.attackRequirements = [],
-              Card.Type.combatRestrictions = [],
-              Card.Type.attackCosts = [],
-              Card.Type.mulliganAction = [],
-              Card.Type.openingHandAction = [],
-              Card.Type.additionalCosts = [],
-              Card.Type.alternativeCosts = [],
-              Card.Type.enchant = Nothing,
-              Card.Type.counterability = Counterability.Counterable
+            { Card.Type.layout = Layout.Normal,
+              Card.Type.faces = wax NonEmpty.:| [wane]
             }
+        named = CardName.MkCardName . Text.pack
      in do
-          Spec.assertBool s (not (Card.isPermanent card)) "not a permanent"
-          Spec.assertBool s (Card.isInstant card) "an instant"
+          Spec.assertEqWith s "the first face" (Card.faceNamed (named "Wax") card) (Just wax)
+          -- The one that matters: a hit on the SECOND face is what says this
+          -- reads past Card.combined rather than through it.
+          Spec.assertEqWith s "the second face" (Card.faceNamed (named "Wane") card) (Just wane)
+          -- CR 709.4a again: a split card has two names and no combined one, so
+          -- the joined name is not a face name and must not resolve to a face.
+          Spec.assertEqWith s "a name no face carries" (Card.faceNamed (named "Wax // Wane") card) Nothing
+  Spec.it s "CR 709.4 a split card's characteristics are its two halves combined" $ do
+    let card = splitCard
+        c = Card.combined card
+    -- CR 709.4b: "The mana cost of a split card is the combined mana costs of
+    -- its two halves. A split card's colors and mana value are determined from
+    -- its combined mana cost."
+    Spec.assertEqWith s "both colours" (Projection.printedColorsOf c) (Set.fromList [Color.Green, Color.White])
+    Spec.assertEqWith s "mana value 2" (Quantity.manaValueOf c) 2
+    -- CR 709.4a, as far as a single CardName can carry it (#650): unspaced,
+    -- the form docs/rules.txt's own Examples write it in ("Fire//Ice",
+    -- "Assault//Battery").
+    Spec.assertEqWith s "the joined name" (Face.name c) (CardName.MkCardName (Text.pack "Wax//Wane"))
+    -- CR 709.4c: "A split card has each card type specified on either of its
+    -- halves and each ability in the text box of each half." Both halves
+    -- contribute, and they contribute DIFFERENT values -- a merge that kept one
+    -- half's type line, keyword set or ability list fails each of these.
+    Spec.assertEqWith s "each card type" (TypeLine.types (Face.typeLine c)) (Set.fromList [CardType.Instant, CardType.Sorcery])
+    -- CR 709.4: the rest of the type line is combined for the reason 709.4c's
+    -- card types are -- a supertype and a subtype are characteristics (CR 109.3)
+    -- and no subrule narrows them. See Pawl.Engine.Card.unionTypeLines.
+    Spec.assertEqWith s "each subtype" (TypeLine.subtypes (Face.typeLine c)) (Set.fromList [Subtype.Arcane, Subtype.Trap])
+    -- One-sided on purpose: only Wane is snow. A merge line replaced by the LEFT
+    -- half's value -- which is what a record update over `l` already does -- would
+    -- leave this empty.
+    Spec.assertEqWith s "the right half's supertype" (TypeLine.supertypes (Face.typeLine c)) (Set.singleton Supertype.Snow)
+    -- CR 709.4c again: a keyword is the printed NAME of an ability (CR 702.1).
+    Spec.assertEqWith s "each keyword" (Face.keywords c) (Set.fromList [Keyword.Flying, Keyword.Trample])
+    -- The three ability lists CR 709.4c's "each ability in the text box of each
+    -- half" reaches, each asserted in PRINTED order (left half then right), so a
+    -- merge that concatenated the halves the other way round fails too.
+    Spec.assertEqWith
+      s
+      "each static ability"
+      (Face.staticAbilities c)
+      [grantsItself Keyword.Flying, grantsItself Keyword.Trample]
+    Spec.assertEqWith
+      s
+      "each activated ability"
+      (Face.activatedAbilities c)
+      [oneEffectActivated (costOf []) (youDraw 1), oneEffectActivated (costOf []) (youDraw 2)]
+    Spec.assertEqWith
+      s
+      "each triggered ability"
+      (Face.triggeredAbilities c)
+      [oneEffectTrigger TriggerCondition.SelfDies (youDraw 1), oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)]
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*).
@@ -277,7 +423,7 @@ effectCounts effect = case effect of
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.GainLife _ quantity -> quantityCounts quantity
-  Effect.Create quantity card _ _ -> quantityCounts quantity <> cardCounts card
+  Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
   Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
@@ -294,7 +440,7 @@ effectCounts effect = case effect of
   Effect.GainControl duration _ -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers duration _ _ -> durationCounts duration
-  Effect.CreateEmblem card -> cardCounts card
+  Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -322,7 +468,7 @@ triggeredAbilityCounts ability =
 --
 -- This traversal is hand-maintained, not derived, so it is NOT enforced
 -- exhaustive by -Werror the way the Zone/Effect/Modification cases inside it
--- are: a NEW Card field, or a new CostComponent/PlayerEffect arm, that can carry
+-- are: a NEW Face field, or a new CostComponent/PlayerEffect arm, that can carry
 -- a Quantity or Count would bypass this lint silently. When you add a field that
 -- can hold either, add it here.
 -- Every effect a card can RESOLVE: its spell's modes, its activated and
@@ -350,26 +496,26 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
 
--- Hand-maintained, with cardCounts' caveat: a NEW Card field holding effects
+-- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
-cardResolutionEffects :: Card.Type.Card -> [Effect.Effect Card.Type.Card]
+cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
 cardResolutionEffects card =
   Card.allEffects card
-    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
-    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities card)
-    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Card.Type.delayedAbilities card))
+    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
 
-cardCounts :: Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
+cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
-  concatMap quantityCounts (Maybe.maybeToList (Card.Type.characteristicPT card))
-    <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Card.Type.power card))
-    <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Card.Type.toughness card))
-    <> concatMap (concatMap modificationCounts . StaticAbility.modifications) (Card.Type.staticAbilities card)
+  concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
+    <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.power card))
+    <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
+    <> concatMap (concatMap modificationCounts . StaticAbility.modifications) (Face.staticAbilities card)
     <> concatMap effectCounts (Card.allEffects card)
-    <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
-    <> concatMap triggeredAbilityCounts (Card.Type.triggeredAbilities card)
-    <> concatMap triggeredAbilityCounts (Map.elems (Card.Type.delayedAbilities card))
-    <> concatMap combatRestrictionCounts (Card.Type.combatRestrictions card)
+    <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
+    <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
+    <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
+    <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." Battlefield/Stack/Exile/Command are
@@ -392,7 +538,7 @@ scopeOffends scope = case scope of
   Scope.InZone zone ref -> isSharedZone zone && ref /= PlayerRef.EachPlayer
   Scope.InHistory _ -> False
 
-cardOffendsSharedZoneScope :: Card.Type.Card -> Bool
+cardOffendsSharedZoneScope :: Face.Face Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
   any (scopeOffends . Count.Type.scope) (cardCounts card)
 
@@ -429,15 +575,15 @@ modalReadOffends abilityBound modal =
    in any modeOffends (Modal.modes modal)
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
--- (Card.replacementEffects, Eon Hub's) and the ones an effect of its own
+-- (Face.replacementEffects, Eon Hub's) and the ones an effect of its own
 -- installs (Effect.Replace, a floating one) -- and, through effectReplacements
 -- below, everything a token or emblem those effects mint prints in turn. All of
 -- them come out of card JSON, which is the whole of what the lint below is
 -- about; a replacement the ENGINE bakes reaches GameState without passing
 -- through a Card and is not swept here.
-cardReplacementEffects :: Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
+cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
 cardReplacementEffects card =
-  Card.Type.replacementEffects card
+  Face.replacementEffects card
     <> concatMap effectReplacements (cardResolutionEffects card)
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -452,8 +598,8 @@ cardReplacementEffects card =
 effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
 effectReplacements effect = case effect of
   Effect.Replace _ _ _ _ replacement -> [replacement]
-  Effect.Create _ token _ _ -> cardReplacementEffects token
-  Effect.CreateEmblem emblem -> cardReplacementEffects emblem
+  Effect.Create _ token _ _ -> overFaces cardReplacementEffects token
+  Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
   Effect.DealDamage _ _ -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
@@ -515,7 +661,7 @@ effectReplacements effect = case effect of
 -- What makes the split expensive is NOT the codec -- nothing needs a baked
 -- pattern to round-trip, since ActiveReplacement and GameState have no codec at
 -- all (#126). It is that ReplacementEffect is the carrier for both halves:
--- Card.replacementEffects, which a card authors, and ActiveReplacement.effect,
+-- Face.replacementEffects, which a card authors, and ActiveReplacement.effect,
 -- which the engine bakes. A card-side / runtime-side split the way Duration and
 -- Expiry are split would therefore have to split or parameterize that whole sum,
 -- not just PhasePattern. Modification is shared exactly the same way, between
@@ -606,13 +752,13 @@ slotNamesCollide sets = Set.size (Set.unions sets) /= sum (fmap Set.size sets)
 -- Activate stamps Modal.modesTargetSpecs, which has no enchant half. Each ability is checked on
 -- its own for the same reason: two abilities are two separate announcements, so
 -- a name they share is never fused.
-cardSlotNamesCollide :: Card.Type.Card -> Bool
+cardSlotNamesCollide :: Face.Face Card.Type.Card -> Bool
 cardSlotNamesCollide card =
   let modeSlots modal = fmap (Map.keysSet . Mode.targetSpecs) (Foldable.toList (Modal.modes modal))
-   in slotNamesCollide (Map.keysSet (Card.enchantSpecs card) : modeSlots (Card.Type.spell card))
-        || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
-        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Card.Type.triggeredAbilities card)
-        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Card.Type.delayedAbilities card))
+   in slotNamesCollide (Map.keysSet (Card.enchantSpecs card) : modeSlots (Face.spell card))
+        || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Face.activatedAbilities card)
+        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Face.triggeredAbilities card)
+        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
 
 -- The TRIGGERED-ability half of the D4 dataflow lint: every slot one of a
 -- triggered ability's effects READS must be a slot something binds for that
@@ -740,9 +886,9 @@ activatedAbilityOffends ability =
 -- "every armed delayed ability is declared" lint is what reports it precisely,
 -- and answering False for it here would let a card that offends both pass this
 -- one.
-onsetOffends :: Card.Type.Card -> Bool
+onsetOffends :: Face.Face Card.Type.Card -> Bool
 onsetOffends card =
-  let scoped name = case Map.lookup name (Card.Type.delayedAbilities card) of
+  let scoped name = case Map.lookup name (Face.delayedAbilities card) of
         Nothing -> False
         Just ability -> Event.controllerTurnScoped (TriggeredAbility.condition ability)
    in not (all scoped (Set.toList (Resolve.onsetGatedAbilities (cardResolutionEffects card))))
@@ -853,15 +999,15 @@ reservedSlots =
 -- spell listed in rules 601.2c-d"; and CR 603.7's delayed abilities are
 -- triggered abilities, placed by that same rule. A lint about what DECLARING a
 -- slot means therefore has to range over all four, not over the spell alone.
-declaredTargetSlots :: Card.Type.Card -> Set.Set SlotName.SlotName
+declaredTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 declaredTargetSlots card =
   Set.unions
     ( Map.keysSet (Card.allTargetSpecs card)
         : fmap
           (Map.keysSet . Modal.allTargetSpecs)
-          ( fmap ActivatedAbility.modal (Card.Type.activatedAbilities card)
-              <> fmap TriggeredAbility.modal (Card.Type.triggeredAbilities card)
-              <> fmap TriggeredAbility.modal (Map.elems (Card.Type.delayedAbilities card))
+          ( fmap ActivatedAbility.modal (Face.activatedAbilities card)
+              <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
+              <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
           )
     )
 
@@ -876,7 +1022,7 @@ declaredTargetSlots card =
 -- chosen target wins the union and the event's own stamp is lost, so the
 -- payload silently reads the answer to a question about something else. Either
 -- way the engine asked a question it did not use.
-reservedDeclarations :: Card.Type.Card -> Set.Set SlotName.SlotName
+reservedDeclarations :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 
 -- CR 111.4: "A spell or ability that creates a token sets both its name and its
@@ -900,13 +1046,13 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 -- copy tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter,
 -- "not Human Token or Doomed Dissenter Token") are each correctly named
 -- something this lint would reject.
-tokenNameOffends :: Card.Type.Card -> Bool
+tokenNameOffends :: Face.Face Card.Type.Card -> Bool
 tokenNameOffends token =
-  case traverse (fmap (Text.pack . fst) . Common.asTagged . Subtype.toJson) (Set.toList (TypeLine.subtypes (Card.Type.typeLine token))) of
+  case traverse (fmap (Text.pack . fst) . Common.asTagged . Subtype.toJson) (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
     Left _ -> True
     Right subtypes ->
       notElem
-        (CardName.unwrap $ Card.Type.name token)
+        (CardName.unwrap $ Face.name token)
         (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
 
 -- CR 701.3a's Filter.CanHostSubject, counted wherever it appears inside ONE
@@ -1178,7 +1324,7 @@ effectFilters effect = case effect of
   Effect.GainLife _ quantity -> unframed (quantityFilters quantity)
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
-  Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> cardFilters card
+  Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> overFaces cardFilters card
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
@@ -1193,7 +1339,7 @@ effectFilters effect = case effect of
   Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers duration _ playerEffect -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
   -- CR 114.2's emblem is a whole card too.
-  Effect.CreateEmblem card -> cardFilters card
+  Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
   Effect.ExileUntilMonarch _ -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and
@@ -1230,7 +1376,7 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Nineteen of Pawl.Types.Card's twenty-seven fields can hold one, and
+-- frames it. Nineteen of Pawl.Types.Face's twenty-eight fields can hold one, and
 -- here is where each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
@@ -1257,46 +1403,49 @@ activatedAbilityFilters ability =
 -- Count, CounterPattern, Effect, Keyword, ObjectRef, PlayerEffect, TargetSpec and
 -- TriggerCondition -- and nothing those eight fields reach is one of them.
 --
+-- Nineteen and eight is twenty-seven, and the twenty-eighth is `attackCosts`,
+-- which can hold one and which this fold does not walk (#651).
+--
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
 -- record fold is the exception, exactly as cardCounts' own caveat says: a NEW
--- Card field that can hold a Filter would bypass it silently. That is what the
+-- Face field that can hold a Filter would bypass it silently. That is what the
 -- codec cross-check in canHostSubjectOffends is for.
-cardFilters :: Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+cardFilters :: Face.Face Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
 cardFilters card =
   unframed
-    ( concatMap keywordFilters (Set.toList (Card.Type.keywords card))
-        <> concatMap quantityFilters (Maybe.maybeToList (Card.Type.characteristicPT card))
-        <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Card.Type.power card))
-        <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Card.Type.toughness card))
-        <> concatMap staticAbilityFilters (Card.Type.staticAbilities card)
-        <> concatMap replacementEffectFilters (Card.Type.replacementEffects card)
-        <> concatMap targetSpecFilters (Maybe.maybeToList (Card.Type.enchant card))
-        <> concatMap costComponentFilters (Card.Type.additionalCosts card)
-        <> concatMap costFilters (Card.Type.alternativeCosts card)
-        <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Card.Type.playerAbilities card)
-        <> concatMap (affectedFilters . BlockRequirement.attacker) (Card.Type.blockRequirements card)
-        <> concatMap (affectedFilters . AttackRequirement.subject) (Card.Type.attackRequirements card)
-        <> concatMap combatRestrictionFilters (Card.Type.combatRestrictions card)
+    ( concatMap keywordFilters (Set.toList (Face.keywords card))
+        <> concatMap quantityFilters (Maybe.maybeToList (Face.characteristicPT card))
+        <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
+        <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
+        <> concatMap staticAbilityFilters (Face.staticAbilities card)
+        <> concatMap replacementEffectFilters (Face.replacementEffects card)
+        <> concatMap targetSpecFilters (Maybe.maybeToList (Face.enchant card))
+        <> concatMap costComponentFilters (Face.additionalCosts card)
+        <> concatMap costFilters (Face.alternativeCosts card)
+        <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
+        <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)
+        <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
+        <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
     )
-    <> modalFilters (Card.Type.spell card)
-    <> concatMap activatedAbilityFilters (Card.Type.activatedAbilities card)
-    <> concatMap triggeredAbilityFilters (Card.Type.triggeredAbilities card)
-    <> concatMap triggeredAbilityFilters (Map.elems (Card.Type.delayedAbilities card))
-    <> concatMap effectFilters (Card.Type.mulliganAction card)
-    <> concatMap effectFilters (Card.Type.openingHandAction card)
+    <> modalFilters (Face.spell card)
+    <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
+    <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
+    <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
+    <> concatMap effectFilters (Face.mulliganAction card)
+    <> concatMap effectFilters (Face.openingHandAction card)
 
 -- How many CR 701.3a atoms this card carries in an Effect.AttachTarget's
 -- destination filter, and how many anywhere else. The second number is the
 -- offence; the first is what Aura Graft legitimately has one of.
-canHostSubjectCounts :: Card.Type.Card -> (Int, Int)
+canHostSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canHostSubjectCounts card =
   let total wanted = sum [canHostSubjects f | (framed, f) <- cardFilters card, framed == wanted]
    in (total True, total False)
 
--- Every occurrence of the atom's codec tag in an ENCODED card. The completeness
--- witness for the traversal above: Pawl.Codec.Card.toJson visits every field
--- of a Card and every type under it, is round-tripped by
+-- Every occurrence of the atom's codec tag in an ENCODED face. The completeness
+-- witness for the traversal above: Pawl.Codec.Face.toJson visits every field
+-- of a Face and every type under it, is round-tripped by
 -- Pawl.CodecIntegrationSpec's "honesty round-trip over allPrintings", and was
 -- written for another purpose entirely -- so a Filter position cardFilters forgets
 -- is one this still sees.
@@ -1330,20 +1479,51 @@ jsonCanHostSubjects value = case value of
 --     means cardFilters has a blind spot, and an atom sitting in it would be
 --     reported as zero rather than as an offence.
 --
--- The second is not hypothetical maintenance theatre: cardFilters' Card-record
+-- The second is not hypothetical maintenance theatre: cardFilters' Face-record
 -- fold is hand-maintained, and a new field holding a Filter is exactly the kind of
 -- change that would otherwise make this lint quietly stop doing its job.
-canHostSubjectOffends :: Card.Type.Card -> Bool
+canHostSubjectOffends :: Face.Face Card.Type.Card -> Bool
 canHostSubjectOffends card =
   let (framed, unframedCount) = canHostSubjectCounts card
-   in unframedCount /= 0 || framed + unframedCount /= jsonCanHostSubjects (Card.toJson card)
+   in unframedCount /= 0 || framed + unframedCount /= jsonCanHostSubjects (Face.Codec.toJson Card.toJson card)
 
--- The D4 dataflow lint: every slot an effect reads is declared, and every
--- declared slot is read. Equality, not subset: a spec no effect reads is a
--- card announcing a target it ignores -- representable in Magic, not in this
--- pool. Loosen to superset if such a card ever lands.
+-- A lint fixture built as a FACE, put back into the one-face card an
+-- Effect.Create's token payload has to be.
+oneFaced :: Face.Face Card.Type.Card -> Card.Type.Card
+oneFaced face = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
+
+-- CR 709.2 / 712.8: every lint below is stated about ONE face's printed text,
+-- and a card offends when ANY of its faces does. Every card in the pool but
+-- Wax // Wane has exactly one face, so this mostly fans out over a singleton --
+-- and it is what keeps the second half of a card going unlinted from being
+-- possible at all.
+anyFace :: (Face.Face Card.Type.Card -> Bool) -> Card.Type.Card -> Bool
+anyFace p = any p . Card.Type.faces
+
+-- The same fanout for a lint that GATHERS rather than decides.
+overFaces :: (Face.Face Card.Type.Card -> [a]) -> Card.Type.Card -> [a]
+overFaces f = concatMap f . NonEmpty.toList . Card.Type.faces
+
+-- CR 709.4a: a card's faces are referred to BY NAME (Card.faceNamed), so two
+-- faces sharing a name make that reference ambiguous -- faceNamed would return
+-- the FIRST of them and silently hide the second. Over the whole card rather
+-- than through anyFace: this is a claim about the SET of names a card prints,
+-- which no per-face predicate can state.
+distinctFaceNamesOffends :: Card.Type.Card -> Bool
+distinctFaceNamesOffends card =
+  let names = fmap Face.name (NonEmpty.toList (Card.Type.faces card))
+   in length (List.nub names) /= length names
+
+-- Every claim pawl makes about how its own card files are authored, swept over
+-- the whole corpus. A sweep alone proves nothing about the lint it runs -- a
+-- correctly authored pool passes a lint that never fires -- so most cases here
+-- pair their sweep with a hand-built offender proving the REJECTING direction.
 lintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 lintSpec s registry = Spec.describe s "Lint" $ do
+  -- The D4 dataflow lint: every slot an effect reads is declared, and every
+  -- declared slot is read. Equality, not subset: a spec no effect reads is a
+  -- card announcing a target it ignores -- representable in Magic, not in this
+  -- pool. Loosen to superset if such a card ever lands.
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
     let modeOffends m =
@@ -1355,12 +1535,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               -- same definedSlots exemption the delayed-ability lint below uses.
               Set.difference reads_ defined /= Map.keysSet (Mode.targetSpecs m)
         cardOffends card =
-          any modeOffends (Modal.modes (Card.Type.spell card))
+          any modeOffends (Modal.modes (Face.spell card))
         offenders =
           filter
-            (cardOffends . Printing.card)
+            (anyFace cardOffends . Printing.card)
             ps
-    Spec.assertEqWith s "no dangling or unused slots" (fmap (Card.Type.name . Printing.card) offenders) []
+    Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
   -- The D4 lint above is strictly per mode, so two modes of one card sharing a
   -- slot NAME pass it. This is the missing half, and the check both
   -- Modal.allTargetSpecs and Modal.modesTargetSpecs now name in their own
@@ -1373,17 +1553,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Every modal cardSlotNamesCollide sweeps, so the guard below ranges over
         -- the same four scopes the lint does rather than over the spell alone.
         modalsOf card =
-          Card.Type.spell card
-            : fmap ActivatedAbility.modal (Card.Type.activatedAbilities card)
-              <> fmap TriggeredAbility.modal (Card.Type.triggeredAbilities card)
-              <> fmap TriggeredAbility.modal (Map.elems (Card.Type.delayedAbilities card))
-        offenders = filter (cardSlotNamesCollide . Printing.card) ps
+          Face.spell card
+            : fmap ActivatedAbility.modal (Face.activatedAbilities card)
+              <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
+              <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
+        offenders = filter (anyFace cardSlotNamesCollide . Printing.card) ps
     -- Guards against passing vacuously: a pool whose every modal had at most one
     -- slot-declaring mode could not collide whatever the lint said. Dream's Grip
     -- is the spell that makes it real; Aether Channeler's triggered ability is
     -- the multi-mode ability nearest to it, with one declaring mode of three.
-    Spec.assertBool s (any (any ((> 1) . declaring) . modalsOf . Printing.card) ps) "the pool has a modal with two slot-declaring modes"
-    Spec.assertEqWith s "no fused mode slot" (fmap (Card.Type.name . Printing.card) offenders) []
+    Spec.assertBool s (any (any ((> 1) . declaring) . overFaces modalsOf . Printing.card) ps) "the pool has a modal with two slot-declaring modes"
+    Spec.assertEqWith s "no fused mode slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sweep above passes because the pool is authored correctly, so it proves
   -- nothing about the lint. The REJECTING direction is proven here, against
   -- hand-built offenders and against Dream's Grip misauthored on purpose --
@@ -1395,14 +1575,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         tap slot = Effect.Tap (ObjectRef.InSlot slot)
         shared = modalActivated [lintMode [tap creature] [creature], lintMode [tap creature] [creature]]
         distinct = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
-        collides = cardSlotNamesCollide . Printing.card
+        collides = anyFace cardSlotNamesCollide . Printing.card
         -- Dream's Grip's own two modes, renamed to one shared slot: the exact
         -- authoring the card avoids, and the CR 702.42a fusion it would cause.
-        card = Printing.card dreamsGrip
+        face = S.combinedFace dreamsGrip
         fuse mode = mode {Mode.targetSpecs = Map.mapKeys (const creature) (Mode.targetSpecs mode)}
-        fused = card {Card.Type.spell = (Card.Type.spell card) {Modal.modes = fmap fuse (Modal.modes (Card.Type.spell card))}}
-    Spec.assertBool s (cardSlotNamesCollide (card {Card.Type.activatedAbilities = [shared]})) "two modes sharing one name are rejected"
-    Spec.assertBool s (not (cardSlotNamesCollide (card {Card.Type.activatedAbilities = [distinct]}))) "and two modes naming distinct slots are accepted"
+        fused = face {Face.spell = (Face.spell face) {Modal.modes = fmap fuse (Modal.modes (Face.spell face))}}
+    Spec.assertBool s (cardSlotNamesCollide (face {Face.activatedAbilities = [shared]})) "two modes sharing one name are rejected"
+    Spec.assertBool s (not (cardSlotNamesCollide (face {Face.activatedAbilities = [distinct]}))) "and two modes naming distinct slots are accepted"
     Spec.assertBool s (cardSlotNamesCollide fused) "Dream's Grip with both modes on one slot is rejected"
     Spec.assertBool s (not (collides dreamsGrip)) "and the real card, naming them 'tapped' and 'untapped', is accepted"
   Spec.it s "every file in data/cards loads, and its card is named by its file name" $ do
@@ -1446,9 +1626,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let readsX c = Resolve.readsX (Card.allEffects c)
         offenders =
           filter
-            (\p -> readsX (Printing.card p) /= declaresVariable (Card.Type.manaCost (Printing.card p)))
+            (anyFace (\f -> readsX f /= declaresVariable (Face.manaCost f)) . Printing.card)
             ps
-    Spec.assertEqWith s "X read iff {X} declared" (fmap (Card.Type.name . Printing.card) offenders) []
+    Spec.assertEqWith s "X read iff {X} declared" (fmap (S.nameOf . Printing.card) offenders) []
   -- The ACTIVATED-ABILITY half, and it is a separate sweep because it is a
   -- separate cost: CR 602.2b makes "an activated ability's analog to a spell's
   -- mana cost (as referenced in rule 601.2f) ... its activation cost", so an
@@ -1459,7 +1639,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- offender and this one calls correct (#544).
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
-    let abilitiesOf p = fmap ((,) (Card.Type.name (Printing.card p))) (Card.Type.activatedAbilities (Printing.card p))
+    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
         offends (_, ab) =
           Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab))
@@ -1472,20 +1652,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "X read iff {X} declared" (fmap fst (filter offends abilities)) []
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
-    let tokensOf card = [token | Effect.Create _ token _ _ <- cardResolutionEffects card]
-        tokens = concatMap (tokensOf . Printing.card) ps
+    -- Every FACE of every token, since CR 707.8a's double-faced token names two.
+    let tokensOf face = concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create _ token _ _ <- cardResolutionEffects face]
+        tokens = concatMap (overFaces tokensOf . Printing.card) ps
     -- Guards the sweep against passing vacuously if Create ever moves out
     -- from under cardResolutionEffects.
     Spec.assertBool s (not (null tokens)) "the pool creates tokens"
-    Spec.assertEqWith s "no token is misnamed" (fmap Card.Type.name (filter tokenNameOffends tokens)) []
+    Spec.assertEqWith s "no token is misnamed" (fmap Face.name (filter tokenNameOffends tokens)) []
   Spec.it s "the lint itself catches a token named without the suffix" $ do
     doomedTraveler <- S.printingOf s registry "Doomed Traveler"
-    case [token | Effect.Create _ token _ _ <- cardResolutionEffects (Printing.card doomedTraveler)] of
+    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create _ token _ _ <- cardResolutionEffects (S.combinedFace doomedTraveler)] of
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
         -- the suffix dropped.
-        Spec.assertBool s (tokenNameOffends token {Card.Type.name = CardName.MkCardName $ Text.pack "Spirit"}) "misnamed token detected"
+        Spec.assertBool s (tokenNameOffends token {Face.name = CardName.MkCardName $ Text.pack "Spirit"}) "misnamed token detected"
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
   -- ONE sweep over the whole reserved set, replacing the five per-name
   -- cases this grew out of. Those five each filtered on
@@ -1497,8 +1678,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no reserved binding slot is ever a declared target slot" $ do
     ps <- S.allPrintings s
     let offends = not . Set.null . reservedDeclarations
-        offenders = filter (offends . Printing.card) ps
-    Spec.assertEqWith s "no card declares a reserved slot" (fmap (Card.Type.name . Printing.card) offenders) []
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card declares a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sweep above passes VACUOUSLY: no committed card declares a reserved
   -- slot anywhere, so on its own it proves nothing about the lint. Proven
   -- here instead against hand-built offenders, in the posture the
@@ -1522,7 +1703,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (ModeSelection.ChooseExactly 1)
         withTriggered slot card =
           card
-            { Card.Type.triggeredAbilities =
+            { Face.triggeredAbilities =
                 [ TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.SelfDies,
                       TriggeredAbility.modal = declaring slot,
@@ -1531,12 +1712,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 ]
             }
         withActivated slot card =
-          card {Card.Type.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = declaring slot}) (Card.Type.activatedAbilities card)}
+          card {Face.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = declaring slot}) (Face.activatedAbilities card)}
         withDelayed slot card =
-          card {Card.Type.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Card.Type.delayedAbilities card)}
+          card {Face.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Face.delayedAbilities card)}
         catches slot graft printing =
-          let card = graft slot (Printing.card printing)
-           in (reservedDeclarations card, Map.member slot (Card.allTargetSpecs card))
+          let face = graft slot (S.combinedFace printing)
+           in (reservedDeclarations face, Map.member slot (Card.allTargetSpecs face))
     Spec.assertEqWith
       s
       "CR 109.5 you declared on a triggered ability is caught, and the spell-modes view misses it"
@@ -1560,12 +1741,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "an activated ability's ordinary slot is in the sweep but not the spell-modes view"
-      (Set.member target (declaredTargetSlots (Printing.card sorcerer)), Map.member target (Card.allTargetSpecs (Printing.card sorcerer)))
+      (Set.member target (declaredTargetSlots (S.combinedFace sorcerer)), Map.member target (Card.allTargetSpecs (S.combinedFace sorcerer)))
       (True, False)
     Spec.assertEqWith
       s
       "and the three real cards declare no reserved slot"
-      (fmap (reservedDeclarations . Printing.card) [roaches, sorcerer, tidalWave])
+      (fmap (reservedDeclarations . S.combinedFace) [roaches, sorcerer, tidalWave])
       [Set.empty, Set.empty, Set.empty]
   -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
   -- ArmDelayedTrigger naming an ability the card does not declare is a FAILING
@@ -1586,9 +1767,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "every armed delayed ability is declared, and every declared one is armed" $ do
     ps <- S.allPrintings s
     let cardOffends card =
-          Resolve.armedAbilities (cardResolutionEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
-        offenders = filter (cardOffends . Printing.card) ps
-    Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (Card.Type.name . Printing.card) offenders) []
+          Resolve.armedAbilities (cardResolutionEffects card) /= Map.keysSet (Face.delayedAbilities card)
+        offenders = filter (anyFace cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (S.nameOf . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, a token bound by a Create, or the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
@@ -1606,17 +1787,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let cardOffends card =
           let bound = Set.insert Binding.triggerSource (Resolve.definedSlots (cardResolutionEffects card))
-           in any (modalReadOffends bound . TriggeredAbility.modal) (Map.elems (Card.Type.delayedAbilities card))
-        offenders = filter (cardOffends . Printing.card) ps
-    Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (Card.Type.name . Printing.card) offenders) []
+           in any (modalReadOffends bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+        offenders = filter (anyFace cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
   -- alone. See onsetOffends for why the onset and the condition's TurnScope
   -- are two halves of one printed "your next turn", and what goes wrong when a
   -- card supplies only one of them.
   Spec.it s "every delayed ability armed for YOUR next turn is controller-scoped" $ do
     ps <- S.allPrintings s
-    let offenders = filter (onsetOffends . Printing.card) ps
-    Spec.assertEqWith s "no onset over a condition that admits another player's turn" (fmap (Card.Type.name . Printing.card) offenders) []
+    let offenders = filter (anyFace onsetOffends . Printing.card) ps
+    Spec.assertEqWith s "no onset over a condition that admits another player's turn" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sweep above is NOT vacuous -- Meandering Towershell is a real card with
   -- an onset, so the accepting direction is exercised by the pool -- but nothing
   -- committed offends it, so the REJECTING direction is proven here instead,
@@ -1624,7 +1805,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- that offends a lint must not be loadable.
   Spec.it s "the lint itself catches an onset over an EachTurn condition" $ do
     towershell <- S.printingOf s registry "Meandering Towershell"
-    let card = Printing.card towershell
+    let face = S.combinedFace towershell
         -- The Towershell's own condition with CR 603.2b's OTHER turn scope: "at
         -- the beginning of EACH declare attackers step", which an opponent's
         -- turn satisfies. Built rather than pattern-matched, so this fixture
@@ -1634,26 +1815,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             { TriggeredAbility.condition =
                 TriggerCondition.StepBegins (Phase.Combat CombatStep.DeclareAttackers) TurnScope.EachTurn
             }
-        widened = card {Card.Type.delayedAbilities = fmap eachTurn (Card.Type.delayedAbilities card)}
+        widened = face {Face.delayedAbilities = fmap eachTurn (Face.delayedAbilities face)}
         -- The other way a card can reach this: an onset naming an ability the
         -- card does not declare at all.
-        dangling = card {Card.Type.delayedAbilities = Map.empty}
-    Spec.assertBool s (not (onsetOffends card)) "the real card, ControllersTurn, is accepted"
+        dangling = face {Face.delayedAbilities = Map.empty}
+    Spec.assertBool s (not (onsetOffends face)) "the real card, ControllersTurn, is accepted"
     Spec.assertBool s (onsetOffends widened) "EachTurn under an onset is rejected"
     Spec.assertBool s (onsetOffends dangling) "and so is an onset naming no declared ability"
     -- Not a check that fires for every card: one with no onset at all has
     -- nothing for this to reject, whatever its delayed abilities are scoped to.
     tidalWave <- S.printingOf s registry "Tidal Wave"
-    Spec.assertBool s (not (onsetOffends (Printing.card tidalWave))) "a card with no onset is not swept up"
+    Spec.assertBool s (not (onsetOffends (S.combinedFace tidalWave))) "a card with no onset is not swept up"
   -- The same subset shape over a card's TRIGGERED abilities, which is where
   -- the condition-specific reserved slots live -- CR 400.7e's `became` and
   -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
   -- side and for why this cannot be an equality check.
   Spec.it s "every slot a triggered ability reads is bound for its condition" $ do
     ps <- S.allPrintings s
-    let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
-        offenders = filter (cardOffends . Printing.card) ps
-    Spec.assertEqWith s "no dangling triggered-ability slot" (fmap (Card.Type.name . Printing.card) offenders) []
+    let cardOffends = any triggeredAbilityOffends . Face.triggeredAbilities
+        offenders = filter (anyFace cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling triggered-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sweep above passes VACUOUSLY: no committed card misauthors the
   -- pairing, so the sweep proves nothing about the lint. Both directions are
   -- proven here instead, against a hand-built offender (never a card file --
@@ -1685,14 +1866,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and under a combat-damage trigger it is accepted"
     Spec.assertBool
       s
-      (not (any triggeredAbilityOffends (Card.Type.triggeredAbilities (Printing.card roaches))))
+      (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
   -- The same subset shape over a card's ACTIVATED abilities, whose available
   -- side is the narrowest of the three: an activation has no event, and is never
   -- given CR 109.5's `you`. See activatedAbilityOffends for the available side.
   Spec.it s "every slot an activated ability reads is bound for its activation" $ do
     ps <- S.allPrintings s
-    let abilitiesOf p = fmap ((,) (Card.Type.name (Printing.card p))) (Card.Type.activatedAbilities (Printing.card p))
+    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
         readsAnySlot ab = not (Set.null (Set.unions (fmap Resolve.slotsOf (Modal.allEffects (ActivatedAbility.modal ab)))))
     -- Guards the sweep against passing vacuously, in both directions: an empty
@@ -1768,7 +1949,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "Longtusk Cub, Prodigal Sorcerer and Cinder Elemental are all accepted"
-      (fmap (any activatedAbilityOffends . Card.Type.activatedAbilities . Printing.card) [longtuskCub, sorcerer, cinderElemental])
+      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental])
       [False, False, False]
   -- The PER-MODE half of all three read lints (#570), which no sweep above can
   -- reach: a one-mode ability cannot have a mode read another mode's slot at
@@ -1823,9 +2004,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders =
           filter
-            (Resolve.bindsSeveralTokens . cardResolutionEffects . Printing.card)
+            (anyFace (Resolve.bindsSeveralTokens . cardResolutionEffects) . Printing.card)
             ps
-    Spec.assertEqWith s "no multi-token binding" (fmap (Card.Type.name . Printing.card) offenders) []
+    Spec.assertEqWith s "no multi-token binding" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
   -- exile, command) must pair with PlayerRef.EachPlayer -- the type
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a
@@ -1834,13 +2015,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders =
           filter
-            (cardOffendsSharedZoneScope . Printing.card)
+            (anyFace cardOffendsSharedZoneScope . Printing.card)
             ps
-    Spec.assertEqWith s "no shared-zone scope with a non-EachPlayer ref" (fmap (Card.Type.name . Printing.card) offenders) []
+    Spec.assertEqWith s "no shared-zone scope with a non-EachPlayer ref" (fmap (S.nameOf . Printing.card) offenders) []
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let card = Printing.card piker
-    Spec.assertEqWith s "no enchant spec" (Card.Type.enchant card) Nothing
+    let card = S.combinedFace piker
+    Spec.assertEqWith s "no enchant spec" (Face.enchant card) Nothing
     Spec.assertBool s (not (Card.isAura card)) "not an Aura"
     Spec.assertEqWith s "no enchant slot" (Card.enchantSpecs card) Map.empty
   -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
@@ -1849,16 +2030,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
   Spec.it s "a card is an Aura iff it declares an enchant ability" $ do
     ps <- S.allPrintings s
-    let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
-        offenders = filter (offends . Printing.card) ps
-    Spec.assertEqWith s "Aura iff enchant" (fmap (Card.Type.name . Printing.card) offenders) []
+    let offends c = Card.isAura c /= Maybe.isJust (Face.enchant c)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "Aura iff enchant" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
   -- mode declaring it would be silently shadowed.
   -- #199: no card authors a layer-2 control modification into an effect that
   -- RESOLVES. SetControllerToSource is the payload-free constructor and is
   -- INERT when stored: Projection.controllerOfGiven's storedSetter matches only
   -- Modification.SetController, Projection.controlGrants reads control-granting
-  -- static abilities off Card.staticAbilities and never off stored effects, and
+  -- static abilities off Face.staticAbilities and never off stored effects, and
   -- Projection.applyModification's SetControllerToSource arm is the identity.
   -- A card authoring one would resolve, store the effect, and grant control to
   -- no one -- there is nothing for CR 800.4a to end (see Pawl.Engine.Departure's
@@ -1881,30 +2062,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends effect = case effect of
           Effect.ModifyTarget _ modification _ -> Projection.layer modification == Layer.Control
           _ -> False
-        offenders = filter (any offends . cardResolutionEffects . Printing.card) ps
-    Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (Card.Type.name . Printing.card) offenders) []
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).
   Spec.it s "no card authors a player-scoped phase skip (#437)" $ do
     ps <- S.allPrintings s
-    let offenders = filter (any phasePatternOffends . cardReplacementEffects . Printing.card) ps
+    let offenders = filter (anyFace (any phasePatternOffends . cardReplacementEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no PhaseR in the pool at all this
     -- would pass whatever the classification said. Eon Hub is the card that
     -- prints one.
-    Spec.assertBool s (any (any isPhaseR . cardReplacementEffects . Printing.card) ps) "the pool has a card printing a phase skip"
-    Spec.assertEqWith s "whosePhase is baked by the engine, never authored" (fmap (Card.Type.name . Printing.card) offenders) []
+    Spec.assertBool s (any (anyFace (any isPhaseR . cardReplacementEffects) . Printing.card) ps) "the pool has a card printing a phase skip"
+    Spec.assertEqWith s "whosePhase is baked by the engine, never authored" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sweep passes because the pool is authored correctly, so the REJECTING
   -- direction is proven here against Eon Hub with a seat baked into it -- never
   -- a card file, since a card that offends a lint must not be loadable.
   Spec.it s "the lint itself catches a baked whosePhase" $ do
     eonHub <- S.printingOf s registry "Eon Hub"
-    let card = Printing.card eonHub
+    let card = S.combinedFace eonHub
         bake replacement = case replacement of
           ReplacementEffect.PhaseR phasePattern ->
             ReplacementEffect.PhaseR phasePattern {PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
           other -> other
-        baked = card {Card.Type.replacementEffects = fmap bake (Card.Type.replacementEffects card)}
+        baked = card {Face.replacementEffects = fmap bake (Face.replacementEffects card)}
     Spec.assertBool s (not (any phasePatternOffends (cardReplacementEffects card))) "the real Eon Hub is symmetric and accepted"
     Spec.assertBool s (any phasePatternOffends (cardReplacementEffects baked)) "and the same card naming a seat is rejected"
   -- The same lint one event class over, for the OTHER pair of fields the codec
@@ -1912,19 +2093,19 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- remaining amount. See damagePatternOffends.
   Spec.it s "no card authors a recipient-scoped damage pattern or a counted shield" $ do
     ps <- S.allPrintings s
-    let offenders = filter (any damagePatternOffends . cardReplacementEffects . Printing.card) ps
+    let offenders = filter (anyFace (any damagePatternOffends . cardReplacementEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: Fog is the card that prints a DamageR.
-    Spec.assertBool s (any (any isDamageR . cardReplacementEffects . Printing.card) ps) "the pool has a card printing a damage replacement"
-    Spec.assertEqWith s "a shield is baked by the engine, never authored" (fmap (Card.Type.name . Printing.card) offenders) []
+    Spec.assertBool s (any (anyFace (any isDamageR . cardReplacementEffects) . Printing.card) ps) "the pool has a card printing a damage replacement"
+    Spec.assertEqWith s "a shield is baked by the engine, never authored" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against Fog rather than a card file, exactly
   -- as the Eon Hub case above is.
   Spec.it s "the lint itself catches a baked shield" $ do
     fog <- S.printingOf s registry "Fog"
     -- Fog's DamageR is installed by a resolution effect rather than printed as a
     -- static replacement ability, so the baking here is on what
-    -- cardReplacementEffects reports rather than on Card.replacementEffects --
+    -- cardReplacementEffects reports rather than on Face.replacementEffects --
     -- which is the sweep's own input either way.
-    let printed = cardReplacementEffects (Printing.card fog)
+    let printed = cardReplacementEffects (S.combinedFace fog)
         bakeRecipient replacement = case replacement of
           ReplacementEffect.DamageR damagePattern rewrite ->
             ReplacementEffect.DamageR
@@ -1948,15 +2129,33 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- directions, which is why it is a lint and not a per-card assertion.
   Spec.it s "a card is a planeswalker iff it has a printed loyalty" $ do
     ps <- S.allPrintings s
-    let isPlaneswalker c = Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine c))
-        offends c = isPlaneswalker c /= Maybe.isJust (Card.Type.loyalty c)
-        offenders = filter (offends . Printing.card) ps
-    Spec.assertEqWith s "planeswalker iff loyalty" (fmap (Card.Type.name . Printing.card) offenders) []
+    let isPlaneswalker c = Set.member CardType.Planeswalker (TypeLine.types (Face.typeLine c))
+        offends c = isPlaneswalker c /= Maybe.isJust (Face.loyalty c)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "planeswalker iff loyalty" (fmap (S.nameOf . Printing.card) offenders) []
+  -- What makes Pawl.Engine.Card.faceNamed's answer unique, and so what makes
+  -- referring to a face BY NAME well-defined (CR 709.4a). Held over the whole
+  -- pool rather than by construction, because a card file is data.
+  --
+  Spec.it s "a card's face names are pairwise distinct" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (distinctFaceNamesOffends . Printing.card) ps
+    -- The guard the sibling lints carry: over a pool of one-face cards this
+    -- sweep passes on every card without comparing two names, and so proves
+    -- nothing. Wax // Wane is what makes it non-vacuous.
+    Spec.assertBool s (any ((> 1) . length . Card.Type.faces . Printing.card) ps) "the pool has a multi-face card to lint"
+    Spec.assertEqWith s "no card repeats a face name" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against a hand-built offender rather than a
+  -- card file: a card that repeats a face name must not be loadable.
+  Spec.it s "the lint itself catches a card that repeats a face name" $ do
+    let wax = vanillaFace "Wax" instantLine
+        offender = Card.Type.MkCard {Card.Type.layout = Layout.Split, Card.Type.faces = wax NonEmpty.:| [wax]}
+    Spec.assertBool s (distinctFaceNamesOffends offender) "two faces sharing one name are rejected"
   Spec.it s "no mode declares a slot named enchant" $ do
     ps <- S.allPrintings s
-    let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))
-        offenders = filter (offends . Printing.card) ps
-    Spec.assertEqWith s "the enchant slot is never hand-declared" (fmap (Card.Type.name . Printing.card) offenders) []
+    let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Face.spell c))
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "the enchant slot is never hand-declared" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 701.3a: "An Aura, Equipment, or Fortification can't be attached to an
   -- object or player it couldn't enchant, equip, or fortify, respectively." The
   -- atom that asks that question is answerable only where an attach frames the
@@ -1964,8 +2163,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- two offences this one predicate covers.
   Spec.it s "CR 701.3a no card asks CanHostSubject outside an attach's destination" $ do
     ps <- S.allPrintings s
-    let offenders = filter (canHostSubjectOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in an AttachTarget destination" (fmap (Card.Type.name . Printing.card) offenders) []
+    let offenders = filter (anyFace canHostSubjectOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in an AttachTarget destination" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous: the pool authors the atom, and the one card that does is
     -- ACCEPTED here rather than skipped. Aura Graft's "another permanent it can
     -- enchant" is the whole legal use, so a lint that swept past it would be
@@ -1974,12 +2173,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "Aura Graft's one atom is framed by its own attach"
-      (canHostSubjectCounts (Printing.card graft))
+      (canHostSubjectCounts (S.combinedFace graft))
       (1, 0)
     Spec.assertEqWith
       s
       "and it is the pool's only one"
-      (sum (fmap (\p -> uncurry (+) (canHostSubjectCounts (Printing.card p))) ps))
+      (sum (fmap (\p -> uncurry (+) (canHostSubjectCounts (S.combinedFace p))) ps))
       1
     -- The traversal reaches a Filter position no effect, target spec or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
@@ -1990,7 +2189,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       ( elem
           (False, Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic])
-          (cardFilters (Printing.card barrens))
+          (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
@@ -2008,7 +2207,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     graft <- S.printingOf s registry "Aura Graft"
-    let base = Printing.card piker
+    let base = S.combinedFace piker
         slot = SlotName.MkSlotName (Text.pack "target")
         atom = Filter.Type.CanHostSubject
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
@@ -2025,14 +2224,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
         planted =
           [ ( "a target spec",
-              base {Card.Type.spell = spellOf [] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just buried)))}
+              base {Face.spell = spellOf [] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just buried)))}
             ),
             ( "CR 303.4a's enchant ability",
-              base {Card.Type.enchant = Just (TargetSpec.MkTargetSpec Pool.Permanents (Just buried))}
+              base {Face.enchant = Just (TargetSpec.MkTargetSpec Pool.Permanents (Just buried))}
             ),
             ( "a static ability's affected set",
               base
-                { Card.Type.staticAbilities =
+                { Face.staticAbilities =
                     [ StaticAbility.MkStaticAbility
                         (Affected.Matching buried)
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
@@ -2041,7 +2240,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ),
             ( "a Count's filter",
               base
-                { Card.Type.staticAbilities =
+                { Face.staticAbilities =
                     [ boostedBy
                         ( Quantity.Type.Count
                             (Count.Type.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) buried Aggregation.Objects)
@@ -2050,14 +2249,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "a Search filter",
-              base {Card.Type.spell = spellOf [Effect.Search buried SearchDestination.RevealThenHand] Map.empty}
+              base {Face.spell = spellOf [Effect.Search buried SearchDestination.RevealThenHand] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
-              base {Card.Type.spell = spellOf [Effect.Destroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing] Map.empty}
+              base {Face.spell = spellOf [Effect.Destroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing] Map.empty}
             ),
             ( "CR 603.6a's trigger condition",
               base
-                { Card.Type.triggeredAbilities =
+                { Face.triggeredAbilities =
                     [ oneEffectTrigger
                         (TriggerCondition.PermanentEnters buried)
                         (Effect.Draw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1))
@@ -2065,38 +2264,38 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 601.2f's sacrifice cost component",
-              (Printing.card sorcerer)
-                { Card.Type.activatedAbilities =
+              (S.combinedFace sorcerer)
+                { Face.activatedAbilities =
                     fmap
                       (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice 1 buried]}})
-                      (Card.Type.activatedAbilities (Printing.card sorcerer))
+                      (Face.activatedAbilities (S.combinedFace sorcerer))
                 }
             ),
             ( "CR 702.29e's typecycling predicate",
-              base {Card.Type.keywords = Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried))}
+              base {Face.keywords = Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried))}
             ),
             ( "CR 613.11's spell-cost modifier",
               base
-                { Card.Type.playerAbilities =
+                { Face.playerAbilities =
                     [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.IncreaseSpellCost buried 1)]
                 }
             ),
             ( "CR 508.1c's combat restriction",
-              base {Card.Type.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried) Nothing]}
+              base {Face.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried) Nothing]}
             ),
             ( "CR 614.1's counter-placement pattern",
               base
-                { Card.Type.replacementEffects =
+                { Face.replacementEffects =
                     [ReplacementEffect.CounterR (CounterPattern.MkCounterPattern Nothing ControllerRelation.Yours buried) (Scaling.AddMore 1)]
                 }
             ),
             ( "a created token's own static ability",
               base
-                { Card.Type.spell =
+                { Face.spell =
                     spellOf
                       [ Effect.Create
                           (Quantity.Type.Literal 1)
-                          (base {Card.Type.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) (NonEmpty.singleton Modification.LoseAllAbilities)]})
+                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) (NonEmpty.singleton Modification.LoseAllAbilities)]}))
                           EntryRiders.defaultValue
                           Nothing
                       ]
@@ -2104,7 +2303,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Card.Type.mulliganAction = [Effect.Search buried SearchDestination.RevealThenHand]}
+              base {Face.mulliganAction = [Effect.Search buried SearchDestination.RevealThenHand]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)
@@ -2118,7 +2317,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "and the codec counts exactly the atoms the traversal does"
-      (fmap (\(_, card) -> jsonCanHostSubjects (Card.toJson card)) planted)
+      (fmap (\(_, card) -> jsonCanHostSubjects (Face.Codec.toJson Card.toJson card)) planted)
       (fmap (const 1) planted)
     -- The nesting, stated on its own: a top-level-only check would score every
     -- one of these zero but the first.
@@ -2142,9 +2341,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "Aura Graft is accepted"
-      (canHostSubjectOffends (Printing.card graft), canHostSubjectCounts (Printing.card graft))
+      (canHostSubjectOffends (S.combinedFace graft), canHostSubjectCounts (S.combinedFace graft))
       (False, (1, 0))
-    let grafted = base {Card.Type.spell = spellOf [Effect.AttachTarget slot buried] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents Nothing))}
+    let grafted = base {Face.spell = spellOf [Effect.AttachTarget slot buried] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents Nothing))}
     Spec.assertEqWith
       s
       "a buried atom in an AttachTarget destination is accepted"

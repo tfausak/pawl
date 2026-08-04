@@ -1,47 +1,51 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Hexproof"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Hybrid",
-      "value": [
+      "keywords": [
         {
-          "type": "Colored",
-          "value": {
-            "type": "Green"
-          }
-        },
-        {
-          "type": "Colored",
-          "value": {
-            "type": "Blue"
-          }
+          "type": "Hexproof"
         }
-      ]
+      ],
+      "manaCost": [
+        {
+          "type": "Hybrid",
+          "value": [
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            },
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Slippery Bogle",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Beast"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
     }
-  ],
-  "name": "Slippery Bogle",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Beast"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

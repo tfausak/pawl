@@ -1,73 +1,77 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "FirstStrike"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "keywords": [
+        {
+          "type": "FirstStrike"
         }
-      }
-    }
-  ],
-  "name": "Thalia, Guardian of Thraben",
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "IncreaseSpellCost",
-        "value": [
-          {
-            "type": "Not",
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "HasCardType",
-              "value": {
-                "type": "Creature"
-              }
+              "type": "White"
             }
+          }
+        }
+      ],
+      "name": "Thalia, Guardian of Thraben",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "IncreaseSpellCost",
+            "value": [
+              {
+                "type": "Not",
+                "value": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                }
+              },
+              1
+            ]
           },
-          1
-        ]
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      "scope": {
-        "type": "EachPlayer"
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Soldier"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Human"
-      },
-      {
-        "type": "Soldier"
-      }
-    ],
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

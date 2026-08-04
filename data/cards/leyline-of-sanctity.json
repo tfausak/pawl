@@ -1,58 +1,62 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    }
-  ],
-  "name": "Leyline of Sanctity",
-  "openingHandAction": [
-    {
-      "type": "MoveToZone",
-      "value": [
-        "self",
+      "manaCost": [
         {
-          "type": "Battlefield"
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      ]
-    }
-  ],
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "CantBeTargetedBy",
-        "value": {
-          "type": "Opponents"
+      ],
+      "name": "Leyline of Sanctity",
+      "openingHandAction": [
+        {
+          "type": "MoveToZone",
+          "value": [
+            "self",
+            {
+              "type": "Battlefield"
+            }
+          ]
         }
-      },
-      "scope": {
-        "type": "You"
+      ],
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantBeTargetedBy",
+            "value": {
+              "type": "Opponents"
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

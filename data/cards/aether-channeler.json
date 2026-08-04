@@ -1,155 +1,163 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Aether Channeler",
-  "power": {
-    "type": "Literal",
-    "value": 3
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
+      ],
+      "name": "Aether Channeler",
+      "power": {
+        "type": "Literal",
+        "value": 3
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  {
-                    "keywords": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "type": "Flying"
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "faces": [
+                          {
+                            "keywords": [
+                              {
+                                "type": "Flying"
+                              }
+                            ],
+                            "name": "Bird Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Bird"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
                       }
-                    ],
-                    "name": "Bird Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Bird"
-                        }
-                      ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
+                    ]
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": [
+                      "permanent",
+                      {
+                        "type": "Hand"
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "permanent",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Land"
+                              }
+                            }
+                          },
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "IsSource"
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
                     }
                   }
                 ]
-              }
-            ]
-          },
-          {
-            "effects": [
+              },
               {
-                "type": "MoveToZone",
-                "value": [
-                  "permanent",
+                "effects": [
                   {
-                    "type": "Hand"
-                  }
-                ]
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "permanent",
-                "spec": {
-                  "filter": {
-                    "type": "And",
+                    "type": "Draw",
                     "value": [
                       {
-                        "type": "Not",
+                        "type": "Relative",
                         "value": {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Land"
-                          }
+                          "type": "You"
                         }
                       },
                       {
-                        "type": "Not",
-                        "value": {
-                          "type": "IsSource"
-                        }
+                        "type": "Literal",
+                        "value": 1
                       }
                     ]
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
-                }
-              }
-            ]
-          },
-          {
-            "effects": [
-              {
-                "type": "Draw",
-                "value": [
-                  {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Wizard"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Human"
-      },
-      {
-        "type": "Wizard"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

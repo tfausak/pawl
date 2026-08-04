@@ -460,7 +460,8 @@ placeBorne srcId pending = do
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if Natural.length legal < count
@@ -725,8 +726,8 @@ priorityLoop = do
                                 State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
-                              Action.Type.Cast oid -> do
-                                Cast.castSpell p oid
+                              Action.Type.Cast oid name -> do
+                                Cast.castSpell p oid name
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

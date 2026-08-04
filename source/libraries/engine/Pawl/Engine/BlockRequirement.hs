@@ -13,7 +13,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
-import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
@@ -47,9 +47,9 @@ instances able candidates attackers gs =
       -- unforced until some permanent actually declares a requirement.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
-      fromPermanent source = case Game.cardOf source gs of
+      fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
-        Just card -> case Card.blockRequirements card of
+        Just face -> case Face.blockRequirements face of
           -- Every permanent in almost every game.
           [] -> []
           requirements ->

@@ -1,45 +1,49 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
                     "value": {
-                      "type": "Blue"
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Blue"
+                        }
+                      }
                     }
                   }
-                }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "name": "Seat of the Synod",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Land"
           }
         ]
       }
     }
-  ],
-  "name": "Seat of the Synod",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      },
-      {
-        "type": "Land"
-      }
-    ]
-  }
+  ]
 }

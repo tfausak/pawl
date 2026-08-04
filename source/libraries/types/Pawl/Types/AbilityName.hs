@@ -3,7 +3,7 @@ module Pawl.Types.AbilityName where
 import qualified Data.Text as Text
 
 -- | The name of a delayed triggered ability declared on a card (CR 603.7),
--- joining Effect.ArmDelayedTrigger to Card.delayedAbilities. SlotName's exact
+-- joining Effect.ArmDelayedTrigger to Face.delayedAbilities. SlotName's exact
 -- shape, and for the same reason: named, never positional.
 --
 -- The join is policed the way SlotName's is: the dataflow lint checks that every

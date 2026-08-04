@@ -1,51 +1,55 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Variable"
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "Variable"
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Blaze",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Blaze",
+      "spell": {
+        "modes": [
           {
-            "type": "DealDamage",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "X"
+                "type": "DealDamage",
+                "value": [
+                  "target",
+                  {
+                    "type": "X"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "AnyTarget"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "AnyTarget"
-              }
-            }
+            "type": "Sorcery"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -1,36 +1,40 @@
 {
-  "name": "Urborg, Tomb of Yawgmoth",
-  "staticAbilities": [
+  "faces": [
     {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "HasCardType",
-          "value": {
+      "name": "Urborg, Tomb of Yawgmoth",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Land"
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "AddLandSubtype",
+              "value": {
+                "type": "Swamp"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
             "type": "Land"
           }
-        }
-      },
-      "modifications": [
-        {
-          "type": "AddLandSubtype",
-          "value": {
-            "type": "Swamp"
-          }
-        }
-      ]
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+  ]
 }

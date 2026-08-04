@@ -50,9 +50,11 @@ import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
+import qualified Pawl.Codec.FaceSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.KeywordSpec
+import qualified Pawl.Codec.LayoutSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
@@ -260,9 +262,11 @@ spec s registry = do
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
+  Pawl.Codec.FaceSpec.spec s
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.KeywordSpec.spec s
+  Pawl.Codec.LayoutSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaCountSpec.spec s

@@ -25,12 +25,13 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
-import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
@@ -80,23 +81,29 @@ firstOffered candidates = case candidates of
 -- there for its printed mana cost -- and a card with no flashback yields no
 -- candidate at all, which is CR 601.3's default prohibition arriving through
 -- Cast.castable's affordability gate as well as through its permission gate.
-costsFor :: ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
-costsFor oid gs = case Game.lookupObject oid gs of
+--
+-- They also depend on WHICH FACE is being cast (CR 709.3a: "Only the chosen
+-- half is evaluated to see if it can be cast"), which is why the name arrives
+-- as an argument rather than being read off the object. CR 709.4b's combined
+-- mana cost is what a split card HAS outside the stack, and is emphatically not
+-- what casting one half pays.
+costsFor :: CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
+costsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj -> case Object.source obj of
     Source.OfCard printing ->
-      let card = Printing.card printing
-          printed = Cost.MkCost {Cost.mana = Card.manaCost card, Cost.components = Card.additionalCosts card}
+      let face = Game.resolveFace (Just name) (Printing.card printing)
+          printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
           -- CR 118.9d: an alternative replaces only the MANA cost; every
           -- additional cost still applies. The increases and reductions are
           -- Pawl.Engine.Cost.total's job, called on whichever candidate is
           -- chosen. CR 702.34a's own last sentence sends flashback through the
           -- same rules, so its cost is wrapped identically.
           withAdditional alternative =
-            alternative {Cost.components = Cost.components alternative <> Card.additionalCosts card}
+            alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
        in case Object.zone obj of
-            Zone.Graveyard -> fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Card.keywords card)))
-            _ -> printed : fmap withAdditional (Card.alternativeCosts card)
+            Zone.Graveyard -> fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
+            _ -> printed : fmap withAdditional (Face.alternativeCosts face)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []

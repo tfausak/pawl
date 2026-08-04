@@ -9,6 +9,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -57,7 +58,7 @@ evaluate viewOf context gs oid = evaluateFor viewOf context gs oid oid
 evaluateFor :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> ObjectId -> Quantity -> Maybe Integer
 evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Literal n -> Just n
-  Quantity.ManaValue -> fmap manaValueOf (Game.cardOf oid gs)
+  Quantity.ManaValue -> fmap manaValueOf (Game.faceOf oid gs)
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller
   -- decides that by which ViewOf it supplies (Projection.fullView vs.
@@ -163,8 +164,8 @@ slots quantity = case quantity of
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A
 -- land has no mana cost (CR 202.1b), so its mana value is 0 (CR 202.3a).
-manaValueOf :: Card.Card -> Integer
-manaValueOf card = case Card.manaCost card of
+manaValueOf :: Face.Face Card.Card -> Integer
+manaValueOf face = case Face.manaCost face of
   Nothing -> 0
   Just (ManaCost.MkManaCost symbols) -> sum (fmap symbolValue symbols)
 

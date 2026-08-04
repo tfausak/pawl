@@ -1,98 +1,102 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 2
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "Attach",
-                "value": "target"
+                "type": "Generic",
+                "value": 2
               }
-            ],
-            "targetSpecs": [
+            ]
+          },
+          "modal": {
+            "modes": [
               {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "You"
+                "effects": [
+                  {
+                    "type": "Attach",
+                    "value": "target"
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
                     }
-                  },
-                  "pool": {
-                    "type": "Creatures"
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": {
+            "type": "SorcerySpeed"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Vectis Gloves",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 2
+                },
+                {
+                  "type": "Literal",
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Landwalk",
+                "value": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
                   }
                 }
               }
-            ]
-          }
-        ]
-      },
-      "timing": {
-        "type": "SorcerySpeed"
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    }
-  ],
-  "name": "Vectis Gloves",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Attached"
-      },
-      "modifications": [
-        {
-          "type": "ModifyPowerToughness",
-          "value": [
-            {
-              "type": "Literal",
-              "value": 2
-            },
-            {
-              "type": "Literal",
-              "value": 0
             }
           ]
-        },
-        {
-          "type": "GainKeyword",
-          "value": {
-            "type": "Landwalk",
-            "value": {
-              "type": "HasCardType",
-              "value": {
-                "type": "Artifact"
-              }
-            }
-          }
         }
-      ]
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Equipment"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Equipment"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

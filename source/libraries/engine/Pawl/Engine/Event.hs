@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
-import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
 import Pawl.Types.DamageEvent (DamageEvent)
@@ -33,6 +32,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -289,7 +289,18 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- control until a CR 616.1b replacement says otherwise --
               -- Replacement.runEntry is the only writer. `chosenColor` and
               -- `chosenSubtype` are reset for the same reason (CR 614.1c).
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.timestamp = ts}
+              --
+              -- `face` is cleared under CR 400.7 as well, which is right for the
+              -- one layout that ships: whichever half CR 709.3b singled out
+              -- belonged only to the incarnation that left, and CR 709.4 gives
+              -- the split card its two halves combined everywhere but the stack.
+              -- It is NOT right in general -- CR 712.13: "a resolving
+              -- double-faced spell that becomes a permanent is put onto the
+              -- battlefield with the same face up that was face up on the
+              -- stack", so a stack-to-battlefield move must CARRY the face
+              -- rather than drop it. Not implemented; no double-faced card is in
+              -- the pool to reach it (#657).
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.timestamp = ts, Object.face = Nothing}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -455,12 +466,12 @@ counter source controller oid = do
   case Game.lookupObject oid gs of
     Nothing -> pure ()
     -- CR 608.2n, reached before the CR 113.6g gate because that gate asks about a
-    -- spell's own card and an ability has none -- Game.cardOf answers Nothing for
+    -- spell's own card and an ability has none -- Game.faceOf answers Nothing for
     -- one, so asking first would fall through to the graveyard move by accident.
     -- An ability of a source that "can't be countered" is uncovered either way,
     -- that clause being about the spell (#542).
     Just _ | Game.isAbility oid gs -> State.modify' (Game.cease oid)
-    Just _ -> case fmap Card.counterability (Game.cardOf oid gs) of
+    Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure ()
       _ -> do
         moved <- changeZoneReturning oid Zone.Graveyard
@@ -568,7 +579,8 @@ createTokens controller card n tapped = do
                     Object.attachedTo = Nothing,
                     Object.chosenColor = Nothing,
                     Object.chosenSubtype = Nothing,
-                    Object.timestamp = ts
+                    Object.timestamp = ts,
+                    Object.face = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids
@@ -1301,9 +1313,9 @@ eventTriggers events gs =
       cycledCard event = case event of
         GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> case Game.lookupObject oid gs of
           Nothing -> Map.empty
-          Just obj -> case Game.cardOf oid gs of
+          Just obj -> case Game.faceOf oid gs of
             Nothing -> Map.empty
-            Just card -> Map.singleton oid (Object.owner obj, Card.triggeredAbilities card)
+            Just face -> Map.singleton oid (Object.owner obj, Face.triggeredAbilities face)
         GameEvent.Discarded _ _ DiscardCause.Ordinary -> Map.empty
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
@@ -1334,9 +1346,9 @@ eventTriggers events gs =
       -- sentence governs and this live read is the game as it stands. A card that
       -- arrives in a graveyard and is gone again before the boundary is lost
       -- (#349).
-      graveyardCandidate oid = case (Game.lookupObject oid gs, Game.cardOf oid gs) of
-        (Just obj, Just card) ->
-          case filter (functionsInGraveyard . TriggeredAbility.condition) (Card.triggeredAbilities card) of
+      graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+        (Just obj, Just face) ->
+          case filter (functionsInGraveyard . TriggeredAbility.condition) (Face.triggeredAbilities face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing

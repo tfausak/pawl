@@ -11,7 +11,6 @@ module Pawl.PowerToughnessSpec where
 import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -23,10 +22,10 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
@@ -44,7 +43,7 @@ import qualified Pawl.Types.Zone as Zone
 leechesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
 leechesOnBattlefield gs = filter isLeech (Set.toList (GameState.battlefield gs))
   where
-    isLeech oid = maybe False (\c -> Card.Type.name c == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.cardOf oid gs)
+    isLeech oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.faceOf oid gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
@@ -97,7 +96,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     let base = S.landsInPlay forest 1
         (goyfId, board) = S.addCreature tarmogoyf S.alice base
         (gs, fogId) = S.handOne fog board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice fogId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice fogId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "before: no card types in any graveyard, so 0 power" (Projection.powerOf goyfId board) (Just 0)
     Spec.assertEqWith s "before: 0+1 toughness" (Projection.toughnessOf goyfId board) (Just 1)
@@ -174,12 +173,12 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         (ggId, h2) = S.addHandCard giantGrowth S.alice h1
         (_, gs) = S.addHandCard forest S.alice h2
         -- Casting Inner Calm moves it from hand to the stack, leaving two.
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice icId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice icId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- Now the hand shrinks. Giant Growth is only CAST, not resolved, so it
         -- contributes no pump of its own -- the only thing that changed is the
         -- number Inner Calm counted.
-        shrunk = snd (Engine.runGamePure S.identityAnswer after (Cast.castSpell S.alice ggId))
+        shrunk = snd (Engine.runGamePure S.identityAnswer after (S.cast S.alice ggId))
     Spec.assertEqWith s "two cards left in hand at resolution" (S.handSize S.alice after) 2
     Spec.assertEqWith s "the 2/1 Piker is pumped to 4" (Projection.powerOf pikerId after) (Just 4)
     Spec.assertEqWith s "and to 3 toughness" (Projection.toughnessOf pikerId after) (Just 3)
@@ -224,7 +223,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         (h1, icId) = S.handOne innerCalm board
         (_, h2) = S.addHandCard giantGrowth S.alice h1
         (_, gs) = S.addHandCard forest S.alice h2
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice icId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice icId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "bob holds nothing" (S.handSize S.bob after) 0
     Spec.assertEqWith s "the pump is alice's two, not bob's zero" (Projection.powerOf bobsPiker after) (Just 4)
@@ -246,7 +245,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         (_, g2) = S.addGraveyardCard piker S.alice g1
         (goyfId, board) = S.addCreature tarmogoyf S.alice g2
         (gs, tiId) = S.handOne twistedImage board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice tiId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice tiId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "before: a 2/3" (Projection.powerOf goyfId board) (Just 2)
     Spec.assertEqWith s "before: toughness 3" (Projection.toughnessOf goyfId board) (Just 3)
@@ -270,7 +269,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         (_, g2) = S.addGraveyardCard piker S.alice g1
         (goyfId, board) = S.addCreature tarmogoyf S.alice g2
         (gs, tiId) = S.handOne twistedImage board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice tiId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice tiId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         (_, later) = S.addGraveyardCard divination S.bob after
     Spec.assertEqWith s "a third card type: 3/4 switched is 4/3, power" (Projection.powerOf goyfId later) (Just 4)
@@ -333,7 +332,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         (_, g4) = S.addLibraryCard forest S.alice g3
         board = S.markDamage goyfId 2 g4
         (gs, tiId) = S.handOne twistedImage board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice tiId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice tiId))
         after = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
     Spec.assertBool s (Set.member goyfId (GameState.battlefield board)) "the 2/3 with 2 damage was alive"
     Spec.assertBool s (not (Set.member goyfId (GameState.battlefield after))) "the switched 3/2 with 2 damage is dead"
@@ -528,7 +527,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     leech <- S.printingOf s registry "Monstrous War-Leech"
     let base = S.landsInPlay swamp 4
         (gs, leechId) = S.handOne leech base
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice leechId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leechId))
         settled = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
     Spec.assertEqWith s "the spell left the stack" (GameState.stack settled) []
     Spec.assertEqWith s "no Leech on the battlefield" (leechesOnBattlefield settled) []

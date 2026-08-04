@@ -1,63 +1,67 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Leyline of the Void",
-  "openingHandAction": [
-    {
-      "type": "MoveToZone",
-      "value": [
-        "self",
+      "manaCost": [
         {
-          "type": "Battlefield"
-        }
-      ]
-    }
-  ],
-  "replacementEffects": [
-    {
-      "type": "ZoneChangeR",
-      "value": [
+          "type": "Generic",
+          "value": 2
+        },
         {
-          "whenDestination": {
-            "type": "Graveyard"
-          },
-          "whoseObject": {
-            "type": "Opponents"
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
           }
         },
         {
-          "type": "Exile"
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+      ],
+      "name": "Leyline of the Void",
+      "openingHandAction": [
+        {
+          "type": "MoveToZone",
+          "value": [
+            "self",
+            {
+              "type": "Battlefield"
+            }
+          ]
+        }
+      ],
+      "replacementEffects": [
+        {
+          "type": "ZoneChangeR",
+          "value": [
+            {
+              "whenDestination": {
+                "type": "Graveyard"
+              },
+              "whoseObject": {
+                "type": "Opponents"
+              }
+            },
+            {
+              "type": "Exile"
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

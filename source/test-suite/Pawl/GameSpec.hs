@@ -16,7 +16,6 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
@@ -50,6 +49,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -172,7 +172,10 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.chosenSubtype = Nothing,
               -- changeZone draws a fresh timestamp; oneMountainState's
               -- nextTimestamp starts at 1 (object 0 already holds 0).
-              Object.timestamp = Timestamp.MkTimestamp 1
+              Object.timestamp = Timestamp.MkTimestamp 1,
+              -- CR 400.7: changeZone clears any singled-out face along with
+              -- every other per-incarnation field.
+              Object.face = Nothing
             }
       )
 
@@ -213,7 +216,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
 
   Spec.it s "a vanilla printing declares no static abilities" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    Spec.assertEqWith s "empty" (Card.Type.staticAbilities (Printing.card piker)) []
+    Spec.assertEqWith s "empty" (Face.staticAbilities (S.combinedFace piker)) []
 
 actionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 actionSpec s registry = Spec.describe s "Action" $ do
@@ -340,7 +343,7 @@ recordingAnswer p = case p of
   Prompt.ChooseAction _ pid actions -> do
     State.modify' (\asked -> asked <> [pid])
     let isCast a = case a of
-          A.Cast _ -> True
+          A.Cast {} -> True
           _ -> False
     pure $ case filter isCast actions of
       h : _ -> h
@@ -394,7 +397,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
         steps = do
-          Cast.castSpell S.alice oid
+          S.cast S.alice oid
           Engine.priorityLoop
         after = snd (Engine.runGamePure S.identityAnswer gs steps)
     Spec.assertEqWith s "stack emptied" (length (GameState.stack after)) 0
@@ -990,9 +993,9 @@ declareAttackersAskAnswer p = case p of
 -- group-local helpers (CostSpec, ActivateSpec, ReplacementSpec each carry
 -- their own).
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.combinedFace p)) ActivationTiming.AnyTime
 
 -- Records every player asked Prompt.Concede, in order -- the
 -- concedeOrderAnswer shape -- and drives alice through exactly one Activate
@@ -1443,15 +1446,16 @@ handBobBolt lightningBolt gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
 namedIs :: CardName.CardName -> Maybe Object.Object -> Bool
 namedIs wanted mo = case mo of
   Just o -> case Object.source o of
-    Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
-    Source.OfToken card -> Card.Type.name card == wanted
+    Source.OfCard printing -> Face.name (S.combinedFace printing) == wanted
+    Source.OfToken card -> S.nameOf card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
     Source.OfEmblem _ -> False
@@ -1582,7 +1586,7 @@ pickPlayerRecipient candidates =
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of
-  A.Cast _ -> True
+  A.Cast {} -> True
   _ -> False
 
 -- Is this a legal-action Activate? On the gate board (a Mindslaver plus basic
@@ -1759,7 +1763,8 @@ restartOnStack mountain =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
-            Object.timestamp = ts
+            Object.timestamp = ts,
+            Object.face = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),
@@ -1919,7 +1924,7 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     curse <- S.printingOf s registry "Curse of Death's Hold"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs0, ggId) = S.handOne giantGrowth withPiker
-        cast = S.runPure S.identityAnswer gs0 (Cast.castSpell S.alice ggId)
+        cast = S.runPure S.identityAnswer gs0 (S.cast S.alice ggId)
         pumped = S.runPure S.identityAnswer cast Stack.resolveTop
         (curseId, withCurse) = S.addCreature curse S.bob pumped
         atCleanup =

@@ -1,127 +1,131 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Baral, Chief of Compliance",
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "ReduceSpellCost",
-        "value": [
-          {
-            "type": "Or",
+      ],
+      "name": "Baral, Chief of Compliance",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceSpellCost",
             "value": [
               {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Instant"
-                }
-              },
-              {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Sorcery"
-                }
-              }
-            ]
-          },
-          [
-            {
-              "type": "Generic",
-              "value": 1
-            }
-          ]
-        ]
-      },
-      "scope": {
-        "type": "You"
-      }
-    }
-  ],
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SpellOrAbilityCounters",
-        "value": {
-          "type": "You"
-        }
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
-              {
-                "type": "Draw",
+                "type": "Or",
                 "value": [
                   {
-                    "type": "Relative",
+                    "type": "HasCardType",
                     "value": {
-                      "type": "You"
+                      "type": "Instant"
                     }
                   },
                   {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Sorcery"
+                    }
                   }
                 ]
               },
-              {
-                "type": "Discard",
-                "value": [
-                  "you",
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                ]
-              }
-            ],
-            "optionality": {
-              "type": "Optional"
+              [
+                {
+                  "type": "Generic",
+                  "value": 1
+                }
+              ]
+            ]
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SpellOrAbilityCounters",
+            "value": {
+              "type": "You"
             }
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Discard",
+                    "value": [
+                      "you",
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ],
+                "optionality": {
+                  "type": "Optional"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Wizard"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Human"
-      },
-      {
-        "type": "Wizard"
-      }
-    ],
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

@@ -1,59 +1,63 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Relentless Assault",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Untap",
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "AttackedThisTurn"
+              "type": "Red"
             }
-          },
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Relentless Assault",
+      "spell": {
+        "modes": [
           {
-            "type": "AddPhases",
-            "value": [
+            "effects": [
               {
-                "type": "ExtraCombat"
+                "type": "Untap",
+                "value": {
+                  "type": "AttackedThisTurn"
+                }
               },
               {
-                "type": "ExtraMain"
+                "type": "AddPhases",
+                "value": [
+                  {
+                    "type": "ExtraCombat"
+                  },
+                  {
+                    "type": "ExtraMain"
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -1,37 +1,41 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Indestructible"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    }
-  ],
-  "name": "Darksteel Myr",
-  "power": {
-    "type": "Literal",
-    "value": 0
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Myr"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
+      "keywords": [
+        {
+          "type": "Indestructible"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "name": "Darksteel Myr",
+      "power": {
+        "type": "Literal",
+        "value": 0
       },
-      {
-        "type": "Creature"
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Myr"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }
