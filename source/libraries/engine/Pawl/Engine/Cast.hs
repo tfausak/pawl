@@ -608,8 +608,10 @@ castProposed pid sid card castFrom candidates before = do
   let decider = Decide.deciderFor pid gs
       modal = Card.Type.spell card
       legal = Target.fillableModes (Just pid) sid (Card.enchantSpecs card) modal gs
-      -- CR 601.2: "the game returns to the moment before the casting of that
-      -- spell was proposed" -- which is the state before CR 601.2a's move.
+      -- CR 601.2e: "If the proposed spell is illegal, the game returns to the
+      -- moment before the casting of that spell was proposed" -- which is the
+      -- state before CR 601.2a's move. CR 601.6 says the same for a permission
+      -- lost after the proposal completes.
       reject :: Game ()
       reject = State.put before
   -- CR 702.42a: entwine, asked FIRST -- before the mode choice CR 601.2b lists
