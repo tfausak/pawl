@@ -678,16 +678,19 @@ CR 709.3 and 709.3a: the choice precedes the move to the stack, and only the cho
 
 - [ ] **Step 1: Write the failing test**
 
-```haskell
-  Spec.it s "CR 709.3a both halves are offered, each priced from its own half" $ do
-    waxWane <- S.printingOf s registry "Wax // Wane"
-    forest <- S.printingOf s registry "Forest"
-    let (gs0, _) = S.handOne waxWane (S.landsInPlay forest 1)
-        names = [n | Action.Cast _ n <- Action.legalActions S.alice gs0]
-    -- One Forest pays Wax's {G} and cannot pay Wane's {W}, so the two halves
-    -- are separately gated: CR 709.3a evaluates only the chosen half.
-    Spec.assertEqWith s "only the affordable half" names [CardName.MkCardName (Text.pack "Wax")]
-```
+Use `Pawl.CardSpec`'s hand-built `splitCard` fixture (Wax `{G}` / Wane `{W}`), not a
+registry lookup: `data/cards/wax-wane.json` and the registry name-check fix are
+both Task 5, so a real-card test cannot compile here. Task 5's real-card cases
+prove the *card*; this one proves the *mechanism*.
+
+**Whatever board you build, give each half a legal target.** `castable` ends in
+`targetable`, so on a board of lands alone Wax (targets a creature) and Wane
+(targets an enchantment) are both untargetable and the offered list is empty —
+an earlier draft of this step asserted `["Wax"]` against exactly that board and
+would have failed for a reason unrelated to what it was testing. Put a creature
+and an enchantment on the battlefield, then vary the *mana* to separate the two
+halves, since paying `{G}` but not `{W}` is what makes CR 709.3a's per-half
+evaluation observable.
 
 - [ ] **Step 2: Run it and confirm it fails**
 
@@ -813,6 +816,26 @@ Model the fixture on `giantGrowthOnPiker` at `source/test-suite/Pawl/ProjectionS
 ```
 
 Then, in the same group: casting Wane destroys a targeted enchantment (`S.addCreature`'s sibling for an enchantment plus `S.onBattlefield` to assert it left); the card in a graveyard is green and white with mana value 2 (CR 709.4b, via `S.addGraveyardCard` and `Projection.printedColorsOf`); and the Wax on the stack projects the name "Wax" while the card in hand projects "Wax//Wane" (CR 709.3b against CR 709.4).
+
+Add one more, the real-card counterpart of Task 4's mechanism test — this is the CR 709.3a proof with the actual printed card, which Task 4 could only assert against a fixture:
+
+```haskell
+  Spec.it s "CR 709.3a each half is offered and gated on its own" $ do
+    waxWane <- S.printingOf s registry "Wax // Wane"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    -- Both halves need a legal target or `targetable` gates them BOTH out and
+    -- the list is empty for a reason that has nothing to do with mana. Wax wants
+    -- a creature; Wane wants an enchantment.
+    let board = <a Piker and an enchantment on the battlefield, one Forest untapped>
+        (gs, _) = S.handOne waxWane board
+        offered = [n | Action.Cast _ n <- Action.legalActions S.alice gs]
+    -- One Forest pays Wax's {G} and cannot pay Wane's {W}: only the chosen half
+    -- is evaluated to see if it can be cast.
+    Spec.assertEqWith s "only the affordable half" offered [CardName.MkCardName (Text.pack "Wax")]
+```
+
+Pick the enchantment from the pool rather than inventing one, and add a Plains-and-Forest variant asserting **both** names are offered when both halves are payable — a test that only ever sees one name offered cannot distinguish "each half gated on its own" from "the first face wins".
 
 - [ ] **Step 5b: Discharge the anti-vacuity guard owed by Task 2**
 
