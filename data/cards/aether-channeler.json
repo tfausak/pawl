@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -22,20 +19,6 @@
     "type": "Literal",
     "value": 3
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 3
@@ -57,45 +40,26 @@
                     "value": 1
                   },
                   {
-                    "activatedAbilities": [],
-                    "castingPermissions": [],
                     "keywords": [
                       {
                         "type": "Flying"
                       }
                     ],
-                    "manaCost": null,
                     "name": "Bird Token",
                     "power": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "replacementEffects": [],
-                    "spell": {
-                      "modes": [
-                        {
-                          "effects": [],
-                          "targetSpecs": []
-                        }
-                      ],
-                      "selection": {
-                        "type": "ChooseExactly",
-                        "value": 1
-                      }
-                    },
-                    "staticAbilities": [],
                     "toughness": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "triggeredAbilities": [],
                     "typeLine": {
                       "subtypes": [
                         {
                           "type": "Bird"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -105,8 +69,7 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           },
           {
             "effects": [
@@ -168,14 +131,9 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
@@ -188,7 +146,6 @@
         "type": "Wizard"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

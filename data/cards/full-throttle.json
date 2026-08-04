@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "delayedAbilities": [
     {
       "ability": {
@@ -28,20 +26,14 @@
                     "type": "AttackedThisTurn"
                   }
                 }
-              ],
-              "targetSpecs": []
+              ]
             }
-          ],
-          "selection": {
-            "type": "ChooseExactly",
-            "value": 1
-          }
+          ]
         }
       },
       "name": "each combat"
     }
   ],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -67,8 +59,6 @@
     }
   ],
   "name": "Full Throttle",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -93,21 +83,11 @@
               }
             ]
           }
-        ],
-        "targetSpecs": []
+        ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Sorcery"

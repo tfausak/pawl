@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.AttackRequirementSpec where
 
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
@@ -19,4 +21,4 @@ spec s =
       AttackRequirement.toJson
       AttackRequirement.fromJson
       (AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature)))
-      "{\"subject\":{\"type\":\"AttachedPlayerControls\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}"
+      """ {"subject":{"type":"AttachedPlayerControls","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """

@@ -20,10 +20,10 @@ import qualified Pawl.Types.Count as Count
 -- its own arm like the rest, and a Count is just the payload.
 toJson :: (q -> Value.Value) -> Count.Count q -> Value.Value
 toJson codec count =
-  Common.object
-    [ Common.pair "scope" . Scope.toJson $ Count.scope count,
-      Common.pair "filter" . Filter.toJson Keyword.toJson $ Count.filter count,
-      Common.pair "aggregation" . Aggregation.toJson codec $ Count.aggregation count
+  Common.object . concat $
+    [ Common.requiredPair "scope" Scope.toJson (Count.scope count),
+      Common.requiredPair "filter" (Filter.toJson Keyword.toJson) (Count.filter count),
+      Common.requiredPair "aggregation" (Aggregation.toJson codec) (Count.aggregation count)
     ]
 
 fromJson :: (Value.Value -> Either Text.Text q) -> Value.Value -> Either Text.Text (Count.Count q)

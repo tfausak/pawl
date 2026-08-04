@@ -22,14 +22,9 @@
                   }
                 }
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     },
     {
@@ -77,38 +72,12 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
-  "manaCost": null,
   "name": "Labyrinth of Skophos",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Land"

@@ -16,9 +16,9 @@ import qualified Pawl.Types.AttackCost as AttackCost
 toJson :: AttackCost.AttackCost -> Value.Value
 toJson ac =
   Common.object
-    [ Common.pair "subject" (Affected.toJson (AttackCost.subject ac)),
-      Common.pair "perAttacker" (ManaCost.toJson (AttackCost.perAttacker ac))
-    ]
+    ( Common.requiredPair "subject" Affected.toJson (AttackCost.subject ac)
+        <> Common.requiredPair "perAttacker" ManaCost.toJson (AttackCost.perAttacker ac)
+    )
 
 fromJson :: Value.Value -> Either Text.Text AttackCost.AttackCost
 fromJson value = do

@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "delayedAbilities": [
     {
       "ability": {
@@ -37,14 +35,9 @@
                     }
                   ]
                 }
-              ],
-              "targetSpecs": []
+              ]
             }
-          ],
-          "selection": {
-            "type": "ChooseExactly",
-            "value": 1
-          }
+          ]
         }
       },
       "name": "return it"
@@ -90,20 +83,6 @@
     "type": "Literal",
     "value": 5
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 9
@@ -140,14 +119,9 @@
                   null
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
@@ -157,7 +131,6 @@
         "type": "Turtle"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

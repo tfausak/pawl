@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,22 +15,6 @@
     }
   ],
   "name": "Megrim",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {
@@ -56,20 +37,13 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Enchantment"

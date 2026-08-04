@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.LoyaltySpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -8,4 +10,9 @@ import qualified Pawl.Types.Loyalty as Loyalty
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.Loyalty" . Spec.it s "MkLoyalty" $
-    Common.assertJsonCodec s Loyalty.toJson Loyalty.fromJson (Loyalty.MkLoyalty 3) "3"
+    Common.assertJsonCodec
+      s
+      Loyalty.toJson
+      Loyalty.fromJson
+      (Loyalty.MkLoyalty 3)
+      """ 3 """

@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Hexproof"
@@ -30,32 +28,16 @@
     "type": "Literal",
     "value": 1
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 1
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
         "type": "Beast"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

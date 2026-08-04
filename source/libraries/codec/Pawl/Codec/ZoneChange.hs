@@ -9,11 +9,11 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 
 toJson :: ZoneChange.ZoneChange -> Value.Value
 toJson zc =
-  Common.object
-    [ Common.pair "departed" . ObjectId.toJson $ ZoneChange.departed zc,
-      Common.pair "object" . ObjectId.toJson $ ZoneChange.object zc,
-      Common.pair "from" . Zone.toJson $ ZoneChange.from zc,
-      Common.pair "to" . Zone.toJson $ ZoneChange.to zc
+  Common.object . concat $
+    [ Common.requiredPair "departed" ObjectId.toJson (ZoneChange.departed zc),
+      Common.requiredPair "object" ObjectId.toJson (ZoneChange.object zc),
+      Common.requiredPair "from" Zone.toJson (ZoneChange.from zc),
+      Common.requiredPair "to" Zone.toJson (ZoneChange.to zc)
     ]
 
 fromJson :: Value.Value -> Either Text.Text ZoneChange.ZoneChange

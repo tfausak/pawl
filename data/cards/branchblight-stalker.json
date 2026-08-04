@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Toxic",
@@ -27,25 +25,10 @@
     "type": "Literal",
     "value": 3
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 1
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
@@ -58,7 +41,6 @@
         "type": "Scout"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

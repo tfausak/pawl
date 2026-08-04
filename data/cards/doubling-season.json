@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,7 +15,6 @@
     }
   ],
   "name": "Doubling Season",
-  "power": null,
   "replacementEffects": [
     {
       "type": "TokenR",
@@ -42,7 +38,6 @@
             "type": "And",
             "value": []
           },
-          "whichKind": null,
           "whose": {
             "type": "Yours"
           }
@@ -54,24 +49,7 @@
       ]
     }
   ],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Enchantment"

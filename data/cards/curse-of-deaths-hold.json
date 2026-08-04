@@ -1,12 +1,9 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "enchant": {
     "pool": {
       "type": "Players"
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -32,20 +29,6 @@
     }
   ],
   "name": "Curse of Death's Hold",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -74,8 +57,6 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
@@ -85,7 +66,6 @@
         "type": "Curse"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Enchantment"

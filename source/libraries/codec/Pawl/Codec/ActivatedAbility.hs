@@ -10,26 +10,27 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 
-toJson :: (card -> Value.Value) -> ActivatedAbility.ActivatedAbility card -> Value.Value
+-- | CR 117.1b: "A player may activate an activated ability any time they have
+-- priority" -- the unrestricted case, and every ability without a timing rider
+-- means exactly that (CR 307.5's restricted case is a narrower carve-out).
+defaultTiming :: ActivationTiming.ActivationTiming
+defaultTiming = ActivationTiming.AnyTime
+
+toJson :: (Eq card) => (card -> Value.Value) -> ActivatedAbility.ActivatedAbility card -> Value.Value
 toJson codec aa =
-  Common.object $
-    [ Common.pair "cost" (Cost.toJson Keyword.toJson (ActivatedAbility.cost aa)),
-      Common.pair "modal" (Modal.toJson codec (ActivatedAbility.modal aa))
-    ]
-      -- CR 307.5: emitted only for a restricted ability, so the absence of the
-      -- key means "no timing rider" -- the same optional-field shape Card.enchant
-      -- takes, and it leaves every card without one byte-identical.
-      <> ( case ActivatedAbility.timing aa of
-             ActivationTiming.AnyTime -> []
-             _ -> [Common.pair "timing" (ActivationTiming.toJson (ActivatedAbility.timing aa))]
-         )
+  Common.object
+    ( Common.requiredPair "cost" (Cost.toJson Keyword.toJson) (ActivatedAbility.cost aa)
+        <> Common.requiredPair "modal" (Modal.toJson codec) (ActivatedAbility.modal aa)
+        -- CR 307.5: emitted only for a restricted ability, so the absence of the
+        -- key means "no timing rider" -- the same optional-field shape Card.enchant
+        -- takes, and it leaves every card without one byte-identical.
+        <> Common.optionalPair "timing" defaultTiming ActivationTiming.toJson (ActivatedAbility.timing aa)
+    )
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility card)
 fromJson decode value = do
   ps <- Common.asObject value
   c <- Common.field "cost" ps >>= Cost.fromJson Keyword.fromJson
   m <- Common.field "modal" ps >>= Modal.fromJson decode
-  t <- case Common.optionalField "timing" ps of
-    Nothing -> pure ActivationTiming.AnyTime
-    Just v -> ActivationTiming.fromJson v
+  t <- Common.defaultedField "timing" defaultTiming ActivationTiming.fromJson ps
   pure (ActivatedAbility.MkActivatedAbility c m t)

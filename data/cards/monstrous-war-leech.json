@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "characteristicPT": {
     "type": "Count",
     "value": {
@@ -30,7 +28,6 @@
       }
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -50,24 +47,9 @@
   "power": {
     "type": "Star"
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Star"
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
@@ -77,7 +59,6 @@
         "type": "Leech"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

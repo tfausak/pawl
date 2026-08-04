@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CastingPermissionSpec where
 
 import qualified Pawl.Codec.CastingPermission as CastingPermission
@@ -13,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.CastingPermission" $ do
       CastingPermission.toJson
       CastingPermission.fromJson
       CastingPermission.CastFromLibraryWhileSearching
-      "{\"type\":\"CastFromLibraryWhileSearching\"}"
+      """ {"type":"CastFromLibraryWhileSearching"} """
   Spec.it s "CastFromGraveyard" $
     Common.assertJsonCodec
       s
       CastingPermission.toJson
       CastingPermission.fromJson
       CastingPermission.CastFromGraveyard
-      "{\"type\":\"CastFromGraveyard\"}"
+      """ {"type":"CastFromGraveyard"} """

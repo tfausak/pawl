@@ -10,14 +10,6 @@ toJson c = Common.nullary $ case c of
   Counterability.Counterable -> "Counterable"
   Counterability.CantBeCountered -> "CantBeCountered"
 
--- | Absent means Counterable (CR 113.6g is printed text: a card either says it
--- or does not), the shape 'Common.decodeBooleanDefault' gives the other
--- defaulted keys.
-fromJsonDefault :: Value.Value -> Either Text.Text Counterability.Counterability
-fromJsonDefault value = case value of
-  Value.Null _ -> Right Counterability.Counterable
-  _ -> fromJson value
-
 fromJson :: Value.Value -> Either Text.Text Counterability.Counterability
 fromJson =
   Common.decodeNullary

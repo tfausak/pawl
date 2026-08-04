@@ -86,3 +86,71 @@ spec s = Spec.describe s "Pawl.Codec.Common" $ do
   Spec.describe s "assertToJson"
     . Spec.it s "ignores object key order"
     $ Common.assertToJson s id (Common.object [Common.pair "b" (Common.integer 1), Common.pair "a" (Common.integer 2)]) "{\"a\":2,\"b\":1}"
+
+  Spec.describe s "optionalPair" $ do
+    Spec.it s "omits a field equal to its default" $
+      Spec.assertEq s (Common.optionalPair "k" (0 :: Integer) Common.integer 0) []
+    Spec.it s "writes a field differing from its default" $
+      Spec.assertEq s (Common.optionalPair "k" (0 :: Integer) Common.integer 1) [Common.pair "k" (Common.integer 1)]
+    -- The default is not required to be the type's zero: R2 of the omit-defaults
+    -- design's enum defaults are ordinary values, and a field equal to one of
+    -- those is the omitted case.
+    Spec.it s "omits a non-zero default" $
+      Spec.assertEq s (Common.optionalPair "k" (7 :: Integer) Common.integer 7) []
+
+  Spec.describe s "requiredPair"
+    . Spec.it s "always writes the field"
+    $ Spec.assertEq s (Common.requiredPair "k" Common.integer (0 :: Integer)) [Common.pair "k" (Common.integer 0)]
+
+  Spec.describe s "defaultedField" $ do
+    Spec.it s "supplies the default for an absent key" $
+      Spec.assertEq s (Common.defaultedField "k" (0 :: Integer) Common.asInteger []) (Right 0)
+    Spec.it s "decodes a present key" $
+      Spec.assertEq s (Common.defaultedField "k" (0 :: Integer) Common.asInteger [Common.pair "k" (Common.integer 1)]) (Right 1)
+    -- R7 of the omit-defaults design: a present null goes to the decoder rather
+    -- than short-circuiting to the default, which is what lets decodeMaybe keep
+    -- accepting an explicit null.
+    Spec.it s "hands a present null to the decoder" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" (Just (1 :: Integer)) (Common.decodeMaybe Common.asInteger) [Common.pair "k" Common.null])
+        (Right Nothing)
+    -- The round trip the two halves have to agree on, stated once here so the
+    -- per-codec cases in Task 11 are checking a property this pins down. What
+    -- this actually asserts reduces to the same thing as the case above it --
+    -- 'optionalPair' elides a field equal to its default, so 'defaultedField'
+    -- sees an absent key and supplies that same default back.
+    Spec.it s "supplies the default when optionalPair elides the field" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" (7 :: Integer) Common.asInteger (Common.optionalPair "k" 7 Common.integer 7))
+        (Right 7)
+
+  Spec.describe s "defaultedField accepts the verbose form" $ do
+    -- The key is PRESENT here, so 'defaultedField' hands the value straight to
+    -- the decoder rather than consulting its default argument; the result
+    -- equals the default only because 'decodeMaybe' reads an explicit null as
+    -- Nothing on its own.
+    Spec.it s "an explicit null decodes to Nothing via decodeMaybe, not via the default" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" Nothing (Common.decodeMaybe Common.asInteger) [Common.pair "k" Common.null])
+        (Right (Nothing :: Maybe Integer))
+    -- Same shape: the key is present, so this exercises 'decodeList' on an
+    -- explicit empty array, not the default argument.
+    Spec.it s "an explicit empty array decodes to [] via decodeList, not via the default" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Common.pair "k" (Common.array [])])
+        (Right ([] :: [Integer]))
+    -- R7 of the omit-defaults design's narrowing, pinned so it cannot drift back
+    -- by accident: an explicit
+    -- null on a NON-Maybe defaulted field is an error, not the default. It used
+    -- to be the default only because `nullableField` spelled an absent key as
+    -- null; `defaultedField` reads absence directly, so a file that says
+    -- `"keywords": null` is malformed rather than empty.
+    Spec.it s "an explicit null on a non-Maybe defaulted field is an error" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Common.pair "k" Common.null]))
+        "expected a decode failure"

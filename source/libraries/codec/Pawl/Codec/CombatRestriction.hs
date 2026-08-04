@@ -30,9 +30,10 @@ toJson cr = case cr of
 -- Pacifism's two arms are the ones that do not say it.
 payload :: Affected.Type.Affected -> Maybe Condition.Type.Condition -> Value.Value
 payload a c =
-  Common.object $
-    Common.pair "affected" (Affected.toJson a)
-      : foldMap (\condition -> [Common.pair "unless" (Condition.toJson condition)]) c
+  Common.object
+    ( Common.requiredPair "affected" Affected.toJson a
+        <> Common.optionalPair "unless" Nothing (Common.encodeMaybe Condition.toJson) c
+    )
 
 fromJson :: Value.Value -> Either Text.Text CombatRestriction.CombatRestriction
 fromJson value = do
@@ -49,5 +50,5 @@ payloadFromJson ::
 payloadFromJson mk value = do
   ps <- Common.asObject value
   a <- Common.field "affected" ps >>= Affected.fromJson
-  c <- traverse Condition.fromJson (Common.optionalField "unless" ps)
+  c <- Common.defaultedField "unless" Nothing (Common.decodeMaybe Condition.fromJson) ps
   pure $ mk a c

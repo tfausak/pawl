@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PhaseSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -16,22 +18,32 @@ spec s = Spec.describe s "Pawl.Codec.Phase" $ do
       Phase.toJson
       Phase.fromJson
       (Phase.Beginning BeginningStep.Upkeep)
-      "{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}}"
+      """ {"type":"Beginning","value":{"type":"Upkeep"}} """
   Spec.it s "PrecombatMain" $
-    Common.assertJsonCodec s Phase.toJson Phase.fromJson Phase.PrecombatMain "{\"type\":\"PrecombatMain\"}"
+    Common.assertJsonCodec
+      s
+      Phase.toJson
+      Phase.fromJson
+      Phase.PrecombatMain
+      """ {"type":"PrecombatMain"} """
   Spec.it s "Combat" $
     Common.assertJsonCodec
       s
       Phase.toJson
       Phase.fromJson
       (Phase.Combat CombatStep.DeclareBlockers)
-      "{\"type\":\"Combat\",\"value\":{\"type\":\"DeclareBlockers\"}}"
+      """ {"type":"Combat","value":{"type":"DeclareBlockers"}} """
   Spec.it s "PostcombatMain" $
-    Common.assertJsonCodec s Phase.toJson Phase.fromJson Phase.PostcombatMain "{\"type\":\"PostcombatMain\"}"
+    Common.assertJsonCodec
+      s
+      Phase.toJson
+      Phase.fromJson
+      Phase.PostcombatMain
+      """ {"type":"PostcombatMain"} """
   Spec.it s "Ending" $
     Common.assertJsonCodec
       s
       Phase.toJson
       Phase.fromJson
       (Phase.Ending EndingStep.EndStep)
-      "{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}}"
+      """ {"type":"Ending","value":{"type":"EndStep"}} """

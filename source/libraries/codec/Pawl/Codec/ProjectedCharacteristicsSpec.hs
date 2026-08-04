@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ProjectedCharacteristicsSpec where
 
 import qualified Data.Map.Strict as Map
@@ -15,16 +17,20 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
--- | R7's one case for MkProjectedCharacteristics's single constructor. Every
--- field is a REQUIRED key here (unlike Card's defaulted/elided ones) -- the
--- encoder writes JSON null rather than omitting the key for an absent Maybe --
--- so one populated fixture, with every collection given at least one element
--- and 'power'/'toughness' set but 'loyalty'/'characteristicPT' left at their
+-- | R7's one case for MkProjectedCharacteristics's single constructor. `name`
+-- and `cardTypes` are the only required keys; every other field is omitted
+-- from the JSON when it is at its default (Common.optionalPair/defaultedField).
+-- One populated fixture, with every collection given at least one element and
+-- 'power'/'toughness' set but 'loyalty'/'characteristicPT' left at their
 -- Nothing (a creature has no loyalty and no printed star), exercises the whole
--- shape at once. `triggeredAbilities` reuses 'CardSpec.minimalTriggeredAbility'
--- rather than building a second one by hand; `activatedAbilities` and
--- `replacementEffects` stay empty because ActivatedAbility's and
--- ReplacementEffect's own per-constructor coverage lives in their own XSpecs.
+-- shape at once, including the omission of the still-defaulted keys.
+-- `triggeredAbilities` reuses 'CardSpec.minimalTriggeredAbility' rather than
+-- building a second one by hand; `activatedAbilities` and `replacementEffects`
+-- stay empty (and so omitted) because ActivatedAbility's and
+-- ReplacementEffect's own per-constructor coverage lives in their own XSpecs. A
+-- second fixture, `minimalCharacteristics`, is the counterpart at every field
+-- but the two required ones left at its default, proving the omission side
+-- directly.
 --
 -- No registry here: like Pawl.Codec.CardSpec, this sublibrary sits above
 -- Pawl.Registry and cannot reach a real snapshot. The GameEvent.Moved/Revealed
@@ -56,12 +62,40 @@ testCharacteristics =
 testCharacteristicsJson :: String
 testCharacteristicsJson =
   "{\"name\":\"Test Creature\",\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"type\":\"Flying\"}],"
-    <> "\"colors\":[{\"type\":\"Blue\"}],\"power\":1,\"toughness\":2,\"loyalty\":null,\"characteristicPT\":null,"
-    <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],\"activatedAbilities\":[],"
-    <> "\"replacementEffects\":[],\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}]}"
+    <> "\"colors\":[{\"type\":\"Blue\"}],\"power\":1,\"toughness\":2,"
+    <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
+    <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
+    <> "\"modal\":{\"modes\":[{}]}}]}"
 
-spec :: (Monad m) => Spec.Spec m n -> n ()
-spec s =
-  Spec.describe s "Pawl.Codec.ProjectedCharacteristics" . Spec.it s "MkProjectedCharacteristics, every field populated or explicitly Nothing" $
+-- | Every field but the two required ones ('name', 'cardTypes') at its
+-- default -- the counterpart to 'testCharacteristics' above, which populates
+-- every collection at least once.
+minimalCharacteristics :: PC.ProjectedCharacteristics
+minimalCharacteristics =
+  PC.MkProjectedCharacteristics
+    { PC.name = CardName.MkCardName (Text.pack "Mountain"),
+      PC.supertypes = Set.empty,
+      PC.keywords = Map.empty,
+      PC.colors = Set.empty,
+      PC.power = Nothing,
+      PC.toughness = Nothing,
+      PC.loyalty = Nothing,
+      PC.characteristicPT = Nothing,
+      PC.cardTypes = Set.singleton CardType.Land,
+      PC.subtypes = Set.empty,
+      PC.activatedAbilities = [],
+      PC.replacementEffects = [],
+      PC.triggeredAbilities = []
+    }
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.ProjectedCharacteristics" $ do
+  Spec.it s "MkProjectedCharacteristics, every collection populated, loyalty and characteristicPT omitted at Nothing" $
     Common.assertJsonCodec s PC.toJson PC.fromJson testCharacteristics testCharacteristicsJson
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      PC.toJson
+      PC.fromJson
+      minimalCharacteristics
+      """ {"name":"Mountain","cardTypes":[{"type":"Land"}]} """

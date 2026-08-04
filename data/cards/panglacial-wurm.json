@@ -1,5 +1,4 @@
 {
-  "activatedAbilities": [],
   "castingPermissions": [
     {
       "type": "CastFromLibraryWhileSearching"
@@ -39,28 +38,11 @@
     "type": "Literal",
     "value": 9
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 5
   },
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

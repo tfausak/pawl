@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CounterPatternSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -22,9 +24,11 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.whose = ControllerRelation.Yours,
           CounterPattern.onWhat = Filter.HasCardType CardType.Creature
         }
-      "{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
-  -- Doubling Season: whichKind = Nothing means ANY kind (an explicit JSON
-  -- null), never "no kind" -- and the trivial filter matching every permanent.
+      """ {"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  -- Doubling Season: whichKind = Nothing means ANY kind, never "no kind" -- and
+  -- the trivial filter matching every permanent. The omitted key is what an
+  -- absent whichKind means (R1 of the omit-defaults design), same as an
+  -- explicit JSON null would.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
     Common.assertJsonCodec
       s
@@ -35,4 +39,17 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.whose = ControllerRelation.Yours,
           CounterPattern.onWhat = Filter.And []
         }
-      "{\"whichKind\":null,\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}}"
+      """ {"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}} """
+  -- CR 109.5: whichKind's Nothing and whose's Anyones are both what a pattern
+  -- that says nothing means, so only the required onWhat key survives.
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      CounterPattern.toJson
+      CounterPattern.fromJson
+      CounterPattern.MkCounterPattern
+        { CounterPattern.whichKind = Nothing,
+          CounterPattern.whose = ControllerRelation.Anyones,
+          CounterPattern.onWhat = Filter.And []
+        }
+      """ {"onWhat":{"type":"And","value":[]}} """

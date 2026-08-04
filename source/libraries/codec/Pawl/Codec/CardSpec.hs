@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CardSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -45,6 +47,8 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -75,13 +79,14 @@ minimalTriggeredAbility =
 
 -- | Every required field set to a simple value, and every defaulted/elided
 -- field at its Haskell default (Nothing, empty, or Counterable). Its JSON has
--- none of the sixteen optional keys -- 'baseCardJson' below -- which is what
--- lets the single round-trip assertion in the first test prove BOTH halves of
--- every one of those fields' elision at once: 'Card.toJson' would emit an
--- extra key if any field's encoder mis-omitted its default, and
--- 'Card.fromJson' would land on the wrong value if any field's decoder
--- mis-defaulted an absent key, and either failure would break the equality
--- check.
+-- none of the 23 defaulted keys this fixture leaves at their default (of 26
+-- total; manaCost, power and toughness are the other three, set to
+-- non-default values above) -- 'baseCardJson' below -- which is what lets the
+-- single round-trip assertion in the first test prove BOTH halves of every one
+-- of those fields' elision at once: 'Card.toJson' would emit an extra key if
+-- any field's encoder mis-omitted its default, and 'Card.fromJson' would land
+-- on the wrong value if any field's decoder mis-defaulted an absent key, and
+-- either failure would break the equality check.
 baseCard :: Card.Card
 baseCard =
   Card.MkCard
@@ -115,22 +120,69 @@ baseCard =
       Card.counterability = Counterability.Counterable
     }
 
+-- | Every field at the default an omitted key means, which is what the minimal
+-- JSON above has to decode to.
+minimalCard :: Card.Card
+minimalCard =
+  Card.MkCard
+    { Card.name = CardName.MkCardName (Text.pack "Mountain"),
+      Card.manaCost = Nothing,
+      Card.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Land) Set.empty,
+      Card.power = Nothing,
+      Card.toughness = Nothing,
+      Card.loyalty = Nothing,
+      Card.keywords = Set.empty,
+      Card.colorIndicator = Set.empty,
+      Card.characteristicPT = Nothing,
+      Card.staticAbilities = [],
+      Card.spell = Card.defaultSpell,
+      Card.activatedAbilities = [],
+      Card.replacementEffects = [],
+      Card.triggeredAbilities = [],
+      Card.delayedAbilities = Map.empty,
+      Card.castingPermissions = [],
+      Card.castingRestrictions = [],
+      Card.enchant = Nothing,
+      Card.counterability = Counterability.Counterable,
+      Card.additionalCosts = [],
+      Card.alternativeCosts = [],
+      Card.playerAbilities = [],
+      Card.blockRequirements = [],
+      Card.attackRequirements = [],
+      Card.combatRestrictions = [],
+      Card.attackCosts = [],
+      Card.mulliganAction = [],
+      Card.openingHandAction = []
+    }
+
+-- The same card the verbose literal below spells out: minimalCard's fields, with
+-- the type line a real basic land carries.
+mountainCard :: Card.Card
+mountainCard =
+  minimalCard
+    { Card.typeLine =
+        TypeLine.MkTypeLine
+          (Set.singleton Supertype.Basic)
+          (Set.singleton CardType.Land)
+          (Set.singleton Subtype.Mountain)
+    }
+
 baseCardJson :: String
 baseCardJson =
   "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
-    <> "\"typeLine\":{\"supertypes\":[],\"types\":[{\"type\":\"Creature\"}],\"subtypes\":[]},"
-    <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
-    <> "\"keywords\":[],\"staticAbilities\":[],"
-    <> "\"spell\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}},"
-    <> "\"activatedAbilities\":[],\"replacementEffects\":[],\"triggeredAbilities\":[],\"castingPermissions\":[]}"
+    <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
+    <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}"
 
--- | 'baseCard' with every field populated at once, including the sixteen
--- defaulted/elided ones and the recursive card-in-card fields (spell,
--- activatedAbilities, triggeredAbilities, delayedAbilities) -- the shape a
--- reviewer would otherwise have to piece together from sixteen separate single-
--- field cases. Its JSON, 'populatedCardJson', was produced by running
--- 'Card.toJson' on this exact value (not transcribed by hand) and pasted back in,
--- per the recipe's "derive every JSON literal by reading the encoder" rule.
+-- | 'baseCard' with every field populated at once, except 'Card.spell' -- left
+-- at 'Card.defaultSpell' since nothing here overrides it, which is why
+-- 'populatedCardJson' has no @"spell"@ key. Covers the other 25 of the 26
+-- defaulted keys, plus the recursive card-in-card fields that do get
+-- populated (activatedAbilities, triggeredAbilities, delayedAbilities) -- the
+-- shape a reviewer would otherwise have to piece together from sixteen
+-- separate single-field cases. Its JSON, 'populatedCardJson', was produced by
+-- running 'Card.toJson' on this exact value (not transcribed by hand) and
+-- pasted back in, per the recipe's "derive every JSON literal by reading the
+-- encoder" rule.
 populatedCard :: Card.Card
 populatedCard =
   baseCard
@@ -161,27 +213,26 @@ populatedCard =
 populatedCardJson :: String
 populatedCardJson =
   "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
-    <> "\"typeLine\":{\"supertypes\":[],\"types\":[{\"type\":\"Creature\"}],\"subtypes\":[]},"
+    <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
     <> "\"keywords\":[{\"type\":\"Deathtouch\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
-    <> "\"spell\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}},"
-    <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[],\"components\":[]},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}],"
+    <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[]},"
+    <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}],"
+    <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
     <> "\"loyalty\":3,\"colorIndicator\":[{\"type\":\"White\"}],\"characteristicPT\":{\"type\":\"ManaValue\"},"
     <> "\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}}],"
+    <> "\"modal\":{\"modes\":[{}]}}}],"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
-    <> "\"alternativeCosts\":[{\"mana\":[],\"components\":[]}],"
+    <> "\"alternativeCosts\":[{\"mana\":[]}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
     <> "\"mulliganAction\":[{\"type\":\"ExileHandThenDraw\"}],"
     <> "\"openingHandAction\":[{\"type\":\"ExileHandThenDraw\"}],"
@@ -190,17 +241,31 @@ populatedCardJson =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Card" $ do
+  -- R6 of the omit-defaults design: name and typeLine are the only required
+  -- keys, and a card that says nothing else is a vanilla card rather than a
+  -- malformed file.
+  Spec.it s "a minimal card carries only name and typeLine" $
+    Common.assertJsonCodec
+      s
+      Card.toJson
+      Card.fromJson
+      minimalCard
+      """ {"name":"Mountain","typeLine":{"types":[{"type":"Land"}]}} """
   -- R7's one case for MkCard's single constructor, and simultaneously the
-  -- absent-key proof for all sixteen defaulted/elided fields at once: see
-  -- 'baseCard's haddock for why one round trip suffices for both.
+  -- absent-key proof for the 23 fields 'baseCard' leaves at their default, all
+  -- at once: see 'baseCard's haddock for why one round trip suffices for both.
   Spec.it s "MkCard, every required field present and every optional field absent" $
     Common.assertJsonCodec s Card.toJson Card.fromJson baseCard baseCardJson
-  -- Each defaulted field gets its own explicit absent-key assertion too, not
-  -- just the aggregate proof above: a decoder that defaulted the WRONG field
+  -- 16 of the 26 defaulted fields also get their own explicit absent-key
+  -- assertion below, not just the aggregate proofs above (the 'baseCard' round
+  -- trip and 'minimalCard's): a decoder that defaulted the WRONG field
   -- (swapping two Maybe fields of the same underlying type, say) could still
-  -- pass the aggregate 'baseCard' equality by accident if the two defaults
+  -- pass one of those aggregate equalities by accident if the two defaults
   -- happened to collide; reading each field back out individually rules that
-  -- out.
+  -- out. The other ten (keywords, staticAbilities, spell, activatedAbilities,
+  -- replacementEffects, triggeredAbilities, castingPermissions, manaCost,
+  -- power, toughness) have no individual case -- covered by the aggregate
+  -- proofs alone, not by a weaker guarantee.
   Spec.describe s "each defaulted field takes its default when its key is absent from the JSON" $ do
     Spec.it s "loyalty (CR 306.5) defaults to Nothing" $ do
       v <- Common.assertJson s baseCardJson
@@ -290,7 +355,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
         baseCard {Card.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility}
         ( init baseCardJson
             <> ",\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-            <> "\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}}]}"
+            <> "\"modal\":{\"modes\":[{}]}}}]}"
         )
     Spec.it s "playerAbilities" $
       Common.assertJsonCodec
@@ -340,7 +405,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
         Card.toJson
         Card.fromJson
         baseCard {Card.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []]}
-        (init baseCardJson <> ",\"alternativeCosts\":[{\"mana\":[],\"components\":[]}]}")
+        (init baseCardJson <> ",\"alternativeCosts\":[{\"mana\":[]}]}")
     Spec.it s "counterability" $
       Common.assertJsonCodec
         s
@@ -381,3 +446,12 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
   -- itself ties the knot on -- 'populatedCard's haddock explains the fixture.
   Spec.it s "MkCard, every field populated at once" $
     Common.assertJsonCodec s Card.toJson Card.fromJson populatedCard populatedCardJson
+  -- R7 of the omit-defaults design: omission is permitted on input, never
+  -- required. This is mountain.json as it stood before the migration; every
+  -- such file must still load.
+  Spec.it s "a pre-migration card file still decodes" $
+    Common.assertFromJson
+      s
+      Card.fromJson
+      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
+      mountainCard

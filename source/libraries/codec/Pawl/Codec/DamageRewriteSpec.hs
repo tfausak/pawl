@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.DamageRewriteSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -9,17 +11,37 @@ import qualified Pawl.Types.Scaling as Scaling
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
   Spec.it s "PreventAll" $
-    Common.assertJsonCodec s DamageRewrite.toJson DamageRewrite.fromJson DamageRewrite.PreventAll "{\"type\":\"PreventAll\"}"
+    Common.assertJsonCodec
+      s
+      DamageRewrite.toJson
+      DamageRewrite.fromJson
+      DamageRewrite.PreventAll
+      """ {"type":"PreventAll"} """
   -- CR 615.7: Mending Hands' shield, whose Natural is what REMAINS of it. Baked
   -- by Resolve's PreventNextDamage arm and never authored on a card (see
   -- Pawl.Types.DamageRewrite), so this codec is the only place the wire form is
   -- pinned.
   Spec.it s "PreventNext" $
-    Common.assertJsonCodec s DamageRewrite.toJson DamageRewrite.fromJson (DamageRewrite.PreventNext 4) "{\"type\":\"PreventNext\",\"value\":4}"
+    Common.assertJsonCodec
+      s
+      DamageRewrite.toJson
+      DamageRewrite.fromJson
+      (DamageRewrite.PreventNext 4)
+      """ {"type":"PreventNext","value":4} """
   -- CR 614.1a: Galvanic Blast's "deals 4 damage instead".
   Spec.it s "SetAmount" $
-    Common.assertJsonCodec s DamageRewrite.toJson DamageRewrite.fromJson (DamageRewrite.SetAmount 4) "{\"type\":\"SetAmount\",\"value\":4}"
+    Common.assertJsonCodec
+      s
+      DamageRewrite.toJson
+      DamageRewrite.fromJson
+      (DamageRewrite.SetAmount 4)
+      """ {"type":"SetAmount","value":4} """
   -- Furnace of Rath's "double that damage", which is Scaling's Multiply 2 -- the
   -- same value Corpsejack Menace doubles counters with.
   Spec.it s "Scale" $
-    Common.assertJsonCodec s DamageRewrite.toJson DamageRewrite.fromJson (DamageRewrite.Scale (Scaling.Multiply 2)) "{\"type\":\"Scale\",\"value\":{\"type\":\"Multiply\",\"value\":2}}"
+    Common.assertJsonCodec
+      s
+      DamageRewrite.toJson
+      DamageRewrite.fromJson
+      (DamageRewrite.Scale (Scaling.Multiply 2))
+      """ {"type":"Scale","value":{"type":"Multiply","value":2}} """

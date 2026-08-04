@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Haste"
@@ -43,20 +41,6 @@
     "type": "Literal",
     "value": 6
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 1
@@ -80,14 +64,9 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     },
     {
@@ -113,14 +92,9 @@
                 "type": "Sacrifice",
                 "value": "self"
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
@@ -133,7 +107,6 @@
         "type": "Skeleton"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

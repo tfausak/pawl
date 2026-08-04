@@ -2,7 +2,6 @@
   "activatedAbilities": [
     {
       "cost": {
-        "components": [],
         "mana": [
           {
             "type": "Generic",
@@ -66,14 +65,9 @@
                   "self"
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       },
       "timing": {
         "type": "DuringPhase",
@@ -88,8 +82,6 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -97,26 +89,7 @@
     }
   ],
   "name": "Jade Statue",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Artifact"

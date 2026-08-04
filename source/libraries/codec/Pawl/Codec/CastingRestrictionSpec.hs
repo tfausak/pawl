@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CastingRestrictionSpec where
 
 import qualified Pawl.Codec.CastingRestriction as CastingRestriction
@@ -17,7 +19,7 @@ spec s = Spec.describe s "Pawl.Codec.CastingRestriction" $ do
       CastingRestriction.toJson
       CastingRestriction.fromJson
       (CastingRestriction.DuringPhase (Phase.Combat CombatStep.DeclareAttackers))
-      "{\"type\":\"DuringPhase\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"DeclareAttackers\"}}}"
+      """ {"type":"DuringPhase","value":{"type":"Combat","value":{"type":"DeclareAttackers"}}} """
   -- A different phase, so the phase is pinned as part of the encoding rather
   -- than defaulted past.
   Spec.it s "DuringPhase, upkeep" $
@@ -26,11 +28,11 @@ spec s = Spec.describe s "Pawl.Codec.CastingRestriction" $ do
       CastingRestriction.toJson
       CastingRestriction.fromJson
       (CastingRestriction.DuringPhase (Phase.Beginning BeginningStep.Upkeep))
-      "{\"type\":\"DuringPhase\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}}}"
+      """ {"type":"DuringPhase","value":{"type":"Beginning","value":{"type":"Upkeep"}}} """
   Spec.it s "AttackedThisStep" $
     Common.assertJsonCodec
       s
       CastingRestriction.toJson
       CastingRestriction.fromJson
       CastingRestriction.AttackedThisStep
-      "{\"type\":\"AttackedThisStep\"}"
+      """ {"type":"AttackedThisStep"} """

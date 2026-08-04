@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -14,8 +11,6 @@
     }
   ],
   "name": "Battlegrowth",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -45,18 +40,9 @@
           }
         ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

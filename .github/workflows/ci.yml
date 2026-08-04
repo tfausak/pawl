@@ -53,15 +53,11 @@ jobs:
         run: cp $( cabal list-bin ${{ needs.meta.outputs.name }}-test-suite ) artifact
       - if: matrix.bench
         run: cp $( cabal list-bin ${{ needs.meta.outputs.name }}-benchmark ) artifact
-      - run: artifact/${{ needs.meta.outputs.name }}${{ runner.os == 'Windows' && '.exe' || '' }} --schema > artifact/schema.json
-        shell: bash
       - run: tar --create --file artifact.tar --verbose artifact
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}
           path: artifact.tar
-      - run: echo | artifact/${{ needs.meta.outputs.name }}${{ runner.os == 'Windows' && '.exe' || '' }}
-        shell: bash
   cabal:
     name: Cabal
     runs-on: ubuntu-latest

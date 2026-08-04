@@ -25,10 +25,10 @@ import qualified Pawl.Types.Condition as Condition
 -- Count arm and this module never has to know it.
 toJson :: Condition.Condition -> Value.Value
 toJson condition =
-  Common.object
-    [ Common.pair "measured" . Quantity.toJson $ Condition.measured condition,
-      Common.pair "comparison" . Comparison.toJson $ Condition.comparison condition,
-      Common.pair "threshold" . Quantity.toJson $ Condition.threshold condition
+  Common.object . concat $
+    [ Common.requiredPair "measured" Quantity.toJson (Condition.measured condition),
+      Common.requiredPair "comparison" Comparison.toJson (Condition.comparison condition),
+      Common.requiredPair "threshold" Quantity.toJson (Condition.threshold condition)
     ]
 
 fromJson :: Value.Value -> Either Text.Text Condition.Condition

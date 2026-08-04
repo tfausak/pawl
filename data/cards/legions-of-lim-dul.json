@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Landwalk",
@@ -52,32 +50,16 @@
     "type": "Literal",
     "value": 2
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 3
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
         "type": "Zombie"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

@@ -1,12 +1,9 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Cycling",
       "value": [
         {
-          "components": [],
           "mana": [
             {
               "type": "Generic",
@@ -38,32 +35,16 @@
     "type": "Literal",
     "value": 4
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 4
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
         "type": "Beast"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

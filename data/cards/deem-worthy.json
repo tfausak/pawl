@@ -1,12 +1,9 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Cycling",
       "value": [
         {
-          "components": [],
           "mana": [
             {
               "type": "Generic",
@@ -43,8 +40,6 @@
     }
   ],
   "name": "Deem Worthy",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -71,14 +66,8 @@
           }
         ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {
@@ -113,17 +102,11 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

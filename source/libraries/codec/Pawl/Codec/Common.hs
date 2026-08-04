@@ -1,9 +1,18 @@
 -- | Construction, normalization, and extraction helpers over the @json@
 -- sublibrary's 'Value.Value', plus the tagged-object convention the codec builds
 -- on, the element-generic combinators every per-type codec module is written in
--- terms of, and the assertions its specs are written in terms of. Encoding and
--- decoding themselves live in 'Pawl.Json.Value'; this module adapts them to the
--- codec's @Either Text@ error channel.
+-- terms of, the field combinators ('requiredPair', 'optionalPair',
+-- 'defaultedField') those modules use to encode and decode a record's fields,
+-- and the assertions its specs are written in terms of. Encoding and decoding
+-- themselves live in 'Pawl.Json.Value'; this module adapts them to the codec's
+-- @Either Text@ error channel.
+--
+-- 'optionalPair' and 'defaultedField' carry one invariant between them: an
+-- omitted key means the default that 'defaultedField' supplies, and that
+-- default must be the same value 'optionalPair' omits a field for writing. A
+-- per-type module calls both with the same default argument for a given field;
+-- if the two ever drift apart, encoding a default value and decoding it back
+-- stops being the identity.
 --
 -- Nothing here names a @Pawl.Types@ type, which is what keeps it below all 98
 -- per-type modules rather than in a cycle with them.
@@ -52,7 +61,7 @@ number m = Value.Number . Number.MkNumber . Decimal.mkDecimal m
 
 -- | The whole-number case of 'number', which is every number the codec writes.
 integer :: Integer -> Value.Value
-integer m = number m 0
+integer = flip number 0
 
 string :: String -> Value.Value
 string = text . Text.pack
@@ -167,15 +176,36 @@ field k ps = case lookupPair k ps of
 optionalField :: String -> [Pair.Pair Value.Value] -> Maybe Value.Value
 optionalField = lookupPair
 
--- | An absent field reads as JSON null, which is what the @decode*Default@
--- family treats as "say nothing and take the default".
-nullableField :: String -> [Pair.Pair Value.Value] -> Value.Value
-nullableField k = Maybe.fromMaybe Pawl.Codec.Common.null . lookupPair k
-
 withValue :: Maybe Value.Value -> (Value.Value -> Either Text.Text a) -> Either Text.Text a
 withValue mv f = case mv of
   Just v -> f v
   Nothing -> Left $ Text.pack "missing tagged value"
+
+-- | A field that is always written, whatever its value. The singleton list is
+-- so that 'Common.object . concat' can take required and defaulted fields in one
+-- list, with which is which readable down the left edge.
+requiredPair :: String -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
+requiredPair k f x = [pair k (f x)]
+
+-- | A field written only when it differs from the default that an absent key
+-- means. The default passed here and the one 'defaultedField' supplies must be
+-- the same binding: that is the whole guarantee that a codec's two halves agree.
+optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
+optionalPair k d f x = if x == d then [] else [pair k (f x)]
+
+-- | Reads a field that may be absent, supplying the default 'optionalPair'
+-- omits. A key that is present but null goes to the decoder rather than
+-- short-circuiting, so composing with 'decodeMaybe' accepts an absent key, an
+-- explicit null, and a value alike (R7 of the omit-defaults design).
+defaultedField ::
+  String ->
+  a ->
+  (Value.Value -> Either Text.Text a) ->
+  [Pair.Pair Value.Value] ->
+  Either Text.Text a
+defaultedField k d f ps = case lookupPair k ps of
+  Nothing -> Right d
+  Just v -> f v
 
 -- Combinators ----------------------------------------------------------------
 --
@@ -250,56 +280,58 @@ decodeNatural value = do
     Just x -> Right x
     Nothing -> Left . Text.pack $ "expected natural but got " <> show n
 
--- Defaults -------------------------------------------------------------------
---
--- An omitted field decodes to the empty or default value, which lets an
--- all-default field stay OUT of the committed JSON so existing card files remain
--- byte-identical.
-
-decodeListDefault :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text [a]
-decodeListDefault f value = case value of
-  Value.Null _ -> Right []
-  _ -> decodeList f value
-
-decodeSetDefault :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Set.Set a)
-decodeSetDefault f value = case value of
-  Value.Null _ -> Right Set.empty
-  _ -> decodeSet f value
-
-decodeMapDefault :: (Value.Value -> Either Text.Text (Map.Map k v)) -> Value.Value -> Either Text.Text (Map.Map k v)
-decodeMapDefault f value = case value of
-  Value.Null _ -> Right Map.empty
-  _ -> f value
-
-decodeBooleanDefault :: Bool -> Value.Value -> Either Text.Text Bool
-decodeBooleanDefault d value = case value of
-  Value.Null _ -> Right d
-  _ -> asBoolean value
-
 -- Assertions -----------------------------------------------------------------
 
 -- | Asserts both directions of a codec against one JSON literal, which is the
 -- shape almost every case in a @Pawl.Codec.XSpec@ takes.
-assertJsonCodec :: (Stack.HasCallStack, Monad m, Eq a, Show a) => Spec.Spec m n -> (a -> Value.Value) -> (Value.Value -> Either Text.Text a) -> a -> String -> m ()
+assertJsonCodec ::
+  (Stack.HasCallStack, Monad m, Eq a, Show a) =>
+  Spec.Spec m n ->
+  (a -> Value.Value) ->
+  (Value.Value -> Either Text.Text a) ->
+  a ->
+  String ->
+  m ()
 assertJsonCodec s enc dec x j = do
   assertToJson s enc x j
   assertFromJson s dec j x
 
-assertFromJson :: (Stack.HasCallStack, Monad m, Eq a, Eq b, Show a, Show b) => Spec.Spec m n -> (Value.Value -> Either a b) -> String -> b -> m ()
+assertFromJson ::
+  (Stack.HasCallStack, Monad m, Eq a, Eq b, Show a, Show b) =>
+  Spec.Spec m n ->
+  (Value.Value -> Either a b) ->
+  String ->
+  b ->
+  m ()
 assertFromJson s f j x = do
   v <- assertJson s j
   Spec.assertEq s (f v) (Right x)
 
 -- | Compares 'sortKeys'-normalized values, because JSON objects are unordered
--- and key order is not a property the codec has.
-assertToJson :: (Stack.HasCallStack, Monad m) => Spec.Spec m n -> (a -> Value.Value) -> a -> String -> m ()
+-- and key order is not a property the codec has. The failure renders both sides
+-- as JSON rather than as 'Value.Value', so a mismatch can be read — and pasted
+-- back into the literal — without translating a Show instance by hand.
+assertToJson ::
+  (Stack.HasCallStack, Monad m) =>
+  Spec.Spec m n ->
+  (a -> Value.Value) ->
+  a ->
+  String ->
+  m ()
 assertToJson s f x j = do
   v <- assertJson s j
-  Spec.assertEq s (sortKeys (f x)) (sortKeys v)
+  Spec.assertBool
+    s
+    (sortKeys (f x) == sortKeys v)
+    ("encoded " <> Text.unpack (render (f x)) <> " but the literal says " <> j)
 
 -- | Goes through 'parse' rather than parsing itself, so a literal with trailing
 -- garbage is a test failure instead of silently parsing as its prefix.
-assertJson :: (Stack.HasCallStack, Monad m) => Spec.Spec m n -> String -> m Value.Value
+assertJson ::
+  (Stack.HasCallStack, Monad m) =>
+  Spec.Spec m n ->
+  String ->
+  m Value.Value
 assertJson s j = case parse (Text.pack j) of
   Left e -> Spec.assertFailure s $ "invalid JSON: " <> show j <> ": " <> show e
   Right v -> pure v

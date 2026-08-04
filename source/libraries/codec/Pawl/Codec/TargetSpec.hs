@@ -18,17 +18,14 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 toJson :: TargetSpec.TargetSpec -> Value.Value
 toJson spec =
   Common.object $
-    Common.pair "pool" (Pool.toJson (TargetSpec.pool spec)) : case TargetSpec.filter spec of
-      Nothing -> []
-      Just f -> [Common.pair "filter" (Filter.toJson Keyword.toJson f)]
+    Common.requiredPair "pool" Pool.toJson (TargetSpec.pool spec)
+      <> Common.optionalPair "filter" Nothing (Common.encodeMaybe (Filter.toJson Keyword.toJson)) (TargetSpec.filter spec)
 
 fromJson :: Value.Value -> Either Text.Text TargetSpec.TargetSpec
 fromJson value = do
   ps <- Common.asObject value
   p <- Common.field "pool" ps >>= Pool.fromJson
-  f <- case Common.optionalField "filter" ps of
-    Nothing -> Right Nothing
-    Just v -> Just <$> Filter.fromJson Keyword.fromJson v
+  f <- Common.defaultedField "filter" Nothing (Common.decodeMaybe (Filter.fromJson Keyword.fromJson)) ps
   pure
     TargetSpec.MkTargetSpec
       { TargetSpec.pool = p,

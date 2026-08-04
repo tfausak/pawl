@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.AggregationSpec where
 
 import qualified Pawl.Codec.Aggregation as Aggregation
@@ -17,18 +19,18 @@ spec s = Spec.describe s "Pawl.Codec.Aggregation" $ do
       (Aggregation.toJson Common.integer)
       (Aggregation.fromJson Common.asInteger)
       Aggregation.Objects
-      "{\"type\":\"Objects\"}"
+      """ {"type":"Objects"} """
   Spec.it s "DistinctCardTypes" $
     Common.assertJsonCodec
       s
       (Aggregation.toJson Common.integer)
       (Aggregation.fromJson Common.asInteger)
       Aggregation.DistinctCardTypes
-      "{\"type\":\"DistinctCardTypes\"}"
+      """ {"type":"DistinctCardTypes"} """
   Spec.it s "Greatest" $
     Common.assertJsonCodec
       s
       (Aggregation.toJson Common.integer)
       (Aggregation.fromJson Common.asInteger)
       (Aggregation.Greatest 3)
-      "{\"type\":\"Greatest\",\"value\":3}"
+      """ {"type":"Greatest","value":3} """

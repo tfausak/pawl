@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "characteristicPT": {
     "type": "Count",
     "value": {
@@ -37,7 +35,6 @@
       }
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -65,19 +62,6 @@
   "name": "Ashaya, Soul of the Wild",
   "power": {
     "type": "Star"
-  },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
   },
   "staticAbilities": [
     {
@@ -126,7 +110,6 @@
   "toughness": {
     "type": "Star"
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

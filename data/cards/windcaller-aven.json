@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Flying"
@@ -9,7 +7,6 @@
       "type": "Cycling",
       "value": [
         {
-          "components": [],
           "mana": [
             {
               "type": "OfType",
@@ -55,20 +52,6 @@
     "type": "Literal",
     "value": 4
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 3
@@ -109,11 +92,7 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
@@ -126,7 +105,6 @@
         "type": "Wizard"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

@@ -9,20 +9,23 @@ import qualified Pawl.Types.Cost as Cost
 
 -- | The keyword codec is a PARAMETER, mirroring CostComponent's own -- see
 -- Pawl.Codec.Filter's header: the CostComponents this carries need one, and
--- every caller passes Pawl.Codec.Keyword.toJson.
-toJson :: (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
+-- every caller passes Pawl.Codec.Keyword.toJson. The 'Eq' constraint is only
+-- for 'Common.optionalPair' on 'components'; every instantiation in the pool is
+-- at 'Pawl.Types.Keyword.Keyword', which has one.
+toJson :: (Eq keyword) => (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
 toJson encode c =
   Common.object
-    [ Common.pair "mana" (Common.encodeMaybe ManaCost.toJson (Cost.mana c)),
-      Common.pair "components" (Common.encodeList (CostComponent.toJson encode) (Cost.components c))
-    ]
+    ( Common.requiredPair "mana" (Common.encodeMaybe ManaCost.toJson) (Cost.mana c)
+        <> Common.optionalPair "components" [] (Common.encodeList (CostComponent.toJson encode)) (Cost.components c)
+    )
 
--- | CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
--- never to {0}. Every ability-bearing card file states its mana part explicitly
--- (`[]` for {0}), so the absent case is only ever reached by a malformed file.
+-- | CR 118.6: 'mana' is REQUIRED, not defaulted, despite being a 'Maybe' --
+-- Nothing and Just (MkManaCost []) are both real, distinct values (Pawl.Types.
+-- Cost's own comment), so there is no single default an absent key could mean.
+-- A card file that forgets 'mana' is malformed rather than unpayable-by-default.
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Cost.Cost keyword)
 fromJson decode value = do
   ps <- Common.asObject value
-  m <- Common.decodeMaybe ManaCost.fromJson (Common.nullableField "mana" ps)
-  cs <- Common.decodeListDefault (CostComponent.fromJson decode) (Common.nullableField "components" ps)
+  m <- Common.field "mana" ps >>= Common.decodeMaybe ManaCost.fromJson
+  cs <- Common.defaultedField "components" [] (Common.decodeList (CostComponent.fromJson decode)) ps
   pure Cost.MkCost {Cost.mana = m, Cost.components = cs}

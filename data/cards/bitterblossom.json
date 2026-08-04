@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,22 +15,6 @@
     }
   ],
   "name": "Bitterblossom",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {
@@ -77,8 +58,6 @@
                     "value": 1
                   },
                   {
-                    "activatedAbilities": [],
-                    "castingPermissions": [],
                     "colorIndicator": [
                       {
                         "type": "Black"
@@ -89,31 +68,15 @@
                         "type": "Flying"
                       }
                     ],
-                    "manaCost": null,
                     "name": "Faerie Rogue Token",
                     "power": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "replacementEffects": [],
-                    "spell": {
-                      "modes": [
-                        {
-                          "effects": [],
-                          "targetSpecs": []
-                        }
-                      ],
-                      "selection": {
-                        "type": "ChooseExactly",
-                        "value": 1
-                      }
-                    },
-                    "staticAbilities": [],
                     "toughness": {
                       "type": "Literal",
                       "value": 1
                     },
-                    "triggeredAbilities": [],
                     "typeLine": {
                       "subtypes": [
                         {
@@ -123,7 +86,6 @@
                           "type": "Rogue"
                         }
                       ],
-                      "supertypes": [],
                       "types": [
                         {
                           "type": "Creature"
@@ -133,14 +95,9 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
@@ -150,7 +107,6 @@
         "type": "Faerie"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Enchantment"

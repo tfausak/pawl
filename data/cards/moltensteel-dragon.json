@@ -2,7 +2,6 @@
   "activatedAbilities": [
     {
       "cost": {
-        "components": [],
         "mana": [
           {
             "type": "Phyrexian",
@@ -38,18 +37,12 @@
                   "self"
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Flying"
@@ -78,25 +71,10 @@
     "type": "Literal",
     "value": 4
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 4
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
@@ -106,7 +84,6 @@
         "type": "Phyrexian"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Artifact"

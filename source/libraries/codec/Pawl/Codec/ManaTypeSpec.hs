@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ManaTypeSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -14,6 +16,11 @@ spec s = Spec.describe s "Pawl.Codec.ManaType" $ do
       ManaType.toJson
       ManaType.fromJson
       (ManaType.Colored Color.Red)
-      "{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}"
+      """ {"type":"Colored","value":{"type":"Red"}} """
   Spec.it s "Colorless" $
-    Common.assertJsonCodec s ManaType.toJson ManaType.fromJson ManaType.Colorless "{\"type\":\"Colorless\"}"
+    Common.assertJsonCodec
+      s
+      ManaType.toJson
+      ManaType.fromJson
+      ManaType.Colorless
+      """ {"type":"Colorless"} """

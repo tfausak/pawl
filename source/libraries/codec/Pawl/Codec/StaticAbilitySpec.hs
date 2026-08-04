@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.StaticAbilitySpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -19,7 +21,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       StaticAbility.toJson
       StaticAbility.fromJson
       (StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
-      "{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]}"
+      """ {"affected":{"type":"Attached"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
     Common.assertJsonCodec
@@ -30,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Affected.Attached
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
       )
-      "{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"},{\"type\":\"SetBasePowerToughness\",\"value\":[{\"type\":\"Literal\",\"value\":1},{\"type\":\"Literal\",\"value\":1}]}]}"
+      """ {"affected":{"type":"Attached"},"modifications":[{"type":"LoseAllAbilities"},{"type":"SetBasePowerToughness","value":[{"type":"Literal","value":1},{"type":"Literal","value":1}]}]} """
   -- CR 613.6 made a static ability "one affected set, one or more parts", so the
   -- wire format has an array where it used to have a single modification -- and
   -- an array can be empty where a single value could not. An ability with no

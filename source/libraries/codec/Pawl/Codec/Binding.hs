@@ -16,20 +16,20 @@ import qualified Pawl.Types.SlotName as SlotName
 -- game state carries.
 toJson :: Binding.Binding -> Value.Value
 toJson b =
-  Common.object
-    [ Common.pair "target" . Common.encodeMaybe Recipient.toJson $ Binding.target b,
-      Common.pair "amount" . Common.encodeMaybe Common.encodeNatural $ Binding.amount b,
-      Common.pair "modes" . Common.encodeMaybe (Common.encodeSet ModeIndex.toJson) $ Binding.modes b,
-      Common.pair "copy" . Common.encodeMaybe ProjectedCharacteristics.toJson $ Binding.copy b
+  Common.object . concat $
+    [ Common.optionalPair "target" Nothing (Common.encodeMaybe Recipient.toJson) (Binding.target b),
+      Common.optionalPair "amount" Nothing (Common.encodeMaybe Common.encodeNatural) (Binding.amount b),
+      Common.optionalPair "modes" Nothing (Common.encodeMaybe (Common.encodeSet ModeIndex.toJson)) (Binding.modes b),
+      Common.optionalPair "copy" Nothing (Common.encodeMaybe ProjectedCharacteristics.toJson) (Binding.copy b)
     ]
 
 fromJson :: Value.Value -> Either Text.Text Binding.Binding
 fromJson value = do
   ps <- Common.asObject value
-  t <- Common.decodeMaybe Recipient.fromJson (Common.nullableField "target" ps)
-  a <- Common.decodeMaybe Common.decodeNatural (Common.nullableField "amount" ps)
-  m <- Common.decodeMaybe (Common.decodeSet ModeIndex.fromJson) (Common.nullableField "modes" ps)
-  c <- Common.decodeMaybe ProjectedCharacteristics.fromJson (Common.nullableField "copy" ps)
+  t <- Common.defaultedField "target" Nothing (Common.decodeMaybe Recipient.fromJson) ps
+  a <- Common.defaultedField "amount" Nothing (Common.decodeMaybe Common.decodeNatural) ps
+  m <- Common.defaultedField "modes" Nothing (Common.decodeMaybe (Common.decodeSet ModeIndex.fromJson)) ps
+  c <- Common.defaultedField "copy" Nothing (Common.decodeMaybe ProjectedCharacteristics.fromJson) ps
   pure
     Binding.MkBinding
       { Binding.target = t,

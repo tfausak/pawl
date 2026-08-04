@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ToughnessSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -9,4 +11,9 @@ import qualified Pawl.Types.Toughness as Toughness
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.Toughness" . Spec.it s "MkToughness delegates to Quantity" $
-    Common.assertJsonCodec s Toughness.toJson Toughness.fromJson (Toughness.MkToughness (Quantity.Literal 2)) "{\"type\":\"Literal\",\"value\":2}"
+    Common.assertJsonCodec
+      s
+      Toughness.toJson
+      Toughness.fromJson
+      (Toughness.MkToughness (Quantity.Literal 2))
+      """ {"type":"Literal","value":2} """

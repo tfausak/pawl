@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "delayedAbilities": [
     {
       "ability": {
@@ -26,20 +24,14 @@
                   "type": "Sacrifice",
                   "value": "token"
                 }
-              ],
-              "targetSpecs": []
+              ]
             }
-          ],
-          "selection": {
-            "type": "ChooseExactly",
-            "value": 1
-          }
+          ]
         }
       },
       "name": "sacrifice it"
     }
   ],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -56,8 +48,6 @@
     }
   ],
   "name": "Tidal Wave",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -70,8 +60,6 @@
                 "value": 1
               },
               {
-                "activatedAbilities": [],
-                "castingPermissions": [],
                 "colorIndicator": [
                   {
                     "type": "Blue"
@@ -82,38 +70,21 @@
                     "type": "Defender"
                   }
                 ],
-                "manaCost": null,
                 "name": "Wall Token",
                 "power": {
                   "type": "Literal",
                   "value": 5
                 },
-                "replacementEffects": [],
-                "spell": {
-                  "modes": [
-                    {
-                      "effects": [],
-                      "targetSpecs": []
-                    }
-                  ],
-                  "selection": {
-                    "type": "ChooseExactly",
-                    "value": 1
-                  }
-                },
-                "staticAbilities": [],
                 "toughness": {
                   "type": "Literal",
                   "value": 5
                 },
-                "triggeredAbilities": [],
                 "typeLine": {
                   "subtypes": [
                     {
                       "type": "Wall"
                     }
                   ],
-                  "supertypes": [],
                   "types": [
                     {
                       "type": "Creature"
@@ -128,21 +99,11 @@
             "type": "ArmDelayedTrigger",
             "value": "sacrifice it"
           }
-        ],
-        "targetSpecs": []
+        ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

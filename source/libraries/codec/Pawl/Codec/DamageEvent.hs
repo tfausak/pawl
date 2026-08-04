@@ -12,16 +12,17 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 toJson :: DamageEvent.DamageEvent -> Value.Value
 toJson ev =
   Common.object
-    [ Common.pair "source" $ ObjectId.toJson (DamageEvent.source ev),
-      Common.pair "target" $ Recipient.toJson (DamageEvent.target ev),
-      Common.pair "amount" $ Common.encodeNatural (DamageEvent.amount ev),
-      Common.pair "dealtByDeathtouch" . Common.boolean $ DamageEvent.dealtByDeathtouch ev,
-      Common.pair "dealtByInfect" . Common.boolean $ DamageEvent.dealtByInfect ev,
-      Common.pair "dealtByToxic" $ Common.encodeNatural (DamageEvent.dealtByToxic ev),
-      -- CR 702.15b's answer is a player or nobody, so JSON null is Nothing.
-      Common.pair "dealtByLifelink" $ Common.encodeMaybe PlayerId.toJson (DamageEvent.dealtByLifelink ev),
-      Common.pair "kind" $ DamageKind.toJson (DamageEvent.kind ev)
-    ]
+    ( Common.requiredPair "source" ObjectId.toJson (DamageEvent.source ev)
+        <> Common.requiredPair "target" Recipient.toJson (DamageEvent.target ev)
+        <> Common.requiredPair "amount" Common.encodeNatural (DamageEvent.amount ev)
+        <> Common.optionalPair "dealtByDeathtouch" False Common.boolean (DamageEvent.dealtByDeathtouch ev)
+        <> Common.optionalPair "dealtByInfect" False Common.boolean (DamageEvent.dealtByInfect ev)
+        <> Common.optionalPair "dealtByToxic" 0 Common.encodeNatural (DamageEvent.dealtByToxic ev)
+        -- CR 702.15b's answer is a player or nobody, so Nothing (no lifelink at
+        -- deal time) is what an absent key means.
+        <> Common.optionalPair "dealtByLifelink" Nothing (Common.encodeMaybe PlayerId.toJson) (DamageEvent.dealtByLifelink ev)
+        <> Common.requiredPair "kind" DamageKind.toJson (DamageEvent.kind ev)
+    )
 
 fromJson :: Value.Value -> Either Text.Text DamageEvent.DamageEvent
 fromJson value = do
@@ -29,10 +30,10 @@ fromJson value = do
   s <- Common.field "source" ps >>= ObjectId.fromJson
   t <- Common.field "target" ps >>= Recipient.fromJson
   a <- Common.field "amount" ps >>= Common.decodeNatural
-  d <- Common.field "dealtByDeathtouch" ps >>= Common.decodeBooleanDefault False
-  i <- Common.field "dealtByInfect" ps >>= Common.decodeBooleanDefault False
-  x <- Common.field "dealtByToxic" ps >>= Common.decodeNatural
-  l <- Common.field "dealtByLifelink" ps >>= Common.decodeMaybe PlayerId.fromJson
+  d <- Common.defaultedField "dealtByDeathtouch" False Common.asBoolean ps
+  i <- Common.defaultedField "dealtByInfect" False Common.asBoolean ps
+  x <- Common.defaultedField "dealtByToxic" 0 Common.decodeNatural ps
+  l <- Common.defaultedField "dealtByLifelink" Nothing (Common.decodeMaybe PlayerId.fromJson) ps
   k <- Common.field "kind" ps >>= DamageKind.fromJson
   pure
     DamageEvent.MkDamageEvent

@@ -26,14 +26,9 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     },
     {
@@ -75,11 +70,7 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     },
     {
@@ -87,7 +78,7 @@
         "components": [
           {
             "type": "RemoveLoyaltyFromThis",
-            "value": 10
+            "value": 1E+1
           }
         ],
         "mana": []
@@ -102,7 +93,7 @@
                   "target",
                   {
                     "type": "Literal",
-                    "value": 20
+                    "value": 2E+1
                   }
                 ]
               }
@@ -118,16 +109,10 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "loyalty": 3,
   "manaCost": [
     {
@@ -154,23 +139,6 @@
     }
   ],
   "name": "Jace Beleren",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {

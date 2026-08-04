@@ -2,7 +2,6 @@
   "activatedAbilities": [
     {
       "cost": {
-        "components": [],
         "mana": [
           {
             "type": "Generic",
@@ -38,16 +37,10 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -73,25 +66,10 @@
     "type": "Literal",
     "value": 2
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 2
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
@@ -101,7 +79,6 @@
         "type": "Zombie"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

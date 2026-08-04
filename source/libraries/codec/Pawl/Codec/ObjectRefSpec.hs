@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ObjectRefSpec where
 
 import qualified Data.Text as Text
@@ -17,14 +19,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.toJson
       ObjectRef.fromJson
       (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
-      "\"target\""
+      """ "target" """
   Spec.it s "EachMatching" $
     Common.assertJsonCodec
       s
       ObjectRef.toJson
       ObjectRef.fromJson
       (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))
-      "{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}"
+      """ {"type":"HasCardType","value":{"type":"Creature"}} """
   -- An ObjectRef is untagged and told apart by JSON TYPE rather than by a tag:
   -- a slot is a bare string, a swept set is an object. The two assertions
   -- above already pin that; this one additionally guards against a decoder

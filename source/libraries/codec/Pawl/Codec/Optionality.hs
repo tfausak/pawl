@@ -17,11 +17,3 @@ fromJson =
     [ ("Mandatory", Optionality.Mandatory),
       ("Optional", Optionality.Optional)
     ]
-
--- | An omitted optionality decodes to Mandatory, the counterability posture (and
--- for the same reason): almost every mode in the corpus prints no "may", and a
--- required key would have meant editing every card file to say nothing.
-fromJsonDefault :: Value.Value -> Either Text.Text Optionality.Optionality
-fromJsonDefault value = case value of
-  Value.Null _ -> Right Optionality.Mandatory
-  _ -> fromJson value

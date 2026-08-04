@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -35,31 +32,16 @@
       ]
     }
   ],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 0
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
         "type": "Shapeshifter"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

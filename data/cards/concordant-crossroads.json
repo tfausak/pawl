@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -14,20 +11,6 @@
     }
   ],
   "name": "Concordant Crossroads",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -49,10 +32,7 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
     "supertypes": [
       {
         "type": "World"

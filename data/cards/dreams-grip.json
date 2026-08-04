@@ -1,11 +1,8 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Entwine",
       "value": {
-        "components": [],
         "mana": [
           {
             "type": "Generic",
@@ -27,8 +24,6 @@
     }
   ],
   "name": "Dream's Grip",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -67,18 +62,9 @@
           }
         ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

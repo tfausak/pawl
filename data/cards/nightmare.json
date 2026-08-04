@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "characteristicPT": {
     "type": "Count",
     "value": {
@@ -61,24 +59,9 @@
   "power": {
     "type": "Star"
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Star"
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
@@ -88,7 +71,6 @@
         "type": "Nightmare"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

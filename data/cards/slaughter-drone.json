@@ -2,7 +2,6 @@
   "activatedAbilities": [
     {
       "cost": {
-        "components": [],
         "mana": [
           {
             "type": "OfType",
@@ -31,18 +30,12 @@
                   "self"
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Devoid"
@@ -68,25 +61,10 @@
     "type": "Literal",
     "value": 2
   },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
   "toughness": {
     "type": "Literal",
     "value": 2
   },
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
@@ -96,7 +74,6 @@
         "type": "Eldrazi"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Creature"

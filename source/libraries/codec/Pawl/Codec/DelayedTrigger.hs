@@ -1,5 +1,6 @@
 module Pawl.Codec.DelayedTrigger where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
@@ -14,19 +15,19 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 
 toJson :: DelayedTrigger.DelayedTrigger -> Value.Value
 toJson d =
-  Common.object
-    [ Common.pair "ability" $ TriggeredAbility.toJson Card.toJson (DelayedTrigger.ability d),
-      Common.pair "source" $ ObjectId.toJson (DelayedTrigger.source d),
-      Common.pair "controller" $ PlayerId.toJson (DelayedTrigger.controller d),
-      Common.pair "bindings" $ Binding.toJsonMap (DelayedTrigger.bindings d),
+  Common.object . concat $
+    [ Common.requiredPair "ability" (TriggeredAbility.toJson Card.toJson) (DelayedTrigger.ability d),
+      Common.requiredPair "source" ObjectId.toJson (DelayedTrigger.source d),
+      Common.requiredPair "controller" PlayerId.toJson (DelayedTrigger.controller d),
+      Common.optionalPair "bindings" Map.empty Binding.toJsonMap (DelayedTrigger.bindings d),
       -- CR 603.7a: TurnWindow.AnyTurn for an ability armed with no onset gate,
       -- which is the rule's default and every entry in the pool but Meandering
       -- Towershell's. Always present, unlike the expiry below: "no restriction"
       -- is one of the windows rather than the absence of one.
-      Common.pair "window" $ TurnWindow.toJson (DelayedTrigger.window d),
+      Common.requiredPair "window" TurnWindow.toJson (DelayedTrigger.window d),
       -- CR 603.7b: absent for an ability with no stated duration, which is the
       -- rule's default and every entry in the pool but Full Throttle's.
-      Common.pair "expiry" . Common.encodeMaybe Expiry.toJson $ DelayedTrigger.expiry d
+      Common.optionalPair "expiry" Nothing (Common.encodeMaybe Expiry.toJson) (DelayedTrigger.expiry d)
     ]
 
 fromJson :: Value.Value -> Either Text.Text DelayedTrigger.DelayedTrigger
@@ -35,9 +36,9 @@ fromJson value = do
   a <- Common.field "ability" ps >>= TriggeredAbility.fromJson Card.fromJson
   s <- Common.field "source" ps >>= ObjectId.fromJson
   c <- Common.field "controller" ps >>= PlayerId.fromJson
-  b <- Common.field "bindings" ps >>= Binding.fromJsonMap
+  b <- Common.defaultedField "bindings" Map.empty Binding.fromJsonMap ps
   w <- Common.field "window" ps >>= TurnWindow.fromJson
-  e <- Common.decodeMaybe Expiry.fromJson (Common.nullableField "expiry" ps)
+  e <- Common.defaultedField "expiry" Nothing (Common.decodeMaybe Expiry.fromJson) ps
   pure
     DelayedTrigger.MkDelayedTrigger
       { DelayedTrigger.ability = a,

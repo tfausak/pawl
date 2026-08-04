@@ -22,24 +22,17 @@
                   }
                 }
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
-  "castingPermissions": [],
   "keywords": [
     {
       "type": "Cycling",
       "value": [
         {
-          "components": [],
           "mana": [
             {
               "type": "Generic",
@@ -67,28 +60,8 @@
       ]
     }
   ],
-  "manaCost": null,
   "name": "Ash Barrens",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Land"

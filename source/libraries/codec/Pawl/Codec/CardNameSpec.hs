@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CardNameSpec where
 
 import qualified Data.Text as Text
@@ -14,4 +16,4 @@ spec s = Spec.describe s "Pawl.Codec.CardName" $ do
       CardName.toJson
       CardName.fromJson
       (CardName.MkCardName $ Text.pack "a")
-      "\"a\""
+      """ "a" """

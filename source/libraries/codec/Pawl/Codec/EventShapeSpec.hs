@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.EventShapeSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -15,4 +17,4 @@ spec s =
       EventShape.toJson
       EventShape.fromJson
       (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard)
-      "{\"type\":\"MovedBetween\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"Graveyard\"}]}"
+      """ {"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]} """

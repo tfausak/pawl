@@ -1,6 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
   "enchant": {
     "filter": {
       "type": "ControlledBy",
@@ -12,7 +10,6 @@
       "type": "Creatures"
     }
   },
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -29,20 +26,6 @@
     }
   ],
   "name": "Setessan Training",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -71,7 +54,6 @@
       ]
     }
   ],
-  "toughness": null,
   "triggeredAbilities": [
     {
       "condition": {
@@ -96,14 +78,9 @@
                   }
                 ]
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     }
   ],
@@ -113,7 +90,6 @@
         "type": "Aura"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Enchantment"

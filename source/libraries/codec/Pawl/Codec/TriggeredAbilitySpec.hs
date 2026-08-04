@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TriggeredAbilitySpec where
 
 import qualified Data.Map.Strict as Map
@@ -50,10 +52,11 @@ toJson = TriggeredAbility.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility Text.Text)
 fromJson = TriggeredAbility.fromJson cardFromJson
 
--- One constructor (MkTriggeredAbility), so two cases cover both states of the
--- CR 603.4 `intervening` field: Sarcomancy's own two triggered abilities
--- (data/cards/sarcomancy.json), whose zombie-token trigger states no
--- intervening "if" and whose upkeep trigger states one.
+-- One constructor (MkTriggeredAbility), so three cases: Sarcomancy's own two
+-- triggered abilities (data/cards/sarcomancy.json) cover both states of the CR
+-- 603.4 `intervening` field -- its zombie-token trigger states no intervening
+-- "if" and its upkeep trigger states one -- and the third is every field left
+-- at its default below.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
   Spec.it s "MkTriggeredAbility, Sarcomancy's zombie-token trigger (no intervening if)" $
@@ -70,7 +73,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             TriggeredAbility.intervening = Nothing
           }
       )
-      "{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"Create\",\"value\":[{\"type\":\"Literal\",\"value\":1},\"Zombie Token\"]}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}"
+      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},"Zombie Token"]}]}]}} """
   -- CR 603.4's intervening "if" clause: emitted only when the ability states
   -- one, so Sarcomancy's upkeep trigger ("if no Zombies") writes the key and
   -- the case above (which states none) omits it.
@@ -94,7 +97,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 )
           }
       )
-      "{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},{\"type\":\"ControllersTurn\"}]},\"intervening\":{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Zombie\"}},\"aggregation\":{\"type\":\"Objects\"}}},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"DealDamage\",\"value\":[\"you\",{\"type\":\"Literal\",\"value\":1}]}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}"
+      """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"intervening":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Objects"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}},"modal":{"modes":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}]}]}} """
   -- CR 603.7: Card.delayedAbilities is a name-keyed map, rendered as a sorted
   -- array of entries so the render is deterministic and the file byte-stable
   -- (Pawl.Codec.TargetSpec.toJsonMap's own comment, and Pawl.Codec.Binding's).
@@ -130,4 +133,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             )
           ]
       )
-      "[{\"name\":\"each combat\",\"ability\":{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Combat\",\"value\":{\"type\":\"BeginningOfCombat\"}},{\"type\":\"EachTurn\"}]},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"Untap\",\"value\":{\"type\":\"AttackedThisTurn\"}}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}},{\"name\":\"sacrifice it\",\"ability\":{\"condition\":{\"type\":\"StepBegins\",\"value\":[{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},{\"type\":\"EachTurn\"}]},\"modal\":{\"modes\":[{\"effects\":[{\"type\":\"Sacrifice\",\"value\":\"token\"}],\"targetSpecs\":[]}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}}}]"
+      """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Untap","value":{"type":"AttackedThisTurn"}}]}]}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}}}] """
+  -- CR 603.4: no intervening "if" is what a triggered ability that states none
+  -- means, so only the two required keys survive -- 'condition' at CR 603.6a's
+  -- simplest trigger and 'modal' at the minimal non-modal payload (CR 700.2).
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing
+        }
+      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{}]}} """

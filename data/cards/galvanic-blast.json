@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "OfType",
@@ -14,8 +11,6 @@
     }
   ],
   "name": "Galvanic Blast",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -81,8 +76,6 @@
                 "type": "DamageR",
                 "value": [
                   {
-                    "whichKind": null,
-                    "whichRecipient": null,
                     "whichSource": {
                       "type": "TheSource"
                     }
@@ -117,18 +110,9 @@
           }
         ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"

@@ -22,14 +22,9 @@
                   }
                 }
               }
-            ],
-            "targetSpecs": []
+            ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       }
     },
     {
@@ -70,11 +65,7 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       },
       "timing": {
         "type": "DuringPhase",
@@ -95,34 +86,13 @@
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
-  "manaCost": null,
   "name": "Desert",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
         "type": "Desert"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Land"

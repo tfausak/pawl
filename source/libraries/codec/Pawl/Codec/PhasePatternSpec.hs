@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.PhasePatternSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -22,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.PhasePattern" $ do
       PhasePattern.toJson
       PhasePattern.fromJson
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep), PhasePattern.whosePhase = Nothing}
-      "{\"whichPhase\":{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}}},\"whosePhase\":null}"
+      """ {"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}}} """
   -- Fatigue's baked "TARGET PLAYER skips their next draw step": the only Just
   -- Resolve's SkipNextPhase arm produces, never authored on a card (#437).
   Spec.it s "Fatigue's player-scoped whosePhase = Just" $
@@ -31,7 +33,7 @@ spec s = Spec.describe s "Pawl.Codec.PhasePattern" $ do
       PhasePattern.toJson
       PhasePattern.fromJson
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep), PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
-      "{\"whichPhase\":{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"DrawStep\"}}},\"whosePhase\":1}"
+      """ {"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"DrawStep"}}},"whosePhase":1} """
   -- CR 500.1: the whole-phase arm, once Resolve has baked the player its
   -- resolution named -- Stonehorn Dignitary's.
   Spec.it s "Stonehorn Dignitary's whole-phase selector" $
@@ -40,4 +42,4 @@ spec s = Spec.describe s "Pawl.Codec.PhasePattern" $ do
       PhasePattern.toJson
       PhasePattern.fromJson
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
-      "{\"whichPhase\":{\"type\":\"CombatPhase\"},\"whosePhase\":1}"
+      """ {"whichPhase":{"type":"CombatPhase"},"whosePhase":1} """

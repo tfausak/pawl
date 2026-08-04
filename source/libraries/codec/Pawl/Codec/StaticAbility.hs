@@ -13,9 +13,12 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 toJson :: StaticAbility.StaticAbility -> Value.Value
 toJson sa =
   Common.object
-    [ Common.pair "affected" . Affected.toJson $ StaticAbility.affected sa,
-      Common.pair "modifications" . Common.encodeNonEmpty Modification.toJson $ StaticAbility.modifications sa
-    ]
+    ( Common.requiredPair "affected" Affected.toJson (StaticAbility.affected sa)
+        <> Common.requiredPair
+          "modifications"
+          (Common.encodeNonEmpty Modification.toJson)
+          (StaticAbility.modifications sa)
+    )
 
 fromJson :: Value.Value -> Either Text.Text StaticAbility.StaticAbility
 fromJson value = do

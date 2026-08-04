@@ -33,10 +33,9 @@ entry =
 
 entryJson :: String
 entryJson =
-  "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
-    <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
-    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
-    <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":null}"
+  "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
+    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
+    <> "\"window\":{\"type\":\"AnyTurn\"}}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
@@ -50,9 +49,8 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.toJson
       DelayedTrigger.fromJson
       entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
-      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
-          <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
+      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
           <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"}}"
       )
   -- CR 603.7a: an onset gate, at the arm Meandering Towershell's entry is stored
@@ -64,8 +62,26 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.toJson
       DelayedTrigger.fromJson
       entry {DelayedTrigger.window = TurnWindow.ControllersNextTurn}
-      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"effects\":[],\"targetSpecs\":[]}],"
-          <> "\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"target\":null,\"amount\":9,\"modes\":null,\"copy\":null}}],"
-          <> "\"window\":{\"type\":\"ControllersNextTurn\"},\"expiry\":null}"
+      ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
+          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
+          <> "\"window\":{\"type\":\"ControllersNextTurn\"}}"
       )
+  -- 'bindings' at its default (the empty map) and no stated 'expiry': 'window'
+  -- stays a required key regardless (Pawl.Codec.DelayedTrigger's own comment --
+  -- CR 603.7a's "no restriction" is one of TurnWindow's arms, not the absence of
+  -- one), so it is the only key besides the three unconditional ones that
+  -- survives.
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      DelayedTrigger.toJson
+      DelayedTrigger.fromJson
+      DelayedTrigger.MkDelayedTrigger
+        { DelayedTrigger.ability = CardSpec.minimalTriggeredAbility,
+          DelayedTrigger.source = ObjectId.MkObjectId 4,
+          DelayedTrigger.controller = PlayerId.MkPlayerId 0,
+          DelayedTrigger.bindings = Map.empty,
+          DelayedTrigger.window = TurnWindow.AnyTurn,
+          DelayedTrigger.expiry = Nothing
+        }
+      "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,\"window\":{\"type\":\"AnyTurn\"}}"

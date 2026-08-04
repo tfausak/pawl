@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.TargetSpecSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -23,21 +25,21 @@ spec s = Spec.describe s "Pawl.Codec.TargetSpec" $ do
       TargetSpec.toJson
       TargetSpec.fromJson
       (TargetSpec.MkTargetSpec Pool.Creatures Nothing)
-      "{\"pool\":{\"type\":\"Creatures\"}}"
+      """ {"pool":{"type":"Creatures"}} """
   Spec.it s "MkTargetSpec filtered pool" $
     Common.assertJsonCodec
       s
       TargetSpec.toJson
       TargetSpec.fromJson
       (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.HasCardType CardType.Artifact)))
-      "{\"pool\":{\"type\":\"Permanents\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}}"
+      """ {"pool":{"type":"Permanents"},"filter":{"type":"HasCardType","value":{"type":"Artifact"}}} """
   Spec.it s "MkTargetSpec \"another\" (Not IsSource)" $
     Common.assertJsonCodec
       s
       TargetSpec.toJson
       TargetSpec.fromJson
       (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.Not Filter.IsSource])))
-      "{\"pool\":{\"type\":\"Permanents\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}}"
+      """ {"pool":{"type":"Permanents"},"filter":{"type":"And","value":[{"type":"Not","value":{"type":"HasCardType","value":{"type":"Land"}}},{"type":"Not","value":{"type":"IsSource"}}]}} """
   -- CR 115.2 clause (a): a target spec over a graveyard, tagged with WHOSE --
   -- Raise Dead's "target creature card in your graveyard".
   Spec.it s "MkTargetSpec over a graveyard" $
@@ -46,7 +48,7 @@ spec s = Spec.describe s "Pawl.Codec.TargetSpec" $ do
       TargetSpec.toJson
       TargetSpec.fromJson
       (TargetSpec.MkTargetSpec (Pool.CardsInGraveyard PlayerScope.You) (Just (Filter.HasCardType CardType.Creature)))
-      "{\"pool\":{\"type\":\"CardsInGraveyard\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}"
+      """ {"pool":{"type":"CardsInGraveyard","value":{"type":"You"}},"filter":{"type":"HasCardType","value":{"type":"Creature"}}} """
   -- CR 115.2 clause (a)'s other zone: Riftsweeper's "target face-up exiled
   -- card" -- no PlayerScope (CR 400.1's shared zone) and no Filter.
   Spec.it s "MkTargetSpec over exile, scopeless and unfiltered" $
@@ -55,4 +57,4 @@ spec s = Spec.describe s "Pawl.Codec.TargetSpec" $ do
       TargetSpec.toJson
       TargetSpec.fromJson
       (TargetSpec.MkTargetSpec Pool.CardsInExile Nothing)
-      "{\"pool\":{\"type\":\"CardsInExile\"}}"
+      """ {"pool":{"type":"CardsInExile"}} """

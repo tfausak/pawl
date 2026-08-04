@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.FilterSpec where
 
 import qualified Data.Text as Text
@@ -32,93 +34,133 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       toJson
       fromJson
       (Filter.HasCardType CardType.Creature)
-      "{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}"
+      """ {"type":"HasCardType","value":{"type":"Creature"}} """
   Spec.it s "HasSupertype" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.HasSupertype Supertype.Basic)
-      "{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Basic\"}}"
+      """ {"type":"HasSupertype","value":{"type":"Basic"}} """
   Spec.it s "HasColor" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.HasColor Color.Black)
-      "{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}}"
+      """ {"type":"HasColor","value":{"type":"Black"}} """
   Spec.it s "HasSubtype" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.HasSubtype Subtype.Mountain)
-      "{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}"
+      """ {"type":"HasSubtype","value":{"type":"Mountain"}} """
   Spec.it s "HasKeyword" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.HasKeyword Keyword.Flying)
-      "{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}"
+      """ {"type":"HasKeyword","value":{"type":"Flying"}} """
   Spec.it s "PowerAtLeast" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.PowerAtLeast 4)
-      "{\"type\":\"PowerAtLeast\",\"value\":4}"
+      """ {"type":"PowerAtLeast","value":4} """
   Spec.it s "ControlledBy" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.ControlledBy PlayerRelation.Opponent)
-      "{\"type\":\"ControlledBy\",\"value\":{\"type\":\"Opponent\"}}"
+      """ {"type":"ControlledBy","value":{"type":"Opponent"}} """
   Spec.it s "IsPlayer" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.IsPlayer PlayerRelation.Opponent)
-      "{\"type\":\"IsPlayer\",\"value\":{\"type\":\"Opponent\"}}"
+      """ {"type":"IsPlayer","value":{"type":"Opponent"}} """
   Spec.it s "IsSource" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsSource "{\"type\":\"IsSource\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsSource
+      """ {"type":"IsSource"} """
   Spec.it s "IsAttacking" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsAttacking "{\"type\":\"IsAttacking\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttacking
+      """ {"type":"IsAttacking"} """
   Spec.it s "IsBlocking" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsBlocking "{\"type\":\"IsBlocking\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsBlocking
+      """ {"type":"IsBlocking"} """
   Spec.it s "AttackedThisTurn" $
-    Common.assertJsonCodec s toJson fromJson Filter.AttackedThisTurn "{\"type\":\"AttackedThisTurn\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.AttackedThisTurn
+      """ {"type":"AttackedThisTurn"} """
   Spec.it s "IsAttachedToCreature" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsAttachedToCreature "{\"type\":\"IsAttachedToCreature\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttachedToCreature
+      """ {"type":"IsAttachedToCreature"} """
   Spec.it s "IsAttachedToPermanent" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsAttachedToPermanent "{\"type\":\"IsAttachedToPermanent\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttachedToPermanent
+      """ {"type":"IsAttachedToPermanent"} """
   Spec.it s "CanHostSubject" $
-    Common.assertJsonCodec s toJson fromJson Filter.CanHostSubject "{\"type\":\"CanHostSubject\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.CanHostSubject
+      """ {"type":"CanHostSubject"} """
   Spec.it s "IsToken" $
-    Common.assertJsonCodec s toJson fromJson Filter.IsToken "{\"type\":\"IsToken\"}"
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsToken
+      """ {"type":"IsToken"} """
   Spec.it s "And" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.And [Filter.HasCardType CardType.Land, Filter.HasSupertype Supertype.Basic])
-      "{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Basic\"}}]}"
+      """ {"type":"And","value":[{"type":"HasCardType","value":{"type":"Land"}},{"type":"HasSupertype","value":{"type":"Basic"}}]} """
   Spec.it s "Or" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Enchantment])
-      "{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}}]}"
+      """ {"type":"Or","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"HasCardType","value":{"type":"Enchantment"}}]} """
   Spec.it s "Not" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Filter.Not (Filter.HasColor Color.Black))
-      "{\"type\":\"Not\",\"value\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}}}"
+      """ {"type":"Not","value":{"type":"HasColor","value":{"type":"Black"}}} """
   -- Moved from Pawl.CodecSpec's "filter (P9)" group: nested And/Or/Not, one
   -- fixture per named card, exercising the recursion the per-constructor cases
   -- above do not.

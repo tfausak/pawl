@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.CounteringSpec where
 
 import qualified Pawl.Codec.Common as Common
@@ -19,4 +21,4 @@ spec s =
           Countering.source = ObjectId.MkObjectId 5,
           Countering.controller = PlayerId.MkPlayerId 1
         }
-      "{\"spell\":4,\"source\":5,\"controller\":1}"
+      """ {"spell":4,"source":5,"controller":1} """

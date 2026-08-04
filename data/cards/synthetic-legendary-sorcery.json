@@ -1,11 +1,6 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [],
   "name": "Synthetic Legendary Sorcery",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -25,20 +20,11 @@
               }
             ]
           }
-        ],
-        "targetSpecs": []
+        ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
     "supertypes": [
       {
         "type": "Legendary"

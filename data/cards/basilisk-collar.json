@@ -2,7 +2,6 @@
   "activatedAbilities": [
     {
       "cost": {
-        "components": [],
         "mana": [
           {
             "type": "Generic",
@@ -36,19 +35,13 @@
               }
             ]
           }
-        ],
-        "selection": {
-          "type": "ChooseExactly",
-          "value": 1
-        }
+        ]
       },
       "timing": {
         "type": "SorcerySpeed"
       }
     }
   ],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -56,20 +49,6 @@
     }
   ],
   "name": "Basilisk Collar",
-  "power": null,
-  "replacementEffects": [],
-  "spell": {
-    "modes": [
-      {
-        "effects": [],
-        "targetSpecs": []
-      }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
-  },
   "staticAbilities": [
     {
       "affected": {
@@ -91,15 +70,12 @@
       ]
     }
   ],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
         "type": "Equipment"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Artifact"

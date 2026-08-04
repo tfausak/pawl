@@ -1,7 +1,4 @@
 {
-  "activatedAbilities": [],
-  "castingPermissions": [],
-  "keywords": [],
   "manaCost": [
     {
       "type": "Generic",
@@ -18,8 +15,6 @@
     }
   ],
   "name": "Inner Calm, Outer Strength",
-  "power": null,
-  "replacementEffects": [],
   "spell": {
     "modes": [
       {
@@ -102,22 +97,14 @@
           }
         ]
       }
-    ],
-    "selection": {
-      "type": "ChooseExactly",
-      "value": 1
-    }
+    ]
   },
-  "staticAbilities": [],
-  "toughness": null,
-  "triggeredAbilities": [],
   "typeLine": {
     "subtypes": [
       {
         "type": "Arcane"
       }
     ],
-    "supertypes": [],
     "types": [
       {
         "type": "Instant"
