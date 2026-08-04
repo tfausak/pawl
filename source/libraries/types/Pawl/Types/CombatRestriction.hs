@@ -4,9 +4,9 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 
 -- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an effect saying a
--- creature can't attack, or can't attack unless some condition is met, and the
--- same sentence with "block" in place of "attack". Pacifism states both in one
--- line, and prints one of each arm below.
+-- creature can't attack, or can't attack unless some condition is met -- or the
+-- sentence CR 509.1b writes with "block" in place of "attack". Pacifism states
+-- both in one line, and prints one of each arm below.
 --
 -- The FIFTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
@@ -18,7 +18,9 @@ import qualified Pawl.Types.Condition as Condition
 --
 -- What is different is that this is ONE type where the requirements are two, and
 -- the reason is the AXIS. CR 508.1d and CR 509.1c each imply a subject and an
--- object, and the two requirement carriers collapse opposite ones. A restriction
+-- object, and the two requirement carriers collapse opposite ones -- a blocking
+-- requirement carries the attacker to be blocked and no subject, an attacking
+-- requirement carries the subject and no object. A restriction
 -- carries only the SUBJECT on BOTH sides: Pacifism's two halves are the same
 -- Affected twice, so the only thing distinguishing them is which declaration
 -- they forbid. Splitting them would copy the requirements' shape without the
@@ -51,7 +53,9 @@ import qualified Pawl.Types.Condition as Condition
 -- its restriction with nothing to unwind. The gate is re-read on the same
 -- schedule: CR 508.1 and CR 509.1 make the declaration a SEQUENCE OF STEPS, of
 -- which CR 508.1c and CR 509.1b are one, so the only moment a gate's answer has
--- to be right is the moment it is asked. CR 509.1b's own note that an evasion
+-- to be right is the moment it is asked, and a gate that stops holding
+-- re-imposes the restriction with nothing to unwind either. CR 509.1b's note
+-- that an evasion
 -- ability gained after a legal block does not affect that block is the rules
 -- saying the same thing.
 --
@@ -60,7 +64,8 @@ import qualified Pawl.Types.Condition as Condition
 -- Giant". Nothing is the unconditional restriction (Pacifism), which is not the
 -- same as a condition that never holds: the two would answer alike today, but
 -- only one of them is what the card says. A Condition states the gate because
--- CR 508.1c's condition is a predicate over game STATE.
+-- CR 508.1c's condition is a predicate over game STATE, which is the type
+-- Pawl.Types.Condition already is.
 --
 -- The "you" inside the condition is CR 109.5's: the controller of the permanent
 -- the restriction is printed on, which is not necessarily the controller of the
@@ -68,12 +73,14 @@ import qualified Pawl.Types.Condition as Condition
 -- apart; a conditional Aura would.
 data CombatRestriction
   = -- | CR 508.1c: these creatures can't attack, unless the gate holds. Pacifism
-    -- (ungated) and Blind-Spot Giant (gated). CR 702.3b's defender keyword stays
-    -- a Keyword, because rule 702 is part of the rulebook and a keyword's
-    -- meaning is the closed half's to know.
+    -- (ungated) and Blind-Spot Giant (gated) are the pool's printed attacking
+    -- restrictions that are not CR 702.3b's defender keyword, which stays a
+    -- Keyword because rule 702 is part of the rulebook and a keyword's meaning
+    -- is the closed half's to know.
     CantAttack Affected.Affected (Maybe Condition.Condition)
-  | -- | CR 509.1b: these creatures can't block, unless the gate holds. Every
-    -- other blocking restriction in the pool today is an evasion keyword on the
+  | -- | CR 509.1b: these creatures can't block, unless the gate holds.
+    -- Pacifism's second half and Blind-Spot Giant's are the pool's only printed
+    -- blocking restrictions; every other one today is an evasion keyword on the
     -- ATTACKER, which restricts being blocked rather than blocking.
     CantBlock Affected.Affected (Maybe Condition.Condition)
   deriving (Eq, Ord, Show)

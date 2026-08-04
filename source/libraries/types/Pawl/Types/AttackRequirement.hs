@@ -5,7 +5,8 @@ import qualified Pawl.Types.Affected as Affected
 -- | CR 508.1d: one printed ATTACKING REQUIREMENT. Curse of the Nightly Hunt's
 -- "creatures enchanted player controls attack each combat if able".
 --
--- The twin of Pawl.Types.BlockRequirement, which argues why neither
+-- The FOURTH carrier of a printed static ability, and the twin of
+-- Pawl.Types.BlockRequirement, which argues why neither
 -- Pawl.Types.StaticAbility nor Pawl.Types.PlayerStaticAbility can hold a
 -- requirement. The two collapse opposite axes, because the printings do:
 -- BlockRequirement carries only the attacker to be blocked, its subject always

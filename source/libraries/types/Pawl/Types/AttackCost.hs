@@ -27,6 +27,8 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- attack AT ALL, and Pawl.Engine.Combat.canAttackGiven drops every one of them
 -- from CR 508.1a's candidate list. A creature under a Ghostly Prison is not one
 -- of them: it CAN attack, and does so the moment CR 508.1j's payment is made.
+-- Folding this into that type would either strike a payable attacker off the
+-- candidate list or teach a set of ids a cost it has nowhere to put.
 --
 -- The "YOU" is IMPLICIT and is the source's controller (CR 109.5), and the thing
 -- it names is the PLAYER. Pawl.Engine.AttackCost therefore charges an attack
@@ -45,7 +47,8 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- posture all five siblings take -- so a Ghostly Prison leaving the battlefield
 -- lifts its cost with nothing to unwind. CR 508.1h's "locked in" is the one
 -- moment that is deliberately NOT live, and it is Pawl.Engine.Combat's to
--- enforce: the total is computed once from the finished declaration.
+-- enforce: the total is computed once from the finished declaration and never
+-- recomputed.
 data AttackCost = MkAttackCost
   { -- | Which creatures the cost is on -- Ghostly Prison's "creatures". An
     -- Affected, and not a bare Filter, for the reason
@@ -71,7 +74,7 @@ data AttackCost = MkAttackCost
     -- A ManaCost and not a Pawl.Types.Cost, so it carries no components. CR
     -- 508.1h's list is wider than mana, but a cost to attack that is not mana has
     -- no printing here (#599). Mana alone is also what makes CR 508.1i's window
-    -- the whole of the payment.
+    -- plus CR 508.1j the whole payment, which Pawl.Engine.Mana.payCost is.
     perAttacker :: ManaCost.ManaCost
   }
   deriving (Eq, Ord, Show)
