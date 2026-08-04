@@ -170,8 +170,10 @@ startGameFromCards perform = do
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             -- CR 400.7: a hand-written zone move outside Event.changeZone, so
-            -- the per-incarnation reset it would have done has to be repeated
-            -- here for the field this task added.
+            -- every per-incarnation reset it would have done has to be repeated
+            -- here. This list is NOT the whole of that reset: `attachedTo`,
+            -- `enteredUnder`, `chosenColor` and `chosenSubtype` survive the move
+            -- (#653).
             Object.face = Nothing
           }
       cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
@@ -404,9 +406,11 @@ funnelBack finalSub parent =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
-            -- CR 400.7: a hand-written zone move outside Event.changeZone, so
-            -- the per-incarnation reset it would have done has to be repeated
-            -- here for the field this task added.
+            -- CR 400.7, exactly as startGameFromCards' own toLibraryCard: a
+            -- hand-written zone move outside Event.changeZone repeating that
+            -- reset, and repeating it INCOMPLETELY -- `attachedTo`,
+            -- `enteredUnder`, `chosenColor` and `chosenSubtype` survive here too
+            -- (#653).
             Object.face = Nothing
           }
       returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))

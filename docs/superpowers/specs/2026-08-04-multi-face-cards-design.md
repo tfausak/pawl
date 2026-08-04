@@ -60,7 +60,7 @@ parametric in `card` and `Card` instantiates it at itself, which is the
 established way this repo breaks such a cycle — no `hs-boot`, no narrowed
 stand-in type.
 
-Tying at `Face` instead would have made a double-faced token (CR 712.9)
+Tying at `Face` instead would have made a double-faced token (CR 707.8a)
 unrepresentable and churned every one of those type applications for nothing.
 
 ### 3.2 `Layout` is a rulebook enumeration
@@ -83,19 +83,23 @@ the whole change rests on, and it is what makes the 227-file migration safe.
 Two closed-half functions in `Pawl.Engine.Card`, both casing on `Layout`:
 
 - **`combined :: Card -> Face Card`** — CR 709.4, the characteristics a card has
-  in every zone except the stack. Under `Split`: the union of the faces'
-  supertypes, types, subtypes (CR 709.4c), keywords and abilities, and the
-  concatenation of their mana costs (CR 709.4b), from which colours and mana
-  value fall out. The name is the face names joined by `//` — see §4.1. Under
-  `Normal`: the sole face.
-- **`castableFaces :: Card -> [(CardName, Face Card)]`** — CR 709.3a, the faces
-  a player may propose to cast.
+  in every zone except the stack. Under `Split`: the union of the faces' card
+  types and abilities (CR 709.4c), of their supertypes and subtypes (CR 709.4
+  itself — a supertype and a subtype are characteristics under CR 109.3, and
+  709.4c narrows only the card types), of their keywords, and the concatenation
+  of their mana costs (CR 709.4b), from which colours and mana value fall out.
+  The name is the face names joined by `//` — see §4.1. Under `Normal`: the sole
+  face.
+- **`castableFaces :: Card -> [Face Card]`** — CR 709.3a, the faces a player may
+  propose to cast. A `Face` already carries its own `name`, so the pair the first
+  draft returned was redundant; `Cast.castableSpells` reads `Face.name` off it to
+  build each `Action.Cast`.
 
 `Object` gains `face :: Maybe CardName` — the face this object is on the stack
 with (CR 709.3b, "while on the stack, only the characteristics of the half being
 cast exist"). `Nothing` in every other zone, where the layout decides. That field
-is also where CR 712.8d/712.8e's "face that's up" will live when double-faced
-cards land.
+is also where CR 712.8f's "the face that's up" will live when double-faced cards
+land.
 
 The two seams where a card becomes characteristics — `Projection.baseCharacteristics`
 and `Projection.viewOfCard` — take the face from the object rather than the card,
@@ -137,15 +141,18 @@ and is deliberately not #649: this is a characteristic, that is a lookup.
 ## 5. Faces are referenced by name, not by index
 
 `faces` is a `NonEmpty` and keeps printed order, because several layouts have
-positional rules: CR 709.5's "left half"/"right half", CR 710.1a's "top
-half"/"bottom half", CR 712.8a's front face. Combining a mana cost needs a
+positional rules: CR 709.5's "left half"/"right half", CR 710.1a's "top half" and
+CR 710.1b's bottom, CR 712.8a's front face. Combining a mana cost needs a
 deterministic order too. But the *reference* to a face is its `CardName`.
 
 Order belongs to the container; identity belongs to the name. CR 709.4a says the
 card has those names, and in paper a player casts a half by naming it. A
 name-keyed `Action.Cast` in a `DecisionLog` — the canonical replayable artifact,
-`design.md` §2.10 — either replays correctly or fails loudly; an index silently
-replays as the wrong half if the card data is ever reordered.
+`design.md` §2.10 — replays correctly as long as the name still names a face,
+where an index silently replays as the wrong half if the card data is ever
+reordered. It does not fail loudly on a name that names none: `Game.resolveFace`
+falls back to CR 709.4's combined view, which the lint below is what keeps
+unreachable.
 
 Three consequences:
 
@@ -245,7 +252,12 @@ Gameplay-level tests, per `design.md` §4:
 3. Both halves are offered as legal actions from one card in hand, and each is
    priced from its own face (CR 709.3a).
 4. In hand and in the graveyard the card is both green and white with mana value
-   2, has both halves' abilities (CR 709.4b, CR 709.4c) and is named "Wax//Wane"
-   — the combined view — while the Wax on the stack is named "Wax" (CR 709.3b).
+   2 (CR 709.4b) and is named "Wax//Wane" — the combined view — while the Wax on
+   the stack is named "Wax" (CR 709.3b). This card does NOT prove CR 709.4c's
+   ability half: its two halves are vanilla instants whose only text is a spell
+   payload, and `Face.spell` is deliberately not merged (only the chosen half
+   ever resolves). The union of card types, subtypes, keywords and the three
+   printed ability lists is proven instead against `Pawl.CardSpec`'s hand-built
+   `splitCard`, whose halves differ on each of those axes.
 5. `named registry "Wax"` and `named registry "Wane"` both resolve the one card.
 6. The corpus lint holds that every card's face names are pairwise distinct.

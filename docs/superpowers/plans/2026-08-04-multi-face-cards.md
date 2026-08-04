@@ -83,7 +83,7 @@ Behaviour-preserving. Nothing in this task knows what a split card is; `Layout` 
 **Interfaces:**
 - Produces:
   - `Pawl.Types.Face.Face :: * -> *`, constructor `MkFace`, with exactly the 28 field names `Card` has today and the same types, except that the six recursive fields are parameterized: `spell :: Modal.Modal card`, `activatedAbilities :: [ActivatedAbility.ActivatedAbility card]`, `triggeredAbilities :: [TriggeredAbility.TriggeredAbility card]`, `delayedAbilities :: Map AbilityName (TriggeredAbility.TriggeredAbility card)`, `mulliganAction :: [Effect.Effect card]`, `openingHandAction :: [Effect.Effect card]`. `deriving (Eq, Ord, Show)`.
-  - `Pawl.Types.Layout.Layout = Normal`, `deriving (Bounded, Enum, Eq, Ord, Show)`.
+  - `Pawl.Types.Layout.Layout = Normal`, `deriving (Eq, Ord, Show)`.
   - `Pawl.Types.Card.Card = MkCard { layout :: Layout.Layout, faces :: NonEmpty.NonEmpty (Face.Face Card) }`, `deriving (Eq, Ord, Show)`.
   - `Pawl.Engine.Card.combined :: Card.Card -> Face.Face Card.Card`
   - `Pawl.Engine.Card.faceNamed :: CardName.CardName -> Card.Card -> Maybe (Face.Face Card.Card)`
@@ -168,7 +168,7 @@ data Layout
   = -- | A card with exactly one face: every card printed without a second set
     -- of characteristics, which is the whole pool today.
     Normal
-  deriving (Bounded, Enum, Eq, Ord, Show)
+  deriving (Eq, Ord, Show)
 ```
 
 - [ ] **Step 4: Create `Pawl.Types.Face` by moving the record out of `Card`**
@@ -178,16 +178,17 @@ Cut lines 33-237 of `source/libraries/types/Pawl/Types/Card.hs` into the new mod
 The module header replaces `Card`'s:
 
 ```haskell
--- | CR 709.4 / 712.8 / 715.2: one set of printed characteristics. A card has one
+-- | CR 709.1 / 712.8 / 715.2: one set of printed characteristics. A card has one
 -- or more of these; which of them are live depends on the card's Layout and on
 -- where the object is, which is Pawl.Engine.Card's question and not this
 -- module's.
 --
 -- Parametric in `card` so Pawl.Types.Card can close the loop at itself: the six
 -- fields below that carry card-shaped payloads (a token a spell defines, an
--- ability's own modal payload) name a whole CARD, not a face, because CR 712.9's
--- double-faced tokens are cards too. That keeps every `Modal Card` and
--- `Effect Card` in the codebase unchanged and avoids an hs-boot cycle.
+-- ability's own modal payload) name a whole CARD, not a face, because CR 707.8a's
+-- double-faced tokens carry two faces of their own and pawl represents a token
+-- with the very same Card value. That keeps every `Modal Card` and `Effect Card`
+-- in the codebase unchanged and avoids an hs-boot cycle.
 module Pawl.Types.Face where
 ```
 
@@ -196,11 +197,11 @@ Also move `Pawl.Codec.Card.defaultSpell` here as `Face.defaultSpell :: Modal.Mod
 - [ ] **Step 5: Reduce `Pawl.Types.Card` to the container**
 
 ```haskell
--- | CR 108.1: a card. Its printed characteristics live on its FACES; this type
+-- | CR 108.2: a card. Its printed characteristics live on its FACES; this type
 -- is the container and the layout that says how they combine.
 --
 -- The knot is tied here rather than in Pawl.Types.Face so that a token-defining
--- effect keeps naming a whole card (CR 712.9), and so no `Modal Card` in the
+-- effect keeps naming a whole card (CR 707.8a), and so no `Modal Card` in the
 -- codebase has to change.
 module Pawl.Types.Card where
 
@@ -433,11 +434,11 @@ combined card = case Card.layout card of
   Layout.Normal -> NonEmpty.head (Card.faces card)
   -- CR 709.4: "In every zone except the stack, the characteristics of a split
   -- card are those of its two halves combined." Written over the whole
-  -- NonEmpty rather than over a pair. NOT because CR 709 is arity-agnostic --
-  -- it says "two" four times (709.1, 709.2, 709.4, 709.4a). Because design.md
-  -- section 2.11 is a standing rule not to bake arity into the card model, and
-  -- because the five-part Who // What // When // Where // Why -- a silver-border
-  -- Un-card, outside the CR -- costs an arity-general fold nothing.
+  -- NonEmpty rather than over a pair because docs/design.md section 2.11 is a
+  -- standing rule against baking arity into the card model: every
+  -- tournament-legal split card has exactly two faces, but a fold over N costs
+  -- nothing to write and so also covers Who // What // When // Where // Why, a
+  -- five-part split card from a silver-border Un-set, entirely outside the CR.
   Layout.Split -> foldSplit (Card.faces card)
 ```
 
@@ -460,9 +461,14 @@ merge2 l r =
       -- CR 709.4b: "the combined mana costs of its two halves", from which
       -- colours and mana value fall out with no further arm.
       Face.manaCost = concatCosts (Face.manaCost l) (Face.manaCost r),
-      -- CR 709.4c: "each card type specified on either of its halves".
+      -- CR 709.4c: "each card type specified on either of its halves" -- see
+      -- unionTypeLines for where the other two sets of the type line come from.
       Face.typeLine = unionTypeLines (Face.typeLine l) (Face.typeLine r),
+      -- CR 709.4c again: a keyword is the printed NAME of an ability the object
+      -- has (CR 702.1).
       Face.keywords = Set.union (Face.keywords l) (Face.keywords r),
+      -- CR 709.4: the colour indicator is a characteristic (CR 109.3), and no
+      -- subrule narrows it the way 709.4b narrows the mana cost.
       Face.colorIndicator = Set.union (Face.colorIndicator l) (Face.colorIndicator r),
       -- CR 709.4c: "each ability in the text box of each half".
       Face.staticAbilities = Face.staticAbilities l <> Face.staticAbilities r,
@@ -481,9 +487,10 @@ merge2 l r =
       Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
       Face.mulliganAction = Face.mulliganAction l <> Face.mulliganAction r,
       Face.openingHandAction = Face.openingHandAction l <> Face.openingHandAction r,
-      -- The first half that has one. No split card in the pool prints a
-      -- permanent half, so these are unexercised (#648's deferral list); CR
-      -- 709.5's shared-type-line cards are what will need a real answer.
+      -- The first half that has one. CR 709.4 does not say how two printed
+      -- power/toughness/loyalty boxes or two enchant abilities combine, and
+      -- taking the left half's is not implemented as anything the rule
+      -- sanctions (#658).
       Face.power = firstJust (Face.power l) (Face.power r),
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),

@@ -70,9 +70,15 @@ merge2 l r =
       -- CR 709.4b: "the combined mana costs of its two halves", from which
       -- colours and mana value fall out with no further arm.
       Face.manaCost = concatCosts (Face.manaCost l) (Face.manaCost r),
-      -- CR 709.4c: "each card type specified on either of its halves".
+      -- CR 709.4c: "each card type specified on either of its halves" -- see
+      -- unionTypeLines for where the other two sets of the type line come from.
       Face.typeLine = unionTypeLines (Face.typeLine l) (Face.typeLine r),
+      -- CR 709.4c again: a keyword is the NAME of an ability the object has (CR
+      -- 702.1), so "each ability in the text box of each half" is what unions
+      -- these.
       Face.keywords = Set.union (Face.keywords l) (Face.keywords r),
+      -- CR 709.4: the colour indicator is a characteristic (CR 109.3), and no
+      -- subrule narrows it the way 709.4b narrows the mana cost.
       Face.colorIndicator = Set.union (Face.colorIndicator l) (Face.colorIndicator r),
       -- CR 709.4c: "each ability in the text box of each half".
       Face.staticAbilities = Face.staticAbilities l <> Face.staticAbilities r,
@@ -94,9 +100,10 @@ merge2 l r =
       Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
       Face.mulliganAction = Face.mulliganAction l <> Face.mulliganAction r,
       Face.openingHandAction = Face.openingHandAction l <> Face.openingHandAction r,
-      -- The first half that has one. No split card in the pool prints a
-      -- permanent half, so these are unexercised (#648's deferral list); CR
-      -- 709.5's shared-type-line cards are what will need a real answer.
+      -- The first half that has one. CR 709.4 does not say how two printed
+      -- power/toughness/loyalty boxes or two enchant abilities combine, and
+      -- taking the left half's is not implemented as anything the rule
+      -- sanctions (#658).
       Face.power = firstJust (Face.power l) (Face.power r),
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
@@ -130,9 +137,11 @@ concatCosts l r = case (l, r) of
 costSymbols :: Maybe ManaCost.ManaCost -> [ManaSymbol.ManaSymbol]
 costSymbols = foldMap ManaCost.unwrap
 
--- CR 709.4c: "each card type specified on either of its halves" reaches every
--- set a TypeLine carries, not card types alone -- a supertype or subtype
--- printed on either half is on the combined view too.
+-- CR 709.4c names the card types: "A split card has each card type specified on
+-- either of its halves". The supertypes and subtypes come from CR 709.4 itself
+-- -- "the characteristics of a split card are those of its two halves combined"
+-- -- since a supertype or subtype is a characteristic (CR 109.3) and 709.4c does
+-- not narrow the type line to its middle set.
 unionTypeLines :: TypeLine.TypeLine -> TypeLine.TypeLine -> TypeLine.TypeLine
 unionTypeLines l r =
   TypeLine.MkTypeLine

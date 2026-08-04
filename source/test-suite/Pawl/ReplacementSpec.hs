@@ -104,7 +104,7 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 -- already duplicate singleModeAbility the same way) rather than centralizing
 -- a helper this small in Support.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
-theAbility p = case Face.activatedAbilities (S.faceOf p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
 

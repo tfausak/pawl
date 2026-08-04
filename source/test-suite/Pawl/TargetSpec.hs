@@ -263,7 +263,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (mongooseId, pikerId, gs) = restrictionBoard mongoose piker S.alice
-    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.faceOf sorcerer)) of
+    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
       [theSpec] -> do
         let legal = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) legal) "the Piker is a legal any-target"
@@ -335,7 +335,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (gs, cancelId) = S.handOne cancel onStack
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    case soleTargetSpec (Face.spell (S.faceOf cancel)) of
+    case soleTargetSpec (Face.spell (S.combinedFace cancel)) of
       Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
       Just theSpec ->
         Spec.assertBool
@@ -359,7 +359,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let base = S.landsInPlay island 3
         (victimId, withVictim) = S.spellOnStack mongoose S.bob base
         (cancelId, gs) = S.spellOnStack cancel S.alice withVictim
-    case soleTargetSpec (Face.spell (S.faceOf cancel)) of
+    case soleTargetSpec (Face.spell (S.combinedFace cancel)) of
       Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
       Just theSpec -> do
         let legal = Target.legalRecipients (Just S.alice) cancelId theSpec gs
@@ -382,7 +382,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   Spec.it s "CR 115.5 does not stop Prodigal Sorcerer's ability targeting its own source" $ do
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (sorcererId, gs) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
-    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.faceOf sorcerer)) of
+    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
       [theSpec] ->
         Spec.assertBool
           s
@@ -476,7 +476,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (bogleId, pikerId, gs) = restrictionBoard bogle piker S.alice
-    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.faceOf sorcerer)) of
+    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
       [theSpec] -> do
         let mine = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
             theirs = Target.legalRecipients (Just S.bob) S.noSource theSpec gs
@@ -602,7 +602,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     stifle <- S.printingOf s registry "Stifle"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     piker <- S.printingOf s registry "Goblin Piker"
-    case Face.activatedAbilities (S.faceOf sorcerer) of
+    case Face.activatedAbilities (S.combinedFace sorcerer) of
       [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
       ability : _ -> do
         let (srcId, withSorcerer) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
@@ -613,7 +613,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
             abilIds = filter (/= spellId) (GameState.stack gs)
             -- soleTargetSpec, not S.spellTargetSpec: neither card calls its slot
             -- "target" -- Cancel's is "spell" and Stifle's is "ability".
-            legalFor printing = fmap (\theSpec -> Target.legalRecipients (Just S.bob) S.noSource theSpec gs) (soleTargetSpec (Face.spell (S.faceOf printing)))
+            legalFor printing = fmap (\theSpec -> Target.legalRecipients (Just S.bob) S.noSource theSpec gs) (soleTargetSpec (Face.spell (S.combinedFace printing)))
         case (abilIds, legalFor cancel, legalFor stifle) of
           ([abilId], Just cancelLegal, Just stifleLegal) -> do
             Spec.assertEqWith s "Cancel sees the spell and only the spell" cancelLegal (Set.singleton (Recipient.ToObject spellId))
@@ -733,7 +733,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (mineId, g2) = S.addGraveyardCard piker S.alice g1
         (myBoltId, g3) = S.addGraveyardCard bolt S.alice g2
         (theirsId, gs) = S.addGraveyardCard piker S.bob g3
-        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.faceOf wretch))
+        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace wretch))
     case (wretchSpecs, S.spellTargetSpec raiseDead) of
       ([wretchSpec], Just raiseDeadSpec) -> do
         let legal theSpec = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
@@ -770,7 +770,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (mineId, g2) = S.addGraveyardCard piker S.alice g1
         (theirsId, g3) = S.addGraveyardCard piker S.bob g2
         board = g3 {GameState.priority = Just S.alice}
-    case Face.activatedAbilities (S.faceOf wretch) of
+    case Face.activatedAbilities (S.combinedFace wretch) of
       [ability] -> do
         let exiling oid = S.runPure (aimAtCard oid) (S.runPure (aimAtCard oid) board (Activate.activateAbility S.alice wretchId ability)) Stack.resolveTop
             mine = exiling mineId
@@ -799,7 +799,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let (wretchId, g1) = S.addCreature wretch S.alice (S.landsInPlay swamp 1)
         (theirsId, g2) = S.addGraveyardCard piker S.bob g1
         board = g2 {GameState.priority = Just S.alice}
-    case Face.activatedAbilities (S.faceOf wretch) of
+    case Face.activatedAbilities (S.combinedFace wretch) of
       [ability] -> do
         let activated = S.runPure (aimAtCard theirsId) board (Activate.activateAbility S.alice wretchId ability)
             resolve g = S.runPure (aimAtCard theirsId) g Stack.resolveTop
@@ -845,8 +845,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (buriedId, g2) = S.addGraveyardCard piker S.alice g1
         (hersId, g3) = S.addExiledCard piker S.alice g2
         (hisId, gs) = S.addExiledCard bolt S.bob g3
-        riftSpecs = Maybe.mapMaybe (soleTargetSpec . TriggeredAbility.modal) (Face.triggeredAbilities (S.faceOf riftsweeper))
-        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.faceOf wretch))
+        riftSpecs = Maybe.mapMaybe (soleTargetSpec . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace riftsweeper))
+        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace wretch))
     case (riftSpecs, wretchSpecs) of
       ([riftSpec], [wretchSpec]) -> do
         let legal theSpec = Target.legalRecipients (Just S.alice) S.noSource theSpec gs

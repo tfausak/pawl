@@ -433,8 +433,8 @@ viewUpTo bound cands gs oid =
 -- matched by a search. No projection exists there, so every axis is read from the
 -- printed face and power/controller are Nothing.
 viewOfCard :: Face.Face Card.Type.Card -> Filter.View
-viewOfCard card =
-  let typeLine = Face.typeLine card
+viewOfCard face =
+  let typeLine = Face.typeLine face
    in Filter.MkView
         { Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
@@ -442,12 +442,12 @@ viewOfCard card =
           -- the battlefield is projected (#160), so devoid is applied here
           -- rather than inherited from a fold this object never enters.
           Filter.colors =
-            if definesColorless (Face.keywords card)
+            if definesColorless (Face.keywords face)
               then Set.empty
-              else printedColorsOf card,
+              else printedColorsOf face,
           Filter.subtypes = TypeLine.subtypes typeLine,
           -- CR 702: read off the printed face, like the type line above.
-          Filter.keywords = Face.keywords card,
+          Filter.keywords = Face.keywords face,
           Filter.power = Nothing,
           Filter.controller = Nothing,
           -- Not an object, so no identity for IsSource to compare.
@@ -552,8 +552,8 @@ copiableCharacteristics oid gs =
 -- the star to sit in (CR 208.1) -- a card with one and not the other is
 -- malformed data, and yields no CDA rather than a partial one.
 seedCharacteristicPT :: Face.Face Card.Type.Card -> Maybe (Quantity.Type.Quantity, Quantity.Type.Quantity)
-seedCharacteristicPT card =
-  case (Face.characteristicPT card, Face.power card, Face.toughness card) of
+seedCharacteristicPT face =
+  case (Face.characteristicPT face, Face.power face, Face.toughness face) of
     (Just star, Just (Power.MkPower p), Just (Toughness.MkToughness t)) ->
       Just (Quantity.substituteStar star p, Quantity.substituteStar star t)
     _ -> Nothing
@@ -627,10 +627,10 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
 -- of their layer (5 for colour, CR 613.1e), not before the fold begins.
 -- applyColorDefining is where it lands.
 printedColorsOf :: Face.Face Card.Type.Card -> Set Color.Color
-printedColorsOf card =
+printedColorsOf face =
   Set.union
-    (Face.colorIndicator card)
-    (manaCostColors (Face.manaCost card))
+    (Face.colorIndicator face)
+    (manaCostColors (Face.manaCost face))
 
 -- CR 702.114a. The one place that decides what devoid means, so the fold and the
 -- off-battlefield card view cannot drift apart on it.

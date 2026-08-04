@@ -1105,7 +1105,7 @@ creaturesInPlay pid gs =
   let isCreatureObject oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.isCreature (faceOf printing)
+          Source.OfCard printing -> Card.isCreature (combinedFace printing)
           Source.OfToken card -> Card.isCreature (Card.combined card)
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
@@ -1125,8 +1125,12 @@ nameOf = Face.name . Card.combined
 -- that reaches past Printing.card goes through. Card.combined for nameOf's
 -- reason: a characteristic belongs to a face, and which face a card shows is
 -- Pawl.Engine.Card's question.
-faceOf :: Printing.Printing -> Face.Face Card.Type.Card
-faceOf = Card.combined . Printing.card
+--
+-- Named for the view it builds. Pawl.Engine.Game.faceOf answers a DIFFERENT
+-- question -- which face is this OBJECT showing (CR 709.3b) -- and the two
+-- carried one name between them.
+combinedFace :: Printing.Printing -> Face.Face Card.Type.Card
+combinedFace = Card.combined . Printing.card
 
 countByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countByName wanted pid gs =

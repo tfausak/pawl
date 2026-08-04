@@ -1361,7 +1361,7 @@ zombieTokenOf sarcomancy pikerFallback =
   let created effect = case effect of
         Effect.Create _ card _ _ -> Just card
         _ -> Nothing
-      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities (S.faceOf sarcomancy))
+      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace sarcomancy))
    in case Maybe.mapMaybe created abilityEffects of
         card : _ -> card
         [] -> Printing.card pikerFallback
@@ -2112,7 +2112,7 @@ counterTriggerSpec s registry =
           sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
           piker <- S.printingOf s registry "Goblin Piker"
           mountain <- S.printingOf s registry "Mountain"
-          case Face.activatedAbilities (S.faceOf sorcerer) of
+          case Face.activatedAbilities (S.combinedFace sorcerer) of
             [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
             ability : _ -> do
               -- bob: Baral, three Islands, one library card, and both a Cancel
@@ -2653,7 +2653,7 @@ permanentDiesSpec s registry =
           Spec.assertEqWith
             s
             "one triggered ability, with that condition"
-            (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.faceOf meren)))
+            (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace meren)))
             [TriggerCondition.PermanentDies anotherCreatureYouControl]
 
 -- CR 603.6c's FIRST written form, and the whole of its first clause:

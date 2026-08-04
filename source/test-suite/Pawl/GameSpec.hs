@@ -216,7 +216,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
 
   Spec.it s "a vanilla printing declares no static abilities" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    Spec.assertEqWith s "empty" (Face.staticAbilities (S.faceOf piker)) []
+    Spec.assertEqWith s "empty" (Face.staticAbilities (S.combinedFace piker)) []
 
 actionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 actionSpec s registry = Spec.describe s "Action" $ do
@@ -993,9 +993,9 @@ declareAttackersAskAnswer p = case p of
 -- group-local helpers (CostSpec, ActivateSpec, ReplacementSpec each carry
 -- their own).
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Face.activatedAbilities (S.faceOf p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.faceOf p)) ActivationTiming.AnyTime
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.combinedFace p)) ActivationTiming.AnyTime
 
 -- Records every player asked Prompt.Concede, in order -- the
 -- concedeOrderAnswer shape -- and drives alice through exactly one Activate
@@ -1454,7 +1454,7 @@ handBobBolt lightningBolt gs =
 namedIs :: CardName.CardName -> Maybe Object.Object -> Bool
 namedIs wanted mo = case mo of
   Just o -> case Object.source o of
-    Source.OfCard printing -> Face.name (S.faceOf printing) == wanted
+    Source.OfCard printing -> Face.name (S.combinedFace printing) == wanted
     Source.OfToken card -> S.nameOf card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False

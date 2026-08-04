@@ -89,7 +89,7 @@ chooseNoModes p = case p of
 -- empty-ability fallback is unreachable in these fixtures, and honors the
 -- no-partial-functions rule (no `error`).
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Face.activatedAbilities (S.faceOf p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
 
@@ -520,7 +520,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   Spec.it s "CR 702.29a the minted ability is '{2}, Discard this card: Draw a card'" $ do
     mauler <- S.printingOf s registry "Barkhide Mauler"
     (oid, gs) <- cyclingBoard s registry
-    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.faceOf mauler)) []
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.combinedFace mauler)) []
     case Activate.abilitiesFor oid gs of
       [ability] -> do
         Spec.assertEqWith

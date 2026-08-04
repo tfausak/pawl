@@ -5,7 +5,7 @@
 --
 -- Parametric in `card` so Pawl.Types.Card can close the loop at itself: the six
 -- fields below that carry card-shaped payloads (a token a spell defines, an
--- ability's own modal payload) name a whole CARD, not a face, because CR 712.9's
+-- ability's own modal payload) name a whole CARD, not a face, because CR 707.8a's
 -- double-faced tokens carry two faces of their own and pawl represents a token
 -- with the very same Card value. That keeps every `Modal Card` and `Effect Card`
 -- in the codebase unchanged and avoids an hs-boot cycle.

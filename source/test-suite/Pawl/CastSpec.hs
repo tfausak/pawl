@@ -119,11 +119,12 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 1 Phase.PrecombatMain
     Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice gs))) "not offered"
-  -- The mechanism, against Pawl.CardSpec's hand-built fixture: two Instant
-  -- halves, Wax costing {G} and Wane costing {W}, and nothing else printed on
-  -- either. waxWaneSpec below asserts the same rules against the printed Wax //
-  -- Wane, which is what proves the card data; this pair says the gate is the
-  -- layout's and does not depend on what those halves happen to do.
+  -- The mechanism, against Pawl.CardSpec's hand-built fixture: Wax a green
+  -- instant costing {G}, Wane a white sorcery costing {W}, and each half
+  -- carrying inert text that only Pawl.CardSpec's CR 709.4 merge test reads.
+  -- waxWaneSpec below asserts the same rules against the printed Wax // Wane,
+  -- which is what proves the card data; this pair says the gate is the layout's
+  -- and does not depend on what those halves happen to do.
   Spec.it s "CR 709.3a both halves are offered, each priced from its own half" $ do
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
@@ -229,7 +230,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
           Spec.assertEqWith s "zone" (Object.zone obj) Zone.Battlefield
           case Object.source obj of
             Source.OfCard printing ->
-              Spec.assertBool s (Card.isCreature (S.faceOf printing)) "creature"
+              Spec.assertBool s (Card.isCreature (S.combinedFace printing)) "creature"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
@@ -338,7 +339,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
           Spec.assertEqWith s "zone" (Object.zone obj) Zone.Stack
           case Object.source obj of
             Source.OfCard printing ->
-              Spec.assertEqWith s "name" (Face.name (S.faceOf printing)) (CardName.MkCardName $ Text.pack "Goblin Piker")
+              Spec.assertEqWith s "name" (Face.name (S.combinedFace printing)) (CardName.MkCardName $ Text.pack "Goblin Piker")
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
@@ -1019,7 +1020,7 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
-        specs = Card.modesTargetSpecs (Set.singleton (ModeIndex.MkModeIndex 0)) (S.faceOf unholyStrength)
+        specs = Card.modesTargetSpecs (Set.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
     Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet specs)
     Spec.assertEqWith
       s
@@ -1145,7 +1146,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     Spec.assertEqWith
       s
       "and the printed mana cost is still {R}"
-      (Face.manaCost (S.faceOf firebolt))
+      (Face.manaCost (S.combinedFace firebolt))
       (Just (ManaCost.MkManaCost [theRed]))
   Spec.it s "CR 118.3 four Mountains do not pay the flashback {4}{R}; five do" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1214,7 +1215,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature jace S.alice gs)
-    Spec.assertBool s (not (Card.isCreature (S.faceOf jace))) "not a creature"
+    Spec.assertBool s (not (Card.isCreature (S.combinedFace jace))) "not a creature"
     Spec.assertBool s (S.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery)) (Action.legalActions S.alice board)) "and offered as a legal action"
   Spec.it s "CR 205.4e not castable with no legendary permanent at all" $ do
@@ -1779,10 +1780,14 @@ castFirstOption p = case p of
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
+-- Does the object with this id show this name? CR 709.3b: through Game.faceOf,
+-- so a spell with a half singled out is matched on THAT half's name rather than
+-- on CR 709.4's joined one. No caller passes a split card today, so the two
+-- readings agree on every id this sees.
 nameOnStack :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
   Just o -> case Object.source o of
-    Source.OfCard printing -> Face.name (S.faceOf printing) == wanted
+    Source.OfCard _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
     Source.OfToken card -> S.nameOf card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False

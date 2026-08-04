@@ -454,7 +454,7 @@ lifelinkSpec s registry =
           equipped = (S.attach collarId srcId g1) {GameState.priority = Just S.alice}
           bare = g1 {GameState.priority = Just S.alice}
           ping board ability = S.runPure pingsBob board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-      case Face.activatedAbilities (S.faceOf prodigalSorcerer) of
+      case Face.activatedAbilities (S.combinedFace prodigalSorcerer) of
         [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
         ability : _ -> do
           let withCollar = ping equipped ability
@@ -564,7 +564,7 @@ lastKnownRiderSpec s registry =
     Spec.it s "CR 702.15c/702.2e a sacrificed Basilisk Collar'd Fire-Eater still deals lifelink deathtouch damage" $ do
       ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
       basiliskCollar <- S.printingOf s registry "Basilisk Collar"
-      case Face.activatedAbilities (S.faceOf ghituFireEater) of
+      case Face.activatedAbilities (S.combinedFace ghituFireEater) of
         [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
         ability : _ -> do
           let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
@@ -604,7 +604,7 @@ lastKnownRiderSpec s registry =
     Spec.it s "CR 702.15b/613.1b a stolen Fire-Eater's lifelink pays the THIEF, not its owner" $ do
       ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
       basiliskCollar <- S.printingOf s registry "Basilisk Collar"
-      case Face.activatedAbilities (S.faceOf ghituFireEater) of
+      case Face.activatedAbilities (S.combinedFace ghituFireEater) of
         [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
         ability : _ -> do
           let (srcId, g0) = S.addCreature ghituFireEater S.bob (Setup.emptyGame S.bothPlayers)
@@ -641,7 +641,7 @@ lastKnownRiderSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       basiliskCollar <- S.printingOf s registry "Basilisk Collar"
       humility <- S.printingOf s registry "Humility"
-      case Face.activatedAbilities (S.faceOf prodigalSorcerer) of
+      case Face.activatedAbilities (S.combinedFace prodigalSorcerer) of
         [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
         ability : _ -> do
           let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)

@@ -1649,7 +1649,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
 -- the spec needs a value; a printing with no ability would fail the assertions that
 -- follow rather than this lookup.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Face.activatedAbilities (S.faceOf p) of
+theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
 

@@ -623,7 +623,7 @@ replaySpec s registry =
       acPrinting <- S.printingOf s registry "Aether Channeler"
       let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
           decider = Decide.deciderFor S.alice gs
-      case Face.triggeredAbilities (S.faceOf acPrinting) of
+      case Face.triggeredAbilities (S.combinedFace acPrinting) of
         [ability] -> do
           let legal = Target.fillableModes Nothing acId Map.empty (TriggeredAbility.modal ability) gs
               p = Prompt.ChooseModes decider S.alice acId legal 1

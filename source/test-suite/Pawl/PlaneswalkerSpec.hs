@@ -53,7 +53,7 @@ import qualified Pawl.Types.Zone as Zone
 -- the first card in the pool with more than one activated ability and CR 606.6 is
 -- a claim about WHICH of them is offered.
 abilityAt :: Int -> Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilityAt i p = take 1 (drop i (Face.activatedAbilities (S.faceOf p)))
+abilityAt i p = take 1 (drop i (Face.activatedAbilities (S.combinedFace p)))
 
 -- The Activate action for one of Jace's abilities, as a one-or-zero-element list
 -- so a fixture that finds no such ability produces an assertion failure rather

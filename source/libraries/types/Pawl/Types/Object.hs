@@ -136,8 +136,9 @@ data Object = MkObject
     -- token-definition card a Create names) cannot dangle it. A name that no
     -- longer names a face of that card falls back to the combined view
     -- (Game.resolveFace) rather than failing -- unreachable in practice, since
-    -- the corpus lint (#648) holds a card's face names pairwise distinct and the
-    -- only writer of this field draws the name from that same card's faces.
+    -- Pawl.CardSpec's "a card's face names are pairwise distinct" corpus lint
+    -- holds that of every loadable card, and the only writer of this field draws
+    -- the name from that same card's faces.
     --
     -- Per-incarnation state, like damage and counters: cleared by changeZone,
     -- because CR 400.7 makes the moved object a new one.

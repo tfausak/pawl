@@ -12,4 +12,4 @@ data Layout
   | -- | CR 709.1: "Split cards have two card faces on a single card. The back
     -- of a split card is the normal Magic card back."
     Split
-  deriving (Bounded, Enum, Eq, Ord, Show)
+  deriving (Eq, Ord, Show)

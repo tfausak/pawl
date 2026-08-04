@@ -475,7 +475,7 @@ assaultBoard mountain assault mine piker =
 
 -- The card's one printed activated ability.
 assaultAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
-assaultAbility assault = case Face.activatedAbilities (S.faceOf assault) of
+assaultAbility assault = case Face.activatedAbilities (S.combinedFace assault) of
   [] -> Nothing
   ability : _ -> Just ability
 

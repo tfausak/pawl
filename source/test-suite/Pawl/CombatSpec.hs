@@ -2322,7 +2322,7 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
 -- activated ability rather than a spell). The first is the land's "{T}: Add
 -- {C}".
 removalAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
-removalAbility printing = case Face.activatedAbilities (S.faceOf printing) of
+removalAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
   [_, ability] -> Just ability
   _ -> Nothing
 

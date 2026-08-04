@@ -103,15 +103,15 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   Spec.describe s "honesty round-trip over allPrintings" $ do
     Spec.it s "P1: Printing.Codec.fromJson . Printing.Codec.toJson == Right" $ do
       ps <- S.allPrintings s
-      mapM_ (\p -> Spec.assertEqWith s (show (Face.name (S.faceOf p))) (Printing.Codec.fromJson (Printing.Codec.toJson p)) (Right p)) ps
+      mapM_ (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Printing.Codec.fromJson (Printing.Codec.toJson p)) (Right p)) ps
     Spec.it s "P2: through text" $ do
       ps <- S.allPrintings s
       mapM_
-        (\p -> Spec.assertEqWith s (show (Face.name (S.faceOf p))) (Common.parse (Common.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
+        (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Common.parse (Common.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
         ps
     Spec.it s "M4e Cancel loads as a single Counter effect targeting a spell" $ do
       cancel <- S.printingOf s registry "Cancel"
-      let card = S.faceOf cancel
+      let card = S.combinedFace cancel
       Spec.assertEqWith
         s
         "effects"
@@ -133,7 +133,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     -- it to become (hence the Nothing beside Pool.Abilities).
     Spec.it s "CR 113.9 Stifle loads as the same Counter effect over Pool.Abilities" $ do
       stifle <- S.printingOf s registry "Stifle"
-      let card = S.faceOf stifle
+      let card = S.combinedFace stifle
       Spec.assertEqWith
         s
         "effects"
@@ -154,12 +154,12 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
       Spec.assertEqWith
         s
         "Rending Volley says it"
-        (Face.counterability (S.faceOf rendingVolley))
+        (Face.counterability (S.combinedFace rendingVolley))
         Counterability.CantBeCountered
       Spec.assertEqWith
         s
         "Cancel does not, and its file has no counterability key"
-        (Face.counterability (S.faceOf cancel))
+        (Face.counterability (S.combinedFace cancel))
         Counterability.Counterable
   Spec.describe s "P4 runtime types" $ do
     -- A real permanent, not a projection of a nonexistent object: Typhoid

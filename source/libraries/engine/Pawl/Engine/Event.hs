@@ -288,10 +288,18 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- per-incarnation field, so the new object enters under its owner's
               -- control until a CR 616.1b replacement says otherwise --
               -- Replacement.runEntry is the only writer. `chosenColor` and
-              -- `chosenSubtype` are reset for the same reason (CR 614.1c). So is
-              -- `face` (CR 400.7): the moved object is a new one, and whichever
-              -- half CR 709.3b singled out belonged only to the incarnation that
-              -- left -- a face named in the new zone is Game.faceOf's business.
+              -- `chosenSubtype` are reset for the same reason (CR 614.1c).
+              --
+              -- `face` is cleared under CR 400.7 as well, which is right for the
+              -- one layout that ships: whichever half CR 709.3b singled out
+              -- belonged only to the incarnation that left, and CR 709.4 gives
+              -- the split card its two halves combined everywhere but the stack.
+              -- It is NOT right in general -- CR 712.13: "a resolving
+              -- double-faced spell that becomes a permanent is put onto the
+              -- battlefield with the same face up that was face up on the
+              -- stack", so a stack-to-battlefield move must CARRY the face
+              -- rather than drop it. Not implemented; no double-faced card is in
+              -- the pool to reach it (#657).
               mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.timestamp = ts, Object.face = Nothing}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g

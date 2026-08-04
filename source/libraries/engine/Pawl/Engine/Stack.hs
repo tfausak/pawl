@@ -58,10 +58,15 @@ resolveTopWith runSubgame = do
           -- is read off THAT half, not the two combined -- routed through
           -- Game.faceOf rather than Card.combined directly, so this
           -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
-          -- OTHER characteristic read of a stack object already does (#648
-          -- still owes Cost.hs and Action.hs the same change). Falls back to
-          -- the combined view for parity with faceOf's own fallback;
-          -- unreachable here since `obj` already resolved via this same `oid`.
+          -- OTHER characteristic read of a stack object already does
+          -- (Cost.costsFor resolves the same way, through Game.resolveFace).
+          -- Action.playableLands stays on Card.combined on purpose: Action.Play
+          -- carries no face, and the layout that would make a land's halves
+          -- differ is CR 712.12's modal double-faced card, which has not landed.
+          --
+          -- Falls back to the combined view for parity with faceOf's own
+          -- fallback; unreachable here since `obj` already resolved via this
+          -- same `oid`.
           let face = Maybe.fromMaybe (Card.combined (Printing.card printing)) (Game.faceOf oid gs)
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid

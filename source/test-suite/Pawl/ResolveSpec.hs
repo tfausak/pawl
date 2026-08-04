@@ -296,7 +296,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         -- The slot lives on the ENTRY TRIGGER, not the spell, so
         -- Card.allTargetSpecs (which covers the spell and the enchant slot)
         -- is the wrong door -- read the ability the card actually prints.
-        specs = fmap (Modal.allTargetSpecs . TriggeredAbility.modal) (Face.triggeredAbilities (S.faceOf ravenousRats))
+        specs = fmap (Modal.allTargetSpecs . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace ravenousRats))
     case concatMap Map.elems specs of
       [theSpec] ->
         Spec.assertEqWith
@@ -657,7 +657,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 608.2n a resolving ability deals its damage and ceases" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
-        ability = case Face.activatedAbilities (S.faceOf prodigalSorcerer) of
+        ability = case Face.activatedAbilities (S.combinedFace prodigalSorcerer) of
           ab : _ -> ab
           [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
         (abilId, g1) = Game.freshObjectId g0
@@ -944,7 +944,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           Face.MkFace
             { Face.name = CardName.MkCardName $ Text.pack "Subgame Test Spell",
               Face.manaCost = Nothing,
-              Face.typeLine = Face.typeLine (S.faceOf lightningBolt),
+              Face.typeLine = Face.typeLine (S.combinedFace lightningBolt),
               Face.power = Nothing,
               Face.toughness = Nothing,
               Face.loyalty = Nothing,
@@ -1013,7 +1013,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           Face.MkFace
             { Face.name = CardName.MkCardName $ Text.pack "Subgame Test Spell (Three Seats, One Departed)",
               Face.manaCost = Nothing,
-              Face.typeLine = Face.typeLine (S.faceOf lightningBolt),
+              Face.typeLine = Face.typeLine (S.combinedFace lightningBolt),
               Face.power = Nothing,
               Face.toughness = Nothing,
               Face.loyalty = Nothing,
@@ -1770,7 +1770,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
 -- rather than silently picking whichever came first (Pawl.TargetSpec's
 -- soleTargetSpec is the same shape for the same reason).
 soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
-soleActivatedAbility p = case Face.activatedAbilities (S.faceOf p) of
+soleActivatedAbility p = case Face.activatedAbilities (S.combinedFace p) of
   [only] -> Just only
   _ -> Nothing
 

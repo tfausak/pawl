@@ -1597,7 +1597,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
           [] -> ObjectId.MkObjectId 999
         (_, g1) = S.addCreature march S.alice gs0
         (coatingId, g2) = S.addCreature coating S.alice g1
-        ability = case Face.activatedAbilities (S.faceOf coating) of
+        ability = case Face.activatedAbilities (S.combinedFace coating) of
           ab : _ -> Just ab
           [] -> Nothing
     case ability of
@@ -1765,7 +1765,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   Spec.it s "viewOfCard reads a printed basic land's supertypes off the battlefield" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let face = S.faceOf mountain
+    let face = S.combinedFace mountain
         view = Projection.viewOfCard face
     Spec.assertBool s (Set.member CardType.Land (Filter.cardTypes view)) "is a land"
     Spec.assertBool s (Set.member Supertype.Basic (Filter.supertypes view)) "is basic"

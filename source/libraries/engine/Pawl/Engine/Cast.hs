@@ -547,6 +547,13 @@ castSpell pid oid name = do
           -- 709.4's combined view -- entwineOffer's keywords and the CR 613
           -- projection included. Event.changeZone cleared the field on the way
           -- in (CR 400.7), so this is a write onto a fresh object.
+          --
+          -- JUST AFTER the move, not during it: anything that runs inside CR
+          -- 601.2a -- a CR 616.1 entry replacement, or a trigger the move fires
+          -- -- reads the stack object before this stamp lands, and so sees CR
+          -- 709.4's combined view instead of the chosen half. Not implemented;
+          -- no card in the pool replaces or triggers on a cast card's move to
+          -- the stack (#659).
           State.modify'
             ( \g ->
                 g

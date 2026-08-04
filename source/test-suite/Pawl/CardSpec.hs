@@ -157,26 +157,79 @@ vanillaFace name typeLine =
       Face.counterability = Counterability.Counterable
     }
 
-instantLine :: TypeLine.TypeLine
-instantLine =
+-- A spell's printed type line: one card type, plus whatever supertypes and
+-- subtypes sit beside it.
+spellLine :: CardType.CardType -> Set.Set Supertype.Supertype -> Set.Set Subtype.Subtype -> TypeLine.TypeLine
+spellLine cardType supertypes subtypes =
   TypeLine.MkTypeLine
-    { TypeLine.supertypes = Set.empty,
-      TypeLine.types = Set.singleton CardType.Instant,
-      TypeLine.subtypes = Set.empty
+    { TypeLine.supertypes = supertypes,
+      TypeLine.types = Set.singleton cardType,
+      TypeLine.subtypes = subtypes
     }
 
--- CR 709.4's fixture: two Instant halves, Wax costing {G} and Wane costing
--- {W}, so the combined view's colours, mana value and type line are each a
--- genuine union rather than a copy of one half. Built by hand for the faceNamed
--- fixture's reason, which the printed Wax // Wane does not retire: this group
--- takes no Registry, so a card file is not reachable from here at all.
+instantLine :: TypeLine.TypeLine
+instantLine = spellLine CardType.Instant Set.empty Set.empty
+
+-- "You draw this many cards" -- the smallest payload an ability can carry, used
+-- below only so that two abilities can be told apart by their effect.
+youDraw :: Integer -> Effect.Effect Card.Type.Card
+youDraw n = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal n)
+
+-- "This object has [keyword]" as a static ability (CR 604.1), the smallest
+-- carrier Face.staticAbilities takes.
+grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility
+grantsItself keyword =
+  StaticAbility.MkStaticAbility
+    (Affected.Matching Filter.Type.IsSource)
+    (NonEmpty.singleton (Modification.GainKeyword keyword))
+
+-- CR 709.4's fixture: two halves that DIFFER on every axis Pawl.Engine.Card.merge2
+-- unions, so a merge that dropped a union line -- or took one half's value alone
+-- -- fails the group below instead of passing on a value the halves happened to
+-- share. Wax is a green Arcane instant, Wane a white snow Trap sorcery.
+--
+-- Everything past each half's name and mana cost is there to make one merge line
+-- observable, and is deliberately INERT rather than plausible: a combat keyword
+-- on a spell; a static ability on a card no projection ever gathers, since
+-- Pawl.Engine.Projection.gather walks the battlefield and this card only ever
+-- reaches a hand or the stack; and a dies trigger with no permanent to die. What
+-- is under test is CR 709.4c's union, not what either printing would mean.
+--
+-- Built by hand for the faceNamed fixture's reason, which the printed Wax // Wane
+-- does not retire: this group takes no Registry, so a card file is not reachable
+-- from here at all. And the printed card could not stand in even if it were --
+-- its two halves are vanilla instants that share every field but name and cost,
+-- which is exactly the shape that leaves the union lines unexercised.
 splitCard :: Card.Type.Card
 splitCard =
   Card.Type.MkCard
     { Card.Type.layout = Layout.Split,
-      Card.Type.faces =
-        (vanillaFace "Wax" instantLine) {Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.Green)]}
-          NonEmpty.:| [(vanillaFace "Wane" instantLine) {Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.White)]}]
+      Card.Type.faces = waxFace NonEmpty.:| [waneFace]
+    }
+
+-- splitCard's left half, and the one CastSpec casts: {G} buys it with a single
+-- Forest, which is what makes CR 709.3a's per-half pricing observable there.
+waxFace :: Face.Face Card.Type.Card
+waxFace =
+  (vanillaFace "Wax" (spellLine CardType.Instant Set.empty (Set.singleton Subtype.Arcane)))
+    { Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.Green)],
+      Face.keywords = Set.singleton Keyword.Flying,
+      Face.staticAbilities = [grantsItself Keyword.Flying],
+      Face.activatedAbilities = [oneEffectActivated (costOf []) (youDraw 1)],
+      Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 1)]
+    }
+
+-- Wax's opposite number, differing on every field Wax prints: a different card
+-- type, subtype and keyword, a supertype Wax has none of, and abilities that draw
+-- a different number of cards so the concatenation's ORDER is checkable too.
+waneFace :: Face.Face Card.Type.Card
+waneFace =
+  (vanillaFace "Wane" (spellLine CardType.Sorcery (Set.singleton Supertype.Snow) (Set.singleton Subtype.Trap)))
+    { Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.White)],
+      Face.keywords = Set.singleton Keyword.Trample,
+      Face.staticAbilities = [grantsItself Keyword.Trample],
+      Face.activatedAbilities = [oneEffectActivated (costOf []) (youDraw 2)],
+      Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)]
     }
 
 cardSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -221,8 +274,38 @@ cardSpec s = Spec.describe s "Card" $ do
     -- "Assault//Battery").
     Spec.assertEqWith s "the joined name" (Face.name c) (CardName.MkCardName (Text.pack "Wax//Wane"))
     -- CR 709.4c: "A split card has each card type specified on either of its
-    -- halves and each ability in the text box of each half."
-    Spec.assertEqWith s "each card type" (TypeLine.types (Face.typeLine c)) (Set.singleton CardType.Instant)
+    -- halves and each ability in the text box of each half." Both halves
+    -- contribute, and they contribute DIFFERENT values -- a merge that kept one
+    -- half's type line, keyword set or ability list fails each of these.
+    Spec.assertEqWith s "each card type" (TypeLine.types (Face.typeLine c)) (Set.fromList [CardType.Instant, CardType.Sorcery])
+    -- CR 709.4: the rest of the type line is combined for the reason 709.4c's
+    -- card types are -- a supertype and a subtype are characteristics (CR 109.3)
+    -- and no subrule narrows them. See Pawl.Engine.Card.unionTypeLines.
+    Spec.assertEqWith s "each subtype" (TypeLine.subtypes (Face.typeLine c)) (Set.fromList [Subtype.Arcane, Subtype.Trap])
+    -- One-sided on purpose: only Wane is snow. A merge line replaced by the LEFT
+    -- half's value -- which is what a record update over `l` already does -- would
+    -- leave this empty.
+    Spec.assertEqWith s "the right half's supertype" (TypeLine.supertypes (Face.typeLine c)) (Set.singleton Supertype.Snow)
+    -- CR 709.4c again: a keyword is the printed NAME of an ability (CR 702.1).
+    Spec.assertEqWith s "each keyword" (Face.keywords c) (Set.fromList [Keyword.Flying, Keyword.Trample])
+    -- The three ability lists CR 709.4c's "each ability in the text box of each
+    -- half" reaches, each asserted in PRINTED order (left half then right), so a
+    -- merge that concatenated the halves the other way round fails too.
+    Spec.assertEqWith
+      s
+      "each static ability"
+      (Face.staticAbilities c)
+      [grantsItself Keyword.Flying, grantsItself Keyword.Trample]
+    Spec.assertEqWith
+      s
+      "each activated ability"
+      (Face.activatedAbilities c)
+      [oneEffectActivated (costOf []) (youDraw 1), oneEffectActivated (costOf []) (youDraw 2)]
+    Spec.assertEqWith
+      s
+      "each triggered ability"
+      (Face.triggeredAbilities c)
+      [oneEffectTrigger TriggerCondition.SelfDies (youDraw 1), oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)]
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*).
@@ -1495,7 +1578,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         collides = anyFace cardSlotNamesCollide . Printing.card
         -- Dream's Grip's own two modes, renamed to one shared slot: the exact
         -- authoring the card avoids, and the CR 702.42a fusion it would cause.
-        face = S.faceOf dreamsGrip
+        face = S.combinedFace dreamsGrip
         fuse mode = mode {Mode.targetSpecs = Map.mapKeys (const creature) (Mode.targetSpecs mode)}
         fused = face {Face.spell = (Face.spell face) {Modal.modes = fmap fuse (Modal.modes (Face.spell face))}}
     Spec.assertBool s (cardSlotNamesCollide (face {Face.activatedAbilities = [shared]})) "two modes sharing one name are rejected"
@@ -1556,7 +1639,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- offender and this one calls correct (#544).
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
-    let abilitiesOf p = fmap ((,) (Face.name (S.faceOf p))) (Face.activatedAbilities (S.faceOf p))
+    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
         offends (_, ab) =
           Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab))
@@ -1569,7 +1652,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "X read iff {X} declared" (fmap fst (filter offends abilities)) []
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
-    -- Every FACE of every token, since CR 712.9's double-faced token names two.
+    -- Every FACE of every token, since CR 707.8a's double-faced token names two.
     let tokensOf face = concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create _ token _ _ <- cardResolutionEffects face]
         tokens = concatMap (overFaces tokensOf . Printing.card) ps
     -- Guards the sweep against passing vacuously if Create ever moves out
@@ -1578,7 +1661,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no token is misnamed" (fmap Face.name (filter tokenNameOffends tokens)) []
   Spec.it s "the lint itself catches a token named without the suffix" $ do
     doomedTraveler <- S.printingOf s registry "Doomed Traveler"
-    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create _ token _ _ <- cardResolutionEffects (S.faceOf doomedTraveler)] of
+    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create _ token _ _ <- cardResolutionEffects (S.combinedFace doomedTraveler)] of
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
@@ -1633,7 +1716,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         withDelayed slot card =
           card {Face.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Face.delayedAbilities card)}
         catches slot graft printing =
-          let face = graft slot (S.faceOf printing)
+          let face = graft slot (S.combinedFace printing)
            in (reservedDeclarations face, Map.member slot (Card.allTargetSpecs face))
     Spec.assertEqWith
       s
@@ -1658,12 +1741,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "an activated ability's ordinary slot is in the sweep but not the spell-modes view"
-      (Set.member target (declaredTargetSlots (S.faceOf sorcerer)), Map.member target (Card.allTargetSpecs (S.faceOf sorcerer)))
+      (Set.member target (declaredTargetSlots (S.combinedFace sorcerer)), Map.member target (Card.allTargetSpecs (S.combinedFace sorcerer)))
       (True, False)
     Spec.assertEqWith
       s
       "and the three real cards declare no reserved slot"
-      (fmap (reservedDeclarations . S.faceOf) [roaches, sorcerer, tidalWave])
+      (fmap (reservedDeclarations . S.combinedFace) [roaches, sorcerer, tidalWave])
       [Set.empty, Set.empty, Set.empty]
   -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
   -- ArmDelayedTrigger naming an ability the card does not declare is a FAILING
@@ -1722,7 +1805,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- that offends a lint must not be loadable.
   Spec.it s "the lint itself catches an onset over an EachTurn condition" $ do
     towershell <- S.printingOf s registry "Meandering Towershell"
-    let face = S.faceOf towershell
+    let face = S.combinedFace towershell
         -- The Towershell's own condition with CR 603.2b's OTHER turn scope: "at
         -- the beginning of EACH declare attackers step", which an opponent's
         -- turn satisfies. Built rather than pattern-matched, so this fixture
@@ -1742,7 +1825,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- Not a check that fires for every card: one with no onset at all has
     -- nothing for this to reject, whatever its delayed abilities are scoped to.
     tidalWave <- S.printingOf s registry "Tidal Wave"
-    Spec.assertBool s (not (onsetOffends (S.faceOf tidalWave))) "a card with no onset is not swept up"
+    Spec.assertBool s (not (onsetOffends (S.combinedFace tidalWave))) "a card with no onset is not swept up"
   -- The same subset shape over a card's TRIGGERED abilities, which is where
   -- the condition-specific reserved slots live -- CR 400.7e's `became` and
   -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
@@ -1783,14 +1866,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and under a combat-damage trigger it is accepted"
     Spec.assertBool
       s
-      (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.faceOf roaches))))
+      (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
   -- The same subset shape over a card's ACTIVATED abilities, whose available
   -- side is the narrowest of the three: an activation has no event, and is never
   -- given CR 109.5's `you`. See activatedAbilityOffends for the available side.
   Spec.it s "every slot an activated ability reads is bound for its activation" $ do
     ps <- S.allPrintings s
-    let abilitiesOf p = fmap ((,) (Face.name (S.faceOf p))) (Face.activatedAbilities (S.faceOf p))
+    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
         readsAnySlot ab = not (Set.null (Set.unions (fmap Resolve.slotsOf (Modal.allEffects (ActivatedAbility.modal ab)))))
     -- Guards the sweep against passing vacuously, in both directions: an empty
@@ -1866,7 +1949,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "Longtusk Cub, Prodigal Sorcerer and Cinder Elemental are all accepted"
-      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.faceOf) [longtuskCub, sorcerer, cinderElemental])
+      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental])
       [False, False, False]
   -- The PER-MODE half of all three read lints (#570), which no sweep above can
   -- reach: a one-mode ability cannot have a mode read another mode's slot at
@@ -1937,7 +2020,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no shared-zone scope with a non-EachPlayer ref" (fmap (S.nameOf . Printing.card) offenders) []
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let card = S.faceOf piker
+    let card = S.combinedFace piker
     Spec.assertEqWith s "no enchant spec" (Face.enchant card) Nothing
     Spec.assertBool s (not (Card.isAura card)) "not an Aura"
     Spec.assertEqWith s "no enchant slot" (Card.enchantSpecs card) Map.empty
@@ -1997,7 +2080,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- a card file, since a card that offends a lint must not be loadable.
   Spec.it s "the lint itself catches a baked whosePhase" $ do
     eonHub <- S.printingOf s registry "Eon Hub"
-    let card = S.faceOf eonHub
+    let card = S.combinedFace eonHub
         bake replacement = case replacement of
           ReplacementEffect.PhaseR phasePattern ->
             ReplacementEffect.PhaseR phasePattern {PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
@@ -2022,7 +2105,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- static replacement ability, so the baking here is on what
     -- cardReplacementEffects reports rather than on Face.replacementEffects --
     -- which is the sweep's own input either way.
-    let printed = cardReplacementEffects (S.faceOf fog)
+    let printed = cardReplacementEffects (S.combinedFace fog)
         bakeRecipient replacement = case replacement of
           ReplacementEffect.DamageR damagePattern rewrite ->
             ReplacementEffect.DamageR
@@ -2090,12 +2173,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "Aura Graft's one atom is framed by its own attach"
-      (canHostSubjectCounts (S.faceOf graft))
+      (canHostSubjectCounts (S.combinedFace graft))
       (1, 0)
     Spec.assertEqWith
       s
       "and it is the pool's only one"
-      (sum (fmap (\p -> uncurry (+) (canHostSubjectCounts (S.faceOf p))) ps))
+      (sum (fmap (\p -> uncurry (+) (canHostSubjectCounts (S.combinedFace p))) ps))
       1
     -- The traversal reaches a Filter position no effect, target spec or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
@@ -2106,7 +2189,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       ( elem
           (False, Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic])
-          (cardFilters (S.faceOf barrens))
+          (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
@@ -2124,7 +2207,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     graft <- S.printingOf s registry "Aura Graft"
-    let base = S.faceOf piker
+    let base = S.combinedFace piker
         slot = SlotName.MkSlotName (Text.pack "target")
         atom = Filter.Type.CanHostSubject
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
@@ -2181,11 +2264,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 601.2f's sacrifice cost component",
-              (S.faceOf sorcerer)
+              (S.combinedFace sorcerer)
                 { Face.activatedAbilities =
                     fmap
                       (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice 1 buried]}})
-                      (Face.activatedAbilities (S.faceOf sorcerer))
+                      (Face.activatedAbilities (S.combinedFace sorcerer))
                 }
             ),
             ( "CR 702.29e's typecycling predicate",
@@ -2258,7 +2341,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "Aura Graft is accepted"
-      (canHostSubjectOffends (S.faceOf graft), canHostSubjectCounts (S.faceOf graft))
+      (canHostSubjectOffends (S.combinedFace graft), canHostSubjectCounts (S.combinedFace graft))
       (False, (1, 0))
     let grafted = base {Face.spell = spellOf [Effect.AttachTarget slot buried] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents Nothing))}
     Spec.assertEqWith
