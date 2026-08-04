@@ -485,9 +485,13 @@ merge2 l r =
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
       Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
-      Face.enchant = firstJust (Face.enchant l) (Face.enchant r),
-      Face.counterability = Face.counterability l
-      -- Face.spell is deliberately NOT merged: it stays the left half's, and
+      Face.enchant = firstJust (Face.enchant l) (Face.enchant r)
+      -- Face.counterability is NOT listed: record update keeps the left half's,
+      -- and writing `Face.counterability l` here would be a no-op. CR 113.6g is
+      -- a per-half ability, so the combined view taking the left half's is a
+      -- placeholder no split card exercises.
+      --
+      -- Face.spell is deliberately NOT merged either: it stays the left half's, and
       -- nothing ever casts it. CR 709.3b means the thing on the stack is always
       -- ONE half, so the combined view is never the payload that resolves --
       -- Task 4's castableFaces is what a cast reads. Merging the modes here
