@@ -20,6 +20,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
@@ -31,6 +32,7 @@ import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Mana as Mana
@@ -193,6 +195,32 @@ combatReplaySpec s =
         -- five, and it is the one ChooseLandTypeSwap's fallback already names.
         Spec.it s "defaultAnswer chooses Mountain" $
           Spec.assertEqWith s "Mountain" (Replay.defaultAnswer (Prompt.ChooseBasicLandType decider S.alice oid)) Subtype.Mountain
+        -- CR 201.4 / 614.1c: a card name chosen as a permanent enters (Null
+        -- Chamber). Unlike the two prompts above the answer is not drawn from a
+        -- fixed five, so what a collapsing codec would lose is any name at all
+        -- -- and the empty name is exactly what defaultAnswer falls back to,
+        -- which is why one of the round-tripped names is empty and the others
+        -- are not.
+        Spec.it s "ChooseCardName records and replays a CardName" $ do
+          let p = Prompt.ChooseCardName decider S.alice oid (Filter.Type.And [])
+          Monad.forM_ [Text.empty, Text.pack "Goblin Piker", Text.pack "Ash Barrens"] $ \name ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p (CardName.MkCardName name))) (Just (CardName.MkCardName name))
+        -- CR 201.2a: a transcript that runs short answers with the name no
+        -- object has, so the Chamber it replays prohibits nothing.
+        Spec.it s "defaultAnswer chooses no name" $
+          Spec.assertEqWith
+            s
+            "the empty name"
+            (Replay.defaultAnswer (Prompt.ChooseCardName decider S.alice oid (Filter.Type.And [])))
+            (CardName.MkCardName Text.empty)
+        -- CR 614.12a: which opponent an as-enters choice names. Its answer has
+        -- the same shape as ChooseDefender's, so the transcript has to tell the
+        -- two apart -- a shared Response constructor would replay a combat
+        -- declaration into Null Chamber's entry.
+        Spec.it s "ChooseOpponent records and replays a PlayerId, and rejects a defender" $ do
+          let p = Prompt.ChooseOpponent decider S.alice oid (S.bob NonEmpty.:| [])
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
+          Spec.assertEqWith s "a defender is not an answer to it" (Replay.decode p (Response.ChoseDefender S.bob)) Nothing
         -- CR 612.2's two word families are asked for by two prompts whose
         -- answers have the SAME shape, so the transcript has to tell them apart:
         -- a shared Response constructor would replay Magical Hack's basic land
