@@ -9,9 +9,11 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import Pawl.Types.Desync (Desync)
@@ -58,6 +60,8 @@ encode p answer = case p of
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
+  Prompt.ChooseCardName {} -> Response.ChoseCardName answer
+  Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
   Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
@@ -155,6 +159,12 @@ decode p response = case p of
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
     _ -> Nothing
+  Prompt.ChooseCardName {} -> case response of
+    Response.ChoseCardName n -> Just n
+    _ -> Nothing
+  Prompt.ChooseOpponent {} -> case response of
+    Response.ChoseOpponent pid -> Just pid
+    _ -> Nothing
   Prompt.ChooseBasicLandType {} -> case response of
     Response.ChoseBasicLandType t -> Just t
     _ -> Nothing
@@ -205,12 +215,12 @@ decode p response = case p of
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
 -- degrades into a deterministic default rather than crashing.
 --
--- Every arm below is a legal answer, and most are the LEAST EVENTFUL one -- but
--- "least eventful" is a statement about the choice, never a promise that the
--- game plays out the same. 'replay' therefore reports the first prompt that
--- reached this function (Pawl.Types.Desync); a caller that ignores the report
--- is reading a different game's final state. Each arm below notes only why its
--- answer is legal.
+-- Every arm below is a legal answer but one, and most are the LEAST EVENTFUL
+-- one -- but "least eventful" is a statement about the choice, never a promise
+-- that the game plays out the same. 'replay' therefore reports the first prompt
+-- that reached this function (Pawl.Types.Desync); a caller that ignores the
+-- report is reading a different game's final state. Each arm below notes only
+-- why its answer is legal, and ChooseCardName says why it deliberately is not.
 defaultAnswer :: Prompt r -> r
 defaultAnswer p = case p of
   Prompt.Shuffle ids -> ids
@@ -288,6 +298,17 @@ defaultAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
+  -- THE ONE ILLEGAL ANSWER, deliberately. CR 201.4 offers every card in the
+  -- Oracle card reference and no card is called "", so this names nothing -- and
+  -- CR 201.2a is why naming nothing is harmless: an object with no name doesn't
+  -- have the same name as any other object, so the prompt's asker prohibits
+  -- nothing. Every arm reaching here is already a reported desync (the
+  -- transcript ran out or did not match), and conjuring a REAL card's name would
+  -- silently prohibit that card in the replay instead.
+  Prompt.ChooseCardName {} -> CardName.MkCardName Text.empty
+  -- Every candidate is an opponent the card's own text offered, and the prompt
+  -- is raised only when there are two or more.
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   -- CR 305.6: any of the five basic land types is legal. Mountain is what the
   -- ChooseLandTypeSwap arm above falls back to, so the two agree on which type
   -- a short transcript conjures.

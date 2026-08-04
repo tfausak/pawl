@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
@@ -15,6 +16,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -317,6 +319,50 @@ data Prompt r where
   -- case to elide. Replacement's arm has an unreachable no-controller fallback
   -- beside it; see there.
   ChooseColor :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Color.Color
+  -- | CR 201.4 / 614.1c: as an object enters, a player chooses a card name ("you
+  -- and an opponent each choose a card name other than a basic land card name"
+  -- -- Null Chamber). The PlayerId is the CHOOSER, who is the entering object's
+  -- controller for one of Null Chamber's two asks and an opponent for the other;
+  -- the ObjectId is the entering object.
+  --
+  -- The one as-enters choice prompt whose chooser is not always the entering
+  -- object's controller, which is why the two are not assumed equal anywhere
+  -- this is raised. Pawl.Engine.Replacement asks in CR 101.4's APNAP order,
+  -- since both choices are made at the same time.
+  --
+  -- No candidate list, for ChooseCreatureTypeSwap's reason carried further: CR
+  -- 205.3m's creature types run to hundreds, and CR 201.4's "the name of a card
+  -- in the Oracle card reference" is not a set the engine holds at all. Nothing
+  -- in the layering forbids that -- Pawl.Registry sits ahead of the engine in
+  -- the table, so the edge would be legal -- but it is not wired, and wiring it
+  -- would hand the closed half a card-by-name lookup, which is the capability
+  -- design.md §1's invariant is enforced by withholding (see
+  -- Pawl.Engine.Card's header). #663 is that whole question.
+  --
+  -- The Filter is CR 201.4a's restriction, read off the card that asks: "the
+  -- player must choose the name of a card whose Oracle text matches those
+  -- characteristics", which for Null Chamber is "other than a basic land card
+  -- name". ADVISORY, like ChooseX's bound -- the answer is filtered against it
+  -- nowhere (#663), and for the same reason there is no candidate list.
+  ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Prompt CardName.CardName
+  -- | Which opponent an as-enters choice names -- Null Chamber's "you and AN
+  -- OPPONENT each choose a card name". The PlayerId is the chooser, the ObjectId
+  -- is the entering object, and the NonEmpty is that player's opponents. CR
+  -- 614.12a is what puts the ask before the permanent enters: "If a replacement
+  -- effect that modifies how a permanent enters the battlefield requires a
+  -- choice, that choice is made before the permanent enters the battlefield."
+  --
+  -- Its own prompt rather than a reuse of ChooseDefender, which also answers with
+  -- an opponent: that prompt asks CR 507.1's question, whom to attack, and a
+  -- responder that knows which prompt it is answering knows which question it was
+  -- asked.
+  --
+  -- WHO is asked is pawl's reading rather than a rule's: the card leaves "an
+  -- opponent" open and no rule assigns the pick, so it goes to the ability's
+  -- controller -- CR 109.5's "you", the player the card's other half already
+  -- names. Asked only when there are two or more: CR 102.2's two-player game
+  -- leaves exactly one opponent and nothing to ask.
+  ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 603.3b: each player, in APNAP order, puts the triggered abilities they
   -- control on the stack in any order they choose. The [TriggerEntry] is that
   -- player's pending triggers in the engine's canonical order; the answer is a

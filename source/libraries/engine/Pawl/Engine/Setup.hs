@@ -116,6 +116,7 @@ createCard pid printing = do
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -172,8 +173,8 @@ startGameFromCards perform = do
             -- CR 400.7: a hand-written zone move outside Event.changeZone, so
             -- every per-incarnation reset it would have done has to be repeated
             -- here. This list is NOT the whole of that reset: `attachedTo`,
-            -- `enteredUnder`, `chosenColor` and `chosenSubtype` survive the move
-            -- (#653).
+            -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
+            -- survive the move (#653).
             Object.face = Nothing
           }
       cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
@@ -409,8 +410,8 @@ funnelBack finalSub parent =
             -- CR 400.7, exactly as startGameFromCards' own toLibraryCard: a
             -- hand-written zone move outside Event.changeZone repeating that
             -- reset, and repeating it INCOMPLETELY -- `attachedTo`,
-            -- `enteredUnder`, `chosenColor` and `chosenSubtype` survive here too
-            -- (#653).
+            -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
+            -- survive here too (#653).
             Object.face = Nothing
           }
       returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))

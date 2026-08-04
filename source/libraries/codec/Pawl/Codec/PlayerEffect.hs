@@ -15,6 +15,8 @@ toJson :: PlayerEffect.PlayerEffect -> Value.Value
 toJson e = case e of
   PlayerEffect.CantCastSpells -> Common.nullary "CantCastSpells"
   PlayerEffect.CantCastMoreThan n -> Common.tagged "CantCastMoreThan" . Just $ Common.encodeNatural n
+  PlayerEffect.CantCastChosenName -> Common.nullary "CantCastChosenName"
+  PlayerEffect.CantPlayLandChosenName -> Common.nullary "CantPlayLandChosenName"
   PlayerEffect.IncreaseSpellCost c n -> Common.tagged "IncreaseSpellCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, Common.encodeNatural n]
   PlayerEffect.ReduceSpellCost c m -> Common.tagged "ReduceSpellCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m]
   PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
@@ -27,6 +29,8 @@ fromJson value = do
   case (t, mv) of
     ("CantCastSpells", _) -> Right PlayerEffect.CantCastSpells
     ("CantCastMoreThan", Just v) -> PlayerEffect.CantCastMoreThan <$> Common.decodeNatural v
+    ("CantCastChosenName", _) -> Right PlayerEffect.CantCastChosenName
+    ("CantPlayLandChosenName", _) -> Right PlayerEffect.CantPlayLandChosenName
     ("IncreaseSpellCost", Just (Value.Array (Array.MkArray [c, n]))) -> PlayerEffect.IncreaseSpellCost <$> Filter.fromJson Keyword.fromJson c <*> Common.decodeNatural n
     ("ReduceSpellCost", Just (Value.Array (Array.MkArray [c, m]))) -> PlayerEffect.ReduceSpellCost <$> Filter.fromJson Keyword.fromJson c <*> ManaCost.fromJson m
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize

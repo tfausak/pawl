@@ -3,13 +3,15 @@ module Pawl.Types.EntryRewrite where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 
 -- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
 -- (CR 707.5, and a real "may" -- declining is legal); ChoiceOf is Primal Plasma
 -- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c);
--- ChooseBasicLandType is Convincing Mirage (CR 614.1c); WithCounters is CR
--- 306.5b's intrinsic loyalty; UnderSourceControl is Gather Specimens (CR
--- 616.1b).
+-- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChooseCardNames is Null
+-- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
+-- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
 -- makes CR 707.2 fall out with no further machinery. CR 707.5's second half is
@@ -37,6 +39,24 @@ data EntryRewrite
     -- Written to Object.chosenSubtype rather than into the copiable snapshot,
     -- for ChooseColor's reason.
     ChooseBasicLandType
+  | -- | CR 614.1c with CR 201.4: as this object enters, its controller AND one
+    -- opponent each choose a card name ("As this enchantment enters, you and an
+    -- opponent each choose a card name other than a basic land card name" --
+    -- Null Chamber). Both names are written to Object.chosenNames, for
+    -- ChooseColor's reason.
+    --
+    -- TWO choosers in ONE arm, which is why this is not ChooseColor with a
+    -- PlayerScope bolted on. "You and an opponent" is not a PlayerScope: it
+    -- coincides with EachPlayer at two seats (CR 102.2) and diverges at three,
+    -- where the card names one opponent and the rest of the table choose
+    -- nothing.
+    --
+    -- The Filter is CR 201.4a's restriction on WHICH names may be chosen -- the
+    -- characteristics of the card whose name is named -- read off the card,
+    -- because "other than a basic land card name" is printed card text. Carried
+    -- and passed to the prompt so the answerer can obey it; the engine does not
+    -- check the answer against it (#663).
+    ChooseCardNames (Filter.Filter Keyword.Keyword)
   | -- | CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b's
     -- intrinsic loyalty ability is the one producer today.
     --

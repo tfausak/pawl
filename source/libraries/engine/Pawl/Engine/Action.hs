@@ -5,10 +5,12 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Action (Action)
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -18,18 +20,34 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Zone as Zone
 
+-- The hand cards this player may play as a land right now: CR 305.1's land
+-- cards, minus the ones an effect prohibits.
+--
+-- The PROHIBITION is asked here and not in legalActions' `canPlayLand` gate,
+-- because it is per-CARD rather than per-turn: CR 305.2/305.3's limits are about
+-- the player and settle the whole list at once, while Null Chamber's is about
+-- the land's name and stops one card while leaving the rest playable.
 playableLands :: PlayerId -> GameState -> [ObjectId]
 playableLands pid gs =
-  let isLandObject oid = case Game.lookupObject oid gs of
+  let -- The hand card's COMBINED face (CR 709.4), which answers both questions
+      -- this asks: whether it is a land at all (CR 305.1) and what it is named
+      -- (CR 201.1). Combined and not a chosen half, because Action.Play carries
+      -- no face -- see Pawl.Engine.Stack.resolveTopWith for why that is safe
+      -- until CR 712.12's modal double-faced card lands. A land with several
+      -- names would want a set here rather than one name (#650).
+      faceOfHandCard oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.isLand (Card.combined (Printing.card printing))
-          Source.OfToken card -> Card.isLand (Card.combined card)
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+          Source.OfCard printing -> Just (Card.combined (Printing.card printing))
+          Source.OfToken card -> Just (Card.combined card)
+          Source.OfAbility _ _ -> Nothing
+          Source.OfTrigger _ _ -> Nothing
+          Source.OfEmblem _ -> Nothing
+          Source.OfInherentTrigger _ _ -> Nothing
+        Nothing -> Nothing
+      playable oid = case faceOfHandCard oid of
         Nothing -> False
-   in filter isLandObject (Game.zoneMembers Zone.Hand pid gs)
+        Just face -> Card.isLand face && not (PlayerEffect.prohibitsPlayingLand pid (Face.name face) gs)
+   in filter playable (Game.zoneMembers Zone.Hand pid gs)
 
 legalActions :: PlayerId -> GameState -> [Action]
 legalActions pid gs =

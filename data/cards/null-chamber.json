@@ -1,0 +1,85 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Null Chamber",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantCastChosenName"
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        },
+        {
+          "effect": {
+            "type": "CantPlayLandChosenName"
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "replacementEffects": [
+        {
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "ChooseCardNames",
+              "value": {
+                "type": "Not",
+                "value": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasSupertype",
+                      "value": {
+                        "type": "Basic"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "World"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

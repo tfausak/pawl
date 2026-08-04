@@ -15,6 +15,7 @@
 -- projectUpTo can see one ("devoid applies at the START of layer 5").
 module Pawl.ColorSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -35,6 +36,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Face as Face
@@ -98,6 +100,8 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
 choosingBlue :: Prompt.Prompt r -> r
 choosingBlue p = case p of
   Prompt.ChooseColor {} -> Color.Blue
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   _ -> S.identityAnswer p
 
 -- Aims every ChooseTargets slot at one object, deferring the rest to

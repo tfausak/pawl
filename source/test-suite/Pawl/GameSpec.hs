@@ -170,6 +170,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
               Object.chosenSubtype = Nothing,
+              Object.chosenNames = Set.empty,
               -- changeZone draws a fresh timestamp; oneMountainState's
               -- nextTimestamp starts at 1 (object 0 already holds 0).
               Object.timestamp = Timestamp.MkTimestamp 1,
@@ -357,6 +358,8 @@ recordingAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
   Prompt.ChooseColor {} -> pure Color.White
+  Prompt.ChooseCardName {} -> pure (CardName.MkCardName mempty)
+  Prompt.ChooseOpponent _ _ _ opponents -> pure (NonEmpty.head opponents)
   Prompt.ChooseBasicLandType {} -> pure Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
@@ -1446,6 +1449,7 @@ handBobBolt lightningBolt gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -1507,6 +1511,8 @@ slaveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -1763,6 +1769,7 @@ restartOnStack mountain =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }

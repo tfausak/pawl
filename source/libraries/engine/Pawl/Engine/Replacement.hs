@@ -20,6 +20,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
@@ -505,6 +506,7 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> ReplacementBucket.Other
+  ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
@@ -553,6 +555,11 @@ readsApplier re = case re of
   -- whole offer whoever's row is applying (Painter's Servant).
   ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> False
   ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> False
+  -- Two choosers rather than one, and neither is the candidate's: the entering
+  -- object's controller is read live off the board for ChooseColor's reason, and
+  -- CR 102.2's opponent is derived from that same player. The restriction rides
+  -- the effect (CR 201.4a).
+  ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> False
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's loyalty included).
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> False
@@ -819,6 +826,55 @@ apply batch candidate event =
         consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenSubtype = Just picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
+      -- CR 614.1c with CR 201.4: Null Chamber's as-enters name choices. Unlike
+      -- the two arms above, this one has to settle WHO is asked before it can
+      -- ask anything: the card names its controller and one opponent, and CR
+      -- 101.4 puts their two simultaneous choices in APNAP order.
+      --
+      -- Written to Object.chosenNames, NOT to the copiable snapshot -- see
+      -- EntryRewrite.ChooseCardNames.
+      EntryRewrite.ChooseCardNames restriction -> do
+        gs <- State.get
+        picked <- case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for ChoiceOf's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner. Names NOTHING rather than
+          -- conjuring a name, which the two arms above cannot do -- their
+          -- fallbacks pick from a fixed five, and CR 201.4's offer is every card
+          -- in the Oracle card reference.
+          Nothing -> pure Set.empty
+          Just controller -> do
+            -- CR 102.1 makes a player one of the people IN the game, and CR
+            -- 104.3a lets one leave at any time -- so the offer is
+            -- Game.stillPlaying and not GameState.turnOrder, which keeps a
+            -- departed seat.
+            let opponents = filter (/= controller) (Game.stillPlaying gs)
+            opponent <- case opponents of
+              -- CR 102.2: a two-player game leaves exactly one opponent, and
+              -- one option is not a choice. The empty case is a game whose
+              -- other seats have all left (CR 104.2a) -- nobody to ask, and no
+              -- second name.
+              [] -> pure Nothing
+              [sole] -> pure (Just sole)
+              first : second : rest -> do
+                let offered = first NonEmpty.:| (second : rest)
+                answer <- Trans.lift (Program.prompt (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered))
+                -- FILTERED, NOT TRUSTED, the posture Sba.chooseLegendVictims
+                -- takes: an answer naming somebody who is not an opponent would
+                -- otherwise hand a second name to a player the card never asked,
+                -- so it falls back to the head.
+                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+            -- CR 101.4: the active player chooses first, then the rest in turn
+            -- order. Both names are chosen as one event, so the order is the
+            -- rule's and not the card's reading order.
+            let choosers = filter (\pid -> pid == controller || Just pid == opponent) (Game.apnapOrder gs)
+                ask pid = Trans.lift (Program.prompt (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction))
+            fmap Set.fromList (Monad.mapM ask choosers)
+        consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenNames = picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
       -- CR 306.5b via CR 614.1c: this permanent enters with N counters. Through
