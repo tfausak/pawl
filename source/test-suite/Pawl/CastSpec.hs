@@ -600,6 +600,16 @@ answerAtBoundOffsetCounting offset p = case p of
     pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
   _ -> pure (S.identityAnswer p)
 
+-- Records the object each CR 601.2c target question is asked ABOUT, and aims
+-- every slot at bob. The recorded id is what proves CR 601.2a ran first: it is
+-- the spell's stack incarnation (CR 400.7), never the card that was in hand.
+answerRecordingTargetObject :: Prompt.Prompt r -> State.State [ObjectId.ObjectId] r
+answerRecordingTargetObject p = case p of
+  Prompt.ChooseTargets _ _ oid sets -> do
+    State.modify' (\seen -> seen <> [oid])
+    pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+  _ -> pure (S.identityAnswer p)
+
 -- How many cards of this name sit in alice's hand (the reject-not-repair no-op
 -- check: a cast that reverses leaves the card exactly where it was).
 inHandNamed :: String -> GameState.GameState -> Int
@@ -691,6 +701,25 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
         asked offset = State.execState (Engine.runGame (answerAtBoundOffsetCounting offset) gs0 (Cast.castSpell S.alice oid)) 0
     Spec.assertEqWith s "at the bound the cast goes on and asks for its target" (asked 0) 1
     Spec.assertEqWith s "one above it, there is nothing left to target for" (asked 1) 0
+  -- CR 601.2a: "To propose the casting of a spell, a player first moves that
+  -- card (or that copy of a card) from where it is to the stack. It becomes the
+  -- topmost object on the stack." FIRST -- before CR 601.2b's modes and cost and
+  -- before CR 601.2c's targets -- so the object a player announces targets for
+  -- is the spell on the stack, and not the card that was in their hand.
+  --
+  -- The two ids are distinguishable because CR 400.7 says they are: "each time an
+  -- object moves ... it becomes a new object with no memory of ... its previous
+  -- existence", which Event.changeZone implements by minting a fresh id. So the
+  -- id the CR 601.2c prompt names being the id ON THE STACK is exactly the claim
+  -- that rule 601.2a ran before rule 601.2c, and nothing weaker would be.
+  Spec.it s "CR 601.2a the spell is already on the stack when CR 601.2c announces its targets" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let (gs0, oid) = S.handOne bolt (S.landsInPlay mountain 1)
+        ((_, after), asked) = State.runState (Engine.runGame answerRecordingTargetObject gs0 (Cast.castSpell S.alice oid)) []
+    Spec.assertEqWith s "the Bolt is the one thing on the stack" (length (GameState.stack after)) 1
+    Spec.assertEqWith s "and it is the object CR 601.2c was asked about" asked (GameState.stack after)
+    Spec.assertBool s (notElem oid asked) "which is the CR 400.7 incarnation, not the card in hand"
   -- The bound is measured at CR 601.2f's TOTAL, not on the printed cost:
   -- Thalia's "noncreature spells cost {1} more" (EachPlayer-scoped, so her own
   -- controller pays it too) eats one of the four Mountains, and the board that
@@ -914,9 +943,9 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "two Islands: the additional cost is {1}"
-      (Cast.entwineOffer S.alice richSpell rich)
+      (Cast.entwineOffer S.alice richSpell (Cost.costsFor richSpell rich) rich)
       (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.Type.components = []}))
-    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer S.alice poorSpell poor) Nothing
+    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer S.alice poorSpell (Cost.costsFor poorSpell poor) poor) Nothing
   -- A card with no entwine is never asked, which is the other half of "where
   -- the rules leave nothing to ask, don't prompt".
   Spec.it s "CR 702.42a a modal spell without entwine (Chaos Charm) is never offered one" $ do
@@ -925,7 +954,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
         (_, gs) = S.addCreature piker S.bob gs0
-    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer S.alice spellId gs) Nothing
+    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer S.alice spellId (Cost.costsFor spellId gs) gs) Nothing
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
