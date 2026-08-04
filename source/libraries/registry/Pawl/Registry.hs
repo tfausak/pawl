@@ -106,10 +106,12 @@ cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 -- to the name it is filed under, or a lookup would quietly serve a different
 -- card than it was asked for. Both callers inherit it.
 --
--- The first face rather than Pawl.Engine.Card.combined's, which is the same
--- face for every card in this pool: the registry sublibrary sits ABOVE engine
--- and cannot call into it. CR 712.8a's front face is the first one either way,
--- so a filename is answerable without knowing how the faces combine.
+-- The first face rather than Pawl.Engine.Card.combined's, which is the same face
+-- for every card in this pool: the registry sublibrary sits ABOVE engine and
+-- cannot call into it. Not a claim that the first face is the right ANSWER in
+-- general -- CR 709.4a gives a split card two names and no combined one, so a
+-- card that prints two faces will need the joined name rather than this. It is
+-- only that this check has to be answerable from `types` alone.
 parseCard :: CardName.CardName -> Slug.Slug -> FilePath -> ByteString.ByteString -> Either CardError.CardError Card.Card
 parseCard name slug path bytes = do
   contents <- either (\err -> invalid ("not valid UTF-8: " <> show err)) Right (Encoding.decodeUtf8' bytes)

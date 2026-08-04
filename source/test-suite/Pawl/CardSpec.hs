@@ -120,49 +120,78 @@ import qualified System.Directory as Directory
 costOf :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
 costOf symbols = Just (ManaCost.MkManaCost symbols)
 
-cardSpec :: (Monad m) => Spec.Spec m n -> n ()
+-- A face carrying nothing but a name and a type line, every other field at the
+-- value an omitted key decodes to. The cases below are about one field apiece,
+-- and a 28-field literal apiece would bury which one.
+vanillaFace :: String -> TypeLine.TypeLine -> Face.Face Card.Type.Card
+vanillaFace name typeLine =
+  Face.MkFace
+    { Face.name = CardName.MkCardName $ Text.pack name,
+      Face.manaCost = Nothing,
+      Face.typeLine = typeLine,
+      Face.power = Nothing,
+      Face.toughness = Nothing,
+      Face.loyalty = Nothing,
+      Face.keywords = Set.empty,
+      Face.colorIndicator = Set.empty,
+      Face.staticAbilities = [],
+      Face.spell = Face.defaultSpell,
+      Face.activatedAbilities = [],
+      Face.replacementEffects = [],
+      Face.triggeredAbilities = [],
+      Face.delayedAbilities = Map.empty,
+      Face.castingPermissions = [],
+      Face.castingRestrictions = [],
+      Face.characteristicPT = Nothing,
+      Face.playerAbilities = [],
+      Face.blockRequirements = [],
+      Face.attackRequirements = [],
+      Face.combatRestrictions = [],
+      Face.attackCosts = [],
+      Face.mulliganAction = [],
+      Face.openingHandAction = [],
+      Face.additionalCosts = [],
+      Face.alternativeCosts = [],
+      Face.enchant = Nothing,
+      Face.counterability = Counterability.Counterable
+    }
+
+instantLine :: TypeLine.TypeLine
+instantLine =
+  TypeLine.MkTypeLine
+    { TypeLine.supertypes = Set.empty,
+      TypeLine.types = Set.singleton CardType.Instant,
+      TypeLine.subtypes = Set.empty
+    }
+
+cardSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 cardSpec s = Spec.describe s "Card" $ do
   Spec.it s "CR 110.1 an instant is not a permanent type" $
-    let instantLine =
-          TypeLine.MkTypeLine
-            { TypeLine.supertypes = Set.empty,
-              TypeLine.types = Set.singleton CardType.Instant,
-              TypeLine.subtypes = Set.empty
-            }
-        face =
-          Face.MkFace
-            { Face.name = CardName.MkCardName $ Text.pack "Some Instant",
-              Face.manaCost = Nothing,
-              Face.typeLine = instantLine,
-              Face.power = Nothing,
-              Face.toughness = Nothing,
-              Face.loyalty = Nothing,
-              Face.keywords = Set.empty,
-              Face.colorIndicator = Set.empty,
-              Face.staticAbilities = [],
-              Face.spell = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
-              Face.activatedAbilities = [],
-              Face.replacementEffects = [],
-              Face.triggeredAbilities = [],
-              Face.delayedAbilities = Map.empty,
-              Face.castingPermissions = [],
-              Face.castingRestrictions = [],
-              Face.characteristicPT = Nothing,
-              Face.playerAbilities = [],
-              Face.blockRequirements = [],
-              Face.attackRequirements = [],
-              Face.combatRestrictions = [],
-              Face.attackCosts = [],
-              Face.mulliganAction = [],
-              Face.openingHandAction = [],
-              Face.additionalCosts = [],
-              Face.alternativeCosts = [],
-              Face.enchant = Nothing,
-              Face.counterability = Counterability.Counterable
-            }
+    let face = vanillaFace "Some Instant" instantLine
      in do
           Spec.assertBool s (not (Card.isPermanent face)) "not a permanent"
           Spec.assertBool s (Card.isInstant face) "an instant"
+  -- CR 709.4a: a card's faces are referred to BY NAME, so this is what a rule or
+  -- a player naming one half resolves through. Built by hand rather than loaded:
+  -- no printing in the pool has a second face yet, and a one-face card could not
+  -- tell "found the right face" from "found the only face".
+  Spec.it s "CR 709.4a faceNamed finds a two-faced card's faces by their own names" $
+    let wax = vanillaFace "Wax" instantLine
+        wane = vanillaFace "Wane" instantLine
+        card =
+          Card.Type.MkCard
+            { Card.Type.layout = Layout.Normal,
+              Card.Type.faces = wax NonEmpty.:| [wane]
+            }
+        named = CardName.MkCardName . Text.pack
+     in do
+          Spec.assertEqWith s "the first face" (Card.faceNamed (named "Wax") card) (Just wax)
+          -- The one that matters: a hit on the SECOND face is what says this
+          -- reads past Card.combined rather than through it.
+          Spec.assertEqWith s "the second face" (Card.faceNamed (named "Wane") card) (Just wane)
+          -- CR 709.4a again: a split card has two names and no combined one, so
+          -- the joined name is not a face name and must not resolve to a face.
+          Spec.assertEqWith s "a name no face carries" (Card.faceNamed (named "Wax // Wane") card) Nothing
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*).
@@ -325,7 +354,7 @@ triggeredAbilityCounts ability =
 --
 -- This traversal is hand-maintained, not derived, so it is NOT enforced
 -- exhaustive by -Werror the way the Zone/Effect/Modification cases inside it
--- are: a NEW Card field, or a new CostComponent/PlayerEffect arm, that can carry
+-- are: a NEW Face field, or a new CostComponent/PlayerEffect arm, that can carry
 -- a Quantity or Count would bypass this lint silently. When you add a field that
 -- can hold either, add it here.
 -- Every effect a card can RESOLVE: its spell's modes, its activated and
@@ -353,7 +382,7 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
 
--- Hand-maintained, with cardCounts' caveat: a NEW Card field holding effects
+-- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
 cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
 cardResolutionEffects card =
@@ -1233,7 +1262,7 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Nineteen of Pawl.Types.Face's twenty-seven fields can hold one, and
+-- frames it. Nineteen of Pawl.Types.Face's twenty-eight fields can hold one, and
 -- here is where each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
@@ -1260,10 +1289,13 @@ activatedAbilityFilters ability =
 -- Count, CounterPattern, Effect, Keyword, ObjectRef, PlayerEffect, TargetSpec and
 -- TriggerCondition -- and nothing those eight fields reach is one of them.
 --
+-- Nineteen and eight is twenty-seven, and the twenty-eighth is `attackCosts`,
+-- which can hold one and which this fold does not walk (#651).
+--
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
 -- record fold is the exception, exactly as cardCounts' own caveat says: a NEW
--- Card field that can hold a Filter would bypass it silently. That is what the
+-- Face field that can hold a Filter would bypass it silently. That is what the
 -- codec cross-check in canHostSubjectOffends is for.
 cardFilters :: Face.Face Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
 cardFilters card =
@@ -1333,7 +1365,7 @@ jsonCanHostSubjects value = case value of
 --     means cardFilters has a blind spot, and an atom sitting in it would be
 --     reported as zero rather than as an offence.
 --
--- The second is not hypothetical maintenance theatre: cardFilters' Card-record
+-- The second is not hypothetical maintenance theatre: cardFilters' Face-record
 -- fold is hand-maintained, and a new field holding a Filter is exactly the kind of
 -- change that would otherwise make this lint quietly stop doing its job.
 canHostSubjectOffends :: Face.Face Card.Type.Card -> Bool
@@ -1341,19 +1373,15 @@ canHostSubjectOffends card =
   let (framed, unframedCount) = canHostSubjectCounts card
    in unframedCount /= 0 || framed + unframedCount /= jsonCanHostSubjects (Face.Codec.toJson Card.toJson card)
 
--- The D4 dataflow lint: every slot an effect reads is declared, and every
--- declared slot is read. Equality, not subset: a spec no effect reads is a
--- card announcing a target it ignores -- representable in Magic, not in this
--- pool. Loosen to superset if such a card ever lands.
--- CR 709.2 / 712.8: every lint below is stated about ONE face's printed text,
--- and a card offends when ANY of its faces does. Every card in the pool has
--- exactly one face, so this fans out over a singleton today -- and it is what
--- keeps the second half of a card going unlinted from being possible at all.
 -- A lint fixture built as a FACE, put back into the one-face card an
 -- Effect.Create's token payload has to be.
 oneFaced :: Face.Face Card.Type.Card -> Card.Type.Card
 oneFaced face = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
 
+-- CR 709.2 / 712.8: every lint below is stated about ONE face's printed text,
+-- and a card offends when ANY of its faces does. Every card in the pool has
+-- exactly one face, so this fans out over a singleton today -- and it is what
+-- keeps the second half of a card going unlinted from being possible at all.
 anyFace :: (Face.Face Card.Type.Card -> Bool) -> Card.Type.Card -> Bool
 anyFace p = any p . Card.Type.faces
 
@@ -1361,8 +1389,16 @@ anyFace p = any p . Card.Type.faces
 overFaces :: (Face.Face Card.Type.Card -> [a]) -> Card.Type.Card -> [a]
 overFaces f = concatMap f . NonEmpty.toList . Card.Type.faces
 
+-- Every claim pawl makes about how its own card files are authored, swept over
+-- the whole corpus. A sweep alone proves nothing about the lint it runs -- a
+-- correctly authored pool passes a lint that never fires -- so most cases here
+-- pair their sweep with a hand-built offender proving the REJECTING direction.
 lintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 lintSpec s registry = Spec.describe s "Lint" $ do
+  -- The D4 dataflow lint: every slot an effect reads is declared, and every
+  -- declared slot is read. Equality, not subset: a spec no effect reads is a
+  -- card announcing a target it ignores -- representable in Magic, not in this
+  -- pool. Loosen to superset if such a card ever lands.
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
     let modeOffends m =

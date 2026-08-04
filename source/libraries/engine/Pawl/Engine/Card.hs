@@ -30,9 +30,12 @@ import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.TargetSpec (TargetSpec)
 import qualified Pawl.Types.TypeLine as TypeLine
 
--- CR 709.4 / 712.8a / 715.4: the characteristics a card has where the rules do
--- not single out one face. Under Normal that is the sole face; the layouts that
--- genuinely combine get their arm when they land.
+-- The face a card shows where nothing has singled out one half for itself. WHICH
+-- face that is, is exactly what the layout decides, and the three rules disagree:
+-- CR 709.4 gives a split card its two halves COMBINED, CR 712.8a gives a
+-- double-faced card its FRONT face alone, CR 715.4 gives an adventurer card its
+-- NORMAL characteristics alone. Under Normal there is one face and all three name
+-- it; the layouts that make them differ get their arm when they land.
 --
 -- TOTAL, which is what Card.faces being NonEmpty buys: every characteristic read
 -- in the engine funnels through here, and a Maybe would spread to all of them.
@@ -45,8 +48,10 @@ combined card = case Card.layout card of
 -- survives in a DecisionLog; the Ord on Card.faces is printed order and carries
 -- no identity.
 --
--- Nothing when no face is so named. The Pawl.CardSpec corpus lint holds that a
--- card's face names are pairwise distinct, so a hit is unique.
+-- Nothing when no face is so named, and the FIRST match otherwise -- so a hit is
+-- unique only where a card's face names are pairwise distinct. That is a
+-- requirement on card DATA rather than something this function can check, and
+-- every card in the pool meets it vacuously by having one face.
 faceNamed :: CardName.CardName -> Card.Card -> Maybe (Face.Face Card.Card)
 faceNamed n card = List.find (\f -> Face.name f == n) (NonEmpty.toList (Card.faces card))
 

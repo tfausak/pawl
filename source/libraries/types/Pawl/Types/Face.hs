@@ -82,33 +82,33 @@ data Face card = MkFace
     -- effect's stated characteristics stand in for printed ones and a token has no
     -- mana cost. Read through Pawl.Engine.Projection.colorsOf, never directly.
     colorIndicator :: Set.Set Color.Color,
-    -- | CR 604.3 / 208.2a: this card's characteristic-defining P/T ability -- what
+    -- | CR 604.3 / 208.2a: this face's characteristic-defining P/T ability -- what
     -- a printed star (Quantity.Star) in its power/toughness box stands for. A CDA
     -- is an ABILITY, not a number: the projection seeds it unevaluated so a copy
     -- acquires the ability (CR 707.2a) and layer 7a recomputes it every time. Read
     -- through Pawl.Engine.Projection, never directly.
     characteristicPT :: Maybe Quantity.Quantity,
-    -- | CR 604.1/604.2: this card's static continuous abilities (Humility), which
+    -- | CR 604.1/604.2: this face's static continuous abilities (Humility), which
     -- the projection gathers live.
     staticAbilities :: [StaticAbility.StaticAbility],
-    -- | The card's spell payload as data: what casting this card does when it
+    -- | This face's spell payload as data: what casting it does when it
     -- resolves, as one or more modes (CR 700.2). A non-modal card is a single mode
     -- with ChooseExactly 1 (forced, unprompted); a land or vanilla creature is a
     -- single EMPTY mode. Pawl.Types.Card ties Modal's `card` knot at `Modal Card`.
     spell :: Modal.Modal card,
-    -- | CR 602: this card's printed activated abilities. The closed half reads
+    -- | CR 602: this face's printed activated abilities. The closed half reads
     -- these through Pawl.Engine.Projection.abilitiesOf, never directly: layer 6
     -- (Humility) removes abilities.
     activatedAbilities :: [ActivatedAbility.ActivatedAbility card],
-    -- | CR 614: this card's replacement effects, active while it is on the
+    -- | CR 614: this face's replacement effects, active while it is on the
     -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never
     -- directly) so layer 6 LoseAllAbilities strips them uniformly.
     replacementEffects :: [ReplacementEffect.ReplacementEffect],
-    -- | CR 603: this card's triggered abilities, read through
+    -- | CR 603: this face's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility card],
-    -- | CR 603.7: this card's DELAYED triggered abilities, keyed by name -- the
-    -- payloads an Effect.ArmDelayedTrigger in this card's own text arms. Card
+    -- | CR 603.7: this face's DELAYED triggered abilities, keyed by name -- the
+    -- payloads an Effect.ArmDelayedTrigger in this face's own text arms. Card
     -- DATA, not an opcode payload: Effect is first-order and non-recursive
     -- (design.md section 1), and Effect -> TriggeredAbility -> Modal -> Mode ->
     -- Effect is a genuine module cycle.
@@ -117,7 +117,7 @@ data Face card = MkFace
     -- ability is not ON the source object -- CR 603.7d gives it no source
     -- permanent to lose, so layer 6 cannot strip it.
     delayedAbilities :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card),
-    -- | CR 601.3: this card's PRINTED casting permissions -- zone or condition
+    -- | CR 601.3: this face's PRINTED casting permissions -- zone or condition
     -- exceptions to normal timing (Panglacial Wurm). Read directly from the card
     -- and NOT the projection: the permission functions in the library (CR 113.6),
     -- which Projection.gather does not reach, walking the battlefield only (#160).
@@ -130,7 +130,7 @@ data Face card = MkFace
     -- one place the two are put together; a reader that wants every permission a
     -- card has must do the same.
     castingPermissions :: [CastingPermission.CastingPermission],
-    -- | CR 601.3: this card's PRINTED casting restrictions -- the clauses of a
+    -- | CR 601.3: this face's PRINTED casting restrictions -- the clauses of a
     -- "Cast this spell only during ..." that WITHHOLD a cast the rules would
     -- otherwise allow. Rally the Troops is
     -- `[DuringPhase (Combat DeclareAttackers), AttackedThisStep]`.
@@ -151,7 +151,7 @@ data Face card = MkFace
     -- axis (playerAbilities / Effect.AffectPlayers); every entry here is a card
     -- restricting only itself.
     castingRestrictions :: [CastingRestriction.CastingRestriction],
-    -- | CR 702.5a: this card's `enchant` ability, restricting what an Aura spell
+    -- | CR 702.5a: this face's `enchant` ability, restricting what an Aura spell
     -- can target and what an Aura can enchant. Nothing for every card that is not
     -- an Aura; the CardSpec lint family holds the biconditional both ways.
     --
@@ -168,14 +168,14 @@ data Face card = MkFace
     -- (#160). CR 613 itself does reach the stack; this is a fact about the engine,
     -- not about the rules.
     counterability :: Counterability.Counterability,
-    -- | CR 118.8: this card's printed additional costs, paid at the same time as
+    -- | CR 118.8: this face's printed additional costs, paid at the same time as
     -- the spell's mana cost (Village Rites). Read directly from the card, the
     -- castingPermissions precedent: a cost is consulted while the object is in
     -- hand, which pawl's projection does not reach (#160). CR 118.8d: this does not
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
-    -- | CR 118.9: this card's printed alternative costs, which its controller MAY
+    -- | CR 118.9: this face's printed alternative costs, which its controller MAY
     -- pay rather than the spell's mana cost (Fireblast). CR 118.9c: this does not
     -- change the card's mana cost.
     --
@@ -195,33 +195,33 @@ data Face card = MkFace
     -- and flashback's only from the graveyard. It rides its keyword instead, and
     -- Pawl.Engine.Cost.costsFor offers it by zone.
     alternativeCosts :: [Cost.Cost Keyword.Keyword],
-    -- | CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
+    -- | CR 604.1/604.2 / 611.1: this face's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary Tower).
     -- The sibling of staticAbilities on the axis CR 613.10/613.11 put OUTSIDE the
     -- layer system, so these are read by Pawl.Engine.PlayerEffect and never by
     -- Pawl.Engine.Projection.
     playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
-    -- | CR 604.1/604.2 / 509.1c: this card's printed BLOCKING REQUIREMENTS -- "all
+    -- | CR 604.1/604.2 / 509.1c: this face's printed BLOCKING REQUIREMENTS -- "all
     -- creatures able to block enchanted creature do so" (Lure).
     -- Pawl.Types.BlockRequirement argues why neither staticAbilities nor
     -- playerAbilities can hold one. Read by Pawl.Engine.BlockRequirement and never
     -- by Pawl.Engine.Projection, since CR 613.11 applies these after the layer
     -- system rather than inside it.
     blockRequirements :: [BlockRequirement.BlockRequirement],
-    -- | CR 604.1/604.2 / 508.1d: this card's printed ATTACKING REQUIREMENTS --
+    -- | CR 604.1/604.2 / 508.1d: this face's printed ATTACKING REQUIREMENTS --
     -- "creatures enchanted player controls attack each combat if able" (Curse of
     -- the Nightly Hunt). The twin of blockRequirements on the other side of the
     -- combat phase; read by Pawl.Engine.AttackRequirement, never by
     -- Pawl.Engine.Projection, for that field's CR 613.11 reason.
     attackRequirements :: [AttackRequirement.AttackRequirement],
-    -- | CR 604.1/604.2 / 508.1c / 509.1b: this card's printed COMBAT RESTRICTIONS
+    -- | CR 604.1/604.2 / 508.1c / 509.1b: this face's printed COMBAT RESTRICTIONS
     -- -- "enchanted creature can't attack or block" (Pacifism); read by
     -- Pawl.Engine.CombatRestriction, never by Pawl.Engine.Projection, for
     -- blockRequirements' CR 613.11 reason. ONE list for both of Pacifism's halves,
     -- where the requirements take two fields: Pawl.Types.CombatRestriction argues
     -- why the axis that split those is absent here.
     combatRestrictions :: [CombatRestriction.CombatRestriction],
-    -- | CR 604.1/604.2 / 508.1c / 508.1h: this card's printed COSTS TO ATTACK --
+    -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,
     -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
     --
@@ -230,7 +230,7 @@ data Face card = MkFace
     -- attack, so it must stay on CR 508.1a's candidate list, where a
     -- CombatRestriction takes its subject off.
     attackCosts :: [AttackCost.AttackCost],
-    -- | CR 103.5b: the effects of this card's "any time you could mulligan"
+    -- | CR 103.5b: the effects of this face's "any time you could mulligan"
     -- action, in written order (Serum Powder). Read directly from the card, the
     -- castingPermissions precedent: the ability functions in the HAND (CR 113.6),
     -- which pawl's projection does not reach (#160).
@@ -239,7 +239,7 @@ data Face card = MkFace
     -- indistinguishable in play. One action per card; a printing declaring two is
     -- unrepresentable (#183).
     mulliganAction :: [Effect.Effect card],
-    -- | CR 103.6 / 103.6a: the effects of this card's opening-hand action, in
+    -- | CR 103.6 / 103.6a: the effects of this face's opening-hand action, in
     -- written order (Leyline of the Void). Read directly from the card, the
     -- mulliganAction precedent (CR 113.6, #160).
     --

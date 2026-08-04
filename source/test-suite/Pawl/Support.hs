@@ -1095,8 +1095,11 @@ creaturesInPlay pid gs =
           Source.OfInherentTrigger _ _ -> False
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
--- The name a whole CARD answers to: CR 709.4's combined face, which for every
--- card in this pool is its only one.
+-- The name on a card's combined face, which for every card in this pool is its
+-- only face and so its only name. NOT "the name a card answers to" in general:
+-- CR 709.4a gives a split card two names and no combined one, so a card that
+-- prints two faces needs the joined name rather than this (#650). Every caller
+-- here is comparing against a one-faced card's printed name.
 nameOf :: Card.Type.Card -> CardName.CardName
 nameOf = Face.name . Card.combined
 
