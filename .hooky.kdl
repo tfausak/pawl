@@ -34,6 +34,13 @@ hook json {
     files *.json
 }
 
+hook nix {
+    command nixfmt {
+        check_args --check
+    }
+    files *.nix
+}
+
 hook ormolu {
     command ormolu {
         check_args --mode check
