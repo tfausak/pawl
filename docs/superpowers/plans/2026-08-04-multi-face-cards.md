@@ -499,7 +499,24 @@ merge2 l r =
     }
 ```
 
-`joinNames` puts `//` between the two, `concatCosts` appends the symbol lists (`Nothing` and `Just` combining to the `Just`, two `Nothing`s to `Nothing`, per CR 202.1), `unionTypeLines` unions all three of a `TypeLine`'s sets, and `firstJust` is `flip Maybe.fromMaybe` lifted — write each with a one-line comment rather than inlining, so `merge2` reads as the rule.
+`concatCosts` appends the symbol lists (`Nothing` and `Just` combining to the `Just`, two `Nothing`s to `Nothing`, per CR 202.1), `unionTypeLines` unions all three of a `TypeLine`'s sets, and `firstJust` is `flip Maybe.fromMaybe` lifted — write each with a one-line comment rather than inlining, so `merge2` reads as the rule.
+
+**`joinNames` does not live here.** Add it to `Pawl.Types.CardName` instead:
+
+```haskell
+-- CR 709.4a as far as a single name can carry it (#650): the CR writes a
+-- multi-face card's name with its faces joined by "//", in all four of its own
+-- examples ("Fire//Ice" three times, "Assault//Battery" once).
+--
+-- Here rather than in Pawl.Engine.Card because `registry` sits BEFORE `engine`
+-- in the sublibrary table and cannot reach it, while both sit after `types`.
+-- Pawl.Engine.Card.combined and Pawl.Registry.parseCard must agree on this
+-- string exactly -- the filename a card is filed under is its slug -- and two
+-- copies of an intercalation are how that quietly stops being true.
+join :: NonEmpty.NonEmpty CardName -> CardName
+```
+
+Task 1 left `Pawl.Registry`'s name check reading `NonEmpty.head (Card.faces card)` precisely because it could not reach `combined`; Task 5 switches it to `CardName.join`, which is the reason this function is being written now rather than there.
 
 - [ ] **Step 5: Run the test**
 
@@ -762,9 +779,11 @@ Then normalize it to the corpus format: `jq -S '.' data/cards/wax-wane.json > t 
 Run: `cabal test --test-options '--timeout 1s --hide-successes'`
 Expected: FAIL — `CardError.Missing`, because `wax.json` does not exist.
 
-- [ ] **Step 4: Add the fallback**
+- [ ] **Step 4: Fix the name check, then add the fallback**
 
-In `Pawl.Registry`, when `loadFile` answers `CardError.Missing`, list the root directory's filenames, keep those whose slug contains the requested slug as a whole hyphen-separated run, parse only those, and accept the first whose faces include a face of the requested name. Confirmation is by face name and never by filename, so a `beeswax-wane.json` could not answer for "Wax".
+First, the name check. Task 1 left `Pawl.Registry.parseCard` reading `NonEmpty.head (Card.faces card)` with a comment saying it could not reach `Engine.Card.combined` — `registry` sits before `engine` in the sublibrary table. Switch it to `CardName.join` (added in Task 2, in the `types` sublibrary, which both can reach), so the filename check and `combined` agree on the joined string by construction rather than by two copies of a `//` intercalation. Update the comment Task 1 left at the site; it describes a constraint that no longer forces the answer.
+
+Then the fallback. In `Pawl.Registry`, when `loadFile` answers `CardError.Missing`, list the root directory's filenames, keep those whose slug contains the requested slug as a whole hyphen-separated run, parse only those, and accept the first whose faces include a face of the requested name. Confirmation is by face name and never by filename, so a `beeswax-wane.json` could not answer for "Wax".
 
 Keep this private — do not add it to the `Registry` record. The module header's "enumerating the pool is deliberately NOT here" is about the *interface*, and this is an implementation detail of one lookup; say so in the comment, and cite **#649**, which carries the rework this is a stopgap for.
 
