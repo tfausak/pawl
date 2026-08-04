@@ -14,10 +14,10 @@
 -- on-disk format rather than about looking a card up. Only how the bytes are
 -- obtained differs; see loadFile.
 --
--- The file-backed registry does list its own root, in byFaceName, but privately
--- and only to answer one lookup that the one-file-per-name convention cannot
--- (CR 709.4a). That is not the same thing: no caller can ask this module what
--- cards exist.
+-- The file-backed registry does list its own root, in byFaceName, to answer one
+-- lookup that the one-file-per-name convention cannot (CR 709.4a). That is not
+-- the same thing: the listing is not reachable through the Registry record, so
+-- it is one lookup's implementation rather than a question a caller can ask.
 module Pawl.Registry where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -110,11 +110,13 @@ memoized root cache name =
 -- Faces are compared by slug for the same reason `named` accepts either form --
 -- slugify is idempotent, so a name and its slug are one lookup.
 --
--- Private to this module rather than a member of the Registry record: what the
--- header keeps out of the INTERFACE is a caller's question "what cards exist",
--- and this is one lookup's implementation detail. A stopgap either way, since
--- it re-lists the root on every miss and leaves the joined filename standing in
--- for a name the rules do not give the card (#649).
+-- Not a member of the Registry record, which is what bounds the interface: a
+-- caller holding a Registry can ask for a named card and nothing else, so this
+-- stays one lookup's implementation. Not a claim about module exports -- pawl
+-- writes no export lists, so this function is exported like every other.
+--
+-- A stopgap either way, since it re-lists the root on every miss and leaves the
+-- joined filename standing in for a name the rules do not give the card (#649).
 byFaceName ::
   FilePath ->
   CardName.CardName ->
@@ -142,9 +144,17 @@ fileSlug :: FilePath -> Maybe Slug.Slug
 fileSlug file = fmap Slug.fromText (Text.stripSuffix (Text.pack ".json") (Text.pack file))
 
 -- Whether `part`'s hyphen-separated words appear consecutively in `whole`'s.
--- Whole words, not a substring: "wax" runs inside "wax-wane" but not inside
--- "beeswax-wane", so a scan never offers a card whose name merely ends in the
--- one asked for.
+-- Whole words rather than a substring, so "wax" runs inside "wax-wane" but not
+-- inside "beeswax-wane".
+--
+-- A narrowing and NOT a guarantee. All it decides is which files are worth
+-- reading, so all it buys is that a miss does not parse the whole pool; what
+-- makes the answer right is byFaceName's face-name confirmation, which refuses
+-- a beeswax-wane.json for "Wax" whether or not this filtered it out first.
+-- Loosening this to a plain substring would cost reads and change no answer,
+-- which is why the case that pins the behaviour ("a filename that merely
+-- contains the name asked for does not answer for it") is written against the
+-- confirmation and not against this.
 containsRun :: Slug.Slug -> Slug.Slug -> Bool
 containsRun part whole = List.isInfixOf (wordsOf part) (wordsOf whole)
   where

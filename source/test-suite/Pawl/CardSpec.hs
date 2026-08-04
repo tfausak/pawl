@@ -2059,7 +2059,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offenders = filter (distinctFaceNamesOffends . Printing.card) ps
     -- The guard the sibling lints carry: over a pool of one-face cards this
     -- sweep passes on every card without comparing two names, and so proves
-    -- nothing. Wax // Wane is what makes it non-vacuous (#648).
+    -- nothing. Wax // Wane is what makes it non-vacuous.
     Spec.assertBool s (any ((> 1) . length . Card.Type.faces . Printing.card) ps) "the pool has a multi-face card to lint"
     Spec.assertEqWith s "no card repeats a face name" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against a hand-built offender rather than a

@@ -168,8 +168,10 @@ castableFaces card = case Card.layout card of
 --
 -- Nothing when no face is so named, and the FIRST match otherwise -- so a hit is
 -- unique only where a card's face names are pairwise distinct. That is a
--- requirement on card DATA rather than something this function can check, and
--- every card in the pool meets it vacuously by having one face.
+-- requirement on card DATA rather than something this function can check: the
+-- corpus lint in Pawl.CardSpec is what holds it, and since the pool now prints a
+-- two-faced card (Wax // Wane) that lint compares two names rather than passing
+-- vacuously over a pool of one-face cards.
 faceNamed :: CardName.CardName -> Card.Card -> Maybe (Face.Face Card.Card)
 faceNamed n card = List.find (\f -> Face.name f == n) (NonEmpty.toList (Card.faces card))
 

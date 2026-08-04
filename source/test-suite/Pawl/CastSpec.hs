@@ -1609,9 +1609,19 @@ waneName = CardName.MkCardName (Text.pack "Wane")
 waxWaneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   -- CR 709.3: "A player chooses which half of a split card they are casting
-  -- before putting it onto the stack." Falsifier: an engine that cast the
-  -- COMBINED view would have no single spell payload to resolve, and one that
-  -- always cast the first face would pass this and fail the Wane case below.
+  -- before putting it onto the stack."
+  --
+  -- Falsifier: an engine pricing the cast from CR 709.4b's COMBINED {G}{W}
+  -- fails here. One Forest cannot pay it, so no candidate survives
+  -- castProposed's payability filter, the cast rewinds (CR 601.2e), and the
+  -- Piker stays a 2/1.
+  --
+  -- What this case does NOT catch, despite the shape suggesting it: an engine
+  -- resolving the combined view's PAYLOAD. Pawl.Engine.Card.merge2 deliberately
+  -- leaves Face.spell as the left half's, so the combined view carries Wax's
+  -- effect and would pass. Nor does it catch one that always casts the first
+  -- face, which Wax already is. The Wane case below is what discriminates
+  -- against both.
   Spec.it s "CR 709.3 casting Wax gives the targeted creature +2/+2" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1621,9 +1631,17 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId resolved) (Just (4, 3))
-  -- The other half, and the case that makes the one above discriminating: this
-  -- board has no creature at all, so an engine that always cast the first face
-  -- would find Wax no legal target here.
+  -- The half that carries the weight. One Plains, an enchantment, and no
+  -- creature at all -- so three broken engines fail here, two of which the Wax
+  -- case above lets through:
+  --
+  --   * one that always casts the FIRST face resolves Wax, which has no legal
+  --     target on a creatureless board;
+  --   * one that resolves the COMBINED view's payload finds the same, since
+  --     Pawl.Engine.Card.merge2 keeps Face.spell as the left half's -- Wax's;
+  --   * one that prices from the combined {G}{W} cannot pay it with a Plains.
+  --
+  -- Each rewinds the cast (CR 601.2e) and leaves the Prison standing.
   Spec.it s "CR 709.3 casting Wane destroys the targeted enchantment" $ do
     plains <- S.printingOf s registry "Plains"
     ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
