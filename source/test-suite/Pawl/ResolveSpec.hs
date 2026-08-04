@@ -558,30 +558,35 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
     Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
   Spec.it s "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
+    -- This gate rides a labelled synthetic: no real instant or sorcery sets a
+    -- land's subtype, and every real card with the effect is an Aura, whose
+    -- modification is a static ability and so exercises a different reader
+    -- (#631).
     -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
     -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
     -- (Swamp -> Mountain) it is SetLandSubtype Mountain -> {Mountain}.
     forest <- S.printingOf s registry "Forest"
-    landform <- S.printingOf s registry "Landform"
+    syntheticLandform <- S.printingOf s registry "Synthetic Landform"
     let base = S.landsInPlay forest 1
         targetLand = case Game.zoneMembers Zone.Battlefield S.alice base of
           i : _ -> i
           [] -> ObjectId.MkObjectId 999
         slot = SlotName.MkSlotName (Text.pack "target")
-        (landformId, g1) = Game.freshObjectId base
-        landformObj =
+        (syntheticLandformId, g1) = Game.freshObjectId base
+        syntheticLandformObj =
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard landform,
+              Object.source = Source.OfCard syntheticLandform,
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              -- CR 700.2: Landform has one mode; a directly-built stack object
-              -- (bypassing Cast.castSpell) must stamp it chosen (mode 0), or
-              -- Resolve.effectsOf/resolveSpell -- now scoped to CHOSEN modes --
-              -- would see no effects and no target specs at all.
+              -- CR 700.2: Synthetic Landform has one mode; a directly-built
+              -- stack object (bypassing Cast.castSpell) must stamp it chosen
+              -- (mode 0), or Resolve.effectsOf/resolveSpell -- now scoped to
+              -- CHOSEN modes -- would see no effects and no target specs at
+              -- all.
               Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
@@ -591,22 +596,24 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             }
         g2 =
           g1
-            { GameState.objects = Map.insert landformId landformObj (GameState.objects g1),
-              GameState.stack = landformId : GameState.stack g1
+            { GameState.objects = Map.insert syntheticLandformId syntheticLandformObj (GameState.objects g1),
+              GameState.stack = syntheticLandformId : GameState.stack g1
             }
         -- A resolved Magical Hack already changed Swamp -> Mountain on the
-        -- Landform spell (stored on the Landform's id).
-        hacked = S.withEffectAt landformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
-        after = snd (Engine.runGamePure S.identityAnswer hacked (Resolve.resolveSpell landformId))
-    -- Landform's own subtype does not matter; its EFFECT was rewritten to
-    -- SetLandSubtype Mountain, so the target land ends up a Mountain.
+        -- Synthetic Landform spell (stored on that spell's id).
+        hacked = S.withEffectAt syntheticLandformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
+        after = snd (Engine.runGamePure S.identityAnswer hacked (Resolve.resolveSpell syntheticLandformId))
+    -- Synthetic Landform's own subtype does not matter; its EFFECT was
+    -- rewritten to SetLandSubtype Mountain, so the target land ends up a
+    -- Mountain.
     Spec.assertEqWith s "target land became Mountain, not Swamp" (Projection.subtypesOf targetLand after) (Set.singleton Subtype.Mountain)
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by
     -- a BASIC LAND TYPE, so it is the first that can tell whether CR 612.1's
     -- "any words or symbols printed on that object" reaches inside an
     -- effect's Filter. The stored ChangeSubtypeWord is what a resolved
-    -- Magical Hack leaves on the spell, exactly as the Landform case above.
+    -- Magical Hack leaves on the spell, exactly as the Synthetic Landform
+    -- case above.
     island <- S.printingOf s registry "Island"
     forest <- S.printingOf s registry "Forest"
     boil <- S.printingOf s registry "Boil"
@@ -623,8 +630,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              -- CR 700.2, as the Landform case explains: a directly-built
-              -- stack object must stamp its one mode chosen.
+              -- CR 700.2, as the Synthetic Landform case explains: a
+              -- directly-built stack object must stamp its one mode chosen.
               Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,

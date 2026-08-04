@@ -539,11 +539,11 @@ the effect through the stack and asserts on the resulting game state. Prefer a
 **real, recognizable** card (the `tests-prefer-real-cards` discipline). A
 **labeled synthetic crutch with a documented expiry** naming the milestone that
 retires it is legitimate — but *only* when a real card would drag in something
-not yet built, which is exactly the `Landform` and synthetic-deathtrampler
-pattern already in use. This is the §1 invariant's testing corollary: coverage
-is per-*classification*/opcode, and the card is how you prove the interpreter
-**does** the right thing — the round-trip proves only that the card **says** it
-(the central trap above).
+not yet built, which is exactly the `Synthetic Landform` and
+synthetic-deathtrampler pattern already in use. This is the §1 invariant's
+testing corollary: coverage is per-*classification*/opcode, and the card is how
+you prove the interpreter **does** the right thing — the round-trip proves only
+that the card **says** it (the central trap above).
 
 **Breadth is the progress signal; card count is not.** What to optimize is
 effect coverage — how many distinct opcodes have a card and a passing
