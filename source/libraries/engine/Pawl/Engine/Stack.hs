@@ -130,7 +130,7 @@ resolveTopWith runSubgame = do
 -- nothing to move.
 --
 -- THE INVARIANT: no case on any effect's identity. Every stored
--- ContinuousEffect qualifies for CR 400.7a by CLASSIFICATION -- Projection.layerOf
+-- ContinuousEffect qualifies for CR 400.7a by CLASSIFICATION -- Projection.layer
 -- puts each modification in one of CR 613.1's layers, and every layer either
 -- changes a characteristic (CR 109.3 lists rules text, subtype, colour,
 -- abilities and P/T among them) or, at layer 2 (CR 613.1b), the controller.

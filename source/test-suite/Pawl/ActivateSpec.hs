@@ -64,6 +64,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
@@ -104,6 +105,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
   variableActivationCostSpec s registry
+  textChangedAbilitySpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -1318,3 +1320,125 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     (_, noneId, none) <- cinderBoard s registry 0
     Spec.assertBool s (Activate.activatable S.alice srcId (theAbility cinder) one) "one Mountain admits X=0"
     Spec.assertBool s (not (Activate.activatable S.alice noneId (theAbility cinder) none)) "no Mountain pays even the {R}"
+
+-- Answers the Hack: it targets `spellId` (rather than identityAnswer's
+-- lowest-id land) and swaps `from` for `to`. Everything else falls through to
+-- the identity, which aims the WARRIOR's own ability at the lowest-id land --
+-- the Forest, added first for exactly that reason.
+hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackAt spellId from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject spellId)) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- alice's board for the Tidal Warrior chain: a Forest (added FIRST, so it holds
+-- the lowest object id and every unanswered ChooseTargets aims there), two
+-- Islands for the two {U} costs, and Tidal Warrior plus Magical Hack in hand.
+-- Returns the Forest, the two cards, and the state with alice holding priority.
+tidalWarriorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+tidalWarriorBoard forest island tidalWarrior magicalHack =
+  let (forestId, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature island S.alice g1
+      (_, g3) = S.addCreature island S.alice g2
+      (warriorCardId, g4) = S.addHandCard tidalWarrior S.alice g3
+      (hackId, g5) = S.addHandCard magicalHack S.alice g4
+   in (forestId, warriorCardId, hackId, g5 {GameState.priority = Just S.alice})
+
+-- The battlefield object alice controls that projects as a creature -- the
+-- Warrior after its spell resolved. Its id is NOT the spell's: CR 400.7 minted a
+-- new one, which is the whole point of the CR 400.7a case below.
+soleCreatureOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe ObjectId.ObjectId
+soleCreatureOf pid gs = case filter (`Projection.isCreatureOf` gs) (Game.zoneMembers Zone.Battlefield pid gs) of
+  [only] -> Just only
+  _ -> Nothing
+
+-- The one activated ability the PROJECTION hands out for `oid` -- not
+-- Card.Type.activatedAbilities, which is the printed list a text change has not
+-- reached. Projection.abilitiesGiven is the list Activate itself offers from, so
+-- this is the same ability a player would be given.
+soleProjectedAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleProjectedAbility oid gs = case Projection.abilitiesOf oid gs of
+  [only] -> Just only
+  _ -> Nothing
+
+-- CR 612.1 reaching an ACTIVATED ability, end to end through the real engine.
+--
+-- Tidal Warrior {U} Creature -- Merfolk Warrior 1/1, "{T}: Target land becomes
+-- an Island until end of turn." (checked against Scryfall). Magical Hack changes
+-- Island to Swamp, and the Warrior's ability must then make its target a Swamp.
+--
+-- CR 612.1: a text-changing effect "can apply to any words or symbols printed on
+-- that object, but generally affects only that object's rules text (which
+-- appears in its text box)". An activated ability is printed in that text box.
+--
+-- CR 113.7a is why the rewrite happens where the ability is ENUMERATED rather
+-- than where it resolves: "once activated or triggered, an ability exists on the
+-- stack independently of its source", so its text is fixed as it is put on the
+-- stack. Pawl.ProjectionSpec's "hacking Tidal Warrior swaps the land type inside
+-- its activated ability" is the projection-level half of this.
+textChangedAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedAbilitySpec s registry = Spec.describe s "TextChangedActivatedAbility" $ do
+  -- The control, and the one that needs no text change at all: unhacked, the
+  -- printed word stands and the Forest becomes an Island.
+  Spec.it s "CR 612 whole card: an unhacked Tidal Warrior makes its target an Island" $ do
+    (forestId, after) <- tidalWarriorChain s registry Nothing
+    Spec.assertEqWith s "the Forest became an Island" (Projection.subtypesOf forestId after) (Set.singleton Subtype.Island)
+
+  -- Hacked on the PERMANENT, after its spell resolved: the plain CR 612.1 case.
+  Spec.it s "CR 612.1 whole card: hacking the Tidal Warrior PERMANENT makes its target a Swamp" $ do
+    (forestId, after) <- tidalWarriorChain s registry (Just OnThePermanent)
+    Spec.assertEqWith s "the Forest became a Swamp" (Projection.subtypesOf forestId after) (Set.singleton Subtype.Swamp)
+
+  -- Hacked on the SPELL, while it is still on the stack. CR 400.7a: "Effects
+  -- from spells, activated abilities, and triggered abilities that change the
+  -- characteristics or controller of a permanent spell on the stack continue to
+  -- apply to the permanent that spell becomes" -- and rules text is a
+  -- characteristic (CR 109.3). So the swap survives CR 400.7's new object and is
+  -- still there when the ability is enumerated off the permanent. Wizards' own
+  -- Magical Hack ruling says the same: "If you change the text of a spell which
+  -- is to become a permanent, the permanent will retain the text change until
+  -- the effect wears off."
+  Spec.it s "CR 400.7a/612.1 whole card: hacking the Tidal Warrior SPELL makes its target a Swamp" $ do
+    (forestId, after) <- tidalWarriorChain s registry (Just OnTheSpell)
+    Spec.assertEqWith s "the Forest became a Swamp" (Projection.subtypesOf forestId after) (Set.singleton Subtype.Swamp)
+
+-- Which incarnation of the Warrior the Hack is aimed at.
+data HackTarget = OnTheSpell | OnThePermanent
+  deriving (Eq, Show)
+
+-- Cast Tidal Warrior; optionally cast Magical Hack (Island -> Swamp) at the
+-- named incarnation; resolve the stack; settle alice's permanents (CR 302.6 --
+-- running a whole turn to wear the sickness off would add nothing to what is
+-- being proved here); activate the Warrior's projected ability, which the
+-- identity answer aims at the lowest-id land (the Forest); resolve it. Returns
+-- the Forest's id and the final state.
+tidalWarriorChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe HackTarget -> m (ObjectId.ObjectId, GameState.GameState)
+tidalWarriorChain s registry hackWhere = do
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  tidalWarrior <- S.printingOf s registry "Tidal Warrior"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let (forestId, warriorCardId, hackId, g0) = tidalWarriorBoard forest island tidalWarrior magicalHack
+      onStack = S.runPure S.identityAnswer g0 (Cast.castSpell S.alice warriorCardId)
+      warriorSpellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      -- Hacking the SPELL: cast the Hack on top of the Warrior spell and resolve
+      -- it, so the stored effect names the spell id. Then resolve the Warrior.
+      hackedSpell = S.runPure (hackAt warriorSpellId Subtype.Island Subtype.Swamp) onStack (do Cast.castSpell S.alice hackId; Stack.resolveTop)
+      resolveWarrior gs = S.runPure S.identityAnswer gs (do Stack.resolveTop; Engine.settleAll S.alice)
+      -- Hacking the PERMANENT: resolve the Warrior first, then aim the Hack at
+      -- the new incarnation.
+      hackPermanent gs = case soleCreatureOf S.alice gs of
+        Nothing -> gs
+        Just permId -> S.runPure (hackAt permId Subtype.Island Subtype.Swamp) gs (do Cast.castSpell S.alice hackId; Stack.resolveTop)
+      board = case hackWhere of
+        Nothing -> resolveWarrior onStack
+        Just OnTheSpell -> resolveWarrior hackedSpell
+        Just OnThePermanent -> hackPermanent (resolveWarrior onStack)
+  case soleCreatureOf S.alice board >>= \permId -> fmap ((,) permId) (soleProjectedAbility permId board) of
+    Nothing -> do
+      Spec.assertFailure s "expected exactly one creature on the battlefield, carrying exactly one activated ability"
+      pure (forestId, board)
+    Just (permId, ability) ->
+      pure (forestId, S.runPure S.identityAnswer board (do Activate.activateAbility S.alice permId ability; Stack.resolveTop))

@@ -557,65 +557,18 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
     Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
-  Spec.it s "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
-    -- This gate rides a labeled synthetic: no real instant or sorcery SETS a
-    -- land's subtype. Aquitect's Will only ADDS one, and needs a flood counter
-    -- kind plus a counter-reading Duration.ForAsLongAs; every other real card
-    -- with the effect is an Aura, whose modification is a static ability and
-    -- so exercises Projection.gatherStatic rather than this stored-effect
-    -- read (#631).
-    -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
-    -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
-    -- (Swamp -> Mountain) it is SetLandSubtype Mountain -> {Mountain}.
-    forest <- S.printingOf s registry "Forest"
-    syntheticLandform <- S.printingOf s registry "Synthetic Landform"
-    let base = S.landsInPlay forest 1
-        targetLand = case Game.zoneMembers Zone.Battlefield S.alice base of
-          i : _ -> i
-          [] -> ObjectId.MkObjectId 999
-        slot = SlotName.MkSlotName (Text.pack "target")
-        (syntheticLandformId, g1) = Game.freshObjectId base
-        syntheticLandformObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard syntheticLandform,
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              -- CR 700.2: Synthetic Landform has one mode; a directly-built
-              -- stack object (bypassing Cast.castSpell) must stamp it chosen
-              -- (mode 0), or Resolve.effectsOf/resolveSpell -- now scoped to
-              -- CHOSEN modes -- would see no effects and no target specs at
-              -- all.
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColor = Nothing,
-              Object.chosenSubtype = Nothing,
-              Object.timestamp = Timestamp.MkTimestamp 0
-            }
-        g2 =
-          g1
-            { GameState.objects = Map.insert syntheticLandformId syntheticLandformObj (GameState.objects g1),
-              GameState.stack = syntheticLandformId : GameState.stack g1
-            }
-        -- A resolved Magical Hack already changed Swamp -> Mountain on the
-        -- Synthetic Landform spell (stored on that spell's id).
-        hacked = S.withEffectAt syntheticLandformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
-        after = snd (Engine.runGamePure S.identityAnswer hacked (Resolve.resolveSpell syntheticLandformId))
-    -- Synthetic Landform's own subtype does not matter; its EFFECT was
-    -- rewritten to SetLandSubtype Mountain, so the target land ends up a
-    -- Mountain.
-    Spec.assertEqWith s "target land became Mountain, not Swamp" (Projection.subtypesOf targetLand after) (Set.singleton Subtype.Mountain)
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by
     -- a BASIC LAND TYPE, so it is the first that can tell whether CR 612.1's
     -- "any words or symbols printed on that object" reaches inside an
     -- effect's Filter. The stored ChangeSubtypeWord is what a resolved
-    -- Magical Hack leaves on the spell, exactly as the Synthetic Landform
-    -- case above.
+    -- Magical Hack leaves on the spell.
+    --
+    -- The SPELL half of read-point 3 (Resolve.modesOf) rests on this case
+    -- alone: no real instant or sorcery SETS a land's subtype, so the
+    -- Modification half of the same read-point is proved through an ACTIVATED
+    -- ability instead -- Pawl.ActivateSpec's Tidal Warrior chain, which reaches
+    -- the same Projection.rewriteEffect ModifyTarget arm.
     island <- S.printingOf s registry "Island"
     forest <- S.printingOf s registry "Forest"
     boil <- S.printingOf s registry "Boil"
@@ -632,8 +585,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              -- CR 700.2, as the Synthetic Landform case explains: a
-              -- directly-built stack object must stamp its one mode chosen.
+              -- CR 700.2: Boil has one mode, and a directly-built stack object
+              -- (bypassing Cast.castSpell) must stamp it chosen (mode 0), or
+              -- Resolve.effectsOf/resolveSpell -- scoped to CHOSEN modes --
+              -- would see no effects and no target specs at all.
               Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
@@ -690,7 +645,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- keeps applying to the permanent that spell becomes, and rules text is a
     -- characteristic (CR 109.3). So the hacked Blood Moon reads "Nonbasic lands
     -- are Islands" on the battlefield, and Urborg -- a nonbasic land -- is an
-    -- Island. Stack.carryOverTo is what re-keys the stored effect.
+    -- Island. Stack.carryOver is what re-keys the stored effect.
     Spec.assertEqWith s "hack carried over: nonbasic land is Island" (Projection.subtypesOf nonbasicId after) (Set.singleton Subtype.Island)
   Spec.it s "CR 608.2n a resolving ability deals its damage and ceases" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
