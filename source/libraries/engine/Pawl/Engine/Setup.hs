@@ -168,7 +168,11 @@ startGameFromCards perform = do
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
-            Object.counters = Map.empty
+            Object.counters = Map.empty,
+            -- CR 400.7: a hand-written zone move outside Event.changeZone, so
+            -- the per-incarnation reset it would have done has to be repeated
+            -- here for the field this task added.
+            Object.face = Nothing
           }
       cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
@@ -399,7 +403,11 @@ funnelBack finalSub parent =
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
-            Object.counters = Map.empty
+            Object.counters = Map.empty,
+            -- CR 400.7: a hand-written zone move outside Event.changeZone, so
+            -- the per-incarnation reset it would have done has to be repeated
+            -- here for the field this task added.
+            Object.face = Nothing
           }
       returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))
       oldLibIds =

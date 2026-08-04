@@ -129,12 +129,15 @@ data Object = MkObject
     -- single one out. Nothing everywhere else, and the layout decides -- see
     -- Pawl.Engine.Game.faceOf.
     --
-    -- A CardName rather than a positional index: CR 709.4a gives a card's faces
-    -- names, a player names the half they are casting, and a name in a
-    -- DecisionLog either replays correctly or fails loudly where an index would
-    -- silently replay as the wrong half. Resolved against the object's STORED
-    -- card, never a projected one, so CR 612.2a's rename (which reaches only a
-    -- token-definition card a Create names) cannot dangle it.
+    -- A CardName rather than a positional index: CR 709.3 has a player choose
+    -- which half they are casting, and CR 709.4a is what gives a card's faces
+    -- names to choose from. Resolved against the object's STORED card, never a
+    -- projected one, so CR 612.2a's rename (which reaches only a
+    -- token-definition card a Create names) cannot dangle it. A name that no
+    -- longer names a face of that card falls back to the combined view
+    -- (Game.resolveFace) rather than failing -- unreachable in practice, since
+    -- the corpus lint (#648) holds a card's face names pairwise distinct and the
+    -- only writer of this field draws the name from that same card's faces.
     --
     -- Per-incarnation state, like damage and counters: cleared by changeZone,
     -- because CR 400.7 makes the moved object a new one.

@@ -7,6 +7,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
 import Pawl.Types.GameState (GameState)
@@ -192,30 +193,45 @@ cardOfSource mSource = case mSource of
     Source.OfEmblem card -> Just card
     Source.OfInherentTrigger _ _ -> Nothing
 
+-- Narrow a card down to the face a (possibly absent) chosen name picks out --
+-- the one resolution step faceOf and faceOfWithLastKnown share, so the two
+-- cannot drift on what the fallback is.
+--
+-- Nothing (no face singled out) answers with the layout's own view (CR 709.4 /
+-- 712.8a): a split card's characteristics are its two halves combined in every
+-- zone but the stack. Just n (CR 709.3b) answers with only that named half's
+-- characteristics -- looked up against the object's own STORED card, never a
+-- projected one.
+resolveFace :: Maybe CardName.CardName -> Card -> Face Card
+resolveFace mName card = case mName of
+  Nothing -> Card.combined card
+  -- A name that does not resolve falls back to the combined view rather than
+  -- failing. #648's corpus lint holds a card's face names pairwise distinct,
+  -- which is what makes faceNamed's answer unique whenever the name IS one of
+  -- the card's own faces, and the only writer of this field reads the name it
+  -- stores from that same card's faces -- so this arm has no case that reaches
+  -- it, short of a bug in that writer.
+  Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
+
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).
 --
--- The seam every characteristic read goes through. When the object has not
--- singled out a face, the layout answers (CR 709.4 / 712.8a): a split card's
--- characteristics are its two halves combined in every zone but the stack. When
--- it has (CR 709.3b), only the named half's characteristics exist -- looked up
--- against the object's own STORED card, never a projected one.
+-- The seam every characteristic read goes through.
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceOf oid gs = do
   card <- cardOf oid gs
-  case lookupObject oid gs >>= Object.face of
-    Nothing -> Just (Card.combined card)
-    -- A name that does not resolve falls back to the combined view rather than
-    -- failing. Pawl.CardSpec's "face names are pairwise distinct" lint is what
-    -- makes faceNamed's answer unique whenever the name IS one of the card's
-    -- own faces; nothing yet writes any other kind of name here (Task 4 is
-    -- what will), so this arm is unreachable in practice today.
-    Just n -> Just (Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card))
+  Just (resolveFace (lookupObject oid gs >>= Object.face) card)
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
--- fallback, for its reasons (CR 608.2h).
+-- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the
+-- object is still live, its own `face` narrows the answer the same way faceOf's
+-- does; if it is gone, `lookupObject` answers Nothing and this falls back to
+-- the combined view, since nothing before this task recorded a gone object's
+-- singled-out face for a later read to recover.
 faceOfWithLastKnown :: ObjectId -> GameState -> Maybe (Face Card)
-faceOfWithLastKnown oid gs = fmap Card.combined (cardOfWithLastKnown oid gs)
+faceOfWithLastKnown oid gs = do
+  card <- cardOfWithLastKnown oid gs
+  Just (resolveFace (lookupObject oid gs >>= Object.face) card)
 
 -- CR 112.1: a spell is a card on the stack. Asks the object's zone AND its KIND
 -- (its Source) -- a classification, never the card's identity.

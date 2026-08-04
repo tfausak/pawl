@@ -1816,10 +1816,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       (PC.power (Projection.projectUpTo Layer.ModifyPT cands pikerId gs))
       (Just 2)
 
-  -- No split card exists in the pool until Task 5, so this fixture is built by
-  -- hand (Pawl.CardSpec.splitCard: two Instant halves, Wax {G} and Wane {W}) and
-  -- put on the stack directly (S.spellOnStack), with Object.face set by hand --
-  -- the caster naming a half is Task 4's job, not this one's.
+  -- No split card is in the pool yet (#648), so this fixture is built by hand
+  -- (Pawl.CardSpec.splitCard: two Instant halves, Wax {G} and Wane {W}) and put
+  -- on the stack directly (S.spellOnStack), with Object.face set by hand -- a
+  -- cast never yet chooses a half; this proves only that Object.face, once
+  -- set, is read correctly.
   Spec.it s "CR 709.3b a split spell on the stack has only the half being cast" $ do
     let wax = CardName.MkCardName (Text.pack "Wax")
         card = CardSpec.splitCard

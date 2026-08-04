@@ -55,11 +55,13 @@ resolveTopWith runSubgame = do
       Just obj -> case Object.source obj of
         Source.OfCard printing ->
           -- CR 709.3b: if this spell has a face singled out, its classification
-          -- is read off THAT half, not the two combined -- Game.faceOf is the
-          -- one seam every characteristic read goes through, resolution's
-          -- is-it-a-permanent/is-it-an-Aura check included. Falls back to the
-          -- combined view for parity with faceOf's own fallback; unreachable
-          -- here since `obj` already resolved via this same `oid`.
+          -- is read off THAT half, not the two combined -- routed through
+          -- Game.faceOf rather than Card.combined directly, so this
+          -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
+          -- OTHER characteristic read of a stack object already does (#648
+          -- still owes Cost.hs and Action.hs the same change). Falls back to
+          -- the combined view for parity with faceOf's own fallback;
+          -- unreachable here since `obj` already resolved via this same `oid`.
           let face = Maybe.fromMaybe (Card.combined (Printing.card printing)) (Game.faceOf oid gs)
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
