@@ -15,15 +15,16 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
--- | R7's one case for MkProjectedCharacteristics's single constructor. Every
--- field is a REQUIRED key here (unlike Card's defaulted/elided ones) -- the
--- encoder writes JSON null rather than omitting the key for an absent Maybe --
--- so one populated fixture, with every collection given at least one element
--- and 'power'/'toughness' set but 'loyalty'/'characteristicPT' left at their
+-- | R7's one case for MkProjectedCharacteristics's single constructor. `name`
+-- and `cardTypes` are the only required keys; every other field is omitted
+-- from the JSON when it is at its default (Common.optionalPair/defaultedField).
+-- One populated fixture, with every collection given at least one element and
+-- 'power'/'toughness' set but 'loyalty'/'characteristicPT' left at their
 -- Nothing (a creature has no loyalty and no printed star), exercises the whole
--- shape at once. `triggeredAbilities` reuses 'CardSpec.minimalTriggeredAbility'
--- rather than building a second one by hand; `activatedAbilities` and
--- `replacementEffects` stay empty because ActivatedAbility's and
+-- shape at once, including the omission of the still-defaulted keys.
+-- `triggeredAbilities` reuses 'CardSpec.minimalTriggeredAbility' rather than
+-- building a second one by hand; `activatedAbilities` and `replacementEffects`
+-- stay empty (and so omitted) because ActivatedAbility's and
 -- ReplacementEffect's own per-constructor coverage lives in their own XSpecs.
 --
 -- No registry here: like Pawl.Codec.CardSpec, this sublibrary sits above
@@ -56,9 +57,9 @@ testCharacteristics =
 testCharacteristicsJson :: String
 testCharacteristicsJson =
   "{\"name\":\"Test Creature\",\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"type\":\"Flying\"}],"
-    <> "\"colors\":[{\"type\":\"Blue\"}],\"power\":1,\"toughness\":2,\"loyalty\":null,\"characteristicPT\":null,"
-    <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],\"activatedAbilities\":[],"
-    <> "\"replacementEffects\":[],\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
+    <> "\"colors\":[{\"type\":\"Blue\"}],\"power\":1,\"toughness\":2,"
+    <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
+    <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}]}"
 
 spec :: (Monad m) => Spec.Spec m n -> n ()
