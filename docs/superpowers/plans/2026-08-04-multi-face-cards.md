@@ -409,7 +409,7 @@ In `source/test-suite/Pawl/CardSpec.hs`. Build the two-face card from the same `
     Spec.assertEqWith s "both colours" (Projection.printedColorsOf c) (Set.fromList [Color.Green, Color.White])
     Spec.assertEqWith s "mana value 2" (Quantity.manaValueOf c) 2
     -- CR 709.4a, as far as a single CardName can carry it (#650): the CR writes
-    -- a split card's name joined, in all four of its own examples.
+    -- a split card's name joined and unspaced, in every Example that names one.
     Spec.assertEqWith s "the joined name" (Face.name c) (CardName.MkCardName (Text.pack "Wax//Wane"))
     -- CR 709.4c: "A split card has each card type specified on either of its
     -- halves and each ability in the text box of each half."
@@ -433,8 +433,11 @@ combined card = case Card.layout card of
   Layout.Normal -> NonEmpty.head (Card.faces card)
   -- CR 709.4: "In every zone except the stack, the characteristics of a split
   -- card are those of its two halves combined." Written over the whole
-  -- NonEmpty rather than over a pair, because CR 709 names no arity and a
-  -- five-part split card exists (Who // What // When // Where // Why).
+  -- NonEmpty rather than over a pair. NOT because CR 709 is arity-agnostic --
+  -- it says "two" four times (709.1, 709.2, 709.4, 709.4a). Because design.md
+  -- section 2.11 is a standing rule not to bake arity into the card model, and
+  -- because the five-part Who // What // When // Where // Why -- a silver-border
+  -- Un-card, outside the CR -- costs an arity-general fold nothing.
   Layout.Split -> foldSplit (Card.faces card)
 ```
 
@@ -451,8 +454,8 @@ merge2 l r =
   l
     { -- CR 709.4a gives the card BOTH names and no joined one; a single
       -- CardName cannot carry that, so this is the form the CR uses in its own
-      -- four examples ("Fire//Ice", "Assault//Battery") and #650 carries the
-      -- plural axis.
+      -- Examples that name one ("Fire//Ice", "Assault//Battery"), and #650
+      -- carries the plural axis.
       Face.name = joinNames (Face.name l) (Face.name r),
       -- CR 709.4b: "the combined mana costs of its two halves", from which
       -- colours and mana value fall out with no further arm.
@@ -505,8 +508,8 @@ merge2 l r =
 
 ```haskell
 -- CR 709.4a as far as a single name can carry it (#650): the CR writes a
--- multi-face card's name with its faces joined by "//", in all four of its own
--- examples ("Fire//Ice" three times, "Assault//Battery" once).
+-- multi-face card's name with its faces joined by "//" and unspaced, in every
+-- Example that names one ("Fire//Ice" twice, "Assault//Battery" once).
 --
 -- Here rather than in Pawl.Engine.Card because `registry` sits BEFORE `engine`
 -- in the sublibrary table and cannot reach it, while both sit after `types`.

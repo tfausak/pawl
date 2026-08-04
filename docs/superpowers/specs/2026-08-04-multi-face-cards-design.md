@@ -103,10 +103,12 @@ and fall back to `combined` when the object names none.
 
 ### 4.1 The combined name is the face names joined by `//`
 
-The comprehensive rules never state this, but they do it: all four places the CR
-names a split card in its own prose it writes the halves joined without spaces —
-"Fire//Ice" three times and "Assault//Battery" once. Every external card source
-does the same, modulo spacing.
+The comprehensive rules never state this, but they do it: every Example in
+`docs/rules.txt` that names a split card writes the halves joined **without
+spaces** — `Fire//Ice` at lines 3882 and 5747, `Assault//Battery` at 5746. That
+is four occurrences across three Examples, and one of the three sits under a
+flashback rule rather than under CR 709 at all; CR 709.4a itself carries no
+example. Every external card source does the same, modulo spacing.
 
 So `combined` joins. It beats taking the first face's name, which would privilege
 one half for no rules reason, and it is what a log or a player view should show.
