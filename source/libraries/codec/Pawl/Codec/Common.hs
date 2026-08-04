@@ -1,9 +1,18 @@
 -- | Construction, normalization, and extraction helpers over the @json@
 -- sublibrary's 'Value.Value', plus the tagged-object convention the codec builds
 -- on, the element-generic combinators every per-type codec module is written in
--- terms of, and the assertions its specs are written in terms of. Encoding and
--- decoding themselves live in 'Pawl.Json.Value'; this module adapts them to the
--- codec's @Either Text@ error channel.
+-- terms of, the field combinators ('requiredPair', 'optionalPair',
+-- 'defaultedField') those modules use to encode and decode a record's fields,
+-- and the assertions its specs are written in terms of. Encoding and decoding
+-- themselves live in 'Pawl.Json.Value'; this module adapts them to the codec's
+-- @Either Text@ error channel.
+--
+-- 'optionalPair' and 'defaultedField' carry one invariant between them: an
+-- omitted key means the default that 'defaultedField' supplies, and that
+-- default must be the same value 'optionalPair' omits a field for writing. A
+-- per-type module calls both with the same default argument for a given field;
+-- if the two ever drift apart, encoding a default value and decoding it back
+-- stops being the identity.
 --
 -- Nothing here names a @Pawl.Types@ type, which is what keeps it below all 98
 -- per-type modules rather than in a cycle with them.
@@ -167,11 +176,6 @@ field k ps = case lookupPair k ps of
 optionalField :: String -> [Pair.Pair Value.Value] -> Maybe Value.Value
 optionalField = lookupPair
 
--- | An absent field reads as JSON null, which is what the @decode*Default@
--- family treats as "say nothing and take the default".
-nullableField :: String -> [Pair.Pair Value.Value] -> Value.Value
-nullableField k = Maybe.fromMaybe Pawl.Codec.Common.null . lookupPair k
-
 withValue :: Maybe Value.Value -> (Value.Value -> Either Text.Text a) -> Either Text.Text a
 withValue mv f = case mv of
   Just v -> f v
@@ -275,33 +279,6 @@ decodeNatural value = do
   case Integer.toNatural n of
     Just x -> Right x
     Nothing -> Left . Text.pack $ "expected natural but got " <> show n
-
--- Defaults (legacy) ------------------------------------------------------------
---
--- Superseded by 'defaultedField' and 'optionalPair', which pair a decoder with
--- an explicit default rather than overloading @null@ to mean "take the
--- default". Callers still exist in codec modules that later tasks convert;
--- Task 10 removes this section once they're gone.
-
-decodeListDefault :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text [a]
-decodeListDefault f value = case value of
-  Value.Null _ -> Right []
-  _ -> decodeList f value
-
-decodeSetDefault :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Set.Set a)
-decodeSetDefault f value = case value of
-  Value.Null _ -> Right Set.empty
-  _ -> decodeSet f value
-
-decodeMapDefault :: (Value.Value -> Either Text.Text (Map.Map k v)) -> Value.Value -> Either Text.Text (Map.Map k v)
-decodeMapDefault f value = case value of
-  Value.Null _ -> Right Map.empty
-  _ -> f value
-
-decodeBooleanDefault :: Bool -> Value.Value -> Either Text.Text Bool
-decodeBooleanDefault d value = case value of
-  Value.Null _ -> Right d
-  _ -> asBoolean value
 
 -- Assertions -----------------------------------------------------------------
 
