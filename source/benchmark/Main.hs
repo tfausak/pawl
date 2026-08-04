@@ -11,6 +11,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Deck as Deck
@@ -93,6 +94,8 @@ alwaysPass p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -146,6 +149,8 @@ castAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -200,6 +205,8 @@ fightAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events

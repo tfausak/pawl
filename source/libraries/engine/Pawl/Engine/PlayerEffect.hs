@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import Pawl.Types.CardName (CardName)
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
@@ -32,6 +33,7 @@ import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.ManaCost (ManaCost)
 import Pawl.Types.ManaUnit (ManaUnit)
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -96,7 +98,14 @@ playersInScope perspective gs scope =
 --
 -- The (controller, scope, effect) triples are local: nothing outside this
 -- function ever sees one.
-applying :: PlayerId -> GameState -> [PlayerEffect]
+--
+-- The SOURCE rides out alongside the effect, and only because CR 601.3a's
+-- quality-bearing prohibitions read it: Null Chamber's "the chosen names" are
+-- Object.chosenNames on the permanent that printed the ability, the same
+-- direction Modification.AddChosenColor reads a colour. Nothing for a stored
+-- CR 611.2c effect, which is a resolved spell's and has no permanent behind it
+-- -- and no such effect names a source-carried quality.
+applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
 applying pid gs =
   let -- Hoisted out of the walk exactly as Projection.gather hoists it: an
       -- inlined call would recompute the whole game's SetLandSubtype list once
@@ -131,7 +140,7 @@ applying pid gs =
               -- started to apply before layer 6 and the cut is unconditional.
               if (null setEffs || Projection.liveGiven setEffs Set.empty oid gs)
                 && not (removed oid)
-                then fmap (\ability -> (controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
+                then fmap (\ability -> (Just oid, controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
@@ -142,13 +151,14 @@ applying pid gs =
       -- to remove: CR 611.2a gives a resolved spell's continuous effect a duration
       -- of its own. Humility cannot take back a Silence that has already resolved.
       storedOne active =
-        ( ActivePlayerEffect.controller active,
+        ( Nothing,
+          ActivePlayerEffect.controller active,
           ActivePlayerEffect.scope active,
           ActivePlayerEffect.effect active
         )
       stored = fmap storedOne (GameState.playerEffects gs)
-      keep (controller, scope, _) = inScope pid controller scope
-      effectOf (_, _, effect) = effect
+      keep (_, controller, scope, _) = inScope pid controller scope
+      effectOf (source, _, _, effect) = (source, effect)
    in fmap effectOf (filter keep (printed <> stored))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
@@ -170,17 +180,49 @@ castsThisTurn pid gs =
 -- over anything allowing or directing. One applicable prohibition is enough and
 -- nothing outvotes it.
 --
--- Deliberately does NOT take the spell. Both prohibitions here are quality-free
--- -- "can't cast spells", "can't cast more than one spell" -- so the answer does
--- not depend on WHICH spell, and a parameter nothing reads would assert a
--- generality this engine has not built. It grows an ObjectId when CR 601.3a's
--- quality-bearing prohibitions do (#95).
-prohibitsCasting :: PlayerId -> GameState -> Bool
-prohibitsCasting pid gs =
+-- Takes the SPELL, as one half named: CR 709.3a evaluates only the chosen half
+-- to see if it can be cast, so the name compared is the half's own and a split
+-- card is asked this question once per half. Two of the three prohibitions are
+-- quality-free -- "can't cast spells", "can't cast more than one spell" -- and
+-- ignore both parameters; CR 601.3a's quality-bearing shape is what the third
+-- needs them for (Null Chamber's "spells with the chosen names").
+--
+-- ONE name rather than the set CR 201.2a asks about ("at least one name in
+-- common"). Every spell in this pool has exactly one name at this moment: the
+-- proposal has already fixed the half, and no other object has several names
+-- (#650).
+--
+-- CR 601.3a's LOOKAHEAD is still not implemented: the rule lets a player begin
+-- casting when some proposal choice could move the spell out of the prohibited
+-- class, and nothing here searches choice space (#95). It is not reachable by
+-- this arm -- the only proposal choice that changes a spell's name is CR 709.3's
+-- half, which the caller has already made, so each half is offered on its own
+-- answer.
+--
+-- A NAME rather than the spell's object id, because the name is the whole of
+-- what the three arms read: the caller has the proposed card and takes the name
+-- off its chosen face, which is also the only place it could come from -- pawl
+-- projects nothing off the battlefield, and the card is still in the zone it is
+-- cast from (#160). A criterion over more of the spell than its name is what
+-- would want the object back (#95).
+--
+-- CR 101.2 is why this folds as a DISJUNCTION: a "can't" effect takes precedence
+-- over anything allowing or directing. One applicable prohibition is enough and
+-- nothing outvotes it.
+prohibitsCasting :: PlayerId -> CardName -> GameState -> Bool
+prohibitsCasting pid name gs =
   let cast = castsThisTurn pid gs
-      prohibits effect = case effect of
+      prohibits (source, effect) = case effect of
         PlayerEffect.CantCastSpells -> True
         PlayerEffect.CantCastMoreThan limit -> cast >= toInteger limit
+        -- CR 601.3a / 614.1c: the quality is the name chosen as the SOURCE
+        -- entered, so an ability whose permanent has chosen nothing prohibits
+        -- nothing.
+        PlayerEffect.CantCastChosenName -> Set.member name (chosenNamesOf source gs)
+        -- CR 305.1: playing a land is a special action and never a cast, so the
+        -- play-side twin stops nothing here. Pawl.Engine.Action.playableLands is
+        -- the gate that reads it.
+        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -190,6 +232,43 @@ prohibitsCasting pid gs =
         -- the restriction lands (CR 115.4, CR 601.2c).
         PlayerEffect.CantBeTargetedBy _ -> False
    in any prohibits (applying pid gs)
+
+-- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
+-- The play-side twin of prohibitsCasting above, and a separate question rather
+-- than a widening of it: CR 305.1 makes playing a land a special action that
+-- never uses the stack, so a land is never a spell and none of the cast-side
+-- prohibitions reaches it (Silence stops no land).
+--
+-- Takes a name for prohibitsCasting's reason, and one more of its own: the
+-- caller has already asked whether the card is a land at all, off the same face
+-- this name comes from. A land with several names would want the set CR 201.2a
+-- asks about (#650), and none exists.
+--
+-- A DISJUNCTION for CR 101.2's reason.
+prohibitsPlayingLand :: PlayerId -> CardName -> GameState -> Bool
+prohibitsPlayingLand pid name gs =
+  let prohibits (source, effect) = case effect of
+        PlayerEffect.CantPlayLandChosenName -> Set.member name (chosenNamesOf source gs)
+        -- CR 305.1 again, in the other direction: a prohibition on CASTING says
+        -- nothing about a special action, so Silence and Rule of Law leave a
+        -- land play alone. CR 305.2/305.3's own limits are the closed half's and
+        -- are asked by Action.legalActions, not here.
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+   in any prohibits (applying pid gs)
+
+-- CR 614.1c: the card names chosen as this effect's source entered
+-- (Object.chosenNames). Empty for an effect with no source -- a stored CR 611.2c
+-- row -- and for a permanent that chose nothing, which CR 201.2a makes the
+-- answer that matches no object rather than one that matches every object.
+chosenNamesOf :: Maybe ObjectId -> GameState -> Set.Set CardName
+chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid -> Game.lookupObject oid gs)
 
 -- Does this spell match the cost-adjustment Filter? Evaluated against the
 -- PROJECTED view (Projection.viewOfObject) -- a card type is CR 613.1d layer 4
@@ -224,6 +303,8 @@ costAdjustments pid oid gs =
         PlayerEffect.ReduceSpellCost _ _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -232,10 +313,12 @@ costAdjustments pid oid gs =
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
-      effects = applying pid gs
+      effects = fmap snd (applying pid gs)
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -272,11 +355,13 @@ protectedFromTargeting caster pid gs =
             PlayerScope.You -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
-   in any stops (applying pid gs)
+   in any (stops . snd) (applying pid gs)
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
 -- starting hand size, which is a different seven (Mulligan.openingHand) that
@@ -294,11 +379,13 @@ maximumHandSize pid gs =
         PlayerEffect.NoMaximumHandSize -> True
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
-   in if any removes (applying pid gs)
+   in if any (removes . snd) (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
 
@@ -332,9 +419,11 @@ keepsUnspentMana pid gs =
         PlayerEffect.DontLoseUnspentMana f -> Just f
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
         PlayerEffect.ReduceSpellCost _ _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
-      filters = Maybe.mapMaybe keeps (applying pid gs)
+      filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters

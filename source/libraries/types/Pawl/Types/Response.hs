@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
@@ -81,6 +82,12 @@ data Response
     ChoseEntryOption Natural.Natural
   | -- | CR 614.1c: the colour a player chose as an object entered.
     ChoseColor Color.Color
+  | -- | CR 201.4 / 614.1c: the card name a player chose as an object entered.
+    ChoseCardName CardName.CardName
+  | -- | CR 614.12a: the opponent a player chose for an as-enters choice the card
+    -- assigns to "an opponent". Unlike ChoseDefender, which also carries an
+    -- opponent, this answers no combat question.
+    ChoseOpponent PlayerId.PlayerId
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as
     -- a permutation of the offered indices.
     OrderedTriggers [Natural.Natural]

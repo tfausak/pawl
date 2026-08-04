@@ -9,9 +9,11 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import Pawl.Types.Desync (Desync)
@@ -58,6 +60,8 @@ encode p answer = case p of
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
+  Prompt.ChooseCardName {} -> Response.ChoseCardName answer
+  Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
   Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
@@ -154,6 +158,12 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
+    _ -> Nothing
+  Prompt.ChooseCardName {} -> case response of
+    Response.ChoseCardName n -> Just n
+    _ -> Nothing
+  Prompt.ChooseOpponent {} -> case response of
+    Response.ChoseOpponent pid -> Just pid
     _ -> Nothing
   Prompt.ChooseBasicLandType {} -> case response of
     Response.ChoseBasicLandType t -> Just t
@@ -288,6 +298,16 @@ defaultAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
+  -- CR 201.2a: an object with no name doesn't have the same name as any other
+  -- object, so the empty name is the answer that prohibits nothing. NOT a legal
+  -- answer under CR 201.4 -- no card in the Oracle card reference is called it
+  -- -- and deliberately so: this arm is reached only by a transcript that ran
+  -- out, which 'replay' reports as a desync, and conjuring a real card's name
+  -- would silently prohibit that card instead.
+  Prompt.ChooseCardName {} -> CardName.MkCardName Text.empty
+  -- Every candidate is an opponent the card's own text offered, and the prompt
+  -- is raised only when there are two or more.
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   -- CR 305.6: any of the five basic land types is legal. Mountain is what the
   -- ChooseLandTypeSwap arm above falls back to, so the two agree on which type
   -- a short transcript conjures.

@@ -287,8 +287,9 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- CR 110.2 / 400.7: `enteredUnder` is reset like every other
               -- per-incarnation field, so the new object enters under its owner's
               -- control until a CR 616.1b replacement says otherwise --
-              -- Replacement.runEntry is the only writer. `chosenColor` and
-              -- `chosenSubtype` are reset for the same reason (CR 614.1c).
+              -- Replacement.runEntry is the only writer. `chosenColor`,
+              -- `chosenSubtype` and `chosenNames` are reset for the same reason
+              -- (CR 614.1c).
               --
               -- `face` is cleared under CR 400.7 as well, which is right for the
               -- one layout that ships: whichever half CR 709.3b singled out
@@ -300,7 +301,7 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- stack", so a stack-to-battlefield move must CARRY the face
               -- rather than drop it. Not implemented; no double-faced card is in
               -- the pool to reach it (#657).
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.timestamp = ts, Object.face = Nothing}
+              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.chosenNames = Set.empty, Object.timestamp = ts, Object.face = Nothing}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
@@ -579,6 +580,7 @@ createTokens controller card n tapped = do
                     Object.attachedTo = Nothing,
                     Object.chosenColor = Nothing,
                     Object.chosenSubtype = Nothing,
+                    Object.chosenNames = Set.empty,
                     Object.timestamp = ts,
                     Object.face = Nothing
                   }

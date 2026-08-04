@@ -379,8 +379,10 @@ castable pid oid name gs =
   timingOk pid oid name gs
     && inCastableZone pid oid name gs
     -- CR 601.3: gated HERE, upstream of Action.legalActions, because the engine
-    -- never offers an illegal action and then rejects it.
-    && not (PlayerEffect.prohibitsCasting pid gs)
+    -- never offers an illegal action and then rejects it. The half's own name
+    -- goes with it, since CR 601.3a's prohibitions name a quality of the spell
+    -- (Null Chamber) and CR 709.3a evaluates only the chosen half.
+    && not (PlayerEffect.prohibitsCasting pid name gs)
     && printedRestrictionsOk pid oid name gs
     && legendaryRestrictionOk pid oid name gs
     && any (payableCost pid oid gs) (Cost.costsFor name oid gs)
@@ -431,9 +433,10 @@ permissionsOf face =
 --
 -- The prohibition is NOT omitted, and that is the point: CR 601.3 is one sentence
 -- with two halves, and the Panglacial permission excepts only the timing one, so
--- a Rule of Law still stops a cast from the library. CR 205.4e's restriction
--- rides along for the same reason. Unobservable in this pool and written anyway,
--- because the alternative is a cast the rules forbid.
+-- a Rule of Law still stops a cast from the library, and a Null Chamber that
+-- named this card stops this one. CR 205.4e's restriction rides along for the
+-- same reason. Unobservable in this pool and written anyway, because the
+-- alternative is a cast the rules forbid.
 --
 -- printedRestrictionsOk rides along too, and it is the closest call of the three:
 -- a "Cast this spell only during the declare attackers step" IS about timing, so
@@ -454,13 +457,15 @@ castableWhileSearching pid gs =
         Just face ->
           let name = Face.name face
            in permitsCastWhileSearching face
+                -- CR 601.3's prohibit half, moved inside `allowed` when it grew
+                -- a name: a quality-bearing prohibition stops one card without
+                -- stopping the search's other candidates.
+                && not (PlayerEffect.prohibitsCasting pid name gs)
                 && any (payableCost pid oid gs) (Cost.costsFor name oid gs)
                 && printedRestrictionsOk pid oid name gs
                 && legendaryRestrictionOk pid oid name gs
                 && targetable pid oid name gs
-   in if PlayerEffect.prohibitsCasting pid gs
-        then []
-        else filter allowed (Game.zoneMembers Zone.Library pid gs)
+   in filter allowed (Game.zoneMembers Zone.Library pid gs)
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them
 -- the chance to cast a castable-while-searching card from it, before any card is

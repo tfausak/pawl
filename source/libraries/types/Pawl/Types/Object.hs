@@ -1,6 +1,7 @@
 module Pawl.Types.Object where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
@@ -103,7 +104,8 @@ data Object = MkObject
     -- Per-incarnation state, like damage and counters: reset by changeZone,
     -- because CR 400.7 makes the moved object a new one.
     --
-    -- One of TWO as-enters choice fields; chosenSubtype below is the other.
+    -- One of THREE as-enters choice fields; chosenSubtype and chosenNames below
+    -- are the others.
     chosenColor :: Maybe Color.Color,
     -- | CR 614.1c: a basic land type this object's controller chose as it
     -- entered (Convincing Mirage). Read by Modification.SetLandSubtypeToChosen
@@ -113,13 +115,36 @@ data Object = MkObject
     -- A sibling of chosenColor rather than one generalized choice map: the two
     -- carry different types and are read by different modifications, and a
     -- sum-typed value would make every reader re-narrow what the field already
-    -- knows. A THIRD as-enters choice of a third type would change that call.
+    -- knows.
     --
     -- NOT a copiable value, for chosenColor's reason (CR 707.5, CR 707.6).
     --
     -- Per-incarnation state: reset by changeZone, because CR 400.7 makes the
     -- moved object a new one.
     chosenSubtype :: Maybe Subtype.Subtype,
+    -- | CR 614.1c / CR 201.4: the card names chosen as this object entered
+    -- ("As this enchantment enters, you and an opponent each choose a card name"
+    -- -- Null Chamber). Read by Pawl.Engine.PlayerEffect off the effect's SOURCE,
+    -- the same direction Modification.AddChosenColor reads chosenColor.
+    --
+    -- The third as-enters choice field, and still a sibling of the two above
+    -- rather than the generalized choice map a third arrival was expected to
+    -- force. A `Map ChoiceKind ChoiceValue` would need a sum over colour,
+    -- subtype and name, which every reader would then have to re-narrow at a
+    -- site where the wrong arm is unrepresentable today; three typed fields keep
+    -- each read total. A fourth would not change that either.
+    --
+    -- A SET rather than one name or a name per chooser. Null Chamber has two
+    -- players each name a card, and its prohibition asks only whether a name is
+    -- among them -- so who named which is not a distinction any reader can make,
+    -- and two players naming the same card is one prohibition either way. Empty
+    -- for everything that never chose (CR 201.2a: an object with no name).
+    --
+    -- NOT a copiable value, for chosenColor's reason (CR 707.5, CR 707.6).
+    --
+    -- Per-incarnation state: reset by changeZone, because CR 400.7 makes the
+    -- moved object a new one.
+    chosenNames :: Set.Set CardName.CardName,
     -- | CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when

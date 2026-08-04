@@ -24,6 +24,32 @@ data PlayerEffect
     -- Laboratory both say one, and a card that says two must not need a sibling
     -- constructor.
     CantCastMoreThan Natural.Natural
+  | -- | CR 601.3 / Null Chamber: this player can't cast a spell whose name is one
+    -- of the names chosen as this effect's SOURCE entered ("Spells with the
+    -- chosen names can't be cast").
+    --
+    -- NULLARY, carrying no name, for UnderSourceControl's reason on the entry
+    -- side: a card cannot write a CardName any more than it can write a
+    -- PlayerId, because the name is not known until CR 614.1c's choice is made.
+    -- The names come from Object.chosenNames on the source, which is how
+    -- Modification.AddChosenColor already reads a colour.
+    --
+    -- The quality is the SPELL's name, which makes this CR 601.3a's shape rather
+    -- than CantCastSpells' -- see Pawl.Engine.PlayerEffect.prohibitsCasting for
+    -- what that costs and what is still missing (#95).
+    CantCastChosenName
+  | -- | CR 305.1 / Null Chamber: this player can't PLAY a land whose name is one
+    -- of the names chosen as this effect's source entered ("lands with the
+    -- chosen names can't be played").
+    --
+    -- The sibling of CantCastChosenName above, and deliberately not folded into
+    -- it even though one printed sentence carries both: CR 305.1 makes playing a
+    -- land a special action that never uses the stack, so a land is never cast
+    -- and the two prohibitions are read by two different gates
+    -- (Pawl.Engine.Action.playableLands, Pawl.Engine.Cast.castable). A card
+    -- printing only one half (Nevermore prints only the cast half) declares only
+    -- one arm.
+    CantPlayLandChosenName
   | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
     IncreaseSpellCost (Filter.Filter Keyword.Keyword) Natural.Natural

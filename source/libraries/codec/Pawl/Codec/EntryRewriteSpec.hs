@@ -6,10 +6,13 @@ import qualified Data.Set as Set
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryRewrite as EntryRewrite
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Supertype as Supertype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
@@ -51,6 +54,16 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       EntryRewrite.ChooseBasicLandType
       """ {"type":"ChooseBasicLandType"} """
+  -- CR 614.1c / 201.4a: an as-enters name choice, carrying the restriction on
+  -- which cards' names may be chosen -- Null Chamber's "other than a basic land
+  -- card name", which is a supertype and a card type together.
+  Spec.it s "ChooseCardNames (Null Chamber)" $
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      (EntryRewrite.ChooseCardNames (Filter.Not (Filter.And [Filter.HasSupertype Supertype.Basic, Filter.HasCardType CardType.Land])))
+      """ {"type":"ChooseCardNames","value":{"type":"Not","value":{"type":"And","value":[{"type":"HasSupertype","value":{"type":"Basic"}},{"type":"HasCardType","value":{"type":"Land"}}]}}} """
   -- CR 614.1c / 306.5b: a planeswalker's intrinsic entry-with-counters rewrite.
   Spec.it s "WithCounters (planeswalker loyalty)" $
     Common.assertJsonCodec

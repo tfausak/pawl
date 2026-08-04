@@ -71,6 +71,7 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
@@ -1249,6 +1250,10 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost f _ -> [f]
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantCastMoreThan _ -> []
+  -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
+  -- the source entered, which is not a Filter and is not written by the card.
+  PlayerEffect.CantCastChosenName -> []
+  PlayerEffect.CantPlayLandChosenName -> []
   PlayerEffect.NoMaximumHandSize -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a cost modifier matches.
@@ -1257,17 +1262,36 @@ playerEffectFilters playerEffect = case playerEffect of
   -- players, and this traversal is about the spells a cost modifier matches.
   PlayerEffect.CantBeTargetedBy _ -> []
 
+-- CR 201.4a: the restriction on which cards' names an as-enters name choice may
+-- name (Null Chamber's "other than a basic land card name"). The one Filter an
+-- EntryRewrite carries, and a predicate over a CARD in the Oracle card reference
+-- rather than over an object on the board -- which is the same shape
+-- Effect.Search's is, and why it belongs in this walk.
+entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
+entryRewriteFilters entryRewrite = case entryRewrite of
+  EntryRewrite.ChooseCardNames f -> [f]
+  EntryRewrite.AsCopy -> []
+  EntryRewrite.ChoiceOf _ -> []
+  EntryRewrite.ChooseColor -> []
+  EntryRewrite.ChooseBasicLandType -> []
+  EntryRewrite.WithCounters _ _ -> []
+  EntryRewrite.UnderSourceControl -> []
+
 -- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
 -- is "one or more counters would be put on a creature YOU control", and EntryR's
 -- whole pattern is one -- CR 614.1c's "as [THIS PERMANENT] enters" (Filter.IsSource)
 -- and CR 614.1d's "[Objects] enter [the battlefield] . . ." (Gather Specimens'
 -- creature clause). The other five narrow by zone, damage, destruction, token or
 -- phase, none of which holds one.
+--
+-- EntryR's REWRITE holds one too, on a second axis: its pattern says which
+-- objects entering it applies to, and entryRewriteFilters above says which
+-- cards a name choice inside it may name.
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
   ReplacementEffect.ZoneChangeR _ _ -> []
-  ReplacementEffect.EntryR entryPattern _ -> [entryPattern]
+  ReplacementEffect.EntryR entryPattern entryRewrite -> entryPattern : entryRewriteFilters entryRewrite
   ReplacementEffect.DamageR _ _ -> []
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR _ _ -> []

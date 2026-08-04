@@ -263,6 +263,8 @@ identityAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -327,6 +329,8 @@ castAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -384,6 +388,8 @@ aggressiveAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -475,6 +481,8 @@ playLandAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -517,6 +525,7 @@ addCreature printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -711,6 +720,7 @@ addToken card pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -740,6 +750,7 @@ addLibraryCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -769,6 +780,7 @@ addGraveyardCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -805,6 +817,7 @@ addExiledCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -848,6 +861,7 @@ addHandCard printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -894,6 +908,7 @@ landsInPlay land n =
                   Object.attachedTo = Nothing,
                   Object.chosenColor = Nothing,
                   Object.chosenSubtype = Nothing,
+                  Object.chosenNames = Set.empty,
                   Object.timestamp = ts,
                   Object.face = Nothing
                 }
@@ -922,6 +937,7 @@ handOne printing base =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -956,6 +972,7 @@ pikerInHand land piker n ph =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }
@@ -1416,6 +1433,7 @@ oneMountainState mountain ph =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = Timestamp.MkTimestamp 0,
             Object.face = Nothing
           }
@@ -1544,6 +1562,7 @@ spellOnStack printing pid gs =
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing
           }

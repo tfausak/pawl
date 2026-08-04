@@ -34,6 +34,23 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.CantCastMoreThan 1)
       """ {"type":"CantCastMoreThan","value":1} """
+  -- CR 601.3 / Null Chamber's cast half. Payload-free: the names come from the
+  -- source's Object.chosenNames, which no card can write.
+  Spec.it s "CantCastChosenName" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantCastChosenName
+      """ {"type":"CantCastChosenName"} """
+  -- CR 305.1 / Null Chamber's play half, which is a different gate.
+  Spec.it s "CantPlayLandChosenName" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantPlayLandChosenName
+      """ {"type":"CantPlayLandChosenName"} """
   -- CR 613.11 / 601.2f / Thalia.
   Spec.it s "IncreaseSpellCost" $
     Common.assertJsonCodec
