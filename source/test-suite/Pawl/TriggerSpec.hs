@@ -7,7 +7,9 @@
 -- reserved trigger-source slot, CR 701.21 -- `sacrificeSpec`. CR 603.6a's
 -- OTHER written form, "whenever a [type] enters", with Soul Warden --
 -- `permanentEntersSpec`. CR 603.8 state
--- triggers -- `stateTriggerSpec`. CR 608.2i turn history (Khabál Ghoul's
+-- triggers -- `stateTriggerSpec`, and CR 612.1's basic-land-type word swap
+-- reaching one of those, with Magical Hack aimed at Barbarian Outcast --
+-- `textChangedTriggerSpec`. CR 608.2i turn history (Khabál Ghoul's
 -- "died this turn") -- `historySpec`. CR 603.7 delayed triggered abilities
 -- -- `delayedSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
@@ -592,6 +594,82 @@ stateTriggerSpec s registry =
               settled = settle gs
               resolved = snd (Engine.runGamePure S.identityAnswer settled Stack.resolveTop)
           Spec.assertBool s (not (Set.member outcast (GameState.battlefield resolved))) "the Outcast is off the battlefield"
+          Spec.assertEqWith s "and in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+
+-- Answers the Hack: it targets `oid` and swaps `from` for `to`. Everything else
+-- falls through to the identity answer.
+answerHackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+answerHackAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- alice controls a Swamp and a Barbarian Outcast; BOB holds the Magical Hack and
+-- the Island that pays for it. Whose Island it is decides the whole test: one on
+-- ALICE's side would satisfy the swapped condition all by itself and the fired
+-- trigger would prove nothing. bob casting it is legal for the same reason a
+-- Hack can be aimed at any permanent -- CR 612.1's swap is a property of the
+-- OBJECT, not of who changed its text.
+--
+-- With `hacked`, bob casts the Hack at the Outcast (Swamp -> Island) and it
+-- resolves before the board is settled. Returns the Outcast's id and the state
+-- at the CR 117.5 boundary, triggers placed and unresolved.
+outcastHackBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
+outcastHackBoard s registry hacked = do
+  barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
+  swamp <- S.printingOf s registry "Swamp"
+  island <- S.printingOf s registry "Island"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let gs0 = Setup.emptyGame S.bothPlayers
+      (_, gs1) = S.addCreature swamp S.alice gs0
+      (_, gs2) = S.addCreature island S.bob gs1
+      (outcastId, gs3) = S.addCreature barbarianOutcast S.alice gs2
+      (hackId, gs4) = S.addHandCard magicalHack S.bob gs3
+      gs5 = gs4 {GameState.priority = Just S.bob}
+      hackIt g = S.runPure (answerHackAt outcastId Subtype.Swamp Subtype.Island) g (do Cast.castSpell S.bob hackId; Stack.resolveTop)
+      settle g = snd (Engine.runGamePure S.identityAnswer g Engine.settleForPriority)
+  pure (outcastId, settle (if hacked then hackIt gs5 else gs5))
+
+-- CR 612.1 reaching a TRIGGERED ability, end to end through the real engine.
+--
+-- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2, "When you
+-- control no Swamps, sacrifice this creature." (checked against Scryfall) and
+-- Magical Hack are the whole board -- no card had to be added for this.
+--
+-- CR 612.1: a text-changing effect "can apply to any words or symbols printed on
+-- that object, but generally affects only that object's rules text (which
+-- appears in its text box)". A triggered ability is printed in that text box
+-- exactly as an activated ability is, so a hacked Outcast asks about ISLANDS.
+--
+-- The reader this proves out is Pawl.Engine.Event.stateTriggers, which takes the
+-- ability from Projection.triggeredAbilitiesOf (the projection's post-layer
+-- list) and hands its CR 603.8 condition to Condition.holds -- so the swap has
+-- to land in the projection, at CR 613.1c layer 3, to be seen here.
+textChangedTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedTriggerSpec s registry =
+  let isTriggerObject gs oid = case Game.lookupObject oid gs of
+        Just obj -> case Object.source obj of
+          Source.OfTrigger _ _ -> True
+          _ -> False
+        Nothing -> False
+      triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
+      resolveTop gs = snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop)
+   in Spec.describe s "TextChangedTriggeredAbility" $ do
+        -- The control, and what keeps the case below from passing vacuously:
+        -- unhacked, the printed word stands, alice's Swamp answers it, and the
+        -- Outcast is never in any danger.
+        Spec.it s "CR 603.8 whole card: an unhacked Outcast asks about SWAMPS and stays" $ do
+          (outcastId, board) <- outcastHackBoard s registry False
+          Spec.assertEqWith s "alice controls a Swamp: no trigger" (length (triggerIds board)) 0
+          Spec.assertBool s (Set.member outcastId (GameState.battlefield (resolveTop board))) "the Outcast is still on the battlefield"
+        -- The swap, at gameplay level. alice's board did not move -- one Swamp,
+        -- no Islands -- but the Outcast's own text now reads "no Islands", which
+        -- is true, so it fires and sacrifices itself.
+        Spec.it s "CR 612.1 whole card: a hacked Outcast asks about ISLANDS, fires and sacrifices itself" $ do
+          (outcastId, board) <- outcastHackBoard s registry True
+          Spec.assertEqWith s "alice controls no Islands: it triggers" (length (triggerIds board)) 1
+          let resolved = resolveTop board
+          Spec.assertBool s (not (Set.member outcastId (GameState.battlefield resolved))) "the Outcast is off the battlefield"
           Spec.assertEqWith s "and in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
 
 -- Khabál Ghoul {2}{B} Creature -- Zombie 1/1: "At the beginning of each end step,
@@ -3556,6 +3634,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   permanentEntersSpec s registry
   sacrificeSpec s registry
   stateTriggerSpec s registry
+  textChangedTriggerSpec s registry
   historySpec s registry
   delayedSpec s registry
   towershellOnsetSpec s registry
