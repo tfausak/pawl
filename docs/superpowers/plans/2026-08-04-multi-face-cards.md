@@ -21,7 +21,9 @@
 - One type per module under `Pawl.Types.<TypeName>`, holding the type and its instances only.
 - No unchecked numeric conversions: `fromIntegral`, `fromInteger`, `realToFrac`, `toEnum` are banned by `.hlint.yaml`. Convert through `Pawl.Extra.Int` / `Pawl.Extra.Integer` / `Pawl.Extra.Natural`.
 - No API stability obligations. Rename and reshape freely; never add a compat shim or a deprecation re-export.
-- Baseline suite count before any of this: **2643 tests passing**. Record the count after each task.
+- Run the suite as `cabal test --test-options '--timeout 1s --hide-successes'`, and **always** with those options — `--hide-successes` cuts ~2600 passing lines down to the failures, and `--timeout 1s` turns a hang into a named failure. The tiny budget is safe because `source/test-suite/Main.hs` gives `Pawl.ReplacementSpec` and `Pawl.EngineSpec` their own 5s and 30s budgets via `Tasty.localOption`, which overrides the command line for those subtrees. Use the same options every time: cabal treats a change of `--test-options` as a configuration change and reconfigures every sublibrary.
+- Never pipe `cabal test` or `cabal build` output through `tail`, `rg` or `sed` — piping stalls the run for minutes. Let it print.
+- Baseline suite count before any of this: **2643 tests passing**, verified under exactly that invocation. Record the count after each task.
 - Do not commit to `main`. All work is on branch `648-multi-face-cards`, which already exists and already carries the spec commits.
 
 ---
@@ -364,7 +366,7 @@ Expected: PASS, warning-free.
 
 - [ ] **Step 15: Run the suite**
 
-Run: `cabal test`
+Run: `cabal test --test-options '--timeout 1s --hide-successes'`
 Expected: PASS. The count should be 2643 plus the cases you added in Steps 1 and 13. If any pre-existing case fails, the move was not behaviour-preserving — find the field you mis-wired rather than editing the case.
 
 - [ ] **Step 16: Format, lint, commit**
@@ -497,7 +499,7 @@ merge2 l r =
 
 - [ ] **Step 5: Run the test**
 
-Run: `cabal test`
+Run: `cabal test --test-options '--timeout 1s --hide-successes'`
 Expected: PASS.
 
 - [ ] **Step 6: Add the corpus lint**
@@ -691,7 +693,7 @@ castableFaces card = case Card.layout card of
 
 - [ ] **Step 5: Run the test**
 
-Run: `cabal test`
+Run: `cabal test --test-options '--timeout 1s --hide-successes'`
 Expected: PASS.
 
 - [ ] **Step 6: Format and commit**
@@ -753,7 +755,7 @@ Then normalize it to the corpus format: `jq -S '.' data/cards/wax-wane.json > t 
 
 - [ ] **Step 3: Run it and confirm it fails**
 
-Run: `cabal test`
+Run: `cabal test --test-options '--timeout 1s --hide-successes'`
 Expected: FAIL — `CardError.Missing`, because `wax.json` does not exist.
 
 - [ ] **Step 4: Add the fallback**
