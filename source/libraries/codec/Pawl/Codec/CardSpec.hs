@@ -47,6 +47,8 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -151,6 +153,18 @@ minimalCard =
       Card.attackCosts = [],
       Card.mulliganAction = [],
       Card.openingHandAction = []
+    }
+
+-- The same card the verbose literal below spells out: minimalCard's fields, with
+-- the type line a real basic land carries.
+mountainCard :: Card.Card
+mountainCard =
+  minimalCard
+    { Card.typeLine =
+        TypeLine.MkTypeLine
+          (Set.singleton Supertype.Basic)
+          (Set.singleton CardType.Land)
+          (Set.singleton Subtype.Mountain)
     }
 
 baseCardJson :: String
@@ -431,3 +445,11 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
   -- itself ties the knot on -- 'populatedCard's haddock explains the fixture.
   Spec.it s "MkCard, every field populated at once" $
     Common.assertJsonCodec s Card.toJson Card.fromJson populatedCard populatedCardJson
+  -- R7: omission is permitted on input, never required. This is goblin-piker.json
+  -- as it stood before the migration; every such file must still load.
+  Spec.it s "a pre-migration card file still decodes" $
+    Common.assertFromJson
+      s
+      Card.fromJson
+      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
+      mountainCard

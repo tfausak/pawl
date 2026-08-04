@@ -120,3 +120,25 @@ spec s = Spec.describe s "Pawl.Codec.Common" $ do
         s
         (Common.defaultedField "k" (7 :: Integer) Common.asInteger (Common.optionalPair "k" 7 Common.integer 7))
         (Right 7)
+
+  Spec.describe s "defaultedField accepts the verbose form" $ do
+    Spec.it s "an explicit null reads as the default for a Maybe" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" Nothing (Common.decodeMaybe Common.asInteger) [Common.pair "k" Common.null])
+        (Right (Nothing :: Maybe Integer))
+    Spec.it s "an explicit empty array reads as the default for a list" $
+      Spec.assertEq
+        s
+        (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Common.pair "k" (Common.array [])])
+        (Right ([] :: [Integer]))
+    -- R7's narrowing, pinned so it cannot drift back by accident: an explicit
+    -- null on a NON-Maybe defaulted field is an error, not the default. It used
+    -- to be the default only because `nullableField` spelled an absent key as
+    -- null; `defaultedField` reads absence directly, so a file that says
+    -- `"keywords": null` is malformed rather than empty.
+    Spec.it s "an explicit null on a non-Maybe defaulted field is an error" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Common.pair "k" Common.null]))
+        "expected a decode failure"
