@@ -52,3 +52,22 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.kind = DamageKind.Noncombat
         }
       """ {"source":1,"target":{"type":"ToPlaneswalker","value":5},"amount":4,"dealtByInfect":true,"dealtByLifelink":2,"kind":{"type":"Noncombat"}} """
+  -- Every dealtBy* rider at its default (CR 702.164b's zero, CR 702.15b's no
+  -- lifelink payer, and both booleans false), which is what an event carrying
+  -- none of them means.
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      DamageEvent.toJson
+      DamageEvent.fromJson
+      DamageEvent.MkDamageEvent
+        { DamageEvent.source = ObjectId.MkObjectId 1,
+          DamageEvent.target = Recipient.ToPlayer (PlayerId.MkPlayerId 2),
+          DamageEvent.amount = 3,
+          DamageEvent.dealtByDeathtouch = False,
+          DamageEvent.dealtByInfect = False,
+          DamageEvent.dealtByToxic = 0,
+          DamageEvent.dealtByLifelink = Nothing,
+          DamageEvent.kind = DamageKind.Combat
+        }
+      """ {"source":1,"target":{"type":"ToPlayer","value":2},"amount":3,"kind":{"type":"Combat"}} """

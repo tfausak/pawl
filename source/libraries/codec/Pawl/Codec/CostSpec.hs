@@ -53,3 +53,12 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
       fromJson
       "{\"components\":[]}"
       Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
+  -- Every field at once: an unpayable cost (CR 118.6) with no components, which
+  -- is what an empty object means.
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
+      """ {} """

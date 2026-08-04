@@ -39,3 +39,16 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWhat = Filter.And []
         }
       """ {"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}} """
+  -- CR 109.5: whichKind's Nothing and whose's Anyones are both what a pattern
+  -- that says nothing means, so only the required onWhat key survives.
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      CounterPattern.toJson
+      CounterPattern.fromJson
+      CounterPattern.MkCounterPattern
+        { CounterPattern.whichKind = Nothing,
+          CounterPattern.whose = ControllerRelation.Anyones,
+          CounterPattern.onWhat = Filter.And []
+        }
+      """ {"onWhat":{"type":"And","value":[]}} """

@@ -133,3 +133,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           ]
       )
       """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Untap","value":{"type":"AttackedThisTurn"}}]}]}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}}}] """
+  -- CR 603.4: no intervening "if" is what a triggered ability that states none
+  -- means, so only the two required keys survive -- 'condition' at CR 603.6a's
+  -- simplest trigger and 'modal' at the minimal non-modal payload (CR 700.2).
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing
+        }
+      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{}]}} """

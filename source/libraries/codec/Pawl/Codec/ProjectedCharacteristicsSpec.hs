@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module Pawl.Codec.ProjectedCharacteristicsSpec where
 
 import qualified Data.Map.Strict as Map
@@ -62,7 +64,35 @@ testCharacteristicsJson =
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}]}"
 
-spec :: (Monad m) => Spec.Spec m n -> n ()
-spec s =
-  Spec.describe s "Pawl.Codec.ProjectedCharacteristics" . Spec.it s "MkProjectedCharacteristics, every field populated or explicitly Nothing" $
+-- | Every field but the two required ones ('name', 'cardTypes') at its
+-- default -- the counterpart to 'testCharacteristics' above, which populates
+-- every collection at least once.
+minimalCharacteristics :: PC.ProjectedCharacteristics
+minimalCharacteristics =
+  PC.MkProjectedCharacteristics
+    { PC.name = CardName.MkCardName (Text.pack "Mountain"),
+      PC.supertypes = Set.empty,
+      PC.keywords = Map.empty,
+      PC.colors = Set.empty,
+      PC.power = Nothing,
+      PC.toughness = Nothing,
+      PC.loyalty = Nothing,
+      PC.characteristicPT = Nothing,
+      PC.cardTypes = Set.singleton CardType.Land,
+      PC.subtypes = Set.empty,
+      PC.activatedAbilities = [],
+      PC.replacementEffects = [],
+      PC.triggeredAbilities = []
+    }
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.ProjectedCharacteristics" $ do
+  Spec.it s "MkProjectedCharacteristics, every field populated or explicitly Nothing" $
     Common.assertJsonCodec s PC.toJson PC.fromJson testCharacteristics testCharacteristicsJson
+  Spec.it s "an all-default value omits every optional key" $
+    Common.assertJsonCodec
+      s
+      PC.toJson
+      PC.fromJson
+      minimalCharacteristics
+      """ {"name":"Mountain","cardTypes":[{"type":"Land"}]} """
