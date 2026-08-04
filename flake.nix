@@ -6,8 +6,12 @@
   };
 
   outputs =
-    { claude-code-nix,
-      hooky, nixpkgs, ... }:
+    {
+      claude-code-nix,
+      hooky,
+      nixpkgs,
+      ...
+    }:
     let
       forAllSystems = nixpkgs.lib.genAttrs [
         "aarch64-darwin"
