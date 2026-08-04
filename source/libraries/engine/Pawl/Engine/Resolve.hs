@@ -103,32 +103,28 @@ playerRefSlots ref = case ref of
   PlayerRef.Relative _ -> Set.empty
   PlayerRef.InSlot slot -> Set.singleton slot
 
--- The slots an ObjectRef reads. Only InSlot names one; EachMatching is swept
--- from the battlefield at resolution and names nothing at cast -- so a card whose
--- only object reference is a set declares no target spec, and CR 608.2b has
--- nothing to fizzle (CR 115.10a: without the word "target" it is not a target).
--- The object-side twin of playerRefSlots above.
+-- The slots an ObjectRef reads. Only InSlot names one; EachMatching is swept from
+-- the battlefield at resolution and names nothing at cast, so a card whose only
+-- object reference is a set declares no target spec and CR 608.2b has nothing to
+-- fizzle (CR 115.10a).
 objectRefSlots :: ObjectRef -> Set SlotName
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Set.singleton slot
   ObjectRef.EachMatching _ -> Set.empty
 
--- THE ONE LEGITIMATE HOME of `case effect of`: this module is the VM's opcode
--- semantics (design.md section 1). Everything else asks classifications. The
--- executor itself arrives with resolution; slotsOf is the read half of the
--- dataflow lint.
+-- The one legitimate home of `case effect of`: this module is the VM's opcode
+-- semantics (design.md section 1), and everything else asks classifications.
+-- slotsOf is the read half of the dataflow lint.
 --
--- Every arm carrying a Quantity unions Quantity.slots over it, because a
--- Quantity.InSlot is a slot READ like any other -- the value half of the same
--- dataflow the SlotName fields carry. X is not one of those reads (Quantity.slots
--- says why); Resolve.readsX below is X's own half of the contract.
+-- Every arm carrying a Quantity unions Quantity.slots over it, a Quantity.InSlot
+-- being a slot read like any other. X is not one of those reads; readsX below is
+-- X's own half of the contract.
 slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
   Effect.DealDamage ref quantity -> Set.union (objectRefSlots ref) (Quantity.slots quantity)
-  -- The modification's own quantities read slots too (Projection.quantitiesOf
-  -- reaches inside it, since casing on a Modification is Projection's charter);
-  -- no card in the pool reads a slot there, but a dangling one would otherwise
-  -- slip past the lint entirely.
+  -- The modification's own quantities read slots too, through
+  -- Projection.quantitiesOf. No card in the pool reads a slot there, but a
+  -- dangling one would otherwise slip past the lint entirely.
   Effect.ModifyTarget duration modification ref ->
     Set.unions [objectRefSlots ref, foldMap Quantity.slots (Projection.quantitiesOf modification), durationSlots duration]
   Effect.ChangeText _ _ slot -> Set.singleton slot
@@ -155,17 +151,13 @@ slotsOf effect = case effect of
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> Quantity.slots quantity
-  -- The ReplacementEffect itself carries no Quantity, but the Duration and the
-  -- Condition each carry two, and a Quantity.InSlot inside either is a slot read
-  -- like any other. No card in the pool writes one -- Galvanic Blast's metalcraft
-  -- condition counts artifacts, which names no slot -- but a dangling one would
-  -- otherwise slip past the lint entirely, exactly as ModifyTarget's Modification
-  -- would.
+  -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
+  -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
+  -- one, but a dangling one would slip past the lint as ModifyTarget's would.
   Effect.Replace duration _ _ condition _ -> Set.union (durationSlots duration) (foldMap conditionSlots condition)
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
-  -- The ObjectRef names the shielded recipient -- Mending Hands' "any target" --
-  -- and the Quantity is the shield's size, a slot read like every other.
+  -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
   Effect.PreventNextDamage duration ref quantity ->
     Set.unions [durationSlots duration, objectRefSlots ref, Quantity.slots quantity]
   Effect.Counter slot -> Set.singleton slot
@@ -189,12 +181,6 @@ slotsOf effect = case effect of
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
   Effect.ShuffleIntoLibrary slot -> Set.singleton slot
 
--- D4 (the value half): does any of these effects read X? A card that reads X
--- must declare {X} in its cost (the lint), the same reads-equal-declares contract
--- slotsOf draws for target slots. Casing on Effect/Quantity is this module's
--- charter. NOTE: when an opcode gains a Quantity field, add its arm here -- the
--- compiler will not force it, since Quantity is compared by ==.
---
 -- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
 -- Condition.
 durationSlots :: Duration.Duration -> Set SlotName
@@ -212,9 +198,13 @@ conditionSlots condition =
     (Quantity.slots $ Condition.Type.measured condition)
     (Quantity.slots $ Condition.Type.threshold condition)
 
--- The comparison is by == and so is shallow: an X nested inside a Plus or a
--- Count is not detected, unlike slotsOf, which recurses through Quantity.slots
--- (#482).
+-- Does any of these effects read X? A card that reads X must declare {X} in its
+-- cost -- the same reads-equal-declares contract slotsOf draws for target slots.
+-- When an opcode gains a Quantity field, add its arm here: the compiler will not
+-- force it, Quantity being compared by ==.
+--
+-- That comparison is shallow, so an X nested inside a Plus or a Count is not
+-- detected, unlike slotsOf, which recurses through Quantity.slots (#482).
 readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
@@ -307,9 +297,8 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
-  -- CR 701.24 shuffles a library; it never LOOKS at one, which is what CR
-  -- 701.23a's search is ("to search for a card in a zone, look at all cards in
-  -- that zone"), so Panglacial Wurm gets no window here.
+  -- CR 701.24 shuffles a library but never LOOKS at one, which is what CR 701.23a
+  -- makes a search, so this opens no window.
   Effect.ShuffleIntoLibrary _ -> False
   Effect.TakeExtraTurn {} -> False
 
@@ -323,16 +312,11 @@ armedAbilities effects =
    in Set.fromList (Maybe.mapMaybe named effects)
 
 -- CR 603.7: the delayed abilities an effect list arms with an ONSET -- the ones
--- whose firing is gated past the turn that armed them (Pawl.Types.Onset). The
--- sibling of armedAbilities above, narrowed to the arms that are not
--- Onset.Immediately.
+-- whose firing is gated past the turn that armed them. armedAbilities' sibling,
+-- narrowed to the arms that are not Onset.Immediately.
 --
--- Its customer is the card lint (CardSpec's "every delayed ability armed for
--- YOUR next turn is controller-scoped"), which joins these names against the
--- card's own Card.delayedAbilities and asks
--- Pawl.Engine.Event.controllerTurnScoped of each one's condition. The two halves
--- live in the two modules that may case on the two types, and the join is the
--- lint's.
+-- Its customer is the card lint, which joins these names against the card's own
+-- delayedAbilities and asks Event.controllerTurnScoped of each condition.
 onsetGatedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
 onsetGatedAbilities effects =
   let named effect = case effect of
@@ -356,12 +340,9 @@ definedSlots effects =
    in Set.fromList (Maybe.mapMaybe bound effects)
 
 -- Does any Create bind a slot while minting more than one token? CR 603.7c's "it"
--- names ONE object; binding one of several would be the engine choosing, so the
--- lint rejects it rather than guessing (#53).
---
--- The PRINTED quantity is all a lint can see. A CR 614.16 replacement (Doubling
--- Season) multiplies the count at RESOLUTION, past this check; the Create arm
--- below handles that by asking the controller which token "it" names.
+-- names ONE object, so binding one of several would be the engine choosing (#53).
+-- The PRINTED quantity is all a lint can see; a CR 614.16 replacement multiplies
+-- the count at resolution, which the Create arm handles by asking the controller.
 bindsSeveralTokens :: [Effect Card.Type.Card] -> Bool
 bindsSeveralTokens effects =
   let offends effect = case effect of
@@ -369,16 +350,13 @@ bindsSeveralTokens effects =
         _ -> False
    in any offends effects
 
--- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
--- an unchosen mode's effects never resolve), with every text-change affecting it
--- applied (CR 612) to each effect. This is read-point 3 of the rewritable AST --
--- the resolver honors a spell hacked on the stack. A non-modal card has one
--- mode, always chosen, so this is unchanged for it.
+-- A resolving spell's PROJECTED modes: only its chosen ones (CR 608.2c/700.2),
+-- with every text change affecting it applied to each effect (CR 612), so the
+-- resolver honors a spell hacked on the stack. A non-modal card has one mode,
+-- always chosen.
 --
 -- Modes rather than a flat effect list because CR 603.5's "may" is a property of
--- the mode, and resolveSpellWith has to ask about it once per mode. A text
--- change rewrites EFFECTS only -- CR 612's word swap has nothing to say about
--- whether an instruction is optional -- so the optionality passes through.
+-- the mode. A text change rewrites EFFECTS only, so optionality passes through.
 modesOf :: ObjectId -> GameState -> [(ModeIndex, Mode.Mode Card.Type.Card)]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
@@ -390,35 +368,22 @@ modesOf oid gs = case Game.lookupObject oid gs of
           rewriteMode m = m {Mode.effects = fmap rewrite (Mode.effects m)}
        in fmap (fmap rewriteMode) (Card.chosenModes chosen card)
 
--- CR 608.2b: are ALL of this spell's targets illegal? "For every instance of the
--- word 'target'" -- so a spell with no target spec never fizzles, and one with
--- several survives if any one is still legal. Reserved slots (a trigger's source,
--- a token this resolution minted) are not targets and cannot make a spell fizzle;
--- they are vacuously legal.
+-- CR 405.4: who controls a SPELL on the stack, fixed at cast time -- for both CR
+-- 608.2b's legality perspective and the effects' own execution. One function
+-- because those two must name the same player, not because they disagree today.
 --
--- Shared by the ordinary spell path (resolveSpellWith) and the Aura path
--- (Pawl.Engine.Stack), which is the whole point of it being a function: an Aura spell is
--- the first PERMANENT spell that can be countered on resolution, and a second
--- copy of this logic would drift.
--- CR 405.4: who controls a SPELL on the stack -- "The controller of a spell is
--- the player who cast it", fixed at cast time -- for both CR 608.2b's legality
--- perspective and the effects' own execution.
---
--- One function because those two must name the same player, not because they
--- currently disagree: they do not. controllerOfGiven answers Nothing only for an
--- object that does not exist, and both callers have already matched `Just obj`
--- from a lookup, so the fallback below is unreachable at either. What was wrong
--- was having the same question spelled two ways -- a bare Projection.controllerOf
--- for legality and this expression for execution -- which is a divergence waiting
--- to be introduced rather than one already there.
---
--- The projection read is itself a no-op in this pool: nothing installs a
--- SetController naming a stack object, so it always folds back to the owner. #83
--- argues it should trust Object.owner outright; whichever way that lands, it now
--- lands in one place instead of three.
+-- The projection read is a no-op in this pool: nothing installs a SetController
+-- naming a stack object, so it always folds back to the owner (#83).
 spellController :: Object.Object -> ObjectId -> GameState -> PlayerId
 spellController obj oid gs = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
 
+-- CR 608.2b: are ALL of this spell's targets illegal? A spell with no target spec
+-- never fizzles, and one with several survives if any one is still legal. Reserved
+-- slots are not targets and are vacuously legal.
+--
+-- Shared by the ordinary spell path and the Aura path in Pawl.Engine.Stack, which
+-- is the point of it being a function: an Aura spell is the first permanent spell
+-- that can be countered on resolution, and a second copy would drift.
 targetsAllIllegal :: ObjectId -> GameState -> Bool
 targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Nothing -> False
@@ -430,26 +395,23 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
           legalSlot slot recipient = case Map.lookup slot specs of
             Nothing -> True
             -- CR 608.2b's perspective is the SPELL's controller (CR 405.4), read
-            -- through the same function resolveSpellWith uses for effect
-            -- execution so the two cannot drift apart.
+            -- through the same function resolveSpellWith uses for execution.
             Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           targeted = Map.restrictKeys legality (Map.keysSet specs)
        in not (Map.null specs) && not (or (Map.elems targeted))
 
--- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
--- the spell has slots and ALL are now illegal, it does not resolve -- it moves
--- to the graveyard with no effect applied (the fizzle). Otherwise the effects
--- run in order (CR 608.2c), each skipping a slot whose target is illegal
--- (illegal targets are unaffected; other parts still happen), and the spell
--- goes to its owner's graveyard as the final part of resolution (CR 608.2n).
--- CR 608.2b/608.2c, extended for CR 729.1b: resolve a spell, re-reading the
--- resolving object's bindings before EACH effect so a slot DEFINED mid-resolution
--- (PlaySubgame's loser; a Create's minted token) is visible to a later effect.
--- Target-slot legality is still fixed at the START of resolution (the pre-fold
--- `gs`); only newly-defined reserved slots (never targets) newly appear, and a
--- reserved slot is vacuously legal (legalSlot's Nothing branch). `runSubgame` is
--- the injected nested-game runner.
+-- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if the
+-- spell has slots and ALL are now illegal it fizzles, moving to the graveyard with
+-- no effect applied. Otherwise the effects run in order (CR 608.2c), each skipping
+-- a slot whose target is illegal, and the spell goes to its owner's graveyard as
+-- the final part of resolution (CR 608.2n).
+--
+-- Extended for CR 729.1b: the resolving object's bindings are re-read before EACH
+-- effect, so a slot DEFINED mid-resolution is visible to a later one. Target-slot
+-- legality stays fixed at the start of resolution; only newly-defined reserved
+-- slots appear, and those are vacuously legal. `runSubgame` is the injected
+-- nested-game runner.
 resolveSpellWith :: Game Result -> ObjectId -> Game ()
 resolveSpellWith runSubgame oid = do
   gs <- State.get
@@ -464,35 +426,21 @@ resolveSpellWith runSubgame oid = do
         let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) card
             legalSlot slot recipient = case Map.lookup slot specs of
               -- CR 608.2b is about TARGETS. A slot with no target spec is a
-              -- RESERVED binding -- the trigger's source (Pawl.Engine.Binding.triggerSource),
-              -- a token this resolution minted -- and was never targeted, so it can
-              -- never have become an illegal target.
+              -- RESERVED binding -- a trigger's source, a token this resolution
+              -- minted -- and was never targeted.
               Nothing -> True
               Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
-                -- CR 405.4: a spell's controller is the player who cast it,
-                -- fixed once, at cast time -- Object.owner obj already carries
-                -- that value (a card's owner never differs from its caster in
-                -- this pool: nothing lets a player cast a card they don't
-                -- own from hand). This Projection.controllerOf call is a no-op
-                -- today: no effect in the pool ever installs a SetController
-                -- naming a STACK object, so it always folds back to
-                -- Object.owner -- but it re-reads live projected control
-                -- rather than trusting the frozen owner outright, the same
-                -- shape an ability's controller recompute used to take (#83).
                 let effectController = spellController obj oid gs
                 Monad.forM_ (modesOf oid gs) $ \(idx, mode) -> do
-                  -- CR 603.5 / 608.2d: a printed "may" is answered HERE, between
-                  -- the preceding mode's instructions and this one's -- the
-                  -- announcement CR 608.2d places "while applying the effect".
+                  -- CR 603.5 / 608.2d: a printed "may" is answered here, between
+                  -- the preceding mode's instructions and this one's.
                   taken <- exercises oid effectController idx mode
                   let applyOne eff = do
-                        -- Re-read the live bindings for THIS effect: a prior PlaySubgame
-                        -- may have bound its loser slot. Target legality is recomputed
-                        -- with the same pre-fold `legalSlot` (targets unchanged; the new
-                        -- reserved slot is vacuously legal).
+                        -- Re-read the live bindings for THIS effect: a prior
+                        -- PlaySubgame may have bound its loser slot.
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalityNow = Map.mapWithKey legalSlot chosenNow
@@ -504,16 +452,14 @@ resolveSpellWith runSubgame oid = do
 resolveSpell :: ObjectId -> Game ()
 resolveSpell = resolveSpellWith noSubgame
 
--- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
--- ability (M3f) on the stack. Re-validate filled slots (CR 608.2b), then walk
--- the CHOSEN MODES in order (CR 608.2c/700.2c) applying each one's effects with
--- `srcId` (the source permanent) as the effect source (CR 113.7), asking about
--- any printed "may" as it goes (CR 603.5); then the ability ceases (CR 608.2n).
--- `stackId` is the ability object's own id.
+-- CR 608.2: the executor shared by an activated and a triggered ability on the
+-- stack. Re-validates filled slots (CR 608.2b), walks the CHOSEN modes in order
+-- (CR 608.2c/700.2c) applying each one's effects with `srcId` as the effect source
+-- (CR 113.7) and asking about any printed "may" (CR 603.5), then the ability
+-- ceases (CR 608.2n). `stackId` is the ability object's own id.
 --
--- Takes the modes rather than a flat effect list plus a separate spec map: the
--- specs ARE the union of those modes' own (CR 700.2c), so deriving them here is
--- one fewer pair of arguments that could disagree.
+-- Takes the modes rather than a flat effect list plus a spec map: the specs ARE
+-- the union of those modes' own (CR 700.2c).
 resolveModes :: ObjectId -> ObjectId -> [(ModeIndex, Mode.Mode Card.Type.Card)] -> Game ()
 resolveModes stackId srcId modes = do
   gs <- State.get
@@ -528,57 +474,41 @@ resolveModes stackId srcId modes = do
             -- a token this resolution minted -- and was never targeted, so it can
             -- never have become an illegal target.
             Nothing -> True
-            -- CR 608.2b: the perspective is the ABILITY's controller -- literally
-            -- the `effectController` bound below, whose own comment explains why
-            -- that is Object.owner and not a live projection (CR 113.8: fixed at
-            -- the ability's creation, and a stolen permanent's later controller
-            -- must not override it). Reading the projection here instead would
-            -- have contradicted that rule three lines away.
-            --
-            -- `srcId` stays the source (CR 113.7) and may well be gone: that is
-            -- exactly the case this rule is about, and why the perspective is not
-            -- read from it.
+            -- CR 608.2b: the perspective is the ABILITY's controller, the
+            -- `effectController` bound below. `srcId` stays the source (CR 113.7)
+            -- and may well be gone -- exactly the case this rule is about, and why
+            -- the perspective is not read from it.
             Just spec -> Target.stillLegal (Just effectController) srcId recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue a spell whose every target is gone.
           targeted = Map.restrictKeys legality (Map.keysSet specs)
           fizzles = not (Map.null specs) && not (or (Map.elems targeted))
-          -- CR 113.8: the controller of an activated ability on the stack is
-          -- the player who activated it; the controller of a triggered
-          -- ability on the stack is whoever controlled its source when it
-          -- triggered (CR 603.3a). Both are fixed once, at the ability's
-          -- creation -- Activate.activateAbility stamps Object.owner = the
-          -- activating player, and Engine.placeOne stamps it with
-          -- PendingTrigger.controller, the CR 603.3a value -- and never
-          -- revisited. `obj` here is the ability object itself (looked up by
-          -- `stackId`, not `srcId`), so its stamped owner IS the answer; a
+          -- CR 113.8 / 603.3a: an activated ability's controller is who activated
+          -- it, a triggered ability's is whoever controlled its source when it
+          -- triggered. Both are stamped as Object.owner at the ability's creation
+          -- and never revisited, and `obj` is the ability object itself, so a
           -- stolen permanent's later controller must not override it.
           effectController = Object.owner obj
           resolveOne (idx, mode) = do
             -- CR 603.5 / 608.2d: the printed "may", answered as this mode's
-            -- instructions are applied. Run only when `fizzles` is False, which
-            -- is what keeps the question from being asked about an ability whose
-            -- every target is already gone (CR 608.2b) -- it never resolves, so
-            -- there is nothing for the answer to decide.
+            -- instructions are applied. Run only when `fizzles` is False, so the
+            -- question is never asked about an ability that never resolves.
             taken <- exercises stackId effectController idx mode
             Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController legality chosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
 
--- CR 603.5 / 608.2d: does this mode's instruction list happen at all? A
--- mandatory mode always does. An OPTIONAL one -- a printed "may" -- is its
--- controller's call, and it is made HERE, as the effect is applied, never by the
--- engine and never earlier: CR 603.5 says an optional ability goes on the stack
--- "regardless of whether their controller intends to exercise the ability's
--- option or not. The choice is made when the ability resolves."
+-- CR 603.5 / 608.2d: does this mode's instruction list happen at all? A mandatory
+-- mode always does; an optional one is its controller's call, made HERE as the
+-- effect is applied -- CR 603.5 puts an optional ability on the stack regardless
+-- and defers the choice to resolution.
 --
--- `resolving` is the object on the stack -- the spell, or the ability object --
--- which is what the prompt names. `controller` is who "you" means (CR 405.4 for
--- a spell, CR 113.8 for an ability) and therefore who is asked; the ask goes
--- through Decide.deciderFor, so a player controlled under CR 723.1 has their
--- controller answer, exactly like every other choice.
+-- `resolving` is the object on the stack, which is what the prompt names.
+-- `controller` is who "you" means (CR 405.4 for a spell, CR 113.8 for an ability)
+-- and therefore who is asked, through Decide.deciderFor so a player controlled
+-- under CR 723.1 has their controller answer.
 exercises :: ObjectId -> PlayerId -> ModeIndex -> Mode.Mode Card.Type.Card -> Game Bool
 exercises resolving controller idx mode = case Mode.optionality mode of
   Optionality.Mandatory -> pure True
@@ -591,13 +521,10 @@ exercises resolving controller idx mode = case Mode.optionality mode of
       OptionalDecision.Declines -> False
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
--- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
--- (CR 113.7a). CR 700.2c/M4g: reads only the ability's CHOSEN modes (stamped at
--- activation, Activate.activateAbility) via Modal.chosenModes, the same
--- mode-scoping resolveSpell already applies to a modal spell. Reuses applyEffect
--- with the same per-slot legality and CR 608.2b fizzle as a spell.
--- CR 608.2n: the ability then ceases to exist -- removed from the stack and
--- objects, NOT buried (an ability is not a card).
+-- (CR 113.7a), not the ability object. Reads only the ability's CHOSEN modes (CR
+-- 700.2c), stamped at activation, and reuses applyEffect with the same per-slot
+-- legality and CR 608.2b fizzle as a spell. The ability then ceases (CR 608.2n)
+-- rather than being buried -- an ability is not a card.
 resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
 resolveAbility abilId srcId ability = do
   gs <- State.get
@@ -607,80 +534,39 @@ resolveAbility abilId srcId ability = do
       let chosen = Binding.modesOf (Object.bindings obj)
        in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
 
--- One effect, applied. The case on the constructor is THIS module's charter.
--- `controller` is the controller of the resolving spell/ability -- who searches
--- their own library (CR 701.23), never the effect `source` (for an ability, the
--- source permanent may already be sacrificed as a cost).
+-- CR 701.3a/701.3b: may `src` legally be attached to `destination` right now?
 --
--- That last parenthesis is why every arm below that evaluates a Quantity binds
--- its view as `Projection.viewWithLastKnown source gs` and not
--- `Projection.fullView gs`. CR 608.2h: "if the effect requires information from a
--- specific object, INCLUDING THE SOURCE OF THE ABILITY ITSELF, the effect uses
--- the current information of that object if it's in the public zone it was
--- expected to be in; if it's no longer in that zone … the effect uses the
--- object's last known information." Uniform across the arms rather than
--- special-cased on the one opcode a card exercises today: the rule is about the
--- source, not about which effect is asking, and for a source that still exists
--- the two views are equal by construction.
--- The subgame-runner-aware executor. `runSubgame` is the injected Game Result
--- that PLAYS a nested game (Engine.playSubgame); the bare applyEffect below
--- passes noSubgame. Only the PlaySubgame arm consults it.
--- CR 701.3a/701.3b: may `src` legally be attached to `target` right now?
+-- CR 701.3a's last sentence is the whole rule -- an Aura, Equipment or
+-- Fortification can't be attached to something it couldn't enchant, equip or
+-- fortify -- so this dispatches on which `src` is, read through the PROJECTION, so
+-- that an Equipment that lost the subtype (CR 301.5c) and a permanent animated
+-- into a creature both answer correctly.
 --
--- CR 701.3a's last sentence is the whole rule: "An Aura, Equipment, or
--- Fortification can't be attached to an object or player it couldn't enchant,
--- equip, or fortify, respectively." So this dispatches on which of those `src`
--- is, read through the PROJECTION, so an Equipment that lost the subtype (CR
--- 301.5c's second sentence) and a permanent animated into a creature both answer
--- correctly.
+-- Equipment is CR 301.5's creature test. Aura is CR 303.4's enchant ability, asked
+-- through Target.admittedRecipients rather than a hand-rolled creature test, which
+-- honours an enchant spec that narrows further for free. Admission and not target
+-- legality: CR 702.5a gives the enchant ability both jobs and this is the second,
+-- so rule 702's targeting restrictions do not reach here. CR 109.5's "you" on that
+-- spec is the AURA's controller, not the moving effect's. An Aura with no enchant
+-- ability cannot arise -- the CardSpec lint holds the biconditional.
 --
--- Equipment: CR 301.5, "An Equipment can be attached to a creature. It can't
--- legally be attached to anything that isn't a creature."
---
--- Aura: CR 303.4, "what an Aura can be attached to is defined by its enchant
--- keyword ability" -- so this asks the Aura's own enchant spec which recipients
--- it ADMITS, through Target.admittedRecipients rather than a hand-rolled
--- creature test, which is what makes an enchant spec that narrows further (a
--- colour, a controller) honoured here for free. Admission and not target
--- legality: CR 702.5a says the enchant ability "restricts what an Aura spell can
--- target AND what an Aura can enchant", and this is the second of those, so rule
--- 702's targeting restrictions (CR 702.18a's shroud is the first) do not reach
--- here -- see Target.admittedRecipients. CR 109.5's "you" on
--- that spec is the AURA's controller, not the moving effect's -- proven by
--- Pawl.AuraSpec's "CR 303.4j whole cards", where Crown of the Ages cannot move
--- Setessan Training ("Enchant creature you control") onto an opponent's
--- creature. An Aura with no enchant ability answers Nothing and cannot arise: the
--- Pawl.CardSpec lint family holds the Aura-iff-enchant biconditional in both
--- directions.
---
--- The Aura branch's first test is CR 303.4d's "An Aura that's also a creature
--- can't enchant anything" -- the RESTRICTION half of that rule, whose
--- state-based half is Pawl.Engine.Sba.cannotBeAttached. Unreachable in this pool (such
--- an Aura is detached by CR 704.5p and buried by CR 704.5m before any player
--- could target it), written anyway because it costs one comparison. The Equipment
+-- The Aura branch's first test is CR 303.4d's "an Aura that's also a creature
+-- can't enchant anything", whose state-based half is Sba.cannotBeAttached.
+-- Unreachable in this pool, written because it costs one comparison. The Equipment
 -- branch has no counterpart: CR 301.5c's matching restriction carries a
--- reconfigure exception (CR 702.151b) that nothing here can express, and the
--- Equipment path is not this change's to alter (#193).
+-- reconfigure exception nothing here can express (#193).
 --
--- The first guard -- the destination naming `src` itself -- is CR 301.5c ("An
--- Equipment can't equip itself") and CR 303.4d ("An Aura can't enchant itself")
--- at once.
+-- The first guard -- the destination naming `src` itself -- is CR 301.5c and CR
+-- 303.4d at once. Nothing for a source that is neither, per CR 701.3b; there is no
+-- Subtype.Fortification to case on.
 --
--- Nothing for a source that is neither, which is CR 701.3b's third sentence: "If
--- an effect tries to attach an object that isn't an Aura, Equipment, or
--- Fortification to another object or player, the effect does nothing and the
--- first object doesn't move." There is no Subtype.Fortification to case on.
---
--- Answers with the RECIPIENT to store rather than with a Bool, because CR 303.4
--- attachment is to "an object or player" and Object.attachedTo records which --
--- and the tag it records has to be the one the moving permanent's OWN rules
--- reference that destination by, not the one the moving EFFECT happened to
--- target it with. A Pool.Players enchant spec produces ToPlayer candidates and a
--- Pool.Permanents one produces ToObject candidates; taking the answer from the
--- spec's own candidate list is what keeps Pawl.Engine.Sba's CR 303.4c re-check able to
--- compare the stored value against that same list later. `destination` is
--- therefore matched by WHICH object or player it names, not by how the caller
--- tagged it.
+-- Answers with the RECIPIENT to store rather than a Bool, since CR 303.4
+-- attachment is to an object or player and Object.attachedTo records which -- and
+-- the tag must be the one the moving permanent's OWN rules reference the
+-- destination by, not the one the moving effect targeted it with. Taking the
+-- answer from the spec's candidate list is what keeps Sba's CR 303.4c re-check
+-- able to compare against that same list later, so `destination` is matched by
+-- which object or player it names rather than by how the caller tagged it.
 attachmentFor :: ObjectId -> Recipient -> GameState -> Maybe Recipient
 attachmentFor src destination gs
   | Recipient.objectOf destination == Just src = Nothing
@@ -711,33 +597,22 @@ attachmentFor src destination gs
       _ -> False
 
 -- The players a PlayerRef names DURING a resolution, read from the slots this
--- resolution filled rather than from the source's bindings (which is what
--- Count.playersFor reads, for a static count). Shared by applyEffectWith's
--- GainPlayerCounters and Draw arms.
+-- resolution filled rather than the source's bindings (which is what
+-- Count.playersFor reads for a static count).
 --
--- A slot's legality is asked the way every other slot read asks it (CR 608.2b):
--- a slot filled by targeting that has since become illegal names nobody, and a
--- RESERVED slot -- the trigger's "that player" -- has no target spec, so
--- legalSlot already answered True for it.
+-- A slot's legality is asked as every other slot read asks it (CR 608.2b): one
+-- filled by targeting that has since become illegal names nobody, and a reserved
+-- slot has no target spec, so legalSlot already answered True.
 --
--- CR 102.1: "A player is one of the people in the game." A player who has left
--- keeps their row in GameState.players -- Player.status turns Departed, the key
--- stays -- so `everyone` is Game.stillPlaying rather than the map's keys, and
--- CR 800.4a's departure takes a seat out of both enumerating arms.
+-- CR 102.1: a player who has left keeps their row in GameState.players with a
+-- Departed status, so `everyone` is Game.stillPlaying rather than the map's keys.
+-- Only the two enumerating arms read the roster -- `Relative You` and `InSlot`
+-- name one specific player who arrived from elsewhere, and whether a departed
+-- player can still be one of those is CR 800.4d/800.4i's question (#181).
 --
--- Only those two arms, because only they read the roster. `Relative You` and
--- `InSlot` name one specific player who arrived from elsewhere -- the
--- resolution's controller, a recipient the caster chose -- so there is no
--- roster here for CR 102.1 to filter. Whether a departed player can still BE
--- one of those is a different question under different clauses: CR 800.4d keeps
--- their triggered ability off the stack to begin with, and CR 800.4i governs an
--- effect that needs information about a specific player who has left. The
--- unbuilt parts of those clauses are #181, not this.
---
--- `everyone` is in the players map's PlayerId order rather than turn order, and
--- that is deliberate: an unordered SET of players is what a PlayerRef names, and
--- a caller with an ordering rule to obey imposes it on this answer -- the Draw
--- arm does, for CR 121.2c.
+-- `everyone` is in PlayerId order rather than turn order: a PlayerRef names an
+-- unordered SET, and a caller with an ordering rule imposes it on this answer, as
+-- the Draw arm does for CR 121.2c.
 playerRefPlayers :: Map.Map SlotName Recipient -> Map.Map SlotName Bool -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
 playerRefPlayers chosen legality controller gs ref = case ref of
   PlayerRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -812,23 +687,17 @@ objectRefObjects legality chosen controller source gs ref = case ref of
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
 
--- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
--- as RECIPIENTS, before the objects are picked out of them.
+-- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names as
+-- RECIPIENTS, before the objects are picked out of them.
 --
--- It exists because CR 115.4's "any target" includes a player and CR 120.1
--- ("objects can deal damage to battles, creatures, planeswalkers, and players")
--- lets damage go to one -- NOT CR 120.1a, which only forbids damage to an object
--- that is none of those and licenses nothing, so Effect.DealDamage's InSlot arm must be able to name
--- something no ObjectId can -- Lightning Bolt at a player's face. Every other
--- ObjectRef-taking opcode affects permanents only and reads objectRefObjects,
--- which is this answer with the players dropped (Recipient.objectOf).
+-- It exists because CR 115.4's "any target" includes a player and CR 120.1 lets
+-- damage go to one, so DealDamage's InSlot arm must be able to name something no
+-- ObjectId can. Every other ObjectRef-taking opcode affects permanents only and
+-- reads objectRefObjects, which is this answer with the players dropped.
 --
--- EachMatching names permanents, so its members arrive as Recipient.ToObject:
--- CR 109.2 draws the set from the battlefield with no claim about card types
--- beyond the Filter's own, and classifying each one is the OPCODE's job
--- (Damage.damageRecipient sorts them into CR 120.3c's planeswalkers and CR
--- 120.3e's creatures). Order, timing and CR 608.2f are objectRefObjects'
--- haddock above, unchanged.
+-- EachMatching names permanents, so its members arrive as Recipient.ToObject: CR
+-- 109.2 draws the set from the battlefield with no claim about card types beyond
+-- the Filter's own, and classifying each one is the OPCODE's job.
 objectRefRecipients :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [Recipient]
 objectRefRecipients legality chosen controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -836,24 +705,30 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
     _ -> []
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen controller source gs ref)
 
--- `resolving` is the object ON THE STACK whose resolution this is -- the spell
--- itself for a spell, the ABILITY object for an activated or triggered one --
--- and is where every slot this fold DEFINES is bound, and where
--- ArmDelayedTrigger reads CR 603.7c's captured environment back out. NOT
--- `source`: for an ability those two differ (CR 113.7a keeps `source` on the
--- SOURCE PERMANENT, which is what a DealDamage must come from), and the source
--- permanent can be gone by the time a later effect of the same list runs --
--- Meandering Towershell exiles itself and then arms, so a capture keyed to the
--- permanent would find nothing to capture. The stack object outlives its own
--- effect list by construction (CR 608.2n removes it afterwards), so it is the
--- one holder that is always there to write to.
+-- One effect, applied. The case on the constructor is this module's charter.
+-- `runSubgame` is the injected nested-game runner; only the PlaySubgame arm
+-- consults it, and the bare applyEffect below passes noSubgame.
 --
--- It is where CR 601.2b's announced X is READ from for the same reason, which is
--- why every Quantity below goes through Quantity.evaluateFor with both ids rather
--- than through Quantity.evaluate with `source` alone: Cinder Elemental's "{X}{R},
--- {T}, Sacrifice this creature: It deals X damage to any target" sacrifices the
--- source to pay, so the announced value survives only on the ability object
--- (#544).
+-- `controller` is the controller of the resolving spell or ability -- who searches
+-- their own library (CR 701.23) -- never the effect `source`, which for an ability
+-- may already have been sacrificed as a cost. That is why every arm evaluating a
+-- Quantity binds its view as `Projection.viewWithLastKnown source gs` rather than
+-- `fullView`: CR 608.2h covers information from a specific object including the
+-- ability's own source. Uniform across the arms rather than special-cased, the
+-- rule being about the source rather than which effect is asking.
+--
+-- `resolving` is the object ON THE STACK whose resolution this is -- the spell
+-- itself, or the ABILITY object -- and is where every slot this fold DEFINES is
+-- bound and where ArmDelayedTrigger reads CR 603.7c's captured environment back
+-- out. NOT `source`: for an ability the two differ (CR 113.7a keeps `source` on
+-- the source permanent, which is what a DealDamage must come from), and that
+-- permanent can be gone before a later effect of the same list runs. The stack
+-- object outlives its own effect list by construction (CR 608.2n).
+--
+-- It is where CR 601.2b's announced X is read from for the same reason, which is
+-- why every Quantity goes through Quantity.evaluateFor with both ids rather than
+-- Quantity.evaluate with `source` alone: an X-cost ability that sacrifices its
+-- source to pay leaves the announced value only on the ability object (#544).
 applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame resolving source controller legality chosen effect = case effect of
   Effect.DealDamage ref quantity -> do
@@ -1227,36 +1102,25 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               -- exactly one object and it is the whole candidate set.
               Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
       _ -> pure ()
-  -- CR 701.24: shuffle the slot's target into its OWNER's library --
-  -- Riftsweeper's "its owner shuffles it into their library". Two steps, in this
-  -- order and with the owner read BEFORE either:
+  -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
+  -- this order and with the owner read before either:
   --
   --   * CR 400.7's move, through the same changeZone funnel every other
   --     destination uses, so a replacement watching a library entry gets its CR
   --     616.1 opportunity. Game.insertIntoZone files a library arrival under
-  --     Object.owner, which is CR 400.3 ("if an object would go to any library,
-  --     graveyard, or hand other than its owner's, it goes to its owner's
-  --     corresponding zone") -- so the card lands in the owner's library without
-  --     this arm naming a player.
-  --   * CR 701.24a's randomisation of that library, through
-  --     Mulligan.shuffleLibrary -- the same call CR 103.3's opening shuffle
-  --     makes. NOT the only shuffle in this module: the Search arm above still
-  --     spells the prompt out inline against Game.honourShuffle, which is the
-  --     identical three steps and could be folded into that function.
+  --     Object.owner per CR 400.3, so the card lands in the owner's library
+  --     without this arm naming a player.
+  --   * CR 701.24a's randomisation, through Mulligan.shuffleLibrary -- the same
+  --     call CR 103.3's opening shuffle makes.
   --
-  -- The shuffle runs whether or not the move did, which is CR 701.24c: "if an
-  -- effect would cause a player to shuffle one or more specific objects into a
-  -- library, that library is shuffled even if none of those objects are in the
-  -- zone they're expected to be in or an effect causes all of those objects to
-  -- be moved to another zone or remain in their current zone." That is the whole
-  -- reason the owner is read from the PRE-MOVE object rather than from the
-  -- incarnation the funnel mints: a cancelled move leaves no incarnation, and
-  -- the library still has to be shuffled.
+  -- The shuffle runs whether or not the move did, which is CR 701.24c, and is the
+  -- whole reason the owner is read from the PRE-MOVE object rather than the
+  -- incarnation the funnel mints: a cancelled move leaves no incarnation and the
+  -- library still has to be shuffled.
   --
-  -- An id that no longer resolves at all shuffles NOTHING, which is the one
-  -- place this falls short of rule 701.24c -- there is no object left to read an
-  -- owner off (#558). Unreachable from this card: Riftsweeper names one target,
-  -- so CR 608.2b already fizzles the whole ability when that target is gone.
+  -- An id that no longer resolves shuffles NOTHING, the one place this falls short
+  -- of rule 701.24c (#558). Unreachable from the pool's card, whose single target
+  -- makes CR 608.2b fizzle the ability first.
   --
   -- CR 701.24a's "so that no player knows their order" makes WHO shuffles
   -- unobservable, which is why the card's "its owner shuffles" needs nothing
@@ -1283,27 +1147,19 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- each opponent for Master of the Feast's `Relative Opponent`, the whole
         -- table for Vision Skeins' `EachPlayer`.
         named = playerRefPlayers chosen legality controller gs ref
-        -- CR 121.2c: "If more than one player is instructed to draw cards, the
-        -- active player performs all of their draws first, then each other
-        -- player in turn order does the same." The reorder lives here rather
-        -- than in playerRefPlayers because CR 121.2c is a rule about DRAWING;
-        -- that helper's other caller, GainPlayerCounters, has no ordering rule
-        -- to obey. Observable, not cosmetic: each draw records the drawn card's
-        -- zone change in the one turn-scoped log that triggers scan (CR 603.2),
-        -- so the order the draws happen in is the order the log reports.
-        -- CR 121.2d (shared team turns) has no reader -- pawl has no teams
-        -- (#175).
+        -- CR 121.2c: the active player draws first, then each other player in turn
+        -- order. The reorder lives here rather than in playerRefPlayers because
+        -- that is a rule about DRAWING, and the helper's other caller has no
+        -- ordering rule to obey. Observable rather than cosmetic: each draw
+        -- records a zone change in the log the trigger scan reads (CR 603.2). CR
+        -- 121.2d has no reader -- pawl has no teams (#175).
         --
-        -- An intersection: apnapOrder supplies the ORDER, `named` the
-        -- MEMBERSHIP, and a player in only one of the two does not draw. Both
-        -- directions have a case, and the one that bites is a seat apnapOrder
-        -- names and `named` does not. A departure does not shorten the seating
-        -- roster -- CR 800.4k and CR 800.4m both speak of the turn a departed
-        -- player "would have begun", so their seat stays in the order -- while
-        -- playerRefPlayers stopped naming them at CR 102.1. Drawing for one was
-        -- never a no-op: CR 800.4a took their library out of the game with them,
-        -- so Event.drawCard would record them in GameState.drewFromEmpty,
-        -- writing engine state for someone who is not in the game.
+        -- An intersection: apnapOrder supplies the ORDER and `named` the
+        -- MEMBERSHIP. The direction that bites is a seat apnapOrder names and
+        -- `named` does not -- a departure does not shorten the seating roster (CR
+        -- 800.4k/800.4m), while playerRefPlayers stops naming them at CR 102.1.
+        -- Drawing for one was never a no-op: CR 800.4a took their library with
+        -- them, so drawCard would write drewFromEmpty for a player not in the game.
         drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
@@ -1357,16 +1213,12 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                     let decider = Decide.deciderFor target gs
                     choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held count))
                     -- FILTERED AND COMPLETED, the posture PlayerSacrifices takes
-                    -- below and for the same reason. Dropping the invalid picks is
-                    -- not enough: this branch is reached only when the hand is
-                    -- LARGER than the count, so CR 609.3's "as much as possible"
-                    -- is not doing any work here and every card the answer omits
-                    -- is one the player could have discarded. An interpreter
-                    -- answering with too few -- or with nothing -- would otherwise
-                    -- discard fewer cards than the effect demands and cheat a Mind
-                    -- Rot. Reject-not-repair is the COST path's option, available
-                    -- there only because a cost may go unpaid; an effect has no
-                    -- such out.
+                    -- below. Dropping the invalid picks is not enough: this branch
+                    -- is reached only when the hand is LARGER than the count, so CR
+                    -- 609.3's "as much as possible" does no work here and every
+                    -- card the answer omits is one the player could have discarded.
+                    -- Reject-not-repair is the COST path's option, available there
+                    -- only because a cost may go unpaid.
                     --
                     -- Deduplicated as well as filtered, which PlayerSacrifices
                     -- gets for free from its Set-shaped answer: ChooseDiscard is
@@ -1709,12 +1561,10 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- this installs one -- floating, because a sorcery's skip outlives the
     -- sorcery (CR 614.3: floating replacements "last until they're used up").
     --
-    -- CR 614.10a: one instance PER NAMED PLAYER, each with Uses.Once, and each
-    -- PREPENDED as its own row rather than merged into any it finds. That is
-    -- where "if two effects each cause a player to skip their next occurrence,
-    -- that player must skip the next two" comes from: two Fatigues on one player
-    -- are two rows with two timestamps, and Pawl.Engine.Replacement.consume spends
-    -- exactly the one it applied.
+    -- CR 614.10a: one instance PER NAMED PLAYER, each with Uses.Once and each
+    -- prepended as its own row rather than merged. That is where "skip the next
+    -- two" comes from -- two rows with two timestamps, and Replacement.consume
+    -- spends exactly the one it applied.
     --
     -- Expiry.Never, and no Duration on the opcode to derive anything else from:
     -- Fatigue states no duration, so CR 614.3's other terminator ("or their
@@ -1850,11 +1700,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
               State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
       _ -> pure ()
-  -- CR 701.3a, in the other direction from Attach above: the SLOT's target is
-  -- what moves, and the destination is chosen now rather than targeted. Crown of
-  -- the Ages' "Attach target Aura attached to a creature to another creature",
-  -- whose ruling says in as many words that "this only targets the Aura and not
-  -- either creature".
+  -- CR 701.3a, in the other direction from Attach above: the SLOT's target is what
+  -- moves, and the destination is chosen now rather than targeted.
   Effect.AttachTarget slot filter_ ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
@@ -1865,10 +1712,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
               -- One candidate's view, with the one field a projection cannot fill:
               -- whether the SUBJECT could legally be attached here (CR 701.3a).
-              -- The answer comes from attachmentFor -- the same function the move
-              -- itself goes through below, so an offer and a move cannot disagree
-              -- -- and the field is lazy, so a filter that never names the atom
-              -- pays nothing for it.
+              -- Answered by attachmentFor, the same function the move goes through
+              -- below, so an offer and a move cannot disagree. Lazy, so a filter
+              -- that never names the atom pays nothing.
               viewOf oid =
                 (Projection.viewOfObject oid gs)
                   { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
@@ -2220,74 +2066,37 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
 -- resolving effect's controller (CR 109.5) -- and this is what makes it so.
 --
 -- A stored CR 613.1b layer-2 effect over the ONE incarnation CR 400.7 just
--- minted: Projection.controllerOf derives control from layer-2 effects over a
--- base, so storing one IS "entered under that player's control" here.
--- Effect.GainControl's arm builds the same shape for the other producer; the
--- difference is only that this names an id minted a moment ago rather than a
--- chosen target.
+-- minted: controllerOf derives control from layer-2 effects over a base, so
+-- storing one IS "entered under that player's control". Effect.GainControl's arm
+-- builds the same shape, naming a chosen target rather than a fresh id.
 --
--- That base is now Projection.defaultControllerOf -- Object.enteredUnder, and
--- Object.owner where nothing recorded an entry -- so #582's option 2 exists and
--- this could write the field instead of storing an effect. It does not, and the
--- issue is still open: no card in the pool reaches the store at all (see
--- "NOTHING STORED" below), so switching carriers would be an unexercised change
--- to CR 800.4a's answer. The field arrived for CR 616.1b's rewrite, which is
--- CR 110.2's other route to a controller who is not the owner.
+-- Indefinite (CR 611.2a): entering under someone's control is not a duration a
+-- card states an end for.
 --
--- Indefinite (Expiry.Never), CR 611.2a's "lasts until the end of the game":
--- entering under someone's control is not a duration a card states an end for.
+-- BATTLEFIELD ONLY, the rule's own scope (CR 110.2, CR 110.5d). Control is the one
+-- of the three sibling riders that would NOT have been inert elsewhere --
+-- controllerOf answers for an object in any zone, so an ungated store would give a
+-- graveyard card a controller.
 --
--- BATTLEFIELD ONLY, which is the rule's own scope -- CR 110.2 is about
--- permanents, and CR 110.5d says an object outside the battlefield has no
--- status at all. The two sibling riders are inert elsewhere for the same reason
--- (Combat.putOntoBattlefieldAttacking gates on battlefield membership; a tap
--- state off the battlefield means nothing), and control is the one that would
--- NOT have been inert: Projection.controllerOf answers for an object in any
--- zone, so an ungated store would give a graveyard card a controller.
+-- NOTHING STORED when the effect's controller already owns the object, which is
+-- every producer in the pool: the base already answers, and a stored effect would
+-- be a no-op the controllerOf fold pays for on every projection thereafter.
 --
--- NOTHING STORED when the effect's controller already owns it, which is the
--- overwhelming majority: every self-move in the pool (Leyline of the Void,
--- Leyline of Sanctity, Narcomoeba) has owner == controller, so the base
--- Object.owner already answers and a stored effect would be a no-op that the
--- controllerOf fold pays for on every projection thereafter.
+-- NOT re-Sicked, where Effect.GainControl's arm is: CR 302.6 asks whether control
+-- has been continuous since the controller's most recent turn began, and a
+-- permanent that has just entered has no earlier span to interrupt.
 --
--- NOT re-Sicked, where Effect.GainControl's arm is. CR 302.6 asks whether
--- control has been CONTINUOUS since the controller's most recent turn began,
--- and a permanent that has just ENTERED has no earlier span to interrupt --
--- Event.changeZoneAttaching already gives the fresh id Sickness.Sick, which
--- names no player and so is not keyed to owner or controller either way.
+-- No CR 800.4b guard, unlike Effect.GainControl's arm -- CR 800.4d keeps a
+-- departed player's triggered ability off the stack and
+-- Departure.nonCardStackObjectsCease removes one already on it.
 --
--- No CR 800.4b guard, unlike Effect.GainControl's arm. That guard is defence in
--- depth rather than a reachable case (Event.createTokens' is described the same
--- way): CR 800.4d keeps a departed player's triggered ability off the stack in
--- the first place (Engine.apnapPlayers), and Departure.nonCardStackObjectsCease
--- removes one already on it, so no resolution reaches here with a controller who
--- has left.
---
--- Modelling this as a stored effect diverges from CR 800.4a at three or more
--- seats: if this controller later leaves,
--- Departure.controlEffectsEnd ends the effect by payload player and the
--- permanent reverts to its owner, where the rules would leave it controlled by
--- the departing player -- CR 110.2a's control is base state, not "an effect
--- which gives that player control" -- and exile it by that rule's fourth clause
--- (#582).
---
--- The store lands AFTER Event.changeZoneEntering returns, so during CR 614.1c's
--- entry-replacement loop and at the GameEvent.Moved snapshot the permanent still
--- reads as its owner's rather than as this controller's -- which contradicts CR
--- 614.12's "continuous effects that already exist and would apply to the
--- permanent", since an entry replacement reading control would read the wrong
--- player. Not that rule's "as it would exist on the battlefield" clause: CR
--- 109.3 excludes an object's controller from its characteristics by name. CR 614.1d's forms DO read it now
--- (Gather Specimens' "under an opponent's control"), so this is a live ordering
--- question rather than a vacuous one -- but it is still unobservable, because no
--- card in the pool reaches the store: every producer's controller already owns
--- what it puts onto the battlefield (see "NOTHING STORED" above), and the
--- branch that skips the store leaves owner and controller agreeing anyway. The
--- trigger side is fine regardless: a trigger re-derives the controller at the CR
--- 117.5 scan boundary. Fixing the ordering means settling the control before the
--- entry loop runs, which is #582's option 2 (write Object.enteredUnder) plus a
--- door through Event.changeZone to write it early.
+-- Two known divergences, both unobservable because no card in the pool reaches the
+-- store (#582): modelling this as a stored effect reverts the permanent to its
+-- owner if this controller later leaves, where CR 800.4a would leave it controlled
+-- by the departing player and exile it; and the store lands after
+-- changeZoneEntering returns, so CR 614.1c's entry loop and the Moved snapshot
+-- read the owner rather than this controller. Fixing the ordering means settling
+-- control before the entry loop runs.
 applyEntryControl :: PlayerId -> ObjectId -> Zone.Zone -> ObjectId -> Game ()
 applyEntryControl controller source zone newId =
   Monad.when (zone == Zone.Battlefield) . State.modify' $ \gs ->
