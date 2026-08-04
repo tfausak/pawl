@@ -214,8 +214,9 @@ cardSpec s = Spec.describe s "Card" $ do
     -- its combined mana cost."
     Spec.assertEqWith s "both colours" (Projection.printedColorsOf c) (Set.fromList [Color.Green, Color.White])
     Spec.assertEqWith s "mana value 2" (Quantity.manaValueOf c) 2
-    -- CR 709.4a, as far as a single CardName can carry it (#650): the CR writes
-    -- a split card's name joined, in all four of its own examples.
+    -- CR 709.4a, as far as a single CardName can carry it (#650): unspaced,
+    -- the form docs/rules.txt's own Examples write it in ("Fire//Ice",
+    -- "Assault//Battery").
     Spec.assertEqWith s "the joined name" (Face.name c) (CardName.MkCardName (Text.pack "Wax//Wane"))
     -- CR 709.4c: "A split card has each card type specified on either of its
     -- halves and each ability in the text box of each half."
@@ -2056,7 +2057,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "a card's face names are pairwise distinct" $ do
     ps <- S.allPrintings s
     let offenders = filter (distinctFaceNamesOffends . Printing.card) ps
-    Spec.assertEqWith s "no card repeats a face name" (fmap (Face.name . Card.combined . Printing.card) offenders) []
+    Spec.assertEqWith s "no card repeats a face name" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against a hand-built offender rather than a
   -- card file: a card that repeats a face name must not be loadable.
   Spec.it s "the lint itself catches a card that repeats a face name" $ do

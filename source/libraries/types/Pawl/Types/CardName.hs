@@ -14,9 +14,15 @@ newtype CardName = MkCardName
   }
   deriving (Eq, Ord, Show)
 
--- CR 709.4a as far as a single name can carry it (#650): the CR writes a
--- multi-face card's name with its faces joined by "//", in all four of its
--- own examples ("Fire//Ice" three times, "Assault//Battery" once).
+-- CR 709.4a as far as a single name can carry it (#650): docs/rules.txt's own
+-- Examples write a split card's name joined by "//", unspaced -- "Fire//Ice"
+-- (lines 3882, 5747) and "Assault//Battery" (line 5746). CR 709.4a itself
+-- gives no example.
+--
+-- Unspaced rather than the printed "Wax // Wane" is a decision already made,
+-- not an open question: Pawl.Slug.fromText maps '/' to a space and splits on
+-- words, so "Wax//Wane" and "Wax // Wane" both slugify to "wax-wane" --
+-- Task 5's filename check cannot diverge either way, whichever this writes.
 --
 -- Here rather than in Pawl.Engine.Card because `registry` sits BEFORE `engine`
 -- in the sublibrary table and cannot reach it, while both sit after `types`.

@@ -47,8 +47,11 @@ combined card = case Card.layout card of
   Layout.Normal -> NonEmpty.head (Card.faces card)
   -- CR 709.4: "In every zone except the stack, the characteristics of a split
   -- card are those of its two halves combined." Written over the whole
-  -- NonEmpty rather than over a pair, because CR 709 names no arity and a
-  -- five-part split card exists (Who // What // When // Where // Why).
+  -- NonEmpty rather than over a pair because docs/design.md §2.11 is a
+  -- standing rule against baking arity into the card model: every
+  -- tournament-legal split card has exactly two faces, but a fold over N costs
+  -- nothing to write and so also covers Who // What // When // Where // Why, a
+  -- five-part split card from a silver-border Un-set, entirely outside the CR.
   Layout.Split -> foldSplit (Card.faces card)
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
@@ -60,9 +63,9 @@ merge2 :: Face.Face Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
 merge2 l r =
   l
     { -- CR 709.4a gives the card BOTH names and no joined one; a single
-      -- CardName cannot carry that, so this is the form the CR uses in its own
-      -- four examples ("Fire//Ice", "Assault//Battery") and #650 carries the
-      -- plural axis.
+      -- CardName cannot carry that, so this is the form docs/rules.txt's own
+      -- Examples write, unspaced -- "Fire//Ice" (lines 3882, 5747) and
+      -- "Assault//Battery" (line 5746). #650 carries the plural axis.
       Face.name = CardName.join (Face.name l NonEmpty.:| [Face.name r]),
       -- CR 709.4b: "the combined mana costs of its two halves", from which
       -- colours and mana value fall out with no further arm.
@@ -76,6 +79,9 @@ merge2 l r =
       Face.activatedAbilities = Face.activatedAbilities l <> Face.activatedAbilities r,
       Face.replacementEffects = Face.replacementEffects l <> Face.replacementEffects r,
       Face.triggeredAbilities = Face.triggeredAbilities l <> Face.triggeredAbilities r,
+      -- Left-biased: two halves that arm a delayed ability under the same
+      -- AbilityName do not both survive here, and the right half's is the one
+      -- lost (#652).
       Face.delayedAbilities = Map.union (Face.delayedAbilities l) (Face.delayedAbilities r),
       Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
       Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
@@ -108,9 +114,12 @@ merge2 l r =
       -- would invent a spell that has no printing.
     }
 
--- CR 202.1: a land's Nothing is no mana cost at all, not a zero one, so two
--- Nothings stay Nothing and either half present makes the combined cost Just
--- -- concatenated left to right, which is CR 709.4b's "combined mana costs".
+-- CR 202.1b: "Some objects have no mana cost. This normally includes all land
+-- cards." So Nothing is no mana cost at all, not a zero one, and two Nothings
+-- stay Nothing. Either half present making the combined cost Just is this
+-- function's own design choice, not something the rule states -- the symbol
+-- lists are concatenated left to right, which is what CR 709.4b's "combined
+-- mana costs" means for a pair of Maybes.
 concatCosts :: Maybe ManaCost.ManaCost -> Maybe ManaCost.ManaCost -> Maybe ManaCost.ManaCost
 concatCosts l r = case (l, r) of
   (Nothing, Nothing) -> Nothing
@@ -132,9 +141,8 @@ unionTypeLines l r =
       TypeLine.subtypes = Set.union (TypeLine.subtypes l) (TypeLine.subtypes r)
     }
 
--- flip Maybe.fromMaybe, lifted to answer a Maybe rather than unwrap one: the
--- left half's value if it has one, the right half's (Just or Nothing)
--- otherwise -- Maybe's Alternative instance, read left to right.
+-- Maybe's Alternative instance, read left to right: the left half's value if
+-- it has one, the right half's (Just or Nothing) otherwise.
 firstJust :: Maybe a -> Maybe a -> Maybe a
 firstJust l r = l <|> r
 
