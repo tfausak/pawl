@@ -16,7 +16,6 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -213,7 +212,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
         (g2, inHand) = S.handOne pouncingCheetah g1
         (spellId, gs) = S.spellOnStack piker S.alice g2
     Spec.assertBool s (elem spellId (GameState.stack gs)) "the stack really is occupied"
-    Spec.assertBool s (Cast.castable S.alice inHand gs) "the flash spell is castable in response"
+    Spec.assertBool s (S.castable S.alice inHand gs) "the flash spell is castable in response"
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "but equip is not offered"
 
   -- The control: an UNRESTRICTED ability is unaffected by all three, so the
@@ -1420,19 +1419,19 @@ tidalWarriorChain s registry hackWhere = do
   tidalWarrior <- S.printingOf s registry "Tidal Warrior"
   magicalHack <- S.printingOf s registry "Magical Hack"
   let (forestId, warriorCardId, hackId, g0) = tidalWarriorBoard forest island tidalWarrior magicalHack
-      onStack = S.runPure S.identityAnswer g0 (Cast.castSpell S.alice warriorCardId)
+      onStack = S.runPure S.identityAnswer g0 (S.cast S.alice warriorCardId)
       warriorSpellId = case GameState.stack onStack of
         top : _ -> top
         [] -> ObjectId.MkObjectId 999
       -- Hacking the SPELL: cast the Hack on top of the Warrior spell and resolve
       -- it, so the stored effect names the spell id. Then resolve the Warrior.
-      hackedSpell = S.runPure (hackAt warriorSpellId Subtype.Island Subtype.Swamp) onStack (do Cast.castSpell S.alice hackId; Stack.resolveTop)
+      hackedSpell = S.runPure (hackAt warriorSpellId Subtype.Island Subtype.Swamp) onStack (do S.cast S.alice hackId; Stack.resolveTop)
       resolveWarrior gs = S.runPure S.identityAnswer gs (do Stack.resolveTop; Engine.settleAll S.alice)
       -- Hacking the PERMANENT: resolve the Warrior first, then aim the Hack at
       -- the new incarnation.
       hackPermanent gs = case soleCreatureOf S.alice gs of
         Nothing -> gs
-        Just permId -> S.runPure (hackAt permId Subtype.Island Subtype.Swamp) gs (do Cast.castSpell S.alice hackId; Stack.resolveTop)
+        Just permId -> S.runPure (hackAt permId Subtype.Island Subtype.Swamp) gs (do S.cast S.alice hackId; Stack.resolveTop)
       board = case hackWhere of
         Nothing -> resolveWarrior onStack
         Just OnTheSpell -> resolveWarrior hackedSpell

@@ -5,7 +5,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -134,7 +133,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
         (deadId, withDead) = S.addLibraryCard piker S.alice base
         g0 = S.runPure S.identityAnswer withDead (Event.changeZone deadId Zone.Graveyard) -- a card already in the graveyard
         (g1, ripId) = S.handOne restInPeace g0
-        afterCast = snd (Engine.runGamePure S.identityAnswer g1 (Cast.castSpell S.alice ripId))
+        afterCast = snd (Engine.runGamePure S.identityAnswer g1 (S.cast S.alice ripId))
         -- run priority: both players pass, RiP resolves and enters, its ETB is
         -- placed (CR 117.5) and resolves, exiling the graveyard.
         settled = snd (Engine.runGamePure S.identityAnswer afterCast Engine.priorityLoop)

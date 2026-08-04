@@ -16,7 +16,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -26,6 +25,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.CardName as CardName
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -81,14 +81,18 @@ firstOffered candidates = case candidates of
 -- there for its printed mana cost -- and a card with no flashback yields no
 -- candidate at all, which is CR 601.3's default prohibition arriving through
 -- Cast.castable's affordability gate as well as through its permission gate.
-costsFor :: ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
-costsFor oid gs = case Game.lookupObject oid gs of
+--
+-- They also depend on WHICH FACE is being cast (CR 709.3a: "Only the chosen
+-- half is evaluated to see if it can be cast"), which is why the name arrives
+-- as an argument rather than being read off the object. CR 709.4b's combined
+-- mana cost is what a split card HAS outside the stack, and is emphatically not
+-- what casting one half pays.
+costsFor :: CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
+costsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj -> case Object.source obj of
     Source.OfCard printing ->
-      -- CR 709.4b: the mana cost a card HAS is the combined one, which is what
-      -- Card.combined answers.
-      let face = Card.combined (Printing.card printing)
+      let face = Game.resolveFace (Just name) (Printing.card printing)
           printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
           -- CR 118.9d: an alternative replaces only the MANA cost; every
           -- additional cost still applies. The increases and reductions are

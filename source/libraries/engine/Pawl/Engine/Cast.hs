@@ -22,6 +22,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
@@ -70,10 +71,38 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 -- The window the RULES give a spell, and not the whole of when it may be cast: a
 -- card may narrow this further with a printed restriction (CR 601.3), which
 -- `castable` conjoins separately through printedRestrictionsOk.
-timingOk :: PlayerId -> ObjectId -> GameState -> Bool
-timingOk pid oid gs = case Game.faceOf oid gs of
+timingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+timingOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face -> instantSpeed face || sorcerySpeed pid gs
+
+-- The half whose cast is being proposed (CR 709.3a: "Only the chosen half is
+-- evaluated to see if it can be cast"). Nothing when the id is unknown or no
+-- card stands behind it.
+--
+-- NOT Game.faceOf, and the difference is the point: the card is still in a hand
+-- or a graveyard when every gate below is asked, where Object.face is unset and
+-- CR 709.4 would hand back the two halves COMBINED -- one action per card,
+-- priced at the sum of both costs. The name comes from the proposal instead, so
+-- each half is gated and priced on its own.
+--
+-- Resolved through the same Game.resolveFace seam Object.face reads through, so
+-- what a gate measures before the move and what the stack incarnation shows
+-- after it cannot drift.
+proposedFace :: ObjectId -> CardName.CardName -> GameState -> Maybe (Face.Face Card.Type.Card)
+proposedFace oid name gs = fmap (Game.resolveFace (Just name)) (Game.cardOf oid gs)
+
+-- The one half a card offers to cast, where it offers exactly one. Nothing for
+-- a card with several -- CR 709.3's choice is the player's, and this makes it
+-- for nobody.
+--
+-- Only castWhileSearching needs it, because Prompt.CastWhileSearching carries a
+-- bare object id with no room for a face; the offer a MULTI-face card would
+-- make from a library is therefore not made at all (#655).
+soleCastableFace :: ObjectId -> GameState -> Maybe (Face.Face Card.Type.Card)
+soleCastableFace oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
+  Just [face] -> Just face
+  _ -> Nothing
 
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
@@ -114,8 +143,8 @@ instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 -- (Target.legalRecipients); a card whose cost or targeting genuinely differs
 -- between hand and stack is #89's own expiry trigger. castableWhileSearching
 -- reads the same pre-move projection for the same reason.
-targetable :: PlayerId -> ObjectId -> GameState -> Bool
-targetable pid oid gs = case Game.faceOf oid gs of
+targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
     let count = Modal.selectionCount (Face.spell face)
@@ -175,7 +204,10 @@ affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid o
 --
 --   1. The card HAS entwine. CR 702.42a is a static ability of the spell itself,
 --      so it is read off the card's printed keywords and not through the CR 613
---      projection of the stack object CR 601.2a has already made.
+--      projection of the stack object CR 601.2a has already made. Game.faceOf,
+--      because the half being cast is stamped on that object before this is
+--      asked, so CR 709.3b's "only the characteristics of the half being cast"
+--      already narrows the keywords read here.
 --   2. Every printed mode is LEGAL (CR 700.2a), so choosing ALL modes is not open
 --      when one of them cannot be chosen. Unobservable for Dream's Grip and
 --      written anyway: without it an entwined cast would announce fewer modes
@@ -230,9 +262,9 @@ castableZones face =
    in filter permitted castZones
 
 -- Is this object somewhere this player may cast it from?
-inCastableZone :: PlayerId -> ObjectId -> GameState -> Bool
-inCastableZone pid oid gs =
-  case Game.faceOf oid gs of
+inCastableZone :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+inCastableZone pid oid name gs =
+  case proposedFace oid name gs of
     Nothing -> False
     Just face -> any (\zone -> elem oid (Game.zoneMembers zone pid gs)) (castableZones face)
 
@@ -248,8 +280,8 @@ inCastableZone pid oid gs =
 -- The SPELL's own type line is read PRINTED (Card.isLegendary): it is in a hand
 -- or a graveyard when this is asked, where no projection exists, and CR 205.4a
 -- makes supertypes a printed-type-line read regardless.
-legendaryRestrictionOk :: PlayerId -> ObjectId -> GameState -> Bool
-legendaryRestrictionOk pid oid gs = case Game.faceOf oid gs of
+legendaryRestrictionOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+legendaryRestrictionOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
     not (Card.isLegendary face && (Card.isInstant face || Card.isSorcery face))
@@ -285,8 +317,8 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- Casing on the arms is a classification, not an effect's identity:
 -- Pawl.Engine.Cast is the sole reader of Pawl.Types.CastingRestriction exactly as
 -- it is of CastingPermission.
-printedRestrictionsOk :: PlayerId -> ObjectId -> GameState -> Bool
-printedRestrictionsOk pid oid gs = case Game.faceOf oid gs of
+printedRestrictionsOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+printedRestrictionsOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face -> all (restrictionMet pid gs) (Face.castingRestrictions face)
 
@@ -332,24 +364,36 @@ attackedThisStep pid gs =
 -- THREE prohibitions, not one, because they are carried by three different
 -- things: a continuous effect on the player (Rule of Law, Silence), the card's
 -- own printed text, and CR 205.4e itself.
-castable :: PlayerId -> ObjectId -> GameState -> Bool
-castable pid oid gs =
-  timingOk pid oid gs
-    && inCastableZone pid oid gs
+--
+-- Asked of ONE HALF, named: CR 709.3a evaluates only the chosen half to see if
+-- it can be cast, so every conjunct below reads that face and a split card is
+-- asked this question once per half.
+castable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+castable pid oid name gs =
+  timingOk pid oid name gs
+    && inCastableZone pid oid name gs
     -- CR 601.3: gated HERE, upstream of Action.legalActions, because the engine
     -- never offers an illegal action and then rejects it.
     && not (PlayerEffect.prohibitsCasting pid gs)
-    && printedRestrictionsOk pid oid gs
-    && legendaryRestrictionOk pid oid gs
-    && any (payableCost pid oid gs) (Cost.costsFor oid gs)
-    && targetable pid oid gs
+    && printedRestrictionsOk pid oid name gs
+    && legendaryRestrictionOk pid oid name gs
+    && any (payableCost pid oid gs) (Cost.costsFor name oid gs)
+    && targetable pid oid name gs
 
--- Every card this player may cast right now, in castZones' order. `castable`
--- re-checks the permission per card, so a graveyard with no flashback card in it
--- contributes nothing.
-castableSpells :: PlayerId -> GameState -> [ObjectId]
+-- Every cast this player may propose right now, in castZones' order, as the
+-- (object, half) pairs Action.Cast is built from. `castable` re-checks the
+-- permission per card, so a graveyard with no flashback card in it contributes
+-- nothing.
+--
+-- ONE ENTRY PER CASTABLE FACE, which is CR 709.3's choice being offered rather
+-- than made: a split card in hand with both halves affordable appears twice,
+-- and the player picks by picking an action. A card whose halves are separately
+-- gated appears only as often as CR 709.3a lets it.
+castableSpells :: PlayerId -> GameState -> [(ObjectId, CardName.CardName)]
 castableSpells pid gs =
-  let inZone zone = filter (\oid -> castable pid oid gs) (Game.zoneMembers zone pid gs)
+  let proposals oid = fmap (\face -> (oid, Face.name face)) (foldMap Card.castableFaces (Game.cardOf oid gs))
+      offered oid = filter (\(_, name) -> castable pid oid name gs) (proposals oid)
+      inZone zone = concatMap offered (Game.zoneMembers zone pid gs)
    in concatMap inZone castZones
 
 -- CR 601.3 (Panglacial): may this card be cast from the library while its
@@ -391,16 +435,23 @@ permissionsOf face =
 -- narrower reading -- the ruling excepts the RULES' own timing window (CR 302.1 /
 -- 307.1), not a prohibition the card prints on itself. Unobservable: Panglacial
 -- Wurm is the only card with the permission and it prints no restriction.
+--
+-- A card with several castable halves is not offered here at all, and that is
+-- soleCastableFace's restriction rather than a rule: Prompt.CastWhileSearching
+-- carries a bare object id, so two halves of one card would arrive at the
+-- prompt indistinguishable (#655). No card in the pool holds the permission on
+-- a multi-face card.
 castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
-  let permitted oid = maybe False permitsCastWhileSearching (Game.faceOf oid gs)
-      affordable oid = any (payableCost pid oid gs) (Cost.costsFor oid gs)
-      allowed oid =
-        permitted oid
-          && affordable oid
-          && printedRestrictionsOk pid oid gs
-          && legendaryRestrictionOk pid oid gs
-          && targetable pid oid gs
+  let allowed oid = case soleCastableFace oid gs of
+        Nothing -> False
+        Just face ->
+          let name = Face.name face
+           in permitsCastWhileSearching face
+                && any (payableCost pid oid gs) (Cost.costsFor name oid gs)
+                && printedRestrictionsOk pid oid name gs
+                && legendaryRestrictionOk pid oid name gs
+                && targetable pid oid name gs
    in if PlayerEffect.prohibitsCasting pid gs
         then []
         else filter allowed (Game.zoneMembers Zone.Library pid gs)
@@ -424,9 +475,13 @@ castWhileSearching pid = do
         Just oid ->
           -- Reject-not-repair: an option not in the offered set is a no-op that
           -- ends the loop, never a repair.
-          Monad.when (elem oid options) $ do
-            castSpell pid oid
-            castWhileSearching pid
+          Monad.when (elem oid options) $ case soleCastableFace oid gs of
+            -- Unreachable: castableWhileSearching offered only ids that have
+            -- one, and nothing has moved since. Total rather than partial.
+            Nothing -> pure ()
+            Just face -> do
+              castSpell pid oid (Face.name face)
+              castWhileSearching pid
 
 -- CR 601.2's own order, walked in it: 601.2a moves the card to the stack FIRST,
 -- then 601.2b chooses the modes and the cost and announces X and the Phyrexian
@@ -459,21 +514,41 @@ castWhileSearching pid = do
 -- cannot pay, which is why Cost.announce is handed CR 601.2f's totalling below.
 --
 -- A spell with no slots (in its chosen modes) asks nothing.
-castSpell :: PlayerId -> ObjectId -> Game ()
-castSpell pid oid = do
+--
+-- `name` is CR 709.3's half-choice, ALREADY MADE: the rule puts it before the
+-- card is put onto the stack, so it arrives with the proposal rather than being
+-- prompted for here. CR 601.2b's last sentence is what that buys -- a
+-- previously made choice may restrict the ones announced below.
+castSpell :: PlayerId -> ObjectId -> CardName.CardName -> Game ()
+castSpell pid oid name = do
   before <- State.get
-  case Game.faceOf oid before of
+  case proposedFace oid name before of
     Nothing -> pure ()
     Just face -> do
       let castFrom = fmap Object.zone (Game.lookupObject oid before)
-          candidates = Cost.costsFor oid before
+          candidates = Cost.costsFor name oid before
       -- CR 601.2a. Nothing means the id was unknown or the CR 616.1 replacement
       -- loop cancelled the move, and a proposal whose first step did not happen
       -- is one the game returns from (CR 601.2).
       moved <- Event.changeZoneReturning oid Zone.Stack
       case moved of
         Nothing -> State.put before
-        Just sid -> castProposed pid sid face castFrom candidates before
+        Just sid -> do
+          -- CR 709.3a: "Only that half is considered to be put onto the stack."
+          -- Stamped the instant the CR 601.2a move lands and before any of CR
+          -- 601.2b's announcements, so every read of the stack incarnation from
+          -- here on sees the chosen half alone (CR 709.3b) rather than CR
+          -- 709.4's combined view -- entwineOffer's keywords and the CR 613
+          -- projection included. Event.changeZone cleared the field on the way
+          -- in (CR 400.7), so this is a write onto a fresh object.
+          State.modify'
+            ( \g ->
+                g
+                  { GameState.objects =
+                      Map.adjust (\o -> o {Object.face = Just name}) sid (GameState.objects g)
+                  }
+            )
+          castProposed pid sid face castFrom candidates before
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object

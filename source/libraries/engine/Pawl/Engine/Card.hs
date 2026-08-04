@@ -146,6 +146,21 @@ unionTypeLines l r =
 firstJust :: Maybe a -> Maybe a -> Maybe a
 firstJust l r = l <|> r
 
+-- CR 709.3a: the faces a player may propose to cast. Under Normal the sole
+-- face; under Split every half, because CR 709.3 says "A player chooses which
+-- half of a split card they are casting before putting it onto the stack."
+--
+-- A LIST of options and never a choice: which half is cast is the player's, and
+-- offering each as its own legal action is how the engine avoids making it.
+--
+-- `combined` is deliberately not among them. CR 709.4's view is what the card
+-- has in every zone but the stack; CR 709.3a puts only the CHOSEN half on the
+-- stack, so a cast is never priced or evaluated against the pair.
+castableFaces :: Card.Card -> [Face.Face Card.Card]
+castableFaces card = case Card.layout card of
+  Layout.Normal -> [NonEmpty.head (Card.faces card)]
+  Layout.Split -> NonEmpty.toList (Card.faces card)
+
 -- The face of this card with the given name, if it has one. CR 709.4a: a card's
 -- faces are referred to BY NAME, which is what a player names in paper and what
 -- survives in a DecisionLog; the Ord on Card.faces is printed order and carries

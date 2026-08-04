@@ -18,7 +18,6 @@ import qualified Data.Text as Text
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -83,7 +82,7 @@ giantGrowthOnPiker forest piker giantGrowth =
   let base = S.landsInPlay forest 1
       (pikerId, withPiker) = S.addCreature piker S.alice base
       (gs, ggId) = S.handOne giantGrowth withPiker
-      cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ggId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (pikerId, resolved)
 
@@ -102,7 +101,7 @@ untamedMightOnPiker forest piker untamedMight =
   let base = S.landsInPlay forest 5
       (pikerId, withPiker) = S.addCreature piker S.alice base
       (gs, umId) = S.handOne untamedMight withPiker
-      cast = snd (Engine.runGamePure answerX4 gs (Cast.castSpell S.alice umId))
+      cast = snd (Engine.runGamePure answerX4 gs (S.cast S.alice umId))
       resolved = snd (Engine.runGamePure answerX4 cast Stack.resolveTop)
    in (pikerId, resolved)
 
@@ -141,7 +140,7 @@ aimAtCreature oid p = case p of
 turnToFrogAt :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> GameState.GameState
 turnToFrogAt victimId turnToFrog board =
   let (gs, ttfId) = S.handOne turnToFrog board
-      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (Cast.castSpell S.alice ttfId))
+      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (S.cast S.alice ttfId))
    in snd (Engine.runGamePure (aimAtCreature victimId) cast Stack.resolveTop)
 
 -- The object timestamp of the (single) Humility on the battlefield.
@@ -404,7 +403,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forest <- S.printingOf s registry "Forest"
     giantGrowth <- S.printingOf s registry "Giant Growth"
     let (gs, ggId) = S.handOne giantGrowth (S.landsInPlay forest 1)
-    Spec.assertBool s (not (Cast.castable S.alice ggId gs)) "no legal target, not castable"
+    Spec.assertBool s (not (S.castable S.alice ggId gs)) "no legal target, not castable"
 
   Spec.it s "CR 514.2 an until-end-of-turn effect wears off at cleanup" $ do
     forest <- S.printingOf s registry "Forest"
@@ -475,7 +474,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (pikerId, withPiker) = S.addCreature piker S.alice base
         withHum = S.withHumility humility withPiker
         (gs, ggId) = S.handOne giantGrowth withHum
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ggId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     -- Layer 7b (set 1/1) before 7c (+3/+3): 1 then +3 = 4.
     Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
@@ -491,7 +490,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let base = S.landsInPlay forest 3
         (mammothId, withMammoth) = S.addCreature warMammoth S.alice base
         (gs, sgId) = S.handOne serpentsGift withMammoth
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice sgId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice sgId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertBool s (Projection.hasKeyword Keyword.Trample mammothId resolved) "keeps trample"
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch mammothId resolved) "gains deathtouch"
@@ -1284,7 +1283,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (equip, g2) = S.addCreature bonesplitter S.alice g1
         attached = S.attach equip creature g2
         (withSpell, spellId) = S.handOne march attached
-        cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         after = snd (Engine.runGamePure S.identityAnswer resolved Engine.settleForPriority)
     Spec.assertEqWith s "equipped, the Piker was 4/1" (Projection.powerOf creature attached) (Just 4)
@@ -1818,9 +1817,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   -- No split card is in the pool yet (#648), so this fixture is built by hand
   -- (Pawl.CardSpec.splitCard: two Instant halves, Wax {G} and Wane {W}) and put
-  -- on the stack directly (S.spellOnStack), with Object.face set by hand -- a
-  -- cast never yet chooses a half; this proves only that Object.face, once
-  -- set, is read correctly.
+  -- on the stack directly (S.spellOnStack), with Object.face set by hand: this
+  -- is about how the field is READ, and Pawl.CastSpec's CR 709.3a cases are
+  -- what prove a cast writes it.
   Spec.it s "CR 709.3b a split spell on the stack has only the half being cast" $ do
     let wax = CardName.MkCardName (Text.pack "Wax")
         card = CardSpec.splitCard

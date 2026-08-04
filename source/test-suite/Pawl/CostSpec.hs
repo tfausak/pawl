@@ -18,7 +18,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -363,7 +362,7 @@ villageRitesSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       villageRites <- S.printingOf s registry "Village Rites"
       let (rites, pikers, gs) = villageRitesBoard swamp piker villageRites 1
-          cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice rites)
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice rites)
           resolved = S.runPure S.identityAnswer cast Stack.resolveTop
       Spec.assertEqWith s "no creature left on the battlefield" (S.creaturesInPlay S.alice resolved) 0
       -- Plan-bug fix: CR 400.7 gives the sacrificed permanent a NEW
@@ -391,8 +390,8 @@ villageRitesSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       villageRites <- S.printingOf s registry "Village Rites"
       let (rites, _, gs) = villageRitesBoard swamp piker villageRites 0
-      Spec.assertBool s (not (Cast.castable S.alice rites gs)) "not castable"
-      Spec.assertEqWith s "and not offered" (filter (isCastOf rites) (Action.legalActions S.alice gs)) []
+      Spec.assertBool s (not (S.castable S.alice rites gs)) "not castable"
+      Spec.assertEqWith s "and not offered" (filter (S.isCastOf rites) (Action.legalActions S.alice gs)) []
     -- The cost payment went through Event.sacrifice, the CR 701.21 funnel,
     -- so the turn history saw it. A direct zone poke passes both cases
     -- above and fails this one. The settle/resolve shape is
@@ -404,7 +403,7 @@ villageRitesSpec s registry =
       khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (rites, _, gs0) = villageRitesBoard swamp piker villageRites 1
           (ghoul, gs1) = S.addCreature khabalGhoul S.alice gs0
-          cast = S.runPure S.identityAnswer gs1 (Cast.castSpell S.alice rites)
+          cast = S.runPure S.identityAnswer gs1 (S.cast S.alice rites)
           endStep = Phase.Ending EndingStep.EndStep
           beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
           settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
@@ -421,8 +420,8 @@ villageRitesSpec s registry =
       villageRites <- S.printingOf s registry "Village Rites"
       let (ritesTwo, _, twoPikers) = villageRitesBoard swamp piker villageRites 2
           (ritesOne, _, onePiker) = villageRitesBoard swamp piker villageRites 1
-          askedTwo = answersFor S.identityAnswer twoPikers (Cast.castSpell S.alice ritesTwo)
-          askedOne = answersFor S.identityAnswer onePiker (Cast.castSpell S.alice ritesOne)
+          askedTwo = answersFor S.identityAnswer twoPikers (S.cast S.alice ritesTwo)
+          askedOne = answersFor S.identityAnswer onePiker (S.cast S.alice ritesOne)
       Spec.assertBool s (wasAskedToSacrifice askedTwo) "asked with two"
       Spec.assertBool s (not (wasAskedToSacrifice askedOne)) "not asked with one"
     -- CR 115.1 makes a target only what the word "target" names: a
@@ -432,16 +431,11 @@ villageRitesSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       villageRites <- S.printingOf s registry "Village Rites"
       let (rites, _, gs) = villageRitesBoard swamp piker villageRites 2
-          asked = answersFor S.identityAnswer gs (Cast.castSpell S.alice rites)
+          asked = answersFor S.identityAnswer gs (S.cast S.alice rites)
           isTargets r = case r of
             Response.ChoseTargets _ -> True
             _ -> False
       Spec.assertBool s (not (any isTargets asked)) "no ChooseTargets was raised"
-
-isCastOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
-isCastOf oid a = case a of
-  Action.Type.Cast o -> o == oid
-  _ -> False
 
 -- alice controls `n` Mountains (all tapped when `tap` is True) and holds one
 -- Fireblast, with priority in her own precombat main phase. Loaded fresh
@@ -475,9 +469,9 @@ fireblastSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 2 True
-          cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice fireblast)
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice fireblast)
           resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-      Spec.assertBool s (Cast.castable S.alice fireblast gs) "castable"
+      Spec.assertBool s (S.castable S.alice fireblast gs) "castable"
       Spec.assertEqWith s "both Mountains sacrificed" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 0
       Spec.assertEqWith s "alice took 4 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice resolved) (Just 16)
     -- CR 118.9b: an alternative cost is optional, so a player who can
@@ -487,8 +481,8 @@ fireblastSpec s registry =
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (both, sixUntapped) = fireblastBoard mountain fireblastPrinting 6 False
           (onlyAlternative, twoTapped) = fireblastBoard mountain fireblastPrinting 2 True
-          askedBoth = answersFor S.identityAnswer sixUntapped (Cast.castSpell S.alice both)
-          askedOne = answersFor S.identityAnswer twoTapped (Cast.castSpell S.alice onlyAlternative)
+          askedBoth = answersFor S.identityAnswer sixUntapped (S.cast S.alice both)
+          askedOne = answersFor S.identityAnswer twoTapped (S.cast S.alice onlyAlternative)
       Spec.assertBool s (wasAskedToChooseCost askedBoth) "asked when both are payable"
       Spec.assertBool s (not (wasAskedToChooseCost askedOne)) "not asked when only one is"
     -- CR 118.9a: "Only one alternative cost can be applied to any one spell
@@ -498,7 +492,7 @@ fireblastSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 2 True
-          candidates = Cost.costsFor fireblast gs
+          candidates = Cost.costsFor (S.printingName fireblastPrinting) fireblast gs
           red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       Spec.assertEqWith s "two candidates" (length candidates) 2
       Spec.assertEqWith
@@ -512,15 +506,15 @@ fireblastSpec s registry =
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (three, threeMountains) = fireblastBoard mountain fireblastPrinting 3 True
           (two, twoMountains) = fireblastBoard mountain fireblastPrinting 2 True
-          askedThree = answersFor S.identityAnswer threeMountains (Cast.castSpell S.alice three)
-          askedTwo = answersFor S.identityAnswer twoMountains (Cast.castSpell S.alice two)
+          askedThree = answersFor S.identityAnswer threeMountains (S.cast S.alice three)
+          askedTwo = answersFor S.identityAnswer twoMountains (S.cast S.alice two)
       Spec.assertBool s (wasAskedToSacrifice askedThree) "asked with three"
       Spec.assertBool s (not (wasAskedToSacrifice askedTwo)) "not asked with exactly two"
     Spec.it s "CR 118.3 one Mountain pays neither cost" $ do
       mountain <- S.printingOf s registry "Mountain"
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 1 True
-      Spec.assertBool s (not (Cast.castable S.alice fireblast gs)) "not castable"
+      Spec.assertBool s (not (S.castable S.alice fireblast gs)) "not castable"
 
 -- The two cross-checks: Fireblast's alternative cost against the projection
 -- (Blood Moon, CR 613 layer 4) and against P7's cost modification (Thalia, CR
@@ -555,12 +549,12 @@ crossCheckSpec s registry =
           withoutMoon = crossCheckWithPriority gs2
           (_, gs3) = S.addCreature bloodMoon S.alice gs2
           withMoon = crossCheckWithPriority gs3
-          cast = S.runPure S.identityAnswer withMoon (Cast.castSpell S.alice fireblast)
+          cast = S.runPure S.identityAnswer withMoon (S.cast S.alice fireblast)
       Spec.assertBool
         s
-        (not (Cast.castable S.alice fireblast withoutMoon))
+        (not (S.castable S.alice fireblast withoutMoon))
         "without Blood Moon, Evolving Wilds is not a Mountain and one Mountain is not two"
-      Spec.assertBool s (Cast.castable S.alice fireblast withMoon) "with Blood Moon it is castable"
+      Spec.assertBool s (S.castable S.alice fireblast withMoon) "with Blood Moon it is castable"
       Spec.assertBool s (not (Set.member wilds (GameState.battlefield cast))) "and Evolving Wilds was sacrificed as a Mountain"
     -- CR 118.9d: "If an alternative cost is being paid to cast a spell,
     -- any additional costs, cost increases, and cost reductions that
@@ -580,7 +574,7 @@ crossCheckSpec s registry =
           (_, threeMountains) = S.addCreature mountain S.alice twoTapped
           (_, taxedThree) = S.addCreature thalia S.alice threeMountains
           (fireblastThree, gsThree) = S.addHandCard fireblastPrinting S.alice taxedThree
-          alternativeOf oid gs = case Cost.costsFor oid gs of
+          alternativeOf oid gs = case Cost.costsFor (S.printingName fireblastPrinting) oid gs of
             _ : alt : _ -> Just (Cost.Type.mana (Cost.total S.alice oid alt gs))
             _ -> Nothing
       Spec.assertEqWith
@@ -590,11 +584,11 @@ crossCheckSpec s registry =
         (Just (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])))
       Spec.assertBool
         s
-        (not (Cast.castable S.alice fireblastTwo (crossCheckWithPriority gsTwo)))
+        (not (S.castable S.alice fireblastTwo (crossCheckWithPriority gsTwo)))
         "with nothing untapped the taxed alternative is unpayable, so Fireblast is not castable"
       Spec.assertBool
         s
-        (Cast.castable S.alice fireblastThree (crossCheckWithPriority gsThree))
+        (S.castable S.alice fireblastThree (crossCheckWithPriority gsThree))
         "a third, untapped Mountain pays the {1} and it is castable again"
 
 -- Longtusk Cub, the P10 capstone: an energy trigger (CR 603.2 / 509-510) that
@@ -735,7 +729,7 @@ catharticReunionSpec s registry =
       -- prompt is elided -- which noDiscardAnswer proves, since an answer of
       -- [] would discard nothing if the prompt were actually raised.
       let (reunion, gs) = catharticBoard mountain piker catharticReunion 2
-          cast = S.runPure noDiscardAnswer gs (Cast.castSpell S.alice reunion)
+          cast = S.runPure noDiscardAnswer gs (S.cast S.alice reunion)
           resolved = S.runPure noDiscardAnswer cast Stack.resolveTop
       Spec.assertEqWith s "the hand emptied as the cost was paid" (S.handSize S.alice cast) 0
       Spec.assertEqWith s "two discarded cards in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 2
@@ -747,14 +741,11 @@ catharticReunionSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       catharticReunion <- S.printingOf s registry "Cathartic Reunion"
       let (reunion, gs) = catharticBoard mountain piker catharticReunion 1
-          isCastOfReunion a = case a of
-            Action.Type.Cast oid -> oid == reunion
-            _ -> False
       -- Read through costsFor, so the assertion is against the cost the engine
       -- would actually offer (mana cost plus the printed additional cost),
       -- never a hand-built one.
-      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice reunion c gs) (Cost.costsFor reunion gs))) "no offered cost is payable"
-      Spec.assertBool s (not (any isCastOfReunion (Action.legalActions S.alice gs))) "and no Cast is offered"
+      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice reunion c gs) (Cost.costsFor (S.printingName catharticReunion) reunion gs))) "no offered cost is payable"
+      Spec.assertBool s (not (any (S.isCastOf reunion) (Action.legalActions S.alice gs))) "and no Cast is offered"
     Spec.it s "CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid" $ do
       -- The COST path's reject-not-repair, and deliberately the opposite of what
       -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Engine.Cost.pay
@@ -764,7 +755,7 @@ catharticReunionSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       catharticReunion <- S.printingOf s registry "Cathartic Reunion"
       let (reunion, gs) = catharticBoard mountain piker catharticReunion 3
-          cast = S.runPure noDiscardAnswer gs (Cast.castSpell S.alice reunion)
+          cast = S.runPure noDiscardAnswer gs (S.cast S.alice reunion)
       Spec.assertEqWith s "nothing was discarded" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 0
       Spec.assertEqWith s "the hand is untouched, Reunion included" (S.handSize S.alice cast) 4
       Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
@@ -791,8 +782,8 @@ catharticReunionSpec s registry =
           sameCardTwice q = case q of
             Prompt.ChooseDiscard _ _ ids _ -> concat (replicate 2 (take 1 ids))
             _ -> S.identityAnswer q
-          paid = S.runPure duplicateThenDistinct gs (Cast.castSpell S.alice reunion)
-          unpaid = S.runPure sameCardTwice gs (Cast.castSpell S.alice reunion)
+          paid = S.runPure duplicateThenDistinct gs (S.cast S.alice reunion)
+          unpaid = S.runPure sameCardTwice gs (S.cast S.alice reunion)
       Spec.assertEqWith s "[a,a,b] names two distinct cards, so the cost is paid" (length (Game.zoneMembers Zone.Graveyard S.alice paid)) 2
       Spec.assertEqWith s "and the spell is on the stack" (length (GameState.stack paid)) 1
       Spec.assertEqWith s "[a,a] names one, so nothing is discarded" (length (Game.zoneMembers Zone.Graveyard S.alice unpaid)) 0

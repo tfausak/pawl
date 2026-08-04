@@ -27,7 +27,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Stack as Stack
@@ -82,7 +81,7 @@ useAbility i p oid gs = case abilityAt i p of
 jaceOnBattlefield :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 jaceOnBattlefield island jace =
   let (gs, handId) = S.handOne jace (stockLibraries island (S.landsInPlay island 3))
-      after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+      after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
    in (theJace after, after)
 
 -- Four cards in each library. Jace's abilities all draw, and CR 704.5b would end
@@ -162,7 +161,7 @@ aimedAt oid p = case p of
 burnResolved :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 burnResolved jaceId burnId gs =
   S.runPure (aimedAt jaceId) gs $ do
-    Cast.castSpell S.alice burnId
+    S.cast S.alice burnId
     Stack.resolveTop
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -239,7 +238,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     doublingSeason <- S.printingOf s registry "Doubling Season"
     let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-        after = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+        after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
     Spec.assertEqWith s "three doubled to six" (S.counterOf CounterKind.Loyalty (theJace after) after) 6
 
   -- The other half of the same rule, and the reason the two placements are
@@ -251,7 +250,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     doublingSeason <- S.printingOf s registry "Doubling Season"
     let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-        board = S.runPure S.identityAnswer gs (do Cast.castSpell S.alice handId; Stack.resolveTop)
+        board = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
         jaceId = theJace board
         after = useAbility plusTwo jace jaceId board
     Spec.assertEqWith s "six plus two, not six plus four" (S.counterOf CounterKind.Loyalty jaceId after) 8

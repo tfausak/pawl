@@ -41,7 +41,9 @@ legalActions pid gs =
           && GameState.activePlayer gs == pid
           && not (Set.member pid (GameState.landPlayed gs))
       lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
-      spells = fmap Action.Cast (Cast.castableSpells pid gs)
+      -- CR 709.3: one action per castable HALF, so choosing a half is choosing
+      -- an action and the engine never asks which one.
+      spells = fmap (uncurry Action.Cast) (Cast.castableSpells pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. Which abilities an

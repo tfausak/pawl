@@ -41,7 +41,7 @@ isCreatureRecipient r = case r of
 castElsePlay :: [Action.Action] -> Action.Action
 castElsePlay actions =
   let isCast a = case a of
-        Action.Cast _ -> True
+        Action.Cast {} -> True
         _ -> False
       isPlay a = case a of
         Action.Play _ -> True

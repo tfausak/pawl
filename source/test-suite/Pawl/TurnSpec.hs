@@ -19,7 +19,6 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -429,7 +428,7 @@ castingDefender :: Prompt.Prompt r -> r
 castingDefender p = case p of
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
-          Action.Cast _ -> True
+          Action.Cast {} -> True
           _ -> False
      in case filter isCast actions of
           h : _ -> h
@@ -561,7 +560,7 @@ castAndResolve = castAndResolveWith S.identityAnswer
 
 castAndResolveWith :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> GameState.GameState -> GameState.GameState
 castAndResolveWith answer spell gs =
-  let cast = snd (Engine.runGamePure answer gs (Cast.castSpell S.alice spell))
+  let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spell))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
 -- CR 500.8's added phases, end to end, through the cards in the pool that add

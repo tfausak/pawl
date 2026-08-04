@@ -16,7 +16,6 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
@@ -344,7 +343,7 @@ recordingAnswer p = case p of
   Prompt.ChooseAction _ pid actions -> do
     State.modify' (\asked -> asked <> [pid])
     let isCast a = case a of
-          A.Cast _ -> True
+          A.Cast {} -> True
           _ -> False
     pure $ case filter isCast actions of
       h : _ -> h
@@ -398,7 +397,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
         steps = do
-          Cast.castSpell S.alice oid
+          S.cast S.alice oid
           Engine.priorityLoop
         after = snd (Engine.runGamePure S.identityAnswer gs steps)
     Spec.assertEqWith s "stack emptied" (length (GameState.stack after)) 0
@@ -1587,7 +1586,7 @@ pickPlayerRecipient candidates =
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of
-  A.Cast _ -> True
+  A.Cast {} -> True
   _ -> False
 
 -- Is this a legal-action Activate? On the gate board (a Mindslaver plus basic
@@ -1925,7 +1924,7 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     curse <- S.printingOf s registry "Curse of Death's Hold"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs0, ggId) = S.handOne giantGrowth withPiker
-        cast = S.runPure S.identityAnswer gs0 (Cast.castSpell S.alice ggId)
+        cast = S.runPure S.identityAnswer gs0 (S.cast S.alice ggId)
         pumped = S.runPure S.identityAnswer cast Stack.resolveTop
         (curseId, withCurse) = S.addCreature curse S.bob pumped
         atCleanup =

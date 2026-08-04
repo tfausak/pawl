@@ -208,9 +208,9 @@ resolveFace mName card = case mName of
   -- A name that does not resolve falls back to the combined view rather than
   -- failing. #648's corpus lint holds a card's face names pairwise distinct,
   -- which is what makes faceNamed's answer unique whenever the name IS one of
-  -- the card's own faces, and the only writer of this field reads the name it
-  -- stores from that same card's faces -- so this arm has no case that reaches
-  -- it, short of a bug in that writer.
+  -- the card's own faces, and the only writer of this field (Cast.castSpell)
+  -- stores a name it read from that same card's faces -- so this arm has no
+  -- case that reaches it, short of a bug in that writer.
   Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
 
 -- The face of the card an object is showing. Nothing when the id is unknown or
@@ -226,8 +226,8 @@ faceOf oid gs = do
 -- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the
 -- object is still live, its own `face` narrows the answer the same way faceOf's
 -- does; if it is gone, `lookupObject` answers Nothing and this falls back to
--- the combined view, since nothing before this task recorded a gone object's
--- singled-out face for a later read to recover.
+-- the combined view, because LastKnown carries no face of its own for a later
+-- read to recover (#654).
 faceOfWithLastKnown :: ObjectId -> GameState -> Maybe (Face Card)
 faceOfWithLastKnown oid gs = do
   card <- cardOfWithLastKnown oid gs

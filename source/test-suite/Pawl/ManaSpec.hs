@@ -18,7 +18,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -78,7 +77,7 @@ import qualified Pawl.Types.Zone as Zone
 resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 resolvedCreature land creature nLands =
   let (base, oid) = S.handOne creature (S.landsInPlay land nLands)
-      afterCast = snd (Engine.runGamePure S.identityAnswer base (Cast.castSpell S.alice oid))
+      afterCast = snd (Engine.runGamePure S.identityAnswer base (S.cast S.alice oid))
    in snd (Engine.runGamePure S.identityAnswer afterCast Stack.resolveTop)
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) wrapping one
@@ -404,7 +403,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         (elfId, base1) = S.addCreature llanowarElves S.bob base0
         base = S.runPure S.identityAnswer base1 (Engine.settleAll S.bob)
         (withSpell, spellId) = S.handOne actOfTreason base
-        cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice controls the Elves" (Projection.controllerOf elfId resolved) (Just S.alice)
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste elfId resolved) "it has haste"
@@ -496,7 +495,7 @@ castOffBoard :: (forall r. Prompt.Prompt r -> r) -> [Printing.Printing] -> Print
 castOffBoard answer permanents spell =
   let board = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) permanents
       (withSpell, oid) = S.handOne spell board
-      afterCast = S.runPure answer withSpell (Cast.castSpell S.alice oid)
+      afterCast = S.runPure answer withSpell (S.cast S.alice oid)
    in S.runPure answer afterCast Stack.resolveTop
 
 -- The mana Alice's pool holds after tapping `oid` with every prompt answered by
@@ -705,13 +704,13 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
           Prompt.ChooseManaSource _ _ candidates ->
             if elem birdsId (NonEmpty.toList candidates) then birdsId else NonEmpty.head candidates
           _ -> prefersColor Color.Blue p
-        cast = S.runPure floatBlue board (Cast.castSpell S.alice elvesId)
+        cast = S.runPure floatBlue board (S.cast S.alice elvesId)
         afterStep = S.runPure S.identityAnswer cast Engine.runStep
     Spec.assertEqWith s "the Elves are cast off the Forest, floating the Birds' blue" (poolSize S.alice cast) 1
     Spec.assertEqWith s "both sources tapped" (S.tappedCount S.alice afterStep) 2
     Spec.assertEqWith s "the float survived the end of the precombat main phase" (poolSize S.alice afterStep) 1
     Spec.assertEqWith s "Unsummon is still in hand" (Game.zoneMembers Zone.Hand S.alice afterStep) [unsummonId]
-    let spent = S.runPure S.identityAnswer afterStep (Cast.castSpell S.alice unsummonId)
+    let spent = S.runPure S.identityAnswer afterStep (S.cast S.alice unsummonId)
     Spec.assertEqWith s "the retained {U} paid for it" (poolSize S.alice spent) 0
     Spec.assertEqWith s "and nothing new was tapped" (S.tappedCount S.alice spent) 2
     Spec.assertEqWith s "Unsummon is on the stack" (length (GameState.stack spent)) 1
@@ -957,8 +956,8 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
         -- open for either to be offered at all.
         gs = g5 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
         offered = Action.legalActions S.alice gs
-    Spec.assertBool s (elem (Action.Type.Cast planeId) offered) "{2}{G}{G} is offered"
-    Spec.assertBool s (notElem (Action.Type.Cast towershellId) offered) "{3}{G}{G} is not"
+    Spec.assertBool s (elem (Action.Type.Cast planeId (S.printingName livingPlane)) offered) "{2}{G}{G} is offered"
+    Spec.assertBool s (notElem (Action.Type.Cast towershellId (S.printingName towershell)) offered) "{3}{G}{G} is not"
 
   -- And the offer is honoured: the same board casts Living Plane end to end,
   -- which it can only do by tapping one Myr for its Forest's {G} and the other
@@ -971,7 +970,7 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
         (firstMyrId, g2) = S.addCreature palladiumMyr S.alice g1
         (_, g3) = S.addCreature palladiumMyr S.alice g2
         (withSpell, planeId) = S.handOne livingPlane g3
-        cast = S.runPure (prefersLongYieldFrom firstMyrId) withSpell (Cast.castSpell S.alice planeId)
+        cast = S.runPure (prefersLongYieldFrom firstMyrId) withSpell (S.cast S.alice planeId)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "Living Plane resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Living Plane") S.alice resolved) 1
@@ -1052,7 +1051,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     Spec.assertBool s (not (null (Mana.manaSources S.alice board))) "the Mountain IS a mana source"
     Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [redSymbol]) board) "and it pays {R}"
     Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "but it does not pay {S}"
-    Spec.assertBool s (not (Cast.castable S.alice spellId g)) "so the Golem cannot be cast"
+    Spec.assertBool s (not (S.castable S.alice spellId g)) "so the Golem cannot be cast"
 
   -- CR 107.4h's second sentence, from the other end: "Effects that reduce the
   -- amount of generic mana you pay don't affect {S} costs." An {S} that were
@@ -1174,7 +1173,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
     let castOff reds greens =
           let (gs, spellId) = S.handOne burningTreeEmissary (mixedLands mountain forest reds greens)
-              cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+              cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
            in length (GameState.stack cast)
     Spec.assertEqWith s "two Mountains" (castOff 2 0) 1
     Spec.assertEqWith s "two Forests" (castOff 0 2) 1
@@ -1212,7 +1211,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
       -- CR 601.2h rolled the whole attempt back.
       castsOff javelin gs =
         let (g, spellId) = S.handOne javelin gs
-         in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))))
+         in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))))
 
   Spec.it s "CR 107.4e one {2/R} takes one Mountain OR two Islands, and one Island is not enough" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1281,7 +1280,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     island <- S.printingOf s registry "Island"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     let (g, spellId) = S.handOne flameJavelin (S.landsInPlay island 6)
-        cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "every Island tapped" (S.tappedCount S.alice resolved) 6
@@ -1370,7 +1369,7 @@ castAndResolve ::
   ObjectId.ObjectId ->
   ([Response.Response], GameState.GameState)
 castAndResolve answer gs oid =
-  let ((_, cast), asked) = Replay.record answer gs (Cast.castSpell S.alice oid)
+  let ((_, cast), asked) = Replay.record answer gs (S.cast S.alice oid)
    in (asked, snd (S.runPureWith answer cast Stack.resolveTop))
 
 -- alice at `n` life and nothing else on the board.
@@ -1449,7 +1448,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
@@ -1464,8 +1463,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (pikerId, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
-    Spec.assertBool s (Cast.castable S.alice spellId g) "castable with an empty battlefield but for the Piker"
-    let cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+    Spec.assertBool s (S.castable S.alice spellId g) "castable with an empty battlefield but for the Piker"
+    let cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
@@ -1480,10 +1479,10 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     let inHandAt n =
           let (_, withPiker) = S.addCreature piker S.alice (aliceAt n)
            in S.handOne mutagenicGrowth withPiker
-        castableAt n = let (g, spellId) = inHandAt n in Cast.castable S.alice spellId g
+        castableAt n = let (g, spellId) = inHandAt n in S.castable S.alice spellId g
         castsAt n =
           let (g, spellId) = inHandAt n
-           in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))))
+           in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))))
     Spec.assertBool s (not (castableAt 1)) "at 1 life it is not castable"
     Spec.assertEqWith s "and it does not cast" (castsAt 1) 0
     Spec.assertBool s (castableAt 2) "at 2 life it is -- the Piker it targets has not moved"
@@ -1508,7 +1507,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
     Spec.assertEqWith s "2 life paid, no green mana ever made" (S.lifeOf S.alice cast) (Just 18)
     case GameState.stack cast of
       [sid] -> Spec.assertEqWith s "and the spell is still green" (Projection.colorsOf sid cast) (Set.singleton Color.Green)
@@ -1597,7 +1596,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertEqWith s "the Growth resolved" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "exactly 2 life" (S.lifeOf S.alice resolved) (Just 18)
     Spec.assertEqWith s "and the Forest is untapped" (S.tappedCount S.alice resolved) 0
-    Spec.assertBool s (Cast.castable S.alice elvesId resolved) "so the Elves can still be cast"
+    Spec.assertBool s (S.castable S.alice elvesId resolved) "so the Elves can still be cast"
 
   -- The control, one answer different on the same board: the mana route
   -- spends the Forest and the Elves are stranded. Both legs are needed --
@@ -1612,7 +1611,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertBool s (wasAskedHowToPayPhyrexian asked) "the engine asked here too"
     Spec.assertEqWith s "life untouched" (S.lifeOf S.alice resolved) (Just 20)
     Spec.assertEqWith s "the Forest paid for it" (S.tappedCount S.alice resolved) 1
-    Spec.assertBool s (not (Cast.castable S.alice elvesId resolved)) "and the Elves cannot be cast"
+    Spec.assertBool s (not (S.castable S.alice elvesId resolved)) "and the Elves cannot be cast"
 
   -- The elision, both directions. Where only ONE route is payable there is
   -- nothing to ask, and the interpreter asking for the other route does not
@@ -1693,7 +1692,7 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
     medallion <- S.printingOf s registry "Sapphire Medallion"
     thopter <- S.printingOf s registry "Spined Thopter"
     let (gs, thopterId) = S.handOne thopter (withPermanent island medallion 2)
-    Spec.assertBool s (Cast.castable S.alice thopterId gs) "castable"
+    Spec.assertBool s (S.castable S.alice thopterId gs) "castable"
     let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs thopterId
     -- The outcome first, because it is the thing that was wrong: the engine
     -- used to take CR 107.4f's life route here without asking.
@@ -1733,7 +1732,7 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (_, withThalia) = S.addCreature thalia S.alice withPiker
         (gs, growthId) = S.handOne growth withThalia
-    Spec.assertBool s (Cast.castable S.alice growthId gs) "castable, by CR 107.4f's life route"
+    Spec.assertBool s (S.castable S.alice growthId gs) "castable, by CR 107.4f's life route"
     let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs growthId
     -- The outcome first again: answering the route the engine used to offer
     -- made the whole cast a no-op, so the Piker went unpumped and no life was
@@ -1759,7 +1758,7 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp 2)
         (_, withThalia) = S.addCreature thalia S.alice withPiker
         (gs, dismemberId) = S.handOne dismember withThalia
-    Spec.assertBool s (Cast.castable S.alice dismemberId gs) "castable, by two life routes"
+    Spec.assertBool s (S.castable S.alice dismemberId gs) "castable, by two life routes"
     let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
     Spec.assertEqWith s "4 life paid both symbols" (S.lifeOf S.alice resolved) (Just 16)
     Spec.assertEqWith s "both Swamps paid Thalia's {2}" (S.tappedCount S.alice resolved) 2

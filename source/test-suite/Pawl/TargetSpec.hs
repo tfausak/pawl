@@ -34,7 +34,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -217,7 +216,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
               withGuard = maybe base (\g -> snd (S.addCreature g S.bob base)) guard
               (ready, boltId) = S.handOne bolt withGuard
               board = ready {GameState.priority = Just S.alice}
-           in S.runPure prefersBob board (Cast.castSpell S.alice boltId >> Stack.resolveTop)
+           in S.runPure prefersBob board (S.cast S.alice boltId >> Stack.resolveTop)
         unguarded = castAt Nothing
         masked = castAt (Just ivoryMask)
         warded = castAt (Just leyline)
@@ -247,7 +246,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (_, bothMasked) = S.addCreature ivoryMask S.alice oneMask
         castableIn board =
           let (ready, boltId) = S.handOne bolt board
-           in Cast.castable S.alice boltId (ready {GameState.priority = Just S.alice})
+           in S.castable S.alice boltId (ready {GameState.priority = Just S.alice})
     -- The control twin, one step at a time: with only bob masked, alice is still
     -- a candidate and the Bolt is castable, so it is the SECOND Mask that empties
     -- the slot rather than anything else about the board.
@@ -311,7 +310,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (_, b1) = S.addCreature mongoose S.bob base
         (_, b2) = S.addCreature piker S.bob b1
         (gs, dojId) = S.handOne dayOfJudgment b2
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dojId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dojId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- By NAME, not by id: CR 400.7 makes the graveyard incarnation a new
         -- object, and Event.changeZone mints it a fresh ObjectId.
@@ -334,7 +333,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let base = S.landsInPlay island 3
         (spellId, onStack) = S.spellOnStack mongoose S.bob base
         (gs, cancelId) = S.handOne cancel onStack
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cancelId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     case soleTargetSpec (Face.spell (S.faceOf cancel)) of
       Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
@@ -408,7 +407,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let base = S.landsInPlay swamp 2
         (pikerId, board) = S.addCreature piker S.bob base
         (gs, dbId) = S.handOne doomBlade board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))
         resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
         killed = resolve cast
         fizzled = resolve (S.withEffect pikerId (Modification.GainKeyword Keyword.Shroud) cast)
@@ -499,7 +498,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let base = S.landsInPlay swamp 2 -- {1}{B}
         (_, board) = S.addCreature bogle S.alice base
         (gs, dbId) = S.handOne doomBlade board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- By NAME, not by id: CR 400.7 makes the graveyard incarnation a new
         -- object, and Event.changeZone mints it a fresh ObjectId.
@@ -523,7 +522,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (_, b1) = S.addCreature bogle S.bob base
         (_, b2) = S.addCreature piker S.bob b1
         (gs, dojId) = S.handOne dayOfJudgment b2
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dojId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dojId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         buried = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid after)) (Game.zoneMembers Zone.Graveyard S.bob after)
     Spec.assertEqWith s "both of bob's creatures are gone" (S.creaturesInPlay S.bob after) 0
@@ -573,7 +572,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let castAt controller =
           let (pikerId, board) = S.addCreature piker controller (S.landsInPlay swamp 2)
               (gs, dbId) = S.handOne doomBlade board
-           in (pikerId, snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId)))
+           in (pikerId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId)))
         resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
         (theirPiker, atTheirs) = castAt S.bob
         (myPiker, atMine) = castAt S.alice
@@ -672,7 +671,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     raiseDead <- S.printingOf s registry "Raise Dead"
     let (mineId, board) = S.addGraveyardCard piker S.alice (S.landsInPlay swamp 1)
         (gs, rdId) = S.handOne raiseDead board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice rdId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice rdId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "Raise Dead went on the stack" (length (GameState.stack cast)) 1
     Spec.assertEqWith s "the Piker card is in alice's hand" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 1
@@ -701,7 +700,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     raiseDead <- S.printingOf s registry "Raise Dead"
     let (mineId, board) = S.addGraveyardCard piker S.alice (S.landsInPlay swamp 1)
         (gs, rdId) = S.handOne raiseDead board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice rdId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice rdId))
         resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
         returned = resolve cast
         fizzled = resolve (S.runPure S.identityAnswer cast (Event.changeZone mineId Zone.Exile))

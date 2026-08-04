@@ -726,8 +726,8 @@ priorityLoop = do
                                 State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
-                              Action.Type.Cast oid -> do
-                                Cast.castSpell p oid
+                              Action.Type.Cast oid name -> do
+                                Cast.castSpell p oid name
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

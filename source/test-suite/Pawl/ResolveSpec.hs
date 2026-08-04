@@ -18,7 +18,6 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
@@ -320,7 +319,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         (gs, spellId) = S.handOne ravenousRats base1
         aliceBefore = S.handSize S.alice gs
         bobBefore = S.handSize S.bob gs
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
     Spec.assertEqWith s "bob discarded one" (S.handSize S.bob settled) (bobBefore - 1)
     Spec.assertEqWith s "alice lost only the Rats she cast" (S.handSize S.alice settled) (aliceBefore - 1)
@@ -480,7 +479,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let base = S.landsInPlay mountain 1
         (_target, gs0) = S.addCreature piker S.bob base
         (gs1, spellId) = S.handOne lightningBolt gs0
-        cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice spellId))
         -- resolveTop applies the damage but does NOT run SBAs, so the event persists.
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith
@@ -510,7 +509,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "seventeen" (S.lifeOf S.alice after) (Just 17)
   Spec.it s "the resolved damage flows through the event funnel" $ do
@@ -1070,7 +1069,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let base = S.landsInPlay mountain 2
         (gs, spellId) = S.handOne dragonFodder base
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     -- Two Goblin tokens exist (count == 2 proves two distinct objects). The
     -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
@@ -1092,7 +1091,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let base = S.landsInPlay forest 1
         (victim, gs0) = S.addCreature piker S.bob base
         (gs1, fogId) = S.handOne fog gs0
-        cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice fogId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Combat])
         spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Noncombat])
@@ -1115,7 +1114,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard piker pid g)) g0 [1 .. (n :: Int)]
         gs1 = fill S.alice 5 (fill S.bob 2 gs0)
         (spellId, gs2) = S.addHandCard suddenImpact S.alice gs1
-        cast = snd (Engine.runGamePure atBobAnswer gs2 (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs2 (S.cast S.alice spellId))
         before = S.lifeOf S.bob cast
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "two damage" (S.lifeOf S.bob after) (fmap (subtract 2) before)
@@ -1129,7 +1128,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard piker pid g)) g0 [1 .. (n :: Int)]
         gs1 = fill S.bob 2 gs0
         (spellId, gs2) = S.addHandCard suddenImpact S.alice gs1
-        cast = snd (Engine.runGamePure atBobAnswer gs2 (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs2 (S.cast S.alice spellId))
         (_, cast1) = S.addHandCard piker S.bob cast
         before = S.lifeOf S.bob cast1
         after = snd (Engine.runGamePure atBobAnswer cast1 Stack.resolveTop)
@@ -1180,7 +1179,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         gs2 = snd (S.addCreature snowMountain S.bob gs1)
         (wall, gs3) = S.addCreature wallOfStone S.bob gs2
         (spellId, gs4) = S.addHandCard skred S.alice gs3
-        cast = snd (Engine.runGamePure (atCreature wall) gs4 (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure (atCreature wall) gs4 (S.cast S.alice spellId))
         after = snd (Engine.runGamePure (atCreature wall) cast Stack.resolveTop)
     Spec.assertEqWith s "no damage before it resolves" (S.damageOf wall cast) (Just 0)
     Spec.assertEqWith s "two snow permanents you control, so two damage" (S.damageOf wall after) (Just 2)
@@ -1299,7 +1298,7 @@ boltAnswer :: Prompt.Prompt r -> r
 boltAnswer p = case p of
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
-          A.Cast _ -> True
+          A.Cast {} -> True
           _ -> False
      in case filter isCast actions of
           h : _ -> h
@@ -1345,7 +1344,7 @@ cancelVictim island cancel victim =
   let base = S.landsInPlay island 3
       (victimId, onStack) = S.spellOnStack victim S.bob base
       (gs, cancelId) = S.handOne cancel onStack
-      cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cancelId))
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (victimId, resolved)
 
@@ -1376,8 +1375,8 @@ racingCounters island piker cancel =
       atVictim p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject victimId)) sets
         _ -> S.identityAnswer p
-      castA = snd (Engine.runGamePure atVictim gs2 (Cast.castSpell S.alice cancelA))
-      castB = snd (Engine.runGamePure atVictim castA (Cast.castSpell S.alice cancelB))
+      castA = snd (Engine.runGamePure atVictim gs2 (S.cast S.alice cancelA))
+      castB = snd (Engine.runGamePure atVictim castA (S.cast S.alice cancelB))
       r1 = snd (Engine.runGamePure atVictim castB Stack.resolveTop) -- B counters the Piker
       r2 = snd (Engine.runGamePure atVictim r1 Stack.resolveTop) -- A fizzles
    in r2
@@ -1427,7 +1426,7 @@ counterSpec s registry = Spec.describe s "Counter" $ do
     let (_, ripOut) = S.addCreature restInPeace S.alice (S.landsInPlay island 3)
         (_victimId, onStack) = S.spellOnStack piker S.bob ripOut
         (gs, cancelId) = S.handOne cancel onStack
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cancelId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the countered spell is not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
     Spec.assertEqWith s "the countered spell is exiled" (length (Game.zoneMembers Zone.Exile S.bob resolved)) 1
@@ -1477,8 +1476,8 @@ magicalHackTimingSpec s registry = Spec.describe s "MagicalHackTiming" $ do
     cancel <- S.printingOf s registry "Cancel"
     let (_mountainId, hackId, cancelId, gs) = hackBoard mountain island magicalHack cancel
         exchange = do
-          Cast.castSpell S.alice hackId
-          Cast.castSpell S.bob cancelId
+          S.cast S.alice hackId
+          S.cast S.bob cancelId
           Stack.resolveTop
         ((_, after), transcript) = Replay.record S.identityAnswer gs exchange
     -- The control: the exchange really happened. CR 701.6a puts the countered
@@ -1495,7 +1494,7 @@ magicalHackTimingSpec s registry = Spec.describe s "MagicalHackTiming" $ do
     magicalHack <- S.printingOf s registry "Magical Hack"
     cancel <- S.printingOf s registry "Cancel"
     let (mountainId, hackId, _cancelId, gs) = hackBoard mountain island magicalHack cancel
-        ((_, cast), castTranscript) = Replay.record hackToIsland gs (Cast.castSpell S.alice hackId)
+        ((_, cast), castTranscript) = Replay.record hackToIsland gs (S.cast S.alice hackId)
         ((_, resolved), resolveTranscript) = Replay.record hackToIsland cast Stack.resolveTop
     Spec.assertEqWith s "the cast asked nothing about land types" (basicLandTypeResponses castTranscript) []
     Spec.assertEqWith
@@ -1535,7 +1534,7 @@ turnToFrogChain s registry swap = do
   let (wraithId, g1) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
       (turnToFrogId, g2) = S.addHandCard turnToFrog S.alice g1
       (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
-      onStack = S.runPure (aimAtCreature wraithId) g3 (Cast.castSpell S.alice turnToFrogId)
+      onStack = S.runPure (aimAtCreature wraithId) g3 (S.cast S.alice turnToFrogId)
       spellId = case GameState.stack onStack of
         top : _ -> top
         [] -> ObjectId.MkObjectId 999
@@ -1543,7 +1542,7 @@ turnToFrogChain s registry swap = do
         Nothing -> onStack
         Just (from, to) ->
           S.runPure (evolveAt spellId from to) onStack $ do
-            Cast.castSpell S.alice evolutionId
+            S.cast S.alice evolutionId
             Stack.resolveTop
   pure (wraithId, S.runPure S.identityAnswer evolved Stack.resolveTop)
 
@@ -1578,7 +1577,7 @@ dragonFodderChain s registry swap = do
   let g1 = snd (S.addCreature island S.alice (snd (S.addCreature island S.alice (S.landsInPlay mountain 2))))
       (fodderId, g2) = S.addHandCard dragonFodder S.alice g1
       (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
-      onStack = S.runPure S.identityAnswer g3 (Cast.castSpell S.alice fodderId)
+      onStack = S.runPure S.identityAnswer g3 (S.cast S.alice fodderId)
       spellId = case GameState.stack onStack of
         top : _ -> top
         [] -> ObjectId.MkObjectId 999
@@ -1586,7 +1585,7 @@ dragonFodderChain s registry swap = do
         Nothing -> onStack
         Just (from, to) ->
           S.runPure (evolveAt spellId from to) onStack $ do
-            Cast.castSpell S.alice evolutionId
+            S.cast S.alice evolutionId
             Stack.resolveTop
       after = S.runPure S.identityAnswer evolved Stack.resolveTop
   pure (S.tokensOf after, after)
@@ -1606,7 +1605,7 @@ bitterblossomChain s registry swap = do
         Nothing -> g2
         Just (from, to) ->
           S.runPure (evolveAt blossomId from to) g2 $ do
-            Cast.castSpell S.alice evolutionId
+            S.cast S.alice evolutionId
             Stack.resolveTop
       upkeep = Phase.Beginning BeginningStep.Upkeep
       begun =
@@ -1661,7 +1660,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
         forbiddenBy printing =
           let (spellId, g2) = S.addHandCard printing S.alice g1
               cast = do
-                Cast.castSpell S.alice spellId
+                S.cast S.alice spellId
                 Stack.resolveTop
            in State.execState (Engine.runGame (recordingForbidden wraithId) g2 cast) Set.empty
     Spec.assertEqWith s "the Evolution forbids Wall, and nothing else" (forbiddenBy artificialEvolution) (Set.singleton Subtype.Wall)
@@ -1683,13 +1682,13 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     let (wraithId, g1) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
         (firstId, g2) = S.addHandCard artificialEvolution S.alice g1
         (secondId, g3) = S.addHandCard artificialEvolution S.alice g2
-        onStack = S.runPure S.identityAnswer g3 (Cast.castSpell S.alice secondId)
+        onStack = S.runPure S.identityAnswer g3 (S.cast S.alice secondId)
         spellId = case GameState.stack onStack of
           top : _ -> top
           [] -> ObjectId.MkObjectId 999
         -- The first Evolution replaces the second's every Wall with Frog.
         evolved = S.runPure (evolveAt spellId Subtype.Wall Subtype.Frog) onStack $ do
-          Cast.castSpell S.alice firstId
+          S.cast S.alice firstId
           Stack.resolveTop
         forbidden = State.execState (Engine.runGame (recordingForbidden wraithId) evolved Stack.resolveTop) Set.empty
     Spec.assertEqWith s "the evolved Evolution forbids Frog, not Wall" forbidden (Set.singleton Subtype.Frog)
@@ -1760,7 +1759,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay island 1)
         (evolutionId, g2) = S.addHandCard artificialEvolution S.alice g1
         after = S.runPure (evolveAt pikerId Subtype.Goblin Subtype.Elf) g2 $ do
-          Cast.castSpell S.alice evolutionId
+          S.cast S.alice evolutionId
           Stack.resolveTop
     Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf pikerId after) (Set.fromList [Subtype.Elf, Subtype.Warrior])
     Spec.assertEqWith s "and the name is untouched" (Projection.nameOf pikerId after) (CardName.MkCardName (Text.pack "Goblin Piker"))
@@ -1836,7 +1835,7 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
       Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
       Just (stifleIds, srcId, activated) -> do
         let abilIds = GameState.stack activated
-            cast = List.foldl' (\g oid -> S.runPure S.identityAnswer g (Cast.castSpell S.alice oid)) activated stifleIds
+            cast = List.foldl' (\g oid -> S.runPure S.identityAnswer g (S.cast S.alice oid)) activated stifleIds
             countered = S.runPure S.identityAnswer cast Stack.resolveTop
         Spec.assertEqWith s "the activation put exactly one ability on the stack" (length abilIds) 1
         Spec.assertEqWith s "and both it and the Stifle are gone from the stack" (GameState.stack countered) []
@@ -1867,12 +1866,12 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
         (_, withIsland) = S.addCreature island S.bob withMountains
         (stifleId, withStifle) = S.addHandCard stifle S.bob withIsland
         (pikerId, gs) = S.addHandCard piker S.alice withStifle
-        cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice pikerId)
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice pikerId)
         -- The Piker resolves and enters; CR 603.3 then puts Aether Flash's
         -- trigger on the stack the next time a player would receive priority.
         entered = S.runPure S.identityAnswer cast Stack.resolveTop
         placed = S.runPure S.identityAnswer entered Engine.settleForPriority
-        stifled = S.runPure S.identityAnswer placed (Cast.castSpell S.bob stifleId)
+        stifled = S.runPure S.identityAnswer placed (S.cast S.bob stifleId)
         countered = S.runPure S.identityAnswer stifled Stack.resolveTop
         after = S.runPure S.identityAnswer countered Engine.settleForPriority
         entrantId = case filter (\oid -> fmap Face.name (Game.faceOf oid after) == Just (CardName.MkCardName $ Text.pack "Goblin Piker")) (Set.toList (GameState.battlefield after)) of
@@ -1907,7 +1906,7 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
     case stifleBoard island stifle sorcerer 2 2 of
       Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
       Just (stifleIds, _, activated) -> do
-        let castAll g oid = S.runPure S.identityAnswer g (Cast.castSpell S.alice oid)
+        let castAll g oid = S.runPure S.identityAnswer g (S.cast S.alice oid)
             bothCast = List.foldl' castAll activated stifleIds
             first' = S.runPure S.identityAnswer bothCast Stack.resolveTop
             second' = S.runPure S.identityAnswer first' Stack.resolveTop
@@ -1978,7 +1977,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
           Prompt.ChooseTargets _ _ _ sets ->
             fmap (const (Recipient.ToPlayer S.bob)) sets
           Prompt.ChooseAction _ _ actions ->
-            case filter (\a -> a == A.Cast oid) actions of
+            case filter (S.isCastOf oid) actions of
               h : _ -> h
               [] -> A.Pass
           _ -> S.identityAnswer p
@@ -2031,7 +2030,7 @@ castBlackRemovalAt swamp printing foe =
   let base = S.landsInPlay swamp 3
       (foeId, withFoe) = S.addCreature foe S.bob base
       (gs, spellId) = S.handOne printing withFoe
-      cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (foeId, resolved)
 
@@ -2113,7 +2112,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (victim, withFoe) = S.addCreature piker S.bob base
         shielded = S.addRegenShield victim withFoe
         (gs, spellId) = S.handOne murder shielded
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
     Spec.assertEqWith s "the shielded creature survived Murder" (S.creaturesInPlay S.bob after) 1
   Spec.it s "CR 400.7 Unsummon returns a creature to its owner's hand" $ do
@@ -2123,7 +2122,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay island 1
         (_, withPiker) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unsummon withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "no creature on the battlefield" (S.creaturesInPlay S.bob after) 0
     Spec.assertEqWith s "a card in bob's hand (its owner)" (S.handSize S.bob after) 1
@@ -2136,7 +2135,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (victim, withFoe) = S.addCreature piker S.bob base
         shielded = S.addRegenShield victim withFoe
         (gs, spellId) = S.handOne unsummon shielded
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the creature left the battlefield (bounce is not a destruction)" (S.creaturesInPlay S.bob after) 0
     Spec.assertEqWith s "it is in bob's hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 1
@@ -2147,7 +2146,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay plains 5
         (_, withPiker) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne angelicEdict withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "no creature on the battlefield" (S.creaturesInPlay S.bob after) 0
     Spec.assertEqWith s "one card in exile" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
@@ -2160,7 +2159,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         -- it is the single legal CreatureOrEnchantmentTarget.
         (ripId, withRip) = S.addCreature restInPeace S.bob base
         (gs, spellId) = S.handOne angelicEdict withRip
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the enchantment left the battlefield" (Game.lookupObject ripId after) Nothing
     Spec.assertEqWith s "one card in exile" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
@@ -2172,7 +2171,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (_, g1) = S.addLibraryCard piker S.alice base
         (_, g2) = S.addLibraryCard piker S.alice g1
         (gs, spellId) = S.handOne divination g2
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "two cards drawn to hand" (S.handSize S.alice after) 2
     Spec.assertEqWith s "library emptied" (Game.zoneMembers Zone.Library S.alice after) []
@@ -2183,7 +2182,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay island 3
         (_, g1) = S.addLibraryCard piker S.alice base
         (gs, spellId) = S.handOne divination g1
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "drewFromEmpty marked"
   -- The card that proves Effect.Draw's recipient (#272): CR 121.1 says who
@@ -2198,7 +2197,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay island 1
         withLib = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.bob g)) base [1 .. (4 :: Int)]
         (gs, spellId) = S.handOne ancestralRecall withLib
-        cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "three cards drawn to bob's hand" (S.handSize S.bob after) 3
     Spec.assertEqWith s "one card left in bob's library" (length (Game.zoneMembers Zone.Library S.bob after)) 1
@@ -2214,7 +2213,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay island 2
         withLibs = stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 base)
         (gs, spellId) = S.handOne visionSkeins withLibs
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew two" (S.handSize S.alice after) 2
     Spec.assertEqWith s "bob drew two as well" (S.handSize S.bob after) 2
@@ -2243,7 +2242,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         -- the fixture is a legal board regardless: Vision Skeins is an
         -- INSTANT, which alice may cast on bob's turn.
         gs = gs0 {GameState.activePlayer = S.bob}
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith
       s
@@ -2301,7 +2300,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         withLibs = stockLibrary piker S.carol 2 (stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 withMana))
         (gs0, spellId) = S.handOne visionSkeins withLibs
         gs = Departure.depart Departure.Type.Conceded S.carol gs0
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the two players still in the game drew, in APNAP order" (drawersOf after) [S.alice, S.alice, S.bob, S.bob]
     Spec.assertEqWith s "and nothing was drawn against carol's departed library" (GameState.drewFromEmpty after) Set.empty
@@ -2312,7 +2311,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay island 1
         withLib = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.bob g)) base [1 .. (6 :: Int)]
         (gs, spellId) = S.handOne tomeScour withLib
-        cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "five milled to graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 5
     Spec.assertEqWith s "one card left in library" (length (Game.zoneMembers Zone.Library S.bob after)) 1
@@ -2324,7 +2323,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (_, g1) = S.addLibraryCard piker S.bob base
         (_, g2) = S.addLibraryCard piker S.bob g1
         (gs, spellId) = S.handOne tomeScour g2
-        cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
         after = S.settleSba (snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop))
     Spec.assertEqWith s "two milled" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
     Spec.assertBool s (not (Set.member S.bob (GameState.drewFromEmpty after))) "bob did not lose (milling is not drawing)"
@@ -2335,7 +2334,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay swamp 3
         withHand = handCards piker S.bob 3 base
         (gs, spellId) = S.handOne mindRot withHand
-        cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "one card left in bob's hand" (S.handSize S.bob after) 1
     Spec.assertEqWith s "two cards in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
@@ -2352,7 +2351,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
           Prompt.ChooseDiscard {} -> []
           Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
           _ -> S.identityAnswer q
-        cast = snd (Engine.runGamePure noDiscard gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure noDiscard gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
     -- Elision (hand == count): the whole hand is discarded without asking (#63).
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
@@ -2373,7 +2372,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
           Prompt.ChooseDiscard {} -> []
           Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
           _ -> S.identityAnswer q
-        cast = snd (Engine.runGamePure noDiscard gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure noDiscard gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
     Spec.assertEqWith s "two discarded despite the answer naming none" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
     Spec.assertEqWith s "one card left in bob's hand" (S.handSize S.bob after) 1
@@ -2391,7 +2390,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
           Prompt.ChooseDiscard _ _ ids _ -> take 1 (reverse ids)
           Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
           _ -> S.identityAnswer q
-        cast = snd (Engine.runGamePure onlyLast gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure onlyLast gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure onlyLast cast Stack.resolveTop)
     case reverse (Game.zoneMembers Zone.Hand S.bob cast) of
       [] -> Spec.assertFailure s "fixture should leave bob a hand to discard from"
@@ -2411,7 +2410,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
           Prompt.ChooseDiscard _ _ ids _ -> concat (replicate 2 (take 1 ids))
           Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
           _ -> S.identityAnswer q
-        cast = snd (Engine.runGamePure sameTwice gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure sameTwice gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure sameTwice cast Stack.resolveTop)
     Spec.assertEqWith s "two distinct cards discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
     Spec.assertEqWith s "one card left in bob's hand" (S.handSize S.bob after) 1
@@ -2446,7 +2445,7 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
     let base = S.landsInPlay swamp 2
         withLib = stockLibrary piker S.bob 3 base
         (gs, spellId) = S.handOne signInBlood withLib
-        cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
         isDamage ev = case ev of
           GameEvent.DamageDealt _ -> True
@@ -2466,7 +2465,7 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
         withLib = stockLibrary piker S.bob 3 base
         (gs0, spellId) = S.handOne signInBlood withLib
         gs = gs0 {GameState.players = Map.adjust (\pl -> pl {Player.life = 2}) S.bob (GameState.players gs0)}
-        cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "bob is at 0" (S.lifeOf S.bob after) (Just 0)
     Spec.assertEqWith s "and alice wins" (GameState.result (S.settleSba after)) (Just (Result.Won S.alice))
@@ -2496,7 +2495,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
         (_, withThree) = S.addCreature mindslaver S.alice withTwo
         withLib = stockLibrary piker S.alice 10 withThree
         (gs, spellId) = S.handOne oneWithTheMachine withLib
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     -- The spell left the hand as it was cast, so the hand size IS the draw.
     Spec.assertEqWith s "alice drew six" (S.handSize S.alice after) 6
@@ -2513,7 +2512,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
         (_, withTheirs) = S.addCreature mindslaver S.bob withMine
         withLib = stockLibrary piker S.alice 10 withTheirs
         (gs, spellId) = S.handOne oneWithTheMachine withLib
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew one, not six" (S.handSize S.alice after) 1
   Spec.it s "CR 205.2a a larger NONARTIFACT permanent does not raise \"ARTIFACTS you control\"" $ do
@@ -2531,7 +2530,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
         (_, withWurm) = S.addCreature panglacialWurm S.alice withArtifact
         withLib = stockLibrary piker S.alice 10 withWurm
         (gs, spellId) = S.handOne oneWithTheMachine withLib
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew one, not seven" (S.handSize S.alice after) 1
   -- The empty matched set. No rule in the CR gives a maximum over nothing a
@@ -2553,7 +2552,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     let base = S.landsInPlay island 4
         withLib = stockLibrary piker S.alice 10 base
         (gs, spellId) = S.handOne oneWithTheMachine withLib
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew nothing" (S.handSize S.alice after) 0
     Spec.assertEqWith s "and her library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 10
@@ -2569,7 +2568,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
     let base = S.landsInPlay forest 1
         (victim, withFoe) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne battlegrowth withFoe
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "power 3" (Projection.powerOf victim after) (Just 3)
     Spec.assertEqWith s "toughness 2" (Projection.toughnessOf victim after) (Just 2)
@@ -2581,7 +2580,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
     let base = S.landsInPlay forest 1
         (victim, withFoe) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne battlegrowth withFoe
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         afterCleanup = Expiry.dropAtCleanup resolved
     Spec.assertEqWith s "still 3/2 after cleanup" (Projection.powerOf victim afterCleanup) (Just 3)
@@ -2597,7 +2596,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
     let base = S.landsInPlay plains 3
         (target, withCreature) = S.addCreature piker S.alice base
         (gs, spellId) = S.handOne spontaneousFlight withCreature
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         afterCleanup = Expiry.dropAtCleanup resolved
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying target withCreature)) "the Piker did not fly to begin with"
@@ -2623,7 +2622,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
         (gs0, spellId) = S.handOne instillInfection withFoe
         -- put a card in alice's library so the draw has something to find.
         (_, gs) = S.addLibraryCard forest S.alice gs0
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
     Spec.assertEqWith s "Piker died to the -1/-1 counter (704.5f)" (S.creaturesInPlay S.bob after) 0
     Spec.assertEqWith s "alice drew a card" (S.handSize S.alice after) (handBefore + 1)
@@ -2646,7 +2645,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
         (victim, withFoe) = S.addCreature piker S.bob base
         withCounter = S.addCounter CounterKind.PlusOnePlusOne 1 victim withFoe
         (gs, spellId) = S.handOne unsummon withCounter
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- Total (no `head`): expect exactly one bounced card in hand, empty counters.
         handCounters = fmap (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h after)) (Game.zoneMembers Zone.Hand S.bob after)
@@ -2788,7 +2787,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         (_, withLibrary) = S.addLibraryCard piker S.alice base
         handBefore = S.handSize S.alice withLibrary
         (gs, spellId) = S.handOne prologueToPhyresis withLibrary
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "bob is poisoned" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
     Spec.assertEqWith s "alice is not" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
@@ -2809,7 +2808,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         -- game, so a three-seat board adds them one at a time instead.
         withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withLibrary [1 .. (2 :: Int)]
         (gs, spellId) = S.handOne prologueToPhyresis withMana
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     -- No separate "the fixture is payable" assertion: an unpayable cast is a
     -- no-op, so the poison counts below are what prove it resolved.
@@ -2829,7 +2828,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withLibrary [1 .. (2 :: Int)]
         (gs0, spellId) = S.handOne prologueToPhyresis withMana
         gs = Departure.depart Departure.Type.Conceded S.carol gs0
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "bob, still in the game, is poisoned" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
     Spec.assertEqWith s "carol, who left, is not" (S.playerCounterOf PlayerCounterKind.Poison S.carol after) 0
@@ -2923,7 +2922,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         (_, g3) = S.addLibraryCard island S.alice g2
         (withSpell, spell) = S.handOne steadyProgress g3
         handBefore = length (Game.zoneMembers Zone.Hand S.alice withSpell)
-        afterCast = S.runPure proliferatesAll withSpell (Cast.castSpell S.alice spell)
+        afterCast = S.runPure proliferatesAll withSpell (S.cast S.alice spell)
         resolved = S.runPure proliferatesAll afterCast Stack.resolveTop
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "the counter was proliferated" (S.counterOf CounterKind.PlusOnePlusOne creature resolved) 2
@@ -3038,7 +3037,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
     let base = S.landsInPlay swamp 2
         (his, g1) = S.addCreature piker S.bob base
         (withSpell, spell) = S.handOne diabolicEdict g1
-        afterCast = S.runPure (targetsPlayer S.bob) withSpell (Cast.castSpell S.alice spell)
+        afterCast = S.runPure (targetsPlayer S.bob) withSpell (S.cast S.alice spell)
         resolved = S.runPure (targetsPlayer S.bob) afterCast Stack.resolveTop
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertBool s (not (S.onBattlefield his resolved)) "bob's creature was sacrificed"
@@ -3157,7 +3156,7 @@ actOfTreasonSpec s registry = Spec.describe s "Act of Treason" $ do
         (oid, base1) = S.addCreature piker S.bob base0
         base = S.tapObject oid base1 -- start it tapped to prove the untap rider
         (gs1, spellId) = S.handOne actOfTreason base
-        cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice controls the Piker" (Projection.controllerOf oid resolved) (Just S.alice)
     Spec.assertEqWith s "the untap rider untapped it" (fmap Object.tapped (Game.lookupObject oid resolved)) (Just TapState.Untapped)
@@ -3310,7 +3309,7 @@ isOptionalResponse r = case r of
 castDayOfJudgment :: Printing.Printing -> Printing.Printing -> GameState.GameState -> GameState.GameState
 castDayOfJudgment plains dayOfJudgment board =
   let (withSpell, spell) = S.handOne dayOfJudgment (List.foldl' (\gs _ -> snd (S.addCreature plains S.alice gs)) board [1 :: Int .. 4])
-      afterCast = S.runPure S.identityAnswer withSpell (Cast.castSpell S.alice spell)
+      afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
    in S.runPure S.identityAnswer afterCast Stack.resolveTop
 
 destroyAllSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -3478,7 +3477,7 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        asked = State.execState (Engine.runGame countingAnswer withSpell (Cast.castSpell S.alice spell)) 0
+        asked = State.execState (Engine.runGame countingAnswer withSpell (S.cast S.alice spell)) 0
     Spec.assertEqWith s "no target spec anywhere on the card" (Modal.allTargetSpecs (Face.spell (Card.combined card))) Map.empty
     Spec.assertEqWith s "and nothing was asked to target" asked 0
     -- The board still resolves the way the first test says it does, from the
@@ -3690,7 +3689,7 @@ auraThiefSpec s registry =
       -- the same settle places its CR 603.10a look-back trigger), then resolve
       -- the trigger.
       boltIt (gs, spell) =
-        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spell)
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
             damaged = S.runPure S.identityAnswer cast Stack.resolveTop
             settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
@@ -3793,7 +3792,7 @@ auraThiefSpec s registry =
 castBaneOfProgress :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (Maybe ObjectId.ObjectId, GameState.GameState)
 castBaneOfProgress forest bane board =
   let (withSpell, spell) = S.handOne bane (List.foldl' (\gs _ -> snd (S.addCreature forest S.alice gs)) board [1 :: Int .. 6])
-      afterCast = S.runPure S.identityAnswer withSpell (Cast.castSpell S.alice spell)
+      afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
       finished = S.runPure S.identityAnswer afterCast Engine.priorityLoop
    in (namedOnBattlefield "Bane of Progress" finished, finished)
 
@@ -3936,7 +3935,7 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
       Just theSpec -> do
         let (groundId, before) = S.addCreature piker S.alice (S.landsInPlay plains 3)
             (withSpell, spellId) = S.handOne spontaneousFlight before
-            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) (Target.legalRecipients Nothing S.noSource theSpec before))) "no flying, no offer"
         Spec.assertBool s (Projection.hasKeyword Keyword.Flying groundId after) "the grant landed"
@@ -3966,7 +3965,7 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
     let (flierId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 2)
         (groundId, g2) = S.addCreature piker S.bob g1
         (gs, spellId) = S.handOne plummet g2
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
     Spec.assertBool s (not (S.onBattlefield flierId after)) "the flier was destroyed"
     Spec.assertBool s (S.onBattlefield groundId after) "the creature without flying was never a candidate"
@@ -4012,7 +4011,7 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
         (moebaId, g2) = S.addCreature narcomoeba S.alice g1
         (pikerId, g3) = S.addCreature piker S.bob g2
         (gs, spellId) = S.handOne gale g3
-        cast = snd (Engine.runGamePure answerXTwo gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure answerXTwo gs (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure answerXTwo cast Stack.resolveTop)
         after = S.settleSba resolved
     Spec.assertEqWith s "three Forests paid {2}{G}" (S.tappedCount S.alice after) 3
@@ -4035,7 +4034,7 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
     humility <- S.printingOf s registry "Humility"
     let (maidenId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 3)
         (gs, spellId) = S.handOne gale (S.withHumility humility g1)
-        cast = snd (Engine.runGamePure answerXTwo gs (Cast.castSpell S.alice spellId))
+        cast = snd (Engine.runGamePure answerXTwo gs (S.cast S.alice spellId))
         after = S.settleSba (snd (Engine.runGamePure answerXTwo cast Stack.resolveTop))
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying maidenId after)) "Humility took the flying"
     Spec.assertEqWith s "three Forests paid {2}{G} all the same" (S.tappedCount S.alice after) 3

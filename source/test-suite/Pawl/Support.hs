@@ -9,6 +9,7 @@
 module Pawl.Support where
 
 import qualified Control.Exception as Exception
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -299,7 +300,7 @@ castAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
-          A.Cast _ -> True
+          A.Cast {} -> True
           _ -> False
         isPlay a = case a of
           A.Play _ -> True
@@ -452,7 +453,7 @@ playLandAnswer p = case p of
     let isPlay a = case a of
           A.Play _ -> True
           A.Pass -> False
-          A.Cast _ -> False
+          A.Cast {} -> False
           A.Activate _ _ -> False
      in case filter isPlay actions of
           h : _ -> h
@@ -1451,6 +1452,45 @@ oneMountainState mountain ph =
 drawStep :: Game.Type.Game ()
 drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 
+-- Pawl.Engine.Cast.castSpell for a card that offers exactly one half to cast:
+-- CR 709.3's choice, made where the card leaves only one answer. The name is
+-- read off that card's own sole castable face and so is never a stand-in for
+-- one a test failed to name.
+--
+-- A card with SEVERAL halves is a real choice, and this refuses to make it:
+-- nothing is cast, so a test that reaches here with a split card fails on its
+-- own assertion rather than quietly casting a half nobody chose. Such a test
+-- calls Cast.castSpell directly and names the half.
+cast :: PlayerId.PlayerId -> ObjectId.ObjectId -> Game.Type.Game ()
+cast pid oid = do
+  gs <- State.get
+  case Cast.soleCastableFace oid gs of
+    Nothing -> pure ()
+    Just face -> Cast.castSpell pid oid (Face.name face)
+
+-- `cast`'s predicate half: Pawl.Engine.Cast.castable asked of the sole castable
+-- half, and False for a card with several.
+castable :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
+castable pid oid gs = case Cast.soleCastableFace oid gs of
+  Nothing -> False
+  Just face -> Cast.castable pid oid (Face.name face) gs
+
+-- The name a single-face printing carries -- what a test naming the half of an
+-- A.Cast action holds in scope.
+printingName :: Printing.Printing -> CardName.CardName
+printingName = nameOf . Printing.card
+
+-- Is this action a cast of that object, whichever half? An answerer that pins
+-- a cast to one CARD asks this rather than building the action, since CR
+-- 709.3's choice among a card's halves is a separate question it has no answer
+-- for.
+isCastOf :: ObjectId.ObjectId -> A.Action -> Bool
+isCastOf oid action = case action of
+  A.Cast o _ -> o == oid
+  A.Pass -> False
+  A.Play _ -> False
+  A.Activate _ _ -> False
+
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
 -- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only
 -- creature). Returns (pre-cast state, post-cast state, Bolt's hand id).
@@ -1458,7 +1498,7 @@ boltAtBobsPiker :: Printing.Printing -> Printing.Printing -> Printing.Printing -
 boltAtBobsPiker piker land bolt =
   let (_, withPiker) = addCreature piker bob (landsInPlay land 1)
       (gs, oid) = handOne bolt withPiker
-   in (gs, snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid)), oid)
+   in (gs, snd (Engine.runGamePure identityAnswer gs (cast alice oid)), oid)
 
 -- The single creature bob controls in a fixture built by (addCreature piker bob).
 pikerOf :: GameState.GameState -> ObjectId.ObjectId

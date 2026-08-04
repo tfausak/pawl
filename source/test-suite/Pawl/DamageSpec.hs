@@ -13,7 +13,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -367,7 +366,7 @@ toxicSpec s registry =
               castAscent g =
                 let (oid, g1) = S.addHandCard ascent S.alice g
                     g2 = g1 {GameState.priority = Just S.alice}
-                 in S.runPure S.identityAnswer g2 (Cast.castSpell S.alice oid Monad.>> Stack.resolveTop)
+                 in S.runPure S.identityAnswer g2 (S.cast S.alice oid Monad.>> Stack.resolveTop)
               gs = castAscent (castAscent (withIsland (withIsland gs0)))
               after = S.fightWith S.aggressiveAnswer gs
           Spec.assertEqWith s "toxic 2 plus toxic 1 twice" (Projection.totalToxic attacker gs) 4
@@ -479,7 +478,7 @@ lifelinkSpec s registry =
           withIslands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) gs0 [1 :: Int .. 4]
           (rayId, withRay) = S.addHandCard rayOfCommand S.alice withIslands
           ready = withRay {GameState.priority = Just S.alice}
-          stolen = S.runPure S.identityAnswer ready (Cast.castSpell S.alice rayId Monad.>> Stack.resolveTop)
+          stolen = S.runPure S.identityAnswer ready (S.cast S.alice rayId Monad.>> Stack.resolveTop)
           after = S.fightWith S.aggressiveAnswer stolen
       case theirs of
         [] -> Spec.assertFailure s "fixture should have given bob a Child of Night"
@@ -959,7 +958,7 @@ worldRuleSpec s registry =
       let base = S.landsInPlay forest 4 -- {2}{G}{G}
           (incumbent, withCrossroads) = S.addCreature crossroads S.alice base
           (withSpell, spellId) = S.handOne livingPlane withCrossroads
-          cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+          cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
           after = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
       Spec.assertBool s (not (inPlay incumbent after)) "the incumbent is gone"
       Spec.assertEqWith s "one card in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
@@ -1405,7 +1404,7 @@ boltBlockerMidCombat blocks bolt blocker gs =
         S.runPure aimedAtBlocker gs $ do
           Combat.declareAttackers S.alice
           Combat.declareBlockers
-          Cast.castSpell S.alice bolt
+          S.cast S.alice bolt
           Monad.void Stack.resolveTop
    in S.runPure S.aggressiveAnswer (S.settleSba declared) (Monad.void Damage.dealCombatDamage)
 
