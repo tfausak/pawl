@@ -63,8 +63,19 @@ without toxic", and CR 702.164b defines total toxic value as a sum of `N`s, so
 zero is the empty sum rather than a printable toxic value. Contrast
 `EntryOption.power`, where 0 is a real printed characteristic.
 
+**R1's exception: a `Maybe` field whose `Nothing` carries a meaning of its own
+stays required.** `Nothing` defaults the field only when it means "nothing to
+say here"; when `Nothing` is itself one of several real, distinct values, there
+is no single default an absent key could mean, and the field stays required
+instead. `Cost.mana` is the instance: CR 118.6's `Nothing` is an unpayable
+cost, and `Just (MkManaCost [])` is CR 118.5a's real, payable `{0}` -- the two
+are not interchangeable, so omitting the key would let a file that forgot its
+mana part silently become unpayable rather than fail to load. Same shape as R5's
+numeric exception (`EntryOption.power`, where 0 is also a real value rather than
+an absence).
+
 **R2 — an enum is omissible only when one constructor means "no restriction."**
-Five qualify, and two of them already have hand-rolled decode halves
+Seven qualify, and two of them already have hand-rolled decode halves
 (`Counterability.fromJsonDefault`, `Optionality.fromJsonDefault`):
 
 | Type | Default | Read as |
@@ -74,6 +85,8 @@ Five qualify, and two of them already have hand-rolled decode halves
 | `SourceRelation` | `AnySource` | unfiltered |
 | `TapState` | `Untapped` | no rider |
 | `ControllerRelation` | `Anyones` | unfiltered |
+| `ZoneChangeSubject` | `AnyObject` | no particular object |
+| `ActivationTiming` | `AnyTime` | no restriction |
 
 `ModeSelection` joins them at `Modal.selection`, defaulting to `ChooseExactly 1`.
 That is not a new judgment: `Pawl.Types.Modal`'s header already reads "A non-modal

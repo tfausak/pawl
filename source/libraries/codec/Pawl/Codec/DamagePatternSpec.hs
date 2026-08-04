@@ -13,6 +13,8 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamagePattern" $ do
+  -- Fog: prevents all combat damage that would be dealt this turn -- a named
+  -- kind (Combat), no source restriction, no recipient restriction.
   Spec.it s "a named kind" $
     Common.assertJsonCodec
       s
@@ -20,7 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.DamagePattern" $ do
       DamagePattern.fromJson
       (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource Nothing)
       """ {"whichKind":{"type":"Combat"}} """
-  -- Fog: no kind, no source, no recipient -- every field elided at its default.
+  -- No kind, no source, no recipient -- every field elided at its default, so
+  -- the pattern matches any damage instance whatsoever.
   Spec.it s "no kind (matches any)" $
     Common.assertJsonCodec
       s

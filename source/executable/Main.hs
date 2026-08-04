@@ -2,6 +2,11 @@
 -- corpus's canonical form checkable: `script/format-json.sh` can only normalize
 -- whitespace and key order, while the set of keys a card file carries is the
 -- encoder's to decide.
+--
+-- The project's only executable, run as @cabal run pawl@. It takes no
+-- arguments and rewrites every file under 'Registry.defaultRoot' (@data/cards@)
+-- IN PLACE -- there is no dry-run or output-elsewhere mode, so running it is a
+-- destructive rewrite of the corpus, not a read-only report.
 module Main where
 
 import qualified Data.ByteString as ByteString

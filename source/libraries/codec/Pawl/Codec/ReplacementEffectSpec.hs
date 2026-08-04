@@ -151,7 +151,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       """ {"type":"CounterR","value":[{"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}},{"type":"AddMore","value":1}]} """
   -- Doubling Season: whichKind = Nothing means any kind, never "no kind", and
   -- the trivial filter matches every permanent. The absent whichKind key is
-  -- what that Nothing means (R1).
+  -- what that Nothing means (R1 of the omit-defaults design).
   Spec.it s "CounterR (Doubling Season, whichKind omitted)" $
     Common.assertJsonCodec
       s

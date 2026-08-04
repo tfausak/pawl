@@ -45,7 +45,7 @@ fromJson = ActivatedAbility.fromJson cardFromJson
 -- ability (CR 702.6a: "[Cost]: Attach this permanent to target creature you
 -- control. Activate only as a sorcery.") -- a {1} cost, an Attach mode
 -- restricted to creatures you control, and CR 307.5's printed SorcerySpeed
--- rider (data/cards/bonesplitter.json) -- and CR 307.5's own default, AnyTime,
+-- rider (data/cards/bonesplitter.json) -- and CR 117.1b's own default, AnyTime,
 -- whose key is elided.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
@@ -69,7 +69,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           ActivationTiming.SorcerySpeed
       )
       """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"timing":{"type":"SorcerySpeed"}} """
-  -- CR 307.5: AnyTime is the default for every ability but equip, so its key
+  -- CR 117.1b: AnyTime is the default for every ability but equip, so its key
   -- stays out of the JSON -- the same posture Mode's Optionality.Mandatory
   -- takes.
   Spec.it s "an AnyTime ability omits the timing key, and an absent key decodes to AnyTime" $
@@ -82,4 +82,4 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
           ActivationTiming.AnyTime
       )
-      """ {"cost":{},"modal":{"modes":[{}]}} """
+      """ {"cost":{"mana":null},"modal":{"modes":[{}]}} """

@@ -27,7 +27,10 @@ import qualified Pawl.Types.Supertype as Supertype
 -- `triggeredAbilities` reuses 'CardSpec.minimalTriggeredAbility' rather than
 -- building a second one by hand; `activatedAbilities` and `replacementEffects`
 -- stay empty (and so omitted) because ActivatedAbility's and
--- ReplacementEffect's own per-constructor coverage lives in their own XSpecs.
+-- ReplacementEffect's own per-constructor coverage lives in their own XSpecs. A
+-- second fixture, `minimalCharacteristics`, is the counterpart at every field
+-- but the two required ones left at its default, proving the omission side
+-- directly.
 --
 -- No registry here: like Pawl.Codec.CardSpec, this sublibrary sits above
 -- Pawl.Registry and cannot reach a real snapshot. The GameEvent.Moved/Revealed
@@ -87,7 +90,7 @@ minimalCharacteristics =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ProjectedCharacteristics" $ do
-  Spec.it s "MkProjectedCharacteristics, every field populated or explicitly Nothing" $
+  Spec.it s "MkProjectedCharacteristics, every collection populated, loyalty and characteristicPT omitted at Nothing" $
     Common.assertJsonCodec s PC.toJson PC.fromJson testCharacteristics testCharacteristicsJson
   Spec.it s "an all-default value omits every optional key" $
     Common.assertJsonCodec

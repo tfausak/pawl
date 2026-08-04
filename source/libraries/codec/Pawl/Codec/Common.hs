@@ -196,7 +196,7 @@ optionalPair k d f x = if x == d then [] else [pair k (f x)]
 -- | Reads a field that may be absent, supplying the default 'optionalPair'
 -- omits. A key that is present but null goes to the decoder rather than
 -- short-circuiting, so composing with 'decodeMaybe' accepts an absent key, an
--- explicit null, and a value alike (R7).
+-- explicit null, and a value alike (R7 of the omit-defaults design).
 defaultedField ::
   String ->
   a ->

@@ -38,8 +38,9 @@ fromJson :: Value.Value -> Either Text.Text (Modal.Modal Text.Text)
 fromJson = Modal.fromJson cardFromJson
 
 -- One constructor (MkModal), so three cases: a populated payload (Bonesplitter's
--- Equip, CR 702.6a/700.2's non-modal shape -- one Mode with no alternative),
--- every field defaulted at once, and the empty-modes decode failure moved from
+-- Equip, CR 702.6a/700.2's non-modal shape -- one Mode with no alternative), the
+-- `selection` field defaulted (the only omissible one -- `modes` is required and
+-- non-empty by invariant), and the empty-modes decode failure moved from
 -- Pawl.CodecSpec.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Modal" $ do

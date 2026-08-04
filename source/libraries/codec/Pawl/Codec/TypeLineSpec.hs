@@ -42,8 +42,9 @@ spec s = Spec.describe s "Pawl.Codec.TypeLine" $ do
       TypeLine.fromJson
       (TypeLine.MkTypeLine (Set.singleton Supertype.Legendary) (Set.singleton CardType.Planeswalker) (Set.singleton Subtype.Jace))
       """ {"supertypes":[{"type":"Legendary"}],"types":[{"type":"Planeswalker"}],"subtypes":[{"type":"Jace"}]} """
-  -- R6: the typeLine requirement only guards a truncated file if it reaches the
-  -- content. An empty types set is the shape a half-written card file takes.
+  -- R6 of the omit-defaults design: the typeLine requirement only guards a
+  -- truncated file if it reaches the content. An empty types set is the shape
+  -- a half-written card file takes.
   Spec.it s "rejects an empty types set" $
     Spec.assertBool
       s

@@ -27,7 +27,8 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       """ {"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}} """
   -- Doubling Season: whichKind = Nothing means ANY kind, never "no kind" -- and
   -- the trivial filter matching every permanent. The omitted key is what an
-  -- absent whichKind means (R1), same as an explicit JSON null would.
+  -- absent whichKind means (R1 of the omit-defaults design), same as an
+  -- explicit JSON null would.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
     Common.assertJsonCodec
       s

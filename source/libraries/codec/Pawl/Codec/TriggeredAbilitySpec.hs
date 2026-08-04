@@ -52,10 +52,11 @@ toJson = TriggeredAbility.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility Text.Text)
 fromJson = TriggeredAbility.fromJson cardFromJson
 
--- One constructor (MkTriggeredAbility), so two cases cover both states of the
--- CR 603.4 `intervening` field: Sarcomancy's own two triggered abilities
--- (data/cards/sarcomancy.json), whose zombie-token trigger states no
--- intervening "if" and whose upkeep trigger states one.
+-- One constructor (MkTriggeredAbility), so three cases: Sarcomancy's own two
+-- triggered abilities (data/cards/sarcomancy.json) cover both states of the CR
+-- 603.4 `intervening` field -- its zombie-token trigger states no intervening
+-- "if" and its upkeep trigger states one -- and the third is every field left
+-- at its default below.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
   Spec.it s "MkTriggeredAbility, Sarcomancy's zombie-token trigger (no intervening if)" $

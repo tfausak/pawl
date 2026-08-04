@@ -16,7 +16,8 @@ toJson codec m =
   Common.object . concat $
     [ Common.optionalPair "effects" Seq.empty (Common.encodeSeq (Effect.toJson codec)) (Mode.effects m),
       Common.optionalPair "targetSpecs" Map.empty TargetSpec.toJsonMap (Mode.targetSpecs m),
-      -- R2: Mandatory is the absence of a rider (CR 603.5's "may" is the marked case).
+      -- R2 of the omit-defaults design: Mandatory is the absence of a rider
+      -- (CR 603.5's "may" is the marked case).
       Common.optionalPair "optionality" Optionality.Mandatory Optionality.toJson (Mode.optionality m)
     ]
 

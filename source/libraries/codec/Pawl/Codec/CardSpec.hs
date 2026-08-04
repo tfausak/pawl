@@ -241,8 +241,9 @@ populatedCardJson =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Card" $ do
-  -- R6: name and typeLine are the only required keys, and a card that says
-  -- nothing else is a vanilla card rather than a malformed file.
+  -- R6 of the omit-defaults design: name and typeLine are the only required
+  -- keys, and a card that says nothing else is a vanilla card rather than a
+  -- malformed file.
   Spec.it s "a minimal card carries only name and typeLine" $
     Common.assertJsonCodec
       s
@@ -445,8 +446,9 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
   -- itself ties the knot on -- 'populatedCard's haddock explains the fixture.
   Spec.it s "MkCard, every field populated at once" $
     Common.assertJsonCodec s Card.toJson Card.fromJson populatedCard populatedCardJson
-  -- R7: omission is permitted on input, never required. This is goblin-piker.json
-  -- as it stood before the migration; every such file must still load.
+  -- R7 of the omit-defaults design: omission is permitted on input, never
+  -- required. This is mountain.json as it stood before the migration; every
+  -- such file must still load.
   Spec.it s "a pre-migration card file still decodes" $
     Common.assertFromJson
       s

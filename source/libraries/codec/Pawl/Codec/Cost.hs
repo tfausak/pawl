@@ -15,16 +15,17 @@ import qualified Pawl.Types.Cost as Cost
 toJson :: (Eq keyword) => (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
 toJson encode c =
   Common.object
-    ( Common.optionalPair "mana" Nothing (Common.encodeMaybe ManaCost.toJson) (Cost.mana c)
+    ( Common.requiredPair "mana" (Common.encodeMaybe ManaCost.toJson) (Cost.mana c)
         <> Common.optionalPair "components" [] (Common.encodeList (CostComponent.toJson encode)) (Cost.components c)
     )
 
--- | CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
--- never to {0}. Every ability-bearing card file states its mana part explicitly
--- (`[]` for {0}), so the absent case is only ever reached by a malformed file.
+-- | CR 118.6: 'mana' is REQUIRED, not defaulted, despite being a 'Maybe' --
+-- Nothing and Just (MkManaCost []) are both real, distinct values (Pawl.Types.
+-- Cost's own comment), so there is no single default an absent key could mean.
+-- A card file that forgets 'mana' is malformed rather than unpayable-by-default.
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Cost.Cost keyword)
 fromJson decode value = do
   ps <- Common.asObject value
-  m <- Common.defaultedField "mana" Nothing (Common.decodeMaybe ManaCost.fromJson) ps
+  m <- Common.field "mana" ps >>= Common.decodeMaybe ManaCost.fromJson
   cs <- Common.defaultedField "components" [] (Common.decodeList (CostComponent.fromJson decode)) ps
   pure Cost.MkCost {Cost.mana = m, Cost.components = cs}

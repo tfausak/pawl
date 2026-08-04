@@ -2,6 +2,7 @@
 
 module Pawl.Codec.CostSpec where
 
+import qualified Data.Either as Either
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Cost as Cost
@@ -44,21 +45,23 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
       fromJson
       Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
       """ {"mana":[]} """
-  -- CR 118.6: an ABSENT mana field is an UNPAYABLE cost, not {0}. This is the
-  -- footgun the corpus migration exists to avoid, pinned so a future card file
-  -- cannot lose its mana field unnoticed.
-  Spec.it s "an omitted mana field decodes to Nothing, not to {0}" $
-    Common.assertFromJson
+  -- CR 118.6: Nothing (unpayable) and Just (MkManaCost []) ({0}) are both real,
+  -- distinct values, so 'mana' is REQUIRED rather than defaulted -- an omitted
+  -- key has no single value it could mean. This is the footgun the corpus
+  -- migration exists to avoid, pinned so a future card file cannot lose its
+  -- mana field and silently become unpayable instead of failing to load.
+  Spec.it s "an omitted mana field is a decode error" $
+    Spec.assertBool
       s
-      fromJson
-      "{\"components\":[]}"
-      Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
-  -- Every field at once: an unpayable cost (CR 118.6) with no components, which
-  -- is what an empty object means.
-  Spec.it s "an all-default value omits every optional key" $
+      (Either.isLeft (fromJson (Common.object [Common.pair "components" (Common.array [])])))
+      "expected a decode failure"
+  -- Every field at once: an unpayable cost (CR 118.6) with no components. 'mana'
+  -- is required, so Nothing still writes as an explicit null; only the
+  -- 'components' key is omitted.
+  Spec.it s "an all-default value still writes the required mana key" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
-      """ {} """
+      """ {"mana":null} """

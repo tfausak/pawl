@@ -32,9 +32,9 @@ fromJson value = do
       }
 
 -- | The value 'toJson' elides entirely: a card file carries riders only when
--- the effect really does say otherwise (CR 110.5b for tapped, CR 506.3 for a
--- creature being attacking), which is what keeps every card file written
--- before them byte-identical.
+-- the effect really does say otherwise (CR 110.5b for tapped, CR 508.4 for a
+-- creature put onto the battlefield attacking), which is what keeps every card
+-- file written before them byte-identical.
 defaultValue :: EntryRiders.EntryRiders
 defaultValue =
   EntryRiders.MkEntryRiders

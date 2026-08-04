@@ -7,8 +7,9 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.EntryOption as EntryOption
 
--- | 'power' and 'toughness' stay REQUIRED (R5): a 0/0 token is legal (Primal
--- Plasma's own EntryOptionSpec case), so an absent power must not read as 0.
+-- | 'power' and 'toughness' stay REQUIRED (R5 of the omit-defaults design): a
+-- token whose printed characteristics are 0/0 is a legal EntryOption, so an
+-- absent power must not read as 0 when it means the file forgot to state one.
 toJson :: EntryOption.EntryOption -> Value.Value
 toJson o =
   Common.object . concat $
