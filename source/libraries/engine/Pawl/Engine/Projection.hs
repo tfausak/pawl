@@ -1376,9 +1376,13 @@ rewriteEffect pairs effect = case effect of
   Effect.LoseLife {} -> effect
   -- No rewritable subtype word.
   Effect.GainLife {} -> effect
-  -- Not implemented: the swap does not reach the token's embedded card, whose
-  -- type line carries the creature types CR 612.2a names (#640).
-  Effect.Create {} -> effect
+  -- CR 612.2a: "most spells and abilities that create creature tokens use
+  -- creature types to define both the creature types and the names of the
+  -- tokens. A text-changing effect that affects such a spell or an object with
+  -- such an ability can change these words because they're being used as
+  -- creature types, even though they're also being used as names." The token's
+  -- defining card is where those words are, so this arm hands it to rewriteCard.
+  Effect.Create quantity card riders slot -> Effect.Create quantity (rewriteCard pairs card) riders slot
   Effect.Replace {} -> effect
   -- A Phase carries no subtype word for CR 612 to rewrite.
   Effect.SkipNextPhase {} -> effect
@@ -1398,8 +1402,13 @@ rewriteEffect pairs effect = case effect of
   Effect.ArmDelayedTrigger {} -> effect
   -- A player effect carries no subtype word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
-  -- Not implemented either: an emblem's embedded card is Create's token one
-  -- level over, and goes unrewritten for the same reason (#640).
+  -- An emblem's embedded card is Create's token one level over, but rewriteCard
+  -- is provably the identity on it, so this arm stays one: CR 114.3 says "an
+  -- emblem has no characteristics other than the abilities defined by the effect
+  -- that created it. In particular, an emblem has no types, no mana cost, and no
+  -- color. Most emblems also have no name" -- and a type line and a name are the
+  -- two things rewriteCard reaches. What CR 612.1 could reach on an emblem is
+  -- its ABILITIES, which nothing here walks (#643).
   Effect.CreateEmblem {} -> effect
   -- No rewritable subtype word.
   Effect.BecomeMonarch {} -> effect
@@ -1430,6 +1439,95 @@ rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
+
+-- CR 612.2a through the CARD a Create defines its token with -- rewriteEffect's
+-- delegate for the one arm whose payload is a whole card rather than an opcode
+-- fragment.
+--
+-- TWO fields, and the second is the subtle one.
+--
+-- The TYPE LINE is CR 612.1's "the text that appears in its type line", and the
+-- exact-match test is already CR 612.2's family gate for the reason
+-- applyModification's ChangeSubtypeWord arm gives at the projected type line: a
+-- set of subtype words carries each word in its own family, so a land pair finds
+-- a land type here or nothing and a creature pair a creature type or nothing.
+--
+-- The NAME is CR 612.2a, the rule's one licensed exception to CR 612.2's closing
+-- sentence ("an effect that changes a color word or a subtype can't change a
+-- card name, even if that name contains a word ... that is the same as a ...
+-- creature type"). CR 111.4 says why the exception exists: "a spell or ability
+-- that creates a token sets both its name and its subtype(s). If the spell or
+-- ability doesn't specify the name of the token, its name is the same as its
+-- subtype(s) plus the word 'Token.'" -- which is exactly what data/cards writes
+-- ("Goblin Token"). The name is those same words, so the swap carries it.
+--
+-- CONDITIONAL on the type line, never unconditional. CR 612.2a licenses the name
+-- change only "because they're being used as creature types", so the word is
+-- rewritten in the name only where the SAME word is a subtype of the same card.
+-- A Create defining a Soldier token whose name merely happens to hold the word
+-- Goblin is CR 612.2's prohibition and not CR 612.2a's exception, so it is left
+-- alone -- which is why both fields hang off one membership test rather than
+-- two.
+--
+-- NOT CR 612.4, which is the same rule at the other end -- "a token's subtypes
+-- and rules text are defined by the spell or ability that created the token. A
+-- text-changing effect that affects a token can change these characteristics" --
+-- a swap aimed at the token itself, which reaches the projected object and never
+-- this card. CR 111.4's last sentence keeps the two apart: "once a token is on
+-- the battlefield, changing its name doesn't change its subtype(s), and vice
+-- versa."
+--
+-- Not implemented: the swap does not reach the defined card's ABILITY carriers
+-- -- its spell, its activated, triggered and static abilities, its replacement
+-- effects -- so the card is walked, not recursed into (#643). Every token this
+-- pool creates is a vanilla or keyword-only creature, so there is no ability
+-- text on one to rewrite. That also keeps rewriteEffect non-recursive: reaching
+-- those carriers would close the loop rewriteEffect -> rewriteCard ->
+-- rewriteModal -> rewriteEffect, which still terminates -- a Card is a finite
+-- first-order value and each step descends into a strict subterm -- but nothing
+-- here relies on that argument today.
+--
+-- Proved end to end by Pawl.ResolveSpec's ArtificialEvolution group, on both
+-- sides of CR 612.2a's "such a spell or an object with such an ability": an
+-- evolved Dragon Fodder mints Elves, and an evolved Bitterblossom's upkeep
+-- trigger mints an Elf Rogue.
+rewriteCard :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Card.Type.Card -> Card.Type.Card
+rewriteCard pairs card = List.foldl' apply1 card pairs
+  where
+    apply1 c (from, to) =
+      let typeLine = Card.Type.typeLine c
+          subtypes = TypeLine.subtypes typeLine
+       in if Set.notMember from subtypes
+            then c
+            else
+              c
+                { Card.Type.typeLine = typeLine {TypeLine.subtypes = Set.insert to (Set.delete from subtypes)},
+                  Card.Type.name = rewriteTokenName from to (Card.Type.name c)
+                }
+
+-- CR 612.2a's name half, over the one word CR 111.4 put in the name. Both words
+-- are looked up in CR 205.3m's list (Pawl.Engine.Subtype.creatureTypeWord): a
+-- name is TEXT, so writing the new one out needs the word itself and not just
+-- the family test the rest of this family gets by with.
+--
+-- THE FAMILY GATE, stated here rather than inherited: a pair whose words are not
+-- creature types has no word to write, and the Nothing arm leaves the name
+-- exactly as printed. That is CR 612.2's prohibition holding for every other
+-- family -- a Forest -> Island pair may rewrite a land token's type line and
+-- must not touch its name, because CR 612.2a's exception is about creature types
+-- alone.
+--
+-- Every OCCURRENCE, per Artificial Evolution's own "replacing all instances of
+-- one creature type with another": Text.replace, not a whole-name test, because
+-- CR 111.4's derived name is the subtypes PLUS the word "Token" and a two-type
+-- token's name holds two of them ("Faerie Rogue Token"). It matches a substring
+-- rather than a whole word, so a name holding this word inside a longer one
+-- would be over-reached; no name in this pool does, and rewriteCard's type-line
+-- gate already keeps every name pawl was not asked to change out of reach.
+rewriteTokenName :: Subtype.Type.Subtype -> Subtype.Type.Subtype -> CardName.CardName -> CardName.CardName
+rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.creatureTypeWord to) of
+  (Just f, Just t) -> CardName.MkCardName (Text.replace f t (CardName.unwrap name))
+  _ -> name
 
 -- Read-point 4 (CR 612.1): the same word swap over an ACTIVATED ability printed
 -- on a permanent. "Any words or symbols printed on that object ... generally

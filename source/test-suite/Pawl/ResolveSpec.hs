@@ -1546,6 +1546,61 @@ recordingForbidden oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToObject oid)) sets)
   _ -> pure (S.identityAnswer p)
 
+-- Cast Dragon Fodder; optionally cast Artificial Evolution at the Dragon Fodder
+-- SPELL and resolve it, swapping the named creature type words; then resolve the
+-- Fodder. Returns the tokens it minted and the final state.
+--
+-- Two Mountains and two Islands: the Fodder is {1}{R} and the Evolution {U}, and
+-- the generic half may be paid from either colour without stranding the
+-- Evolution.
+dragonFodderChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m ([ObjectId.ObjectId], GameState.GameState)
+dragonFodderChain s registry swap = do
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  dragonFodder <- S.printingOf s registry "Dragon Fodder"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let g1 = snd (S.addCreature island S.alice (snd (S.addCreature island S.alice (S.landsInPlay mountain 2))))
+      (fodderId, g2) = S.addHandCard dragonFodder S.alice g1
+      (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
+      onStack = S.runPure S.identityAnswer g3 (Cast.castSpell S.alice fodderId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      evolved = case swap of
+        Nothing -> onStack
+        Just (from, to) ->
+          S.runPure (evolveAt spellId from to) onStack $ do
+            Cast.castSpell S.alice evolutionId
+            Stack.resolveTop
+      after = S.runPure S.identityAnswer evolved Stack.resolveTop
+  pure (S.tokensOf after, after)
+
+-- The permanent half of the same rule: alice controls Bitterblossom, optionally
+-- has an Artificial Evolution resolved at IT (a permanent, not a spell), and then
+-- her upkeep begins so the printed trigger fires and resolves. Returns the tokens
+-- and the final state.
+bitterblossomChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m ([ObjectId.ObjectId], GameState.GameState)
+bitterblossomChain s registry swap = do
+  island <- S.printingOf s registry "Island"
+  bitterblossom <- S.printingOf s registry "Bitterblossom"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let (blossomId, g1) = S.addCreature bitterblossom S.alice (S.landsInPlay island 1)
+      (evolutionId, g2) = S.addHandCard artificialEvolution S.alice g1
+      evolved = case swap of
+        Nothing -> g2
+        Just (from, to) ->
+          S.runPure (evolveAt blossomId from to) g2 $ do
+            Cast.castSpell S.alice evolutionId
+            Stack.resolveTop
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan upkeep S.alice)
+          (evolved {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      onStack = S.runPure S.identityAnswer begun Engine.settleForPriority
+      after = S.runPure S.identityAnswer onStack Engine.priorityLoop
+  pure (S.tokensOf after, after)
+
 -- Aims every target slot at `oid` as a creature (Turn to Frog's Pool.Creatures
 -- recipient shape); the board holds more than one creature, so the choice has to
 -- be answered rather than forced by construction.
@@ -1622,6 +1677,77 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
           Stack.resolveTop
         forbidden = State.execState (Engine.runGame (recordingForbidden wraithId) evolved Stack.resolveTop) Set.empty
     Spec.assertEqWith s "the evolved Evolution forbids Frog, not Wall" forbidden (Set.singleton Subtype.Frog)
+
+  -- CR 612.2a, the SPELL half: "most spells and abilities that create creature
+  -- tokens use creature types to define both the creature types and the names of
+  -- the tokens. A text-changing effect that affects such a spell ... can change
+  -- these words because they're being used as creature types, even though
+  -- they're also being used as names." Dragon Fodder {1}{R} ("Create two 1/1 red
+  -- Goblin creature tokens") is the spell; the Evolution is resolved at it on the
+  -- stack.
+  --
+  -- The control first, so the pair cannot pass vacuously on a chain that never
+  -- minted anything.
+  Spec.it s "CR 111.4 an unevolved Dragon Fodder still mints two Goblins named Goblin Token" $ do
+    (tokens, after) <- dragonFodderChain s registry Nothing
+    Spec.assertEqWith s "two tokens" (length tokens) 2
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Goblin" (Projection.subtypesOf oid after) (Set.singleton Subtype.Goblin)) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Goblin Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Goblin Token"))) tokens
+
+  -- And the point. BOTH halves of CR 612.2a: the type line, and the name those
+  -- same words define.
+  Spec.it s "CR 612.2a whole card: an evolved Dragon Fodder mints Elves, name and all" $ do
+    (tokens, after) <- dragonFodderChain s registry (Just (Subtype.Goblin, Subtype.Elf))
+    Spec.assertEqWith s "two tokens" (length tokens) 2
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Elf Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Elf Token"))) tokens
+
+  -- CR 612.2a's OTHER half: "or an object with such an ability". Bitterblossom
+  -- {1}{B} Kindred Enchantment -- Faerie ("At the beginning of your upkeep, you
+  -- lose 1 life and create a 1/1 black Faerie Rogue creature token with flying",
+  -- checked against Scryfall) is a PERMANENT whose triggered ability defines a
+  -- token by creature type, so the Evolution reaches it through the printed
+  -- ability rather than through a spell on the stack. Only the word the swap
+  -- names moves: Rogue is untouched, in the type line and in the name alike.
+  Spec.it s "CR 111.4 an unevolved Bitterblossom still mints a Faerie Rogue Token" $ do
+    (tokens, after) <- bitterblossomChain s registry Nothing
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Faerie Rogue" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Faerie, Subtype.Rogue])) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Faerie Rogue Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Faerie Rogue Token"))) tokens
+
+  Spec.it s "CR 612.2a whole card: an evolved Bitterblossom's trigger mints an Elf Rogue Token" $ do
+    (tokens, after) <- bitterblossomChain s registry (Just (Subtype.Faerie, Subtype.Elf))
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Rogue" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Elf, Subtype.Rogue])) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Elf Rogue Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Elf Rogue Token"))) tokens
+
+  -- The BOUNDARY the four tests above sit on, and the falsifier for reading them
+  -- as "a text change rewrites names": CR 612.2's closing sentence -- "an effect
+  -- that changes a color word or a subtype can't change a card name, even if
+  -- that name contains a word or a series of letters that is the same as a Magic
+  -- color word, basic land type, or creature type". Goblin Piker is Creature --
+  -- Goblin Warrior and is NAMED "Goblin Piker", so it is the pool's one card
+  -- where the coincidence is real. CR 612.2a's exception does not reach it --
+  -- the Piker defines no token -- so the Evolution must make it an Elf Warrior
+  -- still named Goblin Piker.
+  --
+  -- What this pins is the SCOPE of the exception: the swap reaches an object's
+  -- name only through the card a Create defines, never through the projection of
+  -- the object it is aimed at. Projection.rewriteCard's own gate -- the word must
+  -- be a subtype of the card whose name it is rewriting -- has no card in this
+  -- pool that makes it observable, since every token here is named after exactly
+  -- its own subtypes (CR 111.4).
+  Spec.it s "CR 612.2 an evolved Goblin Piker is an Elf Warrior still NAMED Goblin Piker" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+    let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay island 1)
+        (evolutionId, g2) = S.addHandCard artificialEvolution S.alice g1
+        after = S.runPure (evolveAt pikerId Subtype.Goblin Subtype.Elf) g2 $ do
+          Cast.castSpell S.alice evolutionId
+          Stack.resolveTop
+    Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf pikerId after) (Set.fromList [Subtype.Elf, Subtype.Warrior])
+    Spec.assertEqWith s "and the name is untouched" (Projection.nameOf pikerId after) (CardName.MkCardName (Text.pack "Goblin Piker"))
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other

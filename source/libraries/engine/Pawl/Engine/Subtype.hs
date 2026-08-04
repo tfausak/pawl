@@ -1,10 +1,14 @@
--- Classifications over Pawl.Types.Subtype: which of CR 205.3's disjoint subtype
--- families a subtype belongs to. The rulebook owns these lists outright (CR
--- 205.3i names the land types by name), so casing on a Subtype here is the same
+-- CR 205.3's disjoint subtype families over Pawl.Types.Subtype: which family a
+-- subtype belongs to, and -- for a creature type, the one family whose word a
+-- rule asks pawl to WRITE rather than only to recognise -- what that word is.
+-- The rulebook owns these lists outright (CR 205.3i and CR 205.3m name the land
+-- types and the creature types by name), so casing on a Subtype here is the same
 -- kind of act as casing on a Phase -- it is a subtype's IDENTITY, never an
 -- effect's.
 module Pawl.Engine.Subtype where
 
+import qualified Data.Maybe as Maybe
+import qualified Data.Text as Text
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 
@@ -43,331 +47,345 @@ isLandType subtype = case subtype of
   Subtype.Urzas -> True
   _ -> False
 
+-- | CR 205.3m's list, carrying each creature type's PRINTED word -- "the two
+-- words long" Time Lord and the punctuated Assembly-Worker, C'tan and Shi'ar
+-- included -- and Nothing for a subtype of any other family. Transcribed from
+-- docs/rules.txt's CR 205.3m, which names every one of them.
+--
+-- The word is what CR 612.2a needs and a family test cannot supply: a token's
+-- NAME is text, so swapping the creature type that defines it means writing the
+-- new word out (Pawl.Engine.Projection.rewriteCard).
+--
+-- isCreatureType below reads this rather than restating the list, so the two
+-- cannot drift.
+creatureTypeWord :: Subtype.Subtype -> Maybe Text.Text
+creatureTypeWord subtype = case subtype of
+  Subtype.Advisor -> Just (Text.pack "Advisor")
+  Subtype.Aetherborn -> Just (Text.pack "Aetherborn")
+  Subtype.Alien -> Just (Text.pack "Alien")
+  Subtype.Ally -> Just (Text.pack "Ally")
+  Subtype.Angel -> Just (Text.pack "Angel")
+  Subtype.Antelope -> Just (Text.pack "Antelope")
+  Subtype.Ape -> Just (Text.pack "Ape")
+  Subtype.Archer -> Just (Text.pack "Archer")
+  Subtype.Archon -> Just (Text.pack "Archon")
+  Subtype.Armadillo -> Just (Text.pack "Armadillo")
+  Subtype.Army -> Just (Text.pack "Army")
+  Subtype.Artificer -> Just (Text.pack "Artificer")
+  Subtype.Assassin -> Just (Text.pack "Assassin")
+  Subtype.AssemblyWorker -> Just (Text.pack "Assembly-Worker")
+  Subtype.Astartes -> Just (Text.pack "Astartes")
+  Subtype.Atog -> Just (Text.pack "Atog")
+  Subtype.Aurochs -> Just (Text.pack "Aurochs")
+  Subtype.Avatar -> Just (Text.pack "Avatar")
+  Subtype.Azra -> Just (Text.pack "Azra")
+  Subtype.Badger -> Just (Text.pack "Badger")
+  Subtype.Balloon -> Just (Text.pack "Balloon")
+  Subtype.Barbarian -> Just (Text.pack "Barbarian")
+  Subtype.Bard -> Just (Text.pack "Bard")
+  Subtype.Basilisk -> Just (Text.pack "Basilisk")
+  Subtype.Bat -> Just (Text.pack "Bat")
+  Subtype.Bear -> Just (Text.pack "Bear")
+  Subtype.Beast -> Just (Text.pack "Beast")
+  Subtype.Beaver -> Just (Text.pack "Beaver")
+  Subtype.Beeble -> Just (Text.pack "Beeble")
+  Subtype.Beholder -> Just (Text.pack "Beholder")
+  Subtype.Berserker -> Just (Text.pack "Berserker")
+  Subtype.Bird -> Just (Text.pack "Bird")
+  Subtype.Bison -> Just (Text.pack "Bison")
+  Subtype.Blinkmoth -> Just (Text.pack "Blinkmoth")
+  Subtype.Boar -> Just (Text.pack "Boar")
+  Subtype.Bringer -> Just (Text.pack "Bringer")
+  Subtype.Brushwagg -> Just (Text.pack "Brushwagg")
+  Subtype.Camarid -> Just (Text.pack "Camarid")
+  Subtype.Camel -> Just (Text.pack "Camel")
+  Subtype.Capybara -> Just (Text.pack "Capybara")
+  Subtype.Caribou -> Just (Text.pack "Caribou")
+  Subtype.Carrier -> Just (Text.pack "Carrier")
+  Subtype.Cat -> Just (Text.pack "Cat")
+  Subtype.Centaur -> Just (Text.pack "Centaur")
+  Subtype.Child -> Just (Text.pack "Child")
+  Subtype.Chimera -> Just (Text.pack "Chimera")
+  Subtype.Citizen -> Just (Text.pack "Citizen")
+  Subtype.Cleric -> Just (Text.pack "Cleric")
+  Subtype.Clown -> Just (Text.pack "Clown")
+  Subtype.Cockatrice -> Just (Text.pack "Cockatrice")
+  Subtype.Construct -> Just (Text.pack "Construct")
+  Subtype.Coward -> Just (Text.pack "Coward")
+  Subtype.Coyote -> Just (Text.pack "Coyote")
+  Subtype.Crab -> Just (Text.pack "Crab")
+  Subtype.Crocodile -> Just (Text.pack "Crocodile")
+  Subtype.Ctan -> Just (Text.pack "C'tan")
+  Subtype.Custodes -> Just (Text.pack "Custodes")
+  Subtype.Cyberman -> Just (Text.pack "Cyberman")
+  Subtype.Cyclops -> Just (Text.pack "Cyclops")
+  Subtype.Dalek -> Just (Text.pack "Dalek")
+  Subtype.Dauthi -> Just (Text.pack "Dauthi")
+  Subtype.Demigod -> Just (Text.pack "Demigod")
+  Subtype.Demon -> Just (Text.pack "Demon")
+  Subtype.Deserter -> Just (Text.pack "Deserter")
+  Subtype.Detective -> Just (Text.pack "Detective")
+  Subtype.Devil -> Just (Text.pack "Devil")
+  Subtype.Dinosaur -> Just (Text.pack "Dinosaur")
+  Subtype.Djinn -> Just (Text.pack "Djinn")
+  Subtype.Doctor -> Just (Text.pack "Doctor")
+  Subtype.Dog -> Just (Text.pack "Dog")
+  Subtype.Dragon -> Just (Text.pack "Dragon")
+  Subtype.Drake -> Just (Text.pack "Drake")
+  Subtype.Dreadnought -> Just (Text.pack "Dreadnought")
+  Subtype.Drix -> Just (Text.pack "Drix")
+  Subtype.Drone -> Just (Text.pack "Drone")
+  Subtype.Druid -> Just (Text.pack "Druid")
+  Subtype.Dryad -> Just (Text.pack "Dryad")
+  Subtype.Dwarf -> Just (Text.pack "Dwarf")
+  Subtype.Echidna -> Just (Text.pack "Echidna")
+  Subtype.Efreet -> Just (Text.pack "Efreet")
+  Subtype.Egg -> Just (Text.pack "Egg")
+  Subtype.Elder -> Just (Text.pack "Elder")
+  Subtype.Eldrazi -> Just (Text.pack "Eldrazi")
+  Subtype.Elemental -> Just (Text.pack "Elemental")
+  Subtype.Elephant -> Just (Text.pack "Elephant")
+  Subtype.Elf -> Just (Text.pack "Elf")
+  Subtype.Elk -> Just (Text.pack "Elk")
+  Subtype.Employee -> Just (Text.pack "Employee")
+  Subtype.Eternal -> Just (Text.pack "Eternal")
+  Subtype.Eye -> Just (Text.pack "Eye")
+  Subtype.Faerie -> Just (Text.pack "Faerie")
+  Subtype.Ferret -> Just (Text.pack "Ferret")
+  Subtype.Fish -> Just (Text.pack "Fish")
+  Subtype.Flagbearer -> Just (Text.pack "Flagbearer")
+  Subtype.Fox -> Just (Text.pack "Fox")
+  Subtype.Fractal -> Just (Text.pack "Fractal")
+  Subtype.Frog -> Just (Text.pack "Frog")
+  Subtype.Fungus -> Just (Text.pack "Fungus")
+  Subtype.Gamer -> Just (Text.pack "Gamer")
+  Subtype.Gamma -> Just (Text.pack "Gamma")
+  Subtype.Gargoyle -> Just (Text.pack "Gargoyle")
+  Subtype.Germ -> Just (Text.pack "Germ")
+  Subtype.Giant -> Just (Text.pack "Giant")
+  Subtype.Giraffe -> Just (Text.pack "Giraffe")
+  Subtype.Gith -> Just (Text.pack "Gith")
+  Subtype.Glimmer -> Just (Text.pack "Glimmer")
+  Subtype.Gnoll -> Just (Text.pack "Gnoll")
+  Subtype.Gnome -> Just (Text.pack "Gnome")
+  Subtype.Goat -> Just (Text.pack "Goat")
+  Subtype.Goblin -> Just (Text.pack "Goblin")
+  Subtype.God -> Just (Text.pack "God")
+  Subtype.Golem -> Just (Text.pack "Golem")
+  Subtype.Gorgon -> Just (Text.pack "Gorgon")
+  Subtype.Graveborn -> Just (Text.pack "Graveborn")
+  Subtype.Gremlin -> Just (Text.pack "Gremlin")
+  Subtype.Griffin -> Just (Text.pack "Griffin")
+  Subtype.Guest -> Just (Text.pack "Guest")
+  Subtype.Hag -> Just (Text.pack "Hag")
+  Subtype.Halfling -> Just (Text.pack "Halfling")
+  Subtype.Hamster -> Just (Text.pack "Hamster")
+  Subtype.Harpy -> Just (Text.pack "Harpy")
+  Subtype.Hedgehog -> Just (Text.pack "Hedgehog")
+  Subtype.Hellion -> Just (Text.pack "Hellion")
+  Subtype.Hero -> Just (Text.pack "Hero")
+  Subtype.Hippo -> Just (Text.pack "Hippo")
+  Subtype.Hippogriff -> Just (Text.pack "Hippogriff")
+  Subtype.Homarid -> Just (Text.pack "Homarid")
+  Subtype.Homunculus -> Just (Text.pack "Homunculus")
+  Subtype.Horror -> Just (Text.pack "Horror")
+  Subtype.Horse -> Just (Text.pack "Horse")
+  Subtype.Human -> Just (Text.pack "Human")
+  Subtype.Hydra -> Just (Text.pack "Hydra")
+  Subtype.Hyena -> Just (Text.pack "Hyena")
+  Subtype.Illusion -> Just (Text.pack "Illusion")
+  Subtype.Imp -> Just (Text.pack "Imp")
+  Subtype.Incarnation -> Just (Text.pack "Incarnation")
+  Subtype.Inhuman -> Just (Text.pack "Inhuman")
+  Subtype.Inkling -> Just (Text.pack "Inkling")
+  Subtype.Inquisitor -> Just (Text.pack "Inquisitor")
+  Subtype.Insect -> Just (Text.pack "Insect")
+  Subtype.Jackal -> Just (Text.pack "Jackal")
+  Subtype.Jellyfish -> Just (Text.pack "Jellyfish")
+  Subtype.Juggernaut -> Just (Text.pack "Juggernaut")
+  Subtype.Kangaroo -> Just (Text.pack "Kangaroo")
+  Subtype.Kavu -> Just (Text.pack "Kavu")
+  Subtype.Kirin -> Just (Text.pack "Kirin")
+  Subtype.Kithkin -> Just (Text.pack "Kithkin")
+  Subtype.Knight -> Just (Text.pack "Knight")
+  Subtype.Kobold -> Just (Text.pack "Kobold")
+  Subtype.Kor -> Just (Text.pack "Kor")
+  Subtype.Kraken -> Just (Text.pack "Kraken")
+  Subtype.Kree -> Just (Text.pack "Kree")
+  Subtype.Llama -> Just (Text.pack "Llama")
+  Subtype.Lamia -> Just (Text.pack "Lamia")
+  Subtype.Lammasu -> Just (Text.pack "Lammasu")
+  Subtype.Leech -> Just (Text.pack "Leech")
+  Subtype.Lemur -> Just (Text.pack "Lemur")
+  Subtype.Leviathan -> Just (Text.pack "Leviathan")
+  Subtype.Lhurgoyf -> Just (Text.pack "Lhurgoyf")
+  Subtype.Licid -> Just (Text.pack "Licid")
+  Subtype.Lizard -> Just (Text.pack "Lizard")
+  Subtype.Lobster -> Just (Text.pack "Lobster")
+  Subtype.Manticore -> Just (Text.pack "Manticore")
+  Subtype.Masticore -> Just (Text.pack "Masticore")
+  Subtype.Mercenary -> Just (Text.pack "Mercenary")
+  Subtype.Merfolk -> Just (Text.pack "Merfolk")
+  Subtype.Metathran -> Just (Text.pack "Metathran")
+  Subtype.Minion -> Just (Text.pack "Minion")
+  Subtype.Minotaur -> Just (Text.pack "Minotaur")
+  Subtype.Mite -> Just (Text.pack "Mite")
+  Subtype.Mole -> Just (Text.pack "Mole")
+  Subtype.Monger -> Just (Text.pack "Monger")
+  Subtype.Mongoose -> Just (Text.pack "Mongoose")
+  Subtype.Monk -> Just (Text.pack "Monk")
+  Subtype.Monkey -> Just (Text.pack "Monkey")
+  Subtype.Moogle -> Just (Text.pack "Moogle")
+  Subtype.Moonfolk -> Just (Text.pack "Moonfolk")
+  Subtype.Mount -> Just (Text.pack "Mount")
+  Subtype.Mouse -> Just (Text.pack "Mouse")
+  Subtype.Mutant -> Just (Text.pack "Mutant")
+  Subtype.Myr -> Just (Text.pack "Myr")
+  Subtype.Mystic -> Just (Text.pack "Mystic")
+  Subtype.Nautilus -> Just (Text.pack "Nautilus")
+  Subtype.Necron -> Just (Text.pack "Necron")
+  Subtype.Nephilim -> Just (Text.pack "Nephilim")
+  Subtype.Nightmare -> Just (Text.pack "Nightmare")
+  Subtype.Nightstalker -> Just (Text.pack "Nightstalker")
+  Subtype.Ninja -> Just (Text.pack "Ninja")
+  Subtype.Noble -> Just (Text.pack "Noble")
+  Subtype.Noggle -> Just (Text.pack "Noggle")
+  Subtype.Nomad -> Just (Text.pack "Nomad")
+  Subtype.Nymph -> Just (Text.pack "Nymph")
+  Subtype.Octopus -> Just (Text.pack "Octopus")
+  Subtype.Ogre -> Just (Text.pack "Ogre")
+  Subtype.Ooze -> Just (Text.pack "Ooze")
+  Subtype.Orb -> Just (Text.pack "Orb")
+  Subtype.Orc -> Just (Text.pack "Orc")
+  Subtype.Orgg -> Just (Text.pack "Orgg")
+  Subtype.Otter -> Just (Text.pack "Otter")
+  Subtype.Ouphe -> Just (Text.pack "Ouphe")
+  Subtype.Ox -> Just (Text.pack "Ox")
+  Subtype.Oyster -> Just (Text.pack "Oyster")
+  Subtype.Pangolin -> Just (Text.pack "Pangolin")
+  Subtype.Peasant -> Just (Text.pack "Peasant")
+  Subtype.Pegasus -> Just (Text.pack "Pegasus")
+  Subtype.Pentavite -> Just (Text.pack "Pentavite")
+  Subtype.Performer -> Just (Text.pack "Performer")
+  Subtype.Pest -> Just (Text.pack "Pest")
+  Subtype.Phelddagrif -> Just (Text.pack "Phelddagrif")
+  Subtype.Phoenix -> Just (Text.pack "Phoenix")
+  Subtype.Phyrexian -> Just (Text.pack "Phyrexian")
+  Subtype.Pilot -> Just (Text.pack "Pilot")
+  Subtype.Pincher -> Just (Text.pack "Pincher")
+  Subtype.Pirate -> Just (Text.pack "Pirate")
+  Subtype.Plant -> Just (Text.pack "Plant")
+  Subtype.Platypus -> Just (Text.pack "Platypus")
+  Subtype.Porcupine -> Just (Text.pack "Porcupine")
+  Subtype.Possum -> Just (Text.pack "Possum")
+  Subtype.Praetor -> Just (Text.pack "Praetor")
+  Subtype.Primarch -> Just (Text.pack "Primarch")
+  Subtype.Prism -> Just (Text.pack "Prism")
+  Subtype.Processor -> Just (Text.pack "Processor")
+  Subtype.Qu -> Just (Text.pack "Qu")
+  Subtype.Rabbit -> Just (Text.pack "Rabbit")
+  Subtype.Raccoon -> Just (Text.pack "Raccoon")
+  Subtype.Ranger -> Just (Text.pack "Ranger")
+  Subtype.Rat -> Just (Text.pack "Rat")
+  Subtype.Rebel -> Just (Text.pack "Rebel")
+  Subtype.Reflection -> Just (Text.pack "Reflection")
+  Subtype.Rhino -> Just (Text.pack "Rhino")
+  Subtype.Rigger -> Just (Text.pack "Rigger")
+  Subtype.Robot -> Just (Text.pack "Robot")
+  Subtype.Rogue -> Just (Text.pack "Rogue")
+  Subtype.Sable -> Just (Text.pack "Sable")
+  Subtype.Salamander -> Just (Text.pack "Salamander")
+  Subtype.Samurai -> Just (Text.pack "Samurai")
+  Subtype.Sand -> Just (Text.pack "Sand")
+  Subtype.Saproling -> Just (Text.pack "Saproling")
+  Subtype.Satyr -> Just (Text.pack "Satyr")
+  Subtype.Scarecrow -> Just (Text.pack "Scarecrow")
+  Subtype.Scientist -> Just (Text.pack "Scientist")
+  Subtype.Scion -> Just (Text.pack "Scion")
+  Subtype.Scorpion -> Just (Text.pack "Scorpion")
+  Subtype.Scout -> Just (Text.pack "Scout")
+  Subtype.Sculpture -> Just (Text.pack "Sculpture")
+  Subtype.Seal -> Just (Text.pack "Seal")
+  Subtype.Serf -> Just (Text.pack "Serf")
+  Subtype.Serpent -> Just (Text.pack "Serpent")
+  Subtype.Servo -> Just (Text.pack "Servo")
+  Subtype.Shade -> Just (Text.pack "Shade")
+  Subtype.Shaman -> Just (Text.pack "Shaman")
+  Subtype.Shapeshifter -> Just (Text.pack "Shapeshifter")
+  Subtype.Shark -> Just (Text.pack "Shark")
+  Subtype.Sheep -> Just (Text.pack "Sheep")
+  Subtype.Shiar -> Just (Text.pack "Shi'ar")
+  Subtype.Siren -> Just (Text.pack "Siren")
+  Subtype.Skeleton -> Just (Text.pack "Skeleton")
+  Subtype.Skrull -> Just (Text.pack "Skrull")
+  Subtype.Skunk -> Just (Text.pack "Skunk")
+  Subtype.Slith -> Just (Text.pack "Slith")
+  Subtype.Sliver -> Just (Text.pack "Sliver")
+  Subtype.Sloth -> Just (Text.pack "Sloth")
+  Subtype.Slug -> Just (Text.pack "Slug")
+  Subtype.Snail -> Just (Text.pack "Snail")
+  Subtype.Snake -> Just (Text.pack "Snake")
+  Subtype.Soldier -> Just (Text.pack "Soldier")
+  Subtype.Soltari -> Just (Text.pack "Soltari")
+  Subtype.Sorcerer -> Just (Text.pack "Sorcerer")
+  Subtype.Spawn -> Just (Text.pack "Spawn")
+  Subtype.Specter -> Just (Text.pack "Specter")
+  Subtype.Spellshaper -> Just (Text.pack "Spellshaper")
+  Subtype.Sphinx -> Just (Text.pack "Sphinx")
+  Subtype.Spider -> Just (Text.pack "Spider")
+  Subtype.Spike -> Just (Text.pack "Spike")
+  Subtype.Spirit -> Just (Text.pack "Spirit")
+  Subtype.Splinter -> Just (Text.pack "Splinter")
+  Subtype.Sponge -> Just (Text.pack "Sponge")
+  Subtype.Spy -> Just (Text.pack "Spy")
+  Subtype.Squid -> Just (Text.pack "Squid")
+  Subtype.Squirrel -> Just (Text.pack "Squirrel")
+  Subtype.Starfish -> Just (Text.pack "Starfish")
+  Subtype.Surrakar -> Just (Text.pack "Surrakar")
+  Subtype.Survivor -> Just (Text.pack "Survivor")
+  Subtype.Symbiote -> Just (Text.pack "Symbiote")
+  Subtype.Synth -> Just (Text.pack "Synth")
+  Subtype.Tentacle -> Just (Text.pack "Tentacle")
+  Subtype.Tetravite -> Just (Text.pack "Tetravite")
+  Subtype.Thalakos -> Just (Text.pack "Thalakos")
+  Subtype.Thopter -> Just (Text.pack "Thopter")
+  Subtype.Thrull -> Just (Text.pack "Thrull")
+  Subtype.Tiefling -> Just (Text.pack "Tiefling")
+  Subtype.TimeLord -> Just (Text.pack "Time Lord")
+  Subtype.Toy -> Just (Text.pack "Toy")
+  Subtype.Treefolk -> Just (Text.pack "Treefolk")
+  Subtype.Trilobite -> Just (Text.pack "Trilobite")
+  Subtype.Triskelavite -> Just (Text.pack "Triskelavite")
+  Subtype.Troll -> Just (Text.pack "Troll")
+  Subtype.Turtle -> Just (Text.pack "Turtle")
+  Subtype.Tyranid -> Just (Text.pack "Tyranid")
+  Subtype.Unicorn -> Just (Text.pack "Unicorn")
+  Subtype.Utrom -> Just (Text.pack "Utrom")
+  Subtype.Vampire -> Just (Text.pack "Vampire")
+  Subtype.Varmint -> Just (Text.pack "Varmint")
+  Subtype.Vedalken -> Just (Text.pack "Vedalken")
+  Subtype.Villain -> Just (Text.pack "Villain")
+  Subtype.Volver -> Just (Text.pack "Volver")
+  Subtype.Wall -> Just (Text.pack "Wall")
+  Subtype.Walrus -> Just (Text.pack "Walrus")
+  Subtype.Warlock -> Just (Text.pack "Warlock")
+  Subtype.Warrior -> Just (Text.pack "Warrior")
+  Subtype.Weasel -> Just (Text.pack "Weasel")
+  Subtype.Weird -> Just (Text.pack "Weird")
+  Subtype.Werewolf -> Just (Text.pack "Werewolf")
+  Subtype.Whale -> Just (Text.pack "Whale")
+  Subtype.Wizard -> Just (Text.pack "Wizard")
+  Subtype.Wolf -> Just (Text.pack "Wolf")
+  Subtype.Wolverine -> Just (Text.pack "Wolverine")
+  Subtype.Wombat -> Just (Text.pack "Wombat")
+  Subtype.Worm -> Just (Text.pack "Worm")
+  Subtype.Wraith -> Just (Text.pack "Wraith")
+  Subtype.Wurm -> Just (Text.pack "Wurm")
+  Subtype.Yeti -> Just (Text.pack "Yeti")
+  Subtype.Zombie -> Just (Text.pack "Zombie")
+  Subtype.Zubera -> Just (Text.pack "Zubera")
+  _ -> Nothing
+
 -- | CR 205.3m
 isCreatureType :: Subtype.Subtype -> Bool
-isCreatureType subtype = case subtype of
-  Subtype.Advisor -> True
-  Subtype.Aetherborn -> True
-  Subtype.Alien -> True
-  Subtype.Ally -> True
-  Subtype.Angel -> True
-  Subtype.Antelope -> True
-  Subtype.Ape -> True
-  Subtype.Archer -> True
-  Subtype.Archon -> True
-  Subtype.Armadillo -> True
-  Subtype.Army -> True
-  Subtype.Artificer -> True
-  Subtype.Assassin -> True
-  Subtype.AssemblyWorker -> True
-  Subtype.Astartes -> True
-  Subtype.Atog -> True
-  Subtype.Aurochs -> True
-  Subtype.Avatar -> True
-  Subtype.Azra -> True
-  Subtype.Badger -> True
-  Subtype.Balloon -> True
-  Subtype.Barbarian -> True
-  Subtype.Bard -> True
-  Subtype.Basilisk -> True
-  Subtype.Bat -> True
-  Subtype.Bear -> True
-  Subtype.Beast -> True
-  Subtype.Beaver -> True
-  Subtype.Beeble -> True
-  Subtype.Beholder -> True
-  Subtype.Berserker -> True
-  Subtype.Bird -> True
-  Subtype.Bison -> True
-  Subtype.Blinkmoth -> True
-  Subtype.Boar -> True
-  Subtype.Bringer -> True
-  Subtype.Brushwagg -> True
-  Subtype.Camarid -> True
-  Subtype.Camel -> True
-  Subtype.Capybara -> True
-  Subtype.Caribou -> True
-  Subtype.Carrier -> True
-  Subtype.Cat -> True
-  Subtype.Centaur -> True
-  Subtype.Child -> True
-  Subtype.Chimera -> True
-  Subtype.Citizen -> True
-  Subtype.Cleric -> True
-  Subtype.Clown -> True
-  Subtype.Cockatrice -> True
-  Subtype.Construct -> True
-  Subtype.Coward -> True
-  Subtype.Coyote -> True
-  Subtype.Crab -> True
-  Subtype.Crocodile -> True
-  Subtype.Ctan -> True
-  Subtype.Custodes -> True
-  Subtype.Cyberman -> True
-  Subtype.Cyclops -> True
-  Subtype.Dalek -> True
-  Subtype.Dauthi -> True
-  Subtype.Demigod -> True
-  Subtype.Demon -> True
-  Subtype.Deserter -> True
-  Subtype.Detective -> True
-  Subtype.Devil -> True
-  Subtype.Dinosaur -> True
-  Subtype.Djinn -> True
-  Subtype.Doctor -> True
-  Subtype.Dog -> True
-  Subtype.Dragon -> True
-  Subtype.Drake -> True
-  Subtype.Dreadnought -> True
-  Subtype.Drix -> True
-  Subtype.Drone -> True
-  Subtype.Druid -> True
-  Subtype.Dryad -> True
-  Subtype.Dwarf -> True
-  Subtype.Echidna -> True
-  Subtype.Efreet -> True
-  Subtype.Egg -> True
-  Subtype.Elder -> True
-  Subtype.Eldrazi -> True
-  Subtype.Elemental -> True
-  Subtype.Elephant -> True
-  Subtype.Elf -> True
-  Subtype.Elk -> True
-  Subtype.Employee -> True
-  Subtype.Eternal -> True
-  Subtype.Eye -> True
-  Subtype.Faerie -> True
-  Subtype.Ferret -> True
-  Subtype.Fish -> True
-  Subtype.Flagbearer -> True
-  Subtype.Fox -> True
-  Subtype.Fractal -> True
-  Subtype.Frog -> True
-  Subtype.Fungus -> True
-  Subtype.Gamer -> True
-  Subtype.Gamma -> True
-  Subtype.Gargoyle -> True
-  Subtype.Germ -> True
-  Subtype.Giant -> True
-  Subtype.Giraffe -> True
-  Subtype.Gith -> True
-  Subtype.Glimmer -> True
-  Subtype.Gnoll -> True
-  Subtype.Gnome -> True
-  Subtype.Goat -> True
-  Subtype.Goblin -> True
-  Subtype.God -> True
-  Subtype.Golem -> True
-  Subtype.Gorgon -> True
-  Subtype.Graveborn -> True
-  Subtype.Gremlin -> True
-  Subtype.Griffin -> True
-  Subtype.Guest -> True
-  Subtype.Hag -> True
-  Subtype.Halfling -> True
-  Subtype.Hamster -> True
-  Subtype.Harpy -> True
-  Subtype.Hedgehog -> True
-  Subtype.Hellion -> True
-  Subtype.Hero -> True
-  Subtype.Hippo -> True
-  Subtype.Hippogriff -> True
-  Subtype.Homarid -> True
-  Subtype.Homunculus -> True
-  Subtype.Horror -> True
-  Subtype.Horse -> True
-  Subtype.Human -> True
-  Subtype.Hydra -> True
-  Subtype.Hyena -> True
-  Subtype.Illusion -> True
-  Subtype.Imp -> True
-  Subtype.Incarnation -> True
-  Subtype.Inhuman -> True
-  Subtype.Inkling -> True
-  Subtype.Inquisitor -> True
-  Subtype.Insect -> True
-  Subtype.Jackal -> True
-  Subtype.Jellyfish -> True
-  Subtype.Juggernaut -> True
-  Subtype.Kangaroo -> True
-  Subtype.Kavu -> True
-  Subtype.Kirin -> True
-  Subtype.Kithkin -> True
-  Subtype.Knight -> True
-  Subtype.Kobold -> True
-  Subtype.Kor -> True
-  Subtype.Kraken -> True
-  Subtype.Kree -> True
-  Subtype.Llama -> True
-  Subtype.Lamia -> True
-  Subtype.Lammasu -> True
-  Subtype.Leech -> True
-  Subtype.Lemur -> True
-  Subtype.Leviathan -> True
-  Subtype.Lhurgoyf -> True
-  Subtype.Licid -> True
-  Subtype.Lizard -> True
-  Subtype.Lobster -> True
-  Subtype.Manticore -> True
-  Subtype.Masticore -> True
-  Subtype.Mercenary -> True
-  Subtype.Merfolk -> True
-  Subtype.Metathran -> True
-  Subtype.Minion -> True
-  Subtype.Minotaur -> True
-  Subtype.Mite -> True
-  Subtype.Mole -> True
-  Subtype.Monger -> True
-  Subtype.Mongoose -> True
-  Subtype.Monk -> True
-  Subtype.Monkey -> True
-  Subtype.Moogle -> True
-  Subtype.Moonfolk -> True
-  Subtype.Mount -> True
-  Subtype.Mouse -> True
-  Subtype.Mutant -> True
-  Subtype.Myr -> True
-  Subtype.Mystic -> True
-  Subtype.Nautilus -> True
-  Subtype.Necron -> True
-  Subtype.Nephilim -> True
-  Subtype.Nightmare -> True
-  Subtype.Nightstalker -> True
-  Subtype.Ninja -> True
-  Subtype.Noble -> True
-  Subtype.Noggle -> True
-  Subtype.Nomad -> True
-  Subtype.Nymph -> True
-  Subtype.Octopus -> True
-  Subtype.Ogre -> True
-  Subtype.Ooze -> True
-  Subtype.Orb -> True
-  Subtype.Orc -> True
-  Subtype.Orgg -> True
-  Subtype.Otter -> True
-  Subtype.Ouphe -> True
-  Subtype.Ox -> True
-  Subtype.Oyster -> True
-  Subtype.Pangolin -> True
-  Subtype.Peasant -> True
-  Subtype.Pegasus -> True
-  Subtype.Pentavite -> True
-  Subtype.Performer -> True
-  Subtype.Pest -> True
-  Subtype.Phelddagrif -> True
-  Subtype.Phoenix -> True
-  Subtype.Phyrexian -> True
-  Subtype.Pilot -> True
-  Subtype.Pincher -> True
-  Subtype.Pirate -> True
-  Subtype.Plant -> True
-  Subtype.Platypus -> True
-  Subtype.Porcupine -> True
-  Subtype.Possum -> True
-  Subtype.Praetor -> True
-  Subtype.Primarch -> True
-  Subtype.Prism -> True
-  Subtype.Processor -> True
-  Subtype.Qu -> True
-  Subtype.Rabbit -> True
-  Subtype.Raccoon -> True
-  Subtype.Ranger -> True
-  Subtype.Rat -> True
-  Subtype.Rebel -> True
-  Subtype.Reflection -> True
-  Subtype.Rhino -> True
-  Subtype.Rigger -> True
-  Subtype.Robot -> True
-  Subtype.Rogue -> True
-  Subtype.Sable -> True
-  Subtype.Salamander -> True
-  Subtype.Samurai -> True
-  Subtype.Sand -> True
-  Subtype.Saproling -> True
-  Subtype.Satyr -> True
-  Subtype.Scarecrow -> True
-  Subtype.Scientist -> True
-  Subtype.Scion -> True
-  Subtype.Scorpion -> True
-  Subtype.Scout -> True
-  Subtype.Sculpture -> True
-  Subtype.Seal -> True
-  Subtype.Serf -> True
-  Subtype.Serpent -> True
-  Subtype.Servo -> True
-  Subtype.Shade -> True
-  Subtype.Shaman -> True
-  Subtype.Shapeshifter -> True
-  Subtype.Shark -> True
-  Subtype.Sheep -> True
-  Subtype.Shiar -> True
-  Subtype.Siren -> True
-  Subtype.Skeleton -> True
-  Subtype.Skrull -> True
-  Subtype.Skunk -> True
-  Subtype.Slith -> True
-  Subtype.Sliver -> True
-  Subtype.Sloth -> True
-  Subtype.Slug -> True
-  Subtype.Snail -> True
-  Subtype.Snake -> True
-  Subtype.Soldier -> True
-  Subtype.Soltari -> True
-  Subtype.Sorcerer -> True
-  Subtype.Spawn -> True
-  Subtype.Specter -> True
-  Subtype.Spellshaper -> True
-  Subtype.Sphinx -> True
-  Subtype.Spider -> True
-  Subtype.Spike -> True
-  Subtype.Spirit -> True
-  Subtype.Splinter -> True
-  Subtype.Sponge -> True
-  Subtype.Spy -> True
-  Subtype.Squid -> True
-  Subtype.Squirrel -> True
-  Subtype.Starfish -> True
-  Subtype.Surrakar -> True
-  Subtype.Survivor -> True
-  Subtype.Symbiote -> True
-  Subtype.Synth -> True
-  Subtype.Tentacle -> True
-  Subtype.Tetravite -> True
-  Subtype.Thalakos -> True
-  Subtype.Thopter -> True
-  Subtype.Thrull -> True
-  Subtype.Tiefling -> True
-  Subtype.TimeLord -> True
-  Subtype.Toy -> True
-  Subtype.Treefolk -> True
-  Subtype.Trilobite -> True
-  Subtype.Triskelavite -> True
-  Subtype.Troll -> True
-  Subtype.Turtle -> True
-  Subtype.Tyranid -> True
-  Subtype.Unicorn -> True
-  Subtype.Utrom -> True
-  Subtype.Vampire -> True
-  Subtype.Varmint -> True
-  Subtype.Vedalken -> True
-  Subtype.Villain -> True
-  Subtype.Volver -> True
-  Subtype.Wall -> True
-  Subtype.Walrus -> True
-  Subtype.Warlock -> True
-  Subtype.Warrior -> True
-  Subtype.Weasel -> True
-  Subtype.Weird -> True
-  Subtype.Werewolf -> True
-  Subtype.Whale -> True
-  Subtype.Wizard -> True
-  Subtype.Wolf -> True
-  Subtype.Wolverine -> True
-  Subtype.Wombat -> True
-  Subtype.Worm -> True
-  Subtype.Wraith -> True
-  Subtype.Wurm -> True
-  Subtype.Yeti -> True
-  Subtype.Zombie -> True
-  Subtype.Zubera -> True
-  _ -> False
+isCreatureType = Maybe.isJust . creatureTypeWord
