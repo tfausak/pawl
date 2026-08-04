@@ -332,9 +332,12 @@ data Prompt r where
   --
   -- No candidate list, for ChooseCreatureTypeSwap's reason carried further: CR
   -- 205.3m's creature types run to hundreds, and CR 201.4's "the name of a card
-  -- in the Oracle card reference" is not a set the engine holds at all -- the
-  -- registry that answers "what card is this name?" sits BELOW this type's
-  -- library and above the engine that raises the prompt.
+  -- in the Oracle card reference" is not a set the engine holds at all. Nothing
+  -- in the layering forbids that -- Pawl.Registry sits ahead of the engine in
+  -- the table, so the edge would be legal -- but it is not wired, and wiring it
+  -- would hand the closed half a card-by-name lookup, which is the capability
+  -- design.md §1's invariant is enforced by withholding (see
+  -- Pawl.Engine.Card's header). #663 is that whole question.
   --
   -- The Filter is CR 201.4a's restriction, read off the card that asks: "the
   -- player must choose the name of a card whose Oracle text matches those
