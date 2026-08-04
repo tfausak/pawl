@@ -846,8 +846,9 @@ apply batch candidate event =
           -- in the Oracle card reference.
           Nothing -> pure Set.empty
           Just controller -> do
-            -- CR 102.1 / 104.2a: an opponent who has left the game is not one
-            -- to ask, so the roster is the still-playing seats.
+            -- CR 102.1 keeps a departed player's seat in the roster, so the
+            -- offer is Game.stillPlaying rather than the turn order: a player
+            -- who has left the game is not an opponent to ask.
             let opponents = filter (/= controller) (Game.stillPlaying gs)
             opponent <- case opponents of
               -- CR 102.2: a two-player game leaves exactly one opponent, and
@@ -856,14 +857,14 @@ apply batch candidate event =
               -- second name.
               [] -> pure Nothing
               [sole] -> pure (Just sole)
-              first : second : rest ->
-                fmap
-                  Just
-                  ( Trans.lift
-                      ( Program.prompt
-                          (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid (first NonEmpty.:| (second : rest)))
-                      )
-                  )
+              first : second : rest -> do
+                let offered = first NonEmpty.:| (second : rest)
+                answer <- Trans.lift (Program.prompt (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered))
+                -- FILTERED, NOT TRUSTED, the posture Sba.chooseLegendVictims
+                -- takes: an answer naming somebody who is not an opponent would
+                -- otherwise hand a second name to a player the card never asked,
+                -- so it falls back to the head.
+                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
             -- CR 101.4: the active player chooses first, then the rest in turn
             -- order. Both names are chosen as one event, so the order is the
             -- rule's and not the card's reading order.

@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers Pawl.Engine.PlayerEffect and Pawl.Engine.Cost, plus the types they case on
 -- (Pawl.Types.PlayerEffect, PlayerScope, PlayerStaticAbility) and
 -- the stored carrier Pawl.Types.ActivePlayerEffect. The spell match runs through
@@ -5,13 +8,19 @@
 -- continuous effects that affect PLAYERS and the RULES OF THE GAME, which sit
 -- outside the CR 613 layer system entirely.
 --
--- The six gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower and Silence. Humility, Opalescence and
--- Titania's Song join them for CR 604.2's "and has the ability" -- the one place
--- this axis does meet the CR 613 layer system.
+-- The seven gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
+-- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Humility,
+-- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
+-- -- the one place this axis does meet the CR 613 layer system.
+--
+-- Null Chamber also brings CR 201.4's card-name choice and CR 614.1c's entry
+-- replacement in with it, so the group covers Pawl.Engine.Replacement's
+-- EntryRewrite.ChooseCardNames arm and Pawl.Engine.Action.playableLands as well.
 module Pawl.PlayerEffectSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
@@ -26,6 +35,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 -- the evaluator Pawl.Engine.Filter already claims the alias Filter.
 
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -43,12 +53,15 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Zone as Zone
 
@@ -1289,9 +1302,238 @@ matchesSpellSpec s registry =
       let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
       Spec.assertBool s (not (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
 
+-- Null Chamber {3}{W} World Enchantment: "As this enchantment enters, you and an
+-- opponent each choose a card name other than a basic land card name. Spells
+-- with the chosen names can't be cast and lands with the chosen names can't be
+-- played."
+--
+-- alice has eight untapped Plains and four Mountains (mana is never the reason a
+-- cast is unavailable, before or after the Chamber's own {3}{W} is paid) and the
+-- Chamber in hand, in her own precombat main phase with an empty stack.
+nullChamberBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+nullChamberBoard plains mountain nullChamber =
+  let addMountain board _ = snd (S.addCreature mountain S.alice board)
+      lands = List.foldl' addMountain (S.landsInPlay plains 8) [1 .. 4 :: Int]
+      (gs, oid) = S.handOne nullChamber lands
+   in (oid, gs)
+
+-- CR 201.4 answered PER CHOOSER, which is the whole of what makes Null Chamber
+-- worth testing: `pick` is asked WHO is choosing, so a case can put the
+-- controller's name and the opponent's on different cards. `opponent` settles CR
+-- 608.2c's other choice -- which opponent is asked at all -- and is never
+-- reached at two seats. Everything else is the shared interpreter.
+chamberAnswer :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> Prompt.Prompt r -> r
+chamberAnswer opponent pick p = case p of
+  Prompt.ChooseCardName _ chooser _ _ -> pick chooser
+  Prompt.ChooseOpponent {} -> opponent
+  _ -> S.identityAnswer p
+
+-- chamberAnswer, also RECORDING who was asked to name a card and in what order
+-- -- the only way to see CR 101.4's APNAP order, since Object.chosenNames is a
+-- set and has forgotten it.
+recordingChamberAnswer :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+recordingChamberAnswer opponent pick p = case p of
+  Prompt.ChooseCardName _ chooser _ _ -> do
+    State.modify' (<> [chooser])
+    pure (pick chooser)
+  _ -> pure (chamberAnswer opponent pick p)
+
+-- Cast the Chamber and let it resolve, answering both name choices.
+--
+-- CAST rather than S.addCreature, because the choice happens only on the entry
+-- path (Replacement.runEntry): a Chamber placed straight onto the battlefield
+-- has an empty chosenNames and prohibits nothing.
+castChamber :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castChamber opponent pick gs oid =
+  let answer :: Prompt.Prompt r -> r
+      answer = chamberAnswer opponent pick
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice oid))
+   in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+-- The one object that reached the battlefield between two states -- the Chamber
+-- itself, whose id the cast never handed back (CR 400.7 mints a new one).
+enteredOne :: GameState.GameState -> GameState.GameState -> Maybe ObjectId.ObjectId
+enteredOne before after = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before)) of
+  [oid] -> Just oid
+  _ -> Nothing
+
+nullChamberSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nullChamberSpec s registry =
+  Spec.describe s "NullChamber" $ do
+    -- CR 614.1c: "As [this permanent] enters . . ." is a replacement effect, and
+    -- CR 614.12a makes its choice happen before the permanent enters. TWO
+    -- choices, by two players, which is what no other as-enters card in the pool
+    -- does -- Painter's Servant and Convincing Mirage each ask their controller
+    -- and nobody else.
+    Spec.it s "CR 614.1c both the controller and an opponent name a card as it enters" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      cancel <- S.printingOf s registry "Cancel"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          picks pid = if pid == S.alice then S.printingName piker else S.printingName cancel
+          after = castChamber S.bob picks board oid
+      case enteredOne board after >>= \chamber -> Game.lookupObject chamber after of
+        Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
+        Just chamber ->
+          Spec.assertEqWith
+            s
+            "both names, and only those two"
+            (Object.chosenNames chamber)
+            (Set.fromList [S.printingName piker, S.printingName cancel])
+
+    -- CR 101.4: "If multiple players would make choices . . . at the same time,
+    -- the active player . . . makes any choices required, then the next player
+    -- in turn order". Both names are chosen as one event, so the order is the
+    -- rule's.
+    --
+    -- NOT yet a discriminating test of CR 101.4 against "the controller first":
+    -- the only way a permanent enters in this pool is its controller casting it,
+    -- and a sorcery-speed enchantment is cast on its controller's own turn, so
+    -- the two orders name the same player. A card that put a permanent onto the
+    -- battlefield under another player's control would separate them.
+    Spec.it s "CR 101.4 the active player is asked to name a card first" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      cancel <- S.printingOf s registry "Cancel"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          picks pid = if pid == S.alice then S.printingName piker else S.printingName cancel
+          asked =
+            State.execState
+              (Program.foldProgramM (recordingChamberAnswer S.bob picks) (State.runStateT (S.cast S.alice oid >> Stack.resolveTop) board))
+              []
+      Spec.assertEqWith s "alice is active" (GameState.activePlayer board) S.alice
+      Spec.assertEqWith s "alice names first, then bob" asked [S.alice, S.bob]
+
+    -- CR 601.3's prohibit half, now carrying a QUALITY: "no rule or effect
+    -- prohibits" is asked of one named spell rather than of casting in general.
+    -- The Lightning Bolt is the falsifier -- a blanket prohibition, or one that
+    -- compared nothing, would take it away too.
+    Spec.it s "CR 601.3 a spell with the chosen name can't be cast, and its neighbour still can" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      cancel <- S.printingOf s registry "Cancel"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          picks pid = if pid == S.alice then S.printingName piker else S.printingName cancel
+          after = castChamber S.bob picks board oid
+          (pikerId, withPiker) = S.addHandCard piker S.alice after
+          (boltId, gs) = S.addHandCard lightningBolt S.alice withPiker
+          offered = Action.legalActions S.alice gs
+      Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker)) offered) "the named Piker is not offered"
+      Spec.assertBool s (elem (Action.Type.Cast boltId (S.printingName lightningBolt)) offered) "the unnamed Bolt still is"
+
+    -- The OPPONENT's name binds the Chamber's controller, which is the half a
+    -- one-chooser reading of the card would lose: bob names the Piker, and it is
+    -- alice who may no longer cast one.
+    Spec.it s "CR 601.3 the opponent's chosen name prohibits the controller too" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      cancel <- S.printingOf s registry "Cancel"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          -- The reverse of the case above: alice names something she is not
+          -- holding, bob names the card she is.
+          picks pid = if pid == S.alice then S.printingName cancel else S.printingName piker
+          after = castChamber S.bob picks board oid
+          (pikerId, gs) = S.addHandCard piker S.alice after
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "alice is prohibited by bob's name"
+      Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.alice gs)) "and no cast is offered"
+
+    -- CR 305.1: playing a land is a SPECIAL ACTION that never uses the stack, so
+    -- the land half of the card is a different gate from the cast half --
+    -- Action.playableLands rather than Cast.castable.
+    --
+    -- The Plains is the falsifier, and it is also why the named land has to be a
+    -- nonbasic one: CR 201.4a forbids naming a basic land card, so a basic land
+    -- is the one land this card can never stop.
+    Spec.it s "CR 305.1 a land with the chosen name can't be played, and a basic land still can" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      ashBarrens <- S.printingOf s registry "Ash Barrens"
+      cancel <- S.printingOf s registry "Cancel"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          picks pid = if pid == S.alice then S.printingName ashBarrens else S.printingName cancel
+          after = castChamber S.bob picks board oid
+          (barrensId, withBarrens) = S.addHandCard ashBarrens S.alice after
+          (plainsId, gs) = S.addHandCard plains S.alice withBarrens
+          playable = Action.playableLands S.alice gs
+      Spec.assertBool s (notElem barrensId playable) "the named Ash Barrens is not playable"
+      Spec.assertBool s (elem plainsId playable) "the Plains still is"
+      Spec.assertBool s (elem (Action.Type.Play plainsId) (Action.legalActions S.alice gs)) "and the Plains is offered"
+      Spec.assertBool s (notElem (Action.Type.Play barrensId) (Action.legalActions S.alice gs)) "while the Barrens is not"
+
+    -- CR 604.2: the effect is re-derived from the battlefield on every read, so
+    -- destroying the Chamber lifts both halves with nothing to unwind -- and the
+    -- names go with it, because CR 400.7 gives the graveyard card a new
+    -- incarnation whose chosenNames is empty.
+    Spec.it s "CR 604.2 destroying the Chamber lifts both prohibitions" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      ashBarrens <- S.printingOf s registry "Ash Barrens"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          picks pid = if pid == S.alice then S.printingName piker else S.printingName ashBarrens
+          after = castChamber S.bob picks board oid
+          (pikerId, withPiker) = S.addHandCard piker S.alice after
+          (barrensId, gs) = S.addHandCard ashBarrens S.alice withPiker
+      case enteredOne board after of
+        Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
+        Just chamber -> do
+          let gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [chamber])
+          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "prohibited while it stands"
+          Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gone)) "not prohibited once it is gone"
+          Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.alice gone)) "and the cast is offered again"
+          Spec.assertBool s (elem barrensId (Action.playableLands S.alice gone)) "and the land may be played again"
+
+    -- CR 608.2c: "an opponent" is a choice the card leaves open, so its
+    -- controller makes it -- and at three seats that choice is real. The third
+    -- player is asked NOTHING, which a reading of "you and an opponent" as CR
+    -- 800.1's whole table (or as PlayerScope.EachPlayer, which coincides with
+    -- the card at two seats) would get wrong.
+    Spec.it s "CR 608.2c at three seats the controller picks which opponent names a card" $ do
+      plains <- S.printingOf s registry "Plains"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      cancel <- S.printingOf s registry "Cancel"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let addLand seat _ = snd (S.addCreature plains S.alice seat)
+          lands = List.foldl' addLand (Setup.emptyGame S.threePlayers) [1 .. 4 :: Int]
+          (oid, seated) = S.addHandCard nullChamber S.alice lands
+          board =
+            seated
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          -- Each seat names a different card, so chosenNames says exactly who
+          -- was asked.
+          picks pid
+            | pid == S.alice = S.printingName piker
+            | pid == S.bob = S.printingName cancel
+            | otherwise = S.printingName lightningBolt
+          after = castChamber S.carol picks board oid
+      case enteredOne board after >>= \chamber -> Game.lookupObject chamber after of
+        Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
+        Just chamber ->
+          Spec.assertEqWith
+            s
+            "alice's name and carol's, and nothing bob named"
+            (Object.chosenNames chamber)
+            (Set.fromList [S.printingName piker, S.printingName lightningBolt])
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
+  nullChamberSpec s registry
   adjustmentSpec s
   thaliaSpec s registry
   medallionSpec s registry
