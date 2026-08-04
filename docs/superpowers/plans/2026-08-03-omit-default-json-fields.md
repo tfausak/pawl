@@ -12,6 +12,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-03-omit-default-json-fields-design.md`. Rules R1–R7 are cited by number throughout; read that file first.
 
+> **Historical note.** Task 1 below put a corpus formatter in the `pawl`
+> executable, and Tasks 3–9 regenerate the corpus by running it. **That was a
+> mistake and the executable has been restored to `main = pure ()`.** `pawl` is a
+> product surface with a CLI contract CI depends on — it is invoked as
+> `pawl --schema` and with no arguments, both of which must be side-effect-free —
+> so it was the wrong home for a destructive developer tool. It also resolved its
+> target through `Registry.defaultRoot`, which points at the *installed* data
+> directory rather than the repo, so it only ever worked via `cabal run` inside
+> the dev shell. The migration is complete and the corpus is canonical; the
+> formatter has no remaining caller. Regenerating the corpus again would need a
+> tool that does not currently exist.
+
 ## Global Constraints
 
 - Toolchain comes from the Nix flake. Run every tool through `direnv exec .` — a bare `cabal`/`hooky`/`jq` may be missing or broken.
