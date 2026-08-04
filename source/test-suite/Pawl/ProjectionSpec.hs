@@ -10,6 +10,7 @@
 -- with.
 module Pawl.ProjectionSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -32,6 +33,7 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -46,6 +48,8 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -578,6 +582,38 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.isCreatureOf islandId hacked) "hacked, the Island is a creature"
     Spec.assertEqWith s "a 1/1 too" (Projection.powerOf islandId hacked) (Just 1)
     Spec.assertBool s (not (Projection.isCreatureOf swampId hacked)) "and the Swamp is not animated any more"
+
+  -- CR 612.1 again, through the fourth carrier of an object's rules text: an
+  -- ACTIVATED ability printed on the permanent. "Any words or symbols printed on
+  -- that object ... generally affects only that object's rules text (which
+  -- appears in its text box)" -- and an activated ability is printed in that box,
+  -- so its land-type word swaps with everything else.
+  --
+  -- Tidal Warrior {U} Creature -- Merfolk Warrior, "{T}: Target land becomes an
+  -- Island until end of turn." (checked against Scryfall) is the card: a vanilla
+  -- 1/1 body carrying exactly one activated ability whose effect is
+  -- ModifyTarget UntilEndOfTurn (SetLandSubtype Island).
+  --
+  -- Read off the PROJECTION rather than at resolution, because CR 113.7a makes
+  -- an activated ability on the stack an object independent of its source -- its
+  -- text is fixed when it is put on the stack, so the rewrite has to happen
+  -- where the ability is enumerated. Pawl.ActivateSpec's whole-card case is the
+  -- end-to-end proof.
+  Spec.it s "CR 612.1 hacking Tidal Warrior swaps the land type inside its activated ability" $ do
+    tidalWarrior <- S.printingOf s registry "Tidal Warrior"
+    let base = Setup.emptyGame S.bothPlayers
+        (warriorId, plain) = S.addCreature tidalWarrior S.alice base
+        hacked = S.withEffectAt warriorId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Island Subtype.Type.Swamp) plain
+        setsTo gs = case Projection.abilitiesOf warriorId gs of
+          ability : _ -> concatMap (Maybe.mapMaybe landTypeSet . Foldable.toList . Mode.effects) (Modal.modes (ActivatedAbility.modal ability))
+          [] -> []
+        landTypeSet effect = case effect of
+          Effect.ModifyTarget _ (Modification.SetLandSubtype st) _ -> Just st
+          _ -> Nothing
+    -- The control: unhacked, the printed word stands.
+    Spec.assertEqWith s "unhacked, the ability sets Island" (setsTo plain) [Subtype.Type.Island]
+    -- And hacked, the ability the projection hands out carries the new word.
+    Spec.assertEqWith s "hacked, the ability sets Swamp" (setsTo hacked) [Subtype.Type.Swamp]
 
   -- CR 613.8a: Kormus Bell's affected set READS subtypes at layer 4, and
   -- Urborg's AddLandSubtype WRITES them at layer 4 -- so the two are dependent

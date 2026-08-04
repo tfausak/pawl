@@ -88,7 +88,6 @@ import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
-import Pawl.Types.Subtype (Subtype)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
@@ -369,87 +368,6 @@ bindsSeveralTokens effects =
         _ -> False
    in any offends effects
 
--- CR 612's basic-land-type word swap, over an effect's AST. Cases on Effect
--- (Resolve's charter); delegates the inner Modification of ModifyTarget to
--- Projection.rewriteModification and every carried Filter to Filter.rewrite, so
--- no module touches another's constructors. ChangeText carries no rewritable
--- land-type word.
---
--- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
--- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
--- word inside an ObjectRef.EachMatching. Every arm holding one goes through
--- Filter.rewrite or rewriteObjectRef rather than being special-cased here.
--- CR 612.1 through an ObjectRef. InSlot names an object CHOSEN at cast time, not
--- a word on the card, so there is nothing in it to rewrite; EachMatching's
--- Filter is card text like any other. Lives here beside objectRefObjects rather
--- than in a module of its own, which the type does not have.
-rewriteObjectRef :: [(Subtype, Subtype)] -> ObjectRef -> ObjectRef
-rewriteObjectRef pairs ref = case ref of
-  ObjectRef.InSlot _ -> ref
-  ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
-
-rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Type.Card
-rewriteEffect pairs effect = case effect of
-  Effect.ModifyTarget duration modification ref ->
-    Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) (rewriteObjectRef pairs ref)
-  Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
-  Effect.ChangeText _ -> effect
-  Effect.AddMana _ -> effect
-  Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
-  Effect.ExileAllGraveyards -> effect
-  Effect.Proliferate -> effect
-  Effect.ExileHandThenDraw -> effect
-  Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
-  Effect.RestartGame -> effect
-  Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
-  Effect.Sacrifice _ -> effect
-  Effect.RemoveFromCombat _ -> effect
-  Effect.MoveToZone {} -> effect
-  Effect.Draw {} -> effect
-  Effect.Mill {} -> effect
-  Effect.Discard {} -> effect
-  -- No rewritable land-type word.
-  Effect.LoseLife {} -> effect
-  -- No rewritable land-type word.
-  Effect.GainLife {} -> effect
-  -- A text-changer does not reach a token's embedded card here (spec section 8).
-  Effect.Create {} -> effect
-  Effect.Replace {} -> effect
-  -- A Phase carries no basic-land-type word for CR 612 to rewrite.
-  Effect.SkipNextPhase {} -> effect
-  -- Nor does a shield: its recipient is baked at resolution and its Quantity
-  -- names no land type.
-  Effect.PreventNextDamage {} -> effect
-  -- No rewritable land-type word.
-  Effect.Counter _ -> effect
-  Effect.PutCounters {} -> effect
-  -- No rewritable land-type word.
-  Effect.GainPlayerCounters {} -> effect
-  Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
-  Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
-  -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
-  Effect.AddPhases _ -> effect
-  Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
-  Effect.ArmDelayedTrigger {} -> effect
-  -- A player effect carries no basic-land-type word for CR 612 to rewrite.
-  Effect.AffectPlayers {} -> effect
-  -- An emblem's embedded card carries no basic-land-type word here (as Create's
-  -- token does not; spec section 8).
-  Effect.CreateEmblem {} -> effect
-  -- No rewritable land-type word.
-  Effect.BecomeMonarch {} -> effect
-  -- No rewritable land-type word.
-  Effect.ExileUntilMonarch _ -> effect
-  Effect.Attach _ -> effect
-  Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
-  -- No rewritable land-type word.
-  Effect.PlaySubgame _ -> effect
-  -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
-  Effect.TakeExtraTurn {} -> effect
-  -- No rewritable land-type word.
-  Effect.ShuffleIntoLibrary _ -> effect
-
 -- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
 -- an unchosen mode's effects never resolve), with every text-change affecting it
 -- applied (CR 612) to each effect. This is read-point 3 of the rewritable AST --
@@ -467,7 +385,7 @@ modesOf oid gs = case Game.lookupObject oid gs of
     Nothing -> []
     Just card ->
       let chosen = Binding.modesOf (Object.bindings obj)
-          rewrite = rewriteEffect (Projection.textChangesAffecting oid gs)
+          rewrite = Projection.rewriteEffect (Projection.textChangesAffecting oid gs)
           rewriteMode m = m {Mode.effects = fmap rewrite (Mode.effects m)}
        in fmap (fmap rewriteMode) (Card.chosenModes chosen card)
 

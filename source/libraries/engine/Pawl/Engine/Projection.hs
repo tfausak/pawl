@@ -25,6 +25,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -39,10 +40,13 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Power as Power
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
@@ -195,14 +199,37 @@ applyModification lyr src cands gs oid m pc =
             Nothing -> pc
             Just s -> setLandSubtypeTo s pc
         -- CR 612.1/612.2: a text-changing effect replaces one basic land type
-        -- word with another where the word is used AS a land type -- here, in
-        -- the projected type line. Layer 3, so it folds before layer 4 (Type):
-        -- a hacked basic Mountain is an Island by the time mana (CR 305.6)
-        -- reads its subtypes. Absent `from` is a no-op.
+        -- word with another where the word is used AS a land type -- in the
+        -- projected type line, and in the object's rules text. Layer 3, so it
+        -- folds before layer 4 (Type): a hacked basic Mountain is an Island by
+        -- the time mana (CR 305.6) reads its subtypes.
+        --
+        -- The type-line half is CR 612.1's "the text that appears in its type
+        -- line"; absent `from` is a no-op there. The rules-text half is its
+        -- "that object's rules text (which appears in its text box)", and the
+        -- activated-ability list is where that text lives -- so a hacked Tidal
+        -- Warrior's "{T}: Target land becomes an Island" hands out an ability
+        -- that says Swamp. Applied unconditionally rather than under the same
+        -- Set.member guard, because the word being swapped in the text box has
+        -- nothing to do with whether the type line carries it: Tidal Warrior is
+        -- a Merfolk Warrior with no land type at all.
+        --
+        -- Not implemented: the swap does not reach PC.triggeredAbilities or
+        -- PC.replacementEffects, which are the other two carriers of the same
+        -- text box, nor a mode's targetSpecs, nor an activated ability's cost
+        -- (#635).
+        --
+        -- Done HERE, where the layer-3 effect is folded, rather than at
+        -- baseCharacteristics' seed: the seed predates every layer, and this way
+        -- each swap applies in CR 613.7 timestamp order alongside the type-line
+        -- half, and costs no extra textChangesAffecting fold -- that whole-list
+        -- fold is what #584/#624 hoisted out of gather's per-permanent walk, and
+        -- the gathered candidate already carries this pair.
         Modification.ChangeSubtypeWord from to ->
-          if Set.member from (PC.subtypes pc)
-            then pc {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc))}
-            else pc
+          let pc' = pc {PC.activatedAbilities = fmap (rewriteActivatedAbility [(from, to)]) (PC.activatedAbilities pc)}
+           in if Set.member from (PC.subtypes pc')
+                then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
+                else pc'
         -- CR 613.1b layer 2: control-changing effects apply here, but
         -- ProjectedCharacteristics carries no controller field -- controllerOf
         -- reads GameState.continuousEffects directly (a lean fold, not the full
@@ -1247,6 +1274,116 @@ rewriteAffected pairs a = case a of
   -- attachment names none either -- both read the SOURCE's own state.
   Affected.TheseObjects _ -> a
   Affected.Attached -> a
+
+-- CR 612's basic-land-type word swap, over an effect's AST. rewriteModification's
+-- sibling one level up: it delegates the inner Modification of ModifyTarget to
+-- rewriteModification and every carried Filter to Filter.rewrite, so no module
+-- touches another's constructors. ChangeText carries no rewritable land-type
+-- word.
+--
+-- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
+-- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
+-- word inside an ObjectRef.EachMatching. Every arm holding one goes through
+-- Filter.rewrite or rewriteObjectRef rather than being special-cased here.
+--
+-- THE INVARIANT: this cases on an effect's STRUCTURE -- does this arm carry a
+-- word a swap could reach -- and never on which effect it is. There is no
+-- behavior here that belongs to DealDamage as opposed to Destroy.
+--
+-- Lives here rather than in Pawl.Engine.Resolve, where it used to: it has two
+-- readers now -- Resolve.modesOf for a resolving spell (read-point 3) and
+-- rewriteActivatedAbility just below for a permanent's printed ability
+-- (read-point 4) -- and Resolve depends on Projection rather than the other way
+-- round.
+rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card -> Effect.Effect Card.Type.Card
+rewriteEffect pairs effect = case effect of
+  Effect.ModifyTarget duration modification ref ->
+    Effect.ModifyTarget duration (rewriteModification pairs modification) (rewriteObjectRef pairs ref)
+  Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
+  Effect.ChangeText _ -> effect
+  Effect.AddMana _ -> effect
+  Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
+  Effect.ExileAllGraveyards -> effect
+  Effect.Proliferate -> effect
+  Effect.ExileHandThenDraw -> effect
+  Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
+  Effect.RestartGame -> effect
+  Effect.ControlPlayerNextTurn _ -> effect
+  Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
+  Effect.Sacrifice _ -> effect
+  Effect.RemoveFromCombat _ -> effect
+  Effect.MoveToZone {} -> effect
+  Effect.Draw {} -> effect
+  Effect.Mill {} -> effect
+  Effect.Discard {} -> effect
+  -- No rewritable land-type word.
+  Effect.LoseLife {} -> effect
+  -- No rewritable land-type word.
+  Effect.GainLife {} -> effect
+  -- A text-changer does not reach a token's embedded card here (spec section 8).
+  Effect.Create {} -> effect
+  Effect.Replace {} -> effect
+  -- A Phase carries no basic-land-type word for CR 612 to rewrite.
+  Effect.SkipNextPhase {} -> effect
+  -- Nor does a shield: its recipient is baked at resolution and its Quantity
+  -- names no land type.
+  Effect.PreventNextDamage {} -> effect
+  -- No rewritable land-type word.
+  Effect.Counter _ -> effect
+  Effect.PutCounters {} -> effect
+  -- No rewritable land-type word.
+  Effect.GainPlayerCounters {} -> effect
+  Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
+  Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
+  -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
+  Effect.AddPhases _ -> effect
+  Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
+  Effect.ArmDelayedTrigger {} -> effect
+  -- A player effect carries no basic-land-type word for CR 612 to rewrite.
+  Effect.AffectPlayers {} -> effect
+  -- An emblem's embedded card carries no basic-land-type word here (as Create's
+  -- token does not; spec section 8).
+  Effect.CreateEmblem {} -> effect
+  -- No rewritable land-type word.
+  Effect.BecomeMonarch {} -> effect
+  -- No rewritable land-type word.
+  Effect.ExileUntilMonarch _ -> effect
+  Effect.Attach _ -> effect
+  Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
+  -- No rewritable land-type word.
+  Effect.PlaySubgame _ -> effect
+  -- CR 500.7's added turns carry no basic-land-type word for CR 612 to rewrite.
+  Effect.TakeExtraTurn {} -> effect
+  -- No rewritable land-type word.
+  Effect.ShuffleIntoLibrary _ -> effect
+
+-- CR 612.1 through an ObjectRef. InSlot names an object CHOSEN at cast time, not
+-- a word on the card, so there is nothing in it to rewrite; EachMatching's
+-- Filter is card text like any other. No module of its own, which the type does
+-- not have.
+rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
+rewriteObjectRef pairs ref = case ref of
+  ObjectRef.InSlot _ -> ref
+  ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
+
+-- Read-point 4 (CR 612.1): the same word swap over an ACTIVATED ability printed
+-- on a permanent. "Any words or symbols printed on that object ... generally
+-- affects only that object's rules text (which appears in its text box)", and an
+-- activated ability is printed in that box, so a hacked Tidal Warrior's
+-- "{T}: Target land becomes an Island" becomes "... becomes a Swamp".
+--
+-- EFFECTS only, matching Resolve.modesOf: CR 612's word swap has nothing to say
+-- about a mode's optionality. Not implemented: a mode's target SPECS and the
+-- ability's activation COST are left unrewritten (#635).
+--
+-- Proved end to end by Pawl.ActivateSpec's Tidal Warrior chain, and at the
+-- projection by Pawl.ProjectionSpec's "hacking Tidal Warrior swaps the land type
+-- inside its activated ability".
+rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ActivatedAbility.ActivatedAbility Card.Type.Card
+rewriteActivatedAbility pairs ability =
+  let rewriteMode m = m {Mode.effects = fmap (rewriteEffect pairs) (Mode.effects m)}
+      modal = ActivatedAbility.modal ability
+   in ability {ActivatedAbility.modal = modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}}
 
 -- Every continuous effect in the game: stored resolution effects, plus the
 -- static abilities of every battlefield permanent (CR 613.7a: with the
