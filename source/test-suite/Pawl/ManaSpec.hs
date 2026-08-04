@@ -957,7 +957,7 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
         gs = g5 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
         offered = Action.legalActions S.alice gs
     Spec.assertBool s (elem (Action.Type.Cast planeId (S.printingName livingPlane)) offered) "{2}{G}{G} is offered"
-    Spec.assertBool s (notElem (Action.Type.Cast towershellId (S.printingName towershell)) offered) "{3}{G}{G} is not"
+    Spec.assertBool s (not (any (S.isCastOf towershellId) offered)) "{3}{G}{G} is not"
 
   -- And the offer is honoured: the same board casts Living Plane end to end,
   -- which it can only do by tapping one Myr for its Forest's {G} and the other

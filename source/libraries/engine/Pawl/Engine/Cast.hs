@@ -161,6 +161,12 @@ targetable pid oid name gs = case proposedFace oid name gs of
 -- hands Cost.totalMana in for exactly that reason: a gate and an offer that
 -- disagree about what a cost is are two ways of getting the same question wrong.
 -- castSpell asks this same predicate again once the announced X exists (#417).
+--
+-- Not implemented: the half being cast does not reach CR 601.2f's adjustments.
+-- The candidate `cost` comes from the chosen face, but Cost.total reads the
+-- object's characteristics through Game.faceOf, which sees no stamped face
+-- while the card is still in hand and so answers with CR 709.4's combined view
+-- (#656).
 payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
 
@@ -223,7 +229,7 @@ affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid o
 -- not an option. WHICH candidate will carry the cost is not decided here --
 -- castSpell narrows the candidates once the answer is in.
 --
--- `candidates` is handed in rather than read from `Cost.costsFor oid gs`: by the
+-- `candidates` is handed in rather than read from `Cost.costsFor`: by the
 -- time castSpell asks, CR 601.2a has already moved the card to the stack, and
 -- pawl offers a candidate cost BY ZONE (flashback's only from a graveyard), so
 -- the list has to come from the proposal. See castSpell.

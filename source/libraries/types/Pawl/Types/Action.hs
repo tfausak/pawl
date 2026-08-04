@@ -15,12 +15,12 @@ data Action
     -- sentence is what that buys: a previously made choice may restrict the
     -- later ones.
     --
-    -- The face's CardName, not an index into Card.faces (CR 709.4a refers to a
-    -- card's faces by name): a name in a decision log either resolves or fails
-    -- loudly, where an index silently replays as the wrong half if the card
-    -- data is ever reordered. Unlike Activate below this is a positional-but-
-    -- stable reference rather than a value, which is safe because no effect
-    -- grants a card a face.
+    -- A CardName, not an index into Card.faces. CR 709.4a is what gives a
+    -- card's faces names at all, and CR 709.3 has the player choose a half by
+    -- naming it, so a name is the reference the rules themselves use. It is
+    -- also the one that survives a decision log: a name either resolves to a
+    -- face or fails loudly, where an index silently replays as the WRONG half
+    -- if the card data is ever reordered.
     Cast ObjectId.ObjectId CardName.CardName
   | -- | CR 602: activate the source permanent's ability. Carries the ability
     -- VALUE (validated by membership in Projection.abilitiesOf), never an

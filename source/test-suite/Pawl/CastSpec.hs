@@ -117,7 +117,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 1 Phase.PrecombatMain
-    Spec.assertBool s (notElem (A.Cast oid (S.printingName piker)) (Action.legalActions S.alice gs)) "not offered"
+    Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice gs))) "not offered"
   -- No split card is in the pool yet (#648), so the fixture is the hand-built
   -- one Pawl.CardSpec already carries: two Instant halves, Wax costing {G} and
   -- Wane costing {W}.
@@ -1171,7 +1171,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
         (inHand, handBoard) = inHandWith mountain bolt 6
     Spec.assertBool s (S.castable S.alice inHand handBoard) "castable from hand"
     Spec.assertBool s (not (S.castable S.alice inGraveyard gs)) "not castable from the graveyard"
-    Spec.assertBool s (notElem (A.Cast inGraveyard (S.printingName bolt)) (Action.legalActions S.alice gs)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs))) "and not offered"
 
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
@@ -1219,7 +1219,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
     Spec.assertBool s (not (S.castable S.alice oid gs)) "not castable"
-    Spec.assertBool s (notElem (A.Cast oid (S.printingName sorcery)) (Action.legalActions S.alice gs)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice gs))) "and not offered"
   -- The supertype alone is not the condition: rule 205.4e names a legendary
   -- CREATURE (or planeswalker), and Mindslaver is a legendary artifact.
   Spec.it s "CR 205.4e a legendary artifact does not satisfy it" $ do
@@ -1229,7 +1229,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature mindslaver S.alice gs)
     Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
-    Spec.assertBool s (notElem (A.Cast oid (S.printingName sorcery)) (Action.legalActions S.alice board)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "and not offered"
   -- "unless THAT PLAYER controls": an opponent's legendary creature is no
   -- help. Bob's Thalia still taxes alice (her ability is EachPlayer-scoped),
   -- so a second Mountain keeps the spell affordable and CR 205.4e the only
@@ -1345,7 +1345,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
       (Map.elems (Combat.Type.attackers (GameState.combat attacked)))
       [AttackTarget.OfPlaneswalker jaceId]
     Spec.assertBool s (not (S.castable S.bob bobsRally attacked)) "not castable"
-    Spec.assertBool s (notElem (A.Cast bobsRally (S.printingName rally)) (Action.legalActions S.bob attacked)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob attacked))) "and not offered"
   -- The "only if you've been attacked this step" clause, isolated: the step is
   -- right and nobody has attacked yet.
   Spec.it s "CR 601.3 not castable in the declare attackers step before attackers are declared" $ do
@@ -1354,7 +1354,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     rally <- S.printingOf s registry "Rally the Troops"
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
     Spec.assertBool s (not (S.castable S.bob bobsRally board)) "not castable"
-    Spec.assertBool s (notElem (A.Cast bobsRally (S.printingName rally)) (Action.legalActions S.bob board)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob board))) "and not offered"
   -- The same clause from the other side, and the reason the check cannot be a
   -- question about the step alone: Eightfold Maze's ruling is "To cast it, a
   -- creature needs to have attacked _you_", and nothing attacked alice.
@@ -1365,7 +1365,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     let (_, alicesRally, _, board) = rallyBoard piker plains rally
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (not (S.castable S.alice alicesRally attacked)) "not castable"
-    Spec.assertBool s (notElem (A.Cast alicesRally (S.printingName rally)) (Action.legalActions S.alice attacked)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf alicesRally) (Action.legalActions S.alice attacked))) "and not offered"
   -- The "only during the declare attackers step" clause, isolated: bob HAS
   -- been attacked -- CR 511.3 keeps the combat record live until the end of
   -- combat step ends -- and the window has passed.
@@ -1385,7 +1385,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
         later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
     Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
     Spec.assertBool s (not (S.castable S.bob bobsRally later)) "not castable"
-    Spec.assertBool s (notElem (A.Cast bobsRally (S.printingName rally)) (Action.legalActions S.bob later)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob later))) "and not offered"
     Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt)) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
   -- CR 508.4's last-but-one sentence: "Such creatures are 'attacking' but, for
   -- the purposes of trigger events and effects, they never 'attacked.'" The
@@ -1420,7 +1420,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     -- CR 508.3b/508.4's record does not.
     Spec.assertBool s (not (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked combat))) "but bob was never DECLARED-attacked"
     Spec.assertBool s (not (S.castable S.bob bobsRally joined)) "so Rally is not castable"
-    Spec.assertBool s (notElem (A.Cast bobsRally (S.printingName rally)) (Action.legalActions S.bob joined)) "and not offered"
+    Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob joined))) "and not offered"
     -- The control twin: the SAME board with a real declaration makes it
     -- castable, so what the assertions above measure is the declaration and not
     -- something else about the fixture.
@@ -1511,7 +1511,7 @@ flashSpec s registry = Spec.describe s "Flash" $ do
     Spec.assertBool s (S.castable S.alice cheetahId bobsTurn) "the Cheetah is castable"
     Spec.assertBool s (elem (A.Cast cheetahId (S.printingName pouncingCheetah)) (Action.legalActions S.alice bobsTurn)) "and offered as a legal action"
     Spec.assertBool s (not (S.castable S.alice mammothId bobsTurn)) "the Mammoth is not"
-    Spec.assertBool s (notElem (A.Cast mammothId (S.printingName warMammoth)) (Action.legalActions S.alice bobsTurn)) "and is not offered"
+    Spec.assertBool s (not (any (S.isCastOf mammothId) (Action.legalActions S.alice bobsTurn))) "and is not offered"
   -- CR 302.1's "when the stack is empty", same pair.
   Spec.it s "CR 702.8a castable with a non-empty stack, where a creature without flash is not" $ do
     forest <- S.printingOf s registry "Forest"

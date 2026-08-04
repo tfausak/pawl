@@ -1452,28 +1452,33 @@ oneMountainState mountain ph =
 drawStep :: Game.Type.Game ()
 drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 
--- Pawl.Engine.Cast.castSpell for a card that offers exactly one half to cast:
--- CR 709.3's choice, made where the card leaves only one answer. The name is
--- read off that card's own sole castable face and so is never a stand-in for
--- one a test failed to name.
+-- CR 709.3's half-choice, made where the card leaves exactly one answer: the
+-- name of the object's sole castable face. Read off that card's own data, so it
+-- is never a stand-in for a name a test failed to give.
 --
--- A card with SEVERAL halves is a real choice, and this refuses to make it:
--- nothing is cast, so a test that reaches here with a split card fails on its
--- own assertion rather than quietly casting a half nobody chose. Such a test
--- calls Cast.castSpell directly and names the half.
+-- A card with SEVERAL halves is a real choice, and this refuses to make it --
+-- LOUDLY, naming the card. A helper that quietly did nothing is how a future
+-- multi-face test would pass while exercising nothing. Such a test names the
+-- half and calls Pawl.Engine.Cast directly.
+soleFaceName :: ObjectId.ObjectId -> GameState.GameState -> CardName.CardName
+soleFaceName oid gs = case Cast.soleCastableFace oid gs of
+  Just face -> Face.name face
+  Nothing ->
+    error
+      ( "Pawl.Support: "
+          <> show (fmap nameOf (Game.cardOf oid gs))
+          <> " does not offer exactly one castable half -- name the half and call Pawl.Engine.Cast directly"
+      )
+
+-- Pawl.Engine.Cast.castSpell of that one half.
 cast :: PlayerId.PlayerId -> ObjectId.ObjectId -> Game.Type.Game ()
 cast pid oid = do
   gs <- State.get
-  case Cast.soleCastableFace oid gs of
-    Nothing -> pure ()
-    Just face -> Cast.castSpell pid oid (Face.name face)
+  Cast.castSpell pid oid (soleFaceName oid gs)
 
--- `cast`'s predicate half: Pawl.Engine.Cast.castable asked of the sole castable
--- half, and False for a card with several.
+-- `cast`'s predicate half: Pawl.Engine.Cast.castable asked of that same half.
 castable :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
-castable pid oid gs = case Cast.soleCastableFace oid gs of
-  Nothing -> False
-  Just face -> Cast.castable pid oid (Face.name face) gs
+castable pid oid gs = Cast.castable pid oid (soleFaceName oid gs) gs
 
 -- The name a single-face printing carries -- what a test naming the half of an
 -- A.Cast action holds in scope.
