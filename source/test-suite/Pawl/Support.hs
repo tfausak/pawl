@@ -168,6 +168,14 @@ pikerJson = do
   root <- Registry.defaultRoot
   TextIO.readFile (root <> "/goblin-piker.json")
 
+-- The committed Wax // Wane file, pikerJson's two-faced counterpart: the only
+-- card in the pool whose faces have names of their own (CR 709.4a), and so the
+-- one a throwaway corpus needs to exercise a by-either-name lookup.
+waxWaneJson :: IO Text.Text
+waxWaneJson = do
+  root <- Registry.defaultRoot
+  TextIO.readFile (root <> "/wax-wane.json")
+
 printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
 printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
 

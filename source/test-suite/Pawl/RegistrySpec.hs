@@ -8,14 +8,17 @@ import qualified Control.Exception as Exception
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardError as CardError
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Printing as Printing
 import qualified System.Directory as Directory
 
@@ -81,6 +84,41 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       byName <- Registry.named registry "Goblin Piker"
       bySlug <- Registry.named registry "goblin-piker"
       Spec.assertEq s byName bySlug
+
+  -- CR 709.4a: "Each split card has two names." Neither of them is the joined
+  -- string the file is named for, so a lookup by either half's own name has to
+  -- reach the file all the same (#649).
+  Spec.it s "CR 709.4a a split card is found by either of its names" $ do
+    waxWane <- S.waxWaneJson
+    withCorpus "split-by-either-name" [("wax-wane.json", waxWane)] $ \_ registry -> do
+      byLeft <- Registry.named registry "Wax"
+      byRight <- Registry.named registry "Wane"
+      Spec.assertEqWith s "the same one card" byLeft byRight
+      -- CR 709.2: "each split card is only one card", so what came back is the
+      -- whole two-faced card rather than the half that was asked for. Without
+      -- this, a fallback that returned some OTHER card entirely would pass the
+      -- equality above.
+      Spec.assertEqWith
+        s
+        "both faces"
+        (fmap (fmap Face.name . NonEmpty.toList . Card.faces) byLeft)
+        (Right (fmap (CardName.MkCardName . Text.pack) ["Wax", "Wane"]))
+      -- The joined name still resolves by the direct path, since "Wax // Wane"
+      -- slugifies to the filename: the fallback is an addition, not a
+      -- replacement.
+      byJoined <- Registry.named registry "Wax // Wane"
+      Spec.assertEqWith s "and by the joined name" byJoined byLeft
+
+  -- The rejecting direction of that scan. "goblin-piker.json" is a candidate
+  -- for "Goblin" by filename -- the slug is a whole hyphen-separated run of it
+  -- -- and is read and parsed, and then refused, because no FACE of it is named
+  -- "Goblin". Without this the scan would answer by filename, which is how a
+  -- lookup starts serving a card it was not asked for.
+  Spec.it s "a filename that merely contains the name asked for does not answer for it" $ do
+    piker <- S.pikerJson
+    withCorpus "not-a-face-name" [("goblin-piker.json", piker)] $ \_ registry -> do
+      result <- Registry.named registry "Goblin"
+      Spec.assertEqWith s "still missing" result . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Goblin"
 
   Spec.it s "a card is parsed at most once: the file may vanish after the first load" $ do
     piker <- S.pikerJson

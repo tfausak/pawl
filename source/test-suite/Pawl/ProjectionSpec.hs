@@ -1815,11 +1815,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       (PC.power (Projection.projectUpTo Layer.ModifyPT cands pikerId gs))
       (Just 2)
 
-  -- No split card is in the pool yet (#648), so this fixture is built by hand
-  -- (Pawl.CardSpec.splitCard: two Instant halves, Wax {G} and Wane {W}) and put
-  -- on the stack directly (S.spellOnStack), with Object.face set by hand: this
-  -- is about how the field is READ, and Pawl.CastSpec's CR 709.3a cases are
-  -- what prove a cast writes it.
+  -- Built by hand (Pawl.CardSpec.splitCard: two Instant halves, Wax {G} and
+  -- Wane {W}) and put on the stack directly (S.spellOnStack), with Object.face
+  -- set by hand: this is about how the field is READ, and Pawl.CastSpec's
+  -- CR 709.3a cases are what prove a cast writes it. The printed Wax // Wane
+  -- takes the same reading through a real cast in Pawl.CastSpec's WaxWane
+  -- group; here the point is to reach the read with nothing else moving.
   Spec.it s "CR 709.3b a split spell on the stack has only the half being cast" $ do
     let wax = CardName.MkCardName (Text.pack "Wax")
         card = CardSpec.splitCard

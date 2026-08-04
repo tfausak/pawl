@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -118,9 +119,11 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 1 Phase.PrecombatMain
     Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice gs))) "not offered"
-  -- No split card is in the pool yet (#648), so the fixture is the hand-built
-  -- one Pawl.CardSpec already carries: two Instant halves, Wax costing {G} and
-  -- Wane costing {W}.
+  -- The mechanism, against Pawl.CardSpec's hand-built fixture: two Instant
+  -- halves, Wax costing {G} and Wane costing {W}, and nothing else printed on
+  -- either. waxWaneSpec below asserts the same rules against the printed Wax //
+  -- Wane, which is what proves the card data; this pair says the gate is the
+  -- layout's and does not depend on what those halves happen to do.
   Spec.it s "CR 709.3a both halves are offered, each priced from its own half" $ do
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
@@ -1588,6 +1591,104 @@ flashSpec s registry = Spec.describe s "Flash" $ do
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash mammothId humbled)) "the Mammoth does not"
     Spec.assertBool s (S.castable S.alice cheetahId humbled) "and it is still castable on bob's turn"
 
+-- The two names Wax // Wane prints (CR 709.4a). Neither of them is "Wax//Wane",
+-- which is the combined view's stand-in and not a name the card has.
+waxName, waneName :: CardName.CardName
+waxName = CardName.MkCardName (Text.pack "Wax")
+waneName = CardName.MkCardName (Text.pack "Wane")
+
+-- The pool's first split card (CR 709.1), and so the first case here that
+-- exercises CR 709.3-709.4 against a printed card rather than a fixture: Wax is
+-- {G} "Target creature gets +2/+2 until end of turn", Wane is {W} "Destroy
+-- target enchantment".
+--
+-- Every case names the half and calls Pawl.Engine.Cast directly. S.cast and
+-- S.castable route through S.soleFaceName, which errors on a card with more
+-- than one castable half precisely so a split card cannot silently exercise
+-- nothing here.
+waxWaneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
+  -- CR 709.3: "A player chooses which half of a split card they are casting
+  -- before putting it onto the stack." Falsifier: an engine that cast the
+  -- COMBINED view would have no single spell payload to resolve, and one that
+  -- always cast the first face would pass this and fail the Wane case below.
+  Spec.it s "CR 709.3 casting Wax gives the targeted creature +2/+2" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    waxWane <- S.printingOf s registry "Wax // Wane"
+    let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+        (gs, oid) = S.handOne waxWane withPiker
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId resolved) (Just (4, 3))
+  -- The other half, and the case that makes the one above discriminating: this
+  -- board has no creature at all, so an engine that always cast the first face
+  -- would find Wax no legal target here.
+  Spec.it s "CR 709.3 casting Wane destroys the targeted enchantment" $ do
+    plains <- S.printingOf s registry "Plains"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    waxWane <- S.printingOf s registry "Wax // Wane"
+    let (prisonId, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
+        (gs, oid) = S.handOne waxWane withPrison
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    Spec.assertBool s (S.onBattlefield prisonId gs) "the Prison starts on the battlefield"
+    Spec.assertBool s (not (S.onBattlefield prisonId resolved)) "and Wane destroys it"
+  -- CR 709.4: "In every zone except the stack, the characteristics of a split
+  -- card are those of its two halves combined", and CR 709.4b: "The mana cost of
+  -- a split card is the combined mana costs of its two halves. A split card's
+  -- colors and mana value are determined from its combined mana cost." Read
+  -- through the game state rather than off the card, so this is the combined
+  -- view a resting object actually projects.
+  Spec.it s "CR 709.4b a split card in a graveyard is green and white with mana value 2" $ do
+    waxWane <- S.printingOf s registry "Wax // Wane"
+    let (oid, gs) = S.addGraveyardCard waxWane S.alice (Setup.emptyGame S.bothPlayers)
+    case Game.faceOf oid gs of
+      Nothing -> Spec.assertFailure s "expected a card in the graveyard"
+      Just face -> do
+        Spec.assertEqWith s "both colours" (Projection.printedColorsOf face) (Set.fromList [Color.Green, Color.White])
+        Spec.assertEqWith s "mana value 2" (Quantity.manaValueOf face) 2
+  -- CR 709.3b: "While on the stack, only the characteristics of the half being
+  -- cast exist. The other half's characteristics are treated as though they
+  -- didn't exist." The same card in a hand is CR 709.4's combined view instead,
+  -- which is the contrast that makes the stack reading a narrowing rather than
+  -- the only answer the engine has.
+  Spec.it s "CR 709.3b the Wax on the stack is named Wax, where the card in hand is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    waxWane <- S.printingOf s registry "Wax // Wane"
+    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+        (gs, oid) = S.handOne waxWane withPiker
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
+    -- CR 709.4a gives the card two names and no joined one, so the string a
+    -- single CardName can carry here is a stand-in (#650) rather than a name
+    -- the card has -- and it is emphatically not "Wax".
+    Spec.assertEqWith s "in hand, the combined view" (Projection.nameOf oid gs) (CardName.MkCardName (Text.pack "Wax//Wane"))
+    case GameState.stack cast of
+      [] -> Spec.assertFailure s "expected the spell on the stack"
+      top : _ -> Spec.assertEqWith s "on the stack, the half being cast" (Projection.nameOf top cast) waxName
+  Spec.it s "CR 709.3a each half is offered and gated on its own" $ do
+    waxWane <- S.printingOf s registry "Wax // Wane"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    -- Both halves need a legal target, or targeting gates them BOTH out and the
+    -- offered list is empty for a reason that has nothing to do with mana. Wax
+    -- wants a creature; Wane wants an enchantment.
+    let targets g = snd (S.addCreature ghostlyPrison S.alice (snd (S.addCreature piker S.alice g)))
+        namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+        (green, _) = S.handOne waxWane (targets (S.landsInPlay forest 1))
+        (both, _) = S.handOne waxWane (targets (snd (S.addCreature plains S.alice (S.landsInPlay forest 1))))
+    -- CR 709.3a: "Only the chosen half is evaluated to see if it can be cast."
+    -- One Forest pays Wax's {G} and cannot pay Wane's {W}. Falsifier: an engine
+    -- pricing either half from CR 709.4b's combined {G}{W} would offer NEITHER.
+    Spec.assertEqWith s "one Forest: only the affordable half" (namesOffered green) [waxName]
+    -- The other direction, without which "each half is gated on its own" is
+    -- indistinguishable from "the first face wins": with both halves payable,
+    -- both are offered and CR 709.3's choice is left to the player.
+    Spec.assertEqWith s "a Forest and a Plains: both halves" (namesOffered both) [waxName, waneName]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
@@ -1598,6 +1699,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   magicalHackSpec s registry
   blazeSpec s registry
   corrosiveGaleSpec s registry
+  waxWaneSpec s registry
   modalCastSpec s registry
   entwineSpec s registry
   auraTargetSpec s registry

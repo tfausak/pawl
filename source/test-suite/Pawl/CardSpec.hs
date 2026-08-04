@@ -167,8 +167,9 @@ instantLine =
 
 -- CR 709.4's fixture: two Instant halves, Wax costing {G} and Wane costing
 -- {W}, so the combined view's colours, mana value and type line are each a
--- genuine union rather than a copy of one half. Built by hand, the faceNamed
--- fixture's reason: no printing in the pool has a second face yet.
+-- genuine union rather than a copy of one half. Built by hand for the faceNamed
+-- fixture's reason, which the printed Wax // Wane does not retire: this group
+-- takes no Registry, so a card file is not reachable from here at all.
 splitCard :: Card.Type.Card
 splitCard =
   Card.Type.MkCard
@@ -186,9 +187,10 @@ cardSpec s = Spec.describe s "Card" $ do
           Spec.assertBool s (not (Card.isPermanent face)) "not a permanent"
           Spec.assertBool s (Card.isInstant face) "an instant"
   -- CR 709.4a: a card's faces are referred to BY NAME, so this is what a rule or
-  -- a player naming one half resolves through. Built by hand rather than loaded:
-  -- no printing in the pool has a second face yet, and a one-face card could not
-  -- tell "found the right face" from "found the only face".
+  -- a player naming one half resolves through. Built by hand rather than loaded
+  -- because this group takes no Registry, and the fixture is Normal on purpose:
+  -- faceNamed reads Card.faces and never Card.layout, which a Split fixture
+  -- could not distinguish from a lookup that went through the layout first.
   Spec.it s "CR 709.4a faceNamed finds a two-faced card's faces by their own names" $
     let wax = vanillaFace "Wax" instantLine
         wane = vanillaFace "Wane" instantLine
@@ -1408,9 +1410,10 @@ oneFaced :: Face.Face Card.Type.Card -> Card.Type.Card
 oneFaced face = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
 
 -- CR 709.2 / 712.8: every lint below is stated about ONE face's printed text,
--- and a card offends when ANY of its faces does. Every card in the pool has
--- exactly one face, so this fans out over a singleton today -- and it is what
--- keeps the second half of a card going unlinted from being possible at all.
+-- and a card offends when ANY of its faces does. Every card in the pool but
+-- Wax // Wane has exactly one face, so this mostly fans out over a singleton --
+-- and it is what keeps the second half of a card going unlinted from being
+-- possible at all.
 anyFace :: (Face.Face Card.Type.Card -> Bool) -> Card.Type.Card -> Bool
 anyFace p = any p . Card.Type.faces
 
@@ -2051,12 +2054,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- referring to a face BY NAME well-defined (CR 709.4a). Held over the whole
   -- pool rather than by construction, because a card file is data.
   --
-  -- No anti-vacuity guard yet: the pool has no multi-face card until Task 5
-  -- adds Wax // Wane, so this sweep cannot yet prove it is looking at
-  -- anything. Task 5 owes that guard.
   Spec.it s "a card's face names are pairwise distinct" $ do
     ps <- S.allPrintings s
     let offenders = filter (distinctFaceNamesOffends . Printing.card) ps
+    -- The guard the sibling lints carry: over a pool of one-face cards this
+    -- sweep passes on every card without comparing two names, and so proves
+    -- nothing. Wax // Wane is what makes it non-vacuous (#648).
+    Spec.assertBool s (any ((> 1) . length . Card.Type.faces . Printing.card) ps) "the pool has a multi-face card to lint"
     Spec.assertEqWith s "no card repeats a face name" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against a hand-built offender rather than a
   -- card file: a card that repeats a face name must not be loadable.

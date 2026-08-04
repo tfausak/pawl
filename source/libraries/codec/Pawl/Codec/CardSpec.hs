@@ -61,8 +61,8 @@ bareFace n =
       Face.openingHandAction = []
     }
 
--- | A basic land, which is what all 227 files in the corpus look like: one face,
--- and no "layout" key.
+-- | A basic land, which is what every file in the corpus but @wax-wane.json@
+-- looks like: one face, and no "layout" key.
 mountainCard :: Card.Card
 mountainCard =
   Card.MkCard
