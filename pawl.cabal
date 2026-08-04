@@ -669,6 +669,7 @@ test-suite pawl-test-suite
   -- cabal-gild: discover source/test-suite --exclude source/test-suite/Main.hs
   other-modules:
     Pawl.ActivateSpec
+    Pawl.AdventureSpec
     Pawl.AuraSpec
     Pawl.BindingSpec
     Pawl.Cards

@@ -252,27 +252,52 @@ entwineOffer pid oid candidates gs = case Game.faceOf oid gs of
 -- a search in progress (castableWhileSearching) rather than to the whole game,
 -- so it is not a zone a player may simply cast from.
 castZones :: [Zone.Zone]
-castZones = [Zone.Hand, Zone.Graveyard]
+castZones = [Zone.Hand, Zone.Graveyard, Zone.Exile]
 
--- Which of those zones THIS card may be cast from -- where a permission turns
--- into a zone.
-castableZones :: Face.Face Card.Type.Card -> [Zone.Zone]
-castableZones face =
+-- Which of those zones THIS player may cast THIS half of THIS object from --
+-- where a permission turns into a zone.
+--
+-- Takes the object and the board, where a card-carried permission would need
+-- only the face: CR 715.3d's permission is state on ONE exiled incarnation and
+-- names ONE player, so no function of a Face could answer for it.
+castableZones :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> [Zone.Zone]
+castableZones pid oid face gs =
   let permitted zone = case zone of
         -- CR 304.1 / 307.1: the rules' own allowance is worded "from their
         -- hand", so the hand needs no permission of its own.
         Zone.Hand -> True
         Zone.Graveyard -> permitsCastFromGraveyard face
+        Zone.Exile -> permitsCastFromExile pid oid face gs
         -- No other zone is in castZones.
         _ -> False
    in filter permitted castZones
+
+-- CR 715.3d: may this player cast this half of this exiled card? Both halves of
+-- the rule, and the second is why the Adventure half of an exiled adventurer
+-- card is not offered while the same card in a hand offers both:
+--
+--   * "For as long as that card remains exiled, that player may play it" -- the
+--     permission the resolution wrote (Object.playableFromExileBy), which naming
+--     a player is what keeps it from being an offer to everyone.
+--   * "It can't be cast as an Adventure this way" -- so the proposed face must
+--     not be the Adventure one.
+--
+-- The rule's own last clause, "although other effects that allow a player to
+-- cast it may allow a player to cast it as an Adventure", is about a DIFFERENT
+-- permission granting the Adventure half from exile. No card in this pool grants
+-- one, and this function is only ever asked about the CR 715.3d permission
+-- (#669).
+permitsCastFromExile :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+permitsCastFromExile pid oid face gs =
+  (Game.lookupObject oid gs >>= Object.playableFromExileBy) == Just pid
+    && not (Card.isAdventure face)
 
 -- Is this object somewhere this player may cast it from?
 inCastableZone :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 inCastableZone pid oid name gs =
   case proposedFace oid name gs of
     Nothing -> False
-    Just face -> any (\zone -> elem oid (Game.zoneMembers zone pid gs)) (castableZones face)
+    Just face -> any (\zone -> elem oid (Game.zoneMembers zone pid gs)) (castableZones pid oid face gs)
 
 -- CR 205.4e: a legendary instant or sorcery can't be cast unless its caster
 -- controls a legendary creature or a legendary planeswalker.

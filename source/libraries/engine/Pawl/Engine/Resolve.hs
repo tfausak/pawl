@@ -447,7 +447,36 @@ resolveSpellWith runSubgame oid = do
                             legalityNow = Map.mapWithKey legalSlot chosenNow
                         applyEffectWith runSubgame oid oid effectController legalityNow chosenNow eff
                   Monad.when taken (Monad.forM_ (Mode.effects mode) applyOne)
-                Event.changeZone oid Zone.Graveyard
+                finishSpell oid face effectController
+
+-- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution.
+-- Its owner's graveyard, unless it was cast as an Adventure -- then its
+-- controller exiles it instead, and CR 715.3d's permission to play it goes onto
+-- the exiled card.
+--
+-- Reached only from the RESOLVING path above. The fizzle a few lines up keeps
+-- the graveyard, and must: a spell whose targets have all become illegal does
+-- not resolve at all (CR 608.2b), so CR 715.3d's "as it resolves" never applies
+-- to it. The mechanic's own ruling says so outright -- an Adventure spell that
+-- leaves the stack any other way, "most likely by being countered or by failing
+-- to resolve because its targets have all become illegal", is not exiled.
+--
+-- Written onto the id the move RETURNS and never onto `oid`: CR 400.7 mints a
+-- fresh incarnation in exile and deletes the one that was on the stack, so the
+-- permission belongs to the new object. Nothing comes back when the move was
+-- cancelled, and then there is no exiled card to permit anything about.
+finishSpell :: ObjectId -> Face.Face Card.Type.Card -> PlayerId -> Game ()
+finishSpell oid face controller =
+  if not (Card.isAdventure face)
+    then Event.changeZone oid Zone.Graveyard
+    else do
+      exiled <- Event.changeZoneReturning oid Zone.Exile
+      Monad.forM_ exiled $ \newId ->
+        State.modify' $ \gs ->
+          gs
+            { GameState.objects =
+                Map.adjust (\o -> o {Object.playableFromExileBy = Just controller}) newId (GameState.objects gs)
+            }
 
 -- The no-subgame spell resolver (Stack's default path and every direct caller).
 resolveSpell :: ObjectId -> Game ()
@@ -1649,7 +1678,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               Object.chosenSubtype = Nothing,
               Object.chosenNames = Set.empty,
               Object.timestamp = ts,
-              Object.face = Nothing
+              Object.face = Nothing,
+              Object.playableFromExileBy = Nothing
             }
     _ <- Event.placeObject controller mkObj Zone.Command
     pure ()

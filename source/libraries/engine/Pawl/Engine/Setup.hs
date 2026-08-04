@@ -118,7 +118,8 @@ createCard pid printing = do
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
-            Object.face = Nothing
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing
           }
       gs3 =
         gs2
@@ -175,7 +176,8 @@ startGameFromCards perform = do
             -- here. This list is NOT the whole of that reset: `attachedTo`,
             -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
             -- survive the move (#653).
-            Object.face = Nothing
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing
           }
       cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
@@ -412,7 +414,8 @@ funnelBack finalSub parent =
             -- reset, and repeating it INCOMPLETELY -- `attachedTo`,
             -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
             -- survive here too (#653).
-            Object.face = Nothing
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing
           }
       returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))
       oldLibIds =

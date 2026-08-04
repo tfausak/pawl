@@ -168,6 +168,33 @@ data Object = MkObject
     --
     -- Per-incarnation state, like damage and counters: cleared by changeZone,
     -- because CR 400.7 makes the moved object a new one.
-    face :: Maybe CardName.CardName
+    face :: Maybe CardName.CardName,
+    -- | CR 715.3d: the player who may play this card while it remains exiled --
+    -- an Adventure spell's controller, written as the resolution that exiled it
+    -- finishes. Nothing for every object that did not get there that way, which
+    -- is what the rule's own "if an adventurer card ends up in exile for any
+    -- other reason" means.
+    --
+    -- STATE, where every other casting permission pawl has is a fact about a
+    -- CARD: Face.castingPermissions and Pawl.Engine.Keyword.castingPermissionsOf
+    -- are true of every copy of a card in every game, and
+    -- Pawl.Engine.Cast.permissionsOf reads them off a face. This one is true of
+    -- one incarnation and names one player, so a CastingPermission arm could not
+    -- carry it.
+    --
+    -- Per-incarnation, like damage and counters: cleared by changeZone, because
+    -- CR 400.7 makes the moved object a new one. That IS CR 715.3d's "for as
+    -- long as that card remains exiled" -- the permission ends when the card
+    -- leaves, with no sweep to run and nothing to unwind.
+    --
+    -- The player is the Adventure's CONTROLLER (CR 715.3d's "its controller
+    -- exiles it"), while Pawl.Engine.Game.zoneMembers filters exile by OWNER --
+    -- so a player who cast an opponent's adventurer card is named here and still
+    -- cannot find the card (#668).
+    --
+    -- PLAYABLE and not castable, after the rule's own word. What reads it is
+    -- narrower than that: only Pawl.Engine.Cast does, so a land under this
+    -- permission would be permitted nothing (#670).
+    playableFromExileBy :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

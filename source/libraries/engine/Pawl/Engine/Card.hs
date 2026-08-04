@@ -53,6 +53,15 @@ combined card = case Card.layout card of
   -- nothing to write and so also covers Who // What // When // Where // Why, a
   -- five-part split card from a silver-border Un-set, entirely outside the CR.
   Layout.Split -> foldSplit (Card.faces card)
+  -- CR 715.4: "In every zone except the stack, and while on the stack not as an
+  -- Adventure, an adventurer card has only its normal characteristics." The
+  -- alternative characteristics of CR 715.2 are reached ONLY through
+  -- Object.face, which CR 715.3b writes for the one incarnation that has them --
+  -- so the face this returns is the normal one, and the same expression Normal
+  -- takes is a different claim: that a card with TWO printed sets of
+  -- characteristics shows one of them, rather than that a card with one shows
+  -- it.
+  Layout.Adventure -> NonEmpty.head (Card.faces card)
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
@@ -169,6 +178,13 @@ castableFaces :: Card.Card -> [Face.Face Card.Card]
 castableFaces card = case Card.layout card of
   Layout.Normal -> [NonEmpty.head (Card.faces card)]
   Layout.Split -> NonEmpty.toList (Card.faces card)
+  -- CR 715.3: "As a player plays an adventurer card, the player chooses whether
+  -- they play the card normally or as an Adventure." Both, for Split's reason:
+  -- the choice is the player's, and offering each half as its own legal action
+  -- is how the engine avoids making it. WHICH of them a given zone allows is not
+  -- this function's question -- CR 715.3d's exile permission excludes the
+  -- Adventure half, and Pawl.Engine.Cast is where that is read.
+  Layout.Adventure -> NonEmpty.toList (Card.faces card)
 
 -- The face of this card with the given name, if it has one. CR 709.4a: a card's
 -- faces are referred to BY NAME, which is what a player names in paper and what
@@ -284,6 +300,19 @@ isPermanent f = any isPermanentType (Set.toList (TypeLine.types (Face.typeLine f
 -- one place an Aura differs from any other enchantment by a rule.
 isAura :: Face.Face Card.Card -> Bool
 isAura f = Set.member Subtype.Aura (TypeLine.subtypes (Face.typeLine f))
+
+-- CR 205.3k: is this face the ADVENTURE half of an adventurer card? The same
+-- printed-subtype read isAura is, and the reason "cast as an Adventure" is
+-- answerable at all: CR 715.3b puts one named face on the stack, and this is
+-- what says which kind of face that is.
+--
+-- A subtype and not a position, though CR 715.2's frames are positional and
+-- `combined` above does read the position. The two questions differ: which face
+-- is NORMAL is a fact about the card's layout, while "was this spell cast as an
+-- Adventure" is a fact about the object on the stack, and CR 715.3d asks the
+-- second of a face that has already been chosen.
+isAdventure :: Face.Face Card.Card -> Bool
+isAdventure f = Set.member Subtype.Adventure (TypeLine.subtypes (Face.typeLine f))
 
 -- CR 303.4a: the slot an Aura spell's required target is bound under. A genuine
 -- target, so it lives in the ordinary target namespace rather than among
