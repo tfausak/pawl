@@ -194,6 +194,21 @@ combatReplaySpec s =
         -- five, and it is the one ChooseLandTypeSwap's fallback already names.
         Spec.it s "defaultAnswer chooses Mountain" $
           Spec.assertEqWith s "Mountain" (Replay.defaultAnswer (Prompt.ChooseBasicLandType decider S.alice oid)) Subtype.Mountain
+        -- CR 612.2's two word families are asked for by two prompts whose
+        -- answers have the SAME shape, so the transcript has to tell them apart:
+        -- a shared Response constructor would replay Magical Hack's basic land
+        -- types into Artificial Evolution's creature-type ask. Each decodes its
+        -- own and rejects the other.
+        Spec.it s "the two CR 612 swap prompts do not answer each other" $ do
+          let slot = SlotName.MkSlotName (Text.pack "target")
+              landPrompt = Prompt.ChooseLandTypeSwap decider S.alice oid slot Set.empty
+              creaturePrompt = Prompt.ChooseCreatureTypeSwap decider S.alice oid slot (Set.singleton Subtype.Wall)
+              lands = (Subtype.Mountain, Subtype.Island)
+              creatures = (Subtype.Frog, Subtype.Elf)
+          Spec.assertEqWith s "land round trip" (Replay.decode landPrompt (Replay.encode landPrompt lands)) (Just lands)
+          Spec.assertEqWith s "creature round trip" (Replay.decode creaturePrompt (Replay.encode creaturePrompt creatures)) (Just creatures)
+          Spec.assertEqWith s "a land answer does not fill a creature ask" (Replay.decode creaturePrompt (Replay.encode landPrompt lands)) Nothing
+          Spec.assertEqWith s "nor the other way round" (Replay.decode landPrompt (Replay.encode creaturePrompt creatures)) Nothing
         Spec.it s "DeclareMulligan records and replays a MulliganDecision" $ do
           let offer = MulliganOffer.MkMulliganOffer {MulliganOffer.taken = 0, MulliganOffer.bottomCount = 1}
               p = Prompt.DeclareMulligan decider S.alice offer

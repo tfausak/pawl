@@ -95,6 +95,7 @@ import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SourceRelationSpec
 import qualified Pawl.Codec.StaticAbilitySpec
+import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TapStateSpec
@@ -304,6 +305,7 @@ spec s registry = do
   Pawl.Codec.SlotNameSpec.spec s
   Pawl.Codec.SourceRelationSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
+  Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TapStateSpec.spec s

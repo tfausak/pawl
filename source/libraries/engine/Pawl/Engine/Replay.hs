@@ -49,6 +49,7 @@ encode p answer = case p of
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
   Prompt.ChooseTargets {} -> Response.ChoseTargets answer
   Prompt.ChooseLandTypeSwap {} -> Response.ChoseLandTypeSwap answer
+  Prompt.ChooseCreatureTypeSwap {} -> Response.ChoseCreatureTypeSwap answer
   Prompt.SearchLibrary {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
@@ -129,6 +130,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseLandTypeSwap {} -> case response of
     Response.ChoseLandTypeSwap pair -> Just pair
+    _ -> Nothing
+  Prompt.ChooseCreatureTypeSwap {} -> case response of
+    Response.ChoseCreatureTypeSwap pair -> Just pair
     _ -> Nothing
   Prompt.SearchLibrary {} -> case response of
     Response.Searched found -> Just found
@@ -279,6 +283,13 @@ defaultAnswer p = case p of
   -- A canonical identity hack (Mountain -> Mountain changes nothing): the fallback
   -- when a transcript runs short on a text-changer's word swap.
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  -- The same canonical identity for CR 612.2's creature-type half. Frog is a
+  -- creature type (CR 205.3m) and is forbidden by nothing the pool prints, so
+  -- this is as legal an answer as the land-type fallback above.
+  --
+  -- Not implemented: neither swap prompt's stated restrictions are checked
+  -- against the answer that comes back (#641).
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   -- CR 701.23b: failing to find is always legal, and is the least eventful
   -- fallback when a transcript runs short on a search.
   Prompt.SearchLibrary {} -> Nothing

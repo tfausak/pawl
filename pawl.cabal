@@ -245,6 +245,8 @@ library codec
     Pawl.Codec.StaticAbility
     Pawl.Codec.StaticAbilitySpec
     Pawl.Codec.Subtype
+    Pawl.Codec.SubtypeFamily
+    Pawl.Codec.SubtypeFamilySpec
     Pawl.Codec.SubtypeSpec
     Pawl.Codec.Supertype
     Pawl.Codec.SupertypeSpec
@@ -608,6 +610,7 @@ library types
     Pawl.Types.StaticAbility
     Pawl.Types.Status
     Pawl.Types.Subtype
+    Pawl.Types.SubtypeFamily
     Pawl.Types.Supertype
     Pawl.Types.TapState
     Pawl.Types.TargetSpec

@@ -654,6 +654,91 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- And hacked, the trigger the projection hands out asks the new question.
     Spec.assertEqWith s "hacked, the trigger counts Islands" (asksAbout hacked) [Subtype.Type.Island]
 
+  -- A CREATURE type word in a type line, swapped -- the half CR 612.2 names
+  -- second, and the half no pair could reach before Artificial Evolution. Bog
+  -- Wraith's printed Wraith moves to Elf.
+  --
+  -- The board is the Ashaya one, because it also pins what a text change may NOT
+  -- reach: Ashaya, Soul of the Wild makes alice's nontoken creatures Forest lands
+  -- in addition to their other types, so the Wraith projects Land Creature --
+  -- Forest Wraith, and a land pair naming that Forest changes nothing at all. CR
+  -- 612.1 is why -- a text-changing effect applies to "words or symbols PRINTED
+  -- on that object", and the Forest is printed nowhere near Bog Wraith -- and CR
+  -- 613.1c/613.1d are how: the swap is layer 3 and Ashaya's subtype grant is
+  -- layer 4, so the word the swap looks for does not exist yet when it looks.
+  -- Wizards' own Artificial Evolution ruling agrees: it "only changes what is
+  -- printed on the card ... It will not change any effects that are on the
+  -- permanent."
+  Spec.it s "CR 612.1/612.2 a printed creature type word is swapped, and a granted land type is not" $ do
+    island <- S.printingOf s registry "Island"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    let (_, withAshaya) = S.addCreature ashaya S.alice (S.landsInPlay island 3)
+        (wraithId, plain) = S.addCreature bogWraith S.alice withAshaya
+        swapped from to = S.withEffectAt wraithId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord from to) plain
+    Spec.assertEqWith
+      s
+      "unswapped: Ashaya's Forest beside the printed Wraith"
+      (Projection.subtypesOf wraithId plain)
+      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Wraith])
+    Spec.assertEqWith
+      s
+      "a creature pair (Wraith -> Elf) moves the printed word, and only it"
+      (Projection.subtypesOf wraithId (swapped Subtype.Type.Wraith Subtype.Type.Elf))
+      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Elf])
+    Spec.assertEqWith
+      s
+      "a land pair (Forest -> Island) reaches nothing: that Forest is Ashaya's, not Bog Wraith's"
+      (Projection.subtypesOf wraithId (swapped Subtype.Type.Forest Subtype.Type.Island))
+      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Wraith])
+    Spec.assertEqWith
+      s
+      "and a pair naming neither word changes nothing"
+      (Projection.subtypesOf wraithId (swapped Subtype.Type.Swamp Subtype.Type.Mountain))
+      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Wraith])
+
+  -- CR 612.2 at the OTHER site a pair meets a word: a Modification's own subtype
+  -- word, where the family is fixed by the CONSTRUCTOR rather than by the word.
+  -- Magical Hack rewrites a SetLandSubtype (Tidal Warrior's Island, proved end
+  -- to end by Pawl.ActivateSpec); Artificial Evolution rewrites a
+  -- SetCreatureSubtype (Turn to Frog's Frog, proved end to end by
+  -- Pawl.ResolveSpec's ArtificialEvolution group); and a pair of the WRONG
+  -- family reaches neither.
+  --
+  -- The cross-family pairs here are hand-built, and deliberately so: pawl's land
+  -- types and creature types share no word, so no card in the pool can produce
+  -- such a pair and no board can make the gate's answer visible. That is why the
+  -- gate is written out rather than left to the exact-match test -- what stops a
+  -- creature-type pair rewriting a land-type word is CR 612.2, not a coincidence
+  -- of which words the two lists happen to hold.
+  Spec.it s "CR 612.2 a modification's subtype word is rewritten only by a pair of its own family" $ do
+    let rewrite from to = Projection.rewriteModification [(from, to)]
+    Spec.assertEqWith
+      s
+      "a creature pair rewrites a creature-type word"
+      (rewrite Subtype.Type.Frog Subtype.Type.Elf (Modification.SetCreatureSubtype Subtype.Type.Frog))
+      (Modification.SetCreatureSubtype Subtype.Type.Elf)
+    Spec.assertEqWith
+      s
+      "a land pair rewrites a land-type word"
+      (rewrite Subtype.Type.Island Subtype.Type.Swamp (Modification.SetLandSubtype Subtype.Type.Island))
+      (Modification.SetLandSubtype Subtype.Type.Swamp)
+    Spec.assertEqWith
+      s
+      "and the added land type too"
+      (rewrite Subtype.Type.Island Subtype.Type.Swamp (Modification.AddLandSubtype Subtype.Type.Island))
+      (Modification.AddLandSubtype Subtype.Type.Swamp)
+    Spec.assertEqWith
+      s
+      "a creature pair leaves a land-type position alone"
+      (rewrite Subtype.Type.Frog Subtype.Type.Elf (Modification.SetLandSubtype Subtype.Type.Frog))
+      (Modification.SetLandSubtype Subtype.Type.Frog)
+    Spec.assertEqWith
+      s
+      "and a land pair leaves a creature-type position alone"
+      (rewrite Subtype.Type.Island Subtype.Type.Swamp (Modification.SetCreatureSubtype Subtype.Type.Island))
+      (Modification.SetCreatureSubtype Subtype.Type.Island)
+
   -- CR 613.8a: Kormus Bell's affected set READS subtypes at layer 4, and
   -- Urborg's AddLandSubtype WRITES them at layer 4 -- so the two are dependent
   -- and Urborg must apply first, which is the classic pairing. It is what makes

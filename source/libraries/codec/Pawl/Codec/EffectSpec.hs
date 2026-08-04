@@ -48,6 +48,8 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SourceRelation as SourceRelation
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -100,13 +102,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking])))
       """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"IsAttacking"}]}]} """
-  Spec.it s "ChangeText" $
+  Spec.it s "ChangeText, a basic land type swap that forbids nothing" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChangeText (SlotName.MkSlotName (Text.pack "target")))
-      """ {"type":"ChangeText","value":"target"} """
+      (Effect.ChangeText SubtypeFamily.BasicLandType Set.empty (SlotName.MkSlotName (Text.pack "target")))
+      """ {"type":"ChangeText","value":[{"type":"BasicLandType"},[],"target"]} """
+  Spec.it s "ChangeText, a creature type swap whose new word can't be Wall" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) (SlotName.MkSlotName (Text.pack "target")))
+      """ {"type":"ChangeText","value":[{"type":"CreatureType"},[{"type":"Wall"}],"target"]} """
   Spec.it s "AddMana, a fixed type and any color" $ do
     Common.assertJsonCodec
       s

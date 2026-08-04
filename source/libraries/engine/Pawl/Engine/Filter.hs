@@ -264,7 +264,7 @@ matches context view predicate = case predicate of
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
 
--- CR 612.1: swap basic-land-type words wherever they appear in a Filter. A
+-- CR 612.1: swap subtype words wherever they appear in a Filter. A
 -- text-changing effect "can apply to any words or symbols printed on that
 -- object", and a Filter carried by an effect is part of that text -- so this is
 -- the shape Pawl.Engine.Projection.rewriteModification already has, for the type THIS
@@ -275,8 +275,15 @@ matches context view predicate = case predicate of
 -- a supertype, a colour, a number, a relation or a status, none of which CR 612's
 -- word swap reaches; HasKeyword is the one exception, and its own arm below says
 -- why it is left alone anyway. Written out exhaustively rather than with a
--- catch-all, so a later atom that can carry a land type fails to compile here
+-- catch-all, so a later atom that can carry a subtype fails to compile here
 -- instead of silently going unrewritten.
+--
+-- CR 612.2's family gate ("only those words that are used in the correct way")
+-- is not restated on the HasSubtype arm, for the reason
+-- Pawl.Engine.Projection's type-line half gives: a HasSubtype atom may name a
+-- word of any family -- Kormus Bell's Swamp is a land type, a Sliver lord's
+-- Sliver is a creature type -- so the family the word is used as IS the family
+-- the word belongs to, and the exact `lookup` already asks CR 612.2's question.
 rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter Keyword.Keyword -> Filter.Filter Keyword.Keyword
 rewrite pairs predicate = case predicate of
   Filter.HasSubtype s -> Filter.HasSubtype (Maybe.fromMaybe s (lookup s pairs))
@@ -295,8 +302,8 @@ rewrite pairs predicate = case predicate of
   --
   -- Still nothing to rewrite, but the reason is narrower than it was. Vectis
   -- Gloves now GRANTS a landwalk, so "no card grants one" is no longer why; its
-  -- criterion is HasCardType Artifact, which names no land type for CR 612.1's
-  -- basic-land-type swap to reach. Nothing in the pool filters by a landwalk
+  -- criterion is HasCardType Artifact, which names no subtype word at all for
+  -- CR 612.1's swap to reach. Nothing in the pool filters by a landwalk
   -- either. Note the separate half: Projection.project's ChangeSubtypeWord arm
   -- rewrites PC.subtypes and never PC.keywords, so a Magical Hack on Bog Wraith
   -- would not make islandwalk even if this arm recursed. Matches

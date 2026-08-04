@@ -25,6 +25,8 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -81,12 +83,21 @@ data Effect card
     -- that became attacking later. The one-shot opcodes that take an ObjectRef
     -- (Destroy, Untap) are under CR 608.2c/608.2f instead, and store nothing.
     ModifyTarget Duration.Duration Modification.Modification ObjectRef.ObjectRef
-  | -- | CR 612: rewrite basic-land-type words in the target spell or permanent. The
-    -- SlotName is the target slot; the two basic land types are announced as this
-    -- effect is applied (CR 608.2d, Prompt.ChooseLandTypeSwap) and baked into a
-    -- stored ChangeSubtypeWord continuous effect. Resolve asks and stores;
+  | -- | CR 612: rewrite subtype words in the target spell or permanent. The
+    -- SubtypeFamily is which words the card's own text names -- Magical Hack's
+    -- "one basic land type", Artificial Evolution's "one creature type" -- and
+    -- so which words the player is asked for; the Set is the words the NEW one
+    -- may not be, Artificial Evolution's "The new creature type can't be Wall"
+    -- (empty for a card that restricts nothing); the SlotName is the target
+    -- slot. The two words are announced as this effect is applied (CR 608.2d,
+    -- Prompt.ChooseLandTypeSwap / Prompt.ChooseCreatureTypeSwap) and baked into
+    -- a stored ChangeSubtypeWord continuous effect. Resolve asks and stores;
     -- Projection applies.
-    ChangeText SlotName.SlotName
+    --
+    -- The family is not stored alongside the pair: CR 612.2's gate reads the
+    -- family of the word being REPLACED, and Pawl.Engine.Subtype answers that
+    -- from the word itself.
+    ChangeText SubtypeFamily.SubtypeFamily (Set.Set Subtype.Subtype) SlotName.SlotName
   | -- | CR 605: add one unit of mana, of the type the ManaProduction names -- one
     -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
     -- mode adding more says so by holding the opcode more than once: Sol Ring's

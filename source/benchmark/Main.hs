@@ -85,6 +85,7 @@ alwaysPass p = case p of
       [] -> Map.empty
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -137,6 +138,7 @@ castAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction _ _ actions -> castElsePlay actions
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
@@ -190,6 +192,7 @@ fightAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction _ _ actions -> castElsePlay actions
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0

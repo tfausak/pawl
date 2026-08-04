@@ -105,6 +105,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -552,7 +553,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
   Spec.it s "CR 612 slotsOf finds a ChangeText slot" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText slot)) (Set.singleton slot)
+    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot)) (Set.singleton slot)
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
@@ -564,11 +565,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- effect's Filter. The stored ChangeSubtypeWord is what a resolved
     -- Magical Hack leaves on the spell.
     --
-    -- The SPELL half of read-point 3 (Resolve.modesOf) rests on this case
-    -- alone: no real instant or sorcery SETS a land's subtype, so the
-    -- Modification half of the same read-point is proved through an ACTIVATED
-    -- ability instead -- Pawl.ActivateSpec's Tidal Warrior chain, which reaches
-    -- the same Projection.rewriteEffect ModifyTarget arm.
+    -- The Filter half of read-point 3 (Resolve.modesOf) rests on this case
+    -- alone: no real instant or sorcery SETS a land's subtype. The Modification
+    -- half of the same read-point is Turn to Frog's SetCreatureSubtype under an
+    -- Artificial Evolution (the ArtificialEvolution group below), and
+    -- Pawl.ActivateSpec's Tidal Warrior chain reaches the same
+    -- Projection.rewriteEffect ModifyTarget arm through an ACTIVATED ability.
     island <- S.printingOf s registry "Island"
     forest <- S.printingOf s registry "Forest"
     boil <- S.printingOf s registry "Boil"
@@ -1494,6 +1496,132 @@ magicalHackTimingSpec s registry = Spec.describe s "MagicalHackTiming" $ do
     let ((_, replayed), desync) = Replay.replay resolveTranscript cast Stack.resolveTop
     Spec.assertEqWith s "the resolution replays deterministically" replayed resolved
     Spec.assertEqWith s "and the transcript answered every prompt" desync Nothing
+
+-- Aims every target slot at `oid` as an object (the SpellsAndPermanents pool's
+-- recipient shape), and swaps `from` for `to` when the text-changer asks. Every
+-- other prompt takes the identity fallback.
+evolveAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+evolveAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- Cast Turn to Frog at alice's Bog Wraith; optionally cast Artificial Evolution
+-- at the Turn to Frog SPELL and resolve it, swapping the named creature type
+-- words; then resolve the Turn to Frog. Returns the Wraith's id and the final
+-- state.
+turnToFrogChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, GameState.GameState)
+turnToFrogChain s registry swap = do
+  island <- S.printingOf s registry "Island"
+  bogWraith <- S.printingOf s registry "Bog Wraith"
+  turnToFrog <- S.printingOf s registry "Turn to Frog"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let (wraithId, g1) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+      (turnToFrogId, g2) = S.addHandCard turnToFrog S.alice g1
+      (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
+      onStack = S.runPure (aimAtCreature wraithId) g3 (Cast.castSpell S.alice turnToFrogId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      evolved = case swap of
+        Nothing -> onStack
+        Just (from, to) ->
+          S.runPure (evolveAt spellId from to) onStack $ do
+            Cast.castSpell S.alice evolutionId
+            Stack.resolveTop
+  pure (wraithId, S.runPure S.identityAnswer evolved Stack.resolveTop)
+
+-- Records the words a swap prompt says the new one may not be, so a test can
+-- assert what the player was actually offered. Targets go to `oid` (a
+-- text-changer aimed at a permanent needs no second card on the stack), and the
+-- swap itself is answered with an identity on a word neither family forbids.
+recordingForbidden :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State (Set.Set Subtype.Subtype) r
+recordingForbidden oid p = case p of
+  Prompt.ChooseCreatureTypeSwap _ _ _ _ forbidden -> do
+    State.modify' (Set.union forbidden)
+    pure (Subtype.Elf, Subtype.Elf)
+  Prompt.ChooseLandTypeSwap _ _ _ _ forbidden -> do
+    State.modify' (Set.union forbidden)
+    pure (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToObject oid)) sets)
+  _ -> pure (S.identityAnswer p)
+
+-- Aims every target slot at `oid` as a creature (Turn to Frog's Pool.Creatures
+-- recipient shape); the board holds more than one creature, so the choice has to
+-- be answered rather than forced by construction.
+aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  _ -> S.identityAnswer p
+
+-- CR 612.2's OTHER half, end to end through the real engine: "a creature type
+-- word used as a creature type".
+--
+-- Artificial Evolution {U} Instant -- "Change the text of target spell or
+-- permanent by replacing all instances of one creature type with another. The
+-- new creature type can't be Wall." (checked against Scryfall) -- is the card
+-- that makes the difference observable, and Turn to Frog {1}{U} ("target
+-- creature ... becomes a blue Frog with base power and toughness 1/1") is the
+-- spell it rewrites: its SetCreatureSubtype names the Frog, so an Evolution
+-- resolved at the spell on the stack has to make the target something else.
+artificialEvolutionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
+  -- The control: with no Evolution the printed word stands, so this cannot pass
+  -- vacuously on a chain that never got as far as resolving the Frog.
+  Spec.it s "CR 205.1b whole card: an unevolved Turn to Frog still makes a Frog" $ do
+    (wraithId, after) <- turnToFrogChain s registry Nothing
+    Spec.assertEqWith s "Creature -- Frog" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Frog)
+
+  -- And the point: the Evolution's word swap reaches the resolving spell's
+  -- SetCreatureSubtype, so the Wraith becomes an Elf and never a Frog.
+  Spec.it s "CR 612.2 whole card: Artificial Evolution on the Turn to Frog spell makes an Elf instead" $ do
+    (wraithId, after) <- turnToFrogChain s registry (Just (Subtype.Frog, Subtype.Elf))
+    Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Elf)
+
+  -- "The new creature type can't be Wall" is printed card text, so it travels
+  -- with the card: the data says it, Effect.ChangeText carries it, and the
+  -- prompt offers it. Nothing in the engine knows which card is asking.
+  Spec.it s "CR 612 the Evolution's own restriction reaches the player being asked" $ do
+    island <- S.printingOf s registry "Island"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+    magicalHack <- S.printingOf s registry "Magical Hack"
+    let (wraithId, g1) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+        forbiddenBy printing =
+          let (spellId, g2) = S.addHandCard printing S.alice g1
+              cast = do
+                Cast.castSpell S.alice spellId
+                Stack.resolveTop
+           in State.execState (Engine.runGame (recordingForbidden wraithId) g2 cast) Set.empty
+    Spec.assertEqWith s "the Evolution forbids Wall, and nothing else" (forbiddenBy artificialEvolution) (Set.singleton Subtype.Wall)
+    -- The falsifier for "the engine hard-codes Wall somewhere": Magical Hack
+    -- prints no restriction, so its swap forbids nothing.
+    Spec.assertEqWith s "and the Hack forbids nothing" (forbiddenBy magicalHack) Set.empty
+
+  -- CR 612.1's "any words or symbols printed on that object" reaches a
+  -- text-changer's own restriction clause: Wall in "The new creature type can't
+  -- be Wall" is a creature type word used as a creature type. Wizards' own
+  -- Artificial Evolution ruling puts it plainly -- the swap "alters all
+  -- occurrences of the chosen word in the text box and the type line of the
+  -- given card" -- so one Evolution aimed at another leaves a spell whose
+  -- restriction names the new word.
+  Spec.it s "CR 612.1 an Evolution on an Evolution rewrites the restriction itself" $ do
+    island <- S.printingOf s registry "Island"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+    let (wraithId, g1) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+        (firstId, g2) = S.addHandCard artificialEvolution S.alice g1
+        (secondId, g3) = S.addHandCard artificialEvolution S.alice g2
+        onStack = S.runPure S.identityAnswer g3 (Cast.castSpell S.alice secondId)
+        spellId = case GameState.stack onStack of
+          top : _ -> top
+          [] -> ObjectId.MkObjectId 999
+        -- The first Evolution replaces the second's every Wall with Frog.
+        evolved = S.runPure (evolveAt spellId Subtype.Wall Subtype.Frog) onStack $ do
+          Cast.castSpell S.alice firstId
+          Stack.resolveTop
+        forbidden = State.execState (Engine.runGame (recordingForbidden wraithId) evolved Stack.resolveTop) Set.empty
+    Spec.assertEqWith s "the evolved Evolution forbids Frog, not Wall" forbidden (Set.singleton Subtype.Frog)
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
@@ -3786,6 +3914,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   greatestSpec s registry
   counterSpec s registry
   magicalHackTimingSpec s registry
+  artificialEvolutionSpec s registry
   stifleSpec s registry
   countersSpec s registry
   untapSpec s registry

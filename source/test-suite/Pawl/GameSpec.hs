@@ -346,6 +346,7 @@ recordingAnswer p = case p of
       h : _ -> h
       [] -> A.Pass
   Prompt.ChooseLandTypeSwap {} -> pure (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> pure (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
   Prompt.ChooseX {} -> pure 0
@@ -1494,6 +1495,7 @@ slaveAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0

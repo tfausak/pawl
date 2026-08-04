@@ -227,7 +227,34 @@ data Prompt r where
   -- its payload: a name that says "basic land types" and means "two of them"
   -- reads as a near-namesake of ChooseBasicLandType below, which asks for one.
   -- The pair is not what makes this prompt what it is -- the swap is.
-  ChooseLandTypeSwap :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Prompt (Subtype.Subtype, Subtype.Subtype)
+  --
+  -- The Set is the words the NEW type may not be, which the text-changer's own
+  -- card text states (Effect.ChangeText carries it). Empty for Magical Hack,
+  -- which restricts nothing; carried here anyway so that the two swap prompts
+  -- present a card's restrictions the same way rather than one of them dropping
+  -- what the data said.
+  ChooseLandTypeSwap :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Set.Set Subtype.Subtype -> Prompt (Subtype.Subtype, Subtype.Subtype)
+  -- | CR 612: ChooseLandTypeSwap's sibling for the other family CR 612.2 names
+  -- -- "a creature type word used as a creature type". Artificial Evolution:
+  -- "replacing all instances of one creature type with another. The new creature
+  -- type can't be Wall."
+  --
+  -- Asked at the same moment and for the same CR 608.2d reason as
+  -- ChooseLandTypeSwap; see there. Its own constructor rather than a family
+  -- field on that one, because the two offer different words and a responder
+  -- that knows which prompt it is answering knows which list to offer.
+  --
+  -- The Set is that "can't be Wall": the words the NEW type may not be, read off
+  -- Effect.ChangeText, which reads it off the card. NOT hard-coded here or at
+  -- the ask -- Artificial Evolution's restriction is printed card text, so it
+  -- lives in the card's data like the rest of its text.
+  --
+  -- No candidate list, unlike ChooseLandTypeSwap's implied five (CR 305.6): CR
+  -- 205.3m's creature types run to hundreds, so the family is named by the
+  -- prompt rather than enumerated in it, and only the restriction the card
+  -- states is carried. Asked whenever the effect applies -- the choice is a real
+  -- one with no one-option case to elide.
+  ChooseCreatureTypeSwap :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Set.Set Subtype.Subtype -> Prompt (Subtype.Subtype, Subtype.Subtype)
   -- | CR 614.1c: as an object enters, its controller chooses ONE basic land
   -- type ("As this Aura enters, choose a basic land type" -- Convincing
   -- Mirage). The ObjectId is the entering object.
