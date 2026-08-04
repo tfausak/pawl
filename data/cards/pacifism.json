@@ -1,53 +1,57 @@
 {
-  "combatRestrictions": [
+  "faces": [
     {
-      "type": "CantAttack",
-      "value": {
-        "affected": {
-          "type": "Attached"
+      "combatRestrictions": [
+        {
+          "type": "CantAttack",
+          "value": {
+            "affected": {
+              "type": "Attached"
+            }
+          }
+        },
+        {
+          "type": "CantBlock",
+          "value": {
+            "affected": {
+              "type": "Attached"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "CantBlock",
-      "value": {
-        "affected": {
-          "type": "Attached"
+      ],
+      "enchant": {
+        "pool": {
+          "type": "Creatures"
         }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Pacifism",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
     }
-  ],
-  "enchant": {
-    "pool": {
-      "type": "Creatures"
-    }
-  },
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    }
-  ],
-  "name": "Pacifism",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

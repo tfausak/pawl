@@ -1,113 +1,121 @@
 {
-  "delayedAbilities": [
+  "faces": [
     {
-      "ability": {
-        "condition": {
-          "type": "StepBegins",
-          "value": [
-            {
-              "type": "Ending",
-              "value": {
-                "type": "EndStep"
-              }
-            },
-            {
-              "type": "EachTurn"
-            }
-          ]
-        },
-        "modal": {
-          "modes": [
-            {
-              "effects": [
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "StepBegins",
+              "value": [
                 {
-                  "type": "Sacrifice",
-                  "value": "token"
+                  "type": "Ending",
+                  "value": {
+                    "type": "EndStep"
+                  }
+                },
+                {
+                  "type": "EachTurn"
                 }
               ]
-            }
-          ]
-        }
-      },
-      "name": "sacrifice it"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Tidal Wave",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Create",
-            "value": [
-              {
-                "type": "Literal",
-                "value": 1
-              },
-              {
-                "colorIndicator": [
-                  {
-                    "type": "Blue"
-                  }
-                ],
-                "keywords": [
-                  {
-                    "type": "Defender"
-                  }
-                ],
-                "name": "Wall Token",
-                "power": {
-                  "type": "Literal",
-                  "value": 5
-                },
-                "toughness": {
-                  "type": "Literal",
-                  "value": 5
-                },
-                "typeLine": {
-                  "subtypes": [
+            },
+            "modal": {
+              "modes": [
+                {
+                  "effects": [
                     {
-                      "type": "Wall"
-                    }
-                  ],
-                  "types": [
-                    {
-                      "type": "Creature"
+                      "type": "Sacrifice",
+                      "value": "token"
                     }
                   ]
                 }
-              },
-              "token"
-            ]
+              ]
+            }
           },
+          "name": "sacrifice it"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Tidal Wave",
+      "spell": {
+        "modes": [
           {
-            "type": "ArmDelayedTrigger",
-            "value": "sacrifice it"
+            "effects": [
+              {
+                "type": "Create",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  },
+                  {
+                    "faces": [
+                      {
+                        "colorIndicator": [
+                          {
+                            "type": "Blue"
+                          }
+                        ],
+                        "keywords": [
+                          {
+                            "type": "Defender"
+                          }
+                        ],
+                        "name": "Wall Token",
+                        "power": {
+                          "type": "Literal",
+                          "value": 5
+                        },
+                        "toughness": {
+                          "type": "Literal",
+                          "value": 5
+                        },
+                        "typeLine": {
+                          "subtypes": [
+                            {
+                              "type": "Wall"
+                            }
+                          ],
+                          "types": [
+                            {
+                              "type": "Creature"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "token"
+                ]
+              },
+              {
+                "type": "ArmDelayedTrigger",
+                "value": "sacrifice it"
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

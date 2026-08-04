@@ -1,71 +1,75 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Instill Infection",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Instill Infection",
+      "spell": {
+        "modes": [
           {
-            "type": "PutCounters",
-            "value": [
+            "effects": [
               {
-                "type": "MinusOneMinusOne"
+                "type": "PutCounters",
+                "value": [
+                  {
+                    "type": "MinusOneMinusOne"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  },
+                  "target"
+                ]
               },
               {
-                "type": "Literal",
-                "value": 1
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "Draw",
-            "value": [
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
-              },
-              {
-                "type": "Literal",
-                "value": 1
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

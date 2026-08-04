@@ -1,101 +1,105 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Khabál Ghoul",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "StepBegins",
-        "value": [
-          {
-            "type": "Ending",
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "EndStep"
+              "type": "Black"
             }
-          },
-          {
-            "type": "EachTurn"
           }
-        ]
+        }
+      ],
+      "name": "Khabál Ghoul",
+      "power": {
+        "type": "Literal",
+        "value": 1
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
               {
-                "type": "PutCounters",
-                "value": [
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
+                }
+              },
+              {
+                "type": "EachTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "PlusOnePlusOne"
-                  },
-                  {
-                    "type": "Count",
-                    "value": {
-                      "aggregation": {
-                        "type": "Objects"
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
                       },
-                      "filter": {
-                        "type": "HasCardType",
+                      {
+                        "type": "Count",
                         "value": {
-                          "type": "Creature"
-                        }
-                      },
-                      "scope": {
-                        "type": "InHistory",
-                        "value": {
-                          "type": "MovedBetween",
-                          "value": [
-                            {
-                              "type": "Battlefield"
-                            },
-                            {
-                              "type": "Graveyard"
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
                             }
-                          ]
+                          },
+                          "scope": {
+                            "type": "InHistory",
+                            "value": {
+                              "type": "MovedBetween",
+                              "value": [
+                                {
+                                  "type": "Battlefield"
+                                },
+                                {
+                                  "type": "Graveyard"
+                                }
+                              ]
+                            }
+                          }
                         }
-                      }
-                    }
-                  },
-                  "self"
+                      },
+                      "self"
+                    ]
+                  }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Zombie"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Zombie"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

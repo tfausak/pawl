@@ -1,66 +1,70 @@
 {
-  "enchant": {
-    "filter": {
-      "type": "HasCardType",
-      "value": {
-        "type": "Land"
-      }
-    },
-    "pool": {
-      "type": "Permanents"
-    }
-  },
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "enchant": {
+        "filter": {
+          "type": "HasCardType",
+          "value": {
+            "type": "Land"
+          }
+        },
+        "pool": {
+          "type": "Permanents"
         }
-      }
-    }
-  ],
-  "name": "Convincing Mirage",
-  "replacementEffects": [
-    {
-      "type": "EntryR",
-      "value": [
+      },
+      "manaCost": [
         {
-          "type": "IsSource"
+          "type": "Generic",
+          "value": 1
         },
         {
-          "type": "ChooseBasicLandType"
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      ]
-    }
-  ],
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Attached"
-      },
-      "modifications": [
+      ],
+      "name": "Convincing Mirage",
+      "replacementEffects": [
         {
-          "type": "SetLandSubtypeToChosen"
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "ChooseBasicLandType"
+            }
+          ]
         }
-      ]
+      ],
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "SetLandSubtypeToChosen"
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

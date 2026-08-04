@@ -1,54 +1,58 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Variable"
-    },
-    {
-      "type": "Phyrexian",
-      "value": {
-        "type": "Green"
-      }
-    }
-  ],
-  "name": "Corrosive Gale",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      "manaCost": [
+        {
+          "type": "Variable"
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Green"
+          }
+        }
+      ],
+      "name": "Corrosive Gale",
+      "spell": {
+        "modes": [
           {
-            "type": "DealDamage",
-            "value": [
+            "effects": [
               {
-                "type": "And",
+                "type": "DealDamage",
                 "value": [
                   {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "HasKeyword",
+                        "value": {
+                          "type": "Flying"
+                        }
+                      }
+                    ]
                   },
                   {
-                    "type": "HasKeyword",
-                    "value": {
-                      "type": "Flying"
-                    }
+                    "type": "X"
                   }
                 ]
-              },
-              {
-                "type": "X"
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

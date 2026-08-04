@@ -1,51 +1,55 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Clone",
-  "power": {
-    "type": "Literal",
-    "value": 0
-  },
-  "replacementEffects": [
-    {
-      "type": "EntryR",
-      "value": [
+      "manaCost": [
         {
-          "type": "IsSource"
+          "type": "Generic",
+          "value": 3
         },
         {
-          "type": "AsCopy"
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      ]
+      ],
+      "name": "Clone",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "replacementEffects": [
+        {
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "AsCopy"
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 0
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Shapeshifter"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
     }
-  ],
-  "toughness": {
-    "type": "Literal",
-    "value": 0
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Shapeshifter"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

@@ -1,140 +1,144 @@
 {
-  "delayedAbilities": [
+  "faces": [
     {
-      "ability": {
-        "condition": {
-          "type": "StepBegins",
-          "value": [
-            {
-              "type": "Combat",
-              "value": {
-                "type": "DeclareAttackers"
-              }
-            },
-            {
-              "type": "ControllersTurn"
-            }
-          ]
-        },
-        "modal": {
-          "modes": [
-            {
-              "effects": [
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "StepBegins",
+              "value": [
                 {
-                  "type": "MoveToZone",
-                  "value": [
-                    "exiled",
+                  "type": "Combat",
+                  "value": {
+                    "type": "DeclareAttackers"
+                  }
+                },
+                {
+                  "type": "ControllersTurn"
+                }
+              ]
+            },
+            "modal": {
+              "modes": [
+                {
+                  "effects": [
                     {
-                      "type": "Battlefield"
-                    },
-                    {
-                      "attacking": true,
-                      "tapped": {
-                        "type": "Tapped"
-                      }
+                      "type": "MoveToZone",
+                      "value": [
+                        "exiled",
+                        {
+                          "type": "Battlefield"
+                        },
+                        {
+                          "attacking": true,
+                          "tapped": {
+                            "type": "Tapped"
+                          }
+                        }
+                      ]
                     }
                   ]
                 }
               ]
             }
-          ]
+          },
+          "name": "return it"
         }
+      ],
+      "keywords": [
+        {
+          "type": "Landwalk",
+          "value": {
+            "type": "HasSubtype",
+            "value": {
+              "type": "Island"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Meandering Towershell",
+      "power": {
+        "type": "Literal",
+        "value": 5
       },
-      "name": "return it"
-    }
-  ],
-  "keywords": [
-    {
-      "type": "Landwalk",
-      "value": {
-        "type": "HasSubtype",
-        "value": {
-          "type": "Island"
-        }
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Meandering Towershell",
-  "power": {
-    "type": "Literal",
-    "value": 5
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 9
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfAttacks",
-        "value": {
-          "type": "EveryTime"
-        }
+      "toughness": {
+        "type": "Literal",
+        "value": 9
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfAttacks",
+            "value": {
+              "type": "EveryTime"
+            }
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "MoveToZone",
-                "value": [
-                  "self",
+                "effects": [
                   {
-                    "type": "Exile"
+                    "type": "MoveToZone",
+                    "value": [
+                      "self",
+                      {
+                        "type": "Exile"
+                      },
+                      "exiled"
+                    ]
                   },
-                  "exiled"
-                ]
-              },
-              {
-                "type": "ArmDelayedTrigger",
-                "value": [
-                  "return it",
                   {
-                    "type": "FromYourNextTurn"
-                  },
-                  null
+                    "type": "ArmDelayedTrigger",
+                    "value": [
+                      "return it",
+                      {
+                        "type": "FromYourNextTurn"
+                      },
+                      null
+                    ]
+                  }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Turtle"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Turtle"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

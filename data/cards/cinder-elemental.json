@@ -1,93 +1,97 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          },
-          {
-            "type": "SacrificeThis"
-          }
-        ],
-        "mana": [
-          {
-            "type": "Variable"
-          },
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
-              "value": {
-                "type": "Red"
-              }
-            }
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "target",
-                  {
-                    "type": "X"
-                  }
-                ]
+                "type": "TapThis"
+              },
+              {
+                "type": "SacrificeThis"
               }
             ],
-            "targetSpecs": [
+            "mana": [
               {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "AnyTarget"
+                "type": "Variable"
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
                   }
                 }
               }
             ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "X"
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "AnyTarget"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Cinder Elemental",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Cinder Elemental",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elemental"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

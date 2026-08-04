@@ -1,51 +1,55 @@
 {
-  "attackRequirements": [
+  "faces": [
     {
-      "subject": {
-        "type": "AttachedPlayerControls",
-        "value": {
-          "type": "HasCardType",
-          "value": {
-            "type": "Creature"
+      "attackRequirements": [
+        {
+          "subject": {
+            "type": "AttachedPlayerControls",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
           }
         }
-      }
-    }
-  ],
-  "enchant": {
-    "pool": {
-      "type": "Players"
-    }
-  },
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      ],
+      "enchant": {
+        "pool": {
+          "type": "Players"
         }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Curse of the Nightly Hunt",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          },
+          {
+            "type": "Curse"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
     }
-  ],
-  "name": "Curse of the Nightly Hunt",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      },
-      {
-        "type": "Curse"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

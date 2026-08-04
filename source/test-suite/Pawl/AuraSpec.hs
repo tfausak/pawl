@@ -35,11 +35,11 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -140,7 +140,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     case equipId of
       Nothing -> Spec.assertFailure s "Bonesplitter should have resolved onto the battlefield"
       Just equip -> do
-        let ability = case Card.Type.activatedAbilities (Printing.card bonesplitter) of
+        let ability = case Face.activatedAbilities (S.faceOf bonesplitter) of
               ab : _ -> Just ab
               [] -> Nothing
         case ability of
@@ -312,7 +312,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
         (aura, g2) = S.addCreature unholyStrength S.alice g1
         attached = S.attach aura creature g2
         (coatingId, g3) = S.addCreature coating S.alice attached
-        ability = case Card.Type.activatedAbilities (Printing.card coating) of
+        ability = case Face.activatedAbilities (S.faceOf coating) of
           ab : _ -> Just ab
           [] -> Nothing
     case ability of
@@ -350,7 +350,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
 -- permanents." Curse of Death's Hold is the proving card -- "Enchant player.
 -- Creatures enchanted player controls get -1/-1" -- and it is the one that needs
 -- BOTH halves of an enchant-player Aura: the Pool.Players enchant spec, which
--- Card.enchant could already express, and a static ability whose affected set is
+-- Face.enchant could already express, and a static ability whose affected set is
 -- reached THROUGH the enchanted player (Affected.AttachedPlayerControls).
 enchantPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
@@ -560,7 +560,7 @@ attachedTo host gs =
 -- the committed spec, not a restatement of it, so a test asserting what it admits
 -- is asserting what the card really says.
 crownTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
-crownTargetSpec printing = case Card.Type.activatedAbilities (Printing.card printing) of
+crownTargetSpec printing = case Face.activatedAbilities (S.faceOf printing) of
   ability : _ -> Map.lookup (SlotName.MkSlotName (Text.pack "target")) (Modal.allTargetSpecs (ActivatedAbility.modal ability))
   [] -> Nothing
 
@@ -605,7 +605,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         case crownId of
           Nothing -> Spec.assertFailure s "Crown of the Ages should have resolved onto the battlefield"
           Just crownObj -> do
-            let ability = case Card.Type.activatedAbilities (Printing.card crown) of
+            let ability = case Face.activatedAbilities (S.faceOf crown) of
                   ab : _ -> Just ab
                   [] -> Nothing
             case ability of
@@ -755,7 +755,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     -- state-based actions then punish -- it is still on a legal host.
     Spec.assertBool s (Set.member aura (GameState.battlefield settled)) "and the Aura is not buried afterwards"
   -- CR 303.4j through two printed cards. Setessan Training's "Enchant creature
-  -- you control" is the first Card.enchant in the pool that narrows past
+  -- you control" is the first Face.enchant in the pool that narrows past
   -- "creature" (CR 702.5a: the enchant ability "restricts what an Aura spell can
   -- target and what an Aura can enchant"), and Crown of the Ages' destination
   -- filter is the bare "another creature" -- so the Crown really does offer a
@@ -791,7 +791,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (Cast.castSpell S.alice crownSpell))
         settledIn = snd (Engine.runGamePure S.identityAnswer castCrown Stack.resolveTop)
         crowns = filter (\oid -> Game.cardOf oid settledIn == Just (Printing.card crown)) (Set.toList (GameState.battlefield settledIn))
-    case (attachedTo host enchanted, crowns, Card.Type.activatedAbilities (Printing.card crown)) of
+    case (attachedTo host enchanted, crowns, Face.activatedAbilities (S.faceOf crown)) of
       ([aura], [crownObj], [move]) -> do
         let ready = settledIn {GameState.priority = Just S.alice}
             run dest =
@@ -1129,7 +1129,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         -- attempted draw from an empty library (CR 704.5b).
         (_, base3) = S.addLibraryCard forest S.alice base2
         (gs, spellId) = S.handOne setessanTraining base3
-        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Card.Type.enchant (Printing.card setessanTraining))
+        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Face.enchant (S.faceOf setessanTraining))
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mine)) gs (Cast.castSpell S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- CR 704.3: the enters trigger waits until a player would get priority,

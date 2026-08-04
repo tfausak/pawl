@@ -1,105 +1,109 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "PayEnergy",
-            "value": 2
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "PutCounters",
-                "value": [
-                  {
-                    "type": "PlusOnePlusOne"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  "self"
-                ]
+                "type": "PayEnergy",
+                "value": 2
               }
-            ]
-          }
-        ]
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Longtusk Cub",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfDealsCombatDamageToPlayer"
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "GainPlayerCounters",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Energy"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "self"
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Longtusk Cub",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfDealsCombatDamageToPlayer"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "GainPlayerCounters",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Energy"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Cat"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Cat"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

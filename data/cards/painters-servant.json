@@ -1,61 +1,65 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    }
-  ],
-  "name": "Painter's Servant",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "replacementEffects": [
-    {
-      "type": "EntryR",
-      "value": [
+      "manaCost": [
         {
-          "type": "IsSource"
-        },
-        {
-          "type": "ChooseColor"
+          "type": "Generic",
+          "value": 2
         }
-      ]
-    }
-  ],
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "MatchingAnywhere",
-        "value": {
-          "type": "And",
-          "value": []
-        }
+      ],
+      "name": "Painter's Servant",
+      "power": {
+        "type": "Literal",
+        "value": 1
       },
-      "modifications": [
+      "replacementEffects": [
         {
-          "type": "AddChosenColor"
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "ChooseColor"
+            }
+          ]
         }
-      ]
-    }
-  ],
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Scarecrow"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
+      ],
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingAnywhere",
+            "value": {
+              "type": "And",
+              "value": []
+            }
+          },
+          "modifications": [
+            {
+              "type": "AddChosenColor"
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
       },
-      {
-        "type": "Creature"
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Scarecrow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

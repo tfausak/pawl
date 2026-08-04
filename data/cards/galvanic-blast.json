@@ -1,122 +1,126 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Galvanic Blast",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Galvanic Blast",
+      "spell": {
+        "modes": [
           {
-            "type": "Replace",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "Once"
-              },
-              {
-                "type": "SelfReplacement"
-              },
-              {
-                "comparison": {
-                  "type": "AtLeast"
-                },
-                "measured": {
-                  "type": "Count",
-                  "value": {
-                    "aggregation": {
-                      "type": "Objects"
-                    },
-                    "filter": {
-                      "type": "And",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Artifact"
-                          }
-                        },
-                        {
-                          "type": "ControlledBy",
-                          "value": {
-                            "type": "You"
-                          }
-                        }
-                      ]
-                    },
-                    "scope": {
-                      "type": "InZone",
-                      "value": [
-                        {
-                          "type": "Battlefield"
-                        },
-                        {
-                          "type": "EachPlayer"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "threshold": {
-                  "type": "Literal",
-                  "value": 3
-                }
-              },
-              {
-                "type": "DamageR",
+                "type": "Replace",
                 "value": [
                   {
-                    "whichSource": {
-                      "type": "TheSource"
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "Once"
+                  },
+                  {
+                    "type": "SelfReplacement"
+                  },
+                  {
+                    "comparison": {
+                      "type": "AtLeast"
+                    },
+                    "measured": {
+                      "type": "Count",
+                      "value": {
+                        "aggregation": {
+                          "type": "Objects"
+                        },
+                        "filter": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "ControlledBy",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "type": "InZone",
+                          "value": [
+                            {
+                              "type": "Battlefield"
+                            },
+                            {
+                              "type": "EachPlayer"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "threshold": {
+                      "type": "Literal",
+                      "value": 3
                     }
                   },
                   {
-                    "type": "SetAmount",
-                    "value": 4
+                    "type": "DamageR",
+                    "value": [
+                      {
+                        "whichSource": {
+                          "type": "TheSource"
+                        }
+                      },
+                      {
+                        "type": "SetAmount",
+                        "value": 4
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "DealDamage",
+                "value": [
+                  "target",
+                  {
+                    "type": "Literal",
+                    "value": 2
                   }
                 ]
               }
-            ]
-          },
-          {
-            "type": "DealDamage",
-            "value": [
-              "target",
+            ],
+            "targetSpecs": [
               {
-                "type": "Literal",
-                "value": 2
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "AnyTarget"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "AnyTarget"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

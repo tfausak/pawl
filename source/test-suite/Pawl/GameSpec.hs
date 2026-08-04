@@ -50,6 +50,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -213,7 +214,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
 
   Spec.it s "a vanilla printing declares no static abilities" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    Spec.assertEqWith s "empty" (Card.Type.staticAbilities (Printing.card piker)) []
+    Spec.assertEqWith s "empty" (Face.staticAbilities (S.faceOf piker)) []
 
 actionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 actionSpec s registry = Spec.describe s "Action" $ do
@@ -990,9 +991,9 @@ declareAttackersAskAnswer p = case p of
 -- group-local helpers (CostSpec, ActivateSpec, ReplacementSpec each carry
 -- their own).
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.faceOf p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.faceOf p)) ActivationTiming.AnyTime
 
 -- Records every player asked Prompt.Concede, in order -- the
 -- concedeOrderAnswer shape -- and drives alice through exactly one Activate
@@ -1450,8 +1451,8 @@ handBobBolt lightningBolt gs =
 namedIs :: CardName.CardName -> Maybe Object.Object -> Bool
 namedIs wanted mo = case mo of
   Just o -> case Object.source o of
-    Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
-    Source.OfToken card -> Card.Type.name card == wanted
+    Source.OfCard printing -> Face.name (S.faceOf printing) == wanted
+    Source.OfToken card -> S.nameOf card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
     Source.OfEmblem _ -> False

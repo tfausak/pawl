@@ -20,7 +20,7 @@ module Pawl.Types.Counterability where
 -- But Pawl.Types.StaticAbility implements only the battlefield-scoped part of
 -- CR 113.6 -- an Affected set plus Modifications folded through the CR 613
 -- layers. A prohibition functioning on the stack has no layer, no affected set
--- and modifies no characteristic. Same reason Card.castingPermissions is a card
+-- and modifies no characteristic. Same reason Face.castingPermissions is a card
 -- field.
 data Counterability
   = Counterable

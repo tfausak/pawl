@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
-import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
 import Pawl.Types.DamageEvent (DamageEvent)
@@ -33,6 +32,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -455,12 +455,12 @@ counter source controller oid = do
   case Game.lookupObject oid gs of
     Nothing -> pure ()
     -- CR 608.2n, reached before the CR 113.6g gate because that gate asks about a
-    -- spell's own card and an ability has none -- Game.cardOf answers Nothing for
+    -- spell's own card and an ability has none -- Game.faceOf answers Nothing for
     -- one, so asking first would fall through to the graveyard move by accident.
     -- An ability of a source that "can't be countered" is uncovered either way,
     -- that clause being about the spell (#542).
     Just _ | Game.isAbility oid gs -> State.modify' (Game.cease oid)
-    Just _ -> case fmap Card.counterability (Game.cardOf oid gs) of
+    Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure ()
       _ -> do
         moved <- changeZoneReturning oid Zone.Graveyard
@@ -1301,9 +1301,9 @@ eventTriggers events gs =
       cycledCard event = case event of
         GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> case Game.lookupObject oid gs of
           Nothing -> Map.empty
-          Just obj -> case Game.cardOf oid gs of
+          Just obj -> case Game.faceOf oid gs of
             Nothing -> Map.empty
-            Just card -> Map.singleton oid (Object.owner obj, Card.triggeredAbilities card)
+            Just face -> Map.singleton oid (Object.owner obj, Face.triggeredAbilities face)
         GameEvent.Discarded _ _ DiscardCause.Ordinary -> Map.empty
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
@@ -1334,9 +1334,9 @@ eventTriggers events gs =
       -- sentence governs and this live read is the game as it stands. A card that
       -- arrives in a graveyard and is gone again before the boundary is lost
       -- (#349).
-      graveyardCandidate oid = case (Game.lookupObject oid gs, Game.cardOf oid gs) of
-        (Just obj, Just card) ->
-          case filter (functionsInGraveyard . TriggeredAbility.condition) (Card.triggeredAbilities card) of
+      graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+        (Just obj, Just face) ->
+          case filter (functionsInGraveyard . TriggeredAbility.condition) (Face.triggeredAbilities face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing

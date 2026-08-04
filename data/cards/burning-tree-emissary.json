@@ -1,101 +1,105 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Hybrid",
-      "value": [
+      "manaCost": [
         {
-          "type": "Colored",
-          "value": {
-            "type": "Red"
-          }
+          "type": "Hybrid",
+          "value": [
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Red"
+              }
+            },
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            }
+          ]
         },
         {
-          "type": "Colored",
-          "value": {
-            "type": "Green"
-          }
+          "type": "Hybrid",
+          "value": [
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Red"
+              }
+            },
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            }
+          ]
         }
-      ]
-    },
-    {
-      "type": "Hybrid",
-      "value": [
-        {
-          "type": "Colored",
-          "value": {
-            "type": "Red"
-          }
-        },
-        {
-          "type": "Colored",
-          "value": {
-            "type": "Green"
-          }
-        }
-      ]
-    }
-  ],
-  "name": "Burning-Tree Emissary",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
+      ],
+      "name": "Burning-Tree Emissary",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
+                "effects": [
+                  {
+                    "type": "AddMana",
                     "value": {
-                      "type": "Red"
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Red"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Green"
+                        }
+                      }
                     }
                   }
-                }
-              },
-              {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Green"
-                    }
-                  }
-                }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Shaman"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Human"
-      },
-      {
-        "type": "Shaman"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

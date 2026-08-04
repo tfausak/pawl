@@ -1,57 +1,61 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Fog",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Fog",
+      "spell": {
+        "modes": [
           {
-            "type": "Replace",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "Unlimited"
-              },
-              {
-                "type": "Other"
-              },
-              null,
-              {
-                "type": "DamageR",
+                "type": "Replace",
                 "value": [
                   {
-                    "whichKind": {
-                      "type": "Combat"
-                    }
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "PreventAll"
+                    "type": "Unlimited"
+                  },
+                  {
+                    "type": "Other"
+                  },
+                  null,
+                  {
+                    "type": "DamageR",
+                    "value": [
+                      {
+                        "whichKind": {
+                          "type": "Combat"
+                        }
+                      },
+                      {
+                        "type": "PreventAll"
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

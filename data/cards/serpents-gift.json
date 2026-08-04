@@ -1,58 +1,62 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Serpent's Gift",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Serpent's Gift",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Deathtouch"
+                    }
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
               {
-                "type": "GainKeyword",
-                "value": {
-                  "type": "Deathtouch"
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
-              },
-              "target"
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -1,77 +1,81 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 4
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AttachTarget",
-                "value": [
-                  "target",
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 4
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
+                    "type": "AttachTarget",
+                    "value": [
+                      "target",
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasSubtype",
+                            "value": {
+                              "type": "Aura"
+                            }
+                          },
+                          {
+                            "type": "IsAttachedToCreature"
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
                     }
                   }
                 ]
               }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasSubtype",
-                        "value": {
-                          "type": "Aura"
-                        }
-                      },
-                      {
-                        "type": "IsAttachedToCreature"
-                      }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
-                }
-              }
             ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Crown of the Ages",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    }
-  ],
-  "name": "Crown of the Ages",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

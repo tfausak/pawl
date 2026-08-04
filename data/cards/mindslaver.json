@@ -1,63 +1,67 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          },
-          {
-            "type": "SacrificeThis"
-          }
-        ],
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 4
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "ControlPlayerNextTurn",
-                "value": "target"
+                "type": "TapThis"
+              },
+              {
+                "type": "SacrificeThis"
               }
             ],
-            "targetSpecs": [
+            "mana": [
               {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Players"
+                "type": "Generic",
+                "value": 4
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "ControlPlayerNextTurn",
+                    "value": "target"
                   }
-                }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Players"
+                      }
+                    }
+                  }
+                ]
               }
             ]
           }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 6
+        }
+      ],
+      "name": "Mindslaver",
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 6
-    }
-  ],
-  "name": "Mindslaver",
-  "typeLine": {
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

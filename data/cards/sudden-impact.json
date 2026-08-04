@@ -1,73 +1,77 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Sudden Impact",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Sudden Impact",
+      "spell": {
+        "modes": [
           {
-            "type": "DealDamage",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "Count",
-                "value": {
-                  "aggregation": {
-                    "type": "Objects"
-                  },
-                  "filter": {
-                    "type": "And",
-                    "value": []
-                  },
-                  "scope": {
-                    "type": "InZone",
-                    "value": [
-                      {
-                        "type": "Hand"
+                "type": "DealDamage",
+                "value": [
+                  "target",
+                  {
+                    "type": "Count",
+                    "value": {
+                      "aggregation": {
+                        "type": "Objects"
                       },
-                      {
-                        "type": "InSlot",
-                        "value": "target"
+                      "filter": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "scope": {
+                        "type": "InZone",
+                        "value": [
+                          {
+                            "type": "Hand"
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        ]
                       }
-                    ]
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
                   }
                 }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

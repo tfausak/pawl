@@ -1,75 +1,79 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Terror",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Terror",
+      "spell": {
+        "modes": [
           {
-            "type": "Destroy",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "CantBeRegenerated"
+                "type": "Destroy",
+                "value": [
+                  "target",
+                  {
+                    "type": "CantBeRegenerated"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Black"
+                          }
+                        }
+                      },
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Artifact"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "filter": {
-                "type": "And",
-                "value": [
-                  {
-                    "type": "Not",
-                    "value": {
-                      "type": "HasColor",
-                      "value": {
-                        "type": "Black"
-                      }
-                    }
-                  },
-                  {
-                    "type": "Not",
-                    "value": {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Artifact"
-                      }
-                    }
-                  }
-                ]
-              },
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

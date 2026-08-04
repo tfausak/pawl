@@ -35,7 +35,6 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Condition as Condition.Type
@@ -46,6 +45,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -1595,7 +1595,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
           [] -> ObjectId.MkObjectId 999
         (_, g1) = S.addCreature march S.alice gs0
         (coatingId, g2) = S.addCreature coating S.alice g1
-        ability = case Card.Type.activatedAbilities (Printing.card coating) of
+        ability = case Face.activatedAbilities (S.faceOf coating) of
           ab : _ -> Just ab
           [] -> Nothing
     case ability of
@@ -1763,8 +1763,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   Spec.it s "viewOfCard reads a printed basic land's supertypes off the battlefield" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let card = Printing.card mountain
-        view = Projection.viewOfCard card
+    let face = S.faceOf mountain
+        view = Projection.viewOfCard face
     Spec.assertBool s (Set.member CardType.Land (Filter.cardTypes view)) "is a land"
     Spec.assertBool s (Set.member Supertype.Basic (Filter.supertypes view)) "is basic"
     Spec.assertEqWith s "no power off battlefield" (Filter.power view) Nothing

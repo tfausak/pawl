@@ -1,40 +1,44 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    }
-  ],
-  "name": "Sapphire Medallion",
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "ReduceSpellCost",
-        "value": [
-          {
-            "type": "HasColor",
-            "value": {
-              "type": "Blue"
-            }
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Sapphire Medallion",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceSpellCost",
+            "value": [
+              {
+                "type": "HasColor",
+                "value": {
+                  "type": "Blue"
+                }
+              },
+              [
+                {
+                  "type": "Generic",
+                  "value": 1
+                }
+              ]
+            ]
           },
-          [
-            {
-              "type": "Generic",
-              "value": 1
-            }
-          ]
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
         ]
-      },
-      "scope": {
-        "type": "You"
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

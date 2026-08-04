@@ -1,39 +1,43 @@
 {
-  "manaCost": [],
-  "name": "Synthetic Legendary Sorcery",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+  "faces": [
+    {
+      "manaCost": [],
+      "name": "Synthetic Legendary Sorcery",
+      "spell": {
+        "modes": [
           {
-            "type": "LoseLife",
-            "value": [
+            "effects": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 3
+                "type": "LoseLife",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 3
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -1,46 +1,50 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Hardened Scales",
-  "replacementEffects": [
-    {
-      "type": "CounterR",
-      "value": [
+      "manaCost": [
         {
-          "onWhat": {
-            "type": "HasCardType",
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "Creature"
+              "type": "Green"
             }
-          },
-          "whichKind": {
-            "type": "PlusOnePlusOne"
-          },
-          "whose": {
-            "type": "Yours"
           }
-        },
-        {
-          "type": "AddMore",
-          "value": 1
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+      ],
+      "name": "Hardened Scales",
+      "replacementEffects": [
+        {
+          "type": "CounterR",
+          "value": [
+            {
+              "onWhat": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              },
+              "whichKind": {
+                "type": "PlusOnePlusOne"
+              },
+              "whose": {
+                "type": "Yours"
+              }
+            },
+            {
+              "type": "AddMore",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

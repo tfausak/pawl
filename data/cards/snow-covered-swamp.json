@@ -1,23 +1,27 @@
 {
-  "name": "Snow-Covered Swamp",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Swamp"
+  "faces": [
+    {
+      "name": "Snow-Covered Swamp",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Swamp"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          },
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
       }
-    ],
-    "supertypes": [
-      {
-        "type": "Basic"
-      },
-      {
-        "type": "Snow"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+    }
+  ]
 }

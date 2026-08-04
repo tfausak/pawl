@@ -40,6 +40,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -53,7 +54,7 @@ import qualified Pawl.Types.Zone as Zone
 -- the first card in the pool with more than one activated ability and CR 606.6 is
 -- a claim about WHICH of them is offered.
 abilityAt :: Int -> Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilityAt i p = take 1 (drop i (Card.Type.activatedAbilities (Printing.card p)))
+abilityAt i p = take 1 (drop i (Face.activatedAbilities (S.faceOf p)))
 
 -- The Activate action for one of Jace's abilities, as a one-or-zero-element list
 -- so a fixture that finds no such ability produces an assertion failure rather
@@ -95,7 +96,7 @@ stockLibraries island base =
 -- object as the spell moves and the hand's id does not survive the cast.
 theJace :: GameState.GameState -> ObjectId.ObjectId
 theJace gs =
-  let isJace oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Jace Beleren")
+  let isJace oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Jace Beleren")
    in case filter isJace (Set.toList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> S.noSource
@@ -136,7 +137,7 @@ burnAtJace island mountain jace burn =
 -- How many cards of a given name are in alice's graveyard.
 graveyardCount :: String -> GameState.GameState -> Int
 graveyardCount name gs =
-  let named oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack name)
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack name)
    in length (filter named (Game.zoneMembers Zone.Graveyard S.alice gs))
 
 -- Fill every target slot with the candidate that NAMES `oid`, whatever tag the

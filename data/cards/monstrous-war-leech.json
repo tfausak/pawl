@@ -1,68 +1,72 @@
 {
-  "characteristicPT": {
-    "type": "Count",
-    "value": {
-      "aggregation": {
-        "type": "Greatest",
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
         "value": {
-          "type": "ManaValue"
+          "aggregation": {
+            "type": "Greatest",
+            "value": {
+              "type": "ManaValue"
+            }
+          },
+          "filter": {
+            "type": "And",
+            "value": []
+          },
+          "scope": {
+            "type": "InZone",
+            "value": [
+              {
+                "type": "Graveyard"
+              },
+              {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              }
+            ]
+          }
         }
       },
-      "filter": {
-        "type": "And",
-        "value": []
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Monstrous War-Leech",
+      "power": {
+        "type": "Star"
       },
-      "scope": {
-        "type": "InZone",
-        "value": [
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
           {
-            "type": "Graveyard"
+            "type": "Horror"
           },
           {
-            "type": "Relative",
-            "value": {
-              "type": "You"
-            }
+            "type": "Leech"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  },
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Monstrous War-Leech",
-  "power": {
-    "type": "Star"
-  },
-  "toughness": {
-    "type": "Star"
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Horror"
-      },
-      {
-        "type": "Leech"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

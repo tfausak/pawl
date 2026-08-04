@@ -37,7 +37,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
@@ -47,6 +46,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -184,7 +184,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
           Spec.assertEqWith s "zone" (Object.zone obj) Zone.Battlefield
           case Object.source obj of
             Source.OfCard printing ->
-              Spec.assertBool s (Card.isCreature (Printing.card printing)) "creature"
+              Spec.assertBool s (Card.isCreature (S.faceOf printing)) "creature"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
@@ -293,7 +293,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
           Spec.assertEqWith s "zone" (Object.zone obj) Zone.Stack
           case Object.source obj of
             Source.OfCard printing ->
-              Spec.assertEqWith s "name" (Card.Type.name (Printing.card printing)) (CardName.MkCardName $ Text.pack "Goblin Piker")
+              Spec.assertEqWith s "name" (Face.name (S.faceOf printing)) (CardName.MkCardName $ Text.pack "Goblin Piker")
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
@@ -959,7 +959,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
--- mode and a Card.Type.enchant of "target creature" (CardSpec's auraCardSpec).
+-- mode and a Face.enchant of "target creature" (CardSpec's auraCardSpec).
 -- Task 6 merges Card.enchantSpecs into allTargetSpecs/modesTargetSpecs and
 -- teaches Target.fillableModes the extra slots a card declares outside its
 -- modes, so castability sees the enchant slot too -- without either function
@@ -973,7 +973,7 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
-        specs = Card.modesTargetSpecs (Set.singleton (ModeIndex.MkModeIndex 0)) (Printing.card unholyStrength)
+        specs = Card.modesTargetSpecs (Set.singleton (ModeIndex.MkModeIndex 0)) (S.faceOf unholyStrength)
     Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet specs)
     Spec.assertEqWith
       s
@@ -1074,7 +1074,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     Spec.assertEqWith s "the Piker went to the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice buried)) 1
     Spec.assertEqWith s "and nothing was exiled" (Game.zoneMembers Zone.Exile S.alice buried) []
   -- Crux (a): flashback's cost is available only from the GRAVEYARD. A cost
-  -- simply added to Card.alternativeCosts would make Firebolt castable from
+  -- simply added to Face.alternativeCosts would make Firebolt castable from
   -- hand for {4}{R} as well, which rule 702.34a does not say.
   Spec.it s "CR 702.34a the flashback cost is offered only from the graveyard" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1099,7 +1099,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     Spec.assertEqWith
       s
       "and the printed mana cost is still {R}"
-      (Card.Type.manaCost (Printing.card firebolt))
+      (Face.manaCost (S.faceOf firebolt))
       (Just (ManaCost.MkManaCost [theRed]))
   Spec.it s "CR 118.3 four Mountains do not pay the flashback {4}{R}; five do" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1168,7 +1168,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature jace S.alice gs)
-    Spec.assertBool s (not (Card.isCreature (Printing.card jace))) "not a creature"
+    Spec.assertBool s (not (Card.isCreature (S.faceOf jace))) "not a creature"
     Spec.assertBool s (Cast.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid) (Action.legalActions S.alice board)) "and offered as a legal action"
   Spec.it s "CR 205.4e not castable with no legendary permanent at all" $ do
@@ -1619,8 +1619,8 @@ castFirstOption p = case p of
 nameOnStack :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
   Just o -> case Object.source o of
-    Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
-    Source.OfToken card -> Card.Type.name card == wanted
+    Source.OfCard printing -> Face.name (S.faceOf printing) == wanted
+    Source.OfToken card -> S.nameOf card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
     Source.OfEmblem _ -> False

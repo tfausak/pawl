@@ -44,6 +44,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
@@ -1373,7 +1374,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- worlds are asserted on ONE board so the pair cannot drift: without
     -- Humility declining is illegal, with it the empty declaration becomes a
     -- legal answer. Fails against an implementation that reads
-    -- Card.blockRequirements off the printed card.
+    -- Face.blockRequirements off the printed card.
     --
     -- The third assertion is what keeps the second from passing vacuously: the
     -- combat is still live under Humility -- the Unicorn is still attacking and
@@ -2321,7 +2322,7 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
 -- activated ability rather than a spell). The first is the land's "{T}: Add
 -- {C}".
 removalAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
-removalAbility printing = case Card.Type.activatedAbilities (Printing.card printing) of
+removalAbility printing = case Face.activatedAbilities (S.faceOf printing) of
   [_, ability] -> Just ability
   _ -> Nothing
 
@@ -3003,7 +3004,7 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
             atReturn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer stolen
             isTowershell g o = case Game.cardOf o g of
               Nothing -> False
-              Just card -> Card.Type.name card == towershellName
+              Just card -> S.nameOf card == towershellName
             towershells g = filter (isTowershell g) (Set.toList (GameState.battlefield g))
         -- The premise: bob owns it and alice is the one attacking with it.
         Spec.assertEqWith s "bob owns it" (fmap Object.owner (Game.lookupObject oid stolen)) (Just S.bob)

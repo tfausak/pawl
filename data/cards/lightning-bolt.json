@@ -1,49 +1,53 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Lightning Bolt",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Lightning Bolt",
+      "spell": {
+        "modes": [
           {
-            "type": "DealDamage",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "Literal",
-                "value": 3
+                "type": "DealDamage",
+                "value": [
+                  "target",
+                  {
+                    "type": "Literal",
+                    "value": 3
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "AnyTarget"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "AnyTarget"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

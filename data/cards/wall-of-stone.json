@@ -1,52 +1,56 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Defender"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "keywords": [
+        {
+          "type": "Defender"
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
+      ],
+      "name": "Wall of Stone",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 8
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Wall"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "Wall of Stone",
-  "power": {
-    "type": "Literal",
-    "value": 0
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 8
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Wall"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

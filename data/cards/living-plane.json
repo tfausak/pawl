@@ -1,73 +1,77 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Living Plane",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "HasCardType",
-          "value": {
-            "type": "Land"
-          }
-        }
-      },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "AddCardType",
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
           "value": {
-            "type": "Creature"
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
           }
         },
         {
-          "type": "SetBasePowerToughness",
-          "value": [
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Living Plane",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Land"
+              }
+            }
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": 1
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
+              }
             },
             {
-              "type": "Literal",
-              "value": 1
+              "type": "SetBasePowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 1
+                },
+                {
+                  "type": "Literal",
+                  "value": 1
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "World"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "supertypes": [
-      {
-        "type": "World"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

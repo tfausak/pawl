@@ -1,70 +1,74 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
-                  }
-                }
-              },
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colorless"
+                      }
+                    }
+                  },
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colorless"
+                      }
+                    }
                   }
-                }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "name": "Palladium Myr",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Myr"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    }
-  ],
-  "name": "Palladium Myr",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Myr"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
-      },
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

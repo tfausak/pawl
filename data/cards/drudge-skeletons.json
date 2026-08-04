@@ -1,84 +1,88 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
-              "value": {
-                "type": "Black"
-              }
-            }
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "Replace",
-                "value": [
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Black"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "Once"
-                  },
-                  {
-                    "type": "Other"
-                  },
-                  null,
-                  {
-                    "type": "DestructionR",
-                    "value": {
-                      "type": "Regenerate"
-                    }
+                    "type": "Replace",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "Once"
+                      },
+                      {
+                        "type": "Other"
+                      },
+                      null,
+                      {
+                        "type": "DestructionR",
+                        "value": {
+                          "type": "Regenerate"
+                        }
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Drudge Skeletons",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Skeleton"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Drudge Skeletons",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Skeleton"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

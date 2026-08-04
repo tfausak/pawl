@@ -1,86 +1,90 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Aphotic Wisps",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Aphotic Wisps",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "SetColor",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Black"
-                  }
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "SetColor",
+                    "value": [
+                      {
+                        "type": "Black"
+                      }
+                    ]
+                  },
+                  "target"
                 ]
               },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
               {
-                "type": "UntilEndOfTurn"
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Fear"
+                    }
+                  },
+                  "target"
+                ]
               },
               {
-                "type": "GainKeyword",
-                "value": {
-                  "type": "Fear"
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "Draw",
-            "value": [
-              {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 1
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

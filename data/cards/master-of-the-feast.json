@@ -1,96 +1,100 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Flying"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "keywords": [
+        {
+          "type": "Flying"
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Master of the Feast",
-  "power": {
-    "type": "Literal",
-    "value": 5
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 5
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "StepBegins",
-        "value": [
-          {
-            "type": "Beginning",
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "Upkeep"
+              "type": "Black"
             }
-          },
-          {
-            "type": "ControllersTurn"
           }
-        ]
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Master of the Feast",
+      "power": {
+        "type": "Literal",
+        "value": 5
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 5
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
               {
-                "type": "Draw",
-                "value": [
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "Opponent"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "Opponent"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Demon"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          },
+          {
+            "type": "Enchantment"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Demon"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      },
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

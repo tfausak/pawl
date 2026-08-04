@@ -1,141 +1,149 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Sarcomancy",
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      ],
+      "name": "Sarcomancy",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  {
-                    "colorIndicator": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "type": "Black"
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "Black"
+                              }
+                            ],
+                            "name": "Zombie Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 2
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 2
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Zombie"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
                       }
-                    ],
-                    "name": "Zombie Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 2
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 2
-                    },
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Zombie"
-                        }
-                      ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
-                    }
+                    ]
                   }
                 ]
               }
             ]
           }
-        ]
-      }
-    },
-    {
-      "condition": {
-        "type": "StepBegins",
-        "value": [
-          {
-            "type": "Beginning",
-            "value": {
-              "type": "Upkeep"
+        },
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "intervening": {
+            "comparison": {
+              "type": "Exactly"
+            },
+            "measured": {
+              "type": "Count",
+              "value": {
+                "aggregation": {
+                  "type": "Objects"
+                },
+                "filter": {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Zombie"
+                  }
+                },
+                "scope": {
+                  "type": "InZone",
+                  "value": [
+                    {
+                      "type": "Battlefield"
+                    },
+                    {
+                      "type": "EachPlayer"
+                    }
+                  ]
+                }
+              }
+            },
+            "threshold": {
+              "type": "Literal",
+              "value": 0
             }
           },
-          {
-            "type": "ControllersTurn"
-          }
-        ]
-      },
-      "intervening": {
-        "comparison": {
-          "type": "Exactly"
-        },
-        "measured": {
-          "type": "Count",
-          "value": {
-            "aggregation": {
-              "type": "Objects"
-            },
-            "filter": {
-              "type": "HasSubtype",
-              "value": {
-                "type": "Zombie"
-              }
-            },
-            "scope": {
-              "type": "InZone",
-              "value": [
-                {
-                  "type": "Battlefield"
-                },
-                {
-                  "type": "EachPlayer"
-                }
-              ]
-            }
-          }
-        },
-        "threshold": {
-          "type": "Literal",
-          "value": 0
-        }
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+          "modal": {
+            "modes": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "you",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "DealDamage",
+                    "value": [
+                      "you",
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

@@ -1,108 +1,112 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Barbarian Outcast",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "StateIs",
-        "value": {
-          "comparison": {
-            "type": "Exactly"
-          },
-          "measured": {
-            "type": "Count",
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "aggregation": {
-                "type": "Objects"
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Barbarian Outcast",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StateIs",
+            "value": {
+              "comparison": {
+                "type": "Exactly"
               },
-              "filter": {
-                "type": "And",
-                "value": [
-                  {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Swamp"
-                    }
+              "measured": {
+                "type": "Count",
+                "value": {
+                  "aggregation": {
+                    "type": "Objects"
                   },
-                  {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "You"
-                    }
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Swamp"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  },
+                  "scope": {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Battlefield"
+                      },
+                      {
+                        "type": "EachPlayer"
+                      }
+                    ]
                   }
-                ]
+                }
               },
-              "scope": {
-                "type": "InZone",
-                "value": [
-                  {
-                    "type": "Battlefield"
-                  },
-                  {
-                    "type": "EachPlayer"
-                  }
-                ]
+              "threshold": {
+                "type": "Literal",
+                "value": 0
               }
             }
           },
-          "threshold": {
-            "type": "Literal",
-            "value": 0
-          }
-        }
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+          "modal": {
+            "modes": [
               {
-                "type": "Sacrifice",
-                "value": "self"
+                "effects": [
+                  {
+                    "type": "Sacrifice",
+                    "value": "self"
+                  }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Barbarian"
+          },
+          {
+            "type": "Beast"
+          },
+          {
+            "type": "Human"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Barbarian"
-      },
-      {
-        "type": "Beast"
-      },
-      {
-        "type": "Human"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

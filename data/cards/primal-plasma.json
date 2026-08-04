@@ -1,76 +1,80 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Primal Plasma",
-  "power": {
-    "type": "Star"
-  },
-  "replacementEffects": [
-    {
-      "type": "EntryR",
-      "value": [
+      "manaCost": [
         {
-          "type": "IsSource"
+          "type": "Generic",
+          "value": 3
         },
         {
-          "type": "ChoiceOf",
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Primal Plasma",
+      "power": {
+        "type": "Star"
+      },
+      "replacementEffects": [
+        {
+          "type": "EntryR",
           "value": [
             {
-              "power": 3,
-              "toughness": 3
+              "type": "IsSource"
             },
             {
-              "keywords": [
+              "type": "ChoiceOf",
+              "value": [
                 {
-                  "type": "Flying"
-                }
-              ],
-              "power": 2,
-              "toughness": 2
-            },
-            {
-              "keywords": [
+                  "power": 3,
+                  "toughness": 3
+                },
                 {
-                  "type": "Defender"
+                  "keywords": [
+                    {
+                      "type": "Flying"
+                    }
+                  ],
+                  "power": 2,
+                  "toughness": 2
+                },
+                {
+                  "keywords": [
+                    {
+                      "type": "Defender"
+                    }
+                  ],
+                  "power": 1,
+                  "toughness": 6
                 }
-              ],
-              "power": 1,
-              "toughness": 6
+              ]
             }
           ]
         }
-      ]
-    }
-  ],
-  "toughness": {
-    "type": "Star"
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elemental"
+      ],
+      "toughness": {
+        "type": "Star"
       },
-      {
-        "type": "Shapeshifter"
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          },
+          {
+            "type": "Shapeshifter"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+    }
+  ]
 }

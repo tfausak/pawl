@@ -1,58 +1,62 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Phyrexian",
-      "value": {
-        "type": "Green"
-      }
-    }
-  ],
-  "name": "Mutagenic Growth",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      "manaCost": [
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Green"
+          }
+        }
+      ],
+      "name": "Mutagenic Growth",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "Literal",
-                    "value": 2
-                  }
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  "target"
                 ]
-              },
-              "target"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

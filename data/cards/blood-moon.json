@@ -1,60 +1,64 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Blood Moon",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "And",
-          "value": [
-            {
-              "type": "HasCardType",
-              "value": {
-                "type": "Land"
-              }
-            },
-            {
-              "type": "Not",
-              "value": {
-                "type": "HasSupertype",
-                "value": {
-                  "type": "Basic"
+      ],
+      "name": "Blood Moon",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Land"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasSupertype",
+                    "value": {
+                      "type": "Basic"
+                    }
+                  }
                 }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "SetLandSubtype",
+              "value": {
+                "type": "Mountain"
               }
             }
           ]
         }
-      },
-      "modifications": [
-        {
-          "type": "SetLandSubtype",
-          "value": {
-            "type": "Mountain"
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
           }
-        }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

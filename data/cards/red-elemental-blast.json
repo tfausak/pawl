@@ -1,78 +1,82 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Red Elemental Blast",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Counter",
-            "value": "spell"
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "spell",
-            "spec": {
-              "filter": {
-                "type": "HasColor",
-                "value": {
-                  "type": "Blue"
-                }
-              },
-              "pool": {
-                "type": "Spells"
-              }
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
             }
           }
-        ]
-      },
-      {
-        "effects": [
+        }
+      ],
+      "name": "Red Elemental Blast",
+      "spell": {
+        "modes": [
           {
-            "type": "Destroy",
-            "value": [
-              "permanent",
+            "effects": [
               {
-                "type": "Regenerable"
+                "type": "Counter",
+                "value": "spell"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "spell",
+                "spec": {
+                  "filter": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "Blue"
+                    }
+                  },
+                  "pool": {
+                    "type": "Spells"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "Destroy",
+                "value": [
+                  "permanent",
+                  {
+                    "type": "Regenerable"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "permanent",
+                "spec": {
+                  "filter": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "Blue"
+                    }
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "permanent",
-            "spec": {
-              "filter": {
-                "type": "HasColor",
-                "value": {
-                  "type": "Blue"
-                }
-              },
-              "pool": {
-                "type": "Permanents"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

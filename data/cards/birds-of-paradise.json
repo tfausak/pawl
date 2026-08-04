@@ -1,65 +1,69 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "AnyColor"
-                }
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "AnyColor"
+                    }
+                  }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Birds of Paradise",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Bird"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "keywords": [
-    {
-      "type": "Flying"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Birds of Paradise",
-  "power": {
-    "type": "Literal",
-    "value": 0
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Bird"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

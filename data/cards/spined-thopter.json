@@ -1,46 +1,50 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Flying"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "Phyrexian",
-      "value": {
-        "type": "Blue"
-      }
-    }
-  ],
-  "name": "Spined Thopter",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Phyrexian"
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Blue"
+          }
+        }
+      ],
+      "name": "Spined Thopter",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      {
-        "type": "Thopter"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
+      "toughness": {
+        "type": "Literal",
+        "value": 1
       },
-      {
-        "type": "Creature"
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Phyrexian"
+          },
+          {
+            "type": "Thopter"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

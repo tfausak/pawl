@@ -1,20 +1,24 @@
 {
-  "name": "Forest",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Forest"
+  "faces": [
+    {
+      "name": "Forest",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Forest"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
       }
-    ],
-    "supertypes": [
-      {
-        "type": "Basic"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+    }
+  ]
 }

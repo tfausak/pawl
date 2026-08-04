@@ -16,9 +16,9 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
@@ -79,9 +79,9 @@ restricted select candidates gs =
       -- both unforced until some permanent actually declares a restriction.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
-      fromPermanent source = case Game.cardOf source gs of
+      fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
-        Just card -> case Card.combatRestrictions card of
+        Just face -> case Face.combatRestrictions face of
           -- Every permanent in almost every game.
           [] -> []
           restrictions ->

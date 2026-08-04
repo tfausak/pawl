@@ -1,92 +1,96 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Aspirant's Ascent",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Aspirant's Ascent",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "Literal",
-                    "value": 3
-                  }
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  "target"
                 ]
               },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
               {
-                "type": "UntilEndOfTurn"
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Flying"
+                    }
+                  },
+                  "target"
+                ]
               },
               {
-                "type": "GainKeyword",
-                "value": {
-                  "type": "Flying"
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Toxic",
+                      "value": 1
+                    }
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
-              },
-              "target"
-            ]
-          },
-          {
-            "type": "ModifyTarget",
-            "value": [
-              {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "GainKeyword",
-                "value": {
-                  "type": "Toxic",
-                  "value": 1
-                }
-              },
-              "target"
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

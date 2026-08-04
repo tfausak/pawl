@@ -1,23 +1,27 @@
 {
-  "name": "Snow-Covered Mountain",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Mountain"
+  "faces": [
+    {
+      "name": "Snow-Covered Mountain",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Mountain"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          },
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
       }
-    ],
-    "supertypes": [
-      {
-        "type": "Basic"
-      },
-      {
-        "type": "Snow"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+    }
+  ]
 }

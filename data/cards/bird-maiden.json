@@ -1,46 +1,50 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Flying"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "keywords": [
+        {
+          "type": "Flying"
         }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Bird Maiden",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Bird"
+          },
+          {
+            "type": "Human"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "Bird Maiden",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Bird"
-      },
-      {
-        "type": "Human"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

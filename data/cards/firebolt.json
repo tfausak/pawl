@@ -1,71 +1,75 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Flashback",
-      "value": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 4
-          },
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
-              "value": {
-                "type": "Red"
-              }
-            }
-          }
-        ]
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Firebolt",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "DealDamage",
-            "value": [
-              "target",
+      "keywords": [
+        {
+          "type": "Flashback",
+          "value": {
+            "mana": [
               {
-                "type": "Literal",
-                "value": 2
+                "type": "Generic",
+                "value": 4
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "AnyTarget"
-              }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
             }
+          }
+        }
+      ],
+      "name": "Firebolt",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "DealDamage",
+                "value": [
+                  "target",
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "AnyTarget"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

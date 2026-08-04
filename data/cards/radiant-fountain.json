@@ -1,69 +1,73 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
-                  }
-                }
+                "type": "TapThis"
               }
-            ]
-          }
-        ]
-      }
-    }
-  ],
-  "name": "Radiant Fountain",
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "GainLife",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
+                    "type": "AddMana",
                     "value": {
-                      "type": "You"
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colorless"
+                      }
                     }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 2
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "name": "Radiant Fountain",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "GainLife",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+  ]
 }

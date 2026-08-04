@@ -1,86 +1,90 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 1
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "Attach",
-                "value": "target"
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
-                  }
-                }
+                "type": "Generic",
+                "value": 1
               }
             ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Attach",
+                    "value": "target"
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": {
+            "type": "SorcerySpeed"
           }
-        ]
-      },
-      "timing": {
-        "type": "SorcerySpeed"
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    }
-  ],
-  "name": "Bonesplitter",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Attached"
-      },
-      "modifications": [
+        }
+      ],
+      "manaCost": [
         {
-          "type": "ModifyPowerToughness",
-          "value": [
+          "type": "Generic",
+          "value": 1
+        }
+      ],
+      "name": "Bonesplitter",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": 2
-            },
-            {
-              "type": "Literal",
-              "value": 0
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 2
+                },
+                {
+                  "type": "Literal",
+                  "value": 0
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Equipment"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Equipment"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

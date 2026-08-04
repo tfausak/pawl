@@ -1,88 +1,92 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 1
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "MoveToZone",
-                "value": [
-                  "target",
+                "type": "Generic",
+                "value": 1
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "Exile"
+                    "type": "MoveToZone",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Exile"
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "CardsInGraveyard",
+                        "value": {
+                          "type": "EachPlayer"
+                        }
+                      }
+                    }
                   }
                 ]
               }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "CardsInGraveyard",
-                    "value": {
-                      "type": "EachPlayer"
-                    }
-                  }
-                }
-              }
             ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Withered Wretch",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Cleric"
+          },
+          {
+            "type": "Zombie"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Withered Wretch",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Cleric"
-      },
-      {
-        "type": "Zombie"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

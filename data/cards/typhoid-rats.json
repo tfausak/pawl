@@ -1,39 +1,43 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Deathtouch"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "keywords": [
+        {
+          "type": "Deathtouch"
         }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Typhoid Rats",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Rat"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "Typhoid Rats",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Rat"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

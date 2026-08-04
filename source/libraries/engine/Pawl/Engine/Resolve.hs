@@ -51,6 +51,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -360,13 +361,13 @@ bindsSeveralTokens effects =
 modesOf :: ObjectId -> GameState -> [(ModeIndex, Mode.Mode Card.Type.Card)]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
-  Just obj -> case Game.cardOf oid gs of
+  Just obj -> case Game.faceOf oid gs of
     Nothing -> []
-    Just card ->
+    Just face ->
       let chosen = Binding.modesOf (Object.bindings obj)
           rewrite = Projection.rewriteEffect (Projection.textChangesAffecting oid gs)
           rewriteMode m = m {Mode.effects = fmap rewrite (Mode.effects m)}
-       in fmap (fmap rewriteMode) (Card.chosenModes chosen card)
+       in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
 
 -- CR 405.4: who controls a SPELL on the stack, fixed at cast time -- for both CR
 -- 608.2b's legality perspective and the effects' own execution. One function
@@ -387,10 +388,10 @@ spellController obj oid gs = Maybe.fromMaybe (Object.owner obj) (Projection.cont
 targetsAllIllegal :: ObjectId -> GameState -> Bool
 targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Nothing -> False
-  Just obj -> case Game.cardOf oid gs of
+  Just obj -> case Game.faceOf oid gs of
     Nothing -> False
-    Just card ->
-      let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) card
+    Just face ->
+      let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) face
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
             Nothing -> True
@@ -417,13 +418,13 @@ resolveSpellWith runSubgame oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
-    Just obj -> case Game.cardOf oid gs of
+    Just obj -> case Game.faceOf oid gs of
       Nothing -> pure ()
-      Just card ->
+      Just face ->
         -- CR 608.2b/700.2c: re-validate only the CHOSEN modes' slots -- an
         -- unchosen mode's slot was never filled and is not part of this
         -- resolution's legality question.
-        let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) card
+        let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) face
             legalSlot slot recipient = case Map.lookup slot specs of
               -- CR 608.2b is about TARGETS. A slot with no target spec is a
               -- RESERVED binding -- a trigger's source, a token this resolution
@@ -579,7 +580,7 @@ attachmentFor src destination gs
   | Set.member Subtype.Aura subtypes =
       if Projection.isCreatureOf src gs
         then Nothing
-        else case Game.cardOf src gs >>= Card.Type.enchant of
+        else case Game.faceOf src gs >>= Face.enchant of
           Nothing -> Nothing
           Just spec ->
             List.find
@@ -888,9 +889,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- search filter never references a player, so ControlledBy is vacuously False.
     -- No source in scope at this site.
     let searchContext = Filter.MkContext Nothing Nothing
-        matches1 g oid = case Game.cardOf oid g of
+        matches1 g oid = case Game.faceOf oid g of
           Nothing -> False
-          Just card -> Filter.matches searchContext (Projection.viewOfCard card) filter_
+          Just face -> Filter.matches searchContext (Projection.viewOfCard face) filter_
      in do
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
@@ -1405,7 +1406,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- have left the battlefield an opcode earlier in this same list -- Meandering
     -- Towershell's "exile it. Return it ..." -- and CR 400.7 has already deleted
     -- the id `source` names by the time this runs.
-    case Game.cardOfWithLastKnown source gs >>= (Map.lookup name . Card.Type.delayedAbilities) of
+    case Game.faceOfWithLastKnown source gs >>= (Map.lookup name . Face.delayedAbilities) of
       -- The dataflow lint makes a dangling name a failing test, never a silent
       -- no-op; this arm only keeps the executor total.
       Nothing -> pure ()

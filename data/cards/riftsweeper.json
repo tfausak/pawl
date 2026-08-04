@@ -1,70 +1,74 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Riftsweeper",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
+      ],
+      "name": "Riftsweeper",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "ShuffleIntoLibrary",
-                "value": "target"
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "CardsInExile"
+                "effects": [
+                  {
+                    "type": "ShuffleIntoLibrary",
+                    "value": "target"
                   }
-                }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "CardsInExile"
+                      }
+                    }
+                  }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elf"
+          },
+          {
+            "type": "Shaman"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elf"
-      },
-      {
-        "type": "Shaman"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

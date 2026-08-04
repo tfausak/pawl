@@ -4,8 +4,10 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Card as Card
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Combat as Combat
+import Pawl.Types.Face (Face)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -188,6 +190,20 @@ cardOfSource mSource = case mSource of
     Source.OfTrigger _ _ -> Nothing
     Source.OfEmblem card -> Just card
     Source.OfInherentTrigger _ _ -> Nothing
+
+-- The face of the card an object is showing. Nothing when the id is unknown or
+-- the object has no card behind it (an ability on the stack, CR 113.7a).
+--
+-- The seam every characteristic read goes through. Today it is always the
+-- combined view; what will narrow it to one half on the stack (CR 709.3b) is
+-- the object, not this function.
+faceOf :: ObjectId -> GameState -> Maybe (Face Card)
+faceOf oid gs = fmap Card.combined (cardOf oid gs)
+
+-- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
+-- fallback, for its reasons (CR 608.2h).
+faceOfWithLastKnown :: ObjectId -> GameState -> Maybe (Face Card)
+faceOfWithLastKnown oid gs = fmap Card.combined (cardOfWithLastKnown oid gs)
 
 -- CR 112.1: a spell is a card on the stack. Asks the object's zone AND its KIND
 -- (its Source) -- a classification, never the card's identity.

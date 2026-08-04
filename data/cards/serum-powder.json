@@ -1,50 +1,54 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colorless"
+                      }
+                    }
                   }
-                }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "mulliganAction": [
+        {
+          "type": "ExileHandThenDraw"
+        }
+      ],
+      "name": "Serum Powder",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 3
-    }
-  ],
-  "mulliganAction": [
-    {
-      "type": "ExileHandThenDraw"
-    }
-  ],
-  "name": "Serum Powder",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

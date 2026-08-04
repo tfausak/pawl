@@ -40,6 +40,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
@@ -1649,7 +1650,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
 -- the spec needs a value; a printing with no ability would fail the assertions that
 -- follow rather than this lookup.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.faceOf p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
 
@@ -1851,7 +1852,7 @@ dismemberBoard swamp piker dismember n =
 -- Piker would fail the assertion that reads it.
 pikerOn :: GameState.GameState -> ObjectId.ObjectId
 pikerOn gs =
-  let isPiker oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Goblin Piker")
+  let isPiker oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Goblin Piker")
    in case filter isPiker (Set.toAscList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> ObjectId.MkObjectId 0
@@ -1949,7 +1950,7 @@ dragonBoard mountain dragon n =
 -- a cast has just put there under a fresh CR 400.7 id.
 dragonOn :: GameState.GameState -> ObjectId.ObjectId
 dragonOn gs =
-  let isDragon oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Moltensteel Dragon")
+  let isDragon oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Moltensteel Dragon")
    in case filter isDragon (Set.toAscList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> ObjectId.MkObjectId 0

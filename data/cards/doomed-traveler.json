@@ -1,94 +1,102 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Doomed Traveler",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfDies"
+      ],
+      "name": "Doomed Traveler",
+      "power": {
+        "type": "Literal",
+        "value": 1
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfDies"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  {
-                    "colorIndicator": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "type": "White"
-                      }
-                    ],
-                    "keywords": [
+                        "type": "Literal",
+                        "value": 1
+                      },
                       {
-                        "type": "Flying"
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "White"
+                              }
+                            ],
+                            "keywords": [
+                              {
+                                "type": "Flying"
+                              }
+                            ],
+                            "name": "Spirit Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Spirit"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
                       }
-                    ],
-                    "name": "Spirit Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Spirit"
-                        }
-                      ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
-                    }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Soldier"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Human"
-      },
-      {
-        "type": "Soldier"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

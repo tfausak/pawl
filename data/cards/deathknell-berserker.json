@@ -1,108 +1,116 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Deathknell Berserker",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfDies"
-      },
-      "intervening": {
-        "comparison": {
-          "type": "AtLeast"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
         },
-        "measured": {
-          "type": "Power"
-        },
-        "threshold": {
-          "type": "Literal",
-          "value": 3
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
+      ],
+      "name": "Deathknell Berserker",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfDies"
+          },
+          "intervening": {
+            "comparison": {
+              "type": "AtLeast"
+            },
+            "measured": {
+              "type": "Power"
+            },
+            "threshold": {
+              "type": "Literal",
+              "value": 3
+            }
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  {
-                    "colorIndicator": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "type": "Black"
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "Black"
+                              }
+                            ],
+                            "name": "Zombie Berserker Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 2
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 2
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Berserker"
+                                },
+                                {
+                                  "type": "Zombie"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
                       }
-                    ],
-                    "name": "Zombie Berserker Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 2
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 2
-                    },
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Berserker"
-                        },
-                        {
-                          "type": "Zombie"
-                        }
-                      ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
-                    }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Berserker"
+          },
+          {
+            "type": "Elf"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Berserker"
-      },
-      {
-        "type": "Elf"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

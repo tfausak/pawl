@@ -1,54 +1,58 @@
 {
-  "additionalCosts": [
+  "faces": [
     {
-      "type": "DiscardCards",
-      "value": 2
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "additionalCosts": [
+        {
+          "type": "DiscardCards",
+          "value": 2
         }
-      }
-    }
-  ],
-  "name": "Cathartic Reunion",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Cathartic Reunion",
+      "spell": {
+        "modes": [
           {
-            "type": "Draw",
-            "value": [
+            "effects": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 3
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 3
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

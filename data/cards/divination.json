@@ -1,48 +1,52 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Divination",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Divination",
+      "spell": {
+        "modes": [
           {
-            "type": "Draw",
-            "value": [
+            "effects": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 2
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

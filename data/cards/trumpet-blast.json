@@ -1,68 +1,72 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Trumpet Blast",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Trumpet Blast",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "Literal",
-                    "value": 0
-                  }
-                ]
-              },
-              {
-                "type": "And",
-                "value": [
-                  {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 0
+                      }
+                    ]
                   },
                   {
-                    "type": "IsAttacking"
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "IsAttacking"
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

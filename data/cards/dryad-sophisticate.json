@@ -1,52 +1,56 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Landwalk",
-      "value": {
-        "type": "Not",
-        "value": {
-          "type": "HasSupertype",
+      "keywords": [
+        {
+          "type": "Landwalk",
           "value": {
-            "type": "Basic"
+            "type": "Not",
+            "value": {
+              "type": "HasSupertype",
+              "value": {
+                "type": "Basic"
+              }
+            }
           }
         }
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
+      ],
+      "name": "Dryad Sophisticate",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Dryad"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "Dryad Sophisticate",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Dryad"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

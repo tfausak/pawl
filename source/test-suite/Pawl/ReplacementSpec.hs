@@ -60,6 +60,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -104,7 +105,7 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 -- already duplicate singleModeAbility the same way) rather than centralizing
 -- a helper this small in Support.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
-theAbility p = case Card.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.faceOf p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
 
@@ -200,7 +201,7 @@ enteringAs which p = case p of
 -- The newest battlefield object whose printed card has this name.
 newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
 newestNamed wanted gs =
-  let named oid = fmap Card.name (Game.cardOf oid gs) == Just wanted
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
    in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
 
 -- Leyline of the Void's redirect, as a floating replacement: any card headed for
@@ -1167,7 +1168,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (gs, cloneId) = S.handOne clone withPiker
         -- S.identityAnswer declines ChooseCopyTarget (Clone's own "may").
         resolved = S.runPure S.identityAnswer gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop >> Engine.settleForPriority)
-        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
+        named = filter (\oid -> fmap Face.name (Game.faceOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
     Spec.assertEqWith s "the 0/0 Clone is gone" named []
   Spec.it s "CR 614.12a the copy choice is locked in BEFORE the enters event exists" $ do
     island <- S.printingOf s registry "Island"
@@ -1178,7 +1179,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (gs, cloneId) = S.handOne clonePrinting withPiker
         -- No settle: the choice must already be made when resolveTop returns.
         resolved = S.runPure (copyOf piker) gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop)
-        named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
+        named = filter (\oid -> fmap Face.name (Game.faceOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
     case named of
       [] -> Spec.assertFailure s "Clone did not reach the battlefield"
       clone : _ -> Spec.assertEqWith s "already a 2/1, with no settle run" (Projection.powerOf clone resolved) (Just 2)
@@ -1538,7 +1539,7 @@ galvanicBlastSpec s registry =
 -- is that the owner and the controller have come apart.
 controlledNamed :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 controlledNamed wanted pid gs =
-  length (filter (\oid -> fmap Card.name (Game.cardOf oid gs) == Just wanted) (Projection.controls pid gs))
+  length (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just wanted) (Projection.controls pid gs))
 
 -- alice controls six untapped Islands (Gather Specimens is {3}{U}{U}{U}) and one
 -- Goblin Piker for a Clone to copy; bob controls ten, enough for a Gather

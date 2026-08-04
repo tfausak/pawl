@@ -1,47 +1,51 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      ],
+      "name": "Ivory Mask",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantBeTargetedBy",
+            "value": {
+              "type": "EachPlayer"
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
         }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
     }
-  ],
-  "name": "Ivory Mask",
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "CantBeTargetedBy",
-        "value": {
-          "type": "EachPlayer"
-        }
-      },
-      "scope": {
-        "type": "You"
-      }
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

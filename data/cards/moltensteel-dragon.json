@@ -1,96 +1,100 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Phyrexian",
-            "value": {
-              "type": "Red"
-            }
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "type": "Phyrexian",
+                "value": {
+                  "type": "Red"
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "Literal",
-                        "value": 0
-                      }
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 0
+                          }
+                        ]
+                      },
+                      "self"
                     ]
-                  },
-                  "self"
+                  }
                 ]
               }
             ]
           }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Red"
+          }
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Red"
+          }
+        }
+      ],
+      "name": "Moltensteel Dragon",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Dragon"
+          },
+          {
+            "type": "Phyrexian"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "keywords": [
-    {
-      "type": "Flying"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 4
-    },
-    {
-      "type": "Phyrexian",
-      "value": {
-        "type": "Red"
-      }
-    },
-    {
-      "type": "Phyrexian",
-      "value": {
-        "type": "Red"
-      }
-    }
-  ],
-  "name": "Moltensteel Dragon",
-  "power": {
-    "type": "Literal",
-    "value": 4
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 4
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Dragon"
-      },
-      {
-        "type": "Phyrexian"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
-      },
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

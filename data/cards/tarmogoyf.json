@@ -1,68 +1,72 @@
 {
-  "characteristicPT": {
-    "type": "Count",
-    "value": {
-      "aggregation": {
-        "type": "DistinctCardTypes"
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "DistinctCardTypes"
+          },
+          "filter": {
+            "type": "And",
+            "value": []
+          },
+          "scope": {
+            "type": "InZone",
+            "value": [
+              {
+                "type": "Graveyard"
+              },
+              {
+                "type": "EachPlayer"
+              }
+            ]
+          }
+        }
       },
-      "filter": {
-        "type": "And",
-        "value": []
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Tarmogoyf",
+      "power": {
+        "type": "Star"
       },
-      "scope": {
-        "type": "InZone",
+      "toughness": {
+        "type": "Plus",
         "value": [
           {
-            "type": "Graveyard"
+            "type": "Literal",
+            "value": 1
           },
           {
-            "type": "EachPlayer"
+            "type": "Star"
+          }
+        ]
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Lhurgoyf"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  },
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Tarmogoyf",
-  "power": {
-    "type": "Star"
-  },
-  "toughness": {
-    "type": "Plus",
-    "value": [
-      {
-        "type": "Literal",
-        "value": 1
-      },
-      {
-        "type": "Star"
-      }
-    ]
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Lhurgoyf"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

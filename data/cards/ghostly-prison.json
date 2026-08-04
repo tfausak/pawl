@@ -1,44 +1,48 @@
 {
-  "attackCosts": [
+  "faces": [
     {
-      "perAttacker": [
+      "attackCosts": [
+        {
+          "perAttacker": [
+            {
+              "type": "Generic",
+              "value": 2
+            }
+          ],
+          "subject": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          }
+        }
+      ],
+      "manaCost": [
         {
           "type": "Generic",
           "value": 2
-        }
-      ],
-      "subject": {
-        "type": "Matching",
-        "value": {
-          "type": "HasCardType",
+        },
+        {
+          "type": "OfType",
           "value": {
-            "type": "Creature"
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
           }
         }
+      ],
+      "name": "Ghostly Prison",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    }
-  ],
-  "name": "Ghostly Prison",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

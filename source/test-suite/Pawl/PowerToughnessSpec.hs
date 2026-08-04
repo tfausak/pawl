@@ -23,10 +23,10 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
@@ -44,7 +44,7 @@ import qualified Pawl.Types.Zone as Zone
 leechesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
 leechesOnBattlefield gs = filter isLeech (Set.toList (GameState.battlefield gs))
   where
-    isLeech oid = maybe False (\c -> Card.Type.name c == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.cardOf oid gs)
+    isLeech oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.faceOf oid gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do

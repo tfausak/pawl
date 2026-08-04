@@ -31,6 +31,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -136,7 +137,7 @@ falsifierSpec s registry = Spec.describe s "Falsifier" $ do
     Spec.assertEqWith
       s
       "the Wall mode (0) is absent from the fillable set"
-      (Target.fillableModes Nothing oid (Card.enchantSpecs (Printing.card chaosCharm)) (Card.Type.spell (Printing.card chaosCharm)) gs1)
+      (Target.fillableModes Nothing oid (Card.enchantSpecs (S.faceOf chaosCharm)) (Face.spell (S.faceOf chaosCharm)) gs1)
       (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
@@ -262,7 +263,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
     syntheticModalActivated <- S.printingOf s registry "Synthetic Modal Activator"
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
-    case Card.Type.activatedAbilities (Printing.card syntheticModalActivated) of
+    case Face.activatedAbilities (S.faceOf syntheticModalActivated) of
       [ability] ->
         let gs0 = S.landsInPlay mountain 1
             (srcId, gs1) = S.addCreature syntheticModalActivated S.alice gs0
@@ -282,7 +283,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
     syntheticModalActivated <- S.printingOf s registry "Synthetic Modal Activator"
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
-    case Card.Type.activatedAbilities (Printing.card syntheticModalActivated) of
+    case Face.activatedAbilities (S.faceOf syntheticModalActivated) of
       [ability] ->
         let gs0 = S.landsInPlay mountain 1
             (srcId, gs1) = S.addCreature syntheticModalActivated S.alice gs0
@@ -308,7 +309,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
 -- through S.entersWithTrigger's hand-built enters event (the same shape
 -- EventSpec uses), then the placed ability resolves off the stack.
 triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card)
-triggerModalOf acPrinting = case Card.Type.triggeredAbilities (Printing.card acPrinting) of
+triggerModalOf acPrinting = case Face.triggeredAbilities (S.faceOf acPrinting) of
   [ab] -> Just (TriggeredAbility.modal ab)
   _ -> Nothing
 
@@ -328,7 +329,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
       [tokId] -> do
         -- CR 111.4: Aether Channeler's first mode does not name the token,
         -- so its name is its subtype plus the word "Token".
-        Spec.assertEqWith s "the token is named Bird Token" (fmap Card.Type.name (Game.cardOf tokId resolved)) (Just . CardName.MkCardName $ Text.pack "Bird Token")
+        Spec.assertEqWith s "the token is named Bird Token" (fmap Face.name (Game.faceOf tokId resolved)) (Just . CardName.MkCardName $ Text.pack "Bird Token")
         Spec.assertBool s (Projection.hasKeyword Keyword.Flying tokId resolved) "the Bird has flying (projected)"
       _ -> Spec.assertFailure s "expected exactly one new (Bird token) permanent"
 

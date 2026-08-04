@@ -1,74 +1,78 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Defender"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 8
-    }
-  ],
-  "name": "The Walls of Ba Sing Se",
-  "power": {
-    "type": "Literal",
-    "value": 0
-  },
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "And",
-          "value": [
+      "keywords": [
+        {
+          "type": "Defender"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 8
+        }
+      ],
+      "name": "The Walls of Ba Sing Se",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
             {
-              "type": "Not",
+              "type": "GainKeyword",
               "value": {
-                "type": "IsSource"
-              }
-            },
-            {
-              "type": "ControlledBy",
-              "value": {
-                "type": "You"
+                "type": "Indestructible"
               }
             }
           ]
         }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 30.0
       },
-      "modifications": [
-        {
-          "type": "GainKeyword",
-          "value": {
-            "type": "Indestructible"
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Wall"
           }
-        }
-      ]
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
     }
-  ],
-  "toughness": {
-    "type": "Literal",
-    "value": 3E+1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Wall"
-      }
-    ],
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
-      },
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

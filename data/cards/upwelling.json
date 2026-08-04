@@ -1,38 +1,42 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
+      ],
+      "name": "Upwelling",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "DontLoseUnspentMana",
+            "value": {
+              "type": "Any"
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
     }
-  ],
-  "name": "Upwelling",
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "DontLoseUnspentMana",
-        "value": {
-          "type": "Any"
-        }
-      },
-      "scope": {
-        "type": "EachPlayer"
-      }
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

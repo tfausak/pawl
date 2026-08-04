@@ -53,11 +53,11 @@ resolveTopWith runSubgame = do
       Nothing -> State.put gs {GameState.stack = rest}
       Just obj -> case Object.source obj of
         Source.OfCard printing ->
-          let card = Printing.card printing
-           in if not (Card.isPermanent card)
+          let face = Card.combined (Printing.card printing)
+           in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
                 else
-                  if not (Card.isAura card)
+                  if not (Card.isAura face)
                     then carryOver oid =<< Event.changeZoneReturning oid Zone.Battlefield
                     else -- CR 303.4a made this spell target, so CR 608.2b applies
                     -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off

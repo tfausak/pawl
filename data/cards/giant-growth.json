@@ -1,61 +1,65 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Giant Growth",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Giant Growth",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Literal",
-                    "value": 3
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "Literal",
-                    "value": 3
-                  }
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  "target"
                 ]
-              },
-              "target"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

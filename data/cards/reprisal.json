@@ -1,56 +1,60 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Reprisal",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Reprisal",
+      "spell": {
+        "modes": [
           {
-            "type": "Destroy",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "CantBeRegenerated"
+                "type": "Destroy",
+                "value": [
+                  "target",
+                  {
+                    "type": "CantBeRegenerated"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "PowerAtLeast",
+                    "value": 4
+                  },
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "filter": {
-                "type": "PowerAtLeast",
-                "value": 4
-              },
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -29,6 +29,7 @@ import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -70,9 +71,9 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 -- card may narrow this further with a printed restriction (CR 601.3), which
 -- `castable` conjoins separately through printedRestrictionsOk.
 timingOk :: PlayerId -> ObjectId -> GameState -> Bool
-timingOk pid oid gs = case Game.cardOf oid gs of
+timingOk pid oid gs = case Game.faceOf oid gs of
   Nothing -> False
-  Just card -> instantSpeed card || sorcerySpeed pid gs
+  Just face -> instantSpeed face || sorcerySpeed pid gs
 
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
@@ -93,8 +94,8 @@ timingOk pid oid gs = case Game.cardOf oid gs of
 -- The PLAYER-scoped sibling is not this and is not built: an effect that lets a
 -- player cast OTHER spells as though they had flash (CR 601.3b, Vedalken Orrery)
 -- would be read here beside this predicate, never folded into it (#565).
-instantSpeed :: Card.Type.Card -> Bool
-instantSpeed card = Card.isInstant card || Keyword.hasFlash (Card.Type.keywords card)
+instantSpeed :: Face.Face Card.Type.Card -> Bool
+instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 
 -- CR 601.2c / 700.2a: castable when at least as many modes are fillable as the
 -- selection demands. For a non-modal card (one mode, count 1) this is identical
@@ -114,11 +115,11 @@ instantSpeed card = Card.isInstant card || Keyword.hasFlash (Card.Type.keywords 
 -- between hand and stack is #89's own expiry trigger. castableWhileSearching
 -- reads the same pre-move projection for the same reason.
 targetable :: PlayerId -> ObjectId -> GameState -> Bool
-targetable pid oid gs = case Game.cardOf oid gs of
+targetable pid oid gs = case Game.faceOf oid gs of
   Nothing -> False
-  Just card ->
-    let count = Modal.selectionCount (Card.Type.spell card)
-     in Natural.length (Target.fillableModes (Just pid) oid (Card.enchantSpecs card) (Card.Type.spell card) gs) >= count
+  Just face ->
+    let count = Modal.selectionCount (Face.spell face)
+     in Natural.length (Target.fillableModes (Just pid) oid (Card.enchantSpecs face) (Face.spell face) gs) >= count
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -195,12 +196,12 @@ affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid o
 -- pawl offers a candidate cost BY ZONE (flashback's only from a graveyard), so
 -- the list has to come from the proposal. See castSpell.
 entwineOffer :: PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
-entwineOffer pid oid candidates gs = case Game.cardOf oid gs of
+entwineOffer pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
-  Just card -> do
-    cost <- Keyword.entwineCost (Card.Type.keywords card)
-    let modal = Card.Type.spell card
-        legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) modal gs
+  Just face -> do
+    cost <- Keyword.entwineCost (Face.keywords face)
+    let modal = Face.spell face
+        legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
     Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
@@ -217,13 +218,13 @@ castZones = [Zone.Hand, Zone.Graveyard]
 
 -- Which of those zones THIS card may be cast from -- where a permission turns
 -- into a zone.
-castableZones :: Card.Type.Card -> [Zone.Zone]
-castableZones card =
+castableZones :: Face.Face Card.Type.Card -> [Zone.Zone]
+castableZones face =
   let permitted zone = case zone of
         -- CR 304.1 / 307.1: the rules' own allowance is worded "from their
         -- hand", so the hand needs no permission of its own.
         Zone.Hand -> True
-        Zone.Graveyard -> permitsCastFromGraveyard card
+        Zone.Graveyard -> permitsCastFromGraveyard face
         -- No other zone is in castZones.
         _ -> False
    in filter permitted castZones
@@ -231,9 +232,9 @@ castableZones card =
 -- Is this object somewhere this player may cast it from?
 inCastableZone :: PlayerId -> ObjectId -> GameState -> Bool
 inCastableZone pid oid gs =
-  case Game.cardOf oid gs of
+  case Game.faceOf oid gs of
     Nothing -> False
-    Just card -> any (\zone -> elem oid (Game.zoneMembers zone pid gs)) (castableZones card)
+    Just face -> any (\zone -> elem oid (Game.zoneMembers zone pid gs)) (castableZones face)
 
 -- CR 205.4e: a legendary instant or sorcery can't be cast unless its caster
 -- controls a legendary creature or a legendary planeswalker.
@@ -248,10 +249,10 @@ inCastableZone pid oid gs =
 -- or a graveyard when this is asked, where no projection exists, and CR 205.4a
 -- makes supertypes a printed-type-line read regardless.
 legendaryRestrictionOk :: PlayerId -> ObjectId -> GameState -> Bool
-legendaryRestrictionOk pid oid gs = case Game.cardOf oid gs of
+legendaryRestrictionOk pid oid gs = case Game.faceOf oid gs of
   Nothing -> False
-  Just card ->
-    not (Card.isLegendary card && (Card.isInstant card || Card.isSorcery card))
+  Just face ->
+    not (Card.isLegendary face && (Card.isInstant face || Card.isSorcery face))
       || controlsLegendaryCreatureOrPlaneswalker pid gs
 
 -- CR 205.4e's condition. Read through the PROJECTION rather than off the printed
@@ -285,9 +286,9 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- Pawl.Engine.Cast is the sole reader of Pawl.Types.CastingRestriction exactly as
 -- it is of CastingPermission.
 printedRestrictionsOk :: PlayerId -> ObjectId -> GameState -> Bool
-printedRestrictionsOk pid oid gs = case Game.cardOf oid gs of
+printedRestrictionsOk pid oid gs = case Game.faceOf oid gs of
   Nothing -> False
-  Just card -> all (restrictionMet pid gs) (Card.Type.castingRestrictions card)
+  Just face -> all (restrictionMet pid gs) (Face.castingRestrictions face)
 
 -- Does the game state satisfy this one printed clause?
 restrictionMet :: PlayerId -> GameState -> CastingRestriction.CastingRestriction -> Bool
@@ -354,24 +355,24 @@ castableSpells pid gs =
 -- CR 601.3 (Panglacial): may this card be cast from the library while its
 -- controller searches their own library? A membership test on the card's casting
 -- permissions -- a classification, never card identity.
-permitsCastWhileSearching :: Card.Type.Card -> Bool
-permitsCastWhileSearching card =
-  elem CastingPermission.CastFromLibraryWhileSearching (permissionsOf card)
+permitsCastWhileSearching :: Face.Face Card.Type.Card -> Bool
+permitsCastWhileSearching face =
+  elem CastingPermission.CastFromLibraryWhileSearching (permissionsOf face)
 
 -- CR 601.3 / 702.34a: may this card be cast from its owner's graveyard? The
 -- flashback half of the same membership test.
-permitsCastFromGraveyard :: Card.Type.Card -> Bool
-permitsCastFromGraveyard card =
-  elem CastingPermission.CastFromGraveyard (permissionsOf card)
+permitsCastFromGraveyard :: Face.Face Card.Type.Card -> Bool
+permitsCastFromGraveyard face =
+  elem CastingPermission.CastFromGraveyard (permissionsOf face)
 
 -- Every casting permission a card has: the ones it PRINTS (Panglacial Wurm) plus
 -- the ones rule 702 gives it for a keyword it holds (flashback). Read off the
 -- card and never through the projection: these permissions function in the
 -- library and the graveyard (CR 113.6), which pawl's projection does not reach
 -- (#160).
-permissionsOf :: Card.Type.Card -> [CastingPermission.CastingPermission]
-permissionsOf card =
-  Card.Type.castingPermissions card <> Keyword.castingPermissionsOf (Card.Type.keywords card)
+permissionsOf :: Face.Face Card.Type.Card -> [CastingPermission.CastingPermission]
+permissionsOf face =
+  Face.castingPermissions face <> Keyword.castingPermissionsOf (Face.keywords face)
 
 -- The library cards this player may cast while searching their own library:
 -- permitted, not prohibited, affordable, and with a fillable target set.
@@ -392,7 +393,7 @@ permissionsOf card =
 -- Wurm is the only card with the permission and it prints no restriction.
 castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
-  let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
+  let permitted oid = maybe False permitsCastWhileSearching (Game.faceOf oid gs)
       affordable oid = any (payableCost pid oid gs) (Cost.costsFor oid gs)
       allowed oid =
         permitted oid
@@ -461,9 +462,9 @@ castWhileSearching pid = do
 castSpell :: PlayerId -> ObjectId -> Game ()
 castSpell pid oid = do
   before <- State.get
-  case Game.cardOf oid before of
+  case Game.faceOf oid before of
     Nothing -> pure ()
-    Just card -> do
+    Just face -> do
       let castFrom = fmap Object.zone (Game.lookupObject oid before)
           candidates = Cost.costsFor oid before
       -- CR 601.2a. Nothing means the id was unknown or the CR 616.1 replacement
@@ -472,19 +473,19 @@ castSpell pid oid = do
       moved <- Event.changeZoneReturning oid Zone.Stack
       case moved of
         Nothing -> State.put before
-        Just sid -> castProposed pid sid card castFrom candidates before
+        Just sid -> castProposed pid sid face castFrom candidates before
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
 -- every step below announces for, targets relative to, is projected from and
 -- stamps its choices onto; `before` is the state to return to. Split out so the
 -- whole announcement reads one state and one id.
-castProposed :: PlayerId -> ObjectId -> Card.Type.Card -> Maybe Zone.Zone -> [Cost Keyword] -> GameState -> Game ()
-castProposed pid sid card castFrom candidates before = do
+castProposed :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> [Cost Keyword] -> GameState -> Game ()
+castProposed pid sid face castFrom candidates before = do
   gs <- State.get
   let decider = Decide.deciderFor pid gs
-      modal = Card.Type.spell card
-      legal = Target.fillableModes (Just pid) sid (Card.enchantSpecs card) modal gs
+      modal = Face.spell face
+      legal = Target.fillableModes (Just pid) sid (Card.enchantSpecs face) modal gs
       -- CR 601.2e: an illegal proposal returns the game to the moment before the
       -- casting was proposed, which is the state before CR 601.2a's move. CR
       -- 601.6 says the same for a permission lost after the proposal completes.
@@ -552,7 +553,7 @@ castProposed pid sid card castFrom candidates before = do
           if notElem chosenCost payable
             then reject
             else do
-              let sets = Target.legalSets (Just pid) sid (Card.modesTargetSpecs chosenModes card) gs
+              let sets = Target.legalSets (Just pid) sid (Card.modesTargetSpecs chosenModes face) gs
               -- CR 601.2b's announcement is free -- any Natural -- but the player
               -- making it is told what the board can pay. The bound rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
@@ -641,7 +642,7 @@ castProposed pid sid card castFrom candidates before = do
                                         (GameState.objects g)
                                   }
                             )
-                          Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid card sid)
+                          Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid face sid)
 
 -- CR 702.34a's SECOND static ability -- exile this card instead of putting it
 -- anywhere else any time it would leave the stack -- installed onto the spell's
@@ -661,8 +662,8 @@ castProposed pid sid card castFrom candidates before = do
 --
 -- CR 614.3's `uses` is Once and its expiry is Never: a spell leaves the stack
 -- exactly once, and the ability has no duration.
-armCastFromGraveyard :: PlayerId -> Card.Type.Card -> ObjectId -> Game ()
-armCastFromGraveyard caster card spellId =
+armCastFromGraveyard :: PlayerId -> Face.Face Card.Type.Card -> ObjectId -> Game ()
+armCastFromGraveyard caster face spellId =
   let arm re = State.modify' $ \gs ->
         let (ts, gs1) = Game.freshTimestamp gs
             active =
@@ -682,4 +683,4 @@ armCastFromGraveyard caster card spellId =
                   ActiveReplacement.origin = ReplacementOrigin.Other
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
-   in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf (Card.Type.keywords card))
+   in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf (Face.keywords face))

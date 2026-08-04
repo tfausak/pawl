@@ -1,59 +1,63 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Diabolic Edict",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Diabolic Edict",
+      "spell": {
+        "modes": [
           {
-            "type": "PlayerSacrifices",
-            "value": [
-              "target",
+            "effects": [
               {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Creature"
+                "type": "PlayerSacrifices",
+                "value": [
+                  "target",
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
                 }
-              },
-              {
-                "type": "Literal",
-                "value": 1
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

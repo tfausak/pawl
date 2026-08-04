@@ -1,99 +1,103 @@
 {
-  "enchant": {
-    "filter": {
-      "type": "ControlledBy",
-      "value": {
-        "type": "You"
-      }
-    },
-    "pool": {
-      "type": "Creatures"
-    }
-  },
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "enchant": {
+        "filter": {
+          "type": "ControlledBy",
+          "value": {
+            "type": "You"
+          }
+        },
+        "pool": {
+          "type": "Creatures"
         }
-      }
-    }
-  ],
-  "name": "Setessan Training",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Attached"
       },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "ModifyPowerToughness",
-          "value": [
-            {
-              "type": "Literal",
-              "value": 1
-            },
-            {
-              "type": "Literal",
-              "value": 0
-            }
-          ]
+          "type": "Generic",
+          "value": 1
         },
         {
-          "type": "GainKeyword",
+          "type": "OfType",
           "value": {
-            "type": "Trample"
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
           }
         }
-      ]
-    }
-  ],
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      ],
+      "name": "Setessan Training",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 1
+                },
+                {
+                  "type": "Literal",
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Trample"
+              }
+            }
+          ]
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "Draw",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

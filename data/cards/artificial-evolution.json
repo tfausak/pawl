@@ -1,53 +1,57 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Artificial Evolution",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Artificial Evolution",
+      "spell": {
+        "modes": [
           {
-            "type": "ChangeText",
-            "value": [
+            "effects": [
               {
-                "type": "CreatureType"
-              },
-              [
-                {
-                  "type": "Wall"
+                "type": "ChangeText",
+                "value": [
+                  {
+                    "type": "CreatureType"
+                  },
+                  [
+                    {
+                      "type": "Wall"
+                    }
+                  ],
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "SpellsAndPermanents"
+                  }
                 }
-              ],
-              "target"
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "SpellsAndPermanents"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

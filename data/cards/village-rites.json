@@ -1,58 +1,62 @@
 {
-  "additionalCosts": [
+  "faces": [
     {
-      "type": "Sacrifice",
-      "value": [
-        1,
+      "additionalCosts": [
         {
-          "type": "HasCardType",
+          "type": "Sacrifice",
+          "value": [
+            1,
+            {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          ]
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
           "value": {
-            "type": "Creature"
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
           }
         }
-      ]
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Village Rites",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Village Rites",
+      "spell": {
+        "modes": [
           {
-            "type": "Draw",
-            "value": [
+            "effects": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
-              },
-              {
-                "type": "Literal",
-                "value": 2
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

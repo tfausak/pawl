@@ -1,68 +1,72 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "Phyrexian",
-      "value": {
-        "type": "Black"
-      }
-    },
-    {
-      "type": "Phyrexian",
-      "value": {
-        "type": "Black"
-      }
-    }
-  ],
-  "name": "Dismember",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Black"
+          }
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Black"
+          }
+        }
+      ],
+      "name": "Dismember",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Literal",
-                    "value": -5
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "Literal",
-                    "value": -5
-                  }
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": -5
+                      },
+                      {
+                        "type": "Literal",
+                        "value": -5
+                      }
+                    ]
+                  },
+                  "target"
                 ]
-              },
-              "target"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

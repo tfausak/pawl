@@ -42,6 +42,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -89,7 +90,7 @@ chooseNoModes p = case p of
 -- empty-ability fallback is unreachable in these fixtures, and honors the
 -- no-partial-functions rule (no `error`).
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.faceOf p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
 
@@ -520,7 +521,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   Spec.it s "CR 702.29a the minted ability is '{2}, Discard this card: Draw a card'" $ do
     mauler <- S.printingOf s registry "Barkhide Mauler"
     (oid, gs) <- cyclingBoard s registry
-    Spec.assertEqWith s "the card itself prints no activated ability" (Card.Type.activatedAbilities (Printing.card mauler)) []
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.faceOf mauler)) []
     case Activate.abilitiesFor oid gs of
       [ability] -> do
         Spec.assertEqWith
@@ -1353,7 +1354,7 @@ soleCreatureOf pid gs = case filter (`Projection.isCreatureOf` gs) (Game.zoneMem
   _ -> Nothing
 
 -- The one activated ability the PROJECTION hands out for `oid` -- not
--- Card.Type.activatedAbilities, which is the printed list a text change has not
+-- Face.activatedAbilities, which is the printed list a text change has not
 -- reached. Projection.abilitiesGiven is the list Activate itself offers from, so
 -- this is the same ability a player would be given.
 soleProjectedAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)

@@ -1,67 +1,71 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Night of Souls' Betrayal",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "HasCardType",
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
           "value": {
-            "type": "Creature"
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
           }
         }
-      },
-      "modifications": [
+      ],
+      "name": "Night of Souls' Betrayal",
+      "staticAbilities": [
         {
-          "type": "ModifyPowerToughness",
-          "value": [
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": -1
-            },
-            {
-              "type": "Literal",
-              "value": -1
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": -1
+                },
+                {
+                  "type": "Literal",
+                  "value": -1
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

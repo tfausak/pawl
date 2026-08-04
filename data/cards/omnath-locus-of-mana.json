@@ -1,25 +1,12 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Omnath, Locus of Mana",
-  "playerAbilities": [
-    {
-      "effect": {
-        "type": "DontLoseUnspentMana",
-        "value": {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
           "type": "OfType",
           "value": {
             "type": "Colored",
@@ -28,92 +15,109 @@
             }
           }
         }
-      },
-      "scope": {
-        "type": "You"
-      }
-    }
-  ],
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "IsSource"
-        }
-      },
-      "modifications": [
+      ],
+      "name": "Omnath, Locus of Mana",
+      "playerAbilities": [
         {
-          "type": "ModifyPowerToughness",
-          "value": [
-            {
-              "type": "ManaCount",
+          "effect": {
+            "type": "DontLoseUnspentMana",
+            "value": {
+              "type": "OfType",
               "value": {
-                "filter": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Green"
-                    }
-                  }
-                },
-                "player": {
-                  "type": "Relative",
-                  "value": {
-                    "type": "You"
-                  }
-                }
-              }
-            },
-            {
-              "type": "ManaCount",
-              "value": {
-                "filter": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Green"
-                    }
-                  }
-                },
-                "player": {
-                  "type": "Relative",
-                  "value": {
-                    "type": "You"
-                  }
+                "type": "Colored",
+                "value": {
+                  "type": "Green"
                 }
               }
             }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "IsSource"
+            }
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "ManaCount",
+                  "value": {
+                    "filter": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Green"
+                        }
+                      }
+                    },
+                    "player": {
+                      "type": "Relative",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "ManaCount",
+                  "value": {
+                    "filter": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Green"
+                        }
+                      }
+                    },
+                    "player": {
+                      "type": "Relative",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
           ]
         }
-      ]
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
     }
-  ],
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elemental"
-      }
-    ],
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

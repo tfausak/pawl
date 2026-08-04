@@ -112,6 +112,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -552,7 +553,7 @@ stateTriggerSpec s registry =
               settledBoth = settle gs1
           Spec.assertEqWith s "two instances, one per source" (length (triggerIds settledBoth)) 2
         -- M-4 (review): the state trigger's Condition.holds reads the PROJECTION
-        -- -- CR 613 layer 4 for a subtype -- not Card.typeLine. Pin it with no real Swamp card
+        -- -- CR 613 layer 4 for a subtype -- not Face.typeLine. Pin it with no real Swamp card
         -- anywhere: alice controls only a Mountain, so the Outcast triggers;
         -- adding an AddLandSubtype Swamp modification (the Urborg shape) to
         -- that same Mountain must turn the trigger off.
@@ -1361,7 +1362,7 @@ zombieTokenOf sarcomancy pikerFallback =
   let created effect = case effect of
         Effect.Create _ card _ _ -> Just card
         _ -> Nothing
-      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card sarcomancy))
+      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities (S.faceOf sarcomancy))
    in case Maybe.mapMaybe created abilityEffects of
         card : _ -> card
         [] -> Printing.card pikerFallback
@@ -2011,7 +2012,7 @@ counterTriggerSpec s registry =
         -- can't be countered" sits on a creature card: the Mongoose also
         -- prints shroud, and CR 702.18 is not implemented (#488), so it could
         -- not be modelled faithfully. Both cards reach this gate the same way
-        -- -- through Card.counterability, read off the spell on the stack.
+        -- -- through Face.counterability, read off the spell on the stack.
         Spec.it s "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
           island <- S.printingOf s registry "Island"
           cancel <- S.printingOf s registry "Cancel"
@@ -2112,7 +2113,7 @@ counterTriggerSpec s registry =
           sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
           piker <- S.printingOf s registry "Goblin Piker"
           mountain <- S.printingOf s registry "Mountain"
-          case Card.Type.activatedAbilities (Printing.card sorcerer) of
+          case Face.activatedAbilities (S.faceOf sorcerer) of
             [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
             ability : _ -> do
               -- bob: Baral, three Islands, one library card, and both a Cancel
@@ -2344,7 +2345,7 @@ graveyardTriggerSpec s registry =
             placed = S.runPure answer milled Engine.settleForPriority
          in (placed, S.runPure answer placed Stack.resolveTop)
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       narcomoebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
    in Spec.describe s "GraveyardTrigger" $ do
         -- The gameplay-level proof, cast to resolution.
@@ -2430,12 +2431,12 @@ diesTriggerSpec s registry =
             settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       spiritsOf pid gs =
         filter
           -- CR 111.4: Doomed Traveler does not specify the token's name, so the
           -- name is its subtype plus the word "Token".
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Spirit Token"))
+          (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Spirit Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
       travelerName = CardName.MkCardName $ Text.pack "Doomed Traveler"
    in Spec.describe s "DiesTrigger" $ do
@@ -2653,7 +2654,7 @@ permanentDiesSpec s registry =
           Spec.assertEqWith
             s
             "one triggered ability, with that condition"
-            (fmap TriggeredAbility.condition (Card.Type.triggeredAbilities (Printing.card meren)))
+            (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.faceOf meren)))
             [TriggerCondition.PermanentDies anotherCreatureYouControl]
 
 -- CR 603.6c's FIRST written form, and the whole of its first clause:
@@ -2715,7 +2716,7 @@ leavesBattlefieldSpec s registry =
         filter
           -- CR 111.4: Thragtusk does not specify the token's name, so the name
           -- is its subtype plus the word "Token".
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Beast Token"))
+          (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Beast Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
       assertOneBeast after =
         case beastsOf S.alice after of
@@ -2728,7 +2729,7 @@ leavesBattlefieldSpec s registry =
           other -> Spec.assertFailure s ("expected exactly one Beast token, got " <> show (length other))
       tuskName = CardName.MkCardName $ Text.pack "Thragtusk"
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       -- Every slot stamped on every object currently on the stack, which for
       -- these boards is the one placed trigger.
       stackSlots gs =
@@ -2781,7 +2782,7 @@ leavesBattlefieldSpec s registry =
           case lookup Binding.became slots of
             Just (Recipient.ToObject graveyardId) -> do
               Spec.assertBool s (graveyardId /= tusk) "became is the CR 400.7 incarnation, a different id"
-              Spec.assertEqWith s "and it is the graveyard card" (fmap Card.Type.name (Game.cardOf graveyardId settled)) (Just tuskName)
+              Spec.assertEqWith s "and it is the graveyard card" (fmap Face.name (Game.faceOf graveyardId settled)) (Just tuskName)
             other -> Spec.assertFailure s ("expected became to name an object, got " <> show other)
         -- THE REGRESSION GUARD. Doomed Traveler prints "dies", not "leaves the
         -- battlefield", and CR 700.4 makes that a graveyard and nothing else. A
@@ -2952,7 +2953,7 @@ becameSlotSpec s registry =
             settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
          in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
       namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       roachName = CardName.MkCardName $ Text.pack "Endless Cockroaches"
    in Spec.describe s "CR 400.7e the card it became" $ do
         -- The gameplay-level proof, cast to resolution. The discriminating
@@ -2984,7 +2985,7 @@ becameSlotSpec s registry =
           case slotFor Binding.became of
             Just (Recipient.ToObject graveyardId) -> do
               Spec.assertBool s (graveyardId /= roachId) "became is a different id"
-              Spec.assertEqWith s "and it is the graveyard card" (fmap Card.Type.name (Game.cardOf graveyardId settled)) (Just roachName)
+              Spec.assertEqWith s "and it is the graveyard card" (fmap Face.name (Game.faceOf graveyardId settled)) (Just roachName)
               -- The spent Bolt is in that graveyard too, so membership is the
               -- assertion rather than the whole zone.
               Spec.assertBool s (elem graveyardId (Game.zoneMembers Zone.Graveyard S.alice settled)) "in alice's graveyard"
@@ -3070,7 +3071,7 @@ lookBackInterveningSpec s registry =
         filter
           -- CR 111.4: the name is BOTH subtypes plus "Token", which is exactly
           -- the rule's own Dwarven Reinforcements example.
-          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack "Zombie Berserker Token"))
+          (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Zombie Berserker Token"))
           (Game.zoneMembers Zone.Battlefield pid gs)
    in Spec.describe s "CR 603.4 an intervening if over last known information" $ do
         Spec.it s "CR 603.4 with Bad Moon the Berserker died at power 3 and its trigger fires" $ do
@@ -3085,7 +3086,7 @@ lookBackInterveningSpec s registry =
               -- (CR 613.4c, layer 7c). Asserting the projection rather than
               -- the printed pair is what keeps the two facts from being
               -- confused for one another.
-              Spec.assertEqWith s "printed 2/2" (maybe (Nothing, Nothing) (\c -> (Card.Type.power c, Card.Type.toughness c)) (Game.cardOf token after)) (Just (Power.MkPower (Quantity.Type.Literal 2)), Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
+              Spec.assertEqWith s "printed 2/2" (maybe (Nothing, Nothing) (\f -> (Face.power f, Face.toughness f)) (Game.faceOf token after)) (Just (Power.MkPower (Quantity.Type.Literal 2)), Just (Toughness.MkToughness (Quantity.Type.Literal 2)))
               Spec.assertEqWith s "3/3 under Bad Moon" (Projection.powerOf token after, Projection.toughnessOf token after) (Just 3, Just 3)
               Spec.assertEqWith s "black" (Projection.colorsOf token after) (Set.singleton Color.Black)
               Spec.assertEqWith s "Zombie Berserker" (Projection.subtypesOf token after) (Set.fromList [Subtype.Zombie, Subtype.Berserker])
@@ -3274,12 +3275,12 @@ aetherFlashSpec s registry =
         let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
          in S.runPure S.identityAnswer cast Engine.priorityLoop
       namesIn zone pid gs =
-        fmap Card.Type.name (Maybe.mapMaybe (\oid -> Game.cardOf oid gs) (Game.zoneMembers zone pid gs))
+        fmap Face.name (Maybe.mapMaybe (\oid -> Game.faceOf oid gs) (Game.zoneMembers zone pid gs))
       damageEventsIn gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events gs))
       -- CR 120.3e's marked damage on the one battlefield permanent with this
       -- name. Nothing if it is not there, or if there is more than one of it.
       markedOn name gs =
-        case filter (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just name) (Set.toList (GameState.battlefield gs)) of
+        case filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just name) (Set.toList (GameState.battlefield gs)) of
           [oid] -> fmap Object.damage (Game.lookupObject oid gs)
           _ -> Nothing
       pikerName = CardName.MkCardName $ Text.pack "Goblin Piker"

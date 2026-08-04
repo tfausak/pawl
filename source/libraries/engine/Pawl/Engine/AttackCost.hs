@@ -19,7 +19,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackTarget as AttackTarget
-import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -42,7 +42,7 @@ import Pawl.Types.ObjectId (ObjectId)
 -- a Prison its own controller is attacking WITH taxes nothing.
 --
 -- Empty for the board almost every game is played on: the battlefield walk
--- stops at `Card.attackCosts card` for every permanent that prints none, so no
+-- stops at `Face.attackCosts face` for every permanent that prints none, so no
 -- projection is forced (#200).
 costsOn :: ObjectId -> AttackTarget.AttackTarget -> GameState -> [ManaCost.ManaCost]
 costsOn attacker target gs =
@@ -53,9 +53,9 @@ costsOn attacker target gs =
       -- CR 613.11 puts these effects after every layer, so the subject set is
       -- read against the FULL projection rather than a partial one.
       view = Projection.project attacker gs
-      fromPermanent source = case Game.cardOf source gs of
+      fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
-        Just card -> case Card.attackCosts card of
+        Just face -> case Face.attackCosts face of
           -- Every permanent in almost every game.
           [] -> []
           costs ->

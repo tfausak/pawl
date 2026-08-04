@@ -1,61 +1,65 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "AddCardType",
-                    "value": {
-                      "type": "Artifact"
-                    }
-                  },
-                  "target"
-                ]
+                "type": "TapThis"
               }
             ],
-            "targetSpecs": [
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Permanents"
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "AddCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      },
+                      "target"
+                    ]
                   }
-                }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
+                  }
+                ]
               }
             ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Liquimetal Coating",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    }
-  ],
-  "name": "Liquimetal Coating",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

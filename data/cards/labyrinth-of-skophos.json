@@ -1,87 +1,91 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 4
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
-              {
-                "type": "RemoveFromCombat",
-                "value": "target"
+                "type": "TapThis"
               }
             ],
-            "targetSpecs": [
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "Or",
-                    "value": [
-                      {
-                        "type": "IsAttacking"
-                      },
-                      {
-                        "type": "IsBlocking"
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colorless"
                       }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Creatures"
+                    }
                   }
-                }
+                ]
               }
             ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 4
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "RemoveFromCombat",
+                    "value": "target"
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "Or",
+                        "value": [
+                          {
+                            "type": "IsAttacking"
+                          },
+                          {
+                            "type": "IsBlocking"
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "name": "Labyrinth of Skophos",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
           }
         ]
       }
     }
-  ],
-  "name": "Labyrinth of Skophos",
-  "typeLine": {
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+  ]
 }

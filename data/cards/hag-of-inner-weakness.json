@@ -1,105 +1,109 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
-        }
-      }
-    }
-  ],
-  "name": "Hag of Inner Weakness",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "StepBegins",
-        "value": [
-          {
-            "type": "Beginning",
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "Upkeep"
+              "type": "Black"
             }
-          },
-          {
-            "type": "ControllersTurn"
           }
-        ]
+        }
+      ],
+      "name": "Hag of Inner Weakness",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
                   {
-                    "type": "UntilYourNextTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Literal",
-                        "value": -2
+                        "type": "UntilYourNextTurn"
                       },
                       {
-                        "type": "Literal",
-                        "value": -1
-                      }
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": -2
+                          },
+                          {
+                            "type": "Literal",
+                            "value": -1
+                          }
+                        ]
+                      },
+                      "target"
                     ]
-                  },
-                  "target"
-                ]
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "Opponent"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
                   }
-                }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "Opponent"
+                        }
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Hag"
+          },
+          {
+            "type": "Warlock"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Hag"
-      },
-      {
-        "type": "Warlock"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

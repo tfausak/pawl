@@ -1,160 +1,164 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 1
-          },
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
-              "value": {
-                "type": "Red"
-              }
-            }
-          },
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
-              "value": {
-                "type": "Red"
-              }
-            }
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "GainControl",
-                "value": [
-                  {
-                    "type": "ForAsLongAs",
-                    "value": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "IsSource"
-                              },
-                              {
-                                "type": "ControlledBy",
-                                "value": {
-                                  "type": "You"
-                                }
-                              }
-                            ]
-                          },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Battlefield"
-                              },
-                              {
-                                "type": "EachPlayer"
-                              }
-                            ]
-                          }
-                        }
-                      },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    }
-                  },
-                  "target"
-                ]
+                "type": "TapThis"
               }
             ],
-            "targetSpecs": [
+            "mana": [
               {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Artifact"
-                    }
-                  },
-                  "pool": {
-                    "type": "Permanents"
+                "type": "Generic",
+                "value": 1
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                }
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
                   }
                 }
               }
             ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "GainControl",
+                    "value": [
+                      {
+                        "type": "ForAsLongAs",
+                        "value": {
+                          "comparison": {
+                            "type": "Exactly"
+                          },
+                          "measured": {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
+                              },
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "IsSource"
+                                  },
+                                  {
+                                    "type": "ControlledBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Battlefield"
+                                  },
+                                  {
+                                    "type": "EachPlayer"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "threshold": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      },
+                      "target"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Aladdin",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Rogue"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Aladdin",
-  "power": {
-    "type": "Literal",
-    "value": 1
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Human"
-      },
-      {
-        "type": "Rogue"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

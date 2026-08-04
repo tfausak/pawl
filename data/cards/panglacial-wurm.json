@@ -1,52 +1,56 @@
 {
-  "castingPermissions": [
+  "faces": [
     {
-      "type": "CastFromLibraryWhileSearching"
-    }
-  ],
-  "keywords": [
-    {
-      "type": "Trample"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 5
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "castingPermissions": [
+        {
+          "type": "CastFromLibraryWhileSearching"
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      ],
+      "keywords": [
+        {
+          "type": "Trample"
         }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 5
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Panglacial Wurm",
+      "power": {
+        "type": "Literal",
+        "value": 9
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 5
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
       }
     }
-  ],
-  "name": "Panglacial Wurm",
-  "power": {
-    "type": "Literal",
-    "value": 9
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 5
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

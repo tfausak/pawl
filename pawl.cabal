@@ -154,12 +154,16 @@ library codec
     Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
     Pawl.Codec.ExtraPhaseSpec
+    Pawl.Codec.Face
+    Pawl.Codec.FaceSpec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordSpec
+    Pawl.Codec.Layout
+    Pawl.Codec.LayoutSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
@@ -536,6 +540,7 @@ library types
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
     Pawl.Types.ExtraTurn
+    Pawl.Types.Face
     Pawl.Types.Filter
     Pawl.Types.Game
     Pawl.Types.GameEvent
@@ -544,6 +549,7 @@ library types
     Pawl.Types.Keyword
     Pawl.Types.LastKnown
     Pawl.Types.Layer
+    Pawl.Types.Layout
     Pawl.Types.Loyalty
     Pawl.Types.Mana
     Pawl.Types.ManaCost

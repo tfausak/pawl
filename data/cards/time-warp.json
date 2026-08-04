@@ -1,62 +1,66 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Time Warp",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Time Warp",
+      "spell": {
+        "modes": [
           {
-            "type": "TakeExtraTurn",
-            "value": [
+            "effects": [
               {
-                "type": "InSlot",
-                "value": "target"
-              },
-              []
+                "type": "TakeExtraTurn",
+                "value": [
+                  {
+                    "type": "InSlot",
+                    "value": "target"
+                  },
+                  []
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
+            "type": "Sorcery"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

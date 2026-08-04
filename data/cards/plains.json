@@ -1,20 +1,24 @@
 {
-  "name": "Plains",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Plains"
+  "faces": [
+    {
+      "name": "Plains",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Plains"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
       }
-    ],
-    "supertypes": [
-      {
-        "type": "Basic"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+    }
+  ]
 }

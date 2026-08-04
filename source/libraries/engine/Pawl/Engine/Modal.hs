@@ -1,5 +1,5 @@
 -- Mode-scoped structural reads over a Modal payload (CR 700.2), shared by the
--- spell (Card.spell) and both ability types. Parametric in `card` and importing
+-- spell (Face.spell) and both ability types. Parametric in `card` and importing
 -- only Type modules and Pawl.Extra, so there is no cycle -- Pawl.Engine.Card
 -- imports THIS.
 module Pawl.Engine.Modal where

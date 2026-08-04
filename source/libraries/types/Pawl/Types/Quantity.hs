@@ -67,7 +67,7 @@ data Quantity
   | -- | CR 208.2 / 208.2a: the star printed in a power/toughness box, standing for
     -- a value a characteristic-defining ability defines. NOTATION, not a value:
     -- Quantity.evaluate returns Nothing for it. Projection.baseCharacteristics
-    -- resolves it at the seed by substituting Card.characteristicPT, so a Star
+    -- resolves it at the seed by substituting Face.characteristicPT, so a Star
     -- is meant to never survive into a projection -- but that is a CONVENTION the
     -- card data must honour, not something this type guarantees. Two cases reach
     -- the evaluator anyway, both benign:

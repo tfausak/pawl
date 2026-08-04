@@ -65,6 +65,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -856,7 +857,7 @@ spellTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
 spellTargetSpec printing =
   Map.lookup
     (SlotName.MkSlotName (Text.pack "target"))
-    (Modal.allTargetSpecs (Card.Type.spell (Printing.card printing)))
+    (Modal.allTargetSpecs (Face.spell (Card.combined (Printing.card printing))))
 
 -- alice controls n untapped basic lands of one printing, nothing else.
 landsInPlay :: Printing.Printing -> Int -> GameState.GameState
@@ -1086,21 +1087,33 @@ creaturesInPlay pid gs =
   let isCreatureObject oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.isCreature (Printing.card printing)
-          Source.OfToken card -> Card.isCreature card
+          Source.OfCard printing -> Card.isCreature (faceOf printing)
+          Source.OfToken card -> Card.isCreature (Card.combined card)
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
           Source.OfEmblem _ -> False
           Source.OfInherentTrigger _ _ -> False
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
+-- The name a whole CARD answers to: CR 709.4's combined face, which for every
+-- card in this pool is its only one.
+nameOf :: Card.Type.Card -> CardName.CardName
+nameOf = Face.name . Card.combined
+
+-- The printed characteristics a PRINTING carries, which is the seam every test
+-- that reaches past Printing.card goes through. Card.combined for nameOf's
+-- reason: a characteristic belongs to a face, and which face a card shows is
+-- Pawl.Engine.Card's question.
+faceOf :: Printing.Printing -> Face.Face Card.Type.Card
+faceOf = Card.combined . Printing.card
+
 countByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countByName wanted pid gs =
   let named oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
-          Source.OfToken card -> Card.Type.name card == wanted
+          Source.OfCard printing -> nameOf (Printing.card printing) == wanted
+          Source.OfToken card -> nameOf card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
           Source.OfEmblem _ -> False
@@ -1115,8 +1128,8 @@ countOnBattlefieldByName wanted pid gs =
   let named oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
-          Source.OfToken card -> Card.Type.name card == wanted
+          Source.OfCard printing -> nameOf (Printing.card printing) == wanted
+          Source.OfToken card -> nameOf card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
           Source.OfEmblem _ -> False
@@ -1334,17 +1347,20 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 -- are inert for a command-zone object (never projected as a permanent). (#125)
 anthemEmblemCard :: Printing.Printing -> Card.Type.Card
 anthemEmblemCard piker =
-  (Printing.card piker)
-    { Card.Type.staticAbilities =
-        [ StaticAbility.MkStaticAbility
-            { StaticAbility.affected =
-                Affected.Matching
-                  (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
-              StaticAbility.modifications =
-                NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
-            }
-        ]
-    }
+  let card = Printing.card piker
+      anthem face =
+        face
+          { Face.staticAbilities =
+              [ StaticAbility.MkStaticAbility
+                  { StaticAbility.affected =
+                      Affected.Matching
+                        (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
+                    StaticAbility.modifications =
+                      NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
+                  }
+              ]
+          }
+   in card {Card.Type.faces = fmap anthem (Card.Type.faces card)}
 
 -- The cards M2a adds, paired with the single keyword each must carry. Named
 -- rather than loaded here so Pawl.Support stays pure: the caller loads them.

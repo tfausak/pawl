@@ -8,6 +8,7 @@ module Pawl.ResolveSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -16,6 +17,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -65,11 +67,13 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -293,7 +297,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         -- The slot lives on the ENTRY TRIGGER, not the spell, so
         -- Card.allTargetSpecs (which covers the spell and the enchant slot)
         -- is the wrong door -- read the ability the card actually prints.
-        specs = fmap (Modal.allTargetSpecs . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card ravenousRats))
+        specs = fmap (Modal.allTargetSpecs . TriggeredAbility.modal) (Face.triggeredAbilities (S.faceOf ravenousRats))
     case concatMap Map.elems specs of
       [theSpec] ->
         Spec.assertEqWith
@@ -652,7 +656,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 608.2n a resolving ability deals its damage and ceases" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
-        ability = case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
+        ability = case Face.activatedAbilities (S.faceOf prodigalSorcerer) of
           ab : _ -> ab
           [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
         (abilId, g1) = Game.freshObjectId g0
@@ -930,39 +934,40 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (ts, g2) = Game.freshTimestamp g1
         -- a minimal synthetic card whose spell has the two effects above;
         -- mirrors the file's existing synthetic-card idiom (CR 612 test above).
-        card =
-          Card.Type.MkCard
-            { Card.Type.name = CardName.MkCardName $ Text.pack "Subgame Test Spell",
-              Card.Type.manaCost = Nothing,
-              Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
-              Card.Type.power = Nothing,
-              Card.Type.toughness = Nothing,
-              Card.Type.loyalty = Nothing,
-              Card.Type.keywords = Set.empty,
-              Card.Type.colorIndicator = Set.empty,
-              Card.Type.staticAbilities = [],
-              Card.Type.spell =
+        card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
+        face =
+          Face.MkFace
+            { Face.name = CardName.MkCardName $ Text.pack "Subgame Test Spell",
+              Face.manaCost = Nothing,
+              Face.typeLine = Face.typeLine (S.faceOf lightningBolt),
+              Face.power = Nothing,
+              Face.toughness = Nothing,
+              Face.loyalty = Nothing,
+              Face.keywords = Set.empty,
+              Face.colorIndicator = Set.empty,
+              Face.staticAbilities = [],
+              Face.spell =
                 Modal.MkModal
                   (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                   (ModeSelection.ChooseExactly 1),
-              Card.Type.activatedAbilities = [],
-              Card.Type.replacementEffects = [],
-              Card.Type.triggeredAbilities = [],
-              Card.Type.delayedAbilities = Map.empty,
-              Card.Type.castingPermissions = [],
-              Card.Type.castingRestrictions = [],
-              Card.Type.characteristicPT = Nothing,
-              Card.Type.playerAbilities = [],
-              Card.Type.blockRequirements = [],
-              Card.Type.attackRequirements = [],
-              Card.Type.combatRestrictions = [],
-              Card.Type.attackCosts = [],
-              Card.Type.mulliganAction = [],
-              Card.Type.openingHandAction = [],
-              Card.Type.additionalCosts = [],
-              Card.Type.alternativeCosts = [],
-              Card.Type.enchant = Nothing,
-              Card.Type.counterability = Counterability.Counterable
+              Face.activatedAbilities = [],
+              Face.replacementEffects = [],
+              Face.triggeredAbilities = [],
+              Face.delayedAbilities = Map.empty,
+              Face.castingPermissions = [],
+              Face.castingRestrictions = [],
+              Face.characteristicPT = Nothing,
+              Face.playerAbilities = [],
+              Face.blockRequirements = [],
+              Face.attackRequirements = [],
+              Face.combatRestrictions = [],
+              Face.attackCosts = [],
+              Face.mulliganAction = [],
+              Face.openingHandAction = [],
+              Face.additionalCosts = [],
+              Face.alternativeCosts = [],
+              Face.enchant = Nothing,
+              Face.counterability = Counterability.Counterable
             }
         spellObj =
           Object.MkObject
@@ -997,39 +1002,40 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         stubRunner = pure (Result.Won S.alice)
         (spellId, g1) = Game.freshObjectId g0
         (ts, g2) = Game.freshTimestamp g1
-        card =
-          Card.Type.MkCard
-            { Card.Type.name = CardName.MkCardName $ Text.pack "Subgame Test Spell (Three Seats, One Departed)",
-              Card.Type.manaCost = Nothing,
-              Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
-              Card.Type.power = Nothing,
-              Card.Type.toughness = Nothing,
-              Card.Type.loyalty = Nothing,
-              Card.Type.keywords = Set.empty,
-              Card.Type.colorIndicator = Set.empty,
-              Card.Type.staticAbilities = [],
-              Card.Type.spell =
+        card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
+        face =
+          Face.MkFace
+            { Face.name = CardName.MkCardName $ Text.pack "Subgame Test Spell (Three Seats, One Departed)",
+              Face.manaCost = Nothing,
+              Face.typeLine = Face.typeLine (S.faceOf lightningBolt),
+              Face.power = Nothing,
+              Face.toughness = Nothing,
+              Face.loyalty = Nothing,
+              Face.keywords = Set.empty,
+              Face.colorIndicator = Set.empty,
+              Face.staticAbilities = [],
+              Face.spell =
                 Modal.MkModal
                   (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                   (ModeSelection.ChooseExactly 1),
-              Card.Type.activatedAbilities = [],
-              Card.Type.replacementEffects = [],
-              Card.Type.triggeredAbilities = [],
-              Card.Type.delayedAbilities = Map.empty,
-              Card.Type.castingPermissions = [],
-              Card.Type.castingRestrictions = [],
-              Card.Type.characteristicPT = Nothing,
-              Card.Type.playerAbilities = [],
-              Card.Type.blockRequirements = [],
-              Card.Type.attackRequirements = [],
-              Card.Type.combatRestrictions = [],
-              Card.Type.attackCosts = [],
-              Card.Type.mulliganAction = [],
-              Card.Type.openingHandAction = [],
-              Card.Type.additionalCosts = [],
-              Card.Type.alternativeCosts = [],
-              Card.Type.enchant = Nothing,
-              Card.Type.counterability = Counterability.Counterable
+              Face.activatedAbilities = [],
+              Face.replacementEffects = [],
+              Face.triggeredAbilities = [],
+              Face.delayedAbilities = Map.empty,
+              Face.castingPermissions = [],
+              Face.castingRestrictions = [],
+              Face.characteristicPT = Nothing,
+              Face.playerAbilities = [],
+              Face.blockRequirements = [],
+              Face.attackRequirements = [],
+              Face.combatRestrictions = [],
+              Face.attackCosts = [],
+              Face.mulliganAction = [],
+              Face.openingHandAction = [],
+              Face.additionalCosts = [],
+              Face.alternativeCosts = [],
+              Face.enchant = Nothing,
+              Face.counterability = Counterability.Counterable
             }
         spellObj =
           Object.MkObject
@@ -1755,7 +1761,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
 -- rather than silently picking whichever came first (Pawl.TargetSpec's
 -- soleTargetSpec is the same shape for the same reason).
 soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
-soleActivatedAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+soleActivatedAbility p = case Face.activatedAbilities (S.faceOf p) of
   [only] -> Just only
   _ -> Nothing
 
@@ -1859,7 +1865,7 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
         stifled = S.runPure S.identityAnswer placed (Cast.castSpell S.bob stifleId)
         countered = S.runPure S.identityAnswer stifled Stack.resolveTop
         after = S.runPure S.identityAnswer countered Engine.settleForPriority
-        entrantId = case filter (\oid -> fmap Card.Type.name (Game.cardOf oid after) == Just (CardName.MkCardName $ Text.pack "Goblin Piker")) (Set.toList (GameState.battlefield after)) of
+        entrantId = case filter (\oid -> fmap Face.name (Game.faceOf oid after) == Just (CardName.MkCardName $ Text.pack "Goblin Piker")) (Set.toList (GameState.battlefield after)) of
           [only] -> Just only
           _ -> Nothing
     Spec.assertEqWith s "the trigger is the only thing on the stack before the Stifle" (length (GameState.stack placed)) 1
@@ -3463,7 +3469,7 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
         asked = State.execState (Engine.runGame countingAnswer withSpell (Cast.castSpell S.alice spell)) 0
-    Spec.assertEqWith s "no target spec anywhere on the card" (Modal.allTargetSpecs (Card.Type.spell card)) Map.empty
+    Spec.assertEqWith s "no target spec anywhere on the card" (Modal.allTargetSpecs (Face.spell (Card.combined card))) Map.empty
     Spec.assertEqWith s "and nothing was asked to target" asked 0
     -- The board still resolves the way the first test says it does, from the
     -- same cast -- so "targets nothing" is not "affects nothing".
@@ -3787,7 +3793,7 @@ castBaneOfProgress forest bane board =
 namedOnBattlefield :: String -> GameState.GameState -> Maybe ObjectId.ObjectId
 namedOnBattlefield name gs =
   List.find
-    (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (CardName.MkCardName $ Text.pack name))
+    (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack name))
     (Set.toList (GameState.battlefield gs))
 
 -- How many +1/+1 counters (CR 122.6) sit on a permanent, 0 for none.

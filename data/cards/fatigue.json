@@ -1,61 +1,65 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Fatigue",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Fatigue",
+      "spell": {
+        "modes": [
           {
-            "type": "SkipNextPhase",
-            "value": [
+            "effects": [
               {
-                "type": "InSlot",
-                "value": "target"
-              },
+                "type": "SkipNextPhase",
+                "value": [
+                  {
+                    "type": "InSlot",
+                    "value": "target"
+                  },
+                  {
+                    "type": "Step",
+                    "value": {
+                      "type": "Beginning",
+                      "value": {
+                        "type": "DrawStep"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
               {
-                "type": "Step",
-                "value": {
-                  "type": "Beginning",
-                  "value": {
-                    "type": "DrawStep"
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
                   }
                 }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
+            "type": "Sorcery"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Sorcery"
-      }
-    ]
-  }
+    }
+  ]
 }

@@ -10,7 +10,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 --
 -- `mana` carries CR 118.6's distinction in the type, and the two cases are NOT
 -- interchangeable. Nothing is an UNPAYABLE cost (CR 118.6), the same fact
--- Card.manaCost's Maybe carries for CR 202.1. Just (MkManaCost []) is {0}, which
+-- Face.manaCost's Maybe carries for CR 202.1. Just (MkManaCost []) is {0}, which
 -- is real and payable (CR 118.5, CR 118.5a) -- ManaCost is a list of symbols and
 -- the empty list IS {0}. Scryfall spells the difference: Ancestral Vision's
 -- mana_cost is '', Ornithopter's is '{0}'.

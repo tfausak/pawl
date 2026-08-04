@@ -40,6 +40,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -475,7 +476,7 @@ assaultBoard mountain assault mine piker =
 
 -- The card's one printed activated ability.
 assaultAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
-assaultAbility assault = case Card.Type.activatedAbilities (Printing.card assault) of
+assaultAbility assault = case Face.activatedAbilities (S.faceOf assault) of
   [] -> Nothing
   ability : _ -> Just ability
 

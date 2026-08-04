@@ -14,7 +14,6 @@ import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardError as CardError
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Printing as Printing
@@ -74,7 +73,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
     piker <- S.pikerJson
     withCorpus "by-name" [("goblin-piker.json", piker)] $ \_ registry -> do
       p <- S.printingOf s registry "Goblin Piker"
-      Spec.assertEq s (Card.name $ Printing.card p) . CardName.MkCardName $ Text.pack "Goblin Piker"
+      Spec.assertEq s (S.nameOf $ Printing.card p) . CardName.MkCardName $ Text.pack "Goblin Piker"
 
   Spec.it s "the same card loads by its slug -- slugify is idempotent" $ do
     piker <- S.pikerJson
@@ -145,7 +144,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       Spec.assertBool s (either (const True) (const False) broken) "the malformed file fails first"
       TextIO.writeFile (root <> "/goblin-piker.json") piker
       c <- S.cardOf s registry "Goblin Piker"
-      Spec.assertEq s (Card.name c) . CardName.MkCardName $ Text.pack "Goblin Piker"
+      Spec.assertEq s (S.nameOf c) . CardName.MkCardName $ Text.pack "Goblin Piker"
 
   -- (b) A mistyped --cards-dir should fail once, at startup, rather than
   -- once per card looked up (#167). This is the one failure that is still an

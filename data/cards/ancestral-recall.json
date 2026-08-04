@@ -1,52 +1,56 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Ancestral Recall",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Ancestral Recall",
+      "spell": {
+        "modes": [
           {
-            "type": "Draw",
-            "value": [
+            "effects": [
               {
-                "type": "InSlot",
-                "value": "target"
-              },
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "InSlot",
+                    "value": "target"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 3
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
               {
-                "type": "Literal",
-                "value": 3
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Players"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

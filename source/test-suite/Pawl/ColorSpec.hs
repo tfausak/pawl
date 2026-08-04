@@ -38,6 +38,7 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -79,7 +80,7 @@ destroyMode = ModeIndex.MkModeIndex 1
 -- index is out of range or the mode does not declare exactly one slot; the
 -- callers assert on that rather than defaulting to a hand-built spec.
 modeSpec :: Printing.Printing -> ModeIndex.ModeIndex -> Maybe TargetSpec.TargetSpec
-modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (Printing.card printing)) of
+modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (S.faceOf printing)) of
   Just [only] -> Just only
   _ -> Nothing
 
@@ -88,7 +89,7 @@ modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (Printing.
 -- existing convention of group-local helpers (ActivateSpec, ReplacementSpec)
 -- rather than centralizing a helper this small in Support.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.faceOf p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
 

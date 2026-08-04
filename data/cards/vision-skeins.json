@@ -1,45 +1,49 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Vision Skeins",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Vision Skeins",
+      "spell": {
+        "modes": [
           {
-            "type": "Draw",
-            "value": [
+            "effects": [
               {
-                "type": "EachPlayer"
-              },
-              {
-                "type": "Literal",
-                "value": 2
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "EachPlayer"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

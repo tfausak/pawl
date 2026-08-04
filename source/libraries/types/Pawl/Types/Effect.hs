@@ -400,7 +400,7 @@ data Effect card
     -- changes in as many words), so an enchantment entering afterwards is safe.
     GainControl Duration.Duration ObjectRef.ObjectRef
   | -- | CR 603.7: create the delayed triggered ability this card declares under
-    -- this name (Card.delayedAbilities). First-order: the payload is card data
+    -- this name (Face.delayedAbilities). First-order: the payload is card data
     -- joined by a name, so this opcode carries no nested ability and adds no type
     -- parameter. The resolving object's binding environment is captured as the
     -- ability is armed, which is how "it" / "that card" (CR 603.7c) survives the

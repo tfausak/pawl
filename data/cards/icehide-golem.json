@@ -1,36 +1,40 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Snow"
-    }
-  ],
-  "name": "Icehide Golem",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Golem"
-      }
-    ],
-    "supertypes": [
-      {
-        "type": "Snow"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
+      "manaCost": [
+        {
+          "type": "Snow"
+        }
+      ],
+      "name": "Icehide Golem",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      {
-        "type": "Creature"
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Golem"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

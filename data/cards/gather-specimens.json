@@ -1,91 +1,95 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 3
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Gather Specimens",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Gather Specimens",
+      "spell": {
+        "modes": [
           {
-            "type": "Replace",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "Unlimited"
-              },
-              {
-                "type": "Other"
-              },
-              null,
-              {
-                "type": "EntryR",
+                "type": "Replace",
                 "value": [
                   {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Creature"
-                        }
-                      },
-                      {
-                        "type": "ControlledBy",
-                        "value": {
-                          "type": "Opponent"
-                        }
-                      }
-                    ]
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "UnderSourceControl"
+                    "type": "Unlimited"
+                  },
+                  {
+                    "type": "Other"
+                  },
+                  null,
+                  {
+                    "type": "EntryR",
+                    "value": [
+                      {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "Opponent"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "UnderSourceControl"
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
         ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

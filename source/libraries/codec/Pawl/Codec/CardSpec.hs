@@ -2,427 +2,125 @@
 
 module Pawl.Codec.CardSpec where
 
+import qualified Data.Either as Either
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Spec as Spec
-import qualified Pawl.Types.AbilityName as AbilityName
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
-import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.AttackCost as AttackCost
-import qualified Pawl.Types.AttackRequirement as AttackRequirement
-import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.CastingPermission as CastingPermission
-import qualified Pawl.Types.CastingRestriction as CastingRestriction
-import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.CombatRestriction as CombatRestriction
-import qualified Pawl.Types.Cost as Cost
-import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
-import qualified Pawl.Types.Effect as Effect
-import qualified Pawl.Types.EntryRewrite as EntryRewrite
-import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Loyalty as Loyalty
-import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
-import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.Optionality as Optionality
-import qualified Pawl.Types.PlayerEffect as PlayerEffect
-import qualified Pawl.Types.PlayerScope as PlayerScope
-import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
-import qualified Pawl.Types.Pool as Pool
-import qualified Pawl.Types.Power as Power
-import qualified Pawl.Types.Quantity as Quantity
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
-import qualified Pawl.Types.TargetSpec as TargetSpec
-import qualified Pawl.Types.Toughness as Toughness
-import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- Fixtures --------------------------------------------------------------------
 --
--- No registry here: the codec sublibrary sits above the test suite in the
--- dependency table, so it cannot reach Pawl.Registry or a real Printing. Every
--- fixture below is a synthetic Card built by hand.
+-- Only the CONTAINER is exercised here -- how faces and the layout are written
+-- and read back. Every case about what one face carries lives in
+-- Pawl.Codec.FaceSpec.
 
--- | CR 700.2's non-modal shape, which is what a land or vanilla creature's
--- spell payload is: one mode, no effects, forced.
-minimalModal :: Modal.Modal Card.Card
-minimalModal =
-  Modal.MkModal
-    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
-    (ModeSelection.ChooseExactly 1)
-
--- | CR 603.6a's simplest trigger. The shape does not matter here, only that it
--- is a well-typed TriggeredAbility Card.
-minimalTriggeredAbility :: TriggeredAbility.TriggeredAbility Card.Card
-minimalTriggeredAbility =
-  TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing
-
--- | Every required field set to a simple value, 'manaCost', 'power' and
--- 'toughness' set to non-default values, and every other defaulted field left at
--- its Haskell default. 'baseCardJson' therefore carries no key for any of those
--- defaulted fields, which is what lets one round-trip assertion prove both halves
--- of every field's elision at once: an encoder that emitted a default, or a
--- decoder that mis-defaulted an absent key, breaks the equality.
-baseCard :: Card.Card
-baseCard =
-  Card.MkCard
-    { Card.name = CardName.MkCardName $ Text.pack "Test Card",
-      Card.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
-      Card.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) Set.empty,
-      Card.power = Just (Power.MkPower (Quantity.Literal 1)),
-      Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
-      Card.loyalty = Nothing,
-      Card.keywords = Set.empty,
-      Card.staticAbilities = [],
-      Card.spell = minimalModal,
-      Card.activatedAbilities = [],
-      Card.replacementEffects = [],
-      Card.triggeredAbilities = [],
-      Card.castingPermissions = [],
-      Card.castingRestrictions = [],
-      Card.colorIndicator = Set.empty,
-      Card.characteristicPT = Nothing,
-      Card.delayedAbilities = Map.empty,
-      Card.playerAbilities = [],
-      Card.blockRequirements = [],
-      Card.attackRequirements = [],
-      Card.combatRestrictions = [],
-      Card.attackCosts = [],
-      Card.additionalCosts = [],
-      Card.alternativeCosts = [],
-      Card.mulliganAction = [],
-      Card.openingHandAction = [],
-      Card.enchant = Nothing,
-      Card.counterability = Counterability.Counterable
+-- Every field at the value Pawl.Codec.Face's decoder defaults it to, so a case
+-- only writes the fields it is about.
+bareFace :: CardName.CardName -> Face.Face Card.Card
+bareFace n =
+  Face.MkFace
+    { Face.name = n,
+      Face.manaCost = Nothing,
+      Face.typeLine = TypeLine.MkTypeLine Set.empty Set.empty Set.empty,
+      Face.power = Nothing,
+      Face.toughness = Nothing,
+      Face.loyalty = Nothing,
+      Face.keywords = Set.empty,
+      Face.colorIndicator = Set.empty,
+      Face.characteristicPT = Nothing,
+      Face.staticAbilities = [],
+      Face.spell = Face.defaultSpell,
+      Face.activatedAbilities = [],
+      Face.replacementEffects = [],
+      Face.triggeredAbilities = [],
+      Face.delayedAbilities = Map.empty,
+      Face.castingPermissions = [],
+      Face.castingRestrictions = [],
+      Face.enchant = Nothing,
+      Face.counterability = Counterability.Counterable,
+      Face.additionalCosts = [],
+      Face.alternativeCosts = [],
+      Face.playerAbilities = [],
+      Face.blockRequirements = [],
+      Face.attackRequirements = [],
+      Face.combatRestrictions = [],
+      Face.attackCosts = [],
+      Face.mulliganAction = [],
+      Face.openingHandAction = []
     }
 
--- | Every field at the default an omitted key means, which is what the minimal
--- JSON above has to decode to.
-minimalCard :: Card.Card
-minimalCard =
-  Card.MkCard
-    { Card.name = CardName.MkCardName (Text.pack "Mountain"),
-      Card.manaCost = Nothing,
-      Card.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Land) Set.empty,
-      Card.power = Nothing,
-      Card.toughness = Nothing,
-      Card.loyalty = Nothing,
-      Card.keywords = Set.empty,
-      Card.colorIndicator = Set.empty,
-      Card.characteristicPT = Nothing,
-      Card.staticAbilities = [],
-      Card.spell = Card.defaultSpell,
-      Card.activatedAbilities = [],
-      Card.replacementEffects = [],
-      Card.triggeredAbilities = [],
-      Card.delayedAbilities = Map.empty,
-      Card.castingPermissions = [],
-      Card.castingRestrictions = [],
-      Card.enchant = Nothing,
-      Card.counterability = Counterability.Counterable,
-      Card.additionalCosts = [],
-      Card.alternativeCosts = [],
-      Card.playerAbilities = [],
-      Card.blockRequirements = [],
-      Card.attackRequirements = [],
-      Card.combatRestrictions = [],
-      Card.attackCosts = [],
-      Card.mulliganAction = [],
-      Card.openingHandAction = []
-    }
-
--- The same card the verbose literal below spells out: minimalCard's fields,
--- with the type line a real basic land carries.
+-- | A basic land, which is what all 227 files in the corpus look like: one face,
+-- and no "layout" key.
 mountainCard :: Card.Card
 mountainCard =
-  minimalCard
-    { Card.typeLine =
-        TypeLine.MkTypeLine
-          (Set.singleton Supertype.Basic)
-          (Set.singleton CardType.Land)
-          (Set.singleton Subtype.Mountain)
+  Card.MkCard
+    { Card.layout = Layout.Normal,
+      Card.faces =
+        NonEmpty.singleton
+          (bareFace (CardName.MkCardName (Text.pack "Mountain")))
+            { Face.typeLine =
+                TypeLine.MkTypeLine
+                  (Set.singleton Supertype.Basic)
+                  (Set.singleton CardType.Land)
+                  (Set.singleton Subtype.Mountain)
+            }
     }
-
-baseCardJson :: String
-baseCardJson =
-  "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
-    <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
-    <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}"
-
--- | 'baseCard' with every field populated at once, except 'Card.spell', which
--- nothing here overrides -- so 'populatedCardJson' has no @"spell"@ key. That
--- literal was produced by running 'Card.toJson' on this exact value rather than
--- transcribed by hand.
-populatedCard :: Card.Card
-populatedCard =
-  baseCard
-    { Card.keywords = Set.singleton Keyword.Deathtouch,
-      Card.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton Modification.LoseAllAbilities)],
-      Card.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal ActivationTiming.AnyTime],
-      Card.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy],
-      Card.triggeredAbilities = [minimalTriggeredAbility],
-      Card.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
-      Card.loyalty = Just (Loyalty.MkLoyalty 3),
-      Card.colorIndicator = Set.singleton Color.White,
-      Card.characteristicPT = Just Quantity.ManaValue,
-      Card.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility,
-      Card.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells],
-      Card.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached],
-      Card.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
-      Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing],
-      Card.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])],
-      Card.additionalCosts = [CostComponent.TapThis],
-      Card.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []],
-      Card.counterability = Counterability.CantBeCountered,
-      Card.mulliganAction = [Effect.ExileHandThenDraw],
-      Card.openingHandAction = [Effect.ExileHandThenDraw],
-      Card.enchant = Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing),
-      Card.castingRestrictions = [CastingRestriction.AttackedThisStep]
-    }
-
-populatedCardJson :: String
-populatedCardJson =
-  "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
-    <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
-    <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
-    <> "\"keywords\":[{\"type\":\"Deathtouch\"}],"
-    <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
-    <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[]},"
-    <> "\"modal\":{\"modes\":[{}]}}],"
-    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}],"
-    <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{}]}}],"
-    <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
-    <> "\"loyalty\":3,\"colorIndicator\":[{\"type\":\"White\"}],\"characteristicPT\":{\"type\":\"ManaValue\"},"
-    <> "\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{}]}}}],"
-    <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
-    <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
-    <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
-    <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
-    <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
-    <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
-    <> "\"alternativeCosts\":[{\"mana\":[]}],"
-    <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
-    <> "\"mulliganAction\":[{\"type\":\"ExileHandThenDraw\"}],"
-    <> "\"openingHandAction\":[{\"type\":\"ExileHandThenDraw\"}],"
-    <> "\"enchant\":{\"pool\":{\"type\":\"Creatures\"}},"
-    <> "\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Card" $ do
-  -- name and typeLine are the only required keys: a card that says nothing else
-  -- is a vanilla card rather than a malformed file.
-  Spec.it s "a minimal card carries only name and typeLine" $
+  -- "faces" is the only required key: CR 709-722's Normal is the absence of a
+  -- card saying otherwise, so every single-face file says nothing about layout.
+  Spec.it s "a single-face card carries only faces, and no layout key" $
     Common.assertJsonCodec
       s
       Card.toJson
       Card.fromJson
-      minimalCard
-      """ {"name":"Mountain","typeLine":{"types":[{"type":"Land"}]}} """
-  Spec.it s "MkCard, every required field present and every optional field absent" $
-    Common.assertJsonCodec s Card.toJson Card.fromJson baseCard baseCardJson
-  -- Most defaulted fields also get their own absent-key assertion below, not
-  -- just the aggregate round trip above: a decoder that defaulted the WRONG
-  -- field could still pass the aggregate equality if two defaults happened to
-  -- collide, and reading each field back out individually rules that out.
-  Spec.describe s "each defaulted field takes its default when its key is absent from the JSON" $ do
-    Spec.it s "loyalty (CR 306.5) defaults to Nothing" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.loyalty <$> Card.fromJson v) (Right Nothing)
-    Spec.it s "colorIndicator (CR 204.1/204.2) defaults to the empty set" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.colorIndicator <$> Card.fromJson v) (Right Set.empty)
-    Spec.it s "characteristicPT (CR 604.3/208.2a) defaults to Nothing" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.characteristicPT <$> Card.fromJson v) (Right Nothing)
-    Spec.it s "delayedAbilities (CR 603.7) defaults to the empty map" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.delayedAbilities <$> Card.fromJson v) (Right Map.empty)
-    Spec.it s "playerAbilities (CR 604.1/604.2/611.1) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.playerAbilities <$> Card.fromJson v) (Right [])
-    Spec.it s "blockRequirements (CR 509.1c) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.blockRequirements <$> Card.fromJson v) (Right [])
-    Spec.it s "attackRequirements (CR 508.1d) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.attackRequirements <$> Card.fromJson v) (Right [])
-    Spec.it s "combatRestrictions (CR 508.1c/509.1b) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.combatRestrictions <$> Card.fromJson v) (Right [])
-    Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.attackCosts <$> Card.fromJson v) (Right [])
-    Spec.it s "additionalCosts (CR 118.8) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.additionalCosts <$> Card.fromJson v) (Right [])
-    Spec.it s "alternativeCosts (CR 118.9) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.alternativeCosts <$> Card.fromJson v) (Right [])
-    -- The registry-backed pair lives in Pawl.CodecIntegrationSpec, which can
-    -- reach real Printings; this sublibrary cannot.
-    Spec.it s "counterability (CR 113.6g) defaults to Counterable" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.counterability <$> Card.fromJson v) (Right Counterability.Counterable)
-    Spec.it s "mulliganAction (CR 103.5b) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.mulliganAction <$> Card.fromJson v) (Right [])
-    Spec.it s "openingHandAction (CR 103.6) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.openingHandAction <$> Card.fromJson v) (Right [])
-    Spec.it s "enchant (CR 702.5a) defaults to Nothing" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.enchant <$> Card.fromJson v) (Right Nothing)
-    Spec.it s "castingRestrictions (CR 601.3) defaults to the empty list" $ do
-      v <- Common.assertJson s baseCardJson
-      Spec.assertEq s (Card.castingRestrictions <$> Card.fromJson v) (Right [])
-  -- The other half of every defaulted field's story: populated, it appears
-  -- under its own key and round-trips. Each case is 'baseCard' with exactly one
-  -- field changed, so its JSON is 'baseCardJson' plus exactly one extra key.
-  Spec.describe s "each defaulted field round-trips when present" $ do
-    Spec.it s "loyalty" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.loyalty = Just (Loyalty.MkLoyalty 3)}
-        (init baseCardJson <> ",\"loyalty\":3}")
-    Spec.it s "colorIndicator" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.colorIndicator = Set.singleton Color.White}
-        (init baseCardJson <> ",\"colorIndicator\":[{\"type\":\"White\"}]}")
-    Spec.it s "characteristicPT" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.characteristicPT = Just Quantity.ManaValue}
-        (init baseCardJson <> ",\"characteristicPT\":{\"type\":\"ManaValue\"}}")
-    Spec.it s "delayedAbilities" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility}
-        ( init baseCardJson
-            <> ",\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-            <> "\"modal\":{\"modes\":[{}]}}}]}"
-        )
-    Spec.it s "playerAbilities" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells]}
-        (init baseCardJson <> ",\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}]}")
-    Spec.it s "blockRequirements" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached]}
-        (init baseCardJson <> ",\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}]}")
-    Spec.it s "attackRequirements" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached]}
-        (init baseCardJson <> ",\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}]}")
-    Spec.it s "combatRestrictions" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing]}
-        (init baseCardJson <> ",\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}]}")
-    Spec.it s "attackCosts" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])]}
-        (init baseCardJson <> ",\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}]}")
-    Spec.it s "additionalCosts" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.additionalCosts = [CostComponent.TapThis]}
-        (init baseCardJson <> ",\"additionalCosts\":[{\"type\":\"TapThis\"}]}")
-    Spec.it s "alternativeCosts" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []]}
-        (init baseCardJson <> ",\"alternativeCosts\":[{\"mana\":[]}]}")
-    Spec.it s "counterability" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.counterability = Counterability.CantBeCountered}
-        (init baseCardJson <> ",\"counterability\":{\"type\":\"CantBeCountered\"}}")
-    Spec.it s "mulliganAction" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.mulliganAction = [Effect.ExileHandThenDraw]}
-        (init baseCardJson <> ",\"mulliganAction\":[{\"type\":\"ExileHandThenDraw\"}]}")
-    Spec.it s "openingHandAction" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.openingHandAction = [Effect.ExileHandThenDraw]}
-        (init baseCardJson <> ",\"openingHandAction\":[{\"type\":\"ExileHandThenDraw\"}]}")
-    Spec.it s "enchant" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.enchant = Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing)}
-        (init baseCardJson <> ",\"enchant\":{\"pool\":{\"type\":\"Creatures\"}}}")
-    Spec.it s "castingRestrictions" $
-      Common.assertJsonCodec
-        s
-        Card.toJson
-        Card.fromJson
-        baseCard {Card.castingRestrictions = [CastingRestriction.AttackedThisStep]}
-        (init baseCardJson <> ",\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}")
-  -- Every field at once, including the recursive card-in-card ones that only
-  -- Card itself ties the knot on.
-  Spec.it s "MkCard, every field populated at once" $
-    Common.assertJsonCodec s Card.toJson Card.fromJson populatedCard populatedCardJson
-  -- Omission is permitted on input, never required: a file that spells out
-  -- every default must still load.
-  Spec.it s "a pre-migration card file still decodes" $
+      mountainCard
+      """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}]} """
+  Spec.it s "a card with two faces round-trips, and layout is omitted when Normal" $ do
+    let face n =
+          (bareFace (CardName.MkCardName (Text.pack n)))
+            { Face.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Instant) Set.empty
+            }
+        card =
+          Card.MkCard
+            { Card.layout = Layout.Normal,
+              Card.faces = face "Wax" NonEmpty.:| [face "Wane"]
+            }
+    -- assertJsonCodec rather than a bare encode-then-decode round trip: only
+    -- pinning the literal proves the "layout" key is ABSENT for Normal, which a
+    -- round trip through the defaulting decoder could not see.
+    Common.assertJsonCodec
+      s
+      Card.toJson
+      Card.fromJson
+      card
+      """ {"faces":[{"name":"Wax","typeLine":{"types":[{"type":"Instant"}]}},{"name":"Wane","typeLine":{"types":[{"type":"Instant"}]}}]} """
+  -- Omission is permitted on input, never required: a file that spells the
+  -- default out must still load.
+  Spec.it s "a card that spells its layout out still decodes" $
     Common.assertFromJson
       s
       Card.fromJson
-      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
+      """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}],"layout":{"type":"Normal"}} """
       mountainCard
+  -- Where the at-least-one-face invariant is enforced: Card.faces is a NonEmpty
+  -- so that Pawl.Engine.Card.combined can be total, and Common.decodeNonEmpty is
+  -- the only gate a file passes through to get there.
+  Spec.it s "a card with no faces is rejected rather than decoded" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"faces":[]} """) >>= Card.fromJson))
+      "expected an empty faces array to fail to decode"

@@ -1,63 +1,67 @@
 {
-  "castingRestrictions": [
+  "faces": [
     {
-      "type": "DuringPhase",
-      "value": {
-        "type": "Combat",
-        "value": {
-          "type": "DeclareAttackers"
-        }
-      }
-    },
-    {
-      "type": "AttackedThisStep"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    }
-  ],
-  "name": "Rally the Troops",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Untap",
+      "castingRestrictions": [
+        {
+          "type": "DuringPhase",
+          "value": {
+            "type": "Combat",
             "value": {
-              "type": "And",
-              "value": [
-                {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
-                  }
-                },
-                {
-                  "type": "ControlledBy",
-                  "value": {
-                    "type": "You"
-                  }
-                }
-              ]
+              "type": "DeclareAttackers"
             }
+          }
+        },
+        {
+          "type": "AttackedThisStep"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Rally the Troops",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Untap",
+                "value": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

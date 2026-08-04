@@ -1,102 +1,106 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "AddMana",
-                "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
-                  }
-                }
+                "type": "TapThis"
               }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "cost": {
-        "components": [
-          {
-            "type": "TapThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colorless"
+                      }
+                    }
                   }
                 ]
               }
-            ],
-            "targetSpecs": [
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
               {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "IsAttacking"
-                  },
-                  "pool": {
-                    "type": "Creatures"
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "IsAttacking"
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": {
+            "type": "DuringPhase",
+            "value": [
+              {
+                "type": "Step",
+                "value": {
+                  "type": "Combat",
+                  "value": {
+                    "type": "EndOfCombat"
                   }
                 }
+              },
+              {
+                "type": "EachTurn"
               }
             ]
           }
-        ]
-      },
-      "timing": {
-        "type": "DuringPhase",
-        "value": [
+        }
+      ],
+      "name": "Desert",
+      "typeLine": {
+        "subtypes": [
           {
-            "type": "Step",
-            "value": {
-              "type": "Combat",
-              "value": {
-                "type": "EndOfCombat"
-              }
-            }
-          },
+            "type": "Desert"
+          }
+        ],
+        "types": [
           {
-            "type": "EachTurn"
+            "type": "Land"
           }
         ]
       }
     }
-  ],
-  "name": "Desert",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Desert"
-      }
-    ],
-    "types": [
-      {
-        "type": "Land"
-      }
-    ]
-  }
+  ]
 }

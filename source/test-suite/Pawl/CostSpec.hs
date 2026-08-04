@@ -44,6 +44,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -72,9 +73,9 @@ import qualified Pawl.Types.Zone as Zone
 -- in these fixtures. Duplicated per this suite's convention of group-local
 -- helpers (ActivateSpec and ReplacementSpec each carry their own).
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
-theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+theAbility p = case Face.activatedAbilities (S.faceOf p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.faceOf p)) ActivationTiming.AnyTime
 
 doorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 doorSpec s registry =
@@ -605,9 +606,9 @@ longtuskCubSpec s registry =
   Spec.describe s "LongtuskCub" $ do
     Spec.it s "Longtusk Cub is a {1}{G} 2/2 Cat with a pay-energy ability" $ do
       longtuskCub <- S.printingOf s registry "Longtusk Cub"
-      Spec.assertEqWith s "name" (Card.Type.name (Printing.card longtuskCub)) (CardName.MkCardName $ Text.pack "Longtusk Cub")
-      Spec.assertEqWith s "power" (Card.Type.power (Printing.card longtuskCub)) (Just (Power.MkPower (Quantity.Type.Literal 2)))
-      Spec.assertEqWith s "one activated ability" (length (Card.Type.activatedAbilities (Printing.card longtuskCub))) 1
+      Spec.assertEqWith s "name" (Face.name (S.faceOf longtuskCub)) (CardName.MkCardName $ Text.pack "Longtusk Cub")
+      Spec.assertEqWith s "power" (Face.power (S.faceOf longtuskCub)) (Just (Power.MkPower (Quantity.Type.Literal 2)))
+      Spec.assertEqWith s "one activated ability" (length (Face.activatedAbilities (S.faceOf longtuskCub))) 1
     Spec.it s "CR 118.6 the pay-energy ability is payable at two energy, not at one, and grows the Cub" $ do
       longtuskCub <- S.printingOf s registry "Longtusk Cub"
       let (cubId, base) = S.addCreature longtuskCub S.alice (Setup.emptyGame S.bothPlayers)

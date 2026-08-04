@@ -18,6 +18,7 @@ module Pawl.Registry where
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception as Exception
 import qualified Data.ByteString as ByteString
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
@@ -29,6 +30,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardError as CardError
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
 import qualified System.Directory as Directory
 import qualified System.IO.Error as IOError
 
@@ -100,17 +102,23 @@ cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 -- non-ASCII character would fail with "invalid byte sequence" instead of naming
 -- the offending file.
 --
--- The name check: a file's own `name` field must slugify back to the name it is
--- filed under, or a lookup would quietly serve a different card than it was
--- asked for. Both callers inherit it.
+-- The name check: the name of the file's FIRST printed face must slugify back
+-- to the name it is filed under, or a lookup would quietly serve a different
+-- card than it was asked for. Both callers inherit it.
+--
+-- The first face rather than Pawl.Engine.Card.combined's, which is the same
+-- face for every card in this pool: the registry sublibrary sits ABOVE engine
+-- and cannot call into it. CR 712.8a's front face is the first one either way,
+-- so a filename is answerable without knowing how the faces combine.
 parseCard :: CardName.CardName -> Slug.Slug -> FilePath -> ByteString.ByteString -> Either CardError.CardError Card.Card
 parseCard name slug path bytes = do
   contents <- either (\err -> invalid ("not valid UTF-8: " <> show err)) Right (Encoding.decodeUtf8' bytes)
   card <- either (invalid . Text.unpack) Right (Common.parse contents >>= Card.fromJson)
-  let actual = Slug.fromText . CardName.unwrap $ Card.name card
+  let firstName = Face.name (NonEmpty.head (Card.faces card))
+      actual = Slug.fromText . CardName.unwrap $ firstName
   if actual == slug
     then Right card
-    else invalid ("is named " <> show (Card.name card) <> ", which files under " <> show actual)
+    else invalid ("is named " <> show firstName <> ", which files under " <> show actual)
   where
     invalid reason = Left (CardError.Invalid name (path <> ": " <> reason))
 

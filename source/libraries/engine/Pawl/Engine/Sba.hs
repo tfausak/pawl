@@ -17,11 +17,11 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -247,9 +247,9 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- and consults neither indestructible (CR 702.12b) nor a regeneration shield (CR
 -- 701.19a).
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
-fallsOff pcs gs oid = case Game.cardOf oid gs of
+fallsOff pcs gs oid = case Game.faceOf oid gs of
   Nothing -> False
-  Just card -> case Card.Type.enchant card of
+  Just face -> case Face.enchant face of
     Nothing -> False
     Just spec -> case Game.lookupObject oid gs of
       Nothing -> False
@@ -272,7 +272,7 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 -- restrict targeting and nothing else -- so an Aura stays attached to a host that
 -- gains either. See Target.admittedRecipients.
 --
--- Pool.Creatures with no Filter is the shape MOST Card.enchant specs in this pool
+-- Pool.Creatures with no Filter is the shape MOST Face.enchant specs in this pool
 -- carry (Unholy Strength). Target.creatureRecipients tags every candidate
 -- ToCreature, drawn from the battlefield objects owned by a still-playing player,
 -- so with no Filter to narrow that set "still legal" reduces EXACTLY to "still a

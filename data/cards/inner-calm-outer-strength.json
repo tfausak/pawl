@@ -1,114 +1,118 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Inner Calm, Outer Strength",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Inner Calm, Outer Strength",
+      "spell": {
+        "modes": [
           {
-            "type": "ModifyTarget",
-            "value": [
+            "effects": [
               {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "ModifyPowerToughness",
+                "type": "ModifyTarget",
                 "value": [
                   {
-                    "type": "Count",
-                    "value": {
-                      "aggregation": {
-                        "type": "Objects"
-                      },
-                      "filter": {
-                        "type": "And",
-                        "value": []
-                      },
-                      "scope": {
-                        "type": "InZone",
-                        "value": [
-                          {
-                            "type": "Hand"
-                          },
-                          {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
-                          }
-                        ]
-                      }
-                    }
+                    "type": "UntilEndOfTurn"
                   },
                   {
-                    "type": "Count",
-                    "value": {
-                      "aggregation": {
-                        "type": "Objects"
-                      },
-                      "filter": {
-                        "type": "And",
-                        "value": []
-                      },
-                      "scope": {
-                        "type": "InZone",
-                        "value": [
-                          {
-                            "type": "Hand"
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
                           },
-                          {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Hand"
+                              },
+                              {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            ]
                           }
-                        ]
+                        }
+                      },
+                      {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Hand"
+                              },
+                              {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            ]
+                          }
+                        }
                       }
-                    }
-                  }
+                    ]
+                  },
+                  "target"
                 ]
-              },
-              "target"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "subtypes": [
           {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
+            "type": "Arcane"
+          }
+        ],
+        "types": [
+          {
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Arcane"
-      }
-    ],
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

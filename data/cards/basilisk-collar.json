@@ -1,85 +1,89 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 2
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
               {
-                "type": "Attach",
-                "value": "target"
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
-                  }
-                }
+                "type": "Generic",
+                "value": 2
               }
             ]
-          }
-        ]
-      },
-      "timing": {
-        "type": "SorcerySpeed"
-      }
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    }
-  ],
-  "name": "Basilisk Collar",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Attached"
-      },
-      "modifications": [
-        {
-          "type": "GainKeyword",
-          "value": {
-            "type": "Deathtouch"
-          }
-        },
-        {
-          "type": "GainKeyword",
-          "value": {
-            "type": "Lifelink"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Attach",
+                    "value": "target"
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": {
+            "type": "SorcerySpeed"
           }
         }
-      ]
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        }
+      ],
+      "name": "Basilisk Collar",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Deathtouch"
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Lifelink"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Equipment"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Equipment"
-      }
-    ],
-    "types": [
-      {
-        "type": "Artifact"
-      }
-    ]
-  }
+  ]
 }

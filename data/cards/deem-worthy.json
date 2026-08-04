@@ -1,79 +1,48 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Cycling",
-      "value": [
+      "keywords": [
         {
-          "mana": [
+          "type": "Cycling",
+          "value": [
             {
-              "type": "Generic",
-              "value": 3
-            },
-            {
-              "type": "OfType",
-              "value": {
-                "type": "Colored",
-                "value": {
-                  "type": "Red"
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 3
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Red"
+                    }
+                  }
                 }
-              }
-            }
+              ]
+            },
+            null
           ]
-        },
-        null
-      ]
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 4
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
         }
-      }
-    }
-  ],
-  "name": "Deem Worthy",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "DealDamage",
-            "value": [
-              "target",
-              {
-                "type": "Literal",
-                "value": 7
-              }
-            ]
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "target",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
             }
           }
-        ]
-      }
-    ]
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfCycled"
-      },
-      "modal": {
+        }
+      ],
+      "name": "Deem Worthy",
+      "spell": {
         "modes": [
           {
             "effects": [
@@ -83,14 +52,11 @@
                   "target",
                   {
                     "type": "Literal",
-                    "value": 2
+                    "value": 7
                   }
                 ]
               }
             ],
-            "optionality": {
-              "type": "Optional"
-            },
             "targetSpecs": [
               {
                 "slot": "target",
@@ -103,14 +69,52 @@
             ]
           }
         ]
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfCycled"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ],
+                "optionality": {
+                  "type": "Optional"
+                },
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+  ]
 }

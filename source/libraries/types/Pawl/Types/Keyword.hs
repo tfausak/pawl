@@ -19,7 +19,7 @@ import qualified Pawl.Types.Filter as Filter
 -- Multiplicity is NOT this type's problem: an object can have the same keyword
 -- ability twice, which Pawl.Types.ProjectedCharacteristics.keywords carries as a
 -- count. This type says only WHICH ability, so a card's printed keywords stay a
--- Set -- see Pawl.Types.Card.keywords.
+-- Set -- see Pawl.Types.Face.keywords.
 --
 -- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
 -- Filter has a HasKeyword arm and this type carries a Filter (702.29e, 702.14c)
@@ -140,7 +140,7 @@ data Keyword
     --
     -- The cost rides the constructor, as Toxic's N does, because rule 702.34a
     -- states it as part of the keyword. It is deliberately NOT a
-    -- Card.alternativeCosts entry: that list is unconditioned, so a flashback cost
+    -- Face.alternativeCosts entry: that list is unconditioned, so a flashback cost
     -- placed there would also be payable from the HAND. Pawl.Engine.Keyword turns
     -- this one value into all three of the rule's consequences -- the cost (read
     -- by Pawl.Engine.Cost.costsFor only in the graveyard), the permission and the
@@ -151,7 +151,7 @@ data Keyword
     -- of the number specified, paying an additional cost if you do.
     --
     -- The cost rides the constructor, as Flashback's and Cycling's do. It is NOT a
-    -- Card.additionalCosts entry: that list is unconditioned, so an entwine cost
+    -- Face.additionalCosts entry: that list is unconditioned, so an entwine cost
     -- placed there would be paid by every cast, and declining it is precisely the
     -- player's choice under CR 601.2b.
     --

@@ -1,53 +1,57 @@
 {
-  "enchant": {
-    "pool": {
-      "type": "Creatures"
-    }
-  },
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "enchant": {
+        "pool": {
+          "type": "Creatures"
         }
-      }
-    }
-  ],
-  "name": "Unholy Strength",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Attached"
       },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "ModifyPowerToughness",
-          "value": [
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Unholy Strength",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": 2
-            },
-            {
-              "type": "Literal",
-              "value": 1
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 2
+                },
+                {
+                  "type": "Literal",
+                  "value": 1
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

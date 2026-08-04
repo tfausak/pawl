@@ -1,132 +1,136 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Master Thief",
-  "power": {
-    "type": "Literal",
-    "value": 2
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 2
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
+      ],
+      "name": "Master Thief",
+      "power": {
+        "type": "Literal",
+        "value": 2
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "GainControl",
-                "value": [
+                "effects": [
                   {
-                    "type": "ForAsLongAs",
-                    "value": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "Count",
+                    "type": "GainControl",
+                    "value": [
+                      {
+                        "type": "ForAsLongAs",
                         "value": {
-                          "aggregation": {
-                            "type": "Objects"
+                          "comparison": {
+                            "type": "Exactly"
                           },
-                          "filter": {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "IsSource"
+                          "measured": {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
                               },
-                              {
-                                "type": "ControlledBy",
-                                "value": {
-                                  "type": "You"
-                                }
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "IsSource"
+                                  },
+                                  {
+                                    "type": "ControlledBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Battlefield"
+                                  },
+                                  {
+                                    "type": "EachPlayer"
+                                  }
+                                ]
                               }
-                            ]
+                            }
                           },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Battlefield"
-                              },
-                              {
-                                "type": "EachPlayer"
-                              }
-                            ]
+                          "threshold": {
+                            "type": "Literal",
+                            "value": 1
                           }
                         }
                       },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 1
+                      "target"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      },
+                      "pool": {
+                        "type": "Permanents"
                       }
                     }
-                  },
-                  "target"
+                  }
                 ]
               }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Artifact"
-                    }
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
-                }
-              }
             ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Rogue"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Human"
-      },
-      {
-        "type": "Rogue"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

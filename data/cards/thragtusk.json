@@ -1,118 +1,126 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 4
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Thragtusk",
-  "power": {
-    "type": "Literal",
-    "value": 5
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfEnters"
+      ],
+      "name": "Thragtusk",
+      "power": {
+        "type": "Literal",
+        "value": 5
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
-              {
-                "type": "GainLife",
-                "value": [
-                  {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 5
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "condition": {
-        "type": "SelfLeavesTheBattlefield"
+      "toughness": {
+        "type": "Literal",
+        "value": 3
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  {
-                    "colorIndicator": [
+                    "type": "GainLife",
+                    "value": [
                       {
-                        "type": "Green"
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 5
                       }
-                    ],
-                    "name": "Beast Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 3
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 3
-                    },
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Beast"
-                        }
-                      ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
-                    }
+                    ]
                   }
                 ]
               }
             ]
           }
+        },
+        {
+          "condition": {
+            "type": "SelfLeavesTheBattlefield"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "Green"
+                              }
+                            ],
+                            "name": "Beast Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 3
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 3
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Beast"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Beast"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Beast"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

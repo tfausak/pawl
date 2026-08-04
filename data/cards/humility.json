@@ -1,65 +1,69 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
-        }
-      }
-    }
-  ],
-  "name": "Humility",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "HasCardType",
-          "value": {
-            "type": "Creature"
-          }
-        }
-      },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "LoseAllAbilities"
+          "type": "Generic",
+          "value": 2
         },
         {
-          "type": "SetBasePowerToughness",
-          "value": [
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Humility",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          },
+          "modifications": [
             {
-              "type": "Literal",
-              "value": 1
+              "type": "LoseAllAbilities"
             },
             {
-              "type": "Literal",
-              "value": 1
+              "type": "SetBasePowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 1
+                },
+                {
+                  "type": "Literal",
+                  "value": 1
+                }
+              ]
             }
           ]
         }
-      ]
-    }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

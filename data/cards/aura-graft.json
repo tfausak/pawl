@@ -1,75 +1,79 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Aura Graft",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
+      ],
+      "name": "Aura Graft",
+      "spell": {
+        "modes": [
           {
-            "type": "GainControl",
-            "value": [
+            "effects": [
               {
-                "type": "Indefinite"
+                "type": "GainControl",
+                "value": [
+                  {
+                    "type": "Indefinite"
+                  },
+                  "target"
+                ]
               },
-              "target"
-            ]
-          },
-          {
-            "type": "AttachTarget",
-            "value": [
-              "target",
               {
-                "type": "CanHostSubject"
+                "type": "AttachTarget",
+                "value": [
+                  "target",
+                  {
+                    "type": "CanHostSubject"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Aura"
+                        }
+                      },
+                      {
+                        "type": "IsAttachedToPermanent"
+                      }
+                    ]
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
               }
             ]
           }
-        ],
-        "targetSpecs": [
+        ]
+      },
+      "typeLine": {
+        "types": [
           {
-            "slot": "target",
-            "spec": {
-              "filter": {
-                "type": "And",
-                "value": [
-                  {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Aura"
-                    }
-                  },
-                  {
-                    "type": "IsAttachedToPermanent"
-                  }
-                ]
-              },
-              "pool": {
-                "type": "Permanents"
-              }
-            }
+            "type": "Instant"
           }
         ]
       }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+    }
+  ]
 }

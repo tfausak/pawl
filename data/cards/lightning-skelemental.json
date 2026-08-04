@@ -1,116 +1,120 @@
 {
-  "keywords": [
+  "faces": [
     {
-      "type": "Haste"
-    },
-    {
-      "type": "Trample"
-    }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "keywords": [
+        {
+          "type": "Haste"
+        },
+        {
+          "type": "Trample"
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
-        }
-      }
-    }
-  ],
-  "name": "Lightning Skelemental",
-  "power": {
-    "type": "Literal",
-    "value": 6
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 1
-  },
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "SelfDealsCombatDamageToPlayer"
+      ],
+      "name": "Lightning Skelemental",
+      "power": {
+        "type": "Literal",
+        "value": 6
       },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfDealsCombatDamageToPlayer"
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "Discard",
-                "value": [
-                  "thatPlayer",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "Discard",
+                    "value": [
+                      "thatPlayer",
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
-        ]
-      }
-    },
-    {
-      "condition": {
-        "type": "StepBegins",
-        "value": [
-          {
-            "type": "Ending",
-            "value": {
-              "type": "EndStep"
-            }
-          },
-          {
-            "type": "EachTurn"
-          }
-        ]
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+        },
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
               {
-                "type": "Sacrifice",
-                "value": "self"
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
+                }
+              },
+              {
+                "type": "EachTurn"
               }
             ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Sacrifice",
+                    "value": "self"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          },
+          {
+            "type": "Skeleton"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elemental"
-      },
-      {
-        "type": "Skeleton"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

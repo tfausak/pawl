@@ -24,6 +24,7 @@ import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -95,9 +96,9 @@ abilitiesFor = abilitiesForGiven Map.empty
 abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
   Just Zone.Battlefield -> Projection.abilitiesGiven pcs oid gs
-  Just Zone.Hand -> case Game.cardOf oid gs of
+  Just Zone.Hand -> case Game.faceOf oid gs of
     Nothing -> []
-    Just card -> Keyword.handAbilitiesOf (Card.keywords card)
+    Just face -> Keyword.handAbilitiesOf (Face.keywords face)
   _ -> []
 
 -- CR 602.2: only an object's controller, or its owner if it has no controller,

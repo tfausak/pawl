@@ -1,159 +1,163 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "AddLoyaltyToThis",
-            "value": 2
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "Draw",
-                "value": [
-                  {
-                    "type": "EachPlayer"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "cost": {
-        "components": [
-          {
-            "type": "RemoveLoyaltyFromThis",
-            "value": 1
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
-              {
-                "type": "Draw",
-                "value": [
-                  {
-                    "type": "InSlot",
-                    "value": "target"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                ]
+                "type": "AddLoyaltyToThis",
+                "value": 2
               }
             ],
-            "targetSpecs": [
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Players"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "cost": {
-        "components": [
-          {
-            "type": "RemoveLoyaltyFromThis",
-            "value": 1E+1
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
-              {
-                "type": "Mill",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 2E+1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "EachPlayer"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }
-            ],
-            "targetSpecs": [
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
               {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Players"
+                "type": "RemoveLoyaltyFromThis",
+                "value": 1
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
-                }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Players"
+                      }
+                    }
+                  }
+                ]
               }
             ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 10.0
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Mill",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 20.0
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Players"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "loyalty": 3,
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Jace Beleren",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Jace"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Planeswalker"
           }
         ]
       }
     }
-  ],
-  "loyalty": 3,
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Blue"
-        }
-      }
-    }
-  ],
-  "name": "Jace Beleren",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Jace"
-      }
-    ],
-    "supertypes": [
-      {
-        "type": "Legendary"
-      }
-    ],
-    "types": [
-      {
-        "type": "Planeswalker"
-      }
-    ]
-  }
+  ]
 }

@@ -1,47 +1,51 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Concordant Crossroads",
-  "staticAbilities": [
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "HasCardType",
-          "value": {
-            "type": "Creature"
-          }
-        }
-      },
-      "modifications": [
+      "manaCost": [
         {
-          "type": "GainKeyword",
+          "type": "OfType",
           "value": {
-            "type": "Haste"
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
           }
         }
-      ]
+      ],
+      "name": "Concordant Crossroads",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Haste"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "World"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
     }
-  ],
-  "typeLine": {
-    "supertypes": [
-      {
-        "type": "World"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

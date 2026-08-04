@@ -1,51 +1,55 @@
 {
-  "blockRequirements": [
+  "faces": [
     {
-      "attacker": {
-        "type": "Attached"
-      }
-    }
-  ],
-  "enchant": {
-    "pool": {
-      "type": "Creatures"
-    }
-  },
-  "manaCost": [
-    {
-      "type": "Generic",
-      "value": 1
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      "blockRequirements": [
+        {
+          "attacker": {
+            "type": "Attached"
+          }
         }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
+      ],
+      "enchant": {
+        "pool": {
+          "type": "Creatures"
         }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Lure",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
       }
     }
-  ],
-  "name": "Lure",
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Aura"
-      }
-    ],
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

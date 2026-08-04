@@ -1,121 +1,125 @@
 {
-  "activatedAbilities": [
+  "faces": [
     {
-      "cost": {
-        "components": [
-          {
-            "type": "SacrificeThis"
-          }
-        ],
-        "mana": []
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
               {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
-                    "value": [
-                      {
-                        "type": "Literal",
-                        "value": 3
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 3
-                      }
-                    ]
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "GainKeyword",
-                    "value": {
-                      "type": "Trample"
-                    }
-                  },
-                  "target"
-                ]
+                "type": "SacrificeThis"
               }
             ],
-            "targetSpecs": [
+            "mana": []
+          },
+          "modal": {
+            "modes": [
               {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 3
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 3
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Trample"
+                        }
+                      },
+                      "target"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": {
+            "type": "DuringPhase",
+            "value": [
+              {
+                "type": "Step",
+                "value": {
+                  "type": "Beginning",
+                  "value": {
+                    "type": "Upkeep"
                   }
                 }
+              },
+              {
+                "type": "ControllersTurn"
               }
             ]
           }
-        ]
-      },
-      "timing": {
-        "type": "DuringPhase",
-        "value": [
-          {
-            "type": "Step",
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
             "value": {
-              "type": "Beginning",
-              "value": {
-                "type": "Upkeep"
-              }
+              "type": "Green"
             }
+          }
+        }
+      ],
+      "name": "Llanowar Augur",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elf"
           },
           {
-            "type": "ControllersTurn"
+            "type": "Shaman"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
           }
         ]
       }
     }
-  ],
-  "manaCost": [
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Green"
-        }
-      }
-    }
-  ],
-  "name": "Llanowar Augur",
-  "power": {
-    "type": "Literal",
-    "value": 0
-  },
-  "toughness": {
-    "type": "Literal",
-    "value": 3
-  },
-  "typeLine": {
-    "subtypes": [
-      {
-        "type": "Elf"
-      },
-      {
-        "type": "Shaman"
-      }
-    ],
-    "types": [
-      {
-        "type": "Creature"
-      }
-    ]
-  }
+  ]
 }

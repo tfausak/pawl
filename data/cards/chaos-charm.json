@@ -1,107 +1,111 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Red"
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         }
+      ],
+      "name": "Chaos Charm",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Destroy",
+                "value": [
+                  "wall",
+                  {
+                    "type": "Regenerable"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "wall",
+                "spec": {
+                  "filter": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Wall"
+                    }
+                  },
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "DealDamage",
+                "value": [
+                  "damaged",
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "damaged",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Haste"
+                    }
+                  },
+                  "hasted"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "hasted",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
       }
     }
-  ],
-  "name": "Chaos Charm",
-  "spell": {
-    "modes": [
-      {
-        "effects": [
-          {
-            "type": "Destroy",
-            "value": [
-              "wall",
-              {
-                "type": "Regenerable"
-              }
-            ]
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "wall",
-            "spec": {
-              "filter": {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Wall"
-                }
-              },
-              "pool": {
-                "type": "Creatures"
-              }
-            }
-          }
-        ]
-      },
-      {
-        "effects": [
-          {
-            "type": "DealDamage",
-            "value": [
-              "damaged",
-              {
-                "type": "Literal",
-                "value": 1
-              }
-            ]
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "damaged",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
-          }
-        ]
-      },
-      {
-        "effects": [
-          {
-            "type": "ModifyTarget",
-            "value": [
-              {
-                "type": "UntilEndOfTurn"
-              },
-              {
-                "type": "GainKeyword",
-                "value": {
-                  "type": "Haste"
-                }
-              },
-              "hasted"
-            ]
-          }
-        ],
-        "targetSpecs": [
-          {
-            "slot": "hasted",
-            "spec": {
-              "pool": {
-                "type": "Creatures"
-              }
-            }
-          }
-        ]
-      }
-    ]
-  },
-  "typeLine": {
-    "types": [
-      {
-        "type": "Instant"
-      }
-    ]
-  }
+  ]
 }

@@ -1,53 +1,57 @@
 {
-  "manaCost": [
+  "faces": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "Black"
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
         }
-      }
-    }
-  ],
-  "name": "Megrim",
-  "triggeredAbilities": [
-    {
-      "condition": {
-        "type": "PlayerDiscards",
-        "value": {
-          "type": "Opponent"
-        }
-      },
-      "modal": {
-        "modes": [
-          {
-            "effects": [
+      ],
+      "name": "Megrim",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PlayerDiscards",
+            "value": {
+              "type": "Opponent"
+            }
+          },
+          "modal": {
+            "modes": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "thatPlayer",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "DealDamage",
+                    "value": [
+                      "thatPlayer",
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
                   }
                 ]
               }
             ]
           }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
         ]
       }
     }
-  ],
-  "typeLine": {
-    "types": [
-      {
-        "type": "Enchantment"
-      }
-    ]
-  }
+  ]
 }

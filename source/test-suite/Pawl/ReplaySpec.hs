@@ -20,7 +20,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
@@ -31,6 +30,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Mana as Mana
@@ -45,7 +45,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
-import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
@@ -624,7 +623,7 @@ replaySpec s registry =
       acPrinting <- S.printingOf s registry "Aether Channeler"
       let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
           decider = Decide.deciderFor S.alice gs
-      case Card.Type.triggeredAbilities (Printing.card acPrinting) of
+      case Face.triggeredAbilities (S.faceOf acPrinting) of
         [ability] -> do
           let legal = Target.fillableModes Nothing acId Map.empty (TriggeredAbility.modal ability) gs
               p = Prompt.ChooseModes decider S.alice acId legal 1
