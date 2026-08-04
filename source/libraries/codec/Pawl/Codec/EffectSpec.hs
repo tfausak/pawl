@@ -585,7 +585,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
 sentinel :: Value.Value
 sentinel = Common.text (Text.pack "SENTINEL")
 
--- CR 614.15 / 616.1a.
+-- The artifact count the conditional self-replacement above (CR 614.15 / 616.1a)
+-- reads; its "three or more" threshold lives in the Condition at the use site.
 threeArtifacts :: Count.Count Quantity.Quantity
 threeArtifacts =
   Count.MkCount

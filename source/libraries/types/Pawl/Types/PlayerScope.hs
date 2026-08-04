@@ -34,7 +34,8 @@ data PlayerScope
   | -- | Every other player. Not a two-player shortcut: CR 806.1 has a
     -- free-for-all's players compete as individuals, so every other player is an
     -- opponent by construction, and CR 102.2 says the same for two players --
-    -- `pid /= controller` is the one predicate that serves both. CR 102.3 is the
+    -- Pawl.Engine.PlayerEffect.inScope's `pid /= controller` is the one predicate
+    -- that serves both. CR 102.3 is the
     -- ONE reading this is wrong for -- a teammate is not an opponent -- and pawl
     -- has no teams to express (#175).
     Opponents

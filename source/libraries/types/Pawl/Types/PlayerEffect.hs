@@ -32,8 +32,9 @@ data PlayerEffect
     --
     -- A SEPARATE constructor from IncreaseSpellCost, never one signed delta. The
     -- rules distinguish them in two ways a signed integer cannot express: CR
-    -- 601.2f applies every increase BEFORE any reduction, and CR 118.7a stops a
-    -- reduction from affecting the coloured or colourless components.
+    -- 601.2f applies every increase BEFORE any reduction, and CR 118.7a confines
+    -- a reduction by GENERIC mana to the generic component, a restriction an
+    -- increase does not have.
     --
     -- An AMOUNT OF MANA rather than a bare number, because CR 118.7 reduces by
     -- mana of a stated type and not only by generic: the Medallion's {1} and

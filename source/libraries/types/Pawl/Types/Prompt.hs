@@ -289,9 +289,9 @@ data Prompt r where
   -- cast, where CR 702.42a's "all modes" leaves no subset to pick.
   ChooseModes :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Set.Set ModeIndex.ModeIndex -> Natural.Natural -> Prompt (Set.Set ModeIndex.ModeIndex)
   -- | CR 707.5 / 614.1c / 614.12a: as an object enters AS A COPY, its controller
-  -- chooses which permanent to copy. The [ObjectId] is the legal copy targets,
-  -- pre-filtered by the engine; Nothing is the card's own "may" decline, after
-  -- which it enters as itself. Answered inside the zone change (CR 614.12a) before
+  -- chooses which permanent to copy. The ObjectId is the entering object; the
+  -- [ObjectId] is the legal copy targets, pre-filtered by the engine; Nothing is
+  -- the card's own "may" decline, after which it enters as itself. Answered inside the zone change (CR 614.12a) before
   -- the enters event is recorded, so the choice really is made as the object
   -- enters. The legal set excludes anything entering in the same batch, a sibling
   -- not yet being "on the battlefield" when the choice is made.

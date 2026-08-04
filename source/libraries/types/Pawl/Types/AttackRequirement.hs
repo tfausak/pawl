@@ -10,9 +10,9 @@ import qualified Pawl.Types.Affected as Affected
 -- requirement. The two collapse opposite axes, because the printings do:
 -- BlockRequirement carries only the attacker to be blocked, its subject always
 -- being "all creatures able to block" (#341), while this carries only the
--- subject, since CR 508.1b leaves whom each attacker attacks to the active
--- player. A requirement naming its object ("attacks a player other than you if
--- able") is unrepresentable (#461).
+-- subject, since no printing in the pool narrows CR 508.1b's announcement of
+-- whom each attacker is attacking. A requirement naming its object ("attacks a
+-- player other than you if able") is unrepresentable (#461).
 --
 -- Gathered LIVE from the battlefield on every read and never captured, so a
 -- Curse leaving the battlefield lifts its requirement with nothing to unwind.

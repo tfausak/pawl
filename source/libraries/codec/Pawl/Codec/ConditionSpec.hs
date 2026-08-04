@@ -30,7 +30,8 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
       Condition.fromJson
       (Condition.MkCondition (Quantity.Literal 3) Comparison.AtLeast (Quantity.Literal 5))
       """ {"measured":{"type":"Literal","value":3},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":5}} """
-  -- Every Comparison, including both sides non-Count (CR 603.4). The
+  -- Every Comparison, including both sides non-Count -- the shape an intervening
+  -- "if" needs (CR 603.4). The
   -- registry-backed fixtures stay in Pawl.CodecIntegrationSpec, shared with
   -- test-suite specs Pawl.Codec cannot import.
   Spec.it s "round-trips at every comparison" $

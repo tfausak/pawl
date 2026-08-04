@@ -72,10 +72,10 @@ data Quantity
     -- card data must honour, not something this type guarantees. Two cases reach
     -- the evaluator anyway, both benign:
     --
-    --   * a card whose OWN characteristicPT itself contained a Star -- the seed
-    --     does not re-descend into the replacement, so the star reaches the CDA's
-    --     evaluator and CR 208.2a makes the undeterminable value 0.
-    --     Hypothetical: no card in the pool does this.
+    --   * a card whose OWN characteristicPT itself contained a Star. The seed
+    --     substitutes without re-descending into the replacement, so the star
+    --     reaches the CDA's evaluator and CR 208.2a makes the undeterminable
+    --     value 0. Hypothetical: no card in the pool does this.
     --   * a card with printed Star power/toughness and NO characteristicPT at
     --     all, so there is nothing for the seed to substitute and the Star
     --     reaches evaluate directly, where CR 208.2a's substitution does not

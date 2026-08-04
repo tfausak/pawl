@@ -22,8 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.Common" $ do
                 Common.null
               ]
        in Spec.assertEq s (Common.parse (Common.render v)) (Right v)
-    -- Blanks on both sides of the document, not merely rejected trailing
-    -- garbage.
+    -- Parse must accept blanks on both sides of the document, not merely reject
+    -- trailing garbage.
     Spec.it s "accepts surrounding blanks" $
       Spec.assertEq s (Common.parse (Text.pack " 1 ")) (Right (Common.integer 1))
 

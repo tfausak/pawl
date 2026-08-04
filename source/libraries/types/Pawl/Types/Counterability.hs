@@ -14,7 +14,7 @@ module Pawl.Types.Counterability where
 -- Not a Bool, for the reason Regenerability, TapState and Sickness are not:
 -- CantBeCountered names the rule at the site that reads it.
 --
--- Modelled on the CARD rather than as a StaticAbility. Under CR 604.2 it is one,
+-- Modelled on the CARD rather than as a StaticAbility. Under CR 604.1 it is one,
 -- but Pawl.Types.StaticAbility implements only the battlefield-scoped part of
 -- CR 113.6 -- an Affected set plus Modifications folded through the CR 613
 -- layers. A prohibition functioning on the stack has no layer, no affected set

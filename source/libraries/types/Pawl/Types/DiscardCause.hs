@@ -6,9 +6,10 @@ module Pawl.Types.DiscardCause where
 -- entries describing one action.
 --
 -- That is CR 702.29d's doing. CR 702.29a makes cycling a discard, and CR 702.29d
--- has an ability that triggers on "cycles or discards" trigger only once when a
--- card is cycled. One event with two descriptions makes that hold by
--- construction; two events would make it a rule every reader had to remember.
+-- makes an ability that triggers whenever a player "cycles or discards" a card
+-- trigger only once when a card is cycled. One event with two descriptions
+-- makes that hold by construction; two events would make it a rule every reader
+-- had to remember.
 data DiscardCause
   = -- | CR 701.9a's plain discard, whatever asked for it: an effect, a cost
     -- component naming cards, or CR 514.1's cleanup step.

@@ -10,8 +10,8 @@ import qualified Numeric.Natural as Natural
 -- the battlefield the number of loyalty counters on it instead, which is a count
 -- in Object.counters and never a value of this type.
 --
--- Natural, not Quantity: Power and Toughness wrap Quantity for CR 208.2a's
--- characteristic-defining star, and no rule gives loyalty one. A printed X
+-- Natural, not Quantity: Power and Toughness wrap Quantity for CR 208.2's star
+-- and the CR 208.2a ability behind it, and no rule gives loyalty one. A printed X
 -- loyalty (Nissa, Steward of Elements) needs the value of X chosen as the spell
 -- was cast, and is unrepresentable here (#495).
 newtype Loyalty = MkLoyalty

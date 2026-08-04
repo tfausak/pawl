@@ -47,7 +47,8 @@ data GameEvent
     BecameMonarch PlayerId.PlayerId
   | -- | CR 701.9a: a card was DISCARDED. Emitted by Pawl.Engine.Event.discard,
     -- the one funnel every discard in the engine goes through, alongside the
-    -- Moved event that same move records.
+    -- Moved event that same move records. The PlayerId is the discarding player,
+    -- whom that rule makes the card's owner either way.
     --
     -- The ObjectId is the incarnation the card became, not the one that was in
     -- the hand: CR 400.7 mints a new object as it moves, and CR 702.29c's
@@ -57,8 +58,9 @@ data GameEvent
     -- ONE event with two descriptions, which is the whole reason the cause is a
     -- FIELD rather than a sibling constructor. CR 702.29a makes cycling a
     -- discard, so a cycle has to be visible to both a "when you cycle this card"
-    -- trigger (CR 702.29c) and a "whenever a player discards a card" one, and
-    -- CR 702.29d then lets the second fire only once. A separate Cycled event
+    -- trigger (CR 702.29c) and a "whenever a player discards a card" one, with
+    -- CR 702.29d capping a "cycles or discards" ability at one trigger per
+    -- cycled card. A separate Cycled event
     -- appended beside this one would be a second record of a single discard,
     -- and any reader that matched both would answer twice.
     --

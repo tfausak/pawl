@@ -92,8 +92,8 @@ cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 
 -- What a card file's bytes mean. Pure, and separate from reading them, because
 -- that is exactly what this module and the test suite's Pawl.Corpus agree
--- about; they disagree only about how to obtain the bytes. `path` is carried
--- only to name the file in the error.
+-- about; they disagree about how to obtain the bytes and about what a failure
+-- to obtain them means. `path` is carried only to name the file in the error.
 --
 -- Decoded as UTF-8 explicitly rather than via Data.Text.IO.readFile, which
 -- decodes using the locale encoding -- ASCII under LC_ALL=C -- so a card with a

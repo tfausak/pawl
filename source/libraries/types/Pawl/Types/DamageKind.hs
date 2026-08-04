@@ -7,7 +7,9 @@ module Pawl.Types.DamageKind where
 -- blind the reader to which it is (no-boolean-blindness).
 --
 -- Lifelink is deliberately NOT among those readers: CR 120.3f states the life
--- gain with no combat/noncombat qualifier, and CR 702.15d says so explicitly.
+-- gain with no combat/noncombat qualifier, and CR 702.15d makes the same point
+-- from the other side -- the lifelink rules function whatever zone the source
+-- deals damage from.
 -- Toxic is the one that IS scoped, CR 120.3g naming combat damage.
 data DamageKind
   = Combat

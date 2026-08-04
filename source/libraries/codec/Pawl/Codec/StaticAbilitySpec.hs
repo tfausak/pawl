@@ -33,7 +33,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
       )
       """ {"affected":{"type":"Attached"},"modifications":[{"type":"LoseAllAbilities"},{"type":"SetBasePowerToughness","value":[{"type":"Literal","value":1},{"type":"Literal","value":1}]}]} """
-  -- CR 613.6: a static ability is one affected set and one or more parts, so
+  -- CR 613.6 is why a static ability is one affected set and one or more parts, so
   -- the wire format is an array -- and an array can be empty. An ability with
   -- no parts does nothing, which no card means, so it is a decode FAILURE
   -- rather than a permanent that quietly under-performs its own text.

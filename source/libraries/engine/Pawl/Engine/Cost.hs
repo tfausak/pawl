@@ -175,7 +175,9 @@ hasVariable cost = case Cost.mana cost of
 -- SOUND AND TERMINATING only because payability is MONOTONE in X -- unpayable at
 -- n means unpayable at every value above n, while the demand grows without bound
 -- and the supplies are finite. That is a property of the PREDICATE and is
--- discharged at the call site; Cast.affordableX carries the argument in full.
+-- discharged at the call site: Cast.affordableX carries the argument in full, and
+-- Activate.affordableX's cost is the same one with CR 601.2f's totalling taken
+-- out, which can only shorten it.
 --
 -- Answers 0 for a cost with no {X} in it, a totality guard rather than a rule:
 -- the climb would never end and there is no variable to report a greatest value

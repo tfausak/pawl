@@ -51,6 +51,9 @@ import qualified Pawl.Types.Zone as Zone
 -- control since THEIR most recent turn began, so a settle recorded for anyone
 -- else does not answer it (#198). CR 702.10c's haste exemption comes with it,
 -- from the shared predicate.
+--
+-- Reads PROJECTED creature-ness, so a plain land is never sick-gated and an
+-- animated one is.
 sicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 sicknessOk = sicknessOkGiven Map.empty
 

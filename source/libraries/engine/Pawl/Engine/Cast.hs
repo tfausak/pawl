@@ -78,7 +78,8 @@ timingOk pid oid gs = case Game.cardOf oid gs of
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
 -- and they are two because one is a CARD TYPE and the other is a KEYWORD.
 --
--- Lifted HERE and emphatically not inside Turn.sorcerySpeedWindow: that window
+-- CR 702.8a's widening is this predicate's second disjunct, and it is lifted HERE
+-- and emphatically not inside Turn.sorcerySpeedWindow: that window
 -- has one copy because CR 307.1 and CR 307.5 are the same three conjuncts, and
 -- CR 702.8a is about neither. Flash is a permission a CARD carries about casting
 -- ITSELF, so widening the shared window would make an equip ability on the same
@@ -374,7 +375,8 @@ permissionsOf card =
 
 -- The library cards this player may cast while searching their own library:
 -- permitted, not prohibited, affordable, and with a fillable target set.
--- Deliberately omits timingOk -- the permission IS the CR 601.3 timing exception.
+-- Deliberately omits timingOk -- the permission IS the CR 601.3 timing exception
+-- (the ruling: "follows all normal rules ... except for timing").
 --
 -- The prohibition is NOT omitted, and that is the point: CR 601.3 is one sentence
 -- with two halves, and the Panglacial permission excepts only the timing one, so

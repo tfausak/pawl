@@ -10,7 +10,8 @@ module Pawl.Types.ReplacementOrigin where
 -- be the identical DamageR value, and only the first is CR 614.15's.
 --
 -- A PERMANENT's static replacement ability is therefore always Other, which is a
--- rules fact: CR 604.2 makes static abilities continuous effects, and CR 614.15
+-- rules fact: CR 604.2 has a static ability CREATE a continuous effect, some of
+-- which are replacement effects, and CR 614.15
 -- puts self-replacement effects outside that class.
 --
 -- Read only by Pawl.Engine.Replacement.bucketOf, which is CR 616.1a's step.

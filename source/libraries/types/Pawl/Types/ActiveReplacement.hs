@@ -24,8 +24,8 @@ import qualified Pawl.Types.Uses as Uses
 --
 -- CR 615.7's multi-source choice is asked over
 -- Pawl.Engine.Replacement.resolveDamageBatch's batch: each DamageEvent still runs
--- its own CR 616.1 loop, and what the shielded player decides is the ORDER those
--- loops run in.
+-- its own CR 616.1 loop, and what the shielded player (or the shielded
+-- permanent's controller) decides is the ORDER those loops run in.
 --
 -- Not implemented: CR 615.13's "prevented" triggers.
 -- Pawl.Engine.Replacement.resolveDamage reports only whether an event survived,
@@ -38,8 +38,9 @@ import qualified Pawl.Types.Uses as Uses
 -- `origin` is CR 614.15's question, and this carrier is the only one that can be
 -- asked it: a self-replacement is an effect of a resolving spell or ability,
 -- which is exactly what a floating, resolution-generated row is. The projection's
--- side of `collect` needs no such field, because CR 614.15's first sentence rules
--- static replacement abilities out.
+-- side of `collect` needs no such field, because CR 614.15 scopes a
+-- self-replacement effect to a resolving spell or ability, ruling static
+-- replacement abilities out.
 data ActiveReplacement = MkActiveReplacement
   { effect :: ReplacementEffect.ReplacementEffect,
     source :: ObjectId.ObjectId,

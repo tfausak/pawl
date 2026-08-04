@@ -152,11 +152,16 @@ playersFor context gs ref =
 -- CR 608.2h: the view of a past event, built from the snapshot the event
 -- recorded rather than from any object that may no longer exist.
 --
--- The snapshot holds CHARACTERISTICS only (CR 109.3), so every field that is
--- not one is vacuously empty over a past event: controller and identity are
--- Nothing, and combat status, attachment and tokenhood are all False. Keywords
--- are the exception -- CR 109.3 lists abilities among an object's
--- characteristics, so the snapshot has a real answer to give.
+-- The snapshot fills the characteristic fields it records: card types, colours,
+-- subtypes, keywords (CR 109.3 counts abilities among an object's
+-- characteristics) and power. Everything that is not a characteristic is
+-- vacuously empty over a past event -- controller, identity and playerIdentity
+-- are Nothing, and combat status, attachment, tokenhood and what the object did
+-- this turn are all False.
+--
+-- `supertypes` is the odd one out: it IS a characteristic and
+-- ProjectedCharacteristics records it, but this view leaves it empty, so a
+-- supertype filter over a past event answers False (#646).
 snapshotView :: EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView shape event = case event of
   GameEvent.Moved zc snapshot -> case shape of

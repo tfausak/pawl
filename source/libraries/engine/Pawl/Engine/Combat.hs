@@ -261,8 +261,9 @@ legalAttackers pid gs =
 --
 -- So nothing here is exponential: one battlefield walk plus, per requirement, one
 -- Projection.affects per candidate. That last read is QUADRATIC in the
--- battlefield rather than linear, which is #435's shape and is documented at that
--- arm; measured, it stays cheap on the boards this pool can build.
+-- battlefield rather than linear, which is #435's shape and is documented at
+-- Projection.affects's AttachedPlayerControls arm; measured, it stays cheap on
+-- the boards this pool can build.
 --
 -- CR 508.1d's COST CLAUSE is a modifier on the maximization rather than a check
 -- of its own: a player is never required to pay a cost to attack, even where
@@ -431,7 +432,7 @@ fearAllowsGiven pcs blocker attacker gs =
 -- landwalk restricts being BLOCKED, so the question is asked of the ATTACKER.
 --
 -- Membership over the projection's keyword map, never its counts (CR 702.14e).
--- The MAP rather than hasKeywordGiven, because CR 702.14a's land type rides the
+-- The MAP rather than hasKeywordGiven, because CR 702.14a's [type] rides the
 -- constructor -- there is no single Keyword value to ask about, which is
 -- Projection.totalToxic's situation and takes its shape.
 --
@@ -459,8 +460,9 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- defending player (CR 802, #175). Nothing means the object is not
       -- attacking, so no landwalk of its can restrict anything.
       --
-      -- CR 508.5's last-known-information clause, for a planeswalker already
-      -- removed from combat, is not honoured: this reads the controller LIVE.
+      -- CR 508.5's second sentence -- the defending player of a creature that is
+      -- no longer attacking, read off what it was attacking before it left combat
+      -- -- is last known information, and this reads the controller LIVE instead.
       -- Unreachable in the pool, which has no card that can remove an attacked
       -- planeswalker from combat and change who controlled it (#537), and
       -- unobservable besides.

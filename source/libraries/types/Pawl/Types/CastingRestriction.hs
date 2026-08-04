@@ -54,7 +54,8 @@ data CastingRestriction
     --
     -- Not a timing window at all, which is why it is its own arm rather than a
     -- field on DuringPhase: it is a question about what the combat record already
-    -- holds (CR 506.2, CR 508.8), asked of the CASTING player.
+    -- holds (CR 506.2's defending player, CR 508.1k's attacking creatures),
+    -- asked of the CASTING player.
     --
     -- Eightfold Maze's ruling pins the interpretation: a creature needs to have
     -- attacked YOU, not merely a combat to have happened.

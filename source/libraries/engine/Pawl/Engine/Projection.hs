@@ -452,13 +452,13 @@ viewOfCard card =
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
-          -- CR 506.3 / 509.1a / 303.4b: only a creature on the battlefield can
-          -- attack, block or be attached to anything.
+          -- CR 506.3 / 509.1a: a card off the battlefield is not a creature that
+          -- can attack or block, and was never declared as an attacker; CR
+          -- 303.4b: nor is it a permanent attached to anything.
           Filter.attacking = False,
           Filter.blocking = False,
           Filter.attackedThisTurn = False,
           Filter.attachedToCreature = False,
-          -- CR 303.4 again: nor is it attached to a permanent, for the same reason.
           Filter.attachedToPermanent = False,
           -- CR 701.3a: only Pawl.Engine.Resolve's AttachTarget arm fills this field, and
           -- its candidates are battlefield permanents, so a card in a library or a
@@ -1421,12 +1421,18 @@ data Aspect
 -- removes a permanent from combat when its controller changes or it stops being a
 -- creature, so an engine deriving attacking-ness from those characteristics would
 -- read Controller and Types here. pawl stores it as a combat record instead (CR
--- 109.3), and every writer of that record -- CR 506.4's removals via
--- Combat.removeChanged, and Effect.RemoveFromCombat via a resolution -- runs
--- BETWEEN projections. So the record is a fixed input to any single projection,
--- which is exactly what CR 613.8a asks about. What that costs is timing, not
--- dependency: the rules remove the permanent the instant control or creature-ness
--- changes, and pawl removes it at the next settle.
+-- 109.3), and every writer of that record -- the CR 508.1 declaration, CR 506.4's
+-- removals via Combat.removeChanged, Effect.RemoveFromCombat via a resolution,
+-- and CR 511.3's clear -- runs BETWEEN projections. So the record is a fixed
+-- input to any single projection, which is exactly what CR 613.8a asks about.
+-- What that costs is timing, not dependency: the rules remove the permanent the
+-- instant control or creature-ness changes, and pawl removes it at the next
+-- settle.
+--
+-- The CR 506.4 clauses that remain unbuilt -- phasing (#154) and an attacked
+-- battle (#302) -- would arrive by one of those same doors; the
+-- attacked-planeswalker clauses are answered where the attack target is read
+-- (Combat.stillAttacked) and never edit the record at all.
 filterReads :: Filter.Type.Filter Keyword.Keyword -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types

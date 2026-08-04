@@ -53,8 +53,9 @@ freshTimestamp gs =
 --
 -- Exhaustive rather than a membership test against a two-element list, so a new
 -- Zone constructor cannot join the public side by default. It lives in this
--- lowest layer because its two callers (Pawl.Engine.Activate for CR 602.2a's
--- reveal, Pawl.Engine.Event for CR 400.7e's proviso) import one another.
+-- lowest layer because Pawl.Engine.Activate (CR 602.2a's reveal) imports
+-- Pawl.Engine.Event (CR 400.7e's proviso), so the only home both callers can
+-- reach is one below them.
 isHiddenZone :: Zone -> Bool
 isHiddenZone zone = case zone of
   Zone.Library -> True
@@ -84,9 +85,13 @@ zoneMembers zone pid gs =
 
 -- CR 506.4: remove a permanent from combat. The one performer, shared by CR
 -- 701.19a regeneration (Pawl.Engine.Replacement), an effect that specifically
--- removes it (Pawl.Engine.Resolve), and the two derived clauses (both
--- Pawl.Engine.Combat.removeChanged). It lives in this lowest layer because
+-- removes it (Pawl.Engine.Resolve), and the two derived clauses -- a controller
+-- change, and an attacking or blocking creature that stops being a creature
+-- (both Pawl.Engine.Combat.removeChanged). It lives in this lowest layer because
 -- Replacement needs it and must never import Pawl.Engine.Event.
+--
+-- `joinedUnder` loses its entry too: that map is CR 506.4's comparand for the
+-- creatures currently in combat, so an object that has left must not stay in it.
 --
 -- The blockers map is edited two different ways on purpose, and the difference
 -- is CR 509.1h's last sentence -- a creature remains blocked even once

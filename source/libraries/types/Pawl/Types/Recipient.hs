@@ -13,7 +13,8 @@ data Recipient
     -- result from CR 120.3e's marked damage: the classification is made once,
     -- where the recipient is built, so Pawl.Engine.Damage.applyDamage reads the
     -- tag rather than re-projecting card types as it applies. Combat produces
-    -- this tag too (CR 306.6, CR 510.1b, CR 306.8).
+    -- this tag too (CR 306.6, CR 510.1b), and CR 306.8 is the loyalty removal
+    -- applyDamage then performs.
     ToPlaneswalker ObjectId.ObjectId
   | ToPlayer PlayerId.PlayerId
   | -- | A spell on the stack or a permanent, named generically (Magical Hack's

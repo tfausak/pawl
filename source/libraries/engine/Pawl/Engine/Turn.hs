@@ -180,8 +180,8 @@ phaseEndingAt phase = if lastStepOf phase == Just phase then wholePhaseOf phase 
 -- Where this phase ends is `thisPhase`'s question. The end of combat step it
 -- splits on is never one of the two steps dropped here, so which side of the
 -- split it lands on is unobservable. The one caller, Combat.skipEmptyCombat,
--- runs as the declare attackers step ends, so that step is always still
--- scheduled.
+-- runs as the declare attackers step ends, so the phase is always a combat
+-- phase and its end of combat step is always still scheduled.
 dropSkippedCombatSteps :: Phase -> Seq Phase -> Seq Phase
 dropSkippedCombatSteps phase remaining =
   let kept p =

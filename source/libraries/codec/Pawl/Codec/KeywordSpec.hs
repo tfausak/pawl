@@ -161,7 +161,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Vigilance
       """ {"type":"Vigilance"} """
-  -- CR 702.29c/702.29e: the typecycling filter rides the same keyword arm and
+  -- CR 702.29e: the typecycling filter rides the same keyword arm and
   -- is absent for plain cycling, so both spellings have to survive the trip.
   Spec.it s "Cycling round-trips with and without a typecycling filter" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []

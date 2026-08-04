@@ -75,11 +75,12 @@ minimalTriggeredAbility :: TriggeredAbility.TriggeredAbility Card.Card
 minimalTriggeredAbility =
   TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing
 
--- | Every required field set to a simple value, and every defaulted field at
--- its Haskell default. 'baseCardJson' therefore carries none of those keys,
--- which is what lets one round-trip assertion prove both halves of every
--- field's elision at once: an encoder that emitted a default, or a decoder that
--- mis-defaulted an absent key, breaks the equality.
+-- | Every required field set to a simple value, 'manaCost', 'power' and
+-- 'toughness' set to non-default values, and every other defaulted field left at
+-- its Haskell default. 'baseCardJson' therefore carries no key for any of those
+-- defaulted fields, which is what lets one round-trip assertion prove both halves
+-- of every field's elision at once: an encoder that emitted a default, or a
+-- decoder that mis-defaulted an absent key, breaks the equality.
 baseCard :: Card.Card
 baseCard =
   Card.MkCard

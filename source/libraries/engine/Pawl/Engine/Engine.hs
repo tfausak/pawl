@@ -157,9 +157,9 @@ untapAll pid = do
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick. The untap step is where that becomes true.
 --
--- The record names `pid`, so it answers CR 302.6 only for `pid` -- the rule's
--- subject is a player, and a settle made for one player says nothing about
--- another.
+-- The record names `pid`, so it answers CR 302.6 only for `pid` -- the rule asks
+-- about a creature relative to its controller, and a settle made for one player
+-- says nothing about another.
 --
 -- It iterates `Projection.controls`, so it settles for whoever currently
 -- controls the permanent, not its owner. That reading is control-duration-
@@ -623,6 +623,10 @@ performSettle = do
   more <- if swept || returned || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
+-- Ask the priority holder for an action until every still-playing player has
+-- passed in succession (CR 117.4). A full round of passes resolves the top of the
+-- stack and hands priority back to the active player; only an EMPTY stack ends
+-- the step.
 priorityLoop :: Game ()
 priorityLoop = do
   -- CR 800.4j: the active player, unless they have left the game.
@@ -1218,7 +1222,7 @@ playSubgame = do
   parent <- State.get
   -- CR 729.2: randomly determine which player goes first. The engine asks; the
   -- interpreter rolls. Only the players still in the main game are in the
-  -- subgame (CR 729.4), so only they can be rolled (#147). Not asked when the
+  -- subgame (CR 729.4), so only they can be rolled. Not asked when the
   -- answer is forced -- a lone candidate goes first no matter what randomness
   -- says.
   starter <- case NonEmpty.nonEmpty (Game.stillPlayingInOrder parent) of
@@ -1236,7 +1240,7 @@ playSubgame = do
   -- CR 729.5: each player takes the traditional cards they own that are in the
   -- subgame, puts them into their main-game library and shuffles. Each player who
   -- was IN the subgame: a player outside it (CR 729.4) took nothing into it and
-  -- is not asked to shuffle their main-game library (#147).
+  -- is not asked to shuffle their main-game library.
   seated <- State.gets Game.stillPlayingInOrder
   Monad.forM_ seated Mulligan.shuffleLibrary
   pure result

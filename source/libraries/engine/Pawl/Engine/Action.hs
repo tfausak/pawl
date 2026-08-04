@@ -43,7 +43,8 @@ legalActions pid gs =
       lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
       spells = fmap Action.Cast (Cast.castableSpells pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
-      -- battlefield -- cycling functions only from there. Which abilities an
+      -- battlefield -- cycling functions only while the card is in a player's
+      -- hand. Which abilities an
       -- object offers from where is Activate.abilitiesFor's question; this list
       -- only says where to look, and the two zones are disjoint.
       --

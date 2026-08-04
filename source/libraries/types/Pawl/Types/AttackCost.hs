@@ -22,7 +22,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- is pawl's and not the rules': at the CR's own level Ghostly Prison is a 508.1c
 -- restriction like Pacifism.
 --
--- It is forced by what the other carrier's ANSWER is.
+-- The split is forced by what the other carrier's ANSWER is.
 -- Pawl.Engine.CombatRestriction.cantAttack returns which creatures may not
 -- attack AT ALL, and Pawl.Engine.Combat.canAttackGiven drops every one of them
 -- from CR 508.1a's candidate list. A creature under a Ghostly Prison is not one

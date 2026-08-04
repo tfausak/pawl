@@ -308,7 +308,8 @@ maximumHandSize pid gs =
 -- 703.4q never learns which effect answered it.
 --
 -- A PER-UNIT predicate rather than a Bool about the whole pool, because CR 106.4
--- loses "this mana" and a card may name only some of it: Omnath, Locus of Mana
+-- says the player loses "this mana" and a card may name only some of it: Omnath,
+-- Locus of Mana
 -- keeps green and drops the rest of the same pool. The pid and the state are
 -- taken FIRST so a caller sweeping a pool resolves the applicable effects once
 -- and asks the units afterwards.

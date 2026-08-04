@@ -36,8 +36,9 @@ data Modification
     -- constructor rather than a field on SetLandSubtype above.
     --
     -- Carries CR 305.7's ability strip in full, exactly as SetLandSubtype does:
-    -- Pawl.Engine.Projection routes both through setLandSubtypeTo, so the fold
-    -- half and the candidate-list-gate half of that rule cannot drift apart.
+    -- Pawl.Engine.Projection routes both through setLandSubtypeTo, and its
+    -- setLandSubtypeEffects answers True for both, so the fold half and the
+    -- candidate-list-gate half of that rule cannot drift apart.
     SetLandSubtypeToChosen
   | AddLandSubtype Subtype.Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
   | -- | layer 4, CR 205.1a/205.1b set (Turn to Frog -> Frog). A SET over the

@@ -90,9 +90,10 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- it is the record of blocked-ness (Combat.isBlocked), and CR 509.1h keeps a
 -- creature blocked even once every blocker is removed from combat. Dropping the
 -- key would make a blocked attacker read as UNBLOCKED and send its full damage
--- at the defending player, which CR 510.1c forbids. Pruning the departing
--- blocker's id from the set would change no answer (Game.removeFromCombat prunes
--- exactly that way for CR 701.19a), but buys nothing: Damage's
+-- at the defending player, which CR 510.1c forbids. The departing blocker's id
+-- could be pruned from the set without changing an answer (Game.removeFromCombat
+-- prunes exactly that way for CR 701.19a), but it is left alone because pruning
+-- buys nothing: Damage's
 -- liveness filter (Damage.onBattlefield) has to run at damage ASSIGNMENT
 -- regardless, since a blocker DESTROYED mid-combat (CR 510.4's two-step window)
 -- leaves an identical stale id this function never sees. A departing attacker's

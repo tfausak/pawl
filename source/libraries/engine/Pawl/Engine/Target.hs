@@ -395,8 +395,9 @@ stillAdmitted perspective source recipient spec gs = Set.member recipient (admit
 -- One legal set per named slot; casting prompts with exactly this map. `source`
 -- is the object the targeting is relative to -- the spell object at cast, the
 -- source permanent for an ability. CR 601.2c's "another" needs no separate pass:
--- a slot that excludes its source says so with Not IsSource, so Prodigal Sorcerer
--- may still target itself with AnyTarget (CR 115.4). CR 115.5's self-exclusion is
+-- a slot that excludes its source says so with Not IsSource, and a slot that does
+-- not is untouched, so Prodigal Sorcerer may still target itself with AnyTarget
+-- (CR 115.4). CR 115.5's self-exclusion is
 -- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
 -- source that is itself on the stack -- see legalRecipients.
 legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
