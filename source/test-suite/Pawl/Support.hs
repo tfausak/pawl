@@ -263,7 +263,14 @@ identityAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
   Prompt.ChooseColor {} -> Color.White
+  -- CR 201.2a: an object with no name doesn't have the same name as any other
+  -- object, so the empty name is the least eventful answer -- a Null Chamber
+  -- entering under this interpreter prohibits nothing. A test about a NAMED
+  -- card supplies its own answer, which is what makes that answer
+  -- discriminating.
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  -- CR 102.2: raised only where there are two or more opponents to pick from,
+  -- which no two-player board reaches.
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
