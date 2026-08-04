@@ -1,12 +1,11 @@
--- CR 611.2: the life cycle of a stored effect's duration. This module is the
--- ONLY module that may case on Pawl.Types.Expiry -- the standing Pawl.Engine.Resolve
--- has over Effect, Pawl.Engine.Projection over Modification and Pawl.Engine.Event over
--- TriggerCondition. It owns the transformation from the PRINTED Duration to the
--- STORED Expiry (`arm`) and every sweep that ends one, over FOUR carriers:
--- GameState.continuousEffects, GameState.replacements, GameState.playerEffects
--- and GameState.delayedTriggers share one expiry vocabulary, so they share one
--- sweep. The fourth differs only in carrying MAYBE an expiry, because CR 603.7b
--- lets a delayed ability have no stated duration at all.
+-- CR 611.2: the life cycle of a stored effect's duration. The ONLY module that
+-- may case on Pawl.Types.Expiry -- the standing Pawl.Engine.Resolve has over
+-- Effect and Pawl.Engine.Projection over Modification. It owns the
+-- transformation from the PRINTED Duration to the STORED Expiry (`arm`) and
+-- every sweep that ends one, over four carriers that share one expiry
+-- vocabulary and so share one sweep. The delayed-trigger carrier differs only
+-- in carrying MAYBE an expiry, because CR 603.7b lets a delayed ability have no
+-- stated duration at all.
 module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad
@@ -36,9 +35,7 @@ import Pawl.Types.PlayerId (PlayerId)
 -- from. Nothing means the duration never started, so per CR 611.2b the effect
 -- does nothing and is never stored at all.
 --
--- CR 611.2b's second sentence -- "if that duration ends before the moment the
--- effect would first be applied and doesn't begin again during that spell or
--- ability's resolution" -- is vacuous here: this runs once, at the point the
+-- CR 611.2b's second sentence is vacuous here: this runs once, at the point the
 -- effect would be stored, and no opcode both ends and restarts a condition
 -- mid-resolution.
 arm :: PlayerId -> ObjectId -> Duration -> GameState -> Maybe Expiry
@@ -54,15 +51,12 @@ arm controller source duration gs = case duration of
   -- the stored window is PhaseSelector.CombatPhase and never the end of combat
   -- step. Naming the phase is the whole of the arming: unlike UntilYourNextTurn
   -- there is nothing about the game to bake in, because the sweep ends the
-  -- effect at the first combat phase whose end it sees and every producer can
-  -- only be activated during one (#525).
+  -- effect at the first combat phase whose end it sees (#525).
   Duration.UntilEndOfCombat -> Just (Expiry.AtEndOf PhaseSelector.CombatPhase)
 
--- CR 514.2: during the cleanup step, "all 'until end of turn' and 'this turn'
--- effects end". Delete-and-recompute (design.md 2.5): dropping the stored entry
--- makes the next projection revert -- nothing is explicitly undone. One sweep
--- over the four carriers: the per-carrier sweeps this absorbed existed only
--- because the lists lived in different modules, not because they differed.
+-- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
+-- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
+-- the next projection revert -- nothing is explicitly undone.
 --
 -- Not implemented: a turn whose ENDING PHASE was skipped never reaches the
 -- cleanup step, so this never runs and every AtCleanup entry outlives its turn
@@ -86,24 +80,19 @@ dropAtCleanup gs =
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
         }
 
--- CR 611.2b: drop every While whose condition has stopped holding. The effect is
--- DELETED, not masked: 611.2b's duration is one continuous period, so an effect
--- that has ended must stay ended even if the condition becomes true again --
--- CR 611.2b: "It doesn't start and immediately stop again, and it doesn't last
--- forever." Reports whether it changed anything, so Engine.settleForPriority
--- knows to run again.
+-- CR 611.2b: drop every While whose condition has stopped holding. The effect
+-- is DELETED, not masked: the duration is one continuous period, so an effect
+-- that has ended stays ended even if the condition becomes true again. Reports
+-- whether it changed anything, so Engine.settleForPriority knows to run again.
 --
--- CR 704.3 fixes the coarsest moment anything can OBSERVE the condition --
--- "whenever a player would get priority" -- and settleForPriority runs at
--- exactly the points where the board can change, so checking here is
--- indistinguishable from checking continuously.
+-- CR 704.3 fixes the coarsest moment anything can OBSERVE the condition, and
+-- settleForPriority runs at exactly the points where the board can change, so
+-- checking here is indistinguishable from checking continuously.
 --
--- `filter` only ever removes elements and preserves the survivors' relative
--- order, so a LENGTH compare is exactly equivalent to the deep structural `/=`
--- this used before -- and cheaper: no need to walk every kept element's Eq
--- instance on a settle that changed nothing (the common case). `State.put` is
--- skipped on that same common case, so a no-op sweep doesn't even rewrite the
--- GameState.
+-- `filter` only removes elements and preserves the survivors' order, so a
+-- LENGTH compare is equivalent to a deep structural `/=` and cheaper.
+-- `State.put` is skipped when nothing changed, so a no-op sweep does not
+-- rewrite the GameState.
 sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
@@ -140,21 +129,13 @@ sweepConditional = do
 -- an until-your-next-turn duration ends as that player's turn begins.
 --
 -- Takes the player EXPLICITLY rather than reading GameState.activePlayer,
--- because CR 800.4m needs this to fire for a seat whose turn does not begin:
--- "When a player leaves the game, any continuous effects with durations that
--- last until that player's next turn ... will last until that turn would have
--- begun. They neither expire immediately nor last indefinitely." Engine's turn
--- handoff walks the seating order and calls this at every seat it passes, so a
--- departed player's durations end at their seat rather than never.
+-- because CR 800.4m needs this to fire for a seat whose turn does not begin: a
+-- departed player's durations last until their turn WOULD have begun. Engine's
+-- turn handoff walks the seating order and calls this at every seat it passes.
 --
 -- Dropping at the handoff is observably identical to dropping "as the turn
--- begins": CR 500.12 (no game events occur between turns), CR 502.4 (no priority
--- during untap) and CR 704.3 (no state-based-action check without a player about
--- to receive priority) leave nothing that could observe the difference. The
--- first observation point is the upkeep step (CR 503.1).
---
--- One sweep over the four carriers, as the neighbouring sweeps do. AtCleanup,
--- Never and While are untouched, and so is a delayed entry on no duration.
+-- begins": CR 500.12, CR 502.4 and CR 704.3 leave nothing that could observe
+-- the difference. The first observation point is the upkeep step (CR 503.1).
 dropAtTurnOf :: PlayerId -> GameState -> GameState
 dropAtTurnOf pid gs =
   let survives expiry = case expiry of
@@ -174,25 +155,17 @@ dropAtTurnOf pid gs =
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
         }
 
--- CR 500.5's FIRST clause: "As a step or phase ends, if there are effects that
--- last until the end of that step or phase, those effects expire. Then any
--- unspent mana left in a player's mana pool empties." The window that is ending
--- is passed in, because only Engine.runStepThatBegan knows which one it is --
--- and at the end of the last step of a stepped phase there are TWO, the step and
--- the phase, so it calls this twice.
+-- CR 500.5's first clause: effects lasting until the end of a step or phase
+-- expire as it ends. The window that is ending is passed in, because only
+-- Engine.runStepThatBegan knows which one it is -- and at the end of the last
+-- step of a stepped phase there are TWO, the step and the phase, so it calls
+-- this twice.
 --
--- EQUALITY on the selector, not containment: CR 500.5a is precisely the claim
--- that an "until end of combat" effect does NOT expire when the end of combat
--- step ends as a step -- "effects that last 'until end of combat' expire at the
--- end of the combat phase, not at the beginning of the end of combat step" --
--- and CR 511.2 repeats it. Containment would end such an effect at the end of
--- the very first combat step it saw. Pawl.Engine.Turn.inWindow is the containment
--- test, and it answers a different question (is the game IN this window) for a
--- different reader (an activation's printed rider).
---
--- One sweep over the four carriers, as the neighbouring sweeps do. AtCleanup,
--- Never, While and AtTurnOf are untouched, and so is a delayed entry on no
--- duration.
+-- EQUALITY on the selector, not containment: CR 500.5a (repeated by CR 511.2)
+-- is precisely the claim that an "until end of combat" effect does NOT expire
+-- when the end of combat step ends as a step, and containment would end it at
+-- the first combat step it saw. Pawl.Engine.Turn.inWindow is the containment
+-- test, and it answers a different question for a different reader.
 dropAtEndOf :: PhaseSelector -> GameState -> GameState
 dropAtEndOf ending gs =
   let survives expiry = case expiry of

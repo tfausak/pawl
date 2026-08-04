@@ -9,14 +9,13 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Keyword as Keyword
 
 -- | This module TIES THE CODEC KNOT that Pawl.Codec.Filter's keyword parameter
--- opens, exactly as Pawl.Types.Keyword ties the data-type one: 702.29e's
--- typecycling filter is decoded here by passing this module's own codec back into
--- the parametric one, which is legal in a single module and would be a cycle
--- across two.
+-- opens, exactly as Pawl.Types.Keyword ties the data-type one: CR 702.29e's
+-- typecycling filter is decoded here by passing this module's own codec back
+-- into the parametric one, which is legal in a single module and would be a
+-- cycle across two.
 --
--- Not Common.decodeNullary's table shape any more: CR 702.164a's toxic and CR
--- 702.70a's poisonous each carry an N, so this is the tagged-with-an-optional-
--- payload case Quantity.toJson uses.
+-- Not Common.decodeNullary's table shape, since CR 702.164a's toxic and
+-- CR 702.70a's poisonous each carry an N.
 toJson :: Keyword.Keyword -> Value.Value
 toJson k = case k of
   Keyword.Deathtouch -> Common.nullary "Deathtouch"

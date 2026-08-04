@@ -5,12 +5,11 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.PlayerId as PlayerId
 
--- | SetController's PlayerId is meant to be runtime-only (a SetController effect
--- is baked at GainControl resolution, not authored on a card), but the codec
--- must stay total, so this arm ACCEPTS one from card JSON and Pawl.CardSpec
--- lints the pool against it instead (#199). Mirrors ObjectId's Natural encoding
--- (Common.encodeNatural/Common.decodeNatural), not a bare Integer: PlayerId
--- wraps a Natural (no partial fromInteger on a negative wire value).
+-- | SetController's PlayerId is meant to be runtime-only (baked at GainControl
+-- resolution, not authored on a card), but the codec must stay total, so this
+-- arm ACCEPTS one from card JSON and a corpus lint keeps the pool honest
+-- (#199). Encoded as a Natural rather than a bare Integer, so a negative wire
+-- value cannot go through a partial fromInteger.
 toJson :: PlayerId.PlayerId -> Value.Value
 toJson = Common.encodeNatural . PlayerId.unwrap
 

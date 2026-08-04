@@ -23,11 +23,9 @@ fromJson value = do
   ps <- Common.asObject value
   sup <- Common.defaultedField "supertypes" Set.empty (Common.decodeSet Supertype.fromJson) ps
   tys <- Common.field "types" ps >>= Common.decodeSet CardType.fromJson
-  -- R6 of the omit-defaults design: a card has at least one card type (CR
-  -- 205.1: the type line "contains the card's card type(s)", unconditionally,
-  -- unlike its subtypes and supertypes which the same rule marks "if
-  -- applicable"), so an empty set is a malformed file rather than a card with
-  -- no types.
+  -- CR 205.1 gives a card at least one card type unconditionally, unlike its
+  -- subtypes and supertypes, so an empty set is a malformed file rather than a
+  -- card with no types.
   Monad.when (Set.null tys) . Left $ Text.pack "typeLine has no types"
   sub <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet Subtype.fromJson) ps
   pure (TypeLine.MkTypeLine sup tys sub)

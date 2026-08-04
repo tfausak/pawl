@@ -10,15 +10,14 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
--- | Rest in Peace's "if a card would be put into a graveyard from anywhere"
--- names no object in particular -- naming one (CR 702.34a's flashback, "this
--- card") is the marked case, so naming none is what a pattern that says
--- nothing about the object means.
+-- | Naming an object (as CR 702.34a's flashback does) is the marked case, so
+-- naming none is what a pattern that says nothing about the object means.
 defaultWhichObject :: ZoneChangeSubject.ZoneChangeSubject
 defaultWhichObject = ZoneChangeSubject.AnyObject
 
--- | CR 109.5 reads a controller relation against the effect's source; "anyone's"
--- is the unrestricted reading, so it is what a pattern that says nothing means.
+-- | CR 109.5 reads a controller relation against the effect's source;
+-- "anyone's" is the unrestricted reading, so it is what a pattern that says
+-- nothing means.
 defaultWhoseObject :: ControllerRelation.ControllerRelation
 defaultWhoseObject = ControllerRelation.Anyones
 

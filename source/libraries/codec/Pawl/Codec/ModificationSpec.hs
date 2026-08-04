@@ -56,8 +56,8 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.SetLandSubtype Subtype.Mountain)
       """ {"type":"SetLandSubtype","value":{"type":"Mountain"}} """
-  -- Nullary: the subtype is read from the effect's source at projection time
-  -- (Object.chosenSubtype), so there is nothing on the wire. Convincing Mirage.
+  -- Nullary: the subtype is read from the effect's source at projection time,
+  -- so there is nothing on the wire.
   Spec.it s "SetLandSubtypeToChosen" $
     Common.assertJsonCodec
       s
@@ -108,7 +108,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       """ {"type":"SetController","value":0} """
   -- layer 2, CR 613.1b: the only shape a printed static ability can grant
   -- control with, since the controller is DERIVED at projection time rather
-  -- than baked. Payload-free, and must not decode as SetController.
+  -- than baked. Must not decode as SetController.
   Spec.it s "SetControllerToSource" $
     Common.assertJsonCodec
       s
@@ -124,8 +124,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.SetColor (Set.singleton Color.Blue))
       """ {"type":"SetColor","value":[{"type":"Blue"}]} """
-  -- layer 5, CR 613.1e / 105.3: an ADD, not a set -- CR 105.3's "in addition"
-  -- parenthetical.
+  -- layer 5, CR 613.1e / 105.3: an ADD, not a set.
   Spec.it s "AddColor" $
     Common.assertJsonCodec
       s
@@ -133,9 +132,8 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.AddColor (Set.singleton Color.Blue))
       """ {"type":"AddColor","value":[{"type":"Blue"}]} """
-  -- layer 5, CR 613.1e / 105.3: an "in addition" colour too, but payload-free --
-  -- the colour is read at projection time off the effect's source
-  -- (Object.chosenColor), so there is nothing on the wire. Painter's Servant.
+  -- layer 5, CR 613.1e / 105.3: an "in addition" colour too, but payload-free
+  -- -- the colour is read at projection time off the effect's source.
   Spec.it s "AddChosenColor" $
     Common.assertJsonCodec
       s

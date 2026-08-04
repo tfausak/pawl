@@ -51,21 +51,19 @@ toJson codec e = case e of
   Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Common.array [SlotName.toJson slot, Filter.toJson Keyword.toJson f, Quantity.toJson q]))
   Effect.RestartGame -> Common.nullary "RestartGame"
   Effect.ControlPlayerNextTurn s -> Common.tagged "ControlPlayerNextTurn" (Just (SlotName.toJson s))
-  -- The bound-count slot is ELIDED when absent, the posture Create's EntryRiders
-  -- and ArmDelayedTrigger's duration both take, so every card that says nothing about
-  -- counting its sweep stays byte-for-byte as it was written.
+  -- The bound-count slot is ELIDED when absent, so a card that says nothing
+  -- about counting its sweep keeps its two-element payload.
   Effect.Destroy s r ms ->
     Common.tagged "Destroy" . Just . Common.array $
       [ObjectRef.toJson s, Regenerability.toJson r] <> fmap SlotName.toJson (Maybe.maybeToList ms)
   Effect.Sacrifice s -> Common.tagged "Sacrifice" (Just (SlotName.toJson s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (SlotName.toJson s))
   Effect.Counter s -> Common.tagged "Counter" (Just (SlotName.toJson s))
-  -- MoveToZone's payload is positional and takes Create's shape, for the same
-  -- reason and with the same two elisions: the EntryRiders are dropped when they
-  -- are the CR 110.5b default and the bound slot when there is none, so every
-  -- card file written before either existed stays byte-for-byte as it was. The
-  -- three-element form is two shapes, told apart on decode by JSON TYPE -- a
-  -- slot name is a string, riders are an object.
+  -- MoveToZone's payload is positional and takes Create's shape, with the same
+  -- two elisions: the EntryRiders are dropped when they are the CR 110.5b
+  -- default, and the bound slot when there is none. The three-element form is
+  -- therefore two shapes, told apart on decode by JSON TYPE -- a slot name is a
+  -- string, riders are an object.
   Effect.MoveToZone s z riders ms ->
     Common.tagged "MoveToZone" . Just . Common.array $
       [SlotName.toJson s, Zone.toJson z]
@@ -76,13 +74,10 @@ toJson codec e = case e of
   Effect.Discard s q -> Common.tagged "Discard" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
   Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.GainLife r q -> Common.tagged "GainLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
-  -- Create's payload is positional, and the EntryRiders are ELIDED when they are
-  -- the CR 110.5b default (EntryRiders.defaultValue) -- the same posture
-  -- `counterability` takes, so a card file that says nothing about how its
-  -- tokens enter stays exactly as it was written. The three-element form is
-  -- therefore two shapes, told apart on decode by JSON TYPE rather than by
-  -- position: a slot name is a string (SlotName.toJson) and riders are an object,
-  -- so the two can never be confused.
+  -- Create's payload is positional, and the EntryRiders are ELIDED when they
+  -- are the CR 110.5b default. The three-element form is therefore two shapes,
+  -- told apart on decode by JSON TYPE rather than by position: a slot name is a
+  -- string and riders are an object, so the two can never be confused.
   Effect.Create q c te ms ->
     Common.tagged "Create" . Just . Common.array $
       [Quantity.toJson q, codec c]
@@ -99,14 +94,12 @@ toJson codec e = case e of
   Effect.Untap r -> Common.tagged "Untap" (Just (ObjectRef.toJson r))
   Effect.AddPhases ps -> Common.tagged "AddPhases" (Just (Common.array (fmap ExtraPhase.toJson ps)))
   Effect.GainControl d r -> Common.tagged "GainControl" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
-  -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
-  -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
-  -- states a duration writes the two-element form. The ONSET is elided when it is CR 603.7a's default (the ability is armed the
-  -- moment it is created), so Tidal Wave's bare name and Full Throttle's
-  -- two-element form both stay exactly as they were written. A stated onset
-  -- takes the THREE-element form, whose last element is the duration or null --
-  -- and LENGTH, not JSON type, is what tells the forms apart, because an onset
-  -- and a duration are both tagged objects.
+  -- The duration is ELIDED when absent (CR 603.7b's default) and the onset when
+  -- it is CR 603.7a's default, so a one-shot entry stays a bare ability name
+  -- and a stated duration alone writes the two-element form. A stated onset
+  -- takes the THREE-element form, whose last element is the duration or null.
+  -- LENGTH, not JSON type, tells the forms apart: an onset and a duration are
+  -- both tagged objects.
   Effect.ArmDelayedTrigger n o md -> Common.tagged "ArmDelayedTrigger" . Just $ case (o, md) of
     (Onset.Immediately, Nothing) -> AbilityName.toJson n
     (Onset.Immediately, Just d) -> Common.array [AbilityName.toJson n, Duration.toJson d]
@@ -119,9 +112,8 @@ toJson codec e = case e of
   Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Common.array [SlotName.toJson s, Filter.toJson Keyword.toJson f]))
   Effect.PlaySubgame s -> Common.tagged "PlaySubgame" (Just (SlotName.toJson s))
   Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Common.array [PlayerRef.toJson r, Common.encodeSet PhaseSelector.toJson skips]))
-  -- A bare slot name, not an array: whose library is DERIVED from the object
-  -- that slot names (CR 701.24 / "its owner"), so there is no second field for
-  -- a card file to write. The Counter and Sacrifice shape.
+  -- A bare slot name, not an array: the library is derived from the object that
+  -- slot names (CR 701.24), so there is no second field to write.
   Effect.ShuffleIntoLibrary s -> Common.tagged "ShuffleIntoLibrary" (Just (SlotName.toJson s))
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Effect.Effect card)
@@ -157,9 +149,8 @@ fromJson decode value = do
     "Sacrifice" -> Common.withValue mv (fmap Effect.Sacrifice . SlotName.fromJson)
     "RemoveFromCombat" -> Common.withValue mv (fmap Effect.RemoveFromCombat . SlotName.fromJson)
     "Counter" -> Common.withValue mv (fmap Effect.Counter . SlotName.fromJson)
-    -- The four shapes the encoder above can emit, read exactly as Create's are:
-    -- an Object in third position is the EntryRiders, anything else is the bound
-    -- slot name (a string).
+    -- Read exactly as Create's are: an Object in third position is the
+    -- EntryRiders, anything else is the bound slot name.
     "MoveToZone" -> case mv of
       Just (Value.Array (Array.MkArray [s, z])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> pure EntryRiders.defaultValue <*> pure Nothing
       Just (Value.Array (Array.MkArray [s, z, e@(Value.Object _)])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> EntryRiders.fromJson e <*> pure Nothing
@@ -181,10 +172,9 @@ fromJson decode value = do
     "GainLife" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.GainLife <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainLife expects [playerRef, quantity]"
-    -- The four shapes the encoder above can emit. The three-element one is read
-    -- by JSON type: an Object is the EntryRiders, anything else is the slot name
-    -- (a string), which is what lets the entry be elided when it is the default
-    -- without a hole in the array.
+    -- The three-element form is read by JSON type: an Object is the
+    -- EntryRiders, anything else is the slot name, which is what lets the
+    -- riders be elided without leaving a hole in the array.
     "Create" -> case mv of
       Just (Value.Array (Array.MkArray [q, c])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> pure EntryRiders.defaultValue <*> pure Nothing
       Just (Value.Array (Array.MkArray [q, c, e@(Value.Object _)])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> EntryRiders.fromJson e <*> pure Nothing

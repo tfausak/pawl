@@ -3,19 +3,15 @@ module Pawl.Types.Regenerability where
 -- | CR 701.19c: whether a would-be-destroyed event admits a regeneration shield.
 --
 -- A property of the DESTRUCTION, not of the permanent. Terror's "It can't be
--- regenerated" says nothing about the creature and everything about the
--- destruction Terror is performing: the same creature, with the same shield,
--- regenerates from lethal damage moments later.
+-- regenerated" says nothing about the creature: the same creature, with the same
+-- shield, regenerates from lethal damage moments later.
 --
--- CR 701.19c is precise about the mechanism, and the precision matters. It does
--- NOT stop a shield being created -- "such abilities" may still be activated and
--- "such spells" still cast -- it stops the shield being APPLIED. So this rides
--- the proposed event, where a replacement candidate is offered its chance, and
--- an unapplied shield is never consumed because it is never chosen.
+-- CR 701.19c does NOT stop a shield being created -- it stops the shield being
+-- APPLIED. So this rides the proposed event, where a replacement candidate is
+-- offered its chance, and an unapplied shield is never consumed.
 --
--- Not a Bool, for the reason TapState and Sickness are not Bools: at a call site
--- `destroy CantBeRegenerated oid` says which rule is in play, where `destroy True
--- oid` would say nothing at all.
+-- Not a Bool, for the reason TapState and Sickness are not: at a call site
+-- `destroy CantBeRegenerated oid` says which rule is in play.
 --
 -- Gates regeneration ONLY. CR 701.19c names regeneration shields specifically, so
 -- a future destruction replacement that is not a regeneration (a totem-armour

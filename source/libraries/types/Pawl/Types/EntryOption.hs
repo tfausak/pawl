@@ -12,10 +12,9 @@ import qualified Pawl.Types.Keyword as Keyword
 -- and keywords only, and no Modification reads a subtype chosen at entry (#608).
 --
 -- The keywords are UNIONED into the object's copiable snapshot, never assigned
--- over it. That is pinned by Primal Plasma's own Gatherer ruling: a Clone of a
--- 2/2-flying Plasma that picks the third option is "1/6 with flying AND
--- defender". P/T, by contrast, is SET (CR 707.2's "abilities that set power and
--- toughness").
+-- over it, per Primal Plasma's Gatherer ruling: a Clone of a 2/2-flying Plasma
+-- that picks the third option is 1/6 with flying AND defender. P/T is SET
+-- instead (CR 707.2).
 data EntryOption = MkEntryOption
   { power :: Integer,
     toughness :: Integer,

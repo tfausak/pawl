@@ -10,10 +10,8 @@ import qualified Pawl.Types.Zone as Zone
 -- BOTH ids, because CR 400.7 destroys the only link between them: the departing
 -- id is the key GameState.lastKnown files the object's CR 608.2h information
 -- under, so without it a departure event names nothing that can answer what the
--- permanent was or who controlled it. That is exactly what CR 603.10a's
--- look-back needs -- "some zone-change triggers look back in time. These are
--- leaves-the-battlefield abilities" -- and Pawl.Engine.Event's `leftBattlefield`
--- candidate source is its reader.
+-- permanent was or who controlled it -- which is what CR 603.10a's look-back for
+-- leaves-the-battlefield abilities needs.
 --
 -- The two are the same value in the PROPOSED event Pawl.Engine.Replacement resolves
 -- (Pawl.Types.ProposedEvent.WouldChangeZone): nothing has moved yet, so the

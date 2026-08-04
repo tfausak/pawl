@@ -18,22 +18,16 @@ data Duration
     -- an end -- "if the 'for as long as' duration never starts, the effect does
     -- nothing" -- which is why Pawl.Engine.Expiry.arm returns a Maybe.
     ForAsLongAs Condition.Condition
-  | -- | CR 500.5a: "Effects that last 'until end of combat' expire at the end of
-    -- the combat PHASE, not at the beginning of the end of combat step." CR
-    -- 511.2 says the same thing from the step's side. Jade Statue's animation.
+  | -- | CR 500.5a / 511.2: expires at the end of the combat PHASE, not at the
+    -- beginning of the end of combat step. Jade Statue's animation.
     --
-    -- Nullary, and the only end-of-window duration a card can print. The stored
-    -- Pawl.Types.Expiry it arms to carries a Pawl.Types.PhaseSelector and so can
-    -- name any window CR 500.5 can end -- a step as well as a phase -- but no
-    -- printed arm reaches the others, because no card in the pool prints them
-    -- (#353's own list: "until end of this step" has no producer).
+    -- Nullary, and the only end-of-window duration a card can print: the stored
+    -- Pawl.Types.Expiry it arms to can name any window CR 500.5 can end, but no
+    -- card in the pool prints the others (#353).
     --
-    -- WHICH combat phase is not carried, because it never has to be: CR 500.8
-    -- permits more than one combat phase in a turn, and the sweep ends this
-    -- effect at the first combat phase whose end it sees. Every producer is an
-    -- ability that can only be activated DURING combat (Jade Statue prints
-    -- "Activate only during combat"), so that phase is always the one the
-    -- effect was created in. An "until end of combat" armed OUTSIDE a combat
-    -- phase is unreachable from the pool and unspecified here (#525).
+    -- WHICH combat phase is not carried. CR 500.8 permits more than one in a
+    -- turn, and the sweep ends this effect at the first whose end it sees; every
+    -- producer can only be activated during combat, so that is the phase the
+    -- effect was created in. One armed OUTSIDE combat is unspecified here (#525).
     UntilEndOfCombat
   deriving (Eq, Ord, Show)

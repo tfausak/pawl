@@ -27,10 +27,8 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.fromJson
       (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))
       """ {"type":"HasCardType","value":{"type":"Creature"}} """
-  -- An ObjectRef is untagged and told apart by JSON TYPE rather than by a tag:
-  -- a slot is a bare string, a swept set is an object. The two assertions
-  -- above already pin that; this one additionally guards against a decoder
-  -- that read every payload as one arm regardless of its JSON type.
+  -- Guards against a decoder that read every payload as one arm regardless of
+  -- its JSON type.
   Spec.it s "the two arms are told apart by JSON type, not by a tag" $
     Spec.assertBool
       s

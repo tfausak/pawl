@@ -13,7 +13,7 @@ import qualified Pawl.Types.Filter as Filter
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
-  -- Hardened Scales, per the type's own doc: a fixed kind and a real filter.
+  -- A fixed kind and a real filter.
   Spec.it s "Hardened Scales (a fixed kind, a real filter)" $
     Common.assertJsonCodec
       s
@@ -25,10 +25,8 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWhat = Filter.HasCardType CardType.Creature
         }
       """ {"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}} """
-  -- Doubling Season: whichKind = Nothing means ANY kind, never "no kind" -- and
-  -- the trivial filter matching every permanent. The omitted key is what an
-  -- absent whichKind means (R1 of the omit-defaults design), same as an
-  -- explicit JSON null would.
+  -- whichKind = Nothing means ANY kind, never "no kind", and the trivial filter
+  -- matches every permanent. An omitted key is what that Nothing means.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
     Common.assertJsonCodec
       s

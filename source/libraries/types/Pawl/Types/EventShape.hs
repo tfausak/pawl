@@ -7,15 +7,9 @@ import qualified Pawl.Types.Zone as Zone
 -- because every history-reading card in the pool asks "this turn" -- so the
 -- log's extent IS the window and none is carried here.
 --
--- Only MovedBetween exists: every OTHER GameEvent constructor -- DamageDealt,
--- StepBegan, SpellCast, BecameMonarch, Discarded, AttackerDeclared and Revealed
--- -- is recorded in
--- the log with no EventShape arm, so a count cannot fold over any of them
--- (#162). Revealed is the one that already carries a characteristics snapshot,
--- so it is the one an arm here could match a Filter against without any new
--- payload.
+-- Only MovedBetween exists: every other GameEvent constructor is recorded in the
+-- log with no EventShape arm, so a count cannot fold over any of them (#162).
 data EventShape
-  = -- | CR 700.4: "dies" means "is put into a graveyard from the battlefield",
-    -- which is MovedBetween Battlefield Graveyard.
+  = -- | CR 700.4: "dies" is MovedBetween Battlefield Graveyard.
     MovedBetween Zone.Zone Zone.Zone
   deriving (Eq, Ord, Show)

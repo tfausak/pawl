@@ -6,14 +6,9 @@ import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Pool as Pool
 
--- | Tagged rather than nullary-only, because CR 400.1's per-player graveyard makes
--- one arm carry a payload: the PlayerScope saying whose. The nullary arms keep
--- emitting exactly what they did, since Common.nullary IS Common.tagged with no
--- value, so no committed card file changes shape.
---
--- The payload widened from a PlayerRelation to a PlayerScope and no committed
--- file moved either: both types spell their shared arm "You", which is the only
--- one any card had written.
+-- | Tagged rather than nullary-only, because CR 400.1's per-player graveyard
+-- makes one arm carry a payload: the PlayerScope saying whose. The nullary arms
+-- are unaffected, since Common.nullary IS Common.tagged with no value.
 toJson :: Pool.Pool -> Value.Value
 toJson p = case p of
   Pool.Creatures -> Common.nullary "Creatures"
@@ -24,9 +19,8 @@ toJson p = case p of
   Pool.Abilities -> Common.nullary "Abilities"
   Pool.SpellsAndPermanents -> Common.nullary "SpellsAndPermanents"
   Pool.CardsInGraveyard scope -> Common.tagged "CardsInGraveyard" . Just $ PlayerScope.toJson scope
-  -- Nullary, and that is CR 400.1's "the other zones are shared by all players"
-  -- showing through the wire format: exile has no per-player copy for a payload
-  -- to select among. See Pawl.Types.Pool.CardsInExile.
+  -- Nullary: CR 400.1's shared zones have no per-player copy for a payload to
+  -- select among.
   Pool.CardsInExile -> Common.nullary "CardsInExile"
 
 fromJson :: Value.Value -> Either Text.Text Pool.Pool
@@ -41,7 +35,7 @@ fromJson value = do
     ("Abilities", _) -> Right Pool.Abilities
     ("SpellsAndPermanents", _) -> Right Pool.SpellsAndPermanents
     -- Common.withValue, not a `Just v` pattern with a fallthrough: a
-    -- CardsInGraveyard with no value is a MALFORMED known constructor, and the
+    -- CardsInGraveyard with no value is a malformed known constructor, and a
     -- fallthrough would report it as an unknown one.
     ("CardsInGraveyard", _) -> Common.withValue mv (fmap Pool.CardsInGraveyard . PlayerScope.fromJson)
     ("CardsInExile", _) -> Right Pool.CardsInExile

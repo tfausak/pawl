@@ -1,24 +1,18 @@
 module Pawl.Types.PhyrexianPayment where
 
--- | CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid either
--- with one mana of its color or by paying 2 life." This is WHICH of those two,
--- as announced under CR 118.13a -- "the choice of how to pay for that symbol is
--- made as its controller proposes that spell or ability."
+-- | CR 107.4f: a Phyrexian mana symbol is paid either with one mana of its colour
+-- or by paying 2 life. This is WHICH of those two, announced under CR 118.13a as
+-- its controller proposes the spell or ability.
 --
--- A named sum rather than a Bool (no boolean blindness), the posture
--- MulliganDecision (Keep/Mulligan), Concession (Continues/Concedes) and
--- OptionalDecision (Declines/Exercises) take: every player-facing choice in this
--- engine is written out, so a transcript reads as the decision it records rather
--- than as an unlabelled boolean.
+-- A named sum rather than a Bool, the posture every player-facing choice in this
+-- engine takes, so a transcript reads as the decision it records.
 --
--- Named for what the player DOES, and deliberately not for the resource's amount:
--- "one mana of its color" is the symbol's own colour and "2 life" is fixed by CR
--- 107.4f, so neither way needs a payload and the announcement carries none. CR
--- 107.4f's hybrid Phyrexian symbols ("{G/U/P}") would break that -- their mana
--- way names two colours -- and they have no ManaSymbol constructor either (#364).
+-- Neither way needs a payload: the colour is the symbol's own and the 2 life is
+-- fixed by CR 107.4f. Hybrid Phyrexian symbols would break that, naming two
+-- colours, and have no ManaSymbol constructor either (#364).
 data PhyrexianPayment
-  = -- | CR 107.4f: "with one mana of its color".
+  = -- | CR 107.4f: one mana of the symbol's colour.
     PaysMana
-  | -- | CR 107.4f: "or by paying 2 life".
+  | -- | CR 107.4f: 2 life.
     PaysLife
   deriving (Eq, Ord, Show)

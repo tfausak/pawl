@@ -57,36 +57,30 @@ import qualified Pawl.Types.TypeLine as TypeLine
 
 -- Fixtures --------------------------------------------------------------------
 --
--- No registry here: Pawl.Codec.CardSpec sits in the codec sublibrary, which is
--- ABOVE the test suite in CLAUDE.md's dependency table, so it cannot reach
--- Pawl.Registry or a real Printing. Every fixture below is a synthetic Card
--- built by hand -- CR 700.2's non-modal shape, a single empty Mode with
--- ChooseExactly 1, is what a land or vanilla creature's `spell` field is.
+-- No registry here: the codec sublibrary sits above the test suite in the
+-- dependency table, so it cannot reach Pawl.Registry or a real Printing. Every
+-- fixture below is a synthetic Card built by hand.
 
--- | A land or vanilla creature's spell payload: one mode, no effects, forced.
+-- | CR 700.2's non-modal shape, which is what a land or vanilla creature's
+-- spell payload is: one mode, no effects, forced.
 minimalModal :: Modal.Modal Card.Card
 minimalModal =
   Modal.MkModal
     (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
     (ModeSelection.ChooseExactly 1)
 
--- | CR 603.6a's simplest trigger, reused for both triggeredAbilities and
--- delayedAbilities below -- the shape does not matter to this module, only that
--- it is a well-typed TriggeredAbility Card.
+-- | CR 603.6a's simplest trigger. The shape does not matter here, only that it
+-- is a well-typed TriggeredAbility Card.
 minimalTriggeredAbility :: TriggeredAbility.TriggeredAbility Card.Card
 minimalTriggeredAbility =
   TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing
 
--- | Every required field set to a simple value, and every defaulted/elided
--- field at its Haskell default (Nothing, empty, or Counterable). Its JSON has
--- none of the 23 defaulted keys this fixture leaves at their default (of 26
--- total; manaCost, power and toughness are the other three, set to
--- non-default values above) -- 'baseCardJson' below -- which is what lets the
--- single round-trip assertion in the first test prove BOTH halves of every one
--- of those fields' elision at once: 'Card.toJson' would emit an extra key if
--- any field's encoder mis-omitted its default, and 'Card.fromJson' would land
--- on the wrong value if any field's decoder mis-defaulted an absent key, and
--- either failure would break the equality check.
+-- | Every required field set to a simple value, 'manaCost', 'power' and
+-- 'toughness' set to non-default values, and every other defaulted field left at
+-- its Haskell default. 'baseCardJson' therefore carries no key for any of those
+-- defaulted fields, which is what lets one round-trip assertion prove both halves
+-- of every field's elision at once: an encoder that emitted a default, or a
+-- decoder that mis-defaulted an absent key, breaks the equality.
 baseCard :: Card.Card
 baseCard =
   Card.MkCard
@@ -155,8 +149,8 @@ minimalCard =
       Card.openingHandAction = []
     }
 
--- The same card the verbose literal below spells out: minimalCard's fields, with
--- the type line a real basic land carries.
+-- The same card the verbose literal below spells out: minimalCard's fields,
+-- with the type line a real basic land carries.
 mountainCard :: Card.Card
 mountainCard =
   minimalCard
@@ -173,16 +167,10 @@ baseCardJson =
     <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
     <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}"
 
--- | 'baseCard' with every field populated at once, except 'Card.spell' -- left
--- at 'Card.defaultSpell' since nothing here overrides it, which is why
--- 'populatedCardJson' has no @"spell"@ key. Covers the other 25 of the 26
--- defaulted keys, plus the recursive card-in-card fields that do get
--- populated (activatedAbilities, triggeredAbilities, delayedAbilities) -- the
--- shape a reviewer would otherwise have to piece together from sixteen
--- separate single-field cases. Its JSON, 'populatedCardJson', was produced by
--- running 'Card.toJson' on this exact value (not transcribed by hand) and
--- pasted back in, per the recipe's "derive every JSON literal by reading the
--- encoder" rule.
+-- | 'baseCard' with every field populated at once, except 'Card.spell', which
+-- nothing here overrides -- so 'populatedCardJson' has no @"spell"@ key. That
+-- literal was produced by running 'Card.toJson' on this exact value rather than
+-- transcribed by hand.
 populatedCard :: Card.Card
 populatedCard =
   baseCard
@@ -241,9 +229,8 @@ populatedCardJson =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Card" $ do
-  -- R6 of the omit-defaults design: name and typeLine are the only required
-  -- keys, and a card that says nothing else is a vanilla card rather than a
-  -- malformed file.
+  -- name and typeLine are the only required keys: a card that says nothing else
+  -- is a vanilla card rather than a malformed file.
   Spec.it s "a minimal card carries only name and typeLine" $
     Common.assertJsonCodec
       s
@@ -251,21 +238,12 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
       Card.fromJson
       minimalCard
       """ {"name":"Mountain","typeLine":{"types":[{"type":"Land"}]}} """
-  -- R7's one case for MkCard's single constructor, and simultaneously the
-  -- absent-key proof for the 23 fields 'baseCard' leaves at their default, all
-  -- at once: see 'baseCard's haddock for why one round trip suffices for both.
   Spec.it s "MkCard, every required field present and every optional field absent" $
     Common.assertJsonCodec s Card.toJson Card.fromJson baseCard baseCardJson
-  -- 16 of the 26 defaulted fields also get their own explicit absent-key
-  -- assertion below, not just the aggregate proofs above (the 'baseCard' round
-  -- trip and 'minimalCard's): a decoder that defaulted the WRONG field
-  -- (swapping two Maybe fields of the same underlying type, say) could still
-  -- pass one of those aggregate equalities by accident if the two defaults
-  -- happened to collide; reading each field back out individually rules that
-  -- out. The other ten (keywords, staticAbilities, spell, activatedAbilities,
-  -- replacementEffects, triggeredAbilities, castingPermissions, manaCost,
-  -- power, toughness) have no individual case -- covered by the aggregate
-  -- proofs alone, not by a weaker guarantee.
+  -- Most defaulted fields also get their own absent-key assertion below, not
+  -- just the aggregate round trip above: a decoder that defaulted the WRONG
+  -- field could still pass the aggregate equality if two defaults happened to
+  -- collide, and reading each field back out individually rules that out.
   Spec.describe s "each defaulted field takes its default when its key is absent from the JSON" $ do
     Spec.it s "loyalty (CR 306.5) defaults to Nothing" $ do
       v <- Common.assertJson s baseCardJson
@@ -300,9 +278,8 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
     Spec.it s "alternativeCosts (CR 118.9) defaults to the empty list" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.alternativeCosts <$> Card.fromJson v) (Right [])
-    -- CR 113.6g's default, the stand-in for the registry-backed Rending
-    -- Volley/Cancel pair kept in Pawl.CodecIntegrationSpec (that test needs
-    -- real Printings, which this sublibrary cannot reach).
+    -- The registry-backed pair lives in Pawl.CodecIntegrationSpec, which can
+    -- reach real Printings; this sublibrary cannot.
     Spec.it s "counterability (CR 113.6g) defaults to Counterable" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.counterability <$> Card.fromJson v) (Right Counterability.Counterable)
@@ -319,12 +296,8 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
       v <- Common.assertJson s baseCardJson
       Spec.assertEq s (Card.castingRestrictions <$> Card.fromJson v) (Right [])
   -- The other half of every defaulted field's story: populated, it appears
-  -- under its own key (proving the encoder's non-default arm) and round-trips
-  -- (proving the decoder's present-key arm). Each case here is 'baseCard' with
-  -- exactly one field changed, so its JSON is 'baseCardJson' plus exactly one
-  -- extra key -- moved from the registry-backed "a Card carrying X round-trips"
-  -- /"an empty X list is omitted" pairs formerly in Pawl.CodecSpec, which
-  -- needed no registry fixture to make the same point.
+  -- under its own key and round-trips. Each case is 'baseCard' with exactly one
+  -- field changed, so its JSON is 'baseCardJson' plus exactly one extra key.
   Spec.describe s "each defaulted field round-trips when present" $ do
     Spec.it s "loyalty" $
       Common.assertJsonCodec
@@ -441,14 +414,12 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
         Card.fromJson
         baseCard {Card.castingRestrictions = [CastingRestriction.AttackedThisStep]}
         (init baseCardJson <> ",\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}")
-  -- Every field at once, including the recursive card-in-card ones (spell,
-  -- activatedAbilities, triggeredAbilities, delayedAbilities) that only Card
-  -- itself ties the knot on -- 'populatedCard's haddock explains the fixture.
+  -- Every field at once, including the recursive card-in-card ones that only
+  -- Card itself ties the knot on.
   Spec.it s "MkCard, every field populated at once" $
     Common.assertJsonCodec s Card.toJson Card.fromJson populatedCard populatedCardJson
-  -- R7 of the omit-defaults design: omission is permitted on input, never
-  -- required. This is mountain.json as it stood before the migration; every
-  -- such file must still load.
+  -- Omission is permitted on input, never required: a file that spells out
+  -- every default must still load.
   Spec.it s "a pre-migration card file still decodes" $
     Common.assertFromJson
       s

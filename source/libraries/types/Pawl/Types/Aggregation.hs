@@ -13,20 +13,13 @@ module Pawl.Types.Aggregation where
 data Aggregation quantity
   = Objects
   | DistinctCardTypes
-  | -- | The largest value of a per-member quantity: "the greatest mana value
-    -- among artifacts you control" (One with the Machine, Karn, Legacy
-    -- Reforged), "the greatest power among creatures you control" (Fungal
-    -- Sprouting).
+  | -- | The largest value of a per-member quantity -- "the greatest mana value
+    -- among artifacts you control" (Karn, Legacy Reforged). Unlike the two above
+    -- it must know WHICH per-object quantity to read, and the payload is the
+    -- existing Quantity that Pawl.Engine.Quantity.evaluate already reads against
+    -- one object rather than a narrower stand-in duplicating its arms.
     --
-    -- NOT a sibling of the two above, which need only the matched set. This one
-    -- also needs to know WHICH per-object quantity to read, and a Quantity is
-    -- what Pawl.Engine.Quantity.evaluate already reads against one object -- so the
-    -- payload is the existing type rather than a narrower stand-in that would
-    -- duplicate its arms.
-    --
-    -- Least and a summing arm (Ghalta's "total power of creatures you control")
-    -- are the obvious neighbours and are NOT here: no card in the pool asks for
-    -- them, and an unused arm is the speculative construction the project
-    -- forbids.
+    -- Least and a summing arm are the obvious neighbours and are NOT here: no
+    -- card in the pool asks for them.
     Greatest quantity
   deriving (Eq, Ord, Show)

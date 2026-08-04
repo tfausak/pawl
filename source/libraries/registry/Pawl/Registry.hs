@@ -1,24 +1,18 @@
 -- Answering one question: given a card's name, what card is that?
 --
 -- The registry is that function and nothing else. It is parameterized over the
--- caller's monad, so a caller who already has the cards -- a fixture map, a pool
--- compiled in, a generated one -- can supply their own without pretending to do
--- IO. Failure is a returned value rather than an exception for the same reason:
--- a pure registry cannot throw.
+-- caller's monad, so a caller who already has the cards -- a fixture map, a
+-- pool compiled in, a generated one -- can supply their own without pretending
+-- to do IO. Failure is a returned value rather than an exception for the same
+-- reason: a pure registry cannot throw. How a registry answers is not part of
+-- the type.
 --
--- How a registry answers is not part of the type. fileRegistry below reads one
--- JSON file per name and memoizes; an eager one, a bounded one, a network-backed
--- one are all further values of the same type rather than changes to it. That is
--- also where the 30k-card cache question lands when it arrives.
---
--- Enumerating the pool is deliberately NOT here. Every caller that wanted it was
--- linting the corpus pawl ships, which is a claim about the data rather than a
--- question for a registry; that lives in the test suite now.
---
--- What that test suite DOES borrow is cardPath and parseCard: where a card file
--- lives and what its bytes mean are facts about the on-disk format, not about
--- looking a card up, and the corpus lint reads the same files. Only HOW the
--- bytes are obtained differs -- see loadFile.
+-- Enumerating the pool is deliberately NOT here: every caller that wanted it
+-- was linting the corpus pawl ships, which is a claim about the data rather
+-- than a question for a registry, and that lives in the test suite. What the
+-- test suite does borrow is cardPath and parseCard -- facts about the on-disk
+-- format rather than about looking a card up. Only how the bytes are obtained
+-- differs; see loadFile.
 module Pawl.Registry where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -44,43 +38,34 @@ newtype Registry m = MkRegistry
 
 -- A card by name ("Goblin Piker") or by slug ("goblin-piker") -- a file-backed
 -- registry slugifies, and slugify is idempotent, so both are the same lookup.
---
--- Takes a String because pawl does not enable OverloadedStrings, so the newtype
--- at every call site would read
--- `CardName.MkCardName (Text.pack "Goblin Piker")` -- a worse document than the
--- String it replaced. The newtype is what the interface speaks; this is what
--- callers write.
+-- Takes a String because pawl does not enable OverloadedStrings: the newtype is
+-- what the interface speaks, this is what callers write.
 named :: Registry m -> String -> m (Either CardError.CardError Card.Card)
 named registry = fetchCard registry . CardName.MkCardName . Text.pack
 
 -- The card corpus's default root: data/cards declared as cabal data-files,
--- resolved through the cabal-generated Paths_pawl so an installed pawl (not
--- just an in-place checkout) finds its cards. A default, not a hidden global:
--- 'fileRegistry' still takes an explicit FilePath, so this is something callers
--- opt into, and a future CLI's --cards-dir can pass something else entirely.
+-- resolved through the cabal-generated Paths_pawl so an installed pawl finds
+-- its cards. A default, not a hidden global -- 'fileRegistry' still takes an
+-- explicit FilePath.
 defaultRoot :: IO FilePath
 defaultRoot = Paths.getDataFileName "cards"
 
 -- A registry over a directory of one-card-per-file JSON, each named by the slug
--- of the card's own name. Reads a file the first time a name is asked for and
--- remembers the result.
+-- of the card's own name, memoized per name.
 --
--- IO to construct, not merely to use: allocating the memo is an effect, and so
--- is checking the root. The root is checked here rather than at the first lookup
--- because a mistyped --cards-dir otherwise surfaces as N identical failures, one
--- per card, instead of one clear failure at startup (#167).
+-- The root is checked here rather than at the first lookup because a mistyped
+-- --cards-dir otherwise surfaces as N identical failures, one per card, instead
+-- of one clear failure at startup (#167).
 fileRegistry :: FilePath -> IO (Registry IO)
 fileRegistry root = do
   exists <- Directory.doesDirectoryExist root
   if not exists
     then Exception.throwIO MissingRoot.MkMissingRoot {MissingRoot.path = root}
     else do
-      -- An MVar rather than an IORef because the test suite is built -threaded
-      -- and tasty runs cases concurrently: holding it across the read-and-parse
-      -- is what makes "each file is parsed at most once" exact rather than
-      -- merely likely. Not a TVar either, for that same reason: the lock has to
-      -- span a readFile, which no transaction can, so the STM equivalent is a
-      -- TMVar -- this, plus a hand-written copy of base's modifyMVar (#265).
+      -- An MVar rather than an IORef because tasty runs cases concurrently:
+      -- holding it across the read-and-parse is what makes "each file is parsed
+      -- at most once" exact rather than merely likely. Not a TVar either, since
+      -- the lock has to span a readFile, which no transaction can (#265).
       cache <- MVar.newMVar Map.empty
       pure (MkRegistry (memoized root cache))
 
@@ -105,23 +90,19 @@ memoized root cache name =
 cardPath :: FilePath -> Slug.Slug -> FilePath
 cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 
--- What a card file's bytes mean. PURE, and separate from reading them, because
--- that is the whole of what this module and the test suite's Pawl.Corpus agree
--- about: a lookup and a corpus-wide lint disagree about how to obtain the bytes
--- and about what a failure to obtain them means, and agree entirely from here
--- on. `path` is carried only to name the file in the error.
+-- What a card file's bytes mean. Pure, and separate from reading them, because
+-- that is exactly what this module and the test suite's Pawl.Corpus agree
+-- about; they disagree about how to obtain the bytes and about what a failure
+-- to obtain them means. `path` is carried only to name the file in the error.
 --
--- Read as bytes and decoded as UTF-8 explicitly, not via Data.Text.IO.readFile:
--- that decodes using the locale encoding, which is ASCII under LC_ALL=C (a
--- minimal CI container, env -i, cron), so a card whose text has a non-ASCII
--- character (khabal-ghoul.json's "a") would fail with an unhelpful "invalid byte
--- sequence" instead of naming the offending file.
+-- Decoded as UTF-8 explicitly rather than via Data.Text.IO.readFile, which
+-- decodes using the locale encoding -- ASCII under LC_ALL=C -- so a card with a
+-- non-ASCII character would fail with "invalid byte sequence" instead of naming
+-- the offending file.
 --
 -- The name check: a file's own `name` field must slugify back to the name it is
 -- filed under, or a lookup would quietly serve a different card than it was
--- asked for. Both callers inherit it, which is half the point of sharing this --
--- a corpus lint that enforced something other than what a lookup enforces would
--- pass on a pool that cannot be looked up.
+-- asked for. Both callers inherit it.
 parseCard :: CardName.CardName -> Slug.Slug -> FilePath -> ByteString.ByteString -> Either CardError.CardError Card.Card
 parseCard name slug path bytes = do
   contents <- either (\err -> invalid ("not valid UTF-8: " <> show err)) Right (Encoding.decodeUtf8' bytes)
@@ -133,9 +114,9 @@ parseCard name slug path bytes = do
   where
     invalid reason = Left (CardError.Invalid name (path <> ": " <> reason))
 
--- Read one file, and say what a failure to read it means. The registry's half of
--- the split described on parseCard: it asks for one named card, so a file that
--- is not there is an answer (CardError.Missing) rather than a crash.
+-- Read one file, and say what a failure to read it means. The registry asks for
+-- one named card, so a file that is not there is an answer (CardError.Missing)
+-- rather than a crash.
 loadFile :: FilePath -> CardName.CardName -> Slug.Slug -> IO (Either CardError.CardError Card.Card)
 loadFile root name slug = do
   result <- IOError.tryIOError (ByteString.readFile path)

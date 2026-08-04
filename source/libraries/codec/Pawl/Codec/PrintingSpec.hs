@@ -6,12 +6,10 @@ import qualified Pawl.Codec.Printing as Printing
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Printing as Printing
 
--- | R7's one case for MkPrinting's single constructor, which just delegates to
--- Card's own codec (Pawl.Codec.Card.toJson/fromJson) -- so 'CardSpec.baseCard'
--- is reused rather than a second synthetic Card being built here. The
--- registry-backed "honesty round-trip over allPrintings" proof, over every real
--- Printing in the pool, stays in Pawl.CodecIntegrationSpec: this sublibrary sits above
--- Pawl.Registry and cannot reach it.
+-- | MkPrinting just delegates to Card's own codec, so 'CardSpec.baseCard' is
+-- reused rather than a second synthetic Card being built here. The
+-- registry-backed round-trip over every real Printing stays in
+-- Pawl.CodecIntegrationSpec, which this sublibrary sits above.
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.Printing" . Spec.it s "MkPrinting delegates to Card's own codec" $

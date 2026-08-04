@@ -6,18 +6,15 @@ import qualified Numeric.Natural as Natural
 -- mulligan -- how many they have already taken, and what taking another would
 -- cost them.
 --
--- The two are NOT the same number, which is the whole reason this is a record
--- and not the bare Natural it replaced. CR 103.5 bottoms "a number of those
--- cards equal to the number of times that player has taken a mulligan", but CR
--- 103.5c exempts the first mulligan in a multiplayer game, so at three or more
--- seats a player who has taken one mulligan bottoms zero cards, not one. An
--- answerer sees only this payload, never the GameState, so a raw count alone
--- left it deciding with strictly less information than the rules give a player
--- at a table.
+-- The two are NOT the same number, which is why this is a record rather than a
+-- bare Natural. CR 103.5 bottoms one card per mulligan taken, but CR 103.5c
+-- exempts the first in a multiplayer game, so at three or more seats a player who
+-- has taken one mulligan bottoms zero. An answerer sees only this payload, never
+-- the GameState, so a raw count left it deciding with less information than the
+-- rules give a player at a table.
 --
 -- Both fields are built by Pawl.Engine.Mulligan.offerFor, which is also what
--- takeMulligan bottoms by -- one function, so what the prompt promises and what
--- the mulligan actually costs cannot drift apart.
+-- takeMulligan bottoms by, so the prompt and the cost cannot drift apart.
 data MulliganOffer = MkMulliganOffer
   { -- | CR 103.5c subtracts FROM this: the raw number of mulligans taken so far,
     -- 0 on the first declaration.

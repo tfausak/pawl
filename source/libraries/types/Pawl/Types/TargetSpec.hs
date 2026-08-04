@@ -10,16 +10,12 @@ import qualified Pawl.Types.Pool as Pool
 -- type-restricted specs (#40): each is now one data value.
 --
 -- CR 601.2c's "another" is not a third field: it is Filter.Not Filter.IsSource
--- inside the Filter, which is the same relation the predicate language already
--- expresses. Folding it in is what makes the exclusion agree with the Pool's
--- own recipient tagging -- a separate field was applied by deleting a
+-- inside the Filter, which is what makes the exclusion agree with the Pool's own
+-- recipient tagging. A separate field was applied by deleting a
 -- Recipient.ToObject, which never matched the ToCreature tags a Creatures pool
 -- produces, so "another target creature" did not exclude itself.
 --
--- The two fields are named for the two JSON keys Pawl.Codec.TargetSpec already
--- wrote, so the wire format is unchanged by their existing. `filter` shadows the
--- Prelude's, for the reason Pawl.Types.Count's does: every module imports this
--- one qualified.
+-- `filter` shadows the Prelude's, for the reason Pawl.Types.Count's does.
 data TargetSpec = MkTargetSpec
   { pool :: Pool.Pool,
     filter :: Maybe (Filter.Filter Keyword.Keyword)

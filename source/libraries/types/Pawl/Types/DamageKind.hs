@@ -6,12 +6,11 @@ module Pawl.Types.DamageKind where
 -- Pawl.Engine.Damage.applyDamage, and, later, by combat-damage triggers. A Bool would
 -- blind the reader to which it is (no-boolean-blindness).
 --
--- Lifelink is deliberately NOT among those readers, though this comment used to
--- anticipate that it would be: CR 120.3f states the life gain with no
--- combat/noncombat qualifier at all, and CR 702.15d makes the point explicitly
--- ("the lifelink rules function no matter what zone an object with lifelink
--- deals damage from"). Toxic is the one that IS scoped -- CR 120.3g says
--- "combat damage dealt to a player" -- which is the whole contrast.
+-- Lifelink is deliberately NOT among those readers: CR 120.3f states the life
+-- gain with no combat/noncombat qualifier, and CR 702.15d makes the same point
+-- from the other side -- the lifelink rules function whatever zone the source
+-- deals damage from.
+-- Toxic is the one that IS scoped, CR 120.3g naming combat damage.
 data DamageKind
   = Combat
   | Noncombat

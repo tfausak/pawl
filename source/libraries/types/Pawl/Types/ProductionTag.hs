@@ -10,17 +10,14 @@ module Pawl.Types.ProductionTag where
 -- constructor is the same kind of act as casing on a Phase -- never an effect's
 -- identity.
 data ProductionTag
-  = -- | CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
-    -- that can be paid with one mana of any type produced by a snow source (see
-    -- rule 106.3)."
+  = -- | CR 107.4h: {S} is paid with mana of any type produced by a snow source
+    -- (CR 106.3).
     --
     -- The tag says the mana WAS so produced; whether the permanent that made it
-    -- is still on the battlefield, or is still snow, is no longer asked. That is
-    -- the whole reason this is a tag and not a lookup: CR 106.3 makes the source
-    -- of an ability's mana the source of that ability, and mana outlives it.
+    -- is still on the battlefield, or still snow, is no longer asked. That is why
+    -- this is a tag and not a lookup -- mana outlives its source.
     --
-    -- Not a mana type and not a colour, so it sits here rather than in
-    -- Pawl.Types.ManaType -- CR 107.4h's last sentence: "Snow is neither a color
-    -- nor a type of mana."
+    -- Neither a mana type nor a colour (CR 107.4h), so it sits here rather than
+    -- in Pawl.Types.ManaType.
     Snow
   deriving (Eq, Ord, Show)

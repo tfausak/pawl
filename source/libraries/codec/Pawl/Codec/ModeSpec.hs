@@ -18,10 +18,9 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
 
--- | Every case below instantiates the `card` parameter at 'Text.Text', a
--- stand-in that is never a real card -- 'Mode.toJson'/'Mode.fromJson' reach it
--- only through the supplied Effect codec, exactly like
--- 'Pawl.Codec.EffectSpec's own cardToJson/cardFromJson.
+-- | The `card` parameter is instantiated at 'Text.Text' throughout.
+-- 'Mode.toJson'/'Mode.fromJson' reach it only through the supplied Effect
+-- codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
 cardToJson = Common.text
 
@@ -34,9 +33,8 @@ toJson = Mode.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (Mode.Mode Text.Text)
 fromJson = Mode.fromJson cardFromJson
 
--- One constructor (MkMode), so the three cases below cover: a populated mode
--- (Bonesplitter's Equip payload, CR 702.6a), CR 603.5's `optionality` flag when
--- it is present (a printed "may"), and every field defaulted at once.
+-- One constructor, so three cases: a populated mode, CR 603.5's `optionality`
+-- flag when present, and every field defaulted at once.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Mode" $ do
   Spec.it s "MkMode, Bonesplitter's Equip payload" $
@@ -59,8 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       fromJson
       (Mode.MkMode Seq.empty Map.empty Optionality.Optional)
       """ {"optionality":{"type":"Optional"}} """
-  -- The byte-identity guarantee for every card file that prints no "may": a
-  -- Mandatory mode with no effects or targetSpecs is what a card that says
+  -- A Mandatory mode with no effects or targetSpecs is what a card that says
   -- nothing extra means, and it round-trips through the empty object.
   Spec.it s "omits every default field" $
     Common.assertJsonCodec

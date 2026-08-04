@@ -7,12 +7,11 @@ import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.AttackCost as AttackCost
 
--- | "subject" is Pawl.Codec.AttackRequirement's key and names the same axis: the
--- creatures the effect is ABOUT, never Pawl.Codec.BlockRequirement's "attacker",
--- which is the object CR 509.1c's requirements carry instead.
--- "perAttacker" is not the card's whole cost: Ghostly Prison's own "for each"
--- repeats it once per taxed attacker before CR 508.1h totals the declaration, so
--- the key names one attacker's share.
+-- | "subject" is Pawl.Codec.AttackRequirement's key and names the same axis:
+-- the creatures the effect is ABOUT, never Pawl.Codec.BlockRequirement's
+-- "attacker", which is the object CR 509.1c's requirements carry instead.
+-- "perAttacker" is one attacker's share, not the card's whole cost -- a "for
+-- each" repeats it per taxed attacker before CR 508.1h totals the declaration.
 toJson :: AttackCost.AttackCost -> Value.Value
 toJson ac =
   Common.object

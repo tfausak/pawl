@@ -22,10 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.TypeLine" $ do
       TypeLine.fromJson
       (TypeLine.MkTypeLine (Set.singleton Supertype.Basic) (Set.singleton CardType.Land) (Set.singleton Subtype.Mountain))
       """ {"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]} """
-  -- CR 308.1/308.2: the kindred shape -- two card types, and a CREATURE
-  -- subtype on a card that is not a creature. Bitterblossom's type line,
-  -- and the only one in the pool where the subtype's family and the
-  -- card types disagree.
+  -- CR 308.1/308.2: the kindred shape -- two card types, and a CREATURE subtype
+  -- on a card that is not a creature.
   Spec.it s "MkTypeLine (kindred)" $
     Common.assertJsonCodec
       s
@@ -33,8 +31,7 @@ spec s = Spec.describe s "Pawl.Codec.TypeLine" $ do
       TypeLine.fromJson
       (TypeLine.MkTypeLine Set.empty (Set.fromList [CardType.Kindred, CardType.Enchantment]) (Set.singleton Subtype.Faerie))
       """ {"types":[{"type":"Enchantment"},{"type":"Kindred"}],"subtypes":[{"type":"Faerie"}]} """
-  -- CR 306.3 / 205.3j: Jace Beleren's, and the first type line whose
-  -- subtype is a planeswalker type.
+  -- CR 306.3 / 205.3j: a type line whose subtype is a planeswalker type.
   Spec.it s "MkTypeLine (planeswalker)" $
     Common.assertJsonCodec
       s
@@ -42,9 +39,8 @@ spec s = Spec.describe s "Pawl.Codec.TypeLine" $ do
       TypeLine.fromJson
       (TypeLine.MkTypeLine (Set.singleton Supertype.Legendary) (Set.singleton CardType.Planeswalker) (Set.singleton Subtype.Jace))
       """ {"supertypes":[{"type":"Legendary"}],"types":[{"type":"Planeswalker"}],"subtypes":[{"type":"Jace"}]} """
-  -- R6 of the omit-defaults design: the typeLine requirement only guards a
-  -- truncated file if it reaches the content. An empty types set is the shape
-  -- a half-written card file takes.
+  -- The typeLine requirement only guards a truncated file if it reaches the
+  -- content, and an empty types set is the shape a half-written file takes.
   Spec.it s "rejects an empty types set" $
     Spec.assertBool
       s

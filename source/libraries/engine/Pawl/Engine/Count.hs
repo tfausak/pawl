@@ -2,12 +2,11 @@
 -- fold -- enumerate the scope, keep by the Filter, aggregate -- that never
 -- learns which effect or card produced the count.
 --
--- Parameterized by the view builder AND by the per-object quantity reader,
--- rather than importing Pawl.Engine.Projection or Pawl.Engine.Quantity: Projection imports
--- Pawl.Engine.Quantity, which imports this module, and Quantity.evaluate is called from
--- INSIDE the layer fold. The caller supplies characteristics as of whatever
--- layers it has already applied, which is what lets a count read the projection
--- without the module cycle or the recursion.
+-- Parameterized by the view builder AND by the per-object quantity reader
+-- rather than importing Pawl.Engine.Projection or Pawl.Engine.Quantity, both of
+-- which sit above this module and call into the layer fold. The caller supplies
+-- characteristics as of whatever layers it has already applied, which is what
+-- lets a count read the projection without the module cycle or the recursion.
 module Pawl.Engine.Count where
 
 import qualified Data.Foldable as Foldable
@@ -37,24 +36,22 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- The characteristics of a candidate, as of the layers the CALLER has already
--- applied. Nothing when the candidate has no view -- an unknown id, or an object
--- the caller's bound projection cannot describe.
+-- applied. Nothing when the candidate has no view -- an unknown id, or an
+-- object the caller's bound projection cannot describe.
 type ViewOf = ObjectId -> Maybe Filter.View
 
--- Reads a per-object quantity off one candidate. INJECTED for exactly the
--- module-cycle reason ViewOf is: Pawl.Engine.Quantity imports this module, so nothing
--- here can call Pawl.Engine.Quantity.evaluate. Pawl.Engine.Quantity ties the knot at its own
--- Count arm, and it is the only module that does -- Pawl.Engine.Condition reaches this
--- fold only THROUGH Pawl.Engine.Quantity, since both sides of a Condition are
--- Quantities. Every aggregation but Aggregation.Greatest ignores it.
+-- Reads a per-object quantity off one candidate. INJECTED for the same
+-- module-cycle reason ViewOf is: Pawl.Engine.Quantity imports this module and
+-- ties the knot at its own Count arm. Every aggregation but
+-- Aggregation.Greatest ignores it.
 type QuantityOf quantity = ObjectId -> quantity -> Maybe Integer
 
 -- Nothing when the count cannot be determined -- an unresolvable PlayerRef, or
 -- (Aggregation.Greatest only) a maximum over a set that is empty or holds a
--- member with no value. It propagates, which is what every caller but one wants;
--- CR 208.2a's "use 0 instead of that number" is a different rule, scoped to a
--- characteristic-defining ability, and applied by the one caller it is about
--- (Pawl.Engine.Quantity.determine, for Pawl.Engine.Projection.applyCharacteristicPT).
+-- member with no value. It propagates, which is what every caller but one
+-- wants: CR 208.2a's substituted 0 is a different rule, scoped to a
+-- characteristic-defining ability and applied by
+-- Pawl.Engine.Quantity.determine.
 evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
 evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   Scope.InZone zone ref -> do
@@ -74,10 +71,9 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
     aggregation = Count.Type.aggregation count
 
 -- The binding slots the per-member quantity of a count reads, with the reader
--- INJECTED for the module-cycle reason QuantityOf is injected above: Pawl.Engine.Quantity
--- imports this module, so nothing here can call Pawl.Engine.Quantity.slots. Only
--- Aggregation.Greatest carries a quantity; the other two aggregate the matched set
--- alone and so read no slot. The Scope and the Filter hold no slot name at all.
+-- INJECTED for the module-cycle reason QuantityOf is. Only Aggregation.Greatest
+-- carries a quantity; the other two aggregate the matched set alone, and
+-- neither the Scope nor the Filter holds a slot name.
 slots :: (quantity -> Set slot) -> Count.Type.Count quantity -> Set slot
 slots slotsOfQuantity count = case Count.Type.aggregation count of
   Aggregation.Objects -> Set.empty
@@ -94,46 +90,41 @@ keep predicate context mv = case mv of
 --
 -- Each member carries the object it came from when there is one. An InHistory
 -- member has none: its view is a CR 608.2h snapshot of a past event rather than
--- of anything on the battlefield now, so there is no object to read a per-object
--- quantity against and Greatest over that scope is undeterminable (#299).
+-- of anything on the battlefield now, so there is no object to read a
+-- per-object quantity against and Greatest over that scope is undeterminable
+-- (#299).
 aggregate :: QuantityOf quantity -> Aggregation.Aggregation quantity -> [(Maybe ObjectId, Filter.View)] -> Maybe Integer
 aggregate quantityOf aggregation members = case aggregation of
   Aggregation.Objects -> Just (toInteger (length members))
   Aggregation.DistinctCardTypes -> Just (toInteger (Set.size (Set.unions (fmap (Filter.cardTypes . snd) members))))
-  -- Total in both directions. A member whose quantity cannot be determined makes
-  -- the whole maximum undeterminable rather than being dropped, which would
-  -- report the maximum of a set the card never named; and an EMPTY matched set
-  -- has no maximum at all. Nothing, NOT 0: no rule gives a maximum over nothing
-  -- a value, and where the CR wants an empty maximum to be 0 it legislates it
-  -- case by case (CR 714.2d, a Saga with no chapter abilities). CR 208.2a's "use
-  -- 0 instead of that number" is one such case, and it is applied where it is
-  -- scoped -- at the characteristic-defining ability that consumes this count,
-  -- never here: Monstrous War-Leech with an empty graveyard is a 0/0 because
-  -- Pawl.Engine.Quantity.determine substituted the 0, not because this fold
-  -- invented one for One with the Machine's draw as well.
+  -- Total in both directions. A member whose quantity cannot be determined
+  -- makes the whole maximum undeterminable rather than being dropped, which
+  -- would report the maximum of a set the card never named; and an EMPTY
+  -- matched set has no maximum. Nothing, NOT 0: no rule gives a maximum over
+  -- nothing a value, and where the CR wants an empty maximum to be 0 it
+  -- legislates it case by case (CR 714.2d). CR 208.2a is one such case, applied
+  -- where it is scoped -- at the characteristic-defining ability that consumes
+  -- this count, never here.
   Aggregation.Greatest quantity -> do
     values <- traverse (\(identity, _) -> identity >>= \oid -> quantityOf oid quantity) members
     case values of
       [] -> Nothing
       value : rest -> Just (Foldable.foldl' max value rest)
 
--- CR 400.1: whose copy of the zone -- and, for Pawl.Engine.ManaCount, whose mana
--- pool, which CR 106.4 attaches to a player the same way. Nothing when the
--- reference cannot be resolved -- a Relative with no perspective, or a slot that
+-- CR 400.1: whose copy of the zone -- and, for Pawl.Engine.ManaCount, whose
+-- mana pool, which CR 106.4 attaches to a player the same way. Nothing when the
+-- reference cannot be resolved: a Relative with no perspective, or a slot that
 -- is unbound or bound to something that is not a player.
 --
--- CR 102.1: "A player is one of the people in the game." A player who has left
--- keeps their row in GameState.players -- Player.status turns Departed, the key
--- stays -- so `everyone` is Game.stillPlaying rather than the map's keys, and
--- neither EachPlayer nor Opponent names a departed seat.
+-- CR 102.1: a departed player keeps their row in GameState.players (only
+-- Player.status changes), so `everyone` is Game.stillPlaying rather than the
+-- map's keys, and neither EachPlayer nor Opponent names a departed seat.
 --
--- Unobservable HERE, unlike at Resolve.playerRefPlayers, and written anyway:
--- CR 800.4a took every object a departing player owned out of the game and no
--- site can mint a new one owned by them, so Game.zoneMembers already answered []
--- for each of their zones and they contributed nothing to any fold. The two
--- readings of a PlayerRef must not disagree about who a PlayerRef names, and the
--- first Scope that folds over PLAYERS rather than over their objects would
--- observe the difference immediately.
+-- Unobservable HERE, unlike at Resolve.playerRefPlayers, and written anyway: CR
+-- 800.4a already emptied every zone a departing player owned, so they
+-- contributed nothing to any fold. The two readings of a PlayerRef must not
+-- disagree, and the first Scope folding over PLAYERS rather than their objects
+-- would observe it.
 playersFor :: Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
 playersFor context gs ref =
   let everyone = Game.stillPlaying gs
@@ -144,10 +135,9 @@ playersFor context gs ref =
           case relation of
             PlayerRelation.You -> Just [you]
             -- Every other player. Not a two-player shortcut: in a free-for-all
-            -- the players compete as individuals and every other player is an
-            -- opponent by construction (CR 806.1). CR 102.3 makes a TEAMMATE not
-            -- an opponent, which is the only reading this is wrong for, and pawl
-            -- has no teams (#175).
+            -- every other player is an opponent by construction (CR 806.1).
+            -- Only CR 102.3's teammates would break that, and pawl has no teams
+            -- (#175).
             PlayerRelation.Opponent -> Just (filter (/= you) everyone)
         PlayerRef.InSlot name -> do
           src <- Filter.source context
@@ -160,9 +150,18 @@ playersFor context gs ref =
             Recipient.ToObject _ -> Nothing
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event
--- recorded rather than from any object that may no longer exist. identity is
--- Nothing (the object is gone, so IsSource cannot match) and controller is
--- Nothing (the snapshot does not record one).
+-- recorded rather than from any object that may no longer exist.
+--
+-- The snapshot fills the characteristic fields it records: card types, colours,
+-- subtypes, keywords (CR 109.3 counts abilities among an object's
+-- characteristics) and power. Everything that is not a characteristic is
+-- vacuously empty over a past event -- controller, identity and playerIdentity
+-- are Nothing, and combat status, attachment, tokenhood and what the object did
+-- this turn are all False.
+--
+-- `supertypes` is the odd one out: it IS a characteristic and
+-- ProjectedCharacteristics records it, but this view leaves it empty, so a
+-- supertype filter over a past event answers False (#646).
 snapshotView :: EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView shape event = case event of
   GameEvent.Moved zc snapshot -> case shape of
@@ -175,42 +174,17 @@ snapshotView shape event = case event of
                 Filter.supertypes = Set.empty,
                 Filter.colors = PC.colors snapshot,
                 Filter.subtypes = PC.subtypes snapshot,
-                -- CR 109.3 lists abilities among an object's characteristics, and
-                -- CR 608.2h's snapshot is exactly the characteristics the object
-                -- last had -- so unlike the vacuous fields below, this one has a
-                -- real answer to give.
                 Filter.keywords = Map.keysSet (PC.keywords snapshot),
                 Filter.power = PC.power snapshot,
                 Filter.controller = Nothing,
                 Filter.identity = Nothing,
                 Filter.playerIdentity = Nothing,
-                -- The snapshot records characteristics only, and combat status is
-                -- not one (CR 109.3) -- so IsAttacking is vacuously False over a
-                -- past event, the posture controller already takes here.
                 Filter.attacking = False,
-                -- Nor is blocking one (CR 509.1g is combat status too), so
-                -- IsBlocking is vacuously False here as well.
                 Filter.blocking = False,
-                -- Nor does the snapshot record what the object DID: it holds the
-                -- characteristics the object last had (CR 608.2h), not the
-                -- turn's event log, and this view is built from one event rather
-                -- than from the game -- so AttackedThisTurn is vacuously False
-                -- here, the posture attacking takes.
                 Filter.attackedThisTurn = False,
-                -- Nor is what a permanent was attached to (CR 109.3 names it
-                -- explicitly), and the snapshot records no attachment either --
-                -- so IsAttachedToCreature is vacuously False here too.
                 Filter.attachedToCreature = False,
-                -- Nor whether that attachment was to a permanent rather than a
-                -- player (CR 303.4), for the same reason.
                 Filter.attachedToPermanent = False,
-                -- And no attach is being performed over a past event, so there is
-                -- no subject for CanHostSubject to be about (CR 701.3a).
                 Filter.canHostSubject = False,
-                -- Nor is what a permanent is represented by (CR 111.6: a token
-                -- "isn't a card"), and the snapshot records characteristics only
-                -- -- so IsToken is vacuously False over a past event, the third
-                -- arm to take that posture here.
                 Filter.token = False
               }
         else Nothing
@@ -219,23 +193,20 @@ snapshotView shape event = case event of
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
-  -- the same discard emits is what carries one -- so there is nothing here for an
-  -- EventShape to match against.
+  -- the same discard emits is what carries one -- so there is nothing here for
+  -- an EventShape to match against.
   GameEvent.Discarded {} -> Nothing
-  -- A reveal DOES carry a characteristics snapshot, unlike the two above, and is
-  -- still Nothing here: the only EventShape is a shape of ZONE CHANGE, and CR
-  -- 701.20b says a reveal is not one ("revealing a card doesn't cause it to
-  -- leave the zone it's in"). The arm becomes a real view the day an EventShape
-  -- names revealing (#162).
+  -- A reveal DOES carry a characteristics snapshot, unlike the two above, and
+  -- is still Nothing here: every EventShape is a shape of ZONE CHANGE, and CR
+  -- 701.20b says a reveal is not one. This becomes a real view the day an
+  -- EventShape names revealing (#162).
   GameEvent.Revealed _ _ -> Nothing
-  -- The same reason as the reveal: an attacker being declared (CR 508.2b) is not
-  -- a zone change, and every EventShape is a shape of one.
+  -- The same reason: an attacker being declared (CR 508.2b) is not a zone
+  -- change.
   GameEvent.AttackerDeclared _ -> Nothing
-  -- A countering (CR 701.6a) DOES move the spell -- to its owner's graveyard --
-  -- but this event is not that move: the Moved event Event.counter records
-  -- alongside this one is the zone change, and matching both would count one
-  -- countering twice. It records no characteristics snapshot either, so there
-  -- would be nothing to build a view from. The arm becomes a real view the day
-  -- an EventShape names countering (#162).
+  -- A countering (CR 701.6a) does move the spell, but this event is not that
+  -- move: Event.counter records a Moved event alongside this one, and matching
+  -- both would count one countering twice. It carries no snapshot either.
+  -- Becomes a real view the day an EventShape names countering (#162).
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing

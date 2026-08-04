@@ -69,9 +69,8 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 
--- CR 613.1: the layer a modification applies in. THE ABI classification the
--- rules core would ask -- never the modification's identity. One of the case-on-
--- Modification functions this module is the sole home of.
+-- CR 613.1: the layer a modification applies in. A classification, never the
+-- modification's identity.
 layer :: Modification -> Layer
 layer m = case m of
   Modification.GainKeyword _ -> Layer.Ability
@@ -91,52 +90,32 @@ layer m = case m of
   Modification.AddChosenColor -> Layer.Color
   Modification.SwitchPowerToughness -> Layer.SwitchPT
 
--- Apply one modification to characteristics-in-progress. THE ONE applier
--- (Resolve : Effect :: Projection : Modification). P/T quantities are evaluated
--- here against the CURRENT state, which is correct for a static ability's
--- continuous effect (CR 604.2 -- Opalescence's mana value is re-read per affected
--- object every projection). A continuous effect created by a spell's RESOLUTION
--- must not be re-read (CR 608.2h / 611.2d); it is frozen to Literals at store
--- time by Resolve, via freezeQuantities -- and is not stored at all when a
--- quantity would not freeze, so the P/T quantities reaching here from a
--- resolution are Literals and this evaluation is the identity on them.
+-- Apply one modification to characteristics-in-progress. P/T quantities are
+-- evaluated against the CURRENT state, which is correct for a static ability
+-- (CR 604.2). A continuous effect from a RESOLUTION must not be re-read (CR
+-- 608.2h / 611.2d); Resolve freezes those to literals at store time, so this
+-- evaluation is the identity on them.
 --
--- CR 109.5: "for a static ability, this is the current controller of the object
--- it's on" -- the effect's SOURCE's controller, not the affected object's. `src`
--- (the Gathered candidate's own source) supplies both the
--- perspective and the InSlot binding source for the built Filter.Context. `lyr`
--- is the layer bound the Pawl.Types.Count fold sees (viewUpTo) -- the layers
--- already applied when this modification is folded in. This is the #34 fix: a
--- characteristic-defining ability is the OTHER case (CR 604.3a(3): a CDA does
--- not directly affect the characteristics of any other object), and it is
--- applied by applyCharacteristicPT, which builds its context from the
--- object's OWN controller instead.
+-- CR 109.5: a static ability's perspective is its SOURCE's controller, so `src`
+-- supplies both that and the InSlot binding source of the Filter.Context. `lyr`
+-- bounds the Count fold (viewUpTo). A characteristic-defining ability is the
+-- other case (CR 604.3a(3)) and is applied by applyCharacteristicPT, which
+-- builds its context from the object's own controller.
 --
--- Omnath, Locus of Mana is the first static ability in the pool whose
--- modification carries a player-scoped quantity, and PowerToughnessSpec's "CR
--- 109.5 the count reads Omnath's controller" pins that the count reads the right
--- PLAYER -- an opponent floating green does not move it.
---
--- Not implemented: that is not a falsifier for THIS line. Omnath's static ability
--- is on Omnath and modifies Omnath, so `src` and `oid` are one object and both
--- perspectives resolve to the same controller; swapping the two would not change
--- its power. Discriminating them needs a source whose controller can differ from
--- the affected object's -- an Aura on an opponent's creature (#155).
+-- No card in the pool discriminates the two perspectives: an Aura on an
+-- opponent's creature would (#155).
 applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification lyr src cands gs oid m pc =
   let context = Filter.MkContext (controllerOf src gs) (Just src)
       viewOf = viewUpTo lyr cands gs
    in case m of
-        -- CR 613.1f layer 6: a grant ADDS an ability. Two grants of the same
-        -- keyword are two abilities (rule 702.164 has no redundancy clause of
-        -- the CR 702.3c/702.9c kind), so the count goes up rather than the
-        -- second grant being absorbed.
+        -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
+        -- keyword count twice rather than the second being absorbed.
         Modification.GainKeyword k ->
           pc {PC.keywords = Map.insertWith (+) k 1 (PC.keywords pc)}
-        -- CR 604.3: a characteristic-defining ability IS a static ability, so
-        -- losing all abilities loses it too. Layer 6, which is BEFORE 7a -- the
-        -- reason the CDA is folded in place from the partial rather than
-        -- gathered up front.
+        -- CR 604.3: a CDA is a static ability, so this loses it too. Layer 6 is
+        -- before 7a, which is why the CDA is folded in place from the partial
+        -- rather than gathered up front.
         Modification.LoseAllAbilities ->
           pc
             { PC.keywords = Map.empty,
@@ -157,95 +136,48 @@ applyModification lyr src cands gs oid m pc =
             }
         Modification.AddLandSubtype s ->
           pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
-        -- CR 205.1a: "when an effect sets one or more of an object's subtypes,
-        -- the new subtype(s) replaces any existing subtypes from the appropriate
-        -- set (creature types, land types, artifact types, enchantment types,
-        -- planeswalker types, or spell types)". The appropriate set here is the
-        -- CREATURE types (CR 205.3m, Pawl.Engine.Subtype.isCreatureType) and only
-        -- those -- CR 205.1b's last sentence says the object keeps "all of its
-        -- prior card types and subtypes other than creature types". So an
-        -- animated permanent's land type survives becoming a Frog, and so would
-        -- an artifact's or an enchantment's.
+        -- CR 205.1a/205.1b: setting a subtype replaces only the appropriate set,
+        -- here the creature types (CR 205.3m), so an animated permanent's land
+        -- type survives becoming a Frog. Strips no abilities -- CR 305.7's
+        -- ability clause is about lands, not about setting a subtype -- and
+        -- touches no card type, which a card says separately with AddCardType.
         --
-        -- Nothing else moves. Unlike SetLandSubtype this strips no abilities:
-        -- CR 305.7's ability clause is a rule about LANDS, not about setting a
-        -- subtype, and Turn to Frog's own ability loss is a separate layer-6
-        -- modification (CR 613.1f). And CR 205.1a's last sentence -- "Removing
-        -- an object's subtype doesn't affect its card types at all" -- is why no
-        -- card type is touched: "becomes a blue Frog" leaves the object a
-        -- creature because it already was one, and Jade Statue's "becomes a
-        -- Golem artifact creature" says the card-type half separately with
-        -- AddCardType.
-        --
-        -- Not checked: CR 205.3d's "an object can't gain a subtype that doesn't
-        -- correspond to one of that object's types", which none of the layer-4
-        -- subtype arms asks (#530).
+        -- Not checked: CR 205.3d, which none of the layer-4 subtype arms asks
+        -- (#530).
         Modification.SetCreatureSubtype s ->
           pc {PC.subtypes = Set.insert s (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
-        -- CR 305.7's set, with the type written into card data. See
-        -- setLandSubtypeTo below for the whole rule.
+        -- CR 305.7's set, with the type written into card data.
         Modification.SetLandSubtype s -> setLandSubtypeTo s pc
-        -- CR 305.7's set again, with the type read off the SOURCE's own entry
-        -- choice (CR 614.1c) instead. An unchosen source -- malformed data, or
-        -- an entry that never ran the rewrite -- sets nothing and strips
-        -- nothing rather than guessing a type, the posture AddChosenColor below
-        -- takes toward an unchosen colour.
-        --
-        -- That no-op leaves this arm and setLandSubtypeEffects' gate disagreeing
-        -- on such a source, because the gate classifies by CONSTRUCTOR and so
-        -- still strips the land's static abilities. Unreachable -- the only
-        -- producer is an EntryR whose rewrite always writes the field before the
-        -- permanent is on the battlefield to be projected -- and it is the same
-        -- kind of disagreement between the rule's two halves that the gate
-        -- already documents for a different reason (#391).
+        -- CR 305.7's set again, with the type read off the source's own entry
+        -- choice (CR 614.1c). An unchosen source sets and strips nothing rather
+        -- than guessing, which leaves this arm disagreeing with
+        -- setLandSubtypeEffects' constructor-keyed gate; unreachable, since the
+        -- rewrite always writes the field before the permanent is projected
+        -- (#391).
         Modification.SetLandSubtypeToChosen ->
           case Game.lookupObject src gs >>= Object.chosenSubtype of
             Nothing -> pc
             Just s -> setLandSubtypeTo s pc
-        -- CR 612.1/612.2: a text-changing effect replaces one subtype word with
-        -- another where the word is used AS that kind of subtype -- in the
-        -- projected type line, and in the object's rules text. Layer 3, so it
-        -- folds before layer 4 (Type): a hacked basic Mountain is an Island by
-        -- the time mana (CR 305.6) reads its subtypes.
+        -- CR 612.1/612.2: a text-changing effect swaps a subtype word both in
+        -- the projected type line and in the object's rules text. Layer 3, so it
+        -- folds before layer 4 -- a hacked Mountain is an Island by the time
+        -- mana (CR 305.6) reads its subtypes.
         --
-        -- The type-line half is CR 612.1's "the text that appears in its type
-        -- line"; absent `from` is a no-op there. CR 612.2's family gate needs no
-        -- statement HERE, unlike in rewriteModification: this position is a set
-        -- of subtype words of every family at once, so the family a word is used
-        -- as is the family the word itself belongs to. The membership test is
-        -- therefore already CR 612.2's question -- a land pair finds a land type
-        -- here or nothing, a creature pair a creature type or nothing, and there
-        -- is no third answer to get wrong.
+        -- CR 612.2's family gate needs no statement here, unlike in
+        -- rewriteModification: this position holds subtype words of every family
+        -- at once, so membership already is CR 612.2's question. The swap does
+        -- not reach a subtype another effect GRANTED, since a grant is layer 4
+        -- (CR 613.1c/613.1d) -- CR 612.1's "printed on that object" falling out
+        -- of the layer order rather than being checked for.
         --
-        -- What this half does NOT reach is a subtype another effect GRANTED: the
-        -- swap is layer 3 and a subtype grant is layer 4 (CR 613.1c/613.1d), so
-        -- Ashaya's Forest is not yet on the Bog Wraith when a Forest -> Island
-        -- pair looks for it. That is CR 612.1's "words or symbols PRINTED on
-        -- that object" falling out of the layer order rather than being checked
-        -- for, and Pawl.ProjectionSpec pins it.
+        -- The rules-text half is applied unconditionally rather than under the
+        -- same Set.member guard: a word swapped in the text box has nothing to
+        -- do with whether the type line carries it.
         --
-        -- The rules-text half is its
-        -- "that object's rules text (which appears in its text box)", and the
-        -- ability lists are where that text lives -- so a hacked Tidal Warrior's
-        -- "{T}: Target land becomes an Island" hands out an ability that says
-        -- Swamp, and a hacked Barbarian Outcast's "when you control no Swamps"
-        -- asks about Islands. Applied unconditionally rather than under the same
-        -- Set.member guard, because the word being swapped in the text box has
-        -- nothing to do with whether the type line carries it: Tidal Warrior is
-        -- a Merfolk Warrior with no land type at all.
-        --
-        -- Not implemented: the swap does not reach PC.replacementEffects, the
-        -- remaining carrier of that same text box, nor a mode's targetSpecs, nor
-        -- an activated ability's cost (#635).
-        --
-        -- Done HERE, where the layer-3 effect is folded, rather than at
-        -- baseCharacteristics' seed: the seed predates every layer, and this way
-        -- each swap applies in CR 613.7 timestamp order alongside the type-line
-        -- half, and costs no extra textChangesAffecting fold -- that whole-list
-        -- fold is what #584/#624 hoisted out of gather's per-permanent walk, and
-        -- the gathered candidate already carries this pair.
+        -- Not implemented: the swap does not reach PC.replacementEffects, a
+        -- mode's targetSpecs, or an activated ability's cost (#635).
         Modification.ChangeSubtypeWord from to ->
           let pairs = [(from, to)]
               pc' =
@@ -256,89 +188,51 @@ applyModification lyr src cands gs oid m pc =
            in if Set.member from (PC.subtypes pc')
                 then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
                 else pc'
-        -- CR 613.1b layer 2: control-changing effects apply here, but
-        -- ProjectedCharacteristics carries no controller field -- controllerOf
-        -- reads GameState.continuousEffects directly (a lean fold, not the full
-        -- layer pass; see its comment). This arm is identity so gather/project's
-        -- uniform walk over every stored effect stays total once a
-        -- SetController effect exists.
+        -- CR 613.1b layer 2: ProjectedCharacteristics carries no controller
+        -- field, so controllerOf reads GameState.continuousEffects directly.
+        -- These arms are identity to keep gather/project's walk total.
         Modification.SetController _ -> pc
-        -- Same identity treatment as SetController just above, and for the same
-        -- reason: ProjectedCharacteristics carries no controller field.
-        -- controllerOf reads GameState.continuousEffects (and, once a static
-        -- ability can produce this, the battlefield's static abilities) directly.
         Modification.SetControllerToSource -> pc
         Modification.SetColor cs ->
           -- CR 105.3: the new colours replace all previous ones.
           pc {PC.colors = cs}
-        -- CR 105.3's parenthetical: an "in addition" colour is added to the
-        -- object's existing colours rather than replacing them.
+        -- CR 105.3's parenthetical: an "in addition" colour adds rather than
+        -- replaces.
         Modification.AddColor cs ->
           pc {PC.colors = Set.union cs (PC.colors pc)}
-        -- CR 105.3's parenthetical again, with the colour read off the SOURCE's
-        -- own entry choice. An unchosen source (malformed data, or an entry that
-        -- never ran the rewrite) adds nothing rather than guessing a colour.
+        -- CR 105.3's parenthetical, with the colour read off the source's own
+        -- entry choice. An unchosen source adds nothing rather than guessing.
         Modification.AddChosenColor ->
           case Game.lookupObject src gs >>= Object.chosenColor of
             Nothing -> pc
             Just c -> pc {PC.colors = Set.insert c (PC.colors pc)}
-        -- CR 613.4d: "take the value of power and apply it to the creature's
-        -- toughness, and take the value of toughness and apply it to the
-        -- creature's power."
+        -- CR 613.4d.
         Modification.SwitchPowerToughness ->
           pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
 
--- CR 305.7's strip, shared by the TWO modifications that set a land's subtype:
--- SetLandSubtype (a type written into card data -- Blood Moon) and
--- SetLandSubtypeToChosen (a type a player chose as the source entered --
--- Convincing Mirage). One body, so the rule cannot be implemented twice and
--- drift.
+-- CR 305.7's strip, shared by both modifications that set a land's subtype so
+-- the rule cannot be implemented twice and drift. Of its three clauses this does
+-- the subtype and ability ones; the new basic type's mana ability rides the
+-- subtype and is read at the mana call site (CR 305.6).
 --
--- CR 305.7, second sentence: "It loses all abilities generated from its
--- rules text, ITS OLD LAND TYPES, and any copiable effects affecting that
--- land, and it gains the appropriate mana ability for each new basic land
--- type." Three clauses, and this does the first two; the mana ability
--- rides the new subtype and is read at the mana call site (CR 305.6).
+-- The subtype clause takes the land types (CR 205.3i) and nothing else, so a
+-- creature type on an animated permanent survives. Taking exactly one type is
+-- not a narrowing: no printed card sets a land's subtype to more than one.
 --
--- The SUBTYPE clause takes the land types and nothing else. CR 205.3i
--- (Pawl.Engine.Subtype.isLandType) is the list; the fourth sentence -- "Setting
--- a land's subtype doesn't add or remove any card types (such as
--- creature) or supertypes" -- is why a creature type on an animated
--- permanent has to survive.
+-- The ability clause strips keywords and the four fields below. A permanent's
+-- static abilities, player abilities and block requirements are decided before
+-- the fold instead, by the CR 305.7 gates in gather,
+-- Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement, because an
+-- ability landing on OTHER objects must be kept out of the candidate list rather
+-- than erased from its own projection. Those gates read base characteristics and
+-- this reads the projection, so the halves disagree on an object that became a
+-- land at layer 4 (#391).
 --
--- CR 305.7 says "one or more of the basic land types" and this takes exactly
--- one, which is not a narrowing: no printed card SETS a land's subtype to more
--- than one basic type (Blood Moon, Magus of the Moon and Zhao all set Mountain
--- alone; Convincing Mirage's CR 305.6 choice is of one type; the multi-type
--- cards -- Urborg, Prismatic Omen -- all ADD).
+-- CR 305.7 spares abilities GRANTED to the land, which needs no guard: every
+-- field cleared here is seeded from the card, and GainKeyword is layer 6, after
+-- this layer-4 strip. characteristicPT goes with the rest per CR 604.3.
 --
--- The ABILITY clause takes every kind of ability a card's rules text can
--- generate, which is every one this record carries plus the three decided
--- outside it. Keywords and the four fields below are stripped here; a
--- permanent's static abilities, its player abilities and its block
--- requirements are decided before the fold instead, by the CR 305.7 gates
--- in gather, Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.
--- instances -- all three calling liveGiven -- because an ability whose
--- effect lands on OTHER objects has to be kept out of the candidate list
--- rather than erased from its own projection. Those gates read BASE
--- characteristics and this reads the projection, so the two halves do
--- not agree on an object that became a land at layer 4 (#391); what this
--- reaches, it strips completely.
---
--- CR 305.7's next sentence -- "Note that this doesn't remove any
--- abilities that were GRANTED to the land by other effects" -- needs no
--- guard here: every field this clears is seeded from the card by
--- copiableCharacteristics, and the only granting modification is
--- GainKeyword at layer 6, which is applied after this layer-4 strip and so
--- lands on an already-emptied map.
---
--- CR 604.3 makes a characteristic-defining ability a static ability, so
--- characteristicPT goes with the rest -- the same reason LoseAllAbilities
--- clears it at layer 6. CR 613.6 rescues neither: a CDA would first apply
--- at layer 7a, which is after both.
---
--- Not stripped, and not an oversight: CR 305.7's third clause, "any
--- copiable effects affecting that land", is a layer-1 question this
+-- Not stripped: CR 305.7's copiable-effects clause, a layer-1 question this
 -- layer-4 strip cannot answer (#406).
 setLandSubtypeTo :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
 setLandSubtypeTo s pc =
@@ -351,11 +245,8 @@ setLandSubtypeTo s pc =
       PC.triggeredAbilities = []
     }
 
--- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
--- an object with no printed P/T that is set (an Opalescence-animated enchantment)
--- gains it. When the effect sets only one axis (Nothing on the other), a base
--- without P/T stays without on that axis (nothing sets it). Contrast addPT (7c),
--- which only MODIFIES and so never gives P/T to something that has none.
+-- CR 613.4b: layer 7b establishes base P/T, so an object with no printed P/T
+-- gains it. Contrast addPT (7c), which only modifies.
 setPT :: Maybe Integer -> Maybe Integer -> Maybe Integer
 setPT base new = case (base, new) of
   (_, Just n) -> Just n
@@ -373,32 +264,20 @@ addPT base delta = case (base, delta) of
 -- ExcludesSource self-exclusion), the set it affects, its timestamp, and the one
 -- modification that applies in `gLayer`. Projection-internal; not a domain type.
 data Gathered = MkGathered
-  { -- WHICH effect this part belongs to, named only when that matters: Just
-    -- (source, the ability's index on that source) for a static ability with
-    -- parts in more than one layer, Nothing for everything else. CR 613.6's "the
-    -- same set of objects in each other applicable layer" is a decision keyed by
-    -- exactly this pair, made once and reused (projectWith). Two parts of one
-    -- ability share it; two abilities never do, even on the same permanent with
-    -- the same filter.
-    --
-    -- A one-part effect is asked once by construction, so it needs no identity at
-    -- all: every counter, every stored effect and every single-line static
-    -- ability is Nothing, which is the whole pool bar three cards.
+  { -- Which effect this part belongs to: Just (source, the ability's index) for
+    -- a static ability with parts in more than one layer, Nothing otherwise. CR
+    -- 613.6's affected-set decision is keyed on this pair, made once and reused
+    -- (projectWith). Two parts of one ability share it; two abilities never do.
     gEffect :: !(Maybe (ObjectId, Natural)),
     gSource :: ObjectId,
     gAffected :: Affected.Affected,
     gLayer :: Layer,
-    -- CR 613.6's DECISION POINT: the lowest layer reached by any part of the
-    -- effect THIS part belongs to -- "if an effect starts to apply in one layer and/or
-    -- sublayer, it will continue to be applied to the same set of objects in each
-    -- other applicable layer and/or sublayer". The layer fold gets this for free
-    -- by visiting layers in order and memoizing on gEffect; a caller that must
-    -- ask the same question from OUTSIDE the fold (abilitiesRemoved) has no memo
-    -- to read, so the answer is carried here instead of re-derived at the wrong
-    -- layer (#326).
-    --
-    -- Equal to gLayer for every one-part effect, which is every counter, every
-    -- stored effect and every single-line static ability.
+    -- CR 613.6's decision point: the lowest layer reached by any part of this
+    -- part's effect. The layer fold gets this for free by visiting layers in
+    -- order and memoizing on gEffect; a caller outside the fold
+    -- (abilitiesRemoved) has no memo, so the answer is carried rather than
+    -- re-derived at the wrong layer (#326). Equal to gLayer for a one-part
+    -- effect.
     gLowest :: Layer,
     gTimestamp :: Timestamp,
     gModification :: Modification
@@ -406,17 +285,10 @@ data Gathered = MkGathered
 
 -- CR 611.2c / 613: does the effect from `source` apply to `oid`, given the
 -- PARTIAL projection built by the layers below this one? A fixed set is a
--- membership test; a dynamic set is a Filter evaluated against the PARTIAL
--- characteristics, so a layer-4 type change is visible to a later layer.
--- A Not IsSource conjunct in that Filter is Opalescence's own "each other"
--- (card text, not a rule -- Opalescence does not animate itself), matched
--- against this View's own identity. CR 109.5: an affected-set filter's "you"
--- is the effect's SOURCE's controller (the perspective), which ControlledBy
--- compares against the affected object's own controller (the View's
--- controller) -- the emblem anthem's "creatures you control" is the first
--- affected set to reference a player.
--- Supertypes read from the printed type line (CR 205.4a; not projected at M3c)
--- via viewOfCharacteristics.
+-- membership test; a dynamic set is a Filter evaluated against the partial
+-- characteristics, so a layer-4 type change is visible to a later layer. CR
+-- 109.5: an affected-set filter's "you" is the SOURCE's controller, which
+-- ControlledBy compares against the affected object's own controller.
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affects source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
@@ -427,29 +299,13 @@ affects source oid a partial gs = case a of
   -- AttachedPlayerControls below instead.
   Affected.Attached -> (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
   Affected.Matching f ->
-    let -- CR 109.5: "you" on a continuous effect is the effect's SOURCE's
-        -- controller; ControlledBy compares the affected object's controller to
-        -- it. controllerOf no longer merely reads GameState.continuousEffects --
-        -- since CR 613.1b's control-granting static abilities (controlGrants), it
-        -- also folds a battlefield liveness gate (liveGiven/CR 305.7) that itself
-        -- calls THIS function for any Matching set. So this call is safe only
-        -- because `perspective` is an unforced thunk until a filter conjunct
-        -- actually needs it (ControlledBy is the only one that does), and no
-        -- subtype-setting effect in the pool -- static OR stored,
-        -- setLandSubtypeEffects gathers both -- pairs Matching with
-        -- ControlledBy: of the two static examples, Blood Moon's Matching
-        -- filter has none, and Convincing Mirage's set is Affected.Attached,
-        -- not a Matching filter at all (its `affects` arm above reads the
-        -- source's attachment and never calls controllerOf). A stored one
-        -- is additionally safe today because Pawl.Engine.Resolve constructs every
-        -- stored ContinuousEffect with Affected.TheseObjects, never Matching;
-        -- that is a fact about Resolve's current call sites, not something
-        -- this fold enforces. That is a laziness accident, not a structural
-        -- guarantee -- such a card would force `perspective`, which recurses
-        -- back into controllerOf -> controlGrants -> this same liveness gate,
-        -- and hangs rather than answering wrong (#197). This IS the call site
-        -- where that forcing would happen -- controlGrants' INVARIANT block and
-        -- the AttachedPlayerControls arm below only restate why it is safe.
+    let -- CR 109.5: "you" is the SOURCE's controller. controllerOf folds a CR
+        -- 305.7 liveness gate that calls back into this function, so this call is
+        -- safe only because `perspective` stays an unforced thunk until a
+        -- ControlledBy conjunct needs it, and no subtype-setting effect in the
+        -- pool pairs Matching with ControlledBy. A laziness accident, not a
+        -- structural guarantee: such a card would recurse and hang rather than
+        -- answer wrong (#197).
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
@@ -458,38 +314,20 @@ affects source oid a partial gs = case a of
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
      in Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
-  -- CR 303.4b / 303.4m: the SOURCE's attachment again, but read for the PLAYER it
-  -- names -- "creatures enchanted player controls". A source that is unattached,
-  -- or attached to an object, names no player and so affects nobody.
+  -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
+  -- names. A source that is unattached, or attached to an object, names no player
+  -- and affects nobody. The controller comparison is CR 613.1b's layer 2, already
+  -- applied by the time this set is asked.
   --
-  -- The controller comparison is CR 613.1b's layer 2, already applied by the time
-  -- this set is asked: a creature the enchanted player has since lost control of
-  -- is out of the set, and one they have gained control of is in it. Same
-  -- `controllerOf oid gs` the Matching arm above hands to the candidate's view.
+  -- Unlike the Matching arm's `perspective`, controllerOf is FORCED here on every
+  -- candidate, so the #197 recursion hazard would bite if a subtype-setting
+  -- effect ever carried an AttachedPlayerControls set; none does, and
+  -- controllerOfGiven's namesFrom answers False for this arm rather than
+  -- recursing. The Filter's perspective stays the source's controller per CR
+  -- 109.5, not the enchanted player's.
   --
-  -- Unlike that arm's `perspective`, this call is FORCED on every candidate, so
-  -- the #197 hazard is worth stating rather than inheriting: controllerOf ->
-  -- controlGrants -> liveGiven -> affectsBase re-enters this function, which would
-  -- loop if a subtype-setting effect (the only kind liveGiven feeds) ever carried
-  -- an AttachedPlayerControls set. None does -- the pool's two static examples
-  -- are Blood Moon, whose set is Matching, and Convincing Mirage, whose set is
-  -- Affected.Attached and NOT this arm (the two names differ by one word and are
-  -- different sets: Attached names the source's own host, this names what an
-  -- enchanted PLAYER controls), and Pawl.Engine.Resolve stores every
-  -- ContinuousEffect with Affected.TheseObjects -- and controllerOfGiven's own
-  -- namesFrom answers False for this arm rather than recursing.
-  --
-  -- The Filter's perspective is the Matching arm's, not the enchanted player's:
-  -- CR 109.5 fixes "you" as the effect's source's controller, and being the set
-  -- the enchanted player controls does not move that. Curse of Death's Hold's
-  -- filter is a bare card type, so nothing forces it today either.
-  --
-  -- The candidate's controller is bound ONCE and used twice (the comparison and
-  -- the view), because controllerOf is the un-hoisted variant -- it rebuilds
-  -- controlGrants, a whole-board walk, on every call. That still costs one such
-  -- walk per candidate per layer this set is asked in, which the Matching arm
-  -- above avoids only by leaving the same call an unforced thunk. Hoisting it out
-  -- of `affects` would mean threading the grant list through every caller.
+  -- The candidate's controller is bound once and used twice, since controllerOf
+  -- rebuilds controlGrants -- a whole-board walk -- on every call.
   Affected.AttachedPlayerControls f -> case Game.lookupObject source gs >>= Object.attachedTo of
     Just (Recipient.ToPlayer pid) ->
       let controller = controllerOf oid gs
@@ -505,71 +343,39 @@ printedSupertypes oid gs = case Game.cardOf oid gs of
   Nothing -> Set.empty
   Just card -> TypeLine.supertypes (Card.Type.typeLine card)
 
--- The characteristics view of a battlefield/stack object: its projection (CR 613
--- layer system, so a colour-changer or type-changer is seen), its printed
--- supertypes (supertypes are not projected -- CR 205.4a basic-ness is read from
--- the printed type line), and its projected controller (CR 613.1b; Nothing when
--- the id is unknown -- e.g. a source that has left the battlefield).
+-- The characteristics view of a battlefield/stack object: its CR 613 projection,
+-- its printed supertypes (CR 205.4a), and its projected controller (CR 613.1b;
+-- Nothing when the id is unknown).
 viewOfObject :: ObjectId -> GameState -> Filter.View
 viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
 
--- viewOfObject against a pre-projected board and a precomputed grant list -- the
--- shape a caller filtering a whole pool of candidates wants, so that one
--- projection and one grant walk serve every candidate instead of two per
--- candidate. See projectGiven for what the board is and when it is valid.
+-- viewOfObject against a pre-projected board and a precomputed grant list, so
+-- one projection and one grant walk serve a whole pool of candidates. See
+-- projectGiven for what the board is and when it is valid.
 viewOfObjectGiven :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> ObjectId -> GameState -> Filter.View
 viewOfObjectGiven pcs grants oid gs =
   viewOfCharacteristics oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) gs
 
--- The ViewOf for callers OUTSIDE the CR 613 layer fold: a full projection of
--- every object, layers fully applied. This is what every count wants once the
--- fold itself has finished -- static abilities' Filters, cost/replacement
--- filtering, expiry conditions, and the like all read the settled state.
---
--- `viewUpTo`, right below, is its bounded counterpart for callers INSIDE the
--- fold, where a count must see candidates only through the layers already
--- applied (CR 613.1-613.10 apply layers in order; a count evaluated mid-layer
--- must not see the effects of layers still to come). Picking the wrong one is
--- not a type error -- both are `Count.ViewOf` -- so it is a SILENT wrong
--- answer: a count fed `viewUpTo` outside the fold under-reads (misses layers
--- that already settled), and a count fed `fullView` inside the fold over-reads
--- (sees layers that have not applied yet). Always reach for this by name
--- rather than re-deriving the lambda at the call site.
+-- The ViewOf for callers OUTSIDE the CR 613 layer fold: every object projected
+-- with all layers applied. `viewUpTo` below is the bounded counterpart for
+-- callers INSIDE the fold. Picking the wrong one is not a type error -- both are
+-- Count.ViewOf -- so it is a silent wrong answer in either direction.
 fullView :: GameState -> Count.ViewOf
 fullView gs oid = Just (viewOfObject oid gs)
 
 -- CR 113.7a / 608.2h: `fullView`, except that the one object named by `src` is
--- read from last known information once it no longer exists. The view a resolving
--- spell or ability wants for anything it reads ABOUT ITS OWN SOURCE -- "this
--- creature deals damage equal to its power" when the cost already sacrificed it
--- (Ghitu Fire-Eater).
+-- read from last known information once it no longer exists -- what a resolving
+-- spell wants for anything it reads about its own source.
 --
--- Scoped to `src` alone, not applied to every id, and that is the whole point:
--- CR 608.2h's fallback is about "a specific object" an effect asks after, while
--- an off-battlefield candidate a COUNT sweeps is matched on printed
--- characteristics instead (#160, viewUpTo's haddock). Widening this to all ids
--- would silently overturn that rule.
+-- Scoped to `src` alone by design: CR 608.2h's fallback is about a specific
+-- object an effect asks after, while an off-battlefield candidate a COUNT sweeps
+-- is matched on printed characteristics instead (#160). The trigger is that the
+-- id names no object, which per CR 400.7 is exactly CR 608.2h's condition.
 --
--- The trigger is that the id names no object. It is not a proxy for "left the
--- battlefield": CR 400.7 mints a fresh id on every zone change and deletes the
--- old one, so an id that still resolves is an object that has not moved, and one
--- that does not is precisely CR 608.2h's "no longer in the zone it was expected
--- to be in". A source that is still on the battlefield therefore reads LIVE, as
--- CR 608.2h's first clause requires -- last known information is the fallback,
--- never the default.
---
--- Nothing when the source is gone AND nothing was recorded for it -- an object
--- that ceased without a zone change ever running over it, which is what
--- Game.cease does to an ability and what Departure.objectsLeaveWith does to a
--- departing player's objects. Honest Nothing rather than a zero, and it lands on
--- the no-op every caller already gives an unevaluable quantity.
---
--- The controller comes from the same record, not from a Nothing: CR 608.2h says
--- the effect uses the object's LAST KNOWN INFORMATION, and CR 613.1b control is
--- information about the object even though CR 109.3 denies it is a
--- characteristic. Passing Nothing here would say the gone source was controlled
--- by nobody rather than by whoever last controlled it -- which a ControlledBy
--- filter read against that source would answer wrongly.
+-- Nothing when the source is gone and nothing was recorded for it, which lands
+-- on the no-op every caller already gives an unevaluable quantity. The
+-- controller comes from the same record rather than Nothing, so a ControlledBy
+-- filter read against a gone source still names whoever last controlled it.
 viewWithLastKnown :: ObjectId -> GameState -> Count.ViewOf
 viewWithLastKnown src gs oid =
   if oid == src && not (Map.member oid (GameState.objects gs))
@@ -579,55 +385,33 @@ viewWithLastKnown src gs oid =
         (Map.lookup oid (GameState.lastKnown gs))
     else fullView gs oid
 
--- CR 608.2h: this object's last known information, and ONLY when the id names
--- nothing -- "the effect uses the current information of that object if it's in
--- the public zone it was expected to be in; if it's no longer in that zone ...
--- the effect uses the object's last known information". Nothing while the object
--- is still there, so a caller falls through to its ordinary live reader: last
--- known information is the fallback, never the default.
---
--- The shared liveness test for the two readers below, so a rule that says "use
--- last known information" cannot come to mean one thing for keywords and another
--- for control. viewWithLastKnown above makes the same test inline rather than
--- through this, deliberately: it wants Nothing when the object is gone and
--- nothing was filed, where fullView would hand back a Just over an empty
--- projection, so it cannot share the fall-through shape these two want.
+-- CR 608.2h: this object's last known information, and only when the id names
+-- nothing -- Nothing while the object is still there, so a caller falls through
+-- to its live reader. The shared liveness test for the two readers below, so the
+-- rule cannot mean one thing for keywords and another for control.
+-- viewWithLastKnown makes the same test inline: it wants Nothing when nothing was
+-- filed, where fullView would hand back a Just over an empty projection.
 lastKnownOf :: ObjectId -> GameState -> Maybe LastKnown.LastKnown
 lastKnownOf oid gs =
   if Map.member oid (GameState.objects gs)
     then Nothing
     else Map.lookup oid (GameState.lastKnown gs)
 
--- keywordsOf with CR 608.2h's fallback: the post-layer keywords the object has,
--- or the ones it last had once its id names nothing.
---
--- The reader CR 702.2e, CR 702.15c and CR 702.90d ask for. All three carry the
--- same sentence -- "If an object is no longer in the zone it's expected to be in
--- as an effect causes it to deal damage, its last known information is used to
--- determine whether it had [deathtouch / lifelink / infect]" -- and rule 702.164
--- has no such clause, so toxic rides this by uniformity, exactly as it rides the
--- deal-time capture itself (Pawl.Engine.Damage.damageEvent). Falling back to the
--- WHOLE keyword map rather than to one keyword is what keeps the four answers
--- from drifting.
+-- keywordsOf with CR 608.2h's fallback, as CR 702.2e, CR 702.15c and CR 702.90d
+-- ask for; toxic (rule 702.164) has no such clause and rides this by uniformity.
+-- Falling back to the whole keyword map rather than one keyword is what keeps
+-- the four answers from drifting.
 keywordsWithLastKnown :: ObjectId -> GameState -> Map Keyword Natural
 keywordsWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> PC.keywords (LastKnown.characteristics lk)
   Nothing -> keywordsOf oid gs
 
--- controllerOf with the same fallback. CR 702.15b is why a controller is wanted
--- at all -- its answer is "that source's controller, or its owner if it has no
--- controller" -- but the authority for taking it from last known information is
--- CR 608.2h, NOT CR 702.15c: that rule licenses last known information for
--- "whether it had lifelink" and says nothing about who controlled it. CR 608.2h
--- is the general clause that does ("If the effect requires information from a
--- specific object ... the effect uses the object's last known information"), and
--- viewWithLastKnown above already cites it for exactly this reason.
---
--- LastKnown.controller is a PlayerId rather than a Maybe -- CR 613.1b control is
--- recorded for the object as it left, which is why that record keeps it
--- separately from the characteristics CR 109.3 says it is not among -- so this
--- answers Just wherever the live reader would have answered Nothing for a gone
--- source. Nothing survives only for an id nothing was ever filed under.
+-- controllerOf with the same fallback. CR 702.15b is why a controller is wanted;
+-- the authority for taking it from last known information is CR 608.2h's general
+-- clause, not CR 702.15c, which licenses the fallback only for whether the
+-- source had lifelink. LastKnown.controller is a PlayerId rather than a Maybe,
+-- so this answers Just wherever the live reader would answer Nothing for a gone
+-- source; Nothing survives only for an id nothing was filed under.
 controllerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> Just (LastKnown.controller lk)
@@ -644,54 +428,37 @@ viewUpTo bound cands gs oid =
     then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) gs)
     else fmap viewOfCard (Game.cardOf oid gs)
 
--- The characteristics view of a PRINTED card off the battlefield (a card in a
--- library/graveyard/hand being matched by a search). No projection exists off the
--- battlefield, so every axis is read from the printed card: types/supertypes/
--- subtypes from the type line, colours from printedColorsOf with devoid applied on
--- top, and power/controller are Nothing (a card in a library has neither under the
--- rules that matter here). This is what lets a Filter read an object's colour
--- outside the battlefield without a projection that does not exist there.
+-- The characteristics view of a printed card off the battlefield, e.g. one being
+-- matched by a search. No projection exists there, so every axis is read from the
+-- printed card and power/controller are Nothing.
 viewOfCard :: Card.Type.Card -> Filter.View
 viewOfCard card =
   let typeLine = Card.Type.typeLine card
    in Filter.MkView
         { Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
-          -- CR 604.3 / 702.114a: a characteristic-defining ability functions in
-          -- ALL zones, and nothing off the battlefield is projected (viewUpTo
-          -- falls back here, #160) -- so devoid is applied here rather than
-          -- inherited from a fold this object never enters.
+          -- CR 604.3 / 702.114a: a CDA functions in all zones, and nothing off
+          -- the battlefield is projected (#160), so devoid is applied here
+          -- rather than inherited from a fold this object never enters.
           Filter.colors =
             if definesColorless (Card.Type.keywords card)
               then Set.empty
               else printedColorsOf card,
           Filter.subtypes = TypeLine.subtypes typeLine,
-          -- CR 702: read straight off the printed card, like the type line above
-          -- it and for the same reason -- no projection exists off the
-          -- battlefield, so a search that asks about a keyword is answered from
-          -- the printing. NOT typecycling, which was the example here and cannot
-          -- be one: CR 702.29e's "[type]" is "any card type, subtype, supertype,
-          -- or combination thereof", and a keyword is none of those.
+          -- CR 702: read off the printed card, like the type line above.
           Filter.keywords = Card.Type.keywords card,
           Filter.power = Nothing,
           Filter.controller = Nothing,
-          -- A printed card off the battlefield is not an object, so it has no
-          -- identity for IsSource to compare -- the same vacuous posture power
-          -- and controller already take here.
+          -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
-          -- CR 506.3: only a creature can attack, and a card in a library or hand
-          -- is not one -- so it has no combat status either.
+          -- CR 506.3 / 509.1a: a card off the battlefield is not a creature that
+          -- can attack or block, and was never declared as an attacker; CR
+          -- 303.4b: nor is it a permanent attached to anything.
           Filter.attacking = False,
-          -- CR 509.1a: nor can it block, for the same reason.
           Filter.blocking = False,
-          -- And it was never on the battlefield to be declared as one, so the
-          -- turn's event log holds nothing about it either.
           Filter.attackedThisTurn = False,
-          -- CR 303.4b: only a permanent on the battlefield is attached to
-          -- anything, and a printed card off it is not one.
           Filter.attachedToCreature = False,
-          -- CR 303.4 again: nor is it attached to a permanent, for the same reason.
           Filter.attachedToPermanent = False,
           -- CR 701.3a: only Pawl.Engine.Resolve's AttachTarget arm fills this field, and
           -- its candidates are battlefield permanents, so a card in a library or a
@@ -732,69 +499,46 @@ viewOfCharacteristics oid pc controller gs =
       Filter.controller = controller,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
-      -- CR 508.1k: attacking is a combat STATUS, not a characteristic (CR 109.3),
-      -- so it comes straight off the combat record and not from the projection
-      -- this function is otherwise assembling.
+      -- CR 508.1k: attacking is a combat status, not a characteristic (CR 109.3),
+      -- so it comes off the combat record rather than the projection.
       Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs)),
-      -- CR 509.1g: likewise a combat status and not a characteristic, read off
-      -- the OTHER map. Combat.blockers is keyed by ATTACKER, so being a blocking
-      -- creature is membership in some attacker's set rather than a key lookup --
-      -- and deliberately not Map.member, which is Pawl.Engine.Combat.isBlocked's
-      -- question about the attacker (CR 509.1h).
+      -- CR 509.1g: likewise. Combat.blockers is keyed by ATTACKER, so blocking is
+      -- membership in some attacker's set rather than a key lookup -- Map.member
+      -- would be Pawl.Engine.Combat.isBlocked's question instead (CR 509.1h).
       Filter.blocking = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs))),
-      -- CR 608.2i: a look-back read of the turn's event log rather than of the
-      -- combat record, because the record does not survive the phase -- CR 511.3
-      -- removes every creature from combat as the end of combat step ends, and
-      -- Combat.clearCombat is what does it. The log outlives that and is cleared
-      -- at turn handoff, which is the span "this turn" names.
+      -- CR 608.2i: read from the turn's event log, not the combat record, which
+      -- CR 511.3 clears at end of combat. The log spans the turn.
       Filter.attackedThisTurn = any (declaredIt oid) (GameState.events gs),
-      -- CR 701.3a: likewise not a characteristic (CR 109.3 names "what an Aura
-      -- enchants" among the things that are not one), so the attachment comes
-      -- off Object.attachedTo. The HOST's creature-ness, though, is projected --
-      -- CR 613 layer 4 can make a land a creature -- so it goes through
-      -- isCreatureOf, which is a projection OF ANOTHER OBJECT.
-      --
-      -- That is why this field must stay lazy: `affects` calls this function
-      -- from inside a projection, and forcing a second projection there would
-      -- recurse. See Pawl.Engine.Filter.View's own note on the field.
-      -- A player host answers False without a projection at all: CR 701.3a's
-      -- question is whether the attachment is to a CREATURE, and a player is not
-      -- one -- Recipient.objectOf's Nothing is that answer.
+      -- CR 701.3a: also not a characteristic, so the attachment comes off
+      -- Object.attachedTo -- but the HOST's creature-ness is projected (layer 4
+      -- can make a land a creature), so it goes through isCreatureOf. That is why
+      -- this field must stay lazy: `affects` calls this function from inside a
+      -- projection, and forcing a second one would recurse. A player host answers
+      -- False, which is Recipient.objectOf's Nothing.
       Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
         Nothing -> False
         Just host -> isCreatureOf host gs,
-      -- CR 303.4: the same stored attachment, asked a question that stops short of
-      -- the host's characteristics -- does the attachment name an object that is
-      -- on the battlefield, which CR 110.1 is the definition of a permanent, or a
-      -- player? Recipient.objectOf splits the two, and the battlefield membership
-      -- is what rules out a stale attachment to a host that has already left:
-      -- CR 704.5m buries such an Aura, but only on the next pass, and until then
-      -- it is attached to nothing that exists. Unlike the field above there is no
-      -- projection OF ANOTHER OBJECT behind this, so it carries no recursion
-      -- hazard and needs no laziness argument.
+      -- CR 303.4 / 110.1: the same attachment, asked whether it names an object
+      -- on the battlefield. The membership test rules out a stale attachment to a
+      -- host that has already left -- CR 704.5m buries such an Aura, but only on
+      -- the next pass. No projection of another object, so no recursion hazard.
       Filter.attachedToPermanent = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
         Nothing -> False
         Just host -> Set.member host (GameState.battlefield gs),
-      -- CR 701.3a: filled only by Pawl.Engine.Resolve's AttachTarget arm, which is the
-      -- one place that knows what is being moved. Every view this function builds
-      -- is asked about some candidate in isolation, and "could the subject be
-      -- attached here" is not a question about the candidate alone.
+      -- CR 701.3a: filled only by Resolve's AttachTarget arm, the one place that
+      -- knows what is being moved. "Could the subject be attached here" is not a
+      -- question about the candidate alone.
       Filter.canHostSubject = False,
-      -- CR 111.6: not a characteristic either, and unlike the two fields above it
-      -- is not even mutable -- Object.source is fixed for the life of the object
-      -- (CR 400.7 mints a new one on every zone change), so this is a constant
-      -- input to the projection being assembled and costs it nothing.
+      -- CR 111.6: fixed for the life of the object (CR 400.7 mints a new one on
+      -- every zone change), so it is a constant input to the projection.
       Filter.token = Game.isToken oid gs
     }
 
--- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
--- STARTS from. If the object carries a copy snapshot in its bindings (stamped as it
--- entered, CR 707.5, by Replacement.apply's EntryR AsCopy arm), that snapshot IS its copiable
--- value; otherwise it is the printed base. Only base-or-snapshot, so counters (7c),
--- pumps (7c), control (2), and ability grants (6) -- all folded ABOVE this -- are
--- never part of a copied object's own copiable value (the P2 falsifier, made
--- structural). Not a recursion: a copy of a copy stores the underlying creature's
--- values at entry, so the snapshot is already resolved.
+-- CR 707.2 / 613.1a: an object's layer-1 (copy) result, the value the layer fold
+-- starts from -- the entry-stamped snapshot (CR 707.5) when it has one, the
+-- printed base otherwise. Base-or-snapshot only, so counters, pumps, control and
+-- ability grants are structurally never part of a copied object's copiable value.
+-- Not a recursion: a copy of a copy already stored resolved values at entry.
 copiableCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 copiableCharacteristics oid gs =
   case Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings) of
@@ -813,16 +557,13 @@ seedCharacteristicPT card =
       Just (Quantity.substituteStar star p, Quantity.substituteStar star t)
     _ -> Nothing
 
--- Printed characteristics before any effect: CR 613.1's starting point, "the
--- values of the characteristics printed on that card". NOT CR 613.2/613.4, which
--- order the SUBLAYERS within layers 1 and 7 and say nothing about where the fold
--- begins.
+-- Printed characteristics before any effect: CR 613.1's starting point.
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 baseCharacteristics oid gs = case Game.cardOf oid gs of
   Nothing ->
     PC.MkProjectedCharacteristics
-      { -- No card behind this object (an ability or trigger on the stack): it has
-        -- no printed name and no type line to seed from.
+      { -- No card behind this object (an ability on the stack): nothing to seed
+        -- from.
         PC.name = CardName.MkCardName Text.empty,
         PC.supertypes = Set.empty,
         PC.keywords = Map.empty,
@@ -838,48 +579,37 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.triggeredAbilities = []
       }
   Just card ->
-    -- The seed predates every layer, including Copy (1) -- there is no
-    -- established view of ANYTHING yet, so a Count reached from here (a
-    -- printed power/toughness Quantity, never a real card's) gets a viewOf
-    -- that determines nothing rather than one that recurses back into
-    -- copiableCharacteristics/baseCharacteristics through viewUpTo/projectUpTo.
-    -- The tradeoff: a Count reached from here folds an empty candidate set and
-    -- aggregates to Just 0 -- a plausible wrong answer -- rather than the
-    -- honest Nothing a printed-P/T Count deserves; no card in the pool has one
-    -- (#156).
-    -- The context is still the object's own controller, the CDA posture (CR
-    -- 604.3a(3)) this seed already shares with applyCharacteristicPT.
+    -- The seed predates every layer, so a Count reached from here gets a viewOf
+    -- that determines nothing rather than one recursing back into
+    -- copiableCharacteristics. The tradeoff is that such a Count folds an empty
+    -- candidate set and aggregates to Just 0 rather than an honest Nothing; no
+    -- card in the pool has one (#156). The context is the object's own
+    -- controller, the CR 604.3a(3) posture this shares with
+    -- applyCharacteristicPT.
     let seedViewOf = const Nothing
         seedContext = Filter.MkContext (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
           { PC.name = Card.Type.name card,
             PC.supertypes = TypeLine.supertypes (Card.Type.typeLine card),
-            -- CR 702: a printed keyword appears once in the card's text, so the
-            -- seed's count is 1 apiece. Multiplicity is what layer-6 grants add
-            -- on top (CR 702.164b).
+            -- CR 702: a printed keyword appears once, so the seed's count is 1
+            -- apiece; layer-6 grants add multiplicity on top (CR 702.164b).
             PC.keywords = Map.fromSet (const 1) (Card.Type.keywords card),
             PC.colors = printedColorsOf card,
             -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
-            -- instead" belongs to a characteristic-defining ability, and a
-            -- printed Star with no CDA behind it has none, so it evaluates to
-            -- Nothing here. Primal Plasma (P5) is the pool's one such card --
-            -- its star is given a value by an as-enters REPLACEMENT (CR 208.2b),
-            -- not by a CDA -- so it projects no power or toughness until that
-            -- entry choice applies. Unobservable on the battlefield, where the
-            -- entry loop always applies the choice before the Moved event
-            -- exists, but a Primal Plasma CARD in a hand, library or graveyard
-            -- reports Nothing where CR 208.2b says 0 (#76). A star that DOES
-            -- have a CDA behind it is Nothing here too, and stays Nothing only
-            -- until layer 7a: seedCharacteristicPT put the substituted pair in
-            -- PC.characteristicPT, and applyCharacteristicPT determines it there.
+            -- instead" belongs to a CDA, and a printed star with none behind it
+            -- evaluates to Nothing. A star given its value by an as-enters
+            -- replacement (CR 208.2b) therefore reports Nothing off the
+            -- battlefield where that rule says 0 (#76). A star that does have a
+            -- CDA is Nothing only until layer 7a, where applyCharacteristicPT
+            -- determines the pair seedCharacteristicPT left in characteristicPT.
             PC.power = case Card.Type.power card of
               Nothing -> Nothing
               Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
             PC.toughness = case Card.Type.toughness card of
               Nothing -> Nothing
               Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
-            -- CR 306.5a: a literal number, so it is copied through rather than
-            -- evaluated the way the two Quantity-valued fields above are.
+            -- CR 306.5a: a literal number, so copied through rather than
+            -- evaluated like the two fields above.
             PC.loyalty = Card.Type.loyalty card,
             PC.characteristicPT = seedCharacteristicPT card,
             PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
@@ -889,65 +619,42 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
             PC.triggeredAbilities = Card.Type.triggeredAbilities card
           }
 
--- CR 202.2 / 204.2: an object's PRINTED colours -- the colours of the coloured
--- mana symbols in its mana cost, together with the colours its colour indicator
--- denotes. CR 202.2b: an object with no coloured mana symbols and no indicator is
--- colourless.
+-- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
+-- coloured symbols and its colour indicator.
 --
--- No devoid here. CR 702.114a makes devoid a CHARACTERISTIC-DEFINING ability, and
--- CR 613.3 puts characteristic-defining abilities at the START of their layer --
--- layer 5 for colour (CR 613.1e) -- not before the fold begins. applyColorDefining
--- is where it lands; see projectWith.
+-- No devoid here: CR 702.114a makes it a CDA, and CR 613.3 puts CDAs at the start
+-- of their layer (5 for colour, CR 613.1e), not before the fold begins.
+-- applyColorDefining is where it lands.
 printedColorsOf :: Card.Type.Card -> Set Color.Color
 printedColorsOf card =
   Set.union
     (Card.Type.colorIndicator card)
     (manaCostColors (Card.Type.manaCost card))
 
--- CR 702.114a: "Devoid is a characteristic-defining ability. 'Devoid' means
--- 'This object is colorless.'" THE one place that decides what devoid means, so
--- the fold and the off-battlefield card view cannot drift apart on it.
+-- CR 702.114a. The one place that decides what devoid means, so the fold and the
+-- off-battlefield card view cannot drift apart on it.
 definesColorless :: Set Keyword -> Bool
 definesColorless = Set.member Keyword.Devoid
 
 -- CR 613.3 / 613.1e: the object's own colour-defining ability, applied at the
--- START of layer 5 -- "within layers 2-6, apply effects from characteristic-
--- defining abilities first, then all other effects in timestamp order".
+-- start of layer 5.
 --
--- Folded IN PLACE rather than emitted as a synthetic Gathered -- the same shape
--- applyCharacteristicPT takes, for these three reasons: a CDA affects only the
--- object it is on (CR 604.3a(3)) so it has no affected set to gather over; CR
--- 604.3 makes it function in ALL zones while gather walks the battlefield only;
--- and it has no source object and no timestamp, so it has nothing to sort on
--- under CR 613.7. NOT applyCharacteristicPT's Humility reason, which is the one
--- that does not transfer -- see below.
+-- Folded in place rather than emitted as a synthetic Gathered, the shape
+-- applyCharacteristicPT also takes: a CDA affects only its own object (CR
+-- 604.3a(3)) so there is no affected set to gather; CR 604.3 makes it function in
+-- all zones while gather walks the battlefield only; and it has no timestamp to
+-- sort on under CR 613.7.
 --
--- Read from the PARTIAL projection's keywords rather than from the card. CR
--- 604.3a(2) makes a static ability characteristic-defining when "it is printed on
--- the card it affects, it was granted to the token it affects by the effect that
--- created the token, or it was acquired by the object it affects as the result of
--- a copy effect or text-changing effect" -- and at layer 5 that map holds exactly
--- those, minus the token clause, which pawl covers at the seed instead. It cannot
--- yet hold a layer-6 grant, because layer 6 has not been applied.
+-- Read from the partial projection's keywords rather than the card, because at
+-- layer 5 that map holds exactly CR 604.3a(2)'s sources: the printed and
+-- copy-effect halves arrive in the seed, no pre-layer-5 modification adds a
+-- keyword (the only ones touching the map go through setLandSubtypeTo, which only
+-- empties it), and layer 6 has not applied yet. So the rule holds by construction.
+-- Humility cannot remove it either, LoseAllAbilities being layer 6.
 --
--- The printed and copy-effect halves both arrive in the SEED: CR 613.1a's
--- copiable value is copiableCharacteristics, the entry-stamped snapshot when the
--- object has one and the printed card otherwise. The rule's text-change clause
--- has no writer at all today -- Layer.Text's one modification is
--- ChangeSubtypeWord, whose arm touches PC.subtypes alone -- so nothing between
--- the seed and layer 5 ADDS a keyword. The only pre-layer-5 modifications that
--- touch the map are the two that set a land subtype at Layer.Type, and both go
--- through setLandSubtypeTo, which only ever EMPTIES it (CR 305.7); a removal
--- cannot introduce a non-characteristic-defining source. So the rule holds by
--- construction rather than by a test, and a future text-changing effect that
--- granted a keyword would land inside CR 604.3a(2) rather than outside it.
---
--- Humility therefore cannot remove it: LoseAllAbilities is layer 6, after this.
---
--- Not implemented: a devoid GRANTED by a layer-6 effect does nothing to colour.
--- Per CR 604.3a(2) such a grant is not characteristic-defining, so it would be an
--- ordinary layer-5 colour effect timestamped when granted (CR 613.7a), which this
--- does not build (#622).
+-- Not implemented: a devoid granted by a layer-6 effect does nothing to colour.
+-- Per CR 604.3a(2) such a grant is an ordinary layer-5 colour effect timestamped
+-- when granted (CR 613.7a), which this does not build (#622).
 applyColorDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applyColorDefining pc =
   if definesColorless (Map.keysSet (PC.keywords pc))
@@ -960,58 +667,28 @@ manaCostColors mc = case mc of
   Nothing -> Set.empty
   Just (ManaCost.MkManaCost symbols) -> Set.fromList (concatMap symbolColors symbols)
 
--- CR 202.2b: only a coloured mana symbol carries a colour ("Objects with no
--- colored mana symbols in their mana costs are colorless"). Generic ({2}), {X},
--- and the colourless symbol ({C}) carry none -- {C} is colourless mana, and
--- CR 105.2c says colourless is not a colour.
+-- CR 202.2b: only a coloured mana symbol carries a colour. Generic, {X} and {C}
+-- carry none, colourless not being a colour (CR 105.2c).
 --
--- A LIST, not a Maybe, because of CR 107.4e's last sentence: "A hybrid mana
--- symbol is all of its component colors." Burning-Tree Emissary's {R/G}{R/G}
--- makes it both red and green, not one or the other and not multicoloured-as-a-
--- third-thing (CR 202.2d: "An object with one or more hybrid mana symbols
--- and/or Phyrexian mana symbols in its mana cost is all of the colors of those
--- mana symbols"). NOT CR 202.2c, whose premise is "two or more DIFFERENT colored
--- mana symbols" and so does not reach {R/G}{R/G}'s two identical ones; and not
--- CR 105.3, which is about an EFFECT changing a colour rather than about what a
--- mana cost makes an object.
---
--- CONTRIBUTIONS, not a set: this may repeat a colour, and deduplicating is the
--- caller's job because the caller is the one building a set. Colour is a set
--- property under CR 105.2 ("an object can be one or more of the five colors"), so
--- manaCostColors above unions the whole cost with Set.fromList and a repeat
--- inside one symbol is absorbed there along with the repeat ACROSS symbols that
--- {R/G}{R/G} already produces. Deduplicating here would only cover the second
--- case -- and only for a degenerate `Hybrid t t` that no card prints.
+-- A list rather than a Maybe because a hybrid symbol is all of its component
+-- colours (CR 107.4e / 202.2d). Contributions rather than a set: the caller is
+-- the one building the set, and manaCostColors absorbs repeats there.
 symbolColors :: ManaSymbol.ManaSymbol -> [Color.Color]
 symbolColors symbol = case symbol of
   ManaSymbol.OfType (ManaType.Colored c) -> [c]
   ManaSymbol.OfType ManaType.Colorless -> []
   ManaSymbol.Hybrid a b -> Maybe.mapMaybe colorOfManaType [a, b]
-  -- CR 107.4e's last sentence again. A monocolored hybrid's other component is
-  -- generic mana -- CR 107.4b, a numerical symbol, which is not one of CR 107.4a's
-  -- five coloured mana symbols and so contributes no colour (CR 202.2a's own
-  -- example: "an object with a mana cost of {2} is colorless"). The named half is
-  -- therefore the whole contribution: Flame Javelin ({2/R}{2/R}{2/R}) is red and
-  -- only red, however it was paid for.
+  -- CR 107.4b/107.4e: a monocolored hybrid's other half is generic, which is not
+  -- one of CR 107.4a's coloured symbols, so the named half is the whole
+  -- contribution.
   ManaSymbol.MonocoloredHybrid t -> Maybe.maybeToList (colorOfManaType t)
-  -- CR 107.4f's first clause: "Phyrexian mana symbols are COLORED mana symbols:
-  -- {W/P} is white, ... and {G/P} is green" -- and CR 202.2d says the object is
-  -- that colour, alongside the hybrids: "An object with one or more hybrid mana
-  -- symbols and/or Phyrexian mana symbols in its mana cost is all of the colors
-  -- of those mana symbols, in addition to any other colors the object might be."
-  --
-  -- A total `[c]` rather than a mapMaybe, because ManaSymbol.Phyrexian carries a
-  -- Color and not a ManaType: there is no colourless Phyrexian symbol. The other
-  -- half of the symbol is LIFE, which is no mana at all and so no colour either,
-  -- exactly as a monocolored hybrid's generic half is none. Mutagenic Growth is
-  -- green even when 2 life paid for it and no green mana was ever made -- proved
-  -- by ManaSpec's "Mutagenic Growth is green on the stack even when 2 life paid
-  -- for it".
+  -- CR 107.4f / 202.2d: Phyrexian symbols are coloured mana symbols. Total `[c]`
+  -- rather than a mapMaybe, since Phyrexian carries a Color and not a ManaType --
+  -- there is no colourless Phyrexian symbol. Its other half is life, which is no
+  -- mana and so no colour.
   ManaSymbol.Phyrexian c -> [c]
-  -- CR 107.4h's last sentence, which settles this outright: "Snow is neither a
-  -- color nor a type of mana." CR 202.2d's colour-granting list names the hybrid
-  -- and Phyrexian symbols and not this one, so Icehide Golem is colorless (CR
-  -- 202.2b) despite having a mana cost.
+  -- CR 107.4h: snow is neither a colour nor a type of mana, and CR 202.2d's list
+  -- does not name it.
   ManaSymbol.Snow -> []
   ManaSymbol.Generic _ -> []
   ManaSymbol.Variable -> []
@@ -1028,44 +705,27 @@ colorOfManaType manaType = case manaType of
 affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
 affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) gs
 
--- CR 608.2h / 611.2d: evaluate a modification's quantities ONCE and rewrite them
--- to Literals. Called by Resolve when a spell's resolution STORES a continuous
--- effect -- "if an effect requires information from the game ... the answer is
--- determined only once, when the effect is applied."
+-- CR 608.2h / 611.2d: evaluate a modification's quantities once and rewrite them
+-- to literals. Called by Resolve when a spell's resolution stores a continuous
+-- effect.
 --
--- `oid` is the SOURCE (the resolving spell), not the affected object: for a
--- spell that object is also the one CR 601.2b's chosen X was stamped on, and
--- `you` is its controller, whose hand a player-scoped count counts.
+-- `oid` is the SOURCE, not the affected object: for a spell that is also where CR
+-- 601.2b's chosen X was stamped, and `you` is its controller. Not the announcing
+-- object for an activated ability, where the two differ -- an X-cost activation
+-- storing a continuous effect measured by its X would freeze nothing here, and no
+-- card in the pool does (#550).
 --
--- Not the announcing object for an ACTIVATED ability, where the two differ
--- (Quantity.evaluateFor); an X-cost activation that stored a continuous effect
--- measured by its X would freeze nothing here. No card in the pool does (#550).
+-- Deliberately not applied to a static ability's effect: CR 611.2 scopes 611.2a-d
+-- to a spell or ability's resolution, while a static ability's effect (CR 604.2)
+-- is regenerated per projection and must keep moving.
 --
--- Deliberately NOT applied to a static ability's effect: CR 611.2 scopes 611.2a-d
--- to "a continuous effect generated by the resolution of a spell or ability", and
--- a static ability's effect (CR 604.2) is regenerated every projection and
--- evaluated per affected object -- Opalescence's mana value must keep moving.
---
--- Nothing when ANY quantity it carries cannot be evaluated at store time. CR
--- 608.2h/611.2d have the answer determined "only once, when the effect is
--- applied" -- so a value that cannot be determined at that one moment cannot be
--- determined later either, and re-reading it live against the affected object on
--- every projection would be a WRONG answer rather than a deferred one. Resolve
--- stores nothing in that case, the same posture CR 611.2b already gives this
--- opcode for a duration that never starts. Untamed Might's "+X/+X" is the pool's
--- producer, and ProjectionSpec's "CR 608.2h/611.2d Untamed Might's X is frozen"
--- is what proves the freeze happens at all.
---
--- Not Literal 0, which would be inventing an answer: CR 208.2a's "if the ability
--- needs to use a number that can't be determined ... use 0 instead of that
--- number" is scoped to a characteristic-defining ability, and this is not one.
---
--- Cases on Modification, so it lives HERE (Projection is the sole home), the same
--- standing rewriteModification has.
+-- Nothing when any quantity cannot be evaluated at store time -- a value
+-- undeterminable at that one moment cannot be determined later either, so
+-- re-reading it live would be wrong rather than deferred, and Resolve stores
+-- nothing. Not Literal 0, which would invent an answer: CR 208.2a's "use 0
+-- instead" is scoped to a CDA, and this is not one.
 freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId.PlayerId -> Modification -> Maybe Modification
 freezeQuantities gs oid you m =
-  -- CR 608.2h / 611.2d: read the CURRENT state through the real projection --
-  -- `oid` is the source, `you` its controller, matching the doc above.
   let viewOf = fullView gs
       context = Filter.MkContext you (Just oid)
       freeze q = fmap Quantity.Type.Literal (Quantity.evaluate viewOf context gs oid q)
@@ -1089,14 +749,9 @@ freezeQuantities gs oid you m =
         Modification.AddChosenColor -> Just m
         Modification.SwitchPowerToughness -> Just m
 
--- Every Quantity a modification carries, in the order it carries them. Another
--- case on Modification, so it lives HERE for freezeQuantities' reason, even
--- though its caller is elsewhere: Resolve's D4 lints have to see INSIDE a
--- ModifyTarget's modification to find the X in Untamed Might's "+X/+X" and any
--- slot a future card reads there.
---
--- NOTE: when a Modification gains a Quantity field, add it here as well as to
--- freezeQuantities -- the compiler forces the arm to exist, not to be right.
+-- Every Quantity a modification carries, in order. When a Modification gains a
+-- Quantity field, add it here as well as to freezeQuantities -- the compiler
+-- forces the arm to exist, not to be right.
 quantitiesOf :: Modification -> [Quantity.Type.Quantity]
 quantitiesOf m = case m of
   Modification.SetBasePowerToughness p t -> [p, t]
@@ -1124,27 +779,20 @@ setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
   let isSet m = case m of
         Modification.SetLandSubtype _ -> True
-        -- CR 305.7 does not care WHERE the type came from: a type chosen as the
-        -- source entered (CR 614.1c) strips the land's rules text exactly as a
-        -- printed one does. Convincing Mirage.
-        --
-        -- Answering False here would strip the land INSIDE the fold
-        -- (setLandSubtypeTo) while leaving its static abilities in the candidate
-        -- list -- the two halves of one rule disagreeing, since this predicate
-        -- classifies by CONSTRUCTOR and the wildcard below means the compiler
-        -- cannot name a new arm that needs to be here. Pawl.ProjectionSpec's
-        -- "Convincing Mirage strips Urborg's static ability" is what catches it.
+        -- CR 305.7 does not care where the type came from: a type chosen as the
+        -- source entered (CR 614.1c) strips rules text as a printed one does.
+        -- Answering False would strip the land inside the fold while leaving its
+        -- static abilities in the candidate list, the two halves of one rule
+        -- disagreeing -- and the wildcard below means the compiler cannot name a
+        -- new arm that belongs here.
         Modification.SetLandSubtypeToChosen -> True
-        -- Not the CR 305.7 land-subtype "set" this predicate gates (a control
-        -- op, not a type change); the existing wildcard already covers it, but
-        -- named explicitly per Modification's exhaustiveness discipline.
+        -- A control op, not a type change; named explicitly per Modification's
+        -- exhaustiveness discipline.
         Modification.SetController _ -> False
         Modification.SetControllerToSource -> False
         -- The OTHER subtype set, and the arm most at risk of being read as this
-        -- one. CR 305.7's ability strip is a rule about a LAND whose subtype is
-        -- set; CR 205.1a/205.1b's creature-type set carries no such clause, so a
-        -- Turn to Frog must not take its target's rules text. The existing
-        -- wildcard already covers it, but the confusion is worth naming.
+        -- one: CR 305.7's ability strip is about a LAND whose subtype is set, and
+        -- CR 205.1a/205.1b's creature-type set carries no such clause.
         Modification.SetCreatureSubtype _ -> False
         _ -> False
       fromStored eff =
@@ -1152,17 +800,12 @@ setLandSubtypeEffects gs =
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
           else []
       -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
-      -- 612's word swap to the same ability's (#624). So a text-changed source
-      -- would have this gate and the layer fold disagreeing about which
-      -- permanents it names. Unreachable twice over. The pool's two
-      -- subtype-setting statics are Blood Moon, which selects by card type and
-      -- supertype and so carries no subtype word for a swap to reach, and
-      -- Convincing Mirage, whose Affected.Attached names no word at all -- and
-      -- rewriteAffected's Attached arm is the identity, so a text change could
-      -- not move it even if one reached here. Rewriting here is not free either --
-      -- textChangesAffecting folds the whole effect list, and this function is
-      -- hoisted out of gather's walk precisely to avoid per-permanent cost
-      -- (#584).
+      -- 612's word swap to the same ability's (#624), so a text-changed source
+      -- would have this gate and the layer fold disagreeing. Unreachable: neither
+      -- subtype-setting static in the pool carries a subtype word a swap could
+      -- reach. Rewriting here is not free either, since textChangesAffecting
+      -- folds the whole effect list and this function is hoisted out of gather's
+      -- walk to avoid per-permanent cost (#584).
       fromPerm permId = case Game.cardOf permId gs of
         Nothing -> []
         Just card ->
@@ -1171,56 +814,29 @@ setLandSubtypeEffects gs =
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
--- CR 305.7: a land whose subtype is SET to a basic type loses its rules-text
--- abilities. This is the GATE half of that rule, shared by all three readers whose
--- ability lands on objects other than the bearer -- gather here,
--- Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.instances -- since such an
--- ability has to be kept out of its reader's candidate list rather than erased
--- from the bearer's own projection afterwards. Every other kind of rules-text
--- ability is stripped inside the fold instead, by setLandSubtypeTo. So an
--- object's static abilities are live unless a live subtype-setting effect
--- applies to it -- either kind, the printed SetLandSubtype (Blood Moon) or the
--- chosen SetLandSubtypeToChosen (Convincing Mirage), since setLandSubtypeEffects
--- gathers both and CR 305.7 does not distinguish them. "Live" recurses on the
--- stripper's own source; "applies to" reads BASE characteristics (nonbasic is a
--- printed supertype, and card-type Land is read off the printed type line here),
--- so nothing recurses into the projection and the result is order-INDEPENDENT. A
--- cycle trips the visited set (both treated as live -- the CR 613.8b loop-escape
--- analog, not an implementation of it, #37).
+-- CR 305.7: a land whose subtype is set to a basic type loses its rules-text
+-- abilities. This is the GATE half of that rule, shared by the three readers
+-- whose ability lands on objects other than the bearer -- gather here,
+-- Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.instances --
+-- since such an ability must be kept out of the candidate list rather than erased
+-- from the bearer's projection afterwards. Every other rules-text ability is
+-- stripped inside the fold by setLandSubtypeTo.
 --
--- The base read is a RESTRICTION, not merely a shortcut, and the two halves of
--- CR 305.7 therefore disagree about their affected set: a permanent that becomes
--- a land only through a layer-4 type change is not seen HERE at all, while the
--- fold's arm reads the projection and does reach it. Ashaya, Soul of the Wild is
--- the card that does that. Blood Moon takes her characteristic-defining P/T, her
--- activated, triggered and replacement abilities and her keywords -- all of which
--- the arm reaches -- and leaves her own animating STATIC ability standing, which
--- only this gate could have taken (#391).
+-- "Live" recurses on the stripper's own source; "applies to" reads BASE
+-- characteristics, so nothing recurses into the projection and the result is
+-- order-independent. A cycle trips the visited set, both treated as live -- an
+-- analog of CR 613.8b's loop escape, not an implementation of it (#37).
 --
--- Ashaya is NOT the dependency loop #37 waits for, and the way she misses is
--- worth recording so the next reader does not re-derive it. A loop needs each
--- effect to change the other's existence; here only one direction holds. Blood
--- Moon depends on Ashaya (CR 613.8a clause (b): applying Ashaya's type change
--- puts alice's creatures INTO "nonbasic lands"), and Ashaya does not depend on
--- Blood Moon, because CR 613.8a asks what applying the other would change FROM
--- THE CURRENT STATE -- CR 613.8c re-asks after each application -- and in that
--- state Ashaya is a Legendary Creature -- Elemental that no subtype-setting
--- effect reaches. Pawl.ProjectionSpec's Ashaya + Blood Moon pair proves that
--- one-way half in both timestamp orders.
---
--- So no board in the pool makes the escape's ANSWER observable. The visited
--- branch is taken on every such board -- Blood Moon asking whether Blood Moon
--- strips Blood Moon -- but what it returns is then thrown away by an affectsBase
--- that is False for an enchantment.
+-- The base read is a restriction rather than a shortcut, so the two halves of CR
+-- 305.7 disagree about their affected set: a permanent that becomes a land only
+-- through a layer-4 type change is invisible here while the fold's arm reaches it
+-- (#391).
 staticAbilitiesLive :: ObjectId -> GameState -> Bool
 staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) Set.empty oid gs
 
--- The liveness fixpoint given the game's SetLandSubtype and
--- SetLandSubtypeToChosen effects PRECOMPUTED. The list is hoisted here (rather
--- than recomputed inside) so gather can compute it once per projection instead
--- of once per permanent -- recomputing it per permanent made project
--- O(permanents^3) per state-based-action sweep. An empty list means no
--- stripper exists, so any strips [] is False and oid is live.
+-- The liveness fixpoint, given the game's subtype-setting effects precomputed.
+-- The list is hoisted so gather computes it once per projection rather than once
+-- per permanent, which made project O(permanents^3) per SBA sweep.
 liveGiven :: [(ObjectId, Affected.Affected)] -> Set ObjectId -> ObjectId -> GameState -> Bool
 liveGiven setEffs visited oid gs =
   Set.member oid visited
@@ -1230,13 +846,10 @@ liveGiven setEffs visited oid gs =
                && affectsBase src oid aff gs
         in not (any strips setEffs)
 
--- Every subtype-word pair a ChangeSubtypeWord continuous effect imposes on
--- `oid` (CR 612), of whichever family the words themselves belong to -- CR
--- 612.2's gate is applied where a pair meets a word, not here. Stored resolution
--- effects only (a text-change is stored by
--- Resolve's ChangeText, never a static ability at M3d); read against BASE
--- characteristics since ChangeSubtypeWord always uses a TheseObjects fixed set,
--- so no projection recursion is needed and nothing loops.
+-- Every subtype-word pair a ChangeSubtypeWord continuous effect imposes on `oid`
+-- (CR 612). CR 612.2's family gate is applied where a pair meets a word, not
+-- here. Stored resolution effects only, read against BASE characteristics since
+-- ChangeSubtypeWord always uses a TheseObjects fixed set, so nothing recurses.
 textChangesAffecting :: ObjectId -> GameState -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
 textChangesAffecting oid gs =
   let pairOf eff = case ContinuousEffect.modification eff of
@@ -1247,66 +860,43 @@ textChangesAffecting oid gs =
         _ -> Nothing
    in Maybe.mapMaybe pairOf (GameState.continuousEffects gs)
 
--- Apply text-changes to a modification's subtype words (CR 612.1/612.2):
--- SetLandSubtype/AddLandSubtype carry a land-type word, SetCreatureSubtype
--- carries a creature-type one, and every other modification carries none at all.
--- Projection's charter (it cases on Modification); it is delegated to by
--- rewriteEffect for the inner modification of ModifyTarget.
+-- Apply text-changes to a modification's subtype words (CR 612.1/612.2).
 --
--- CR 612.2 IS THE GATE on each of those arms: "a text-changing effect changes
--- only those words that are used in the correct way (for example ... a land type
--- word used as a land type, or a creature type word used as a creature type)."
--- So a pair naming land types may rewrite only a land-type position and a pair
--- naming creature types only a creature-type one, which is what
--- Subtype.isLandType / Subtype.isCreatureType say here. The arm's own family is
--- fixed by the constructor; the PAIR's family is read off the word being
--- replaced, which is why no family tag rides along on the stored
+-- CR 612.2 is the gate on each arm: a pair naming land types may rewrite only a
+-- land-type position, and one naming creature types only a creature-type one. The
+-- arm's family is fixed by its constructor; the PAIR's family is read off the
+-- word being replaced, which is why no family tag rides on the stored
 -- ChangeSubtypeWord.
 --
--- The gate is not merely the exact-match test restated. `swap` already requires
--- `s == from` on its own, and pawl's two families share no word (Pawl.Engine.Subtype's two
--- classifications have no constructor in common), so for card data whose
--- SetCreatureSubtype really does name a creature type the gate changes no
--- answer. What it removes is the dependence on that: the rule is stated here
--- rather than inferred from the payload, and malformed data cannot smuggle a
--- cross-family rewrite through.
+-- The gate is not the exact-match test restated. `swap` already requires
+-- `s == from`, and pawl's two families share no word, so on well-formed card data
+-- the gate changes no answer. What it removes is the dependence on that: the rule
+-- is stated rather than inferred from the payload, so malformed data cannot
+-- smuggle a cross-family rewrite through.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
 rewriteModification pairs m =
-  let -- `inFamily from` is CR 612.2's gate: the pair's family, read off the word
-      -- being replaced, has to be the family of the position it is applied to.
+  let -- `inFamily from` is CR 612.2's gate.
       swap inFamily from to s = if s == from && inFamily from then to else s
       apply1 acc (from, to) = case acc of
         Modification.SetLandSubtype s -> Modification.SetLandSubtype (swap Subtype.isLandType from to s)
         Modification.AddLandSubtype s -> Modification.AddLandSubtype (swap Subtype.isLandType from to s)
-        -- CR 612.2's other named example, and the half Artificial Evolution
-        -- reaches: "replacing all instances of one creature type with another"
-        -- rewrites a Turn to Frog's Frog on the stack, so the spell that
-        -- resolves makes its target the new type. Pawl.ResolveSpec's
-        -- ArtificialEvolution group proves it end to end.
+        -- CR 612.2's other named example: the swap rewrites a Turn to Frog's Frog
+        -- on the stack, so the spell resolves making its target the new type.
         Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
-        -- Carries no word at all: the type is read off the effect's source at
-        -- projection time (Object.chosenSubtype), not printed on the card, so CR
-        -- 612.1's "words or symbols printed on that object" has nothing here to
-        -- reach. Identity, the treatment SetController gets just below.
+        -- Carries no word: the type is read off the source at projection time,
+        -- not printed on the card, so CR 612.1 has nothing here to reach.
         Modification.SetLandSubtypeToChosen -> acc
-        -- A control op carries no subtype word for CR 612 to rewrite: identity.
+        -- A control op carries no subtype word either.
         Modification.SetController _ -> acc
         _ -> acc
    in List.foldl' apply1 m pairs
 
--- rewriteModification's sibling for the OTHER half of a static ability. CR 612.1:
--- a text-changing effect "can apply to any words or symbols printed on that
--- object, but generally affects only that object's rules text", and an ability's
--- affected clause is rules text like any other -- so a hacked Kormus Bell, whose
--- "All Swamps" is Affected.Matching (HasSubtype Swamp), animates Islands after
--- the swap and stops animating Swamps.
+-- rewriteModification's sibling for the other half of a static ability. Under CR
+-- 612.1 an ability's affected clause is rules text like any other, so a hacked
+-- Kormus Bell animates Islands after the swap and stops animating Swamps.
 --
--- Delegates to Filter.rewrite, which #395 added for a Filter carried by an
--- EFFECT; this is the same call one level up, and the only thing #402 was
--- missing.
---
--- EXHAUSTIVE over Affected, not a wildcard: the three arms that carry a Filter
--- are the three that could hide a subtype word, and a new arm carrying one
+-- Exhaustive over Affected rather than a wildcard: the three arms carrying a
+-- Filter are the three that could hide a subtype word, and a new arm carrying one
 -- must break this build rather than silently keep the old word.
 rewriteAffected :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Affected.Affected -> Affected.Affected
 rewriteAffected pairs a = case a of
@@ -1318,43 +908,23 @@ rewriteAffected pairs a = case a of
   Affected.TheseObjects _ -> a
   Affected.Attached -> a
 
--- CR 612's subtype word swap, over an effect's AST. rewriteModification's
--- sibling one level up: it delegates the inner Modification of ModifyTarget to
--- rewriteModification and every carried Filter to Filter.rewrite, so no module
--- touches another's constructors.
+-- CR 612's subtype word swap over an effect's AST. Delegates the inner
+-- Modification of ModifyTarget to rewriteModification and every carried Filter to
+-- Filter.rewrite, so no module touches another's constructors.
 --
--- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
--- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
--- word inside an ObjectRef.EachMatching. Every arm holding one goes through
--- Filter.rewrite or rewriteObjectRef rather than being special-cased here.
+-- CR 612.1 reaches any printed word, so a Filter an effect carries is not exempt.
 --
--- THE INVARIANT: this cases on an effect's STRUCTURE -- does this arm carry a
--- word a swap could reach -- and never on which effect it is. There is no
--- behavior here that belongs to DealDamage as opposed to Destroy.
---
--- Lives here rather than in Pawl.Engine.Resolve, where it used to: it has two
--- readers now -- Resolve.modesOf for a resolving spell (read-point 3) and
--- rewriteActivatedAbility just below for a permanent's printed ability
--- (read-point 4) -- and Resolve depends on Projection rather than the other way
--- round.
+-- The invariant: this cases on an effect's STRUCTURE -- does this arm carry a
+-- word a swap could reach -- never on which effect it is.
 rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card -> Effect.Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification ref ->
     Effect.ModifyTarget duration (rewriteModification pairs modification) (rewriteObjectRef pairs ref)
   Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
-  -- A text-changer's OWN restriction clause is text like any other. Artificial
-  -- Evolution's "The new creature type can't be Wall" names a creature type word
-  -- used as a creature type (CR 612.2), and CR 612.1 reaches "any words or
-  -- symbols printed on that object" -- Wizards' own Artificial Evolution ruling
-  -- says the swap "alters all occurrences of the chosen word in the text box and
-  -- the type line of the given card". So an Evolution aimed at an Evolution on
-  -- the stack leaves a spell that forbids the NEW word instead.
-  --
-  -- The family gate is CR 612.2 again, read here off the ChangeText's own family
-  -- rather than off a constructor: these words are the family the card's text
-  -- names, so only a pair of that family may reach them. Nothing else in the
-  -- opcode is a subtype word -- the SlotName is a target slot, and the family
-  -- itself is not a word on the card.
+  -- A text-changer's own restriction clause is text like any other (CR 612.1), so
+  -- an Artificial Evolution aimed at another on the stack leaves a spell that
+  -- forbids the NEW word instead. The CR 612.2 family gate is read off the
+  -- ChangeText's own family rather than off a constructor.
   Effect.ChangeText family forbidden slot ->
     Effect.ChangeText family (Set.map (swapWordIn family pairs) forbidden) slot
   Effect.AddMana _ -> effect
@@ -1372,125 +942,71 @@ rewriteEffect pairs effect = case effect of
   Effect.Draw {} -> effect
   Effect.Mill {} -> effect
   Effect.Discard {} -> effect
-  -- No rewritable subtype word.
   Effect.LoseLife {} -> effect
-  -- No rewritable subtype word.
   Effect.GainLife {} -> effect
-  -- CR 612.2a: "most spells and abilities that create creature tokens use
-  -- creature types to define both the creature types and the names of the
-  -- tokens. A text-changing effect that affects such a spell or an object with
-  -- such an ability can change these words because they're being used as
-  -- creature types, even though they're also being used as names." The token's
-  -- defining card is where those words are, so this arm hands it to rewriteCard.
+  -- CR 612.2a: a token-creating spell defines the token's creature types and its
+  -- name with the same words, so a text change reaches both. Those words live in
+  -- the token's defining card, which this arm hands to rewriteCard.
   Effect.Create quantity card riders slot -> Effect.Create quantity (rewriteCard pairs card) riders slot
   Effect.Replace {} -> effect
-  -- A Phase carries no subtype word for CR 612 to rewrite.
   Effect.SkipNextPhase {} -> effect
-  -- Nor does a shield: its recipient is baked at resolution and its Quantity
-  -- names no subtype.
   Effect.PreventNextDamage {} -> effect
-  -- No rewritable subtype word.
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
-  -- No rewritable subtype word.
   Effect.GainPlayerCounters {} -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
-  -- CR 500.8's added phases carry no subtype word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
   Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger {} -> effect
-  -- A player effect carries no subtype word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
-  -- An emblem's embedded card is Create's token one level over, but rewriteCard
-  -- is provably the identity on it, so this arm stays one: CR 114.3 says "an
-  -- emblem has no characteristics other than the abilities defined by the effect
-  -- that created it. In particular, an emblem has no types, no mana cost, and no
-  -- color. Most emblems also have no name" -- and a type line and a name are the
-  -- two things rewriteCard reaches. What CR 612.1 could reach on an emblem is
-  -- its ABILITIES, which nothing here walks (#643).
+  -- Identity, not a rewriteCard call: CR 114.3 leaves an emblem no type line and
+  -- no name, the two things rewriteCard reaches. What CR 612.1 could reach on one
+  -- is its abilities, which nothing here walks (#643).
   Effect.CreateEmblem {} -> effect
-  -- No rewritable subtype word.
   Effect.BecomeMonarch {} -> effect
-  -- No rewritable subtype word.
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
-  -- No rewritable subtype word.
   Effect.PlaySubgame _ -> effect
-  -- CR 500.7's added turns carry no subtype word for CR 612 to rewrite.
   Effect.TakeExtraTurn {} -> effect
-  -- No rewritable subtype word.
   Effect.ShuffleIntoLibrary _ -> effect
 
--- CR 612.2 over ONE word sitting in a position whose family a card's text names
--- rather than a constructor -- the forbidden-word set of a ChangeText. Each pair
--- applies in turn, and only a pair naming that family's words may reach it.
+-- CR 612.2 over one word whose family a card's text names rather than a
+-- constructor -- a ChangeText's forbidden-word set.
 swapWordIn :: SubtypeFamily.SubtypeFamily -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Subtype.Type.Subtype -> Subtype.Type.Subtype
 swapWordIn family pairs word = List.foldl' step word pairs
   where
     step s (from, to) = if s == from && Subtype.inFamily family from then to else s
 
--- CR 612.1 through an ObjectRef. InSlot names an object CHOSEN at cast time, not
--- a word on the card, so there is nothing in it to rewrite; EachMatching's
--- Filter is card text like any other. No module of its own, which the type does
--- not have.
+-- CR 612.1 through an ObjectRef. InSlot names an object chosen at cast time
+-- rather than a word on the card; EachMatching's Filter is card text like any
+-- other.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
 
--- CR 612.2a through the CARD a Create defines its token with -- rewriteEffect's
--- delegate for the one arm whose payload is a whole card rather than an opcode
--- fragment.
+-- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --
--- TWO fields, and the second is the subtle one.
+-- The TYPE LINE is CR 612.1's, and the exact-match test is already CR 612.2's
+-- family gate for the reason applyModification's ChangeSubtypeWord arm gives.
 --
--- The TYPE LINE is CR 612.1's "the text that appears in its type line", and the
--- exact-match test is already CR 612.2's family gate for the reason
--- applyModification's ChangeSubtypeWord arm gives at the projected type line: a
--- set of subtype words carries each word in its own family, so a land pair finds
--- a land type here or nothing and a creature pair a creature type or nothing.
+-- The NAME is CR 612.2a, the licensed exception to CR 612.2's bar on changing a
+-- card name. CR 111.4 is why the exception exists: an unnamed token's name is its
+-- subtypes plus "Token", so the name holds those same words.
 --
--- The NAME is CR 612.2a, the rule's one licensed exception to CR 612.2's closing
--- sentence ("an effect that changes a color word or a subtype can't change a
--- card name, even if that name contains a word ... that is the same as a ...
--- creature type"). CR 111.4 says why the exception exists: "a spell or ability
--- that creates a token sets both its name and its subtype(s). If the spell or
--- ability doesn't specify the name of the token, its name is the same as its
--- subtype(s) plus the word 'Token.'" -- which is exactly what data/cards writes
--- ("Goblin Token"). The name is those same words, so the swap carries it.
+-- Conditional on the type line, never unconditional: CR 612.2a licenses the name
+-- change only where the word is being used as a creature type, so a Create whose
+-- token name merely happens to contain the word falls under CR 612.2's
+-- prohibition. Hence one membership test for both fields.
 --
--- CONDITIONAL on the type line, never unconditional. CR 612.2a licenses the name
--- change only "because they're being used as creature types", so the word is
--- rewritten in the name only where the SAME word is a subtype of the same card.
--- A Create defining a Soldier token whose name merely happens to hold the word
--- Goblin is CR 612.2's prohibition and not CR 612.2a's exception, so it is left
--- alone -- which is why both fields hang off one membership test rather than
--- two.
+-- Not CR 612.4, which is a swap aimed at the token itself and reaches the
+-- projected object rather than this card.
 --
--- NOT CR 612.4, which is the same rule at the other end -- "a token's subtypes
--- and rules text are defined by the spell or ability that created the token. A
--- text-changing effect that affects a token can change these characteristics" --
--- a swap aimed at the token itself, which reaches the projected object and never
--- this card. CR 111.4's last sentence keeps the two apart: "once a token is on
--- the battlefield, changing its name doesn't change its subtype(s), and vice
--- versa."
---
--- Not implemented: the swap does not reach the defined card's ABILITY carriers
--- -- its spell, its activated, triggered and static abilities, its replacement
--- effects -- so the card is walked, not recursed into (#643). Every token this
--- pool creates is a vanilla or keyword-only creature, so there is no ability
--- text on one to rewrite. That also keeps rewriteEffect non-recursive: reaching
--- those carriers would close the loop rewriteEffect -> rewriteCard ->
--- rewriteModal -> rewriteEffect, which still terminates -- a Card is a finite
--- first-order value and each step descends into a strict subterm -- but nothing
--- here relies on that argument today.
---
--- Proved end to end by Pawl.ResolveSpec's ArtificialEvolution group, on both
--- sides of CR 612.2a's "such a spell or an object with such an ability": an
--- evolved Dragon Fodder mints Elves, and an evolved Bitterblossom's upkeep
--- trigger mints an Elf Rogue.
+-- Not implemented: the swap does not reach the defined card's ability carriers,
+-- so the card is walked rather than recursed into (#643). That also keeps
+-- rewriteEffect non-recursive.
 rewriteCard :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Card.Type.Card -> Card.Type.Card
 rewriteCard pairs card = List.foldl' apply1 card pairs
   where
@@ -1505,62 +1021,34 @@ rewriteCard pairs card = List.foldl' apply1 card pairs
                   Card.Type.name = rewriteTokenName from to (Card.Type.name c)
                 }
 
--- CR 612.2a's name half, over the one word CR 111.4 put in the name. Both words
--- are looked up in CR 205.3m's list (Pawl.Engine.Subtype.creatureTypeWord): a
--- name is TEXT, so writing the new one out needs the word itself and not just
--- the family test the rest of this family gets by with.
+-- CR 612.2a's name half. Both words are looked up in CR 205.3m's list, since a
+-- name is TEXT and writing the new one needs the word itself, not just the family
+-- test the rest of this family gets by with.
 --
--- THE FAMILY GATE, stated here rather than inherited: a pair whose words are not
--- creature types has no word to write, and the Nothing arm leaves the name
--- exactly as printed. That is CR 612.2's prohibition holding for every other
--- family -- a Forest -> Island pair may rewrite a land token's type line and
--- must not touch its name, because CR 612.2a's exception is about creature types
--- alone.
+-- The family gate is stated here rather than inherited: a pair whose words are
+-- not creature types has nothing to write, and the Nothing arm leaves the name as
+-- printed -- CR 612.2's prohibition holding for every other family.
 --
--- Every OCCURRENCE, per Artificial Evolution's own "replacing all instances of
--- one creature type with another": Text.replace, not a whole-name test, because
--- CR 111.4's derived name is the subtypes PLUS the word "Token" and a two-type
--- token's name holds two of them ("Faerie Rogue Token"). It matches a substring
--- rather than a whole word, so a name holding this word inside a longer one
--- would be over-reached (#644); rewriteCard's type-line gate already keeps every
+-- Text.replace rather than a whole-name test, since CR 111.4's derived name holds
+-- one word per subtype. It matches a substring, so a name holding the word inside
+-- a longer one is over-reached (#644); rewriteCard's type-line gate keeps every
 -- name pawl was not asked to change out of reach.
 rewriteTokenName :: Subtype.Type.Subtype -> Subtype.Type.Subtype -> CardName.CardName -> CardName.CardName
 rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.creatureTypeWord to) of
   (Just f, Just t) -> CardName.MkCardName (Text.replace f t (CardName.unwrap name))
   _ -> name
 
--- Read-point 4 (CR 612.1): the same word swap over an ACTIVATED ability printed
--- on a permanent. "Any words or symbols printed on that object ... generally
--- affects only that object's rules text (which appears in its text box)", and an
--- activated ability is printed in that box, so a hacked Tidal Warrior's
--- "{T}: Target land becomes an Island" becomes "... becomes a Swamp".
---
--- The MODAL payload only, through rewriteModal below. Not implemented: the
--- ability's activation COST is left unrewritten (#635).
---
--- Proved end to end by Pawl.ActivateSpec's Tidal Warrior chain, and at the
--- projection by Pawl.ProjectionSpec's "hacking Tidal Warrior swaps the land type
--- inside its activated ability".
+-- CR 612.1: the same word swap over an ACTIVATED ability printed on a permanent,
+-- whose text box the rule reaches. The modal payload only. Not implemented: the
+-- ability's activation cost is left unrewritten (#635).
 rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ActivatedAbility.ActivatedAbility Card.Type.Card
 rewriteActivatedAbility pairs ability =
   ability {ActivatedAbility.modal = rewriteModal pairs (ActivatedAbility.modal ability)}
 
--- Read-point 4's sibling list (CR 612.1): the same word swap over a TRIGGERED
--- ability printed on a permanent. The rule's text box holds this exactly as it
--- holds an activated ability, so a hacked Barbarian Outcast's "When you control
--- no Swamps, sacrifice this creature" becomes "no Islands".
---
--- THREE parts, not just the payload. The CONDITION is where the pool's word
--- actually is -- Barbarian Outcast's CR 603.8 state trigger counts
--- `HasSubtype Swamp` -- so a rewrite that reached only Mode.effects would leave
--- the card asking the printed question. CR 603.4's intervening "if" is the same
--- vocabulary read at a different moment and goes through the same
--- rewriteCondition.
---
--- Proved end to end by Pawl.TriggerSpec's "CR 612.1 whole card: a hacked Outcast
--- asks about ISLANDS, fires and sacrifices itself", through
--- Pawl.Engine.Event.stateTriggers -- which reads
--- Projection.triggeredAbilitiesOf, i.e. this list.
+-- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not just
+-- the payload: the CR 603.8 condition is where the pool's word actually is, so a
+-- rewrite reaching only Mode.effects would leave the card asking the printed
+-- question. CR 603.4's intervening "if" shares rewriteCondition.
 rewriteTriggeredAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggeredAbility Card.Type.Card -> TriggeredAbility Card.Type.Card
 rewriteTriggeredAbility pairs ability =
   ability
@@ -1569,24 +1057,17 @@ rewriteTriggeredAbility pairs ability =
       TriggeredAbility.modal = rewriteModal pairs (TriggeredAbility.modal ability)
     }
 
--- The modal payload both abilities carry, rewritten once so the two cannot
--- drift. EFFECTS only, matching Resolve.modesOf: CR 612's word swap has nothing
--- to say about a mode's optionality or its selection. Not implemented: a mode's
--- target SPECS (#635).
+-- The modal payload both abilities carry, rewritten once so the two cannot drift.
+-- Effects only, matching Resolve.modesOf. Not implemented: a mode's target specs
+-- (#635).
 rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card -> Modal.Modal Card.Type.Card
 rewriteModal pairs modal =
   let rewriteMode m = m {Mode.effects = fmap (rewriteEffect pairs) (Mode.effects m)}
    in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
 
--- CR 612.1 through a trigger's own condition. EXHAUSTIVE rather than a
--- wildcard, so a later condition carrying a Filter fails to compile here instead
--- of silently keeping the printed word.
---
--- The two Filter-carrying arms go through Filter.rewrite, the same call
--- rewriteAffected and rewriteEffect make; StateIs carries CR 603.8's whole
--- Condition. Everything else names a phase and a turn scope, a player relation,
--- a trigger frequency, or nothing at all -- no subtype word for the swap
--- to reach.
+-- CR 612.1 through a trigger's own condition. Exhaustive rather than a wildcard,
+-- so a later condition carrying a Filter fails to compile here instead of
+-- silently keeping the printed word.
 rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggerCondition.TriggerCondition -> TriggerCondition.TriggerCondition
 rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
@@ -1604,15 +1085,11 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
 
--- CR 612.1 through the predicate vocabulary Pawl.Types.Condition documents, at
--- the two customers a printed triggered ability has: a CR 603.8 state trigger's
--- condition and a CR 603.4 intervening "if". (Its third customer, a CR 611.2b
--- "for as long as" duration, is stored on a continuous effect rather than
--- printed on an object, so no text change reaches it here.)
---
--- BOTH SIDES are rewritten, because both are full Quantities -- the type's own
--- note says the field names record where the pool happens to put the constant,
--- not a restriction on either side.
+-- CR 612.1 through Condition's predicate vocabulary, at the two customers a
+-- printed triggered ability has: a CR 603.8 state trigger and a CR 603.4
+-- intervening "if". A CR 611.2b duration is stored rather than printed, so no
+-- text change reaches it here. Both sides are rewritten, both being full
+-- Quantities.
 rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
 rewriteCondition pairs condition =
   condition
@@ -1620,15 +1097,9 @@ rewriteCondition pairs condition =
       Condition.Type.threshold = rewriteQuantity pairs (Condition.Type.threshold condition)
     }
 
--- CR 612.1 through a Quantity. A Count's Filter is where the subtype word
--- hides -- Barbarian Outcast counts `HasSubtype Swamp` controlled by you -- and
--- its Aggregation may name a further Quantity (Aggregation.Greatest), which is
--- the knot Pawl.Types.Quantity ties in the data; the descent is structural and
--- terminates for the same reason evaluation does.
---
--- A Count's SCOPE names a zone or an EventShape, neither of which carries a
--- subtype word. Every remaining arm is a leaf: a number, a characteristic read,
--- a slot, CR 208.2's star, or a mana-pool count.
+-- CR 612.1 through a Quantity. A Count's Filter is where the subtype word hides,
+-- and its Aggregation may name a further Quantity; the descent is structural and
+-- terminates for the same reason evaluation does. Every remaining arm is a leaf.
 rewriteQuantity :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Quantity.Type.Quantity -> Quantity.Type.Quantity
 rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Count c ->
@@ -1646,64 +1117,52 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
 
--- rewriteQuantity's other half of the knot: Greatest is the only Aggregation
--- carrying a Quantity ("the greatest mana value among artifacts you control"),
--- and the set it aggregates over is the Count's own Filter, rewritten there.
+-- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
+-- Quantity, and the set it aggregates over is the Count's own Filter.
 rewriteAggregation :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Aggregation.Aggregation Quantity.Type.Quantity -> Aggregation.Aggregation Quantity.Type.Quantity
 rewriteAggregation pairs aggregation = case aggregation of
   Aggregation.Greatest q -> Aggregation.Greatest (rewriteQuantity pairs q)
   Aggregation.Objects -> aggregation
   Aggregation.DistinctCardTypes -> aggregation
 
--- Every continuous effect in the game: stored resolution effects, plus the
--- static abilities of every battlefield permanent (CR 613.7a: with the
--- permanent's own timestamp), dropping a permanent whose static abilities are
--- not live (CR 305.7 stripped). NOT filtered by object here -- project filters
--- per layer against the partial.
+-- Every continuous effect in the game: stored resolution effects, plus every
+-- battlefield permanent's static abilities (CR 613.7a, with the permanent's own
+-- timestamp), dropping a permanent whose static abilities are not live (CR
+-- 305.7). Not filtered by object here -- project filters per layer against the
+-- partial.
 --
--- CR 613.6: the affected set belongs to the EFFECT, not to each of its parts, so
--- the parts of one static ability all carry that ability's key -- which is what
--- lets projectWith decide their set once. A stored effect and a counter are each
--- a single part and carry none.
+-- CR 613.6: the affected set belongs to the EFFECT rather than each of its parts,
+-- so the parts of one static ability all carry that ability's key, which lets
+-- projectWith decide their set once. A stored effect or counter is a single part
+-- and carries none.
 --
--- TWO ability losses are asked about here, and only about a PERMANENT'S OWN
--- static abilities -- Pawl.Engine.PlayerEffect.applying asks the same pair, about the
--- same permanents, for the CR 613.10/613.11 half of a card's text.
--- CR 305.7's land-subtype strip (liveGiven) drops the permanent
--- outright; CR 613.1f's layer-6 ability removal (abilitiesRemoved) drops only an
--- ability whose every part lands after layer 6 (gatherStatic). Neither gate
--- touches a stored effect or a counter, because neither IS an ability for layer 6
--- to remove: CR 611.2a gives a resolved spell's continuous effect a duration of
--- its own ("lasts as long as stated by the spell or ability creating it ... If no
--- duration is stated, it lasts until the end of the game"), and CR 122.1a/613.4c
--- make a counter's +1/+1 a rule about the counter rather than an ability of the
--- object it sits on. Humility removes neither.
+-- Two ability losses are asked about, and only about a permanent's OWN static
+-- abilities: CR 305.7's land-subtype strip (liveGiven) drops the permanent
+-- outright, and CR 613.1f's layer-6 removal (abilitiesRemoved) drops only an
+-- ability whose every part lands after layer 6. Neither touches a stored effect
+-- or a counter, since neither is an ability for layer 6 to remove (CR 611.2a; CR
+-- 122.1a/613.4c) -- Humility removes neither.
 gather :: GameState -> [Gathered]
 gather gs =
   let ungated = gatherGiven (const False) gs
-   in -- Almost every board has no ability-removing effect at all, and then the
-      -- gathered list IS the ungated one -- no second walk of the battlefield's
-      -- static abilities and no projection spent on the question. A board that
-      -- does have one pays for the stored effects, emblems and counters twice;
-      -- none of those three costs a projection, and only the second walk of the
-      -- static abilities ever did.
+   in -- Almost every board has no ability-removing effect, and then the gathered
+      -- list IS the ungated one -- no second walk and no projection spent on the
+      -- question. A board that has one pays for the stored effects, emblems and
+      -- counters twice, none of which costs a projection.
       if any (removesAbilities . gModification) ungated
         then gatherGiven (abilitiesRemoved ungated gs) gs
         else ungated
 
--- gather's body, with the CR 613.1f gate left open as a parameter: `stripped`
--- answers "were this permanent's abilities removed by the time layer 6
--- finished?" for each battlefield permanent. Called TWICE by gather -- once with
--- the gate wired shut (`const False`) to build the very list the gate reads, and
--- once with the real answer -- and once by abilityRemoval, which needs only the
--- first of those.
+-- gather's body with the CR 613.1f gate left open: `stripped` answers whether a
+-- permanent's abilities were removed by the time layer 6 finished. Called twice
+-- by gather -- once wired shut to build the list the gate reads, once with the
+-- real answer.
 gatherGiven :: (ObjectId -> Bool) -> GameState -> [Gathered]
 gatherGiven stripped gs =
   let setEffs = setLandSubtypeEffects gs
-      -- A stored effect carries exactly one modification (Pawl.Engine.Resolve stores one
-      -- per opcode), so CR 613.6 has nothing to hold together here -- and nothing
-      -- to get wrong either, since every stored effect's set is the CR 611.2c
-      -- TheseObjects one, locked at resolution.
+      -- A stored effect carries exactly one modification, so CR 613.6 has nothing
+      -- to hold together -- and every stored effect's set is CR 611.2c's
+      -- TheseObjects, locked at resolution.
       fromStored eff =
         MkGathered
           { gEffect = Nothing,
@@ -1722,15 +1181,13 @@ gatherGiven stripped gs =
           Just card ->
             if null setEffs || liveGiven setEffs Set.empty permId gs
               then
-                -- Read-point 2 (CR 612): rewrite each static ability's basic-land-
-                -- type words by the text-changes affecting THIS source, before its
-                -- effect is folded onto any other object. Hack Blood Moon's
-                -- SetLandSubtype Mountain -> SetLandSubtype Island.
+                -- CR 612: rewrite each static ability's subtype words by the text
+                -- changes affecting THIS source, before its effect is folded onto
+                -- any other object.
                 let changes = textChangesAffecting permId gs
-                 in -- One thunk per permanent, shared by every one of its abilities
-                    -- and forced by none of them unless that ability is entirely
-                    -- above layer 6 -- so the projection it costs is paid for at
-                    -- most once per permanent, and on almost every board not at all.
+                 in -- One thunk per permanent, shared by all its abilities and
+                    -- forced by none unless an ability is entirely above layer 6,
+                    -- so the projection costs at most one per permanent.
                     concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Card.Type.staticAbilities card))
               else []
       static = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
@@ -1740,11 +1197,10 @@ gatherGiven stripped gs =
           Nothing -> []
           Just card ->
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
-            -- zone. Its static ability's continuous effect shares the emblem's
-            -- entry timestamp (CR 613.7a). No liveness/text-change pass, and
-            -- never stripped: nothing in scope strips an emblem's abilities or
-            -- rewrites land types, and CR 613.1f's removers in the pool reach
-            -- creatures, which an emblem (CR 114.5, not a permanent) is not.
+            -- zone, its effect sharing the emblem's entry timestamp (CR 613.7a).
+            -- No liveness or text-change pass and never stripped: the pool's CR
+            -- 613.1f removers reach creatures, and an emblem is not one (CR
+            -- 114.5).
             concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Card.Type.staticAbilities card))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       counters = counterGathered gs
@@ -1758,52 +1214,39 @@ gatherGiven stripped gs =
 -- same posture setLandSubtypeEffects has for CR 305.7's liveGiven.
 --
 -- The list is gathered with the layer-6 gate OFF, which is what the gate itself
--- reads, and why this needs an extra pass rather than a fixpoint. Deciding
--- whether a source's abilities were removed means projecting that source up to
--- CR 613.6's decision point (abilitiesRemoved), which is never above layer 6, and
--- a projection bounded below layer 6 applies no candidate at layer 6 or later --
--- so it cannot see, and so cannot be changed by, the layer-7 parts the gate
--- drops.
+-- reads, and why this needs an extra pass rather than a fixpoint: deciding
+-- whether a source's abilities were removed means projecting it up to CR 613.6's
+-- decision point, which is never above layer 6, and such a projection cannot see
+-- the layer-7 parts the gate drops.
 --
--- WELL-FOUNDED, and this is the whole argument: nothing reachable from here reads
--- a player effect back. The layer machine's only inputs are static abilities,
--- stored continuous effects and counters; a CR 613.10/613.11 effect is a sibling
--- tier applied AFTER that machine has run and is not among them. Pawl.Engine.Projection
--- accordingly does not import Pawl.Engine.PlayerEffect -- the module graph is what
--- enforces it -- so the call is one-way and cannot re-enter.
+-- Well-founded because nothing reachable from here reads a player effect back:
+-- the layer machine's only inputs are static abilities, stored continuous effects
+-- and counters, and a CR 613.10/613.11 effect is a sibling tier applied after it.
+-- The module graph enforces this -- Projection does not import PlayerEffect.
 abilityRemoval :: GameState -> ObjectId -> Bool
 abilityRemoval gs =
   let ungated = gatherGiven (const False) gs
-   in -- Almost every board has no ability-removing effect at all, and then no
-      -- projection is spent on the question at all.
+   in -- Almost every board has no ability-removing effect, and then no projection
+      -- is spent on the question.
       if any (removesAbilities . gModification) ungated
         then abilitiesRemoved ungated gs
         else const False
 
--- CR 613.1f: does this modification REMOVE abilities? The layer-6 classification
--- abilitiesRemoved asks for, in the same standing as setLandSubtypeEffects's
--- isSet -- Projection is the sole home of a case on Modification.
--- Total, like modificationWrites: a new ability-removing Modification must break
--- this build rather than silently answer False and reopen #297.
+-- CR 613.1f: does this modification remove abilities? Total: a new
+-- ability-removing Modification must break this build rather than silently answer
+-- False and reopen #297.
 removesAbilities :: Modification -> Bool
 removesAbilities m = case m of
   Modification.LoseAllAbilities -> True
-  -- CR 613.1f names ability-ADDING effects in the same layer, and adding is not
-  -- removing.
   Modification.GainKeyword _ -> False
-  -- CR 305.7 strips a land's rules text, which IS an ability loss -- but it is a
-  -- layer-4 type change (see `layer`), not a layer-6 removal, and it is performed
-  -- separately and earlier: applyModification's own arm empties the ability
-  -- fields, and liveGiven keeps the static abilities out of the candidate list.
-  -- Answering True here would double-count it into a layer whose ordering it does
-  -- not have.
+  -- CR 305.7 strips a land's rules text, which IS an ability loss -- but as a
+  -- layer-4 type change performed by setLandSubtypeTo and liveGiven, never a
+  -- layer-6 removal. True here would double-count it into a layer whose ordering
+  -- it does not have.
   Modification.SetLandSubtype _ -> False
-  -- CR 305.7's strip, for SetLandSubtype's reason just above: a layer-4 type
-  -- change performed by setLandSubtypeTo and liveGiven, never a layer-6 removal.
   Modification.SetLandSubtypeToChosen -> False
-  -- CR 205.1a/205.1b's creature-type set has no ability clause at all -- CR
-  -- 305.7's strip belongs to the LAND arm above, not to setting a subtype -- so
-  -- this removes nothing in any layer.
+  -- CR 205.1a/205.1b's creature-type set has no ability clause at all; CR 305.7's
+  -- strip belongs to the land arm above.
   Modification.SetCreatureSubtype _ -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
@@ -1817,62 +1260,36 @@ removesAbilities m = case m of
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
 
--- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6
--- finished? Layer 6 is applied before layer 7, so an ability removed there
--- generates no layer-7 effect at all, and CR 613.6's rescue ("it will continue to
--- be applied ... even if the ability generating the effect is removed during this
--- process") cannot reach it -- an ability whose only parts are in layer 7 never
--- STARTED to apply in an earlier layer. gatherStatic is where that distinction is
--- drawn; this only answers the removal question.
+-- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6 finished?
+-- Layer 6 is applied before layer 7, so an ability removed there generates no
+-- layer-7 effect, and CR 613.6's rescue cannot reach one whose only parts are in
+-- layer 7 -- it never started to apply in an earlier layer. gatherStatic draws
+-- that distinction; this only answers the removal question.
 --
 -- The removers are read off the SAME candidate list, which is where CR 613.6's
--- rescue lands instead: an ability-removing effect is itself a layer-6 part, so
--- an ability that carries one is never gated by this and a Humility'd Humility
--- keeps applying its own layer-7b 1/1 (ProjectionSpec's Humility + Opalescence
--- timestamp pair proves it).
+-- rescue lands: an ability-removing effect is itself a layer-6 part, so an ability
+-- carrying one is never gated by this and a Humility'd Humility keeps applying its
+-- own layer-7b 1/1.
 --
--- Each remover's affected set is judged at CR 613.6's decision point -- the
--- LOWEST layer its whole effect reaches (gLowest), not at layer 6 -- because "if
--- an effect starts to apply in one layer and/or sublayer, it will continue to be
--- applied to the same set of objects in each other applicable layer and/or
--- sublayer". That is the same answer projectWith's `decided` memo reaches inside
--- the fold, which is the point: the two must not disagree, or the fold strips an
--- object this gate did not.
+-- Each remover's affected set is judged at CR 613.6's decision point -- gLowest,
+-- not layer 6 -- which is the same answer projectWith's `decided` memo reaches
+-- inside the fold. The two must not disagree, or the fold strips an object this
+-- gate did not. Humility cannot tell the readings apart, layer 6 being its lowest;
+-- Titania's Song can, pairing a layer-4 type change with the layer-6 removal over
+-- a set that reads the card type its layer-4 part writes.
 --
--- Humility cannot tell the two readings apart -- layer 6 IS its lowest layer, so
--- it decides there either way, which is what still lets an Opalescence-animated
--- Rule of Law be inside its "each creature": the animation is layer 4 and the
--- partial already has it. Titania's Song can tell them apart: its one ability
--- pairs a layer-4 type change with the layer-6 removal, and its "each noncreature
--- artifact" set reads the very card type that layer-4 part writes, so judging at
--- layer 6 would find the artifact already animated and miss it (PlayerEffectSpec's
--- Sapphire Medallion case).
+-- Grouped by that layer so one projection serves every remover deciding there, and
+-- lazily enough that `any` short-circuits before projecting for a layer it never
+-- reaches.
 --
--- The bound is never above layer 6: a remover carries a layer-6 modification (CR
--- 613.1f), so its effect's lowest layer is at most that. The whole-game argument
--- above -- that a projection bounded below layer 6 cannot see the layer-7 parts
--- the gate drops -- therefore still holds, and holds more strongly the lower the
--- bound goes.
+-- Still an approximation in one place: projectUpTo excludes the whole decision
+-- layer, while the fold decides against the state same-layer predecessors have
+-- already produced (CR 613.7/613.8). They disagree only when another effect in
+-- that layer moves the remover's set, which no card in the pool does (#510).
 --
--- Grouped by that layer so one projection serves every remover deciding there,
--- and lazily enough that `any` short-circuits before projecting for a layer it
--- never reaches. Almost every board with a remover at all has exactly one.
---
--- STILL an approximation in one place: projectUpTo excludes the whole of the
--- decision layer, while the fold decides an effect's set against the state its
--- SAME-LAYER predecessors have already produced (CR 613.7 timestamp order, CR
--- 613.8 dependency). The two disagree only when another effect in that same layer
--- moves the remover's set. A layer-6 remover CAN now suffer that in principle --
--- GainKeyword and LoseAllAbilities both write the Keywords aspect, so a remover
--- whose affected set named a keyword would be decided here without the same-layer
--- grants -- but no such remover exists: Humility, the pool's only layer-6 one,
--- selects by card type. Titania's Song would suffer it only beside a second
--- layer-4 effect (#510).
---
--- NOT asked of the remover's own source: whether a stripper was itself stripped
--- is a question about ORDER WITHIN layer 6, which the fold settles by CR 613.7
--- timestamp as it applies that layer, not something this gate can restate (#37's
--- neighbourhood -- see the layer-6 grant/Humility timestamp test).
+-- Not asked of the remover's own source: whether a stripper was itself stripped is
+-- a question about order WITHIN layer 6, which the fold settles by CR 613.7
+-- timestamp (#37).
 abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemoved cands gs oid =
   let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c)]
@@ -1881,34 +1298,25 @@ abilitiesRemoved cands gs oid =
          in any (\c -> affects (gSource c) oid (gAffected c) partial gs) cs
    in any removesAt (Map.toList byLowest)
 
--- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the
--- ability's index on its source, and (src, n) is what every part of a MULTI-part
--- ability carries as its key, so projectWith can tell that a layer-4 part and a
--- layer-7b part are the same effect and must share one affected set. A one-part
--- ability is asked once by construction and carries no key at all.
+-- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the ability's
+-- index on its source, and (src, n) is the key every part of a MULTI-part ability
+-- carries, so projectWith can tell that a layer-4 part and a layer-7b part are one
+-- effect sharing one affected set. A one-part ability carries no key.
 --
--- Read-point 2 (CR 612): the text-changes affecting the SOURCE rewrite each
--- part's subtype words before the part is folded onto any other object.
--- Hack Blood Moon's SetLandSubtype Mountain -> SetLandSubtype Island.
+-- CR 612: the text changes affecting the SOURCE rewrite each part's subtype words
+-- before the part is folded onto any other object.
 --
--- `stripped` is CR 613.1f's answer for the SOURCE (abilitiesRemoved): were its
--- abilities removed by the time layer 6 finished? It costs an ability all of its
--- parts, and only when every one of them applies AFTER layer 6 -- CR 613.1g's
--- layer 7 is the only such layer in the vocabulary. Two clauses, both load-
--- bearing:
+-- `stripped` is CR 613.1f's answer for the source. It costs an ability all of its
+-- parts, and only when every one applies AFTER layer 6. Both clauses are
+-- load-bearing:
 --
---   * ALL parts after 6, so nothing is retracted that CR 613.6 protects. An
---     ability with a part in layers 1-5 has already started to apply by the time
---     anything removes it, and "will continue to be applied ... even if the
---     ability generating the effect is removed during this process" -- a March of
---     the Machines that Opalescence animated and Humility then stripped keeps
---     setting its artifacts' P/T at 7b, off its layer-4 part.
---   * AFTER 6, not at-or-after. An ability whose own part is IN layer 6 starts to
---     apply in the very layer that removes it, which is the same rescue: Humility
---     animated by Opalescence strips itself and still sets its 1/1 at 7b.
+--   * ALL parts after 6, so nothing CR 613.6 protects is retracted -- an ability
+--     with a part in layers 1-5 had already started to apply.
+--   * AFTER 6, not at-or-after: an ability whose own part is IN layer 6 starts to
+--     apply in the very layer that removes it, which is the same rescue.
 --
 -- The whole ability is dropped rather than only its layer-7 parts, which is the
--- same statement: the branch is only taken when every part is a layer-7 one.
+-- same statement -- the branch is taken only when every part is a layer-7 one.
 gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic src ts changes stripped n sa =
   let ms = fmap (rewriteModification changes) (StaticAbility.modifications sa)
@@ -1919,16 +1327,11 @@ gatherStatic src ts changes stripped n sa =
       -- copied onto each of its parts. Total: an ability has at least one
       -- modification, so this minimum is over a NonEmpty.
       lowest = minimum (fmap layer ms)
-      -- CR 612.1: rewritten for the same reason the modifications above are --
-      -- the affected clause is rules text too (#402).
-      --
-      -- Hoisted out of `one` and short-circuited, both for the same reason: this
-      -- runs inside gather, which the SBA sweep reruns at every priority
-      -- boundary. Inside `one` it would rebuild the filter once PER PART (three
-      -- times for Kormus Bell), and Filter.rewrite walks and rebuilds the whole
-      -- tree even for an empty pair list -- unlike rewriteModification, whose
-      -- fold over [] is free. An ordinary board has no text change at all, so
-      -- the guard is what keeps this off the hot path entirely.
+      -- CR 612.1: rewritten because the affected clause is rules text too (#402).
+      -- Hoisted out of `one` and short-circuited, since this runs inside gather,
+      -- which the SBA sweep reruns at every priority boundary: inside `one` it
+      -- would rebuild the filter per part, and Filter.rewrite walks the whole tree
+      -- even for an empty pair list.
       affected =
         if null changes
           then StaticAbility.affected sa
@@ -1945,24 +1348,18 @@ gatherStatic src ts changes stripped n sa =
           }
       parts = fmap one (NonEmpty.toList ms)
    in -- The cheap structural test first, so `stripped`'s projection is forced only
-      -- for an ability the rest of the rule could actually reach. "Every part is
-      -- after layer 6" and "the lowest layer is after layer 6" are the same
-      -- statement.
+      -- for an ability the rest of the rule could reach.
       if lowest > Layer.Ability && stripped then [] else parts
 
--- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
--- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c
--- ModifyPowerToughness with net delta d = (#PlusOnePlusOne - #MinusOneMinusOne) on
--- each axis, folded by the same path as Giant Growth. Constructed HERE (Projection
--- is the sole home that may name a Modification constructor). Layer 7c is purely
--- additive, so pre-combining the counters and the object's own timestamp are both
--- unobservable (spec section 4). d == 0 emits nothing.
+-- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c. Each
+-- object's counters are emitted as ONE synthetic 7c ModifyPowerToughness carrying
+-- the net delta, folded by the same path as Giant Growth. Layer 7c is purely
+-- additive, so pre-combining the counters is unobservable; a zero delta emits
+-- nothing.
 --
--- CR 122.1b / 613.1f: a keyword counter grants its keyword instead, which is
--- LAYER 6 and not 7c. Emitted alongside, one grant per counter rather than one
--- per kind: the layer-6 arm counts instances (see applyModification's GainKeyword
--- comment on CR 702.164's lack of a redundancy clause), so two flying counters
--- must arrive as two grants, exactly as two separate GainKeyword effects would.
+-- CR 122.1b / 613.1f: a keyword counter grants its keyword instead, in layer 6.
+-- One grant per counter rather than per kind, since the layer-6 arm counts
+-- instances.
 counterGathered :: GameState -> [Gathered]
 counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs))
   where
@@ -1991,156 +1388,105 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               CounterKind.Keyword kw -> List.genericReplicate n (at Layer.Ability (Modification.GainKeyword kw))
               CounterKind.PlusOnePlusOne -> []
               CounterKind.MinusOneMinusOne -> []
-              -- CR 122.1e: a loyalty counter grants nothing. It "indicates how
-              -- much loyalty" a planeswalker has, and no CR 613 layer reads
-              -- loyalty at all -- CR 704.5i's state-based action and CR 606.6's
-              -- activation gate count Object.counters directly instead.
+              -- CR 122.1e: a loyalty counter grants nothing, and no CR 613 layer
+              -- reads loyalty -- CR 704.5i and CR 606.6 count Object.counters
+              -- directly instead.
               CounterKind.Loyalty -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
 -- question needs: applying one effect can only change what another applies to if
--- it WRITES something that one READS. Projection-internal; not a domain type, and
--- deliberately coarser than ProjectedCharacteristics -- "the subtypes changed" is
--- enough to make two effects worth comparing exactly.
+-- it WRITES something that one READS. Projection-internal, and deliberately
+-- coarser than ProjectedCharacteristics.
 data Aspect
   = Types
   | Subtypes
   | Colors
-  | -- CR 109.3 counts abilities among an object's characteristics, and CR 613.1f
-    -- is the layer that writes them, so a keyword is an aspect exactly as a
-    -- subtype is. Coarse like the rest: "the keywords changed" is enough to make
-    -- two effects worth comparing exactly.
+  | -- CR 109.3 counts abilities among an object's characteristics and CR 613.1f
+    -- writes them, so a keyword is an aspect exactly as a subtype is.
     Keywords
   | PowerA
   | Controller
   deriving (Eq, Ord)
 
--- Which aspects a Filter reads. Exhaustive on purpose: a new Filter arm that
--- reads a projected characteristic must be classified here, or CR 613.8a would
--- silently stop seeing dependencies through it.
+-- Which aspects a Filter reads. Exhaustive on purpose: a new Filter arm reading a
+-- projected characteristic must be classified here, or CR 613.8a would silently
+-- stop seeing dependencies through it.
 --
 -- Several arms read nothing a modification can write. CR 205.4a supertypes come
--- off the printed type line (printedSupertypes) and nothing projects them;
--- IsSource and IsPlayer ask who the candidate IS, which no effect changes; and
--- IsToken asks what it is REPRESENTED BY, which no effect changes either (its own
--- arm below).
+-- off the printed type line; IsSource and IsPlayer ask who the candidate is; and
+-- IsToken asks what it is represented by.
 --
--- IsAttacking reads nothing either, and the reason is worth stating because
--- CR 506.4 makes it look otherwise. That rule removes a permanent from combat
--- when its CONTROLLER changes or when it stops being a CREATURE, so an engine
--- that derived attacking-ness from those characteristics would have to read
--- Controller and Types here. pawl does not derive it: attacking-ness is a stored
--- combat record (CR 109.3 is emphatic that it is not a characteristic), CR 506.4
--- is performed by EDITING that record, and the edit happens between projections
--- (Combat.removeChanged, from Engine.settleForPriority) rather than inside one.
--- So the record is a fixed INPUT to any single projection: applying one
--- modification before another cannot change what this arm answers, which is
--- exactly the question CR 613.8a asks. That holds for the TYPES clause too, and
--- it is the one that looks most like a dependency: a modification really can be
--- what makes a permanent stop being a creature, but the removal it causes lands
--- at the next settle, not inside the projection that noticed it. CR 506.4's "an
--- effect specifically removes it from combat" clause does not disturb it either:
--- Effect.RemoveFromCombat edits the same record from Resolve.applyEffect, which
--- is a RESOLUTION and so between projections just as squarely as a settle is. The
--- clauses that remain unbuilt -- phasing (#154), and the ones about an attacked
--- battle (#302) -- arrive by one of those two doors as well. The clauses about an
--- attacked PLANESWALKER take a third door that disturbs this even less: they are
--- answered where the attack target is read (Combat.stillAttacked), so they never
--- edit the record at all, and this arm's input is untouched by them.
---
--- What that costs is TIMING, not dependency: the rules remove the permanent the
+-- IsAttacking reads nothing either, which CR 506.4 makes look otherwise: that rule
+-- removes a permanent from combat when its controller changes or it stops being a
+-- creature, so an engine deriving attacking-ness from those characteristics would
+-- read Controller and Types here. pawl stores it as a combat record instead (CR
+-- 109.3), and every writer of that record -- the CR 508.1 declaration, CR 506.4's
+-- removals via Combat.removeChanged, Effect.RemoveFromCombat via a resolution,
+-- and CR 511.3's clear -- runs BETWEEN projections. So the record is a fixed
+-- input to any single projection, which is exactly what CR 613.8a asks about.
+-- What that costs is timing, not dependency: the rules remove the permanent the
 -- instant control or creature-ness changes, and pawl removes it at the next
--- settle. That window is argued where the sampling happens. The effect clause has
--- no such window at all, because a resolving effect edits the record on the spot.
+-- settle.
+--
+-- The CR 506.4 clauses that remain unbuilt -- phasing (#154) and an attacked
+-- battle (#302) -- would arrive by one of those same doors; the
+-- attacked-planeswalker clauses are answered where the attack target is read
+-- (Combat.stillAttacked) and never edit the record at all.
 filterReads :: Filter.Type.Filter Keyword.Keyword -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
   Filter.Type.HasSupertype _ -> Set.empty
   Filter.Type.HasColor _ -> Set.singleton Colors
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
-  -- CR 613.1f: layer 6 adds and removes abilities, so what this atom answers
-  -- moves under the fold exactly as HasCardType's answer moves under layer 4 --
-  -- see modificationWrites' three keyword writers below.
+  -- CR 613.1f: layer 6 adds and removes abilities, so this atom's answer moves
+  -- under the fold as HasCardType's moves under layer 4.
   Filter.Type.HasKeyword _ -> Set.singleton Keywords
   Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
-  -- Reads nothing, for IsAttacking's reason and no weaker version of it. The
-  -- argument above is about the RECORD, not about attacking-ness in particular,
-  -- and Combat.blockers is the same kind of record: written by the CR 509.1
-  -- declaration, edited by CR 506.4's removals through Game.removeFromCombat,
-  -- and emptied at CR 511.3 -- every one of those between projections rather
-  -- than inside one, so it is a fixed input to any single projection too.
-  --
-  -- Checked rather than copied, because blocking has an input attacking does
-  -- not: CR 509.1b's evasion restrictions gate the DECLARATION on projected
-  -- characteristics (flying, CR 702.9b). That changes nothing here. The
-  -- declaration is a turn-based action (CR 509.1) that writes the record once
-  -- and then is over; no projection runs inside it, and re-ordering two
-  -- modifications cannot reach back into a declaration that has already
-  -- happened.
+  -- Reads nothing, for IsAttacking's reason: Combat.blockers is the same kind of
+  -- record, written by the CR 509.1 declaration, edited by CR 506.4's removals and
+  -- emptied at CR 511.3 -- all between projections. CR 509.1b's evasion
+  -- restrictions gate the declaration on projected characteristics, but the
+  -- declaration is a turn-based action that writes the record once and is over.
   Filter.Type.IsBlocking -> Set.empty
-  -- Reads nothing, for IsToken's strong reason rather than IsAttacking's. No
-  -- Modification writes GameState.events -- CR 608.2i's record is appended by
-  -- the change-and-emit funnels and never edited -- so no CR 613 layer can move
-  -- a set this atom selects, and CR 613.8a sees no dependency through it.
+  -- Reads nothing: no Modification writes GameState.events, so no CR 613 layer can
+  -- move a set this atom selects.
   Filter.Type.AttackedThisTurn -> Set.empty
-  -- Declared as reading Types even though the types it reads are the HOST's, not
-  -- the candidate's. Aspect names an aspect of ONE object's projection, so there
-  -- is nothing here that can say "another object's card types"; over-declaring
-  -- orders a Types-writing effect before an effect whose affected set asks this,
-  -- which is the conservative direction. Nothing in the pool puts this atom in an
-  -- affected set, so no ordering observable today turns on the choice (#357).
+  -- Declared as reading Types even though the types are the HOST's. Aspect names
+  -- an aspect of ONE object's projection, so there is no way to say "another
+  -- object's card types"; over-declaring is the conservative direction. Nothing in
+  -- the pool puts this atom in an affected set (#357).
   Filter.Type.IsAttachedToCreature -> Set.singleton Types
-  -- Reads nothing, unlike its sibling above, and the difference is exactly why
-  -- the two are separate atoms: this one stops at Object.attachedTo and asks
-  -- whether the attachment names an object or a player (CR 303.4). No Modification
-  -- writes that field -- CR 701.3's attach is a keyword ACTION performed by a
-  -- resolution, between projections rather than inside one -- so no CR 613 layer
-  -- can move a set this atom selects.
+  -- Reads nothing, unlike its sibling above, which is why the two are separate
+  -- atoms: this one stops at Object.attachedTo (CR 303.4), and no Modification
+  -- writes that field -- CR 701.3's attach is a keyword action performed by a
+  -- resolution.
   Filter.Type.IsAttachedToPermanent -> Set.empty
-  -- Over-declared, deliberately. The characteristics behind this atom are the
-  -- CANDIDATE's (an Equipment needs a creature, CR 301.5) and the SUBJECT's (its
-  -- enchant ability, CR 702.5a, whose own Filter can read anything), and Aspect
-  -- names aspects of one object's projection, so there is no honest way to say
-  -- "and another object's". Declaring everything orders any characteristic-writing
-  -- effect before an affected set that asks this, which is the conservative
-  -- direction -- and no card in the pool puts this atom in an affected set at all,
-  -- because it is a destination filter, so nothing observable turns on the choice.
-  -- The same limitation IsAttachedToCreature's arm above records (#357).
+  -- Over-declared deliberately: the characteristics behind this atom are the
+  -- candidate's (CR 301.5) and the subject's (CR 702.5a), and Aspect cannot say
+  -- "another object's". Declaring everything is the conservative direction, and no
+  -- card in the pool puts this atom in an affected set (#357).
   Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
-  -- Reads nothing, and for a stronger reason than the three empty arms above:
-  -- CR 111.3 makes a token's effect-defined values "functionally equivalent" to
-  -- printed ones rather than a separate kind of characteristic, and no
-  -- Modification writes Object.source. So no effect can move a "nontoken" set,
-  -- and CR 613.8a sees no dependency through this atom -- which is what makes
-  -- Ashaya's affected set depend only on card type and controller.
+  -- Reads nothing: no Modification writes Object.source, so no effect can move a
+  -- "nontoken" set.
   Filter.Type.IsToken -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
 
--- Which aspects a Modification writes -- the other half of the pair above, and
--- another legitimate case-on-Modification that Projection is the sole home of.
+-- Which aspects a Modification writes -- the other half of the pair above.
 --
--- FOUR arms write Keywords, and each of them writes PC.keywords in
--- applyModification above: GainKeyword adds one (CR 613.1f), LoseAllAbilities
--- empties the map (CR 613.1f again -- Humility), and SetLandSubtype and
--- SetLandSubtypeToChosen both empty it, because CR 305.7's second sentence says
--- a land whose subtype is set "loses all abilities generated from its rules
--- text" -- true whether the new subtype is printed on the source (SetLandSubtype)
--- or chosen as the source entered (SetLandSubtypeToChosen, CR 614.1c).
--- Filter.HasKeyword reads that map, so all four can move an affected set and
--- CR 613.8a has to see them. Keyword COUNTERS need no arm of their own:
--- counterGathered mints CounterKind.Keyword as a synthetic GainKeyword
--- candidate, so it arrives here as one.
+-- Four arms write Keywords, each writing PC.keywords in applyModification:
+-- GainKeyword and LoseAllAbilities per CR 613.1f, and both subtype-setting arms
+-- per CR 305.7. Filter.HasKeyword reads that map, so all four can move an affected
+-- set. Keyword counters need no arm, arriving here as synthetic GainKeywords.
 --
--- An ability change can also matter to CR 613.8 by changing an effect's
--- EXISTENCE, which is a different clause of CR 613.8a and still lives in
--- staticAbilitiesLive (CR 305.7) rather than here.
+-- An ability change can also matter to CR 613.8 by changing an effect's EXISTENCE,
+-- a different clause that lives in staticAbilitiesLive.
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords
@@ -2177,27 +1523,19 @@ staticallyMovable c = case gAffected c of
   -- (CR 613.1b), so a control change moves this set.
   Affected.AttachedPlayerControls _ -> True
 
--- CR 613.8's unit is an EFFECT, not a modification: "an effect is said to
--- 'depend on' another", and CR 613.6 calls one ability's modifications "the parts
--- of the effect". Two parts that land in the SAME layer are therefore applied
--- together, with nothing else allowed between them -- so the reorder groups a
--- layer's candidates into effects before it orders them.
+-- CR 613.8's unit is an EFFECT, not a modification, and CR 613.6 calls one
+-- ability's modifications the parts of that effect. Two parts landing in the SAME
+-- layer are applied together with nothing allowed between them, so the reorder
+-- groups a layer's candidates into effects before ordering them.
 --
--- gatherStatic emits one ability's parts contiguously and keys them alike
--- (gEffect), and filtering by layer preserves that order, so adjacency is enough
--- to find a unit. A Nothing key is always a unit of one: it marks a
--- single-modification ability, a stored effect or a counter, none of which has a
--- second part to be separated from.
+-- gatherStatic emits one ability's parts contiguously and keys them alike, and
+-- filtering by layer preserves that order, so adjacency finds a unit. A Nothing
+-- key is always a unit of one.
 --
--- Ashaya, Soul of the Wild + Blood Moon is the pair that needs it, and the reason
--- nothing before it did. Ashaya's one ability adds the card type Land AND the
--- subtype Forest; Blood Moon's affected set reads card types only, so it depends
--- (CR 613.8a) on the first part and not on the second. Ordered per modification,
--- an older Blood Moon slots in BETWEEN them and its SetLandSubtype is overwritten
--- by the Forest it was meant to replace, leaving a creature that is a Mountain and
--- a Forest at once. March of the Machines' two AddCardType parts are the pool's
--- other same-layer pair, and never noticed: nothing on its boards is ordered
--- against it.
+-- Ashaya, Soul of the Wild + Blood Moon is the pair that needs it: Ashaya's one
+-- ability adds a card type AND a subtype, and Blood Moon depends (CR 613.8a) on
+-- the first part only. Ordered per modification, an older Blood Moon slots in
+-- between them and its set is overwritten by the very subtype it meant to replace.
 effectUnits :: [Gathered] -> [NonEmpty.NonEmpty Gathered]
 effectUnits =
   let sameEffect a b = case (gEffect a, gEffect b) of
@@ -2205,72 +1543,47 @@ effectUnits =
         _ -> False
    in NonEmpty.groupBy sameEffect
 
--- CR 613: apply continuous effects layer by layer (only the layers with effects,
--- ascending). Within a layer, CR 613.8's dependency ordering, falling back to CR
--- 613.7 timestamp order where no dependency exists. An effect's affected set is
--- evaluated against the partial projection as it stands when that effect applies.
--- CR 613.8's EXISTENCE dependency is the exception: it is handled by
--- source-liveness rather than by the reorder. design.md section 2.5.
+-- CR 613: apply continuous effects layer by layer, ascending. Within a layer, CR
+-- 613.8's dependency ordering falling back to CR 613.7 timestamp order. An
+-- effect's affected set is evaluated against the partial projection as it stands
+-- when that effect applies. CR 613.8's EXISTENCE dependency is the exception,
+-- handled by source-liveness rather than the reorder. design.md section 2.5.
 project :: ObjectId -> GameState -> ProjectedCharacteristics
 project oid gs = projectFrom (gather gs) oid gs
 
 -- CR 613.4a layer 7a: apply the object's own characteristic-defining P/T ability.
 -- Read from the PARTIAL projection (post-layer-6), so LoseAllAbilities can strip
--- it first; evaluated against the CURRENT state, so it recomputes on every
+-- it first, and evaluated against the current state so it recomputes every
 -- projection.
 --
--- Folded IN PLACE rather than emitted as a synthetic Gathered the way
--- counterGathered emits layer-7c counters, for three reasons:
+-- Folded in place rather than emitted as a synthetic Gathered, for three reasons:
 --
 --   * gather runs BEFORE the fold and has no partial to read, so a pre-gathered
 --     CDA could never be removed by Humility at layer 6;
---   * CR 604.3 (and CR 208.2a for P/T specifically) says a CDA functions in ALL
---     zones. gather walks the battlefield only; projectFrom is not zone-scoped, so
---     in-place gets all-zones behaviour for free -- a Tarmogoyf in a graveyard has
---     a power, and counts itself;
---   * a CDA has no source object and no timestamp, so it has nothing to sort on
---     under CR 613.7 and does not belong in the candidate list at all.
+--   * CR 604.3 / 208.2a make a CDA function in ALL zones, while gather walks the
+--     battlefield only -- in-place gets all-zones behaviour for free;
+--   * a CDA has no source object and no timestamp to sort on under CR 613.7.
 --
--- A fourth reason applies to this CDA and not to applyColorDefining's: this one
--- is DYNAMIC. Devoid's value is a constant, so computing it early would still
--- give the right answer; Tarmogoyf's P/T reads the graveyards' card types, which
--- change over time. Computing it before the fold would freeze the computed NUMBER
--- into Binding.copy at entry -- Replacement.apply's EntryRewrite.AsCopy arm
--- stamps Binding.setCopy with copiableCharacteristics, and applyEntryOption does
--- the same for CR 208.2b -- so a Clone of a Tarmogoyf would keep whatever P/T the
--- graveyards held the moment it entered. CR 707.2 makes a copy acquire the values
--- derived from the printed TEXT -- the ability itself -- so the copy has to
--- recompute, and folding here is what makes it.
+-- A fourth reason applies here and not to applyColorDefining: this CDA is DYNAMIC.
+-- Computing it before the fold would freeze the computed number into Binding.copy
+-- at entry, so a Clone of a Tarmogoyf would keep whatever P/T the graveyards held
+-- as it entered. CR 707.2 makes a copy acquire values derived from the printed
+-- TEXT, so the copy has to recompute.
 --
--- Quantity.determine rather than Quantity.evaluate, and a BARE ASSIGNMENT rather
--- than setPT, because of CR 208.2a's last sentence: "If the ability needs to use
--- a number that can't be determined, including inside a calculation, use 0
--- instead of that number." A CDA therefore always produces a number, and setPT's
--- keep-the-base arm is left with no case to handle. The difference is a board
--- difference: Monstrous War-Leech cast with an empty graveyard has no greatest
--- mana value to take, so it is a 0/0 that CR 704.5f buries rather than a creature
--- with no P/T at all that survives. Pawl.PowerToughnessSpec casts it and proves
--- that.
+-- Quantity.determine and a bare assignment rather than setPT, because CR 208.2a
+-- makes a CDA always produce a number, leaving setPT's keep-the-base arm no case.
+-- That is a board difference: a creature whose CDA cannot be determined is a 0/0
+-- that CR 704.5f buries, not one with no P/T that survives. setPT stays at layer
+-- 7b, where CR 208.2a does not reach and an unevaluable quantity determines
+-- nothing.
 --
--- setPT stays where the other caller is, layer 7b
--- (Modification.SetBasePowerToughness, CR 613.4b), because that is a different
--- rule: a stored effect that sets base P/T is not a characteristic-defining
--- ability, so CR 208.2a does not reach it and a quantity it cannot evaluate
--- determines nothing rather than 0.
+-- Not implemented: CR 208.5, which is about the READ POINTS -- powerOf and
+-- toughnessOf return Nothing for a creature with no value rather than 0 (#65).
 --
--- NOTE: CR 208.5, CR 208.2a's sibling -- "If a creature somehow has no value for
--- its power, its power is 0. The same is true for toughness" -- is a rule about
--- the READ POINTS and is still not implemented: powerOf and toughnessOf return
--- Nothing for a creature with no value rather than 0 (#65).
---
--- CR 604.3a(3): a characteristic-defining ability does not directly affect the
--- characteristics of any OTHER object, so the built Filter.Context is the
--- object's OWN controller -- contrast applyModification, whose context is the
--- effect's SOURCE's controller (CR 109.5). `lyr`/`cands` are the same pair
--- applyModification receives; the caller always passes Layer.CharacteristicPT
--- for `lyr` here (see projectWith), so a CDA's count sees layers 1-6 -- control
--- at layer 2 and type at layer 4, which is what Nightmare needs to see Urborg
--- and Act of Treason.
+-- CR 604.3a(3): a CDA does not affect any other object, so the Filter.Context is
+-- the object's OWN controller -- contrast applyModification's, which is the
+-- source's (CR 109.5). The caller always passes Layer.CharacteristicPT, so a CDA's
+-- count sees layers 1-6.
 applyCharacteristicPT :: Layer -> [Gathered] -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
@@ -2284,44 +1597,31 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 
 -- Project one object against a PRECOMBINED candidate list, applying only the
 -- layers the predicate admits. CR 613.1 applies layers in order and Layer's
--- derived Ord IS that order, so `(< bound)` is exactly "the layers before this
--- one".
+-- derived Ord IS that order, so `(< bound)` is exactly the layers before this one.
 --
--- The bound exists for counting: a Pawl.Types.Count evaluated while layer L is
--- being applied sees its candidates through `< L`, so a count encountered inside
--- THAT fold is applied at some K < L and sees `< K`. The bound strictly
--- decreases and Layer is finite, so the nesting terminates.
---
--- That BOUND is a terminating approximation: a count is exact whenever it reads
--- layers strictly earlier than its consumer's, and under-reads a count over its
--- own layer or later (#157). It is unrelated to the CR 613.8 dependency ordering
--- below, which is about effects rather than counts and is implemented.
+-- The bound exists for counting: a Count evaluated while layer L is being applied
+-- sees its candidates through `< L`, so one encountered inside that fold is
+-- applied at some K < L and sees `< K`. The bound strictly decreases and Layer is
+-- finite, so the nesting terminates. It is a terminating approximation -- exact
+-- whenever a count reads strictly earlier layers, under-reading one over its own
+-- layer or later (#157).
 projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
--- Written as candidates-in, then a worker taking the object: everything derived
--- from the CANDIDATE LIST alone -- the layer list, and the CR 613.8 movable-layer
--- set -- is bound before `oid`, so projectAll shares it across the whole board
--- instead of rebuilding it per object.
+-- Candidates-in, then a worker taking the object: everything derived from the
+-- candidate list alone is bound before `oid`, so projectAll shares it across the
+-- board instead of rebuilding it per object.
 projectWith admits cands = forObject
   where
-    -- Layer 5 and layer 7a are ALWAYS visited, even when no gathered effect
-    -- lives there: an object's own characteristic-defining abilities are not
-    -- gathered candidates (applyColorDefining, applyCharacteristicPT). For an
-    -- object with neither, each extra pass is an identity function over an empty
-    -- candidate filter.
+    -- Layers 5 and 7a are always visited, even with no gathered effect there: an
+    -- object's own CDAs are not gathered candidates. For an object with neither,
+    -- each extra pass is the identity.
     layers = filter admits (Set.toAscList (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands)))))
-    -- The layers CR 613.8 could reorder anything in: those holding an effect
-    -- whose affected set another effect can move -- a Matching or
-    -- MatchingAnywhere predicate over characteristics, or an
-    -- AttachedPlayerControls set's controller (staticallyMovable). Bound HERE,
-    -- before the object, so a whole-board sweep pays for it once for the board rather
-    -- than once per object per layer -- and for most boards it is empty, so the
-    -- per-layer question becomes a lookup in an empty Set.
+    -- The layers CR 613.8 could reorder anything in: those holding an effect whose
+    -- affected set another can move (staticallyMovable). Bound before the object,
+    -- so a whole-board sweep pays once rather than per object per layer.
     --
-    -- Deliberately coarser than the movableReads inside the fold: this skips the
-    -- CR 613.6 memo test (per object, and it changes as the fold runs) and the
-    -- filter's own aspects. Both only ever turn a True into a False, so this
-    -- over-admits -- which costs the general path where the tight one would have
-    -- done, and never a different answer.
+    -- Deliberately coarser than movableReads inside the fold, skipping the CR 613.6
+    -- memo test and the filter's own aspects. Both only turn True into False, so
+    -- this over-admits -- costing the general path, never a different answer.
     movableLayers = Set.fromList (fmap gLayer (filter staticallyMovable cands))
     forObject oid gs =
       let applyLayer (partial, decided) lyr =
@@ -2332,29 +1632,23 @@ projectWith admits cands = forObject
                   Layer.Color -> applyColorDefining partial
                   Layer.CharacteristicPT -> applyCharacteristicPT lyr cands gs oid partial
                   _ -> partial
-                -- CR 613.6: "If an effect starts to apply in one layer and/or
-                -- sublayer, it will continue to be applied to the same set of objects
-                -- in each other applicable layer." The affected set is therefore asked
-                -- ONCE per effect, at the lowest layer that effect reaches, and the
-                -- answer is remembered in `decided` for its other layers. It remembers
-                -- "no" as faithfully as "yes": an artifact that was ALREADY a creature
-                -- is outside March of the Machines' set when March starts to apply, so
-                -- it stays outside at 7b and keeps its printed P/T (#233).
+                -- CR 613.6: the affected set is asked ONCE per effect, at the
+                -- lowest layer that effect reaches, and remembered in `decided` for
+                -- its other layers. It remembers "no" as faithfully as "yes": an
+                -- artifact already a creature is outside March of the Machines' set
+                -- when March starts to apply, so it stays outside at 7b (#233).
                 --
-                -- Only an effect with parts in more than one layer carries a key
-                -- (gEffect); everything else -- every counter, every stored effect,
-                -- every single-line static ability -- is Nothing and never touches the
-                -- Map.
+                -- Only an effect with parts in more than one layer carries a key;
+                -- everything else is Nothing and never touches the Map.
                 appliesTo ds pc c = case gEffect c of
                   Just k | Just answer <- Map.lookup k ds -> answer
                   _ -> affects (gSource c) oid (gAffected c) pc gs
-                -- Fold every part of ONE effect that lands in this layer, in the
-                -- order the card lists them (CR 613.6: "the parts of the effect").
-                -- The parts share a source and an affected set, so the caller asks
-                -- applicability once and this only writes.
+                -- Fold every part of ONE effect landing in this layer, in the order
+                -- the card lists them (CR 613.6). The parts share a source and an
+                -- affected set, so the caller asks applicability once.
                 applyUnit pc cs = List.foldl' (\p c -> applyModification lyr (gSource c) cands gs oid (gModification c) p) pc (NonEmpty.toList cs)
                 -- Apply one effect, recording its decision the first time.
-                -- Re-inserting an existing key writes the value it just read, so this
+                -- Re-inserting an existing key rewrites the value just read, so this
                 -- is idempotent rather than a second determination.
                 applyOne (pc, ds) cs =
                   let c = NonEmpty.head cs
@@ -2363,15 +1657,14 @@ projectWith admits cands = forObject
                         Nothing -> ds
                         Just k -> Map.insert k answer ds
                    in (if answer then applyUnit pc cs else pc, ds')
-                -- What could move `c`'s affected set, as the aspects its filter reads
-                -- -- or Nothing when nothing can move it at all. Three ways to be
-                -- immovable, none of them an optimization of CR 613.8a so much as its
-                -- own precondition made cheap to test: a TheseObjects set names ids
-                -- (CR 611.2c) and an Attached one reads the source's own attachment off
-                -- the game state (CR 303.4m), neither of which any modification writes;
-                -- an effect CR 613.6 already decided answers from the memo; and a
-                -- filter that reads no projected aspect at all (`And []`, IsSource, a
-                -- supertype) has nothing in it to change.
+                -- What could move `c`'s affected set, as the aspects its filter
+                -- reads -- Nothing when nothing can move it. Three ways to be
+                -- immovable, each CR 613.8a's own precondition made cheap to test: a
+                -- TheseObjects set names ids (CR 611.2c) and an Attached one reads
+                -- its source's attachment (CR 303.4m), neither of which a
+                -- modification writes; an effect CR 613.6 already decided answers
+                -- from the memo; and a filter reading no projected aspect has nothing
+                -- to change.
                 movableReads ds c = case gEffect c of
                   Just k | Map.member k ds -> Nothing
                   _ -> case gAffected c of
@@ -2387,30 +1680,23 @@ projectWith admits cands = forObject
                     -- narrowed by WHO CONTROLS each candidate, and Controller is
                     -- an aspect layer 2 writes (CR 613.1b).
                     Affected.AttachedPlayerControls f -> Just (Set.insert Controller (filterReads f))
-                -- CR 613.8b: an effect that depends on another waits for it, and among
-                -- the effects waiting on nothing, CR 613.7 timestamp order picks the
-                -- next. Re-deriving `ready` each time round IS CR 613.8c ("the order of
-                -- remaining effects is reevaluated"), and removing one effect per
-                -- pass is what makes it terminate: `pending` is finite and strictly
-                -- shorter on every call, and `batch` is never empty, so a choice is
-                -- always available to remove.
+                -- CR 613.8b: an effect that depends on another waits for it, and CR
+                -- 613.7 timestamp order picks the next among those waiting on
+                -- nothing. Re-deriving `ready` each round IS CR 613.8c, and removing
+                -- one effect per pass makes it terminate: `pending` is finite and
+                -- strictly shorter each call, and `batch` is never empty.
                 --
-                -- Applicability is judged HERE, as each effect is applied, rather than
-                -- from `seeded`. That is CR 613.8's premise: "applying the other would
-                -- change ... what it applies to" describes a state that only exists if
-                -- an effect is asked after its predecessor has applied.
+                -- Applicability is judged HERE, as each effect is applied, rather
+                -- than from `seeded` -- CR 613.8's premise describes a state that
+                -- exists only once a predecessor has applied.
                 --
-                -- When `ready` is empty every remaining effect is waiting on
-                -- another, so somewhere in there is a dependency loop, and CR
-                -- 613.8b's last sentence says to ignore the rule for it: "the
-                -- effects in the dependency loop are applied in timestamp order".
-                -- Only the loop's OWN members escape -- an effect that merely
-                -- waits on the loop keeps waiting, and gets its turn once the loop
-                -- has unwound -- so the fallback is restricted to the effects
-                -- that sit on a cycle rather than to everything left.
+                -- An empty `ready` means every remaining effect waits on another, so
+                -- a dependency loop is in there, and CR 613.8b says to apply the
+                -- loop in timestamp order. Only the loop's own members escape; an
+                -- effect merely waiting on the loop gets its turn once it unwinds.
                 --
-                -- `pending` holds EFFECTS (effectUnits), not modifications, because
-                -- that is CR 613.8's unit -- see effectUnits.
+                -- `pending` holds EFFECTS, not modifications, that being CR 613.8's
+                -- unit.
                 resolve (pc, ds) pending = case pending of
                   [] -> (pc, ds)
                   _ ->
@@ -2424,23 +1710,19 @@ projectWith admits cands = forObject
                         -- CR 613.8a clause (b), the "what it applies to" half: `a`
                         -- depends on `b` when applying `b` would change whether `a`
                         -- applies. The tentative application is thrown away and only
-                        -- the answer kept -- and it is only reached for a pair that
-                        -- could interact at all, `b` writing an aspect `a` reads.
+                        -- the answer kept, and it is reached only for a pair that
+                        -- could interact -- `b` writing an aspect `a` reads.
                         --
-                        -- Clause (c)'s characteristic-defining exclusion needs no test:
-                        -- a CDA is never a candidate -- both in-place folds sit outside
-                        -- this list (applyColorDefining at layer 5, applyCharacteristicPT
-                        -- at 7a) -- so no pair here is CDA-vs-non-CDA.
-                        -- Clause (b)'s "text" and "what it does to" halves are not
-                        -- implemented and have no producer; "existence" is handled by
-                        -- staticAbilitiesLive. The CR decides all of this over an
-                        -- effect's whole affected set and this decides it per projected
-                        -- object, which agrees for everything the Filter vocabulary can
-                        -- express (#236).
+                        -- Clause (c)'s CDA exclusion needs no test: a CDA is never a
+                        -- candidate, both in-place folds sitting outside this list.
+                        -- Clause (b)'s "text" and "what it does to" halves have no
+                        -- producer; "existence" is handled by staticAbilitiesLive. The
+                        -- CR decides this over an effect's whole affected set and this
+                        -- decides it per projected object, which agrees for everything
+                        -- the Filter vocabulary can express (#236).
                         --
-                        -- `b` is applied WHOLE here, every part of it that lands in
-                        -- this layer, for the same reason applyOne does: half an
-                        -- effect is not a state CR 613 ever describes.
+                        -- `b` is applied WHOLE, every part landing in this layer:
+                        -- half an effect is not a state CR 613 describes.
                         dependsOnOne (i, as, answer) (j, bs, bApplies) =
                           let a = NonEmpty.head as
                            in case movableReads ds a of
@@ -2479,8 +1761,8 @@ projectWith admits cands = forObject
                         -- unit's.
                         (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, cs, _) -> gTimestamp (NonEmpty.head cs))) batch
                      in resolve (applyOne (pc, ds) next) (filter ((/= chosen) . fst) pending)
-                -- Is there anything at this layer CR 613.8 could reorder? See
-                -- movableLayers above: one Set lookup, almost always in an empty Set.
+                -- Is there anything at this layer CR 613.8 could reorder? One Set
+                -- lookup, almost always in an empty Set.
                 movableHere = Set.member lyr movableLayers
                 -- CR 613.6's memo, populated against `seeded` -- sound only on the
                 -- branch below where nothing is movable, which is exactly where an
@@ -2494,14 +1776,12 @@ projectWith admits cands = forObject
                   then resolve (seeded, decided) (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
                   else
                     -- Nothing here can be moved, so no candidate depends on any other
-                    -- (CR 613.8a needs one to change what another applies to) and no
-                    -- candidate's answer can change as the layer is applied. CR 613.8
+                    -- and none's answer can change as the layer is applied. CR 613.8
                     -- therefore says nothing, CR 613.7 timestamp order stands, and
-                    -- judging applicability against `seeded` gives the same answers as
-                    -- judging it one at a time -- so this branch is not a shortcut past
-                    -- the rule, it is the rule where the rule is silent. It is also
-                    -- almost every layer of almost every projection, which is why it
-                    -- keeps the older, tighter fold rather than sharing `resolve`'s.
+                    -- judging against `seeded` gives the same answers as judging one
+                    -- at a time -- the rule where the rule is silent, not a shortcut
+                    -- past it. Also almost every layer of almost every projection,
+                    -- which is why it keeps a tighter fold than `resolve`'s.
                     let decided' = List.foldl' remember decided cands
                         applies c = case gEffect c of
                           Nothing -> affects (gSource c) oid (gAffected c) seeded gs
@@ -2514,18 +1794,12 @@ projectWith admits cands = forObject
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
 -- (projectAll) instead of re-gathering per object.
---
--- Layers 5 and 7a are ALWAYS in the layer list, even when no gathered effect
--- lives there: an object's own characteristic-defining abilities are not gathered
--- candidates (see applyColorDefining and applyCharacteristicPT). For an object
--- with no CDA each extra pass is an identity function over an empty candidate
--- filter.
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom = projectWith (const True)
 
--- CR 613.1: a projection bounded to the layers BEFORE `bound` -- the fold a
--- Pawl.Types.Count sees while layer `bound` is being applied. See projectWith's
--- comment for the termination argument this exists to serve.
+-- CR 613.1: a projection bounded to the layers BEFORE `bound` -- what a Count sees
+-- while layer `bound` is being applied. See projectWith for the termination
+-- argument this serves.
 projectUpTo :: Layer -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectUpTo bound = projectWith (< bound)
 
@@ -2535,47 +1809,31 @@ projectUpTo bound = projectWith (< bound)
 projectAll :: GameState -> Map ObjectId ProjectedCharacteristics
 projectAll gs =
   let cands = gather gs
-      -- Bound separately, and NOT inlined: projectWith does its candidate-only
-      -- work (the layer list, the CR 613.8 movable-layer set) when it is applied
-      -- to `cands`, so sharing this partial application shares that work across
-      -- every object on the board.
+      -- Bound separately, NOT inlined: projectWith does its candidate-only work
+      -- when applied to `cands`, so sharing this partial application shares that
+      -- work across every object on the board.
       forObject = projectFrom cands
    in Map.fromSet (\oid -> forObject oid gs) (GameState.battlefield gs)
 
--- One object's characteristics out of a PRE-PROJECTED board -- the Map projectAll
--- returns -- falling back to a fresh single-object projection for an id the board
--- does not hold. Every `...Given` reader below is this plus one field read, and
--- every plain `...Of` reader is one of those against Map.empty.
+-- One object's characteristics out of a PRE-PROJECTED board, falling back to a
+-- fresh single-object projection for an id the board does not hold. Every
+-- `...Given` reader below is this plus one field read, and every plain `...Of`
+-- reader is one of those against Map.empty.
 --
--- This is not an approximation of `project`, it IS `project`. Where the key
--- exists, projectAll folded the SAME gathered candidate list `project` would
--- rebuild for that object alone (see projectAll), so the two agree by
--- construction. Where it does not, the id is not on the battlefield -- gather
--- walks the battlefield only -- and projecting it here is the same work
--- `project` would have done anyway. Sba.stillLegalEnchant's haddock argues the
--- identical point for the SBA sweep's board.
+-- Not an approximation of `project`, it IS `project`: where the key exists,
+-- projectAll folded the same candidate list `project` would rebuild for that
+-- object alone, and where it does not, the id is off the battlefield and
+-- projecting it here is the work `project` would have done anyway.
 --
--- The board is a SNAPSHOT of one GameState, so it is the right answer only while
--- that state is the one being read. A caller hoists it inside a single pure pass
--- over one `gs` and must re-project after any change to the state; every hoist
--- in the engine sits in exactly such a pass (Sba.performStateBasedActions,
--- Combat.legalAttackers, Mana.manaSources, Action.legalActions,
--- Target.legalRecipients), and the monadic callers around them take a fresh
--- State.get and so a fresh board.
+-- The board is a SNAPSHOT of one GameState, right only while that state is the one
+-- being read. Every hoist in the engine sits inside a single pure pass over one
+-- `gs`, and the monadic callers around them take a fresh State.get.
 --
--- Map.empty is the honest way to say "no snapshot": every read then projects for
--- itself, which is the right cost for a lone query and the same answer either
--- way.
---
--- The battlefield test is what keeps the fallback from COSTING anything. The
--- board is built value-strict (Map.fromSet), so touching it at all projects every
--- permanent -- and an id gather could never have reached is not worth that: a
--- spell on the stack matched by a Filter (Target.legalRecipients' Pool.Spells
--- arm) would otherwise force a whole-board projection to learn it is absent.
--- Never a different answer, only a cheaper route to the same one: the board is
--- keyed on GameState.battlefield of this same state, so an off-battlefield id
--- could not have been a key. Map.null short-circuits it for the Map.empty
--- callers, who are every plain reader above.
+-- The battlefield test keeps the fallback from costing anything: the board is
+-- value-strict, so touching it at all projects every permanent, and an id gather
+-- could never have reached is not worth that. Never a different answer -- the
+-- board is keyed on this state's battlefield, so an off-battlefield id could not
+-- have been a key.
 projectGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> ProjectedCharacteristics
 projectGiven pcs oid gs =
   let found =
@@ -2601,9 +1859,8 @@ keywordsOf = keywordsGiven Map.empty
 keywordsGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Map Keyword Natural
 keywordsGiven pcs oid gs = PC.keywords (projectGiven pcs oid gs)
 
--- CR 105.2 / 613.1e: an object's colours after the layer fold. The SOLE read
--- point -- the closed half never reads Card.manaCost for colour, the same
--- discipline keywordsOf established at M2a.
+-- CR 105.2 / 613.1e: an object's colours after the layer fold. The sole read
+-- point -- the closed half never reads Card.manaCost for colour.
 colorsOf :: ObjectId -> GameState -> Set Color.Color
 colorsOf = colorsGiven Map.empty
 
@@ -2625,39 +1882,28 @@ replacementsOf oid gs =
   let pc = project oid gs
    in PC.replacementEffects pc <> intrinsicReplacementsOf pc
 
--- CR 306.5b: "A planeswalker has the intrinsic ability 'This permanent enters
--- with a number of loyalty counters on it equal to its printed loyalty number.'
--- This ability creates a replacement effect (see rule 614.1c)."
+-- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
+-- replacement effect.
 --
--- MINTED from the finished projection rather than stored on the card, the posture
--- Pawl.Engine.Mana.subtypeMana takes for CR 305.6's intrinsic mana ability and
--- Pawl.Engine.Keyword.triggeredAbilitiesOf takes for CR 702.70's poisonous. Three
--- consequences, all of them the rules':
+-- Minted from the finished projection rather than stored on the card, the posture
+-- Mana.subtypeMana and Keyword.triggeredAbilitiesOf take. Three consequences, all
+-- of them the rules':
 --
---   * It is keyed on the PROJECTED card type, so a permanent that became a
---     planeswalker is judged as one and a card that is a planeswalker only on
---     paper is not.
---   * It reads the PROJECTED loyalty, which CR 707.2 makes a copiable value -- so
---     a Clone entering as a copy of a planeswalker enters with the COPY's printed
---     loyalty. That is CR 707.5's "if the text that's being copied includes any
---     abilities that replace the enters-the-battlefield event (such as 'enters
---     with' ...), those abilities will take effect", and it falls out of the mint
---     rather than needing machinery, because the loop re-collects each iteration
---     (CR 616.1f) and finds the newly-stamped loyalty.
---   * Minting AFTER the layer fold puts it out of reach of layer 6's
---     LoseAllAbilities, which empties PC.replacementEffects. That is deliberate
---     and matches the two precedents above: CR 306.5b gives the ability to a
---     planeswalker as a rule, and the card type is what layer 6 would have to take
---     away for it to stop.
+--   * keyed on the PROJECTED card type, so a permanent that became a planeswalker
+--     is judged as one and a paper-only one is not;
+--   * reads the PROJECTED loyalty, a copiable value under CR 707.2, so a Clone of
+--     a planeswalker enters with the copy's printed loyalty per CR 707.5 -- which
+--     falls out of the mint, since the loop re-collects each iteration (CR 616.1f);
+--   * minting AFTER the layer fold puts it out of reach of LoseAllAbilities, which
+--     is deliberate: CR 306.5b gives the ability as a rule, so the card type is
+--     what layer 6 would have to remove.
 --
--- Nothing for a planeswalker with no printed loyalty, which is unrepresentable
--- today anyway: the CardSpec lint holds "planeswalker iff loyalty" in both
--- directions.
+-- Nothing for a planeswalker with no printed loyalty, which the CardSpec lint
+-- makes unrepresentable.
 intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
-  [ -- CR 614.1c: "[THIS PERMANENT] enters with . . .", which is Filter.IsSource
-  -- -- the entering object is the ability's own source (see
-  -- Pawl.Types.ReplacementEffect on why the pattern is a Filter).
+  [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
+  -- is Filter.IsSource.
   ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Loyalty n)
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
@@ -2665,31 +1911,26 @@ intrinsicReplacementsOf pc =
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
 -- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
--- without it. CR 614.1 is why there is a live set to collect at all: replacement
--- effects "apply continuously as events happen -- they aren't locked in ahead of
--- time". NOT CR 614.6, which this used to cite and which is about what happens
--- once an event IS replaced -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
--- without it. Short-circuits when no permanent has one in its base card, so an
--- ordinary zone change (a draw, a land entering) does NOT project the whole
--- board.
+-- without it. The set is collected live rather than locked in ahead of time.
+-- Short-circuits when no permanent's base card has one, so an ordinary zone change
+-- does not project the whole board.
 --
--- The short-circuit reads BASE cards while the result reads the PROJECTION, which
--- is sound only because the one way to acquire a replacement effect you were not
--- printed with is `EntryR AsCopy` -- and a card with that arm is itself a base
--- card with a replacement effect, so it keeps `baseHas` true for its own object.
+-- The short-circuit reads BASE cards while the result reads the PROJECTION, sound
+-- only because the one way to acquire an unprinted replacement effect is
+-- `EntryR AsCopy` -- and a card with that arm is itself a base card with a
+-- replacement effect.
 --
 -- Past the short-circuit this projects per permanent rather than threading one
--- board (projectGiven), so a board holding any replacement effect at all pays a
--- fresh gather for every permanent on it (#435).
+-- board, so a board holding any replacement effect pays a fresh gather per
+-- permanent (#435).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect)]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       baseHas oid = case Game.cardOf oid gs of
         Nothing -> False
-        -- The planeswalker disjunct is what keeps CR 306.5b's INTRINSIC
-        -- replacement inside the short-circuit: it is minted from the projection
-        -- and so appears in no base card's list, and without this a board whose
-        -- only replacement effect is a planeswalker's loyalty would answer [].
+        -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement inside
+        -- the short-circuit: minted from the projection, it appears in no base
+        -- card's list.
         Just card ->
           not (null (Card.Type.replacementEffects card))
             || Set.member CardType.Planeswalker (TypeLine.types (Card.Type.typeLine card))
@@ -2698,19 +1939,15 @@ replacementsAffecting gs =
         then []
         else concatMap forOne onBattlefield
 
--- CR 603 / 613 layer 6: an object's PRINTED-AND-GRANTED triggered abilities after
--- the layer system, the same projection posture as abilitiesOf. A Humility'd
--- creature has none.
+-- CR 603 / 613 layer 6: an object's printed-and-granted triggered abilities after
+-- the layer system. A Humility'd creature has none.
 --
--- NOT the whole list: rule 702.70's poisonous is a triggered ability the RULES
--- give an object for holding a keyword, and Pawl.Engine.Keyword.triggeredAbilitiesOf
--- mints those from PC.keywords instead. Pawl.Engine.Event's event scan adds them; a
--- reader that wants every triggered ability an object has must do the same.
--- Deliberately not folded into PC.triggeredAbilities: that field is built DURING
--- the layer fold, while the mint has to read the FINISHED keyword counts, which
--- only exist once the fold is over. Deriving after the fold is also what makes
--- Humility free -- LoseAllAbilities empties PC.keywords, so there is nothing left
--- to mint from.
+-- Not the whole list: rule 702.70's poisonous is a triggered ability the RULES give
+-- an object for holding a keyword, and Keyword.triggeredAbilitiesOf mints those
+-- from PC.keywords instead. A reader wanting every triggered ability must add
+-- them, as Event's scan does. Not folded into PC.triggeredAbilities because that
+-- field is built DURING the fold while the mint needs the finished keyword counts
+-- -- which is also what makes Humility free.
 triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility Card.Type.Card]
 triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
@@ -2729,9 +1966,9 @@ nameOf oid = PC.name . project oid
 supertypesOf :: ObjectId -> GameState -> Set Supertype.Supertype
 supertypesOf = supertypesGiven Map.empty
 
--- The same supertypes against a pre-projected board, the subtypesGiven shape and
--- carrying its reason (#200): Mana.productionTagsGiven asks this of every mana
--- source in a sweep that has already gathered one.
+-- The same supertypes against a pre-projected board (#200):
+-- Mana.productionTagsGiven asks this of every mana source in a sweep that has
+-- already gathered one.
 supertypesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Set Supertype.Supertype
 supertypesGiven pcs oid gs = PC.supertypes (projectGiven pcs oid gs)
 
@@ -2750,9 +1987,7 @@ isCreatureGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameStat
 isCreatureGiven pcs oid gs = Set.member CardType.Creature (cardTypesGiven pcs oid gs)
 
 -- CR 613.1d again, for the card type CR 115.4's "any target" pool and CR 120.3c's
--- loyalty removal both ask about. Projected for the same reason isCreatureOf is:
--- CR 613.1d puts card types in layer 4, so an effect that adds or removes the
--- type changes the answer, and the printed type line is the wrong place to ask.
+-- loyalty removal both ask about. Projected for isCreatureOf's reason.
 isPlaneswalkerOf :: ObjectId -> GameState -> Bool
 isPlaneswalkerOf = isPlaneswalkerGiven Map.empty
 
@@ -2760,40 +1995,31 @@ isPlaneswalkerGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> Game
 isPlaneswalkerGiven pcs oid gs = Set.member CardType.Planeswalker (cardTypesGiven pcs oid gs)
 
 -- The same question against a PRECOMPUTED candidate list rather than a
--- pre-projected board -- projectFrom's posture instead of projectGiven's. For a
--- caller that asks about a HANDFUL of objects out of a whole battlefield
--- (Combat.removeChanged's combatants), that is the cheaper of the two: one
--- gather and one fold per object asked about, where projectAll would fold every
--- permanent on the board. Same answer either way, by projectAll's own argument.
+-- pre-projected board. For a caller asking about a handful of objects out of a
+-- whole battlefield, that is cheaper: one gather and one fold per object, where
+-- projectAll would fold every permanent. Same answer either way.
 isCreatureFrom :: [Gathered] -> ObjectId -> GameState -> Bool
 isCreatureFrom cands oid gs = Set.member CardType.Creature (PC.cardTypes (projectFrom cands oid gs))
 
--- Membership, which DISCARDS the count -- and is exactly right for every
--- keyword whose multiple instances the rules call redundant (CR 702.3c
--- defender, CR 702.9c flying). A keyword that stacks is asked about with its
--- own reader instead; totalToxic just below is the first.
+-- Membership, which DISCARDS the count -- right for every keyword whose multiple
+-- instances the rules call redundant (CR 702.3c, CR 702.9c). A keyword that stacks
+-- gets its own reader instead, as totalToxic does.
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
 hasKeyword = hasKeywordGiven Map.empty
 
 hasKeywordGiven :: Map ObjectId ProjectedCharacteristics -> Keyword -> ObjectId -> GameState -> Bool
 hasKeywordGiven pcs keyword oid gs = Map.member keyword (keywordsGiven pcs oid gs)
 
--- CR 702.164b: "A creature's total toxic value is the sum of all N values of
--- toxic abilities that creature has." Not hasKeyword's question -- toxic is
--- parameterized, so there is no single member to ask about -- but the same
--- projection posture: the sum is taken over the POST-LAYER keywords, so a
--- Humility'd creature has none.
---
--- Each toxic ability contributes its own N, so a creature with the same N twice
--- counts it twice -- rule 702.164 has no redundancy clause. That is why the
--- projection counts keywords instead of setting them.
+-- Rule 702.164b: a creature's total toxic value sums the N of every toxic ability
+-- it has. Not hasKeyword's question, toxic being parameterized, but the same
+-- projection posture -- summed over post-layer keywords, so a Humility'd creature
+-- has none. Each ability contributes its own N with no redundancy clause, which is
+-- why the projection counts keywords instead of setting them.
 totalToxic :: ObjectId -> GameState -> Natural
 totalToxic oid gs = toxicIn (keywordsOf oid gs)
 
--- totalToxic's fold, over a keyword map the caller already has. Split out so a
--- reader that has taken the map through a different route -- CR 608.2h's
--- last-known fallback, which Pawl.Engine.Damage.damageEvent needs -- sums it the
--- same way instead of restating rule 702.164b's arithmetic.
+-- totalToxic's fold, over a keyword map the caller already has -- so a reader that
+-- took the map through CR 608.2h's last-known fallback sums it the same way.
 toxicIn :: Map Keyword Natural -> Natural
 toxicIn keywords =
   let value keyword count = case keyword of
@@ -2813,53 +2039,28 @@ data ControlGrant = MkControlGrant
 
 -- Every layer-2 control-granting STATIC ability on the battlefield, gathered once.
 --
--- NOT `gather`. This must not project, and cannot: Projection.affects reads
--- controllerOf to supply CR 109.5's "you" when matching a Filter, so a
--- controllerOf built on gather would be mutually recursive with it. That
--- restriction is exactly why Affected.Matching and Affected.MatchingAnywhere are
--- unsupported below (#195).
+-- NOT `gather`. This must not project, and cannot: affects reads controllerOf to
+-- supply CR 109.5's "you" when matching a Filter, so a controllerOf built on
+-- gather would be mutually recursive with it. That is why Affected.Matching and
+-- MatchingAnywhere are unsupported below (#195).
 --
--- Hoisted for the reason liveGiven's list is hoisted: controllerOf feeds combat,
--- priority, mana and Projection.controls, and `controls` calls it once per
--- battlefield object. Recomputing this list inside controllerOf would make
--- `controls` quadratic in the battlefield, inside a loop the state-based-action
--- sweep runs at every priority boundary.
+-- Hoisted for liveGiven's reason: `controls` calls controllerOf once per
+-- battlefield object, so recomputing this list inside it would be quadratic in the
+-- battlefield, inside a loop the SBA sweep runs at every priority boundary.
 --
--- Layer 6/Humility is invisible to this fold -- a control-granting static ability
--- stripped by LoseAllAbilities still appears here -- and CR 613.1 says that is the
--- right answer, not a shortcut. Control-changing effects are applied in layer 2
--- (CR 613.1b) and ability-removing effects in layer 6 (CR 613.1f), so the grant
--- has already been made by the time anything strips the ability that made it. No
--- reordering can reach across that: CR 613.8a scopes dependency to effects
--- "applied in the same layer (and, if applicable, sublayer)", and CR 613.6 keeps
--- an effect applying "even if the ability generating the effect is removed during
--- this process". ProjectionSpec's "CR 613.1b before CR 613.1f" tests prove it.
+-- Layer 6 is invisible to this fold -- a control-granting static ability stripped
+-- by LoseAllAbilities still appears here -- and CR 613.1 says that is the right
+-- answer: control is layer 2 (CR 613.1b) and ability removal layer 6 (CR 613.1f),
+-- so the grant was made before anything stripped the ability that made it. CR
+-- 613.8a scopes dependency within a layer and CR 613.6 keeps a started effect
+-- applying, so no reordering reaches across. Nothing is added at layer 6 either:
+-- its vocabulary cannot put a static ability on an object.
 --
--- That covers REMOVAL, which is the only half that exists: the layer-6 vocabulary
--- is LoseAllAbilities and GainKeyword, and neither can put a control-granting
--- STATIC ability on an object, so there is nothing added at layer 6 for this walk
--- to be missing either.
---
--- The same blindness would be a defect one layer further down, where the order
--- flips: an ability removed at layer 6 generates no layer-7 effect, which is a
--- question `gather` DOES ask (abilitiesRemoved). This walk stays blind on purpose
--- because layer 2 is on the other side of layer 6, not because the question is
--- unanswerable.
---
--- INVARIANT this liveness gate depends on (#197): the `liveGiven` call below
--- must never FORCE a control-dependent Filter. `liveGiven` -> affectsBase ->
--- affects's Matching arm calls `controllerOf`, which calls BACK into
--- `controlGrants` -- so if that Matching filter's evaluation ever forces
--- `affects`'s `perspective` thunk (a ControlledBy conjunct is the only thing
--- that does), this loops rather than answering wrong. Nothing here prevents
--- that; it holds only because no subtype-setting effect in the pool -- static OR
--- stored, setLandSubtypeEffects gathers both -- carries a Matching filter with
--- ControlledBy in it: of the two static examples, Blood Moon's Matching filter
--- has none and Convincing Mirage's Affected.Attached is not a Matching filter at
--- all (its `affects` arm reads the source's attachment and never calls
--- controllerOf), and every stored ContinuousEffect Pawl.Engine.Resolve
--- constructs carries Affected.TheseObjects rather than Matching at all. See
--- #197 for the card shape that would break this and the deferred structural fix.
+-- INVARIANT this liveness gate depends on (#197): the `liveGiven` call below must
+-- never FORCE a control-dependent Filter, since liveGiven -> affectsBase ->
+-- affects's Matching arm calls controllerOf, which calls back into controlGrants.
+-- Nothing here prevents it; it holds only because no subtype-setting effect in the
+-- pool pairs a Matching filter with ControlledBy.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let setEffs = setLandSubtypeEffects gs
@@ -2887,32 +2088,23 @@ controlGrants gs =
    in concatMap grantsOf (Set.toList (GameState.battlefield gs))
 
 -- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2
--- control effects, last timestamp wins (CR 613.7). TWO sources now: stored
--- continuous effects (Effect.GainControl's baked SetController) and control-
--- granting static abilities (Control Magic's derived SetControllerToSource).
--- Both carry a Timestamp, so they merge into one maximum.
+-- control effects, last timestamp wins (CR 613.7). Two sources -- stored
+-- continuous effects and control-granting static abilities -- both carrying a
+-- Timestamp, so they merge into one maximum.
 --
--- Still a lean fold, not the full ProjectedCharacteristics pass -- control feeds
--- combat, mana and priority and is needed before P/T.
+-- Still a lean fold rather than the full ProjectedCharacteristics pass: control
+-- feeds combat, mana and priority, and is needed before P/T.
 controllerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerOf oid gs = controllerOfGiven (controlGrants gs) Set.empty oid gs
 
 -- controllerOf with the grant list PRECOMPUTED and a visited set.
 --
--- The visited set is the CR 613.8b loop-escape analog liveGiven already uses
--- (#37), not an implementation of it: deriving a grant's player asks for its
--- SOURCE's controller, which can re-enter this function. Re-entering an object
--- already under question returns its owner, so a cycle grants nothing and every
--- object in it keeps its own owner. Unreachable in practice today ("enchant
--- creature" forbids two Auras attached to each other, which rules out the
--- Attached route; a second route -- two static abilities each naming the
--- other's fixed ObjectId via Affected.TheseObjects, which is codec-round-
--- trippable and legal on a static ability -- is unauthorable by any real card
--- but not excluded by the types), and unobservable even if it existed: a
--- direct controllerOf query on any object in the cycle returns THAT object's
--- owner either way, whether or not it was first reached by recursing through
--- another object in the cycle -- which is the only kind of query `controls`
--- (or anything else) ever makes.
+-- The visited set is liveGiven's CR 613.8b loop-escape analog (#37), not an
+-- implementation of it: deriving a grant's player asks for its SOURCE's
+-- controller, which can re-enter this function. Re-entering an object already
+-- under question returns its owner, so a cycle grants nothing. Unreachable today
+-- and unobservable if it existed -- a direct query on any object in the cycle
+-- returns that object's owner either way.
 controllerOfGiven :: [ControlGrant] -> Set ObjectId -> ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
@@ -2942,14 +2134,13 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
               setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
 
 -- Which objects an affected set NAMES, for the CR 613.1b layer-2 control fold.
--- Parameterized by the source because Affected.Attached is a question about the
--- SOURCE's state, and the stored and derived paths carry different sources.
+-- Parameterized by the source because Affected.Attached asks about the SOURCE's
+-- state, and the stored and derived paths carry different sources.
 --
--- Deliberately a total case with no wildcard, and three of its five arms are
--- empty: this fold must not project (see controlGrants), which rules out
--- Matching and MatchingAnywhere alike, and AttachedPlayerControls would
--- re-enter controllerOf, which is the fold that reads this. No card produces
--- any of the three (#195).
+-- Total with no wildcard, and three of five arms empty: this fold must not project
+-- (see controlGrants), ruling out Matching and MatchingAnywhere, and
+-- AttachedPlayerControls would re-enter controllerOf. No card produces any of the
+-- three (#195).
 controlNames :: GameState -> ObjectId -> Affected.Affected -> Set ObjectId
 controlNames gs source a = case a of
   Affected.TheseObjects s -> s
@@ -2960,21 +2151,15 @@ controlNames gs source a = case a of
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.AttachedPlayerControls _ -> Set.empty
 
--- CR 603.3a: every object whose controller a CR 613.1b layer-2 effect currently
--- OVERRIDES, and who it says controls it -- the sample Event.recordEvent takes
--- so that a trigger scanned at the CR 117.5 boundary can still be credited to
--- whoever controlled its source at the event. See GameState.controlWhenTriggered
--- for why the objects NOT named here need no entry.
+-- CR 603.3a: every object whose controller a CR 613.1b layer-2 effect OVERRIDES,
+-- and who it says controls it -- the sample Event.recordEvent takes so a trigger
+-- scanned at the CR 117.5 boundary is still credited to whoever controlled its
+-- source at the event. See GameState.controlWhenTriggered for why unnamed objects
+-- need no entry.
 --
--- Both of controllerOfGiven's two setter sources are enumerated, in the same
--- order it consults them: the stored continuous effects (Effect.GainControl's
--- baked SetController) and the control-granting static abilities (Control
--- Magic's derived SetControllerToSource). The VALUE is controllerOfGiven's own
--- answer rather than a re-derivation, so the CR 613.7 timestamp contest between
--- them is settled once, in the one place that knows how.
---
--- Cheap on the board that has no control effect at all -- the common case --
--- where `named` is empty and the only cost is `controlGrants`' battlefield walk.
+-- Both of controllerOfGiven's setter sources are enumerated in the order it
+-- consults them, and the VALUE is its own answer rather than a re-derivation, so
+-- the CR 613.7 timestamp contest is settled once.
 controlOverrides :: GameState -> Map ObjectId PlayerId.PlayerId
 controlOverrides gs =
   let grants = controlGrants gs
@@ -2986,29 +2171,18 @@ controlOverrides gs =
       entry oid = fmap ((,) oid) (controllerOfGiven grants Set.empty oid gs)
    in Map.fromList (Maybe.mapMaybe entry (Set.toList named))
 
--- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES.
+-- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES. Two
+-- rules, one per kind of object: a permanent's default controller is whoever it
+-- entered under (CR 110.2), and a card that has no controller at all uses its
+-- owner (CR 108.4a).
 --
--- Two rules, one per kind of object this is asked about, exactly as
--- Pawl.Types.Object's own note splits them. For a PERMANENT it is CR 110.2 --
--- "a permanent's controller is, by default, the player under whose control it
--- entered the battlefield" -- and the owner fallback is not 108.4a but the fact
--- that in this pool the player who put it there IS its owner unless a CR 616.1b
--- replacement said otherwise. For anything else -- a card in a library, a
--- graveyard, a hand -- there is no controller at all, and CR 108.4a is what says
--- to use the owner: "if anything asks for the controller of a card that doesn't
--- have one (because it's not a permanent or spell), use its owner instead".
+-- Object.enteredUnder is written only by Replacement's CR 616.1b rewrite and is
+-- Nothing on every other object, so for the whole pool bar Gather Specimens'
+-- victims this is the owner it always was.
 --
--- Object.enteredUnder is written by exactly one thing, Pawl.Engine.Replacement's
--- CR 616.1b rewrite, and is Nothing on every other object -- so for the whole
--- pool but Gather Specimens' victims this is the owner it always was.
---
--- ON THE HOT PATH, which #582 flagged as the cost of moving the base off
--- Object.owner: controllerOfGiven runs once per battlefield object inside
--- `controls`, which the state-based-action sweep calls at every priority
--- boundary. One Maybe match, measured on the tasty-bench suite (main vs. this
--- branch: goldfish / casting / fighting / fighting-aura / fighting-no-aura, 2p):
--- 20.0/159/29.9/588/338 ms -> 20.1/164/30.4/598/350 ms, every move inside the
--- benchmark's own run-to-run stddev (+-0.9 to +-30 ms on those means).
+-- On the hot path (#582): controllerOfGiven runs once per battlefield object
+-- inside `controls`, which the SBA sweep calls at every priority boundary. The one
+-- Maybe match measured inside the benchmark suite's run-to-run stddev.
 defaultControllerOf :: Object.Object -> PlayerId.PlayerId
 defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)
 
@@ -3020,31 +2194,23 @@ controls :: PlayerId.PlayerId -> GameState -> [ObjectId]
 controls pid gs = controlsGiven (controlGrants gs) pid gs
 
 -- controls with the grant list PRECOMPUTED, for a caller that then asks
--- controllerOfGiven (or anything else built on the same list) about the
--- permanents it hands back -- Combat.legalAttackers, Mana.manaSources and
--- Action.legalActions all do, and threading the one list keeps the loop from
--- rebuilding it per candidate on top of the rebuild this function already avoids.
+-- controllerOfGiven about the permanents it hands back. Threading the one list
+-- keeps such a loop from rebuilding it per candidate.
 controlsGiven :: [ControlGrant] -> PlayerId.PlayerId -> GameState -> [ObjectId]
 controlsGiven grants pid gs =
   filter (\oid -> controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs))
 
 -- CR 800.4a: does this stored effect give `pid` control of an object? The
--- control-granting classification Pawl.Engine.Departure asks, so that the case on
--- Modification stays in the one module allowed to make it (see
--- Pawl.Types.Modification). Modification.SetController's payload IS the player who
--- gains control -- it is baked at effect creation and is the effect's source's
--- controller -- so the payload is what "that player" names.
+-- classification Departure asks for. SetController's payload IS the player who
+-- gains control -- baked at effect creation as the source's controller -- so the
+-- payload is what "that player" names.
 givesControlTo :: PlayerId.PlayerId -> ContinuousEffect.ContinuousEffect -> Bool
 givesControlTo pid eff = case ContinuousEffect.modification eff of
   Modification.SetController who -> who == pid
-  -- This one names no player, so it cannot be classified from the effect alone:
-  -- CR 109.5 makes its player the current controller of the effect's SOURCE,
-  -- which needs a GameState this function does not take. False is right for
-  -- every state pawl can reach -- the constructor is authored only on Control
-  -- Magic's static ability, which the projection re-derives and never stores, so
-  -- no stored effect carries it. The residual case (card JSON authoring one into
-  -- an Effect.ModifyTarget) is #199, and it does not endanger CR 800.4a's third
-  -- and fourth clauses either way, because a derived player is the source's
-  -- controller -- see the induction in Pawl.Engine.Departure.
+  -- Names no player, so it cannot be classified from the effect alone: CR 109.5
+  -- makes its player the current controller of the source, which needs a
+  -- GameState this function does not take. False is right for every reachable
+  -- state, the constructor being authored only on a static ability the projection
+  -- re-derives and never stores. The residual case is #199.
   Modification.SetControllerToSource -> False
   _ -> False

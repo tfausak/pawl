@@ -15,13 +15,11 @@ import qualified Pawl.Types.ObjectId as ObjectId
 data Affected
   = -- | CR 611.2c: a fixed id set, NOT a predicate.
     TheseObjects (Set.Set ObjectId.ObjectId)
-  | -- | Dynamic: any object matching the Filter, re-derived each projection against
-    -- the PARTIAL projection accumulated so far, so it reads each axis as of
-    -- whichever layers have already applied (CR 613: layers apply in order) -- a
-    -- layer-4 type change is visible to a later layer. Opalescence's own "each
-    -- other" card text (not a rule -- Opalescence does not animate itself) is
-    -- Filter.Not Filter.IsSource inside the Filter, not a separate field -- the
-    -- predicate language already names the source that way.
+  | -- | Dynamic: any object matching the Filter, re-derived each projection
+    -- against the PARTIAL projection accumulated so far, so it reads each axis as
+    -- of whichever layers have already applied (CR 613) -- a layer-4 type change
+    -- is visible to a later layer. A card's own "each other" text is
+    -- Filter.Not Filter.IsSource inside the Filter rather than a separate field.
     Matching (Filter.Filter Keyword.Keyword)
   | -- | Matching, without the battlefield gate. Painter's Servant's "all cards
     -- that aren't on the battlefield, spells, and permanents" is the first
@@ -36,14 +34,11 @@ data Affected
     -- exile is matched against its PRINTED characteristics by viewOfCard and is
     -- never reached (#160, #623).
     --
-    -- Not implemented, the symmetric OVER-reach, recorded at the same place
-    -- because the card's JSON cannot carry a comment: Painter's own filter is
-    -- And [], which matches EVERY object, while the card scopes to three kinds
-    -- of thing -- cards not on the battlefield, spells, and permanents. So this
-    -- also reaches an activated or triggered ability on the stack, which CR
-    -- 113.1c makes an object but not a spell, and an emblem in the command zone,
-    -- which CR 114.5 says "is neither a card nor a permanent". Neither is
-    -- observable today (#623).
+    -- Not implemented, the symmetric OVER-reach, recorded here because the card's
+    -- JSON cannot carry a comment: Painter's own filter is And [], which matches
+    -- EVERY object, while the card scopes to three kinds of thing. So this also
+    -- reaches an ability on the stack (CR 113.1c) and an emblem in the command
+    -- zone (CR 114.5). Neither is observable today (#623).
     MatchingAnywhere (Filter.Filter Keyword.Keyword)
   | -- | CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". Neither a fixed id set nor a predicate over candidates:
@@ -53,9 +48,8 @@ data Affected
     --
     -- The set is {o} when the source is attached to o, and EMPTY when it is
     -- unattached -- an Aura in the graveyard, or one the CR 704.5m sweep has not
-    -- reached yet. Payload-free: CR 303.4m defines it for any permanent, "even
-    -- if the permanent with the ability isn't an Aura", so there is nothing to
-    -- parameterize.
+    -- reached yet. Payload-free: CR 303.4m defines it for any permanent, Aura or
+    -- not, so there is nothing to parameterize.
     Attached
   | -- | CR 303.4b / 303.4m: the objects matching the Filter that the ENCHANTED
     -- PLAYER controls -- Curse of Death's Hold's "creatures enchanted player
@@ -65,17 +59,15 @@ data Affected
     -- attached to no object at all and reaches the battlefield only through the
     -- player it enchants.
     --
-    -- Dynamic in BOTH of its inputs, and re-derived each projection like the
-    -- other two dynamic sets: the source's attachment can change, and so can who
-    -- controls a candidate (CR 613.1b's layer 2 is applied before the layers this
-    -- set feeds).
+    -- Dynamic in BOTH of its inputs, and re-derived each projection: the source's
+    -- attachment can change, and so can who controls a candidate (CR 613.1b's
+    -- layer 2 applies before the layers this set feeds).
     --
     -- The set is EMPTY when the source is unattached or attached to an object
-    -- rather than a player -- the posture Attached takes toward an unattached
-    -- source.
+    -- rather than a player.
     --
     -- Filtered rather than payload-free, unlike Attached: "creatures enchanted
-    -- player controls" narrows by card type, and CR 303.4m's phrase names only
+    -- player controls" narrows by card type, where CR 303.4m's phrase names only
     -- whose permanents they are.
     AttachedPlayerControls (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

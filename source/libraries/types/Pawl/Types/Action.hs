@@ -4,7 +4,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.ObjectId as ObjectId
 
--- | Grows: special actions beyond Play, …
+-- | Grows: special actions beyond Play.
 data Action
   = Pass
   | Play ObjectId.ObjectId

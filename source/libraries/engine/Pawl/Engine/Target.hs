@@ -34,25 +34,22 @@ import qualified Pawl.Types.Zone as Zone
 -- CR 115: a target slot's legal recipients -- the set its spec admits
 -- (admittedRecipients below), less every candidate rule 702 forbids TARGETING
 -- (targetable below, where shroud, hexproof and the restrictions after them
--- live), less CR 115.5's one candidate: "A spell or ability on the stack is an
--- illegal target for itself."
+-- live), less CR 115.5's one candidate, a spell or ability on the stack being an
+-- illegal target for itself.
 --
--- Rule 115.5 is subtracted HERE and not in admittedGiven because it is a
--- TARGETING rule, exactly as rule 702's restrictions are: what an enchant spec
--- admits (CR 303.4c, Sba.stillLegalEnchant) is a different question and asks no
--- targeting question at all. Both of CR 115's moments therefore honour it, since
--- both route through this function -- CR 601.2c's choosing and CR 608.2b's
--- re-validation.
+-- CR 115.5 is subtracted HERE and not in admittedGiven because it is a TARGETING
+-- rule, exactly as rule 702's restrictions are: what an enchant spec admits (CR
+-- 303.4c, Sba.stillLegalEnchant) asks no targeting question at all. Both of CR
+-- 115's moments honour it, since both route through this function -- CR 601.2c's
+-- choosing and CR 608.2b's re-validation.
 --
--- ITS GATE IS THE RULE'S OWN WORDS, "on the stack": `source` is the object the
--- targeting is relative to, and it is the object on the stack only for a SPELL
--- (Cast.castSpell, and Resolve's CR 608.2b re-check, which pass the spell
--- object). A permanent's activated ability passes the source PERMANENT, which is
--- on the battlefield, so this subtracts nothing there -- and that is the right
--- answer rather than a happy accident: the ability, not the permanent, is the
--- object rule 115.5 speaks of, so Prodigal Sorcerer may still ping itself
--- (TargetSpec proves it). An ability targeting ITSELF is the case this cannot
--- reach, because the ability object's own id is not in this frame at all (#638).
+-- ITS GATE IS THE RULE'S OWN WORDS, "on the stack": `source` is the object on the
+-- stack only for a SPELL. A permanent's activated ability passes the source
+-- PERMANENT, so this subtracts nothing there -- the right answer rather than a
+-- happy accident, since the ability and not the permanent is the object CR 115.5
+-- speaks of, so Prodigal Sorcerer may still ping itself. An ability targeting
+-- ITSELF is the case this cannot reach, because the ability object's own id is
+-- not in this frame at all (#638).
 --
 -- The two frames are SEPARATE, and keeping them apart is the whole point:
 --
@@ -65,19 +62,14 @@ import qualified Pawl.Types.Zone as Zone
 --     opponent controls" is a ControlledBy Opponent filter, and a player
 --     candidate is narrowed by the same fold through the IsPlayer atom (#168).
 --
--- They were one frame once, and splitting them is the fix. Deriving the
--- perspective here as `Projection.controllerOf source` returns Nothing after the
--- source leaves the battlefield, which makes ControlledBy vacuously False and
--- yields the EMPTY set
--- -- so CR 608.2b's re-check found every target illegal and fizzled an ability
--- whose source was merely killed in response. CR 608.2b says the opposite: "If
--- the source of an ability has left the zone it was in, its last known
--- information is used during this process."
---
--- The controller is knowable when the source is not, because an ability is its
--- own object on the stack. Callers on the resolution path read it from that
--- object's stamped owner (CR 113.8: fixed at the ability's creation, never
--- re-derived); callers on the cast/activate path already hold the acting player.
+-- Deriving the perspective here as `Projection.controllerOf source` instead
+-- returns Nothing once the source leaves the battlefield, making ControlledBy
+-- vacuously False and the whole set empty -- so CR 608.2b's re-check would fizzle
+-- an ability whose source was merely killed in response, when that rule says to
+-- use last known information. The controller is knowable when the source is not,
+-- because an ability is its own object on the stack: resolution-path callers read
+-- it from that object's stamped owner (CR 113.8), and cast/activate-path callers
+-- already hold the acting player.
 --
 -- Maybe, not PlayerId, matching Filter.MkContext's own field: Nothing is a
 -- genuinely absent perspective, which leaves a player-referencing filter
@@ -98,26 +90,20 @@ legalRecipients perspective source spec gs =
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures and
 -- planeswalkers on the battlefield plus players still in the game; the battles
--- that rule also names are not admitted, #302) narrowed by its Filter (a bare
--- "target creature" carries Nothing and narrows nothing). Rule 702's targeting
--- restrictions are NOT applied.
+-- that rule also names are not admitted, #302) narrowed by its Filter. Rule 702's
+-- targeting restrictions are NOT applied.
 --
 -- Separate from legalRecipients because "can't be the target of" and "is an
--- illegal object to be attached to" are different questions, and rule 702 says
--- so itself. Protection states both halves, separately: CR 702.16b for targeting
--- and CR 702.16c for attachment ("can't be enchanted by Auras that have the
--- stated quality. Such Auras attached to the permanent ... will be put into
--- their owners' graveyards as a state-based action"). Shroud (CR 702.18) and
--- hexproof (CR 702.11) state only the first, so an Aura already attached to a
--- permanent that has shroud stays attached, and Resolve.attachmentFor may move
--- one onto it.
+-- illegal object to be attached to" are different questions, and rule 702 says so
+-- itself: protection states both halves separately (CR 702.16b for targeting, CR
+-- 702.16c for attachment), while shroud (CR 702.18) and hexproof (CR 702.11)
+-- state only the first -- so an Aura already attached to a permanent that has
+-- shroud stays attached, and Resolve.attachmentFor may move one onto it.
 --
 -- Hence the two callers here rather than at legalRecipients:
--- Sba.stillLegalEnchant's general path (CR 303.4c's "illegal object ... as
--- defined by its enchant ability and other applicable effects") and
--- Resolve.attachmentFor (CR 701.3a's "can't be attached to an object or player
--- it couldn't enchant"). Both ask what the enchant SPEC admits; neither is a
--- player choosing a target.
+-- Sba.stillLegalEnchant's general path (CR 303.4c) and Resolve.attachmentFor (CR
+-- 701.3a). Both ask what the enchant SPEC admits; neither is a player choosing a
+-- target.
 admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
 admittedRecipients perspective source spec gs = admittedGiven (Projection.projectAll gs) perspective source spec gs
 
@@ -129,18 +115,13 @@ admittedGiven pcs perspective source spec gs =
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
       -- view are asked of every object on the battlefield, and each was a fresh
-      -- Projection.gather (#200). The hoist Sba.performStateBasedActions takes
-      -- for the CR 704.3 sweep, whose stillLegalEnchant haddock argues at length
-      -- why re-deriving the board per candidate is the shape to avoid; the
-      -- snapshot argument is at Projection.projectGiven, and holds here because
-      -- this is a pure function of one GameState.
+      -- Projection.gather (#200). The snapshot argument is at
+      -- Projection.projectGiven, and holds here because this is a pure function of
+      -- one GameState.
       --
       -- `pcs` is the CALLER's thunk so that legalRecipients' restriction pass and
-      -- this admission pass share one projection rather than taking two.
-      --
-      -- Thunks, so a slot that asks neither question pays for neither: a
-      -- Pool.Players spec with no Filter forces neither, which is what it cost
-      -- before.
+      -- this admission pass share one projection rather than taking two. Thunks,
+      -- so a slot that asks neither question pays for neither.
       grants = Projection.controlGrants gs
       keep recipient = case recipient of
         -- CR 115.1: a player candidate is narrowed too ("target opponent"), by a
@@ -157,82 +138,58 @@ admittedGiven pcs perspective source spec gs =
         Just f -> Filter.matches context view f
    in Set.filter keep (basePoolGiven pcs context pool gs)
 
--- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
--- player can't be the target of spells or abilities.'"
+-- CR 702.18a (shroud) and CR 702.11b (hexproof): THE targeting-restriction gate,
+-- the one every restriction rule 702 states lands in. It is asked of a candidate
+-- the spec has already admitted, and it answers with CR 101.2's "can't": what it
+-- rejects is gone, so no Filter can put it back. Both of CR 115's moments route
+-- through legalRecipients, so neither needs a clause of its own here.
 --
--- CR 702.11b: "'Hexproof' on a permanent means 'This permanent can't be the
--- target of spells or abilities your opponents control.'"
+-- The two restrictions differ in ONE thing, which is the whole reason they are
+-- separate keywords rather than one keyword with a field: shroud names no player,
+-- so it stops the permanent's own controller as readily as anyone else, while
+-- hexproof's "your opponents control" makes the answer depend on WHO is aiming
+-- the spell or ability. `perspective` is that player -- CR 109.5's "you" -- and
+-- CR 702.11b's "your" is the CANDIDATE's controller, which CR 109.5 fixes for a
+-- static ability. opponentOfController below is that comparison.
 --
--- THE targeting-restriction gate -- the one every restriction rule 702 states
--- lands in. It is asked of a candidate the spec has already admitted, and it
--- answers with CR 101.2's "can't": what it rejects is gone, so no Filter can put
--- it back. Both of CR 115's moments route through legalRecipients -- CR 601.2c's
--- choosing and CR 608.2b's re-validation -- so neither needs a clause of its own
--- here.
+-- MEMBERSHIP, never the projection's per-keyword count, which both CR 702.18b and
+-- CR 702.11h say outright. The POST-layer keywords, like every other keyword
+-- reader, so a hexproof granted at layer 6 restricts and a Humility'd Slippery
+-- Bogle does not.
 --
--- The two restrictions differ in ONE thing, and it is the whole reason they are
--- separate keywords rather than one keyword with a field: shroud names no
--- player, so it stops the permanent's own controller as readily as anyone else,
--- while hexproof's "your opponents control" makes the answer depend on WHO is
--- aiming the spell or ability. `perspective` is that player -- CR 109.5's "you",
--- the same value legalRecipients hands the Filter -- and rule 702.11b's "your"
--- is the CANDIDATE's controller, which CR 109.5 fixes for a static ability as
--- "the current controller of the object it's on". opponentOfController below is
--- that comparison.
---
--- MEMBERSHIP, never the projection's per-keyword count, which both rules say
--- outright: CR 702.18b ("multiple instances of shroud on the same permanent or
--- player are redundant") and CR 702.11h ("multiple instances of the same
--- hexproof ability on the same permanent or player are redundant"). The
--- POST-layer keywords, like every other keyword reader, so a hexproof granted at
--- layer 6 restricts and a Humility'd Slippery Bogle does not.
---
--- The battlefield conjunct is CR 113.6: "Abilities of an instant or sorcery
--- spell usually function only while that object is on the stack. Abilities of
--- all other objects usually function only while that object is on the
--- battlefield." Shroud is printed on a creature card, so a Blurred Mongoose
--- SPELL has none and Cancel may target it. That is load-bearing rather than
--- defensive: Pool.Spells tags a stack object ToObject, and its projection still
--- carries the card's printed keywords. (It also short-circuits `pcs` for a slot
--- whose candidates are all off the battlefield.)
+-- The battlefield conjunct is CR 113.6. Shroud is printed on a creature card, so
+-- a Blurred Mongoose SPELL has none and Cancel may target it. That is
+-- load-bearing rather than defensive: Pool.Spells tags a stack object ToObject,
+-- and its projection still carries the card's printed keywords. (It also
+-- short-circuits `pcs` for a slot whose candidates are all off the battlefield.)
 --
 -- The restrictions after these two widen this function and nothing else.
--- Protection (CR 702.16b, "spells with the stated quality") needs the SOURCE's
--- characteristics, which legalRecipients already holds; CR 702.11d's "hexproof
--- from [quality]" is that same reader rather than a payload on this arm (#555).
+-- Protection (CR 702.16b) needs the SOURCE's characteristics, which
+-- legalRecipients already holds; CR 702.11d's "hexproof from [quality]" is that
+-- same reader rather than a payload on this arm (#555).
 --
--- CR 702.18a's "or player" half, and CR 702.11c's ("'Hexproof' on a player means
--- 'You can't be the target of spells or abilities your opponents control'"), come
--- in through a DIFFERENT reader. A player has no keywords: rule 702's keywords
--- live on objects and are folded by the CR 613.1-613.7 layers, which compute an
--- object's characteristics and nothing else, so the player halves ride the CR
--- 613.10/613.11 player axis as PlayerEffect.CantBeTargetedBy. Ivory Mask and
--- Leyline of Sanctity are the producers. PlayerEffect.protectedFromTargeting is
--- the typed question; this module never sees the constructor.
+-- CR 702.18a's "or player" half and CR 702.11c's come in through a DIFFERENT
+-- reader. A player has no keywords: rule 702's keywords live on objects and are
+-- folded by the CR 613.1-613.7 layers, so the player halves ride the CR
+-- 613.10/613.11 player axis as PlayerEffect.CantBeTargetedBy (Ivory Mask, Leyline
+-- of Sanctity). PlayerEffect.protectedFromTargeting is the typed question; this
+-- module never sees the constructor. The two halves are separate readers because
+-- they read different things -- post-layer KEYWORDS, which `pcs` holds, versus
+-- the CR 613.10/613.11 tier, which the layer machine does not compute at all --
+-- and neither could serve the other.
 --
--- The two halves are separate readers because they read different things: the
--- object half wants post-layer KEYWORDS, which `pcs` already holds, and the
--- player half wants the CR 613.10/613.11 tier, which the layer machine does not
--- compute at all. Neither could serve the other.
---
--- NOT because the player half is cheap. PlayerEffect.applying forces
--- Projection.abilityRemoval -- a whole-board gather -- the moment any permanent
--- carries a player ability, which is exactly the board an Ivory Mask makes, and
--- this asks it once per player candidate rather than once per enumeration. That
--- is the same cost class the cast path already pays on such a board and does not
--- add a new one: Cast.castable calls prohibitsCasting and Cost.totalMana calls
--- costAdjustments, both `applying`, once per card in hand per legalActions pass
--- -- strictly more calls than the two seats this adds. Measured: all five
--- benchmarks unmoved (fighting 2p aura 594ms -> 586ms, inside +/-29). None of
--- them puts a player ability on the board, so that arm is reasoned rather than
--- measured; hoisting `applying` per enumeration the way `pcs` is hoisted is
--- #435's question, and #578 is what would catch it regressing.
+-- NOT because the player half is cheap: PlayerEffect.applying forces
+-- Projection.abilityRemoval, a whole-board gather, the moment any permanent
+-- carries a player ability, and this asks it once per player candidate. That is
+-- the same cost class the cast path already pays on such a board (Cast.castable
+-- and Cost.totalMana both call `applying` once per card in hand per legalActions
+-- pass), and the benchmarks were unmoved. Hoisting `applying` per enumeration the
+-- way `pcs` is hoisted is #435's question, and #578 would catch it regressing.
 --
 -- EXHAUSTIVE over Recipient rather than routed through Recipient.objectOf: with
--- the player arm split out, an objectOf-shaped match would leave a Nothing
--- branch no input reaches and would silently swallow a new constructor. CR
--- 120.3h's battle (#302) is the one already planned, and it must break this
--- build rather than default to targetable.
+-- the player arm split out, an objectOf-shaped match would leave a Nothing branch
+-- no input reaches and would silently swallow a new constructor. CR 120.3h's
+-- battle (#302) must break this build rather than default to targetable.
 targetable :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> GameState -> Recipient -> Bool
 targetable pcs perspective gs recipient =
   let restrictedObject oid =
@@ -251,20 +208,17 @@ targetable pcs perspective gs recipient =
 -- spell or ability being aimed -- someone other than `oid`'s controller?
 --
 -- Every other player is an opponent by construction (CR 806.1). CR 102.3 makes a
--- TEAMMATE not an opponent, which is the only reading this is wrong for, and
--- pawl has no teams -- the same argument Count.playersFor's
--- PlayerRelation.Opponent arm carries and Filter.matches repeats, phrased the
--- same way on purpose.
+-- TEAMMATE not an opponent, the only reading this is wrong for, and pawl has no
+-- teams -- the same argument Count.playersFor and Filter.matches carry.
 --
 -- Projection.controllerOf and not the grant list admittedGiven hoists: this is
--- asked only of a candidate that already HAS hexproof, which the `&&` above
--- guarantees and which is no candidate at all on almost every board. Threading
--- that list through is the fix if one ever makes the rebuild matter.
+-- asked only of a candidate that already HAS hexproof, which is no candidate at
+-- all on almost every board. Threading that list through is the fix if one ever
+-- makes the rebuild matter.
 --
 -- Nothing either way is False, the vacuous posture every player-referencing
--- question here already takes (see legalRecipients): a question with no "you" in
--- it names no opponent, and neither does a candidate with no controller -- which
--- CR 110.2's last sentence ("every permanent has a controller") makes
+-- question here already takes: a question with no "you" in it names no opponent,
+-- and neither does a candidate with no controller -- which CR 110.2 makes
 -- unreachable for the battlefield candidates the caller above asks about.
 opponentOfController :: Maybe PlayerId -> ObjectId -> GameState -> Bool
 opponentOfController perspective oid gs = case (perspective, Projection.controllerOf oid gs) of
@@ -277,13 +231,10 @@ opponentOfController perspective oid gs = case (perspective, Projection.controll
 --
 -- The Context is the SAME one the Filter is matched against, and only the
 -- graveyard arm reads it: CR 400.1's per-player zones make a pool that names one
--- have to say whose, and the Context's perspective is what answers. CR 109.5 is
--- why that is the right frame -- "the words 'you' and 'your' on an object refer
--- to the object's controller, its WOULD-BE CONTROLLER (if a player is attempting
--- to play, cast, or activate it)" -- which is the player CR 601.2c has choosing
--- targets. Every battlefield, stack and EXILE arm ignores it, because those
--- zones are shared by all players (CR 400.1 again) -- so the graveyard arm is
--- the only one with a "whose" to answer at all.
+-- have to say whose, and the Context's perspective is what answers. CR 109.5's
+-- would-be controller is why that is the right frame -- the player CR 601.2c has
+-- choosing targets. Every battlefield, stack and EXILE arm ignores it, because
+-- those zones are shared by all players (CR 400.1 again).
 basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Filter.Context -> Pool.Pool -> GameState -> Set Recipient
 basePoolGiven pcs context pool gs = case pool of
   Pool.Creatures -> creatureRecipientsGiven pcs gs
@@ -301,15 +252,12 @@ basePoolGiven pcs context pool gs = case pool of
   Pool.CardsInGraveyard scope -> graveyardRecipients context scope gs
   Pool.CardsInExile -> exileRecipients gs
 
--- CR 115.2 ("Only permanents are legal targets for spells and abilities, unless
--- a spell or ability (a) specifies that it can target an object in another zone
--- or a player, or (b) targets an object that can't exist on the battlefield" --
--- the exception is what the graveyard, exile, spell and player arms above are)
--- with CR 109.2 (an unqualified creature description "means a permanent of that
--- card type or subtype on the battlefield"): creatures on the battlefield, per
--- playing player's zone, tagged
--- ToCreature. Reads Projection.isCreatureOf so a permanent made a creature by the
--- layer system (M3c) counts and one that lost the type does not.
+-- CR 115.2 (only permanents are legal targets, save for the exceptions the
+-- graveyard, exile, spell and player arms above are) with CR 109.2 (an
+-- unqualified creature description means a permanent on the battlefield):
+-- creatures on the battlefield, per playing player's zone, tagged ToCreature.
+-- Reads Projection.isCreatureOf, so a permanent made a creature by the layer
+-- system counts and one that lost the type does not.
 creatureRecipients :: GameState -> Set Recipient
 creatureRecipients gs = creatureRecipientsGiven (Projection.projectAll gs) gs
 
@@ -324,9 +272,7 @@ creatureRecipientsGiven pcs gs =
 
 -- CR 115.4: planeswalkers on the battlefield, per playing player's zone, tagged
 -- ToPlaneswalker. The same walk creatureRecipientsGiven makes and shares its
--- projection with, asking Projection.isPlaneswalkerGiven instead -- so a
--- permanent the layer system made a planeswalker counts and one that lost the
--- type does not.
+-- projection with, asking Projection.isPlaneswalkerGiven instead.
 --
 -- The tag is what CR 120.3c needs and CR 120.3e must not get, which is why this
 -- is a pool of its own rather than a widened creatureRecipients: the two answers
@@ -363,48 +309,39 @@ spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game
 -- permanents are excluded by Game.isAbility. Stifle's "target activated or
 -- triggered ability".
 --
--- The same walk spellRecipients makes over the same list, and DISJOINT from it
--- by construction, which is rule 113.9's first two sentences: "activated and
--- triggered abilities on the stack aren't spells, and therefore can't be
--- countered by anything that counters only spells. Activated and triggered
--- abilities on the stack can be countered by effects that specifically counter
--- abilities."
+-- The same walk spellRecipients makes over the same list, and DISJOINT from it by
+-- construction, which is CR 113.9's first two sentences.
 --
 -- Nothing filters out a MANA ability, and nothing needs to: CR 605.3b and CR
--- 605.4a keep one off the stack entirely ("doesn't go on the stack, so it can't
--- be targeted, countered, or otherwise responded to"), so this walk can never
--- see one. Stifle's "(Mana abilities can't be targeted.)" is reminder text for
--- those rules -- see Pawl.Types.Pool.Abilities.
+-- 605.4a keep one off the stack entirely, so this walk can never see one.
+-- Stifle's "(Mana abilities can't be targeted.)" is reminder text for those rules
+-- -- see Pawl.Types.Pool.Abilities.
 abilityRecipients :: GameState -> Set Recipient
 abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game.isAbility oid gs) (GameState.stack gs)))
 
 -- CR 404.1: the cards in the graveyards the scope names, tagged ToObject -- Raise
 -- Dead's "target creature card in your graveyard", and Withered Wretch's "exile
--- target card from a graveyard", which names no player at all. CR 115.2's
--- clause (a), "a spell or ability ... specifies that it can target an object in
--- another zone" -- its OTHER-ZONE half, since playerRecipients above is already
--- the "or a player" one -- and so the only pool that leaves the battlefield and
--- the stack behind.
+-- target card from a graveyard", which names no player at all. CR 115.2's clause
+-- (a), its OTHER-ZONE half, since playerRecipients above is already the "or a
+-- player" one.
 --
 -- ToObject, like permanentRecipients and unlike creatureRecipients, because the
 -- candidates are CARDS: CR 109.2's battlefield default is switched off by the
 -- card's own word "card", so "creature" is a Filter over an untagged card here.
--- Game.zoneMembers Zone.Graveyard is per-OWNER (CR 400.3 sends every card to its
--- owner's graveyard, so a graveyard holds nothing else), which is what makes the
--- scope answerable at all -- CR 108.4 gives a card in a graveyard no controller
--- to ask about.
+-- Game.zoneMembers Zone.Graveyard is per-OWNER (CR 400.3), which is what makes
+-- the scope answerable at all -- CR 108.4 gives a card in a graveyard no
+-- controller to ask about.
 --
 -- Whose graveyard is PlayerEffect.playersInScope's answer rather than a second
--- reading of CR 109.5 written here: that function folds the one membership test
--- (PlayerEffect.inScope), which is where PlayerScope.Opponents' CR 806.1
--- free-for-all argument lives. NOT Count.playersFor, which answers for a
--- PlayerRef, whose InSlot arm names a slot CR 601.2c has not filled at the moment
--- this pool is read -- see Pawl.Types.Pool.CardsInGraveyard.
+-- reading of CR 109.5 written here: that function folds the one membership test,
+-- which is where PlayerScope.Opponents' CR 806.1 argument lives. NOT
+-- Count.playersFor, which answers for a PlayerRef, whose InSlot arm names a slot
+-- CR 601.2c has not filled at the moment this pool is read.
 --
--- Nothing -> empty, playersInScope's report of an absent perspective (CR 109.5's
--- "you" with nobody to be) -- the vacuous posture every player-referencing Filter
--- atom already takes. PlayerScope.EachPlayer never reaches it: "a graveyard"
--- names the whole table with no perspective to lack.
+-- Nothing -> empty, playersInScope's report of an absent perspective -- the
+-- vacuous posture every player-referencing Filter atom takes.
+-- PlayerScope.EachPlayer never reaches it: "a graveyard" names the whole table
+-- with no perspective to lack.
 graveyardRecipients :: Filter.Context -> PlayerScope.PlayerScope -> GameState -> Set Recipient
 graveyardRecipients context scope gs =
   case PlayerEffect.playersInScope (Filter.perspective context) gs scope of
@@ -421,33 +358,25 @@ graveyardRecipients context scope gs =
 --
 -- Reads GameState.exile WHOLE, exactly as permanentRecipients reads
 -- GameState.battlefield, and takes no scope at all. That is CR 400.1's second
--- sentence: "the other zones are shared by all players", so there is no
--- per-player copy of exile to fold over and no "whose" for the Context's
--- perspective to answer -- see Pawl.Types.Pool.CardsInExile for why a
--- PlayerScope here would be an owner filter wearing a zone's type. So this pool
--- sits with the battlefield and stack ones rather than with the graveyard one,
--- which is why it takes only the GameState.
+-- sentence: the other zones are shared by all players, so there is no per-player
+-- copy of exile to fold over and no "whose" for the Context's perspective to
+-- answer -- see Pawl.Types.Pool.CardsInExile for why a PlayerScope here would be
+-- an owner filter wearing a zone's type.
 --
--- No stillPlaying filter, and none is needed -- unlike graveyardRecipients,
--- which folds a list of players and so must have one. CR 800.4a: "when a player
--- leaves the game, all objects (see rule 109) owned by that player leave the
--- game", which Pawl.Engine.Departure.objectsLeaveWith performs by deleting every
--- id they owned from GameState.objects and from every zone, exile included. So
--- nothing of theirs is left in this set to skip. That sweep is gated on
--- Departure.continuesAfterDeparture, so a two-player loser's exiled cards do
--- stay in the set -- unobservably, because CR 104.2a ends that game at once ("a
--- player still in the game wins the game if that player's opponents have all
--- left the game"), and nobody is left to be offered a target.
+-- No stillPlaying filter, and none is needed -- unlike graveyardRecipients, which
+-- folds a list of players and so must have one. CR 800.4a takes every object a
+-- departing player owned out of the game, which
+-- Pawl.Engine.Departure.objectsLeaveWith performs by deleting those ids from
+-- every zone, exile included. That sweep is gated on
+-- Departure.continuesAfterDeparture, so a two-player loser's exiled cards do stay
+-- in the set -- unobservably, because CR 104.2a ends that game at once. The
+-- rule's LAST clause pushes the other way and is honoured by the same absence:
+-- objects still controlled by that player are exiled, and they are owned by
+-- somebody still here.
 --
--- The rule's LAST clause pushes the other way and is honoured by the same
--- absence: "if there are any objects still controlled by that player, those
--- objects are exiled" -- those are owned by somebody still here, and belong in
--- the pool.
---
--- CR 406.3's face-up default is what makes the whole set offerable: "exiled
--- cards are, by default, kept face up and may be examined by any player at any
--- time." No card in pawl's pool exiles face down, so there is no face-down pile
--- for CR 406.4's choose-at-random rule to reach (#557).
+-- CR 406.3's face-up default is what makes the whole set offerable. No card in
+-- pawl's pool exiles face down, so there is no face-down pile for CR 406.4's
+-- choose-at-random rule to reach (#557).
 exileRecipients :: GameState -> Set Recipient
 exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.exile gs)))
 
@@ -466,25 +395,23 @@ stillAdmitted perspective source recipient spec gs = Set.member recipient (admit
 -- One legal set per named slot; casting prompts with exactly this map. `source`
 -- is the object the targeting is relative to -- the spell object at cast, the
 -- source permanent for an ability. CR 601.2c's "another" needs no separate pass:
--- a slot that excludes its source says so with Not IsSource, and a slot that
--- does not is untouched, so Prodigal Sorcerer may still target itself with
--- AnyTarget (CR 115.4). CR 115.5's self-exclusion is a DIFFERENT rule and is not
--- that clause: it is unconditional, and it fires only where its own words do,
--- for a source that is itself on the stack -- see legalRecipients.
+-- a slot that excludes its source says so with Not IsSource, and a slot that does
+-- not is untouched, so Prodigal Sorcerer may still target itself with AnyTarget
+-- (CR 115.4). CR 115.5's self-exclusion is
+-- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
+-- source that is itself on the stack -- see legalRecipients.
 legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
 legalSets perspective source specs gs = fmap (\spec -> legalRecipients perspective source spec gs) specs
 
 -- CR 700.2a: the mode indices all of whose target slots have a legal recipient
 -- (a mode with no slots is trivially fillable). Self-exclusion ("another") is
--- honored because it lives in the slot's own Filter, so a mode whose only
--- nonland-permanent target is the source itself is NOT fillable. Shared by
--- spells (Cast) and abilities (Activate/Engine). `extra` is the slots EVERY
--- mode carries in addition to its own -- CR 303.4a's enchant slot, which is
--- declared by the card rather than by a mode, and which castability must see
--- or an Aura with no legal creature would be castable and then countered on
--- resolution (CR 601.2c says it could never have been cast). An ability has no
--- enchant spec and passes Map.empty, which makes that a fact of the call
--- rather than a special case here.
+-- honored because it lives in the slot's own Filter. Shared by spells (Cast) and
+-- abilities (Activate/Engine).
+--
+-- `extra` is the slots EVERY mode carries in addition to its own -- CR 303.4a's
+-- enchant slot, declared by the card rather than by a mode, which castability
+-- must see or an Aura with no legal creature would be castable and then countered
+-- on resolution (CR 601.2c). An ability has no enchant spec and passes Map.empty.
 fillableModes :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
 fillableModes perspective source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)

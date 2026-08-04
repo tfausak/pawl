@@ -13,8 +13,7 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamagePattern" $ do
-  -- Fog: prevents all combat damage that would be dealt this turn -- a named
-  -- kind (Combat), no source restriction, no recipient restriction.
+  -- A named kind, no source restriction, no recipient restriction.
   Spec.it s "a named kind" $
     Common.assertJsonCodec
       s
@@ -31,8 +30,8 @@ spec s = Spec.describe s "Pawl.Codec.DamagePattern" $ do
       DamagePattern.fromJson
       (DamagePattern.MkDamagePattern Nothing SourceRelation.AnySource Nothing)
       """ {} """
-  -- CR 614.15's keying: Galvanic Blast's metalcraft clause names the damage its
-  -- own resolution is dealing, and says nothing about the kind.
+  -- CR 614.15's keying: names the damage its own resolution is dealing, and
+  -- says nothing about the kind.
   Spec.it s "the effect's own source (CR 614.15)" $
     Common.assertJsonCodec
       s
@@ -40,9 +39,8 @@ spec s = Spec.describe s "Pawl.Codec.DamagePattern" $ do
       DamagePattern.fromJson
       (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing)
       """ {"whichSource":{"type":"TheSource"}} """
-  -- CR 615.7's shielded permanent, baked by Resolve's PreventNextDamage arm from
-  -- the resolution's chosen target and never authored on a card (see
-  -- Pawl.Codec.DamagePattern).
+  -- CR 615.7's shielded permanent, baked by Resolve's PreventNextDamage arm and
+  -- never authored on a card.
   Spec.it s "a shielded recipient (CR 615.7)" $
     Common.assertJsonCodec
       s

@@ -67,40 +67,27 @@ emptyCombat =
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
 
--- CR 508.8: "If no creatures are declared as attackers or put onto the
--- battlefield attacking, skip the declare blockers and combat damage steps."
+-- CR 508.8: if no creatures were declared as attackers or put onto the
+-- battlefield attacking, skip the declare blockers and combat damage steps.
 --
 -- BOTH of that rule's clauses are the same question of Combat.attacked, because
--- both things that can make one true write that set: declareAttackers
--- below, and putOntoBattlefieldAttacking. Engine.runStepThatBegan asks it as the
--- declare attackers step ENDS -- after the priority round in which an attack
--- trigger resolves -- rather than the moment the turn-based action finishes,
--- which is what made the second clause unrepresentable before.
+-- both things that can make one true write that set: declareAttackers below, and
+-- putOntoBattlefieldAttacking. Engine.runStepThatBegan asks it as the declare
+-- attackers step ENDS -- after the priority round in which an attack trigger
+-- resolves -- rather than the moment the turn-based action finishes.
 --
 -- That set and NOT Map.null on Combat.attackers, which is the same question only
 -- while nothing leaves combat. CR 508.8 asks whether a creature WAS declared or
 -- put onto the battlefield attacking, and CR 508.1k makes that a different
--- question from whether one is attacking now: a declared creature "remains an
--- attacking creature until it's removed from combat", and CR 506.4's removal
--- takes away the attacking, never the declaration. Asking the map skipped both
--- steps for a lone attacker that a Ray of Command took during the step, which is
--- TurnSpec's proving test; Pawl.Engine.Replacement's CR 701.19a regeneration reaches the
--- same Game.removeFromCombat door.
+-- question from whether one is attacking now: CR 506.4's removal takes away the
+-- attacking, never the declaration. Asking the map skipped both steps for a lone
+-- attacker that a Ray of Command took during the step.
 --
 -- A creature put onto the battlefield attacking LATER than that step cannot
 -- un-skip anything, and does not need to: the steps this drops are the only ones
--- of THIS combat phase it could enter during, so if they were dropped there is
--- no such moment, and if they were not then nothing is skipped anyway. A CR
--- 500.8 additional combat phase later in the turn is not this call's business
--- and Turn.dropSkippedCombatSteps does not touch it -- that phase reaches its
--- own declare attackers step and asks this question again for itself.
---
--- The second clause on its own -- a creature put onto the battlefield attacking
--- while NOTHING was declared -- is proved at gameplay level by Meandering
--- Towershell, in CombatSpec's MeanderingTowershell group: its delayed ability
--- returns it attacking on a later turn, on which its controller declares
--- nothing. TurnSpec's direct call to putOntoBattlefieldAttacking states the same
--- clause with no card in the way, and both are kept.
+-- of THIS combat phase it could enter during. A CR 500.8 additional combat phase
+-- later in the turn reaches its own declare attackers step and asks this
+-- question again for itself.
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
   if Set.null (Combat.attacked (GameState.combat gs))
@@ -110,30 +97,25 @@ skipEmptyCombat gs =
 -- CR 506.2a: the candidates the attacking player chooses from. Read only by
 -- chooseDefender; the CHOSEN one lives in Combat.defender.
 --
--- CR 506.2a says the attacking player chooses one of their opponents, and three
--- rules get from "opponents" to this list. CR 102.1: a player is one of the
--- people IN THE GAME, so someone who has left is not a player and cannot be an
--- opponent. CR 806.1: in a free-for-all the players compete as individuals, so
--- every other player is an opponent. CR 102.3 is the one reading this is wrong
--- for -- a teammate is not an opponent -- and pawl has no teams to express
--- (#175). Same argument Count.playersFor's PlayerRelation.Opponent arm carries,
--- phrased the same way on purpose. Filter.matches has an Opponent arm too, but it
--- carries no such note and is deliberately not cited here as though it did.
+-- Three rules get from CR 506.2a's "one of their opponents" to this list. CR
+-- 102.1: a player is one of the people IN THE GAME, so someone who has left is
+-- not a player and cannot be an opponent. CR 806.1: in a free-for-all the players
+-- compete as individuals, so every other player is an opponent. CR 102.3 is the
+-- one reading this is wrong for -- a teammate is not an opponent -- and pawl has
+-- no teams to express (#175). Same argument Count.playersFor's
+-- PlayerRelation.Opponent arm carries.
 --
 -- SEATING order (Game.stillPlayingInOrder), not player-id order: the seating
--- roster is the game's own ordering for anything player-shaped (CR 103.1: "the
--- game's default turn order begins with the starting player and proceeds
--- clockwise"; CR 800.5 only says the seating itself is agreed at the table), and
--- Game.stillPlaying's order is an artifact of reading the players map. It
--- makes the first candidate the next seat rather than the lowest id, which is
--- what an interpreter that takes the head should get.
+-- roster is the game's own ordering for anything player-shaped (CR 103.1), while
+-- Game.stillPlaying's order is an artifact of reading the players map. It makes
+-- the first candidate the next seat rather than the lowest id, which is what an
+-- interpreter that takes the head should get.
 attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayingInOrder gs)
 
 -- CR 508.1b: what the active player may announce a chosen creature is attacking
--- -- "which player, planeswalker, or battle". CR 506.2's second sentence is the
--- same list scoped to a two-player game: "that player, planeswalkers they
--- control, and battles they protect may be attacked."
+-- -- which player, planeswalker or battle. CR 506.2's second sentence is the
+-- same list scoped to a two-player game.
 --
 -- The defending player is FIRST, which is not cosmetic: it is the candidate that
 -- exists on every board, so an interpreter that takes the head gets the answer
@@ -143,14 +125,12 @@ attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayin
 -- Battles are absent because there is no battle card type (#302). CR 802's
 -- attack-multiple-players option would put a SECOND player on this list, and
 -- pawl has no options concept to read it from (#175) -- the defending player is
--- the argument, so this function needs no change when it arrives, only a longer
--- caller.
+-- the argument, so this function needs no change when it arrives.
 --
 -- Read at DECLARATION and again at damage assignment (stillAttacked below), and
 -- both readings are derived rather than stored on purpose: every clause of CR
--- 506.4 that stops a planeswalker being attacked -- it leaves the battlefield,
--- its controller changes, it stops being a planeswalker -- is a change to
--- exactly what this filter asks about, so re-asking IS performing the removal.
+-- 506.4 that stops a planeswalker being attacked is a change to exactly what
+-- this filter asks about, so re-asking IS performing the removal.
 attackTargets :: PlayerId -> GameState -> NonEmpty.NonEmpty AttackTarget.AttackTarget
 attackTargets defender gs =
   AttackTarget.OfPlayer defender
@@ -169,32 +149,24 @@ attackablePlaneswalkers defender gs =
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
 --
--- Asked where the answer is USED (Damage.combatRecipient) rather than sampled
--- into the combat record by Engine.settleForPriority the way removeChanged
--- samples its two clauses, and the difference is invisible: an attack target is
--- read in exactly two places, and both re-ask.
---
---   * Damage.combatRecipient, at CR 510.1's assignment -- whose own rule
---     (CR 510.1b) is phrased for precisely this case: "If it isn't currently
---     attacking anything (if, for example, it was attacking a planeswalker that
---     has left the battlefield), it assigns no combat damage."
---   * landwalkAllowsGiven, for CR 508.5's "defending player", which reads the
---     planeswalker's controller and never whether it is still attacked.
+-- Asked where the answer is USED rather than sampled into the combat record the
+-- way removeChanged samples its two clauses, and the difference is invisible: an
+-- attack target is read in exactly two places, and both re-ask --
+-- Damage.combatRecipient at CR 510.1's assignment, whose own CR 510.1b is
+-- phrased for precisely this case, and landwalkAllowsGiven for CR 508.5's
+-- defending player, which reads the planeswalker's controller and never whether
+-- it is still attacked.
 --
 -- Every other reader of Combat.attackers takes its KEYS (Projection's
 -- Filter.IsAttacking, blockCeiling, declareBlockers, Damage.dealCombatDamage),
--- and CR 506.4c is emphatic that the keys must NOT change here: "removing that
--- planeswalker or battle from combat doesn't remove that creature from combat.
--- It continues to be an attacking creature, although it is not attacking any
--- player, planeswalker, or battle. It may be blocked."
+-- and CR 506.4c is emphatic that the keys must NOT change here: the creature
+-- continues to be an attacking creature, attacking nothing, and may be blocked.
 --
 -- So the state pawl stores -- an attacker whose recorded target is no longer
--- attackable -- and the state the rules describe -- an attacking creature
--- attacking nothing -- are observationally the same board, and stay so until
--- something asks a question that separates them. The candidate for that is a
--- card whose text reads WHAT a creature is attacking (CR 508.3b's "whenever
--- [a planeswalker] is attacked", CR 702.19c's trample over planeswalkers); none
--- is in the pool (#537).
+-- attackable -- and the state the rules describe are observationally the same
+-- board, and stay so until something asks a question that separates them. The
+-- candidate for that is a card whose text reads WHAT a creature is attacking (CR
+-- 508.3b, CR 702.19c's trample over planeswalkers); none is in the pool (#537).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   -- No defending player is no attack (see Pawl.Types.Combat's defender field), so
@@ -216,23 +188,18 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- candidate. A restriction on a SET of creatures could not be answered here
 -- (#533).
 --
--- canAttackGiven is the half a LOOP wants: `grants` is one control-grant walk
--- (Projection.controlGrants), `pcs` one whole-board projection
--- (Projection.projectAll), and `restricted` one battlefield walk for CR 508.1c
--- (CombatRestriction.cantAttack), each taken once per declaration pass by
--- legalAttackers below rather than once per candidate -- the questions this asks
--- are otherwise as many as three fresh gathers (haste, creature-ness, defender), a
--- fresh grant walk and a fresh restriction walk apiece, which made the pass
--- quadratic in the battlefield (#200). Same hoist Sba.performStateBasedActions
--- takes for the CR 704.3 sweep and Projection.controls takes for the grant list;
--- Projection.projectGiven carries the argument for why a shared board is the same
--- answer, and for why it is valid only within one pure pass over one GameState.
+-- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
+-- each one battlefield-wide walk, taken once per declaration pass by
+-- legalAttackers below rather than once per candidate, which is what kept the
+-- pass from being quadratic in the battlefield (#200).
+-- Projection.projectGiven carries the argument for why a shared board is the
+-- same answer, and for why it is valid only within one pure pass over one
+-- GameState.
 --
 -- canAttack itself passes Map.empty for the projection, so a lone query projects
--- per read exactly as it always did. It does NOT pass an empty restriction set:
--- an absent projection is a cache miss the projection recovers from, while an
--- absent restriction is a wrong answer, which is the distinction
--- pairAllowedGiven's grant list already draws.
+-- per read. It does NOT pass an empty restriction set: an absent projection is a
+-- cache miss the projection recovers from, while an absent restriction is a
+-- wrong answer.
 canAttack :: PlayerId -> ObjectId -> GameState -> Bool
 canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantAttack [oid] gs) pid oid gs
 
@@ -267,81 +234,56 @@ legalAttackers pid gs =
    in filter (\oid -> canAttackGiven grants pcs restricted pid oid gs) controlled
 
 -- CR 508.1d's two halves, computed together because neither is usable alone: the
--- requirement instances in force, and a declaration obeying the "maximum possible
--- number of requirements that could be obeyed without disobeying any
--- restrictions". blockCeiling's twin, and the pair is deliberately the same shape
--- so the two rules read the same way at their call sites.
+-- requirement instances in force, and a declaration obeying the maximum number of
+-- them that could be obeyed without disobeying any restriction. blockCeiling's
+-- twin, deliberately the same shape so the two rules read the same way at their
+-- call sites.
 --
--- The maximum is answered in CLOSED FORM -- the best declaration is the instance
--- set, minus whichever instances CR 508.1d's cost clause excuses (below) -- where
--- blockCeiling enumerates every candidate declaration and folds. That is not an
--- optimization of the blocking search; it is a different search, and it is exact
--- only because of what pawl cannot yet print:
+-- The maximum is answered in CLOSED FORM -- the instance set, minus whichever
+-- instances CR 508.1d's cost clause excuses -- where blockCeiling enumerates every
+-- candidate declaration and folds. That is a different search rather than an
+-- optimization of that one, and it is exact only because of what pawl cannot yet
+-- print: every attacking RESTRICTION it models is per creature (CR 508.1a's own
+-- clauses, CR 702.3b's defender, CR 508.1c's printed
+-- CombatRestriction.CantAttack), and canAttack has already applied all of them to
+-- `candidates`, so declaring every required creature at once disobeys nothing and
+-- is maximal by construction. A cost to attack does not break that: CR 508.1h
+-- totals the whole declaration at once, so no creature's presence can make
+-- another's attack ILLEGAL, only dearer.
 --
---   * every attacking RESTRICTION pawl models is per creature (CR 508.1a's own
---     clauses, CR 702.3b's defender, and CR 508.1c's printed
---     CombatRestriction.CantAttack -- Pacifism), and canAttack has already applied
---     all of them to `candidates`, which AttackRequirement.instances then prunes
---     its instances by;
---   * so declaring every required creature at once disobeys nothing -- attacking
---     with one creature cannot make another's attack illegal -- which makes that
---     declaration legal AND maximal by construction. A cost to attack does not
---     break this: CR 508.1h totals the whole declaration at once, so no creature's
---     presence can make another's attack ILLEGAL, only dearer.
+-- That argument fails the moment a set-shaped ATTACKING restriction lands (Silent
+-- Arbiter, Bonded Construct), and the replacement is blockCeiling's enumeration at
+-- blockCeiling's exponential cost (#533). The closed form therefore rests on a
+-- missing capability rather than on a claim about Magic. The BLOCKING side's
+-- set-shaped restriction has landed -- CR 702.111b's menace, in
+-- declarationAllowed -- and reaches nothing here: no restriction on who may block
+-- bounds who may attack.
 --
--- Both bullets fail the moment a set-shaped ATTACKING restriction lands (Silent
--- Arbiter's "no more than one creature can attack each combat", Bonded
--- Construct's "can't attack alone"), and the replacement is blockCeiling's
--- enumeration with blockCeiling's exponential cost (#533). The closed form
--- therefore rests on a missing capability rather than on a claim about Magic.
--- The BLOCKING side's set-shaped restriction has landed -- CR 702.111b's menace,
--- in declarationAllowed -- and reaches nothing here: no restriction on who may
--- block bounds who may attack.
+-- So nothing here is exponential: one battlefield walk plus, per requirement, one
+-- Projection.affects per candidate. That last read is QUADRATIC in the
+-- battlefield rather than linear, which is #435's shape and is documented at
+-- Projection.affects's AttachedPlayerControls arm; measured, it stays cheap on
+-- the boards this pool can build.
 --
--- So nothing here is exponential, and #342's warning about the blocking search has
--- no counterpart: the work is one battlefield walk plus, per requirement, one
--- Projection.affects per candidate. That last read is QUADRATIC in the battlefield
--- rather than linear -- Projection.affects's AttachedPlayerControls arm takes a
--- projection and a control-grant walk per candidate, which is #435's shape and is
--- documented at that arm. Measured on a board of N Goblin Pikers under one Curse:
--- 5 MB allocated at N=100, 15 MB at N=200, 53 MB and 0.02s at N=400. The cost
--- filter below adds one more battlefield walk per REQUIRED creature per attack
--- target, and each stops at the first permanent printing no cost to attack --
--- which on a board with no Ghostly Prison is all of them.
---
--- CR 508.1d's COST CLAUSE is the second component's filter, and it is a modifier
--- on the maximization rather than a check of its own: "if a creature can't attack
--- unless a player pays a cost, that player is not required to pay that cost, even
--- if attacking with that creature would increase the number of requirements being
--- obeyed". A requirement whose creature cannot attack anything without its
--- controller paying is therefore not one the maximum reaches for, and declining
--- to attack with it stays legal.
---
--- Which is why the two components come apart here for the first time. `required`
--- stays every instance in force, because that is what a declaration's obedience
--- is counted against -- attacking with a taxed creature obeys its requirement
--- perfectly well, and paying is then mandatory (CR 508.1j). `best` is the
--- untaxed subset, and it is what makes "no attacks" legal under a Curse of the
--- Nightly Hunt while a Ghostly Prison is out. Both readings of the pair below
--- (obeysAttackRequirements, forcedAttackDeclaration) want exactly that split.
---
--- AttackCost.attacksFreely is asked per required creature against CR 508.1b's
--- whole candidate list of targets, so a creature that could attack a planeswalker
--- for nothing keeps its requirement -- Ghostly Prison's own ruling ("a creature
--- that can't attack you can still attack a planeswalker you control"), and the
--- player's CR 508.1b announcement then decides whether they end up paying.
+-- CR 508.1d's COST CLAUSE is a modifier on the maximization rather than a check
+-- of its own: a player is never required to pay a cost to attack, even where
+-- attacking would obey one more requirement. So a requirement whose creature
+-- cannot attack anything without its controller paying is not one the maximum
+-- reaches for, and declining to attack with it stays legal -- which is why the
+-- two components come apart. `required` stays every instance in force, because
+-- that is what a declaration's obedience is counted against, and paying is
+-- mandatory once a taxed creature does attack (CR 508.1j); `best` is the untaxed
+-- subset, and it is what makes "no attacks" legal under a Curse of the Nightly
+-- Hunt while a Ghostly Prison is out. AttackCost.attacksFreely is asked against
+-- CR 508.1b's whole target list, so a creature that could attack a planeswalker
+-- for nothing keeps its requirement.
 --
 -- No defending player means no target at all, so nothing attacks freely and
--- `best` is empty. Not a fallback: with no defender there is no attack to make
--- (declareAttackers returns before ever prompting), so a requirement that cannot
--- be obeyed is one CR 508.1d's "if able" never reaches.
---
--- Nothing is forced when `required` is empty, which is every board without a
--- Curse on it: Set.filter never calls the predicate, so no cost walk and no
--- target list is built.
---
--- (empty, empty) when no requirement is in force: the maximum is zero, every
--- declaration obeys zero, and CR 508.1d has nothing to say.
+-- `best` is empty. Not a fallback: with no defender there is no attack to make,
+-- so a requirement that cannot be obeyed is one CR 508.1d's "if able" never
+-- reaches. (empty, empty) when no requirement is in force -- the maximum is zero,
+-- every declaration obeys zero, and Set.filter never calls the predicate, so no
+-- cost walk is taken.
 attackCeiling :: [ObjectId] -> GameState -> (Set ObjectId, Set ObjectId)
 attackCeiling candidates gs =
   let required = AttackRequirement.instances candidates gs
@@ -350,10 +292,9 @@ attackCeiling candidates gs =
         Just defender -> NonEmpty.toList (attackTargets defender gs)
    in (required, Set.filter (\oid -> AttackCost.attacksFreely oid targets gs) required)
 
--- How many of `required` this declaration obeys -- CR 508.1d's "the number of
--- requirements that are being obeyed". A requirement instance is obeyed exactly
--- when the declaration attacks with its creature. requirementsMet's twin, on a set
--- of creatures rather than a map of pairs.
+-- How many of `required` this declaration obeys (CR 508.1d): a requirement
+-- instance is obeyed exactly when the declaration attacks with its creature.
+-- requirementsMet's twin, on a set of creatures rather than a map of pairs.
 attackRequirementsMet :: Set ObjectId -> Set ObjectId -> Int
 attackRequirementsMet required declaration = Set.size (Set.intersection required declaration)
 
@@ -371,18 +312,15 @@ obeysAttackRequirements (required, best) chosen =
 -- with CR 508.1c's restrictions, then CR 508.1d's requirements.
 --
 -- CR 508.1c's restrictions are not a separate conjunct because they are not a
--- separate set: canAttack is the whole of what pawl can say a creature "can't
--- attack" for -- CR 508.1a's own clauses, CR 702.3b's defender, and every printed
+-- separate set: canAttack is the whole of what pawl can say a creature can't
+-- attack for -- CR 508.1a's own clauses, CR 702.3b's defender, and every printed
 -- CombatRestriction.CantAttack -- so being a candidate IS obeying every
 -- restriction it knows. That collapse holds only while every restriction is per
 -- creature (#533).
 --
--- CR 508.1d is not a check but a MAXIMIZATION -- "if the number of requirements
--- that are being obeyed is fewer than the maximum possible number of requirements
--- that could be obeyed without disobeying any restrictions, the declaration of
--- attackers is illegal" -- so it cannot be asked of the declaration alone. It is
--- what makes declaring no attackers at all illegal while a Curse of the Nightly
--- Hunt is on the enchanted player's battlefield.
+-- CR 508.1d is not a check but a MAXIMIZATION, so it cannot be asked of the
+-- declaration alone. It is what makes declaring no attackers at all illegal while
+-- a Curse of the Nightly Hunt is on the enchanted player's battlefield.
 legalAttackDeclaration :: PlayerId -> [ObjectId] -> GameState -> Bool
 legalAttackDeclaration pid chosen gs = legalAttackDeclarationGiven (legalAttackers pid gs) chosen gs
 
@@ -408,12 +346,11 @@ forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 --
 -- Only the per-creature ones. CR 509.1b's restrictions are mostly PAIRWISE
 -- (flying, fear) and cannot be decided about a blocker alone -- those live in
--- pairAllowed, which is asked of a (blocker, attacker) pair -- and CR 702.111b's
--- menace is SET-SHAPED, which lives in declarationAllowed. So the rule is
--- answered in three places, one per shape of restriction, and this is the
--- narrowest.
+-- pairAllowed -- and CR 702.111b's menace is SET-SHAPED, which lives in
+-- declarationAllowed. So the rule is answered in three places, one per shape of
+-- restriction, and this is the narrowest.
 --
--- Summoning sickness is NOT a blocking restriction. CR 302.6 restricts attacking
+-- Summoning sickness is NOT a blocking restriction: CR 302.6 restricts attacking
 -- and activated abilities with the tap or untap symbol, and says nothing about
 -- blocking.
 --
@@ -481,36 +418,28 @@ fearAllowsGiven pcs blocker attacker gs =
     || Set.member CardType.Artifact (Projection.cardTypesGiven pcs blocker gs)
     || Set.member Color.Black (Projection.colorsGiven pcs blocker gs)
 
--- CR 702.14c: "A creature with landwalk can't be blocked as long as the
--- defending player controls at least one land with the specified land type (as
--- in 'islandwalk')."
+-- CR 702.14c: a creature with landwalk can't be blocked as long as the defending
+-- player controls at least one land matching the specified criterion.
 --
--- The BLOCKER is not an argument, and that is CR 702.14d stated in the type.
--- "Landwalk abilities don't 'cancel' one another": its example is a player who
--- controls a snow Forest AND a creature with snow forestwalk, and who still may
--- not block a snow-forestwalker. Landwalk is a property of the defending
--- player's LANDS, never a comparison between the two creatures -- unlike
--- protection -- so a signature that could read the blocker is a signature that
--- could answer 702.14d wrong.
+-- The BLOCKER is not an argument, and that is CR 702.14d stated in the type:
+-- landwalk abilities don't cancel one another, so a player who controls a snow
+-- Forest AND a creature with snow forestwalk still may not block a
+-- snow-forestwalker. Landwalk is a property of the defending player's LANDS,
+-- never a comparison between the two creatures -- unlike protection -- so a
+-- signature that could read the blocker could answer 702.14d wrong.
 --
 -- The same asymmetry the other two evasion gates have (see evasionAllows):
 -- landwalk restricts being BLOCKED, so the question is asked of the ATTACKER.
 --
--- Membership over the projection's keyword map, never its counts: CR 702.14e
--- says "multiple instances of the same kind of landwalk on the same creature are
--- redundant". The MAP rather than hasKeywordGiven, because CR 702.14a's "[type]"
--- rides the constructor -- there is no single Keyword value to ask about, which
--- is Projection.totalToxic's situation and takes its shape.
+-- Membership over the projection's keyword map, never its counts (CR 702.14e).
+-- The MAP rather than hasKeywordGiven, because CR 702.14a's [type] rides the
+-- constructor -- there is no single Keyword value to ask about, which is
+-- Projection.totalToxic's situation and takes its shape.
 --
--- All four of CR 702.14c's clauses, because the keyword carries a Filter: "with
--- the specified land type (as in 'islandwalk'), with the specified type or
--- supertype (as in 'artifact landwalk'), without the specified type or supertype
--- (as in 'nonbasic landwalk'), or with both the specified type or supertype and
--- the specified subtype (as in 'snow swampwalk')". All four have a printing in
--- the pool: Bog Wraith the first, Vectis Gloves the second -- the only paper
+-- All four of CR 702.14c's clauses, because the keyword carries a Filter, and all
+-- four have a printing in the pool: Bog Wraith, Vectis Gloves (the only paper
 -- source of artifact landwalk, and it GRANTS the keyword rather than printing it
--- on a creature -- Dryad Sophisticate the third and Legions of Lim-Dûl the
--- fourth.
+-- on a creature), Dryad Sophisticate and Legions of Lim-Dûl.
 landwalkAllows :: ObjectId -> GameState -> Bool
 landwalkAllows attacker gs = landwalkAllowsGiven (Projection.controlGrants gs) Map.empty attacker gs
 
@@ -523,88 +452,77 @@ landwalkAllowsGiven grants pcs attacker gs =
         Keyword.Landwalk criterion -> Just criterion
         _ -> Nothing
       walked = Maybe.mapMaybe landCriterionOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
-      -- CR 508.5: "If an ability of an attacking creature refers to a defending
-      -- player ... the defending player it's referring to is the player that
-      -- creature is attacking, the controller of the planeswalker that creature
-      -- is attacking, or the protector of the battle that creature is attacking."
+      -- CR 508.5: an attacking creature's "defending player" is the player it is
+      -- attacking, or the controller of the planeswalker it is attacking.
       -- Landwalk is exactly such an ability, so this is that rule's own case
       -- split, read off the attack itself rather than off the blocker's
       -- controller -- those two coincide only while there is exactly one
       -- defending player (CR 802, #175). Nothing means the object is not
       -- attacking, so no landwalk of its can restrict anything.
       --
-      -- CR 508.5's second sentence -- the planeswalker's controller "before it
-      -- was removed from combat", once the creature is no longer attacking -- is
-      -- last known information, and this reads the controller LIVE instead.
+      -- CR 508.5's second sentence -- the defending player of a creature that is
+      -- no longer attacking, read off what it was attacking before it left combat
+      -- -- is last known information, and this reads the controller LIVE instead.
       -- Unreachable in the pool, which has no card that can remove an attacked
       -- planeswalker from combat and change who controlled it (#537), and
-      -- unobservable besides: no attacker in the pool has both landwalk and a
-      -- reason to attack a planeswalker.
+      -- unobservable besides.
       defenderOf target = case target of
         AttackTarget.OfPlayer pid -> Just pid
         AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
       defendingPlayer = defenderOf =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
-      -- CR 702.14c's "the defending player controls at least one land ...".
-      --
-      -- Lazy, and load-bearing: this walks the whole battlefield, and `any` below
-      -- never forces it for an attacker without landwalk, which is every attacker
-      -- in almost every combat (#200).
+      -- CR 702.14c's lands of the defending player. Lazy, and load-bearing: this
+      -- walks the whole battlefield, and `any` below never forces it for an
+      -- attacker without landwalk, which is every attacker in almost every combat
+      -- (#200).
       defendersLands = foldMap (\pid -> Projection.controlsGiven grants pid gs) defendingPlayer
       -- The land-ness is asked HERE and never by the criterion: every clause of
-      -- CR 702.14c reads "at least one LAND with/without ...", so it belongs to
-      -- the rule rather than to the card's parameter, and a printing cannot omit
-      -- it. The criterion answers the "[type]" half alone.
+      -- CR 702.14c reads "at least one LAND", so it belongs to the rule rather
+      -- than to the card's parameter. The criterion answers the type half alone.
       --
-      -- CR 205.3d ("an object can't gain a subtype that doesn't correspond to
-      -- one of that object's types") is what makes the card-type test all but
-      -- redundant for the two clauses whose criterion NAMES a land type --
-      -- islandwalk's and snow swampwalk's -- and "all but" is why it is still
-      -- asked even for them: nothing in the projection enforces 205.3d, so a
+      -- CR 205.3d makes the card-type test all but redundant for the two clauses
+      -- whose criterion NAMES a land type, and "all but" is why it is still asked
+      -- even for them: nothing in the projection enforces 205.3d, so a
       -- Modification.AddLandSubtype aimed at a non-land would otherwise be walked
-      -- on. For the other two it is not redundant at all: their criteria name no
-      -- land type, so "nonbasic landwalk" would match every nonbasic PERMANENT
-      -- and "artifact landwalk" every artifact.
+      -- on. For the other two it is not redundant at all -- their criteria name no
+      -- land type, so nonbasic landwalk would match every nonbasic PERMANENT and
+      -- artifact landwalk every artifact.
       --
       -- CR 109.5's "you" for the criterion is the ATTACKER's controller, and the
       -- source is the attacker -- the same pairing every keyword-borne Filter
-      -- takes. No landwalk in the pool reads either (all four clauses are type,
-      -- supertype and subtype tests), so the context is well-defined rather than
-      -- exercised. Hoisted, since it does not vary per candidate.
+      -- takes. No landwalk in the pool reads either, so the context is
+      -- well-defined rather than exercised. Hoisted, since it does not vary per
+      -- candidate.
       context = Filter.MkContext (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
       -- ONE projection per candidate: Filter.cardTypes is the very set
       -- Projection.cardTypesGiven would rebuild, so the land test reads it off
-      -- the view rather than projecting the object a second time. The comment
-      -- above about walking the whole battlefield is why that matters (#200).
+      -- the view rather than projecting the object a second time (#200).
       matchesCriterion criterion oid =
         let view = Projection.viewOfObjectGiven pcs grants oid gs
          in Set.member CardType.Land (Filter.cardTypes view) && Filter.matches context view criterion
    in not (any (\criterion -> any (matchesCriterion criterion) defendersLands) walked)
 
--- CR 702.111b: "A creature with menace can't be blocked except by two or more
--- creatures."
+-- CR 702.111b: a creature with menace can't be blocked except by two or more
+-- creatures.
 --
 -- The first restriction of the SET shape #533 named -- its blocking half; the
--- attacking half is still open, at attackCeiling -- and the reason this takes
--- the whole declaration where its three siblings above take a pair: "two or more
--- creatures" is a fact about how many blockers were assigned to one attacker,
--- which no predicate on a single (blocker, attacker) pair can state. Splitting
--- the declaration into pairs loses exactly the information the rule reads.
+-- attacking half is still open, at attackCeiling -- and the reason this takes the
+-- whole declaration where its three siblings above take a pair: how many blockers
+-- were assigned to one attacker is not something a predicate on a single
+-- (blocker, attacker) pair can state.
 --
 -- "EXCEPT BY two or more", not "must be blocked by two or more". An attacker
 -- nobody blocked is not blocked at all, so 702.111b has nothing to say about it
--- -- and that is why this folds over the attackers the declaration MENTIONS
--- (Map.elems) rather than over every attacker in combat. Declining to block is
--- always legal under restrictions alone, which is the seed blockCeiling's fold
--- relies on.
+-- -- which is why this folds over the attackers the declaration MENTIONS rather
+-- than over every attacker in combat. Declining to block is always legal under
+-- restrictions alone, which is the seed blockCeiling's fold relies on.
 --
 -- The same asymmetry the other three evasion gates have (see evasionAllows): the
 -- keyword is read off the ATTACKER. A creature with menace blocking alone is
 -- legal, since 702.111b restricts being blocked and says nothing about blocking.
 --
 -- Membership rather than the projection's per-keyword count, on
--- landwalkAllowsGiven's terms: CR 702.111c says "multiple instances of menace on
--- the same creature are redundant", so a creature with two of them still needs
--- two blockers rather than four.
+-- landwalkAllowsGiven's terms: CR 702.111c makes multiple instances redundant, so
+-- a creature with two of them still needs two blockers rather than four.
 menaceAllows :: Map ObjectId ObjectId -> GameState -> Bool
 menaceAllows = menaceAllowsGiven Map.empty
 
@@ -629,22 +547,20 @@ menaceAllowsGiven pcs declaration gs =
 -- admits only blockers that answer both.
 --
 -- Every restriction ASKED HERE is at most pairwise, and CR 702.14c's landwalk is
--- less than that: it does not read the blocker at all. Menace (CR 702.111b) is
--- not pairwise -- it constrains the SET blocking one attacker -- so it is asked
--- in declarationAllowed, of the whole declaration, and never here. The two are
--- cumulative rather than alternative, which is CR 509.1b's own "different evasion
--- abilities are cumulative" read across the shapes: a menace attacker that also
--- has fear needs two blockers AND needs each of them to pass 702.36b.
+-- less than that: it does not read the blocker at all. Menace (CR 702.111b)
+-- constrains the SET blocking one attacker, so it is asked in
+-- declarationAllowed and never here. The two are cumulative rather than
+-- alternative: a menace attacker that also has fear needs two blockers AND needs
+-- each of them to pass 702.36b.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowed candidates attackers blocker attacker gs =
   pairAllowedGiven (Projection.controlGrants gs) Map.empty candidates attackers blocker attacker gs
 
 -- pairAllowed against a pre-projected board, which is what the callers below
--- pass: this question is asked once per (blocker, attacker) PAIR, so each of its
--- evasion reads was a fresh gather in a doubly nested loop (#200). The grant list
--- is threaded for the same reason and on canBlockGiven's terms: an EMPTY pcs is a
--- cache miss the projection recovers from, but an empty grant list is a wrong
--- answer, so callers pass the real one.
+-- pass: this question is asked once per (blocker, attacker) PAIR, so each evasion
+-- read would otherwise be a fresh gather in a doubly nested loop (#200). The
+-- grant list is threaded on canBlockGiven's terms: an EMPTY pcs is a cache miss
+-- the projection recovers from, but an empty grant list is a wrong answer.
 pairAllowedGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
   -- CR 509.1a: the blocker must be one this player could block with at all, and
@@ -659,17 +575,15 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- any are disobeyed the DECLARATION is illegal.
 --
 -- The unit of legality is the whole declaration, not the pair, and that is not a
--- stylistic choice. Menace (CR 702.111b) says a creature can't be blocked except
--- by TWO OR MORE creatures -- a constraint on the SET blocking an attacker, which
--- no per-pair predicate can express. Every other evasion ability the pool has --
--- flying, reach, fear, landwalk -- is pairwise or narrower; designing to them
--- would be designing to the case that misleads. See the M2a spec, section 3.
+-- stylistic choice: menace (CR 702.111b) constrains the SET blocking an attacker,
+-- which no per-pair predicate can express. Every other evasion ability the pool
+-- has -- flying, reach, fear, landwalk -- is pairwise or narrower; designing to
+-- them would be designing to the case that misleads.
 --
 -- So the two shapes of restriction are both asked here, one conjunct each:
 -- pairAllowed over the pairs, and menaceAllows over the whole map. This is also
--- the seam blockCeiling's enumeration is filtered through, so CR 509.1c's
--- "maximum possible number of requirements that could be obeyed without
--- disobeying any restrictions" maximizes over declarations menace already allows.
+-- the seam blockCeiling's enumeration is filtered through, so CR 509.1c's maximum
+-- is taken over declarations menace already allows.
 --
 -- Takes the projected board rather than projecting per read, because the
 -- set-shaped conjunct reads a keyword and this sits inside candidateDeclarations'
@@ -680,9 +594,9 @@ declarationAllowed pcs able declaration gs =
   all (uncurry able) (Map.toList declaration)
     && menaceAllowsGiven pcs declaration gs
 
--- How many of `requirements` this declaration obeys -- CR 509.1c's "the number of
--- requirements that are being obeyed". A requirement instance is obeyed exactly
--- when the declaration has its blocker blocking its attacker.
+-- How many of `requirements` this declaration obeys (CR 509.1c): a requirement
+-- instance is obeyed exactly when the declaration has its blocker blocking its
+-- attacker.
 requirementsMet :: Set (ObjectId, ObjectId) -> Map ObjectId ObjectId -> Int
 requirementsMet requirements declaration =
   Set.size (Set.filter (\(blocker, attacker) -> Map.lookup blocker declaration == Just attacker) requirements)
@@ -691,14 +605,12 @@ requirementsMet requirements declaration =
 -- pairs CR 509.1b allows: each candidate blocker independently either blocks
 -- nothing or blocks one attacker it may block.
 --
--- EXPONENTIAL, and honestly so: the list has product over candidates of
--- (1 + how many attackers that candidate may block) entries, so it is
--- O((attackers + 1) ^ blockers) in the worst case. Nothing caps it and nothing
--- samples it -- a cap would answer CR 509.1c's "maximum possible number" with a
--- number that is not the maximum, which is worse than being slow. What keeps it
--- off the hot path is blockCeiling's guard: this is never called unless some
--- requirement is actually in force, which needs a card like Lure on the
--- battlefield (#342).
+-- EXPONENTIAL, and honestly so: O((attackers + 1) ^ blockers) in the worst case.
+-- Nothing caps it and nothing samples it -- a cap would answer CR 509.1c's
+-- maximum with a number that is not the maximum, which is worse than being slow.
+-- What keeps it off the hot path is blockCeiling's guard: this is never called
+-- unless some requirement is actually in force, which needs a card like Lure on
+-- the battlefield (#342).
 candidateDeclarations :: (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId ObjectId]
 candidateDeclarations able candidates attackers =
   let extend acc blocker =
@@ -710,26 +622,23 @@ candidateDeclarations able candidates attackers =
    in List.foldl' extend [Map.empty] candidates
 
 -- CR 509.1c's two halves, computed together because neither is usable alone: the
--- requirement instances in force, and a declaration obeying the "maximum possible
--- number of requirements that could be obeyed without disobeying any
--- restrictions".
+-- requirement instances in force, and a declaration obeying the maximum number of
+-- them that could be obeyed without disobeying any restriction.
 --
--- Map.empty when no requirement is in force, WITHOUT enumerating anything. That
--- is not an optimization of the common case so much as the whole of it: with no
--- requirement the maximum is zero, every declaration obeys zero, and CR 509.1c
--- has nothing to say. A board without Lure never pays a search.
+-- Map.empty when no requirement is in force, WITHOUT enumerating anything: the
+-- maximum is zero, every declaration obeys zero, and CR 509.1c has nothing to
+-- say, so a board without Lure never pays a search.
 --
--- The maximum is taken by folding rather than by `maximum`, and the fold's seed is
--- Map.empty -- which is always a legal declaration under restrictions alone, since
+-- The maximum is taken by folding rather than by `maximum`, and the fold's seed
+-- is Map.empty -- always a legal declaration under restrictions alone, since
 -- declining to block disobeys no restriction -- so the answer is total and needs
 -- no partial function. Ties go to the EARLIER declaration in enumeration order;
--- which one is picked matters only to forcedBlockDeclaration's broken-interpreter
--- path, never to legality, which compares counts.
+-- which one is picked matters only to forcedBlockDeclaration's
+-- broken-interpreter path, never to legality, which compares counts.
 --
 -- One grant walk and one whole-board projection for the whole search, threaded
--- into the candidate list and into every pair `able` judges -- see canAttackGiven
--- and Projection.projectGiven. Nothing between the projection and its uses can
--- move: this is a pure function of one GameState. blockCeilingGiven is the half
+-- into the candidate list and into every pair `able` judges (see canAttackGiven
+-- and Projection.projectGiven). blockCeilingGiven is the half
 -- legalBlockDeclaration reaches, so that the two of them share one board rather
 -- than taking one apiece.
 blockCeiling :: PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId ObjectId)
@@ -756,17 +665,12 @@ blockCeilingGiven grants pcs pid gs =
 -- the rule asks for, in the order it asks them: CR 509.1b's restrictions, then CR
 -- 509.1c's requirements.
 --
--- CR 509.1c is not a check but a MAXIMIZATION -- "if the number of requirements
--- that are being obeyed is fewer than the maximum possible number of requirements
--- that could be obeyed without disobeying any restrictions, the declaration of
--- blockers is illegal" -- so it cannot be asked of the declaration alone. It is
--- what makes declaring no blockers at all illegal while a Lure is on the
--- battlefield.
+-- CR 509.1c is not a check but a MAXIMIZATION, so it cannot be asked of the
+-- declaration alone. It is what makes declaring no blockers at all illegal while
+-- a Lure is on the battlefield.
 --
--- CR 509.1c's cost clause ("if a creature can't block unless a player pays a
--- cost, that player is not required to pay that cost") and CR 509.1d's cost
--- locking are not implemented: no card in the pool makes blocking cost anything
--- (#343).
+-- CR 509.1c's cost clause and CR 509.1d's cost locking are not implemented: no
+-- card in the pool makes blocking cost anything (#343).
 legalBlockDeclaration :: PlayerId -> Map ObjectId ObjectId -> GameState -> Bool
 legalBlockDeclaration pid declaration gs =
   -- Hoisted exactly as blockCeiling hoists, and for the same reason.
@@ -793,100 +697,79 @@ forcedBlockDeclaration pid gs = snd (blockCeiling pid gs)
 blockersOf :: ObjectId -> GameState -> Set ObjectId
 blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs))
 
--- CR 509.1h: "An attacking creature with one or more creatures declared as
--- blockers for it becomes a blocked creature ... A creature remains blocked even
--- if all the creatures blocking it are removed from combat."
+-- CR 509.1h: an attacking creature with one or more blockers declared for it
+-- becomes blocked, and remains blocked even if all of them are removed from
+-- combat.
 --
--- So blocked-ness is a STATUS that the declaration confers once, not a running
--- count of who is still blocking. The map's KEY is that status -- declareBlockers
+-- So blocked-ness is a STATUS the declaration confers once, not a running count
+-- of who is still blocking. The map's KEY is that status -- declareBlockers
 -- creates it and only Game.removeFromCombat's Map.delete arm (the attacker itself
 -- leaving combat, CR 506.4) and Combat.clearCombat ever drop it. The SET behind
 -- the key is the separate CR 510.1c question of who is currently blocking, and it
--- can empty out while the key stays: a regenerated blocker (CR 701.19a) is deleted
--- from it, and a blocker that merely died is filtered out at assignment time.
---
--- Testing the set for emptiness instead is the bug this replaced: a Goblin Piker
--- blocked by a Drudge Skeletons that regenerated before the combat damage step
--- became "unblocked" and hit the defending player for 2. DamageSpec's
--- "Blocked stays blocked" group is what proves it, both ways the set can empty.
+-- can empty out while the key stays: a regenerated blocker (CR 701.19a) is
+-- deleted from it, and a blocker that merely died is filtered out at assignment
+-- time. Testing the set for emptiness instead let a creature blocked by a
+-- regenerated Drudge Skeletons become unblocked.
 isBlocked :: ObjectId -> GameState -> Bool
 isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
 
 -- Every creature currently IN combat: the attackers, plus everything still
 -- blocking one of them. Not the keys of Combat.joinedUnder, which can outlive the
--- record it was taken for -- Pawl.Engine.Departure edits Combat.attackers directly, and
--- deliberately leaves Combat.blockers alone (CR 509.1h).
+-- record it was taken for -- Pawl.Engine.Departure edits Combat.attackers
+-- directly, and deliberately leaves Combat.blockers alone (CR 509.1h).
 combatants :: Combat -> Set ObjectId
 combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.elems (Combat.blockers c)))
 
--- CR 506.4: "A permanent is removed from combat if ... its controller changes ...
--- or if it's an attacking or blocking creature that ... stops being a creature."
---
--- The two clauses of that rule whose trigger is DERIVED state, which is why this
--- is a sampler and not a hook. Neither has an event to hang a removal on: a
--- control-granting static ability (Control Magic's SetControllerToSource) is
--- re-read live by the projection, and even a stored SetController is installed by
--- a resolution that never announces "control changed" (#198); creature-ness is
--- the same, a CR 613 layer-4 answer that changes the moment the effect producing
--- it appears or ends. The same shape, and the same argument, as
--- Engine.checkControlContinuity's CR 302.6 scan; Engine's settleForPriority runs
--- both, at every point the board can change.
+-- CR 506.4's two clauses whose trigger is DERIVED state -- a combatant's
+-- controller changing, and an attacking or blocking creature stopping being a
+-- creature -- which is why this is a sampler and not a hook. Neither has an event
+-- to hang a removal on: a control-granting static ability is re-read live by the
+-- projection, and even a stored SetController is installed by a resolution that
+-- never announces a control change (#198); creature-ness is a CR 613 layer-4
+-- answer that changes the moment the effect producing it appears or ends. The
+-- same shape as Engine.checkControlContinuity's CR 302.6 scan, and
+-- settleForPriority runs both at every point the board can change.
 --
 -- The TIMING that costs: the rules remove the permanent the instant the
 -- characteristic changes, and this notices at the next settle. Nothing can see
--- the difference. CR 117.5 makes "whenever a player would get priority" the
--- coarsest moment anything observes the board, and the two readers of the combat
--- record -- the CR 510 damage steps and Filter.IsAttacking at targeting -- both
--- sit behind a priority grant, which settles first. The window that would open it
--- is a single resolution that changes control or card types and then reads combat
--- status in a LATER effect of the same resolution; no card in the pool has one,
--- and the settle loop is where such a card's fix would go.
+-- the difference -- CR 117.5 makes a priority grant the coarsest moment anything
+-- observes the board, and the two readers of the combat record (the CR 510 damage
+-- steps, Filter.IsAttacking at targeting) both sit behind one, which settles
+-- first. The window that would open it is a single resolution that changes
+-- control or card types and then reads combat status in a LATER effect of the
+-- same resolution; no card in the pool has one.
 --
--- It only ever REMOVES. That asymmetry is what makes the sampling sound, exactly
--- as it is there: a discrepancy proves the characteristic changed, so removing is
--- always right, while putting a creature BACK when control returns or a new
--- animation starts would invent a CR 506.4 the rules do not have -- removal
--- from combat is permanent for that combat phase (the glossary: "has no further
--- involvement in that combat phase").
+-- It only ever REMOVES, and that asymmetry is what makes the sampling sound: a
+-- discrepancy proves the characteristic changed, so removing is always right,
+-- while putting a creature BACK would invent a CR 506.4 the rules do not have --
+-- removal from combat lasts the rest of that combat phase.
 --
--- Battlefield-scoped, so this stays these two clauses and nothing else. CR 110.1
--- makes a permanent something on the battlefield, and an object that has LEFT it
--- was already removed by that separate clause of CR 506.4 -- whose implementation
--- is elsewhere (Pawl.Engine.Departure, and Pawl.Engine.Damage's liveness filters for the
--- CR 509.1h key this must not disturb). Without the gate, an object gone from
--- GameState.objects would fail both tests here -- no controller to match, and no
--- card types to find a creature in -- and be swept up under the wrong clause.
+-- Battlefield-scoped, so this stays these two clauses and nothing else: an object
+-- that has LEFT the battlefield (CR 110.1) was already removed by a separate
+-- clause of CR 506.4, implemented in Pawl.Engine.Departure and Pawl.Engine.Damage.
+-- Without the gate it would fail both tests here and be swept up under the wrong
+-- clause. Removal itself goes through Game.removeFromCombat, so a removed ATTACKER
+-- takes its blocked-ness with it while a removed BLOCKER leaves the attacker
+-- blocked with nothing blocking it -- CR 509.1h's last sentence, argued there.
 --
--- Removal goes through Game.removeFromCombat, so a removed ATTACKER takes its
--- blocked-ness with it (Map.delete) while a removed BLOCKER leaves the attacker
--- blocked with nothing blocking it (Set.delete inside a surviving key) --
--- CR 509.1h's last sentence, argued in full at that function.
---
--- Creatures only, which is what `combatants` gathers: an ATTACKED planeswalker
--- is not in that set, and CR 506.4's clauses about one are answered where its
--- target is read instead (stillAttacked, whose own haddock argues why the two
--- are the same board). CR 506.4d/e are about a permanent that is both an
--- attacked planeswalker and a blocking creature, or both a planeswalker and a
--- battle, and nothing can be either: nothing in the pool prints two of those card
--- types (#503) and there is no battle card type (#302). CR 506.4's "becomes a
--- battle" clause is unreachable for that same reason, and "phases out" for
--- phasing's (#154).
+-- Creatures only, which is what `combatants` gathers: an ATTACKED planeswalker is
+-- not in that set, and CR 506.4's clauses about one are answered at stillAttacked
+-- instead. CR 506.4d/e, the becomes-a-battle clause and the phases-out clause are
+-- all unreachable in this pool (#503, #302, #154).
 --
 -- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
 -- clause, because there is nothing to compare it against and this only ever
 -- removes. Unreachable through the engine: declareAttackers and declareBlockers
 -- write the snapshot in the same update that puts the creature into the record.
 -- The types clause needs no such comparand -- CR 506.3 lets only a creature be
--- declared, so every combatant was one, and "is it one now" is the whole test.
+-- declared, so "is it one now" is the whole test.
 --
 -- Nobody in combat short-circuits, which is most of the game: the grant list and
--- the gathered candidate list each cost a whole-battlefield scan
--- (Projection.controlGrants, Projection.gather), both hoisted out of the
--- per-combatant loop, and this runs on every settle pass alongside
--- checkControlContinuity's own. The gather is NOT shared with the one
+-- the gather each cost a whole-battlefield scan, both hoisted out of the
+-- per-combatant loop. The gather is NOT shared with the one
 -- Sba.performStateBasedActions makes earlier in the same settle pass: a
 -- state-based action can change the board between the two, and a sample has to
--- gather against the state it is judging (Projection.projectGiven's own caveat).
+-- gather against the state it is judging.
 removeChanged :: GameState -> GameState
 removeChanged gs =
   let c = GameState.combat gs
@@ -924,33 +807,24 @@ removeChanged gs =
 --
 -- An answer outside the candidate list is a broken interpreter, not a game state,
 -- and degrades to the first candidate: always legal, least eventful, and the same
--- SHAPE (degrade totally rather than fail) Setup.subgameStateFrom uses for an
--- out-of-order starting player -- and the same VALUE Replay.defaultAnswer gives
--- this very prompt (NonEmpty.head candidates). The two must agree: a diverging
--- fallback here would be an invisible bug, since neither path can observe the
--- other.
+-- value Replay.defaultAnswer gives this very prompt. The two must agree -- a
+-- diverging fallback here would be an invisible bug, since neither path can
+-- observe the other.
 chooseDefender :: Game ()
 chooseDefender = do
   gs <- State.get
   let pid = GameState.activePlayer gs
   -- CR 800.4j: a turn whose active player has left continues without one, so the
-  -- action the rules assign to the active player has no subject. CR 800.4j is a
-  -- priority rule and stops there; CR 800.4h is the one that would hand this
-  -- choice -- required of the active player by CR 507.1 and CR 703.4h -- to the
-  -- next player in turn order. pawl skips it, which is an unobservable divergence
-  -- rather than a vacuous case (#181); the argument is on Pawl.Types.Combat's
-  -- defender field and is not repeated here.
+  -- action the rules assign to the active player has no subject. CR 800.4h is the
+  -- one that would hand this choice -- required of the active player by CR 507.1
+  -- and CR 703.4h -- to the next player in turn order. pawl skips it, which is an
+  -- unobservable divergence rather than a vacuous case (#181); the argument is on
+  -- Pawl.Types.Combat's defender field.
   --
-  -- Engine.runTurnBasedActions binds the identical test (hasActive) before
-  -- calling this, so on the engine's path the two guards are the same value BY
-  -- EQUIVALENCE -- the mechanism (what runs between the bind and the call, and
-  -- why the predicate here is the same expression) is argued at that site, not
-  -- here. Redundant on that path, and declined for a reason that is not a green
-  -- suite: this is the copy a DIRECT caller depends on -- a spec, or a second
-  -- combat phase spliced by an effect, neither of which goes through Engine's
-  -- guard -- and CombatSpec's direct-call case is the test that discriminates
-  -- it. Do not delete it as redundant; Engine.runTurnBasedActions's comment
-  -- states this same argument from the other end.
+  -- Engine.runTurnBasedActions binds the identical test before calling this, so
+  -- on the engine's path this guard is redundant. Do NOT delete it: it is the
+  -- copy a DIRECT caller depends on -- a spec, or a second combat phase spliced
+  -- by an effect, neither of which goes through Engine's guard.
   Monad.when (List.elem pid (Game.stillPlaying gs)) $
     case NonEmpty.nonEmpty (attackableOpponents gs) of
       Nothing -> pure ()
@@ -973,17 +847,14 @@ chooseDefender = do
 -- two).
 --
 -- Not prompted with one candidate, which is CR 508.1b's own condition: the rule
--- calls for an announcement only "if the defending player controls any
--- planeswalkers, is the protector of any battles, or the game allows the active
--- player to attack multiple other players", and attackTargets returns a lone
--- defending player exactly when none of those holds. Where the rules leave
--- nothing to ask, don't prompt.
+-- calls for an announcement only when the defending player controls a
+-- planeswalker or battle, or the game allows attacking multiple players, and
+-- attackTargets returns a lone defending player exactly when none of those holds.
 --
--- An answer outside the candidate list is a broken interpreter, not a game
--- state, and degrades to the first candidate -- the defending player, always a
--- legal thing to attack and the least eventful answer. chooseDefender's posture
--- and Replay.defaultAnswer's value for this prompt, which must agree with it for
--- chooseDefender's reason: neither path can observe the other.
+-- An answer outside the candidate list is a broken interpreter, not a game state,
+-- and degrades to the first candidate -- the defending player, always a legal
+-- thing to attack. chooseDefender's posture and Replay.defaultAnswer's value for
+-- this prompt, which must agree with it for chooseDefender's reason.
 announceAttackTarget :: PlayerId -> ObjectId -> NonEmpty.NonEmpty AttackTarget.AttackTarget -> Game AttackTarget.AttackTarget
 announceAttackTarget pid oid options = case options of
   only NonEmpty.:| [] -> pure only
@@ -1008,16 +879,14 @@ announceAttackTarget pid oid options = case options of
 --
 -- The steps run here are CR 508.1a, 508.1b, 508.1c, 508.1d, 508.1f, 508.1h,
 -- 508.1i, 508.1j and 508.1k, in the rule's own order, plus the event CR 508.1m's
--- triggers watch. CR 508.1g's OPTIONAL costs to attack -- "costs a player may pay
--- 'as' a creature attacks", which CR 701.43d and CR 702.154b name exert and
--- enlist as -- are not implemented (#597).
+-- triggers watch. CR 508.1g's OPTIONAL costs to attack (exert, enlist) are not
+-- implemented (#597).
 --
--- CR 508.1's preamble is the one clause that costs this function its shape: "if
--- at any point during the declaration of attackers, the active player is unable
--- to comply with any of the steps listed below, the declaration is illegal; the
--- game returns to the moment before the declaration". A cost to attack is the
--- first step pawl can fail to comply with AFTER the board has been written to, so
--- the entry state is captured and restored. See the payment below.
+-- CR 508.1's preamble is the one clause that costs this function its shape: a
+-- declaration the active player cannot comply with is illegal, and the game
+-- returns to the moment before it. A cost to attack is the first step pawl can
+-- fail to comply with AFTER the board has been written to, so the entry state is
+-- captured and restored. See the payment below.
 declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
@@ -1046,12 +915,10 @@ declareAttackers pid = do
             -- can itself be the illegal answer, so the filtered answer is not a
             -- state this can always accept. It degrades to forcedAttackDeclaration
             -- instead -- always legal, and EQUAL to the filtered answer whenever
-            -- no requirement is in force, so no board that had a behaviour before
-            -- has a different one now.
+            -- no requirement is in force.
             --
             -- The whole answer is replaced rather than repaired, which is
-            -- declareBlockers' posture and rests on its argument: a declaration is
-            -- illegal AS A WHOLE (CR 508.1's own "the declaration is illegal"), and
+            -- declareBlockers' posture: a declaration is illegal AS A WHOLE, and
             -- unioning the missing creatures into the player's answer would be
             -- sound only while every restriction stays per-creature (#533). Nor is
             -- it re-prompted -- a pure `Prompt r -> r` returns the identical wrong
@@ -1059,15 +926,14 @@ declareAttackers pid = do
             -- error at a table rather than an engine check.
             --
             -- It is not the engine choosing for the player: an enforcing
-            -- interpreter never arrives here, and the player's answer was taken and
-            -- rejected before this ran. Where a requirement leaves exactly one
-            -- legal declaration, this hands back the one the rules already forced.
-            -- Where it leaves several -- any SUPERSET of the required creatures
-            -- also attains the maximum, since attacking with more is always legal
-            -- -- this takes the smallest, which is the least the rules can be said
-            -- to have forced. That is a real choice among distinguishable
-            -- declarations, and it is why nothing but a broken interpreter may
-            -- reach it; the same is true of forcedBlockDeclaration.
+            -- interpreter never arrives here, and the player's answer was taken
+            -- and rejected before this ran. Where a requirement leaves several
+            -- legal declarations -- any SUPERSET of the required creatures also
+            -- attains the maximum -- this takes the smallest, which is the least
+            -- the rules can be said to have forced. That is a real choice among
+            -- distinguishable declarations, and it is why nothing but a broken
+            -- interpreter may reach it; the same is true of
+            -- forcedBlockDeclaration.
             attacking =
               if obeysAttackRequirements bound offered
                 then offered
@@ -1082,26 +948,22 @@ declareAttackers pid = do
             -- CR 506.4's comparand, taken here because here is where the creature
             -- joins combat. `pid` and not a fresh Projection.controllerOf call:
             -- canAttack has already required controllerOf == Just pid of every
-            -- creature in `attacking` (CR 508.1a), so the two are the same value
-            -- and this one cannot disagree with the legality check.
+            -- creature in `attacking` (CR 508.1a), so this cannot disagree with
+            -- the legality check.
             joined = Map.fromList (fmap (\oid -> (oid, pid)) attacking)
             -- CR 508.1b's candidates, taken ONCE for the whole declaration and
             -- from the state it is judged against: a pure `Prompt r -> r` cannot
-            -- change the board between two announcements, so per-creature
-            -- derivation would be the same battlefield walk for the same answer.
+            -- change the board between two announcements.
             targets = attackTargets defender gs
         -- CR 508.1b: the announcement, one question per chosen creature. Taken
         -- here rather than beside the CR 508.1a prompt because that is the rule's
         -- own order, and asked of `attacking` rather than of `chosen` so that a
-        -- creature the CR 508.1d degradation dropped is never announced -- on
-        -- every path but a broken interpreter's the two lists are equal anyway.
+        -- creature the CR 508.1d degradation dropped is never announced.
         recorded <- fmap Map.fromList (Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid targets)) attacking)
-        -- UNIONED into the record, not written over it. Nothing in the pool
-        -- can have joined combat before this runs -- putOntoBattlefieldAttacking
-        -- is reachable only from a resolution, and the earliest one is the
-        -- priority round after this action -- but "the record is mine alone"
-        -- is exactly the assumption CR 508.8's second clause breaks, and
-        -- replacing the map would silently remove such a creature from combat.
+        -- UNIONED into the record, not written over it. Nothing in the pool can
+        -- have joined combat before this runs, but "the record is mine alone" is
+        -- exactly the assumption CR 508.8's second clause breaks, and replacing
+        -- the map would silently remove such a creature from combat.
         let attach g =
               g
                 { GameState.combat =
@@ -1127,61 +989,47 @@ declareAttackers pid = do
         -- CR 508.1's preamble, captured here: everything from this line on is
         -- undone together if the payment below cannot be made.
         before <- State.get
-        -- CR 508.1f, and ONLY 508.1f. Tapping is split from the record-writing it
-        -- used to share a modify' with, because the rules put a step between them:
-        -- 508.1f taps, 508.1h-j determine and pay, and only 508.1k makes the
-        -- creatures attacking. The order is observable rather than pedantic -- a
-        -- Birds of Paradise that was just declared as an attacker is tapped, so it
-        -- is no longer a mana source for the very cost its attack incurred.
+        -- CR 508.1f, and ONLY 508.1f. Tapping is separate from the record-writing
+        -- because the rules put a step between them: 508.1f taps, 508.1h-j
+        -- determine and pay, and only 508.1k makes the creatures attacking. The
+        -- order is observable -- a Birds of Paradise just declared as an attacker
+        -- is tapped, so it is no longer a mana source for the very cost its attack
+        -- incurred.
         State.modify' (\g -> List.foldl' tapIt g attacking)
         gs1 <- State.get
-        -- CR 508.1h: "the active player determines the total cost to attack ...
-        -- Once the total cost is determined, it becomes 'locked in'. If effects
-        -- would change the total cost after this time, ignore this change."
-        --
-        -- LOCKED IN is this `let`, and nothing more elaborate is needed: the total
-        -- is computed once from the finished declaration and from the board as of
-        -- CR 508.1f, and nothing at all runs between that determination and the
-        -- payment it is handed to. Asking AttackCost.totalCost a second time, at
-        -- payment time or after it, is exactly what the rule forbids -- which is
-        -- why that function's own haddock says the locking is the caller's.
+        -- CR 508.1h: the total cost to attack is determined once and then LOCKED
+        -- IN. That is this `let`, and nothing more elaborate is needed: the total
+        -- is computed from the finished declaration and from the board as of CR
+        -- 508.1f, and nothing runs between that determination and the payment it
+        -- is handed to. Asking AttackCost.totalCost a second time is exactly what
+        -- the rule forbids, which is why that function leaves the locking to its
+        -- caller.
         let owed = AttackCost.totalCost recorded gs1
-        -- CR 508.1i ("if any of the costs require mana, the active player then has
-        -- a chance to activate mana abilities") and CR 508.1j ("once the player has
-        -- enough mana in their mana pool, they pay all costs in any order. Partial
-        -- payments are not allowed") are Mana.payCost, which is both: it prompts
-        -- for which source to tap until the pool covers the cost, and restores the
-        -- entry state rather than spending half of it.
-        --
-        -- Skipped outright at {0}, which is every board with no cost to attack on
-        -- it. Not an optimization of Mana.payCost -- it answers True on an empty
-        -- cost without tapping anything -- but a statement that a combat with no
+        -- CR 508.1i's mana-ability window and CR 508.1j's all-costs-or-nothing
+        -- payment are both Mana.payCost: it prompts for which source to tap until
+        -- the pool covers the cost, and restores the entry state rather than
+        -- spending half of it. Skipped outright at {0}, so a combat with no
         -- Ghostly Prison in it reaches no mana code at all.
         --
         -- NO "will you pay?" PROMPT, and that is a rules reading rather than an
-        -- elision. CR 508.1j is unconditional once the creatures are chosen -- "they
-        -- pay all costs" -- and CR 508.1d's "that player is not required to pay that
-        -- cost" is exercised one step earlier, by NOT DECLARING the creature, which
-        -- is what attackCeiling's cost clause keeps legal even under an attacking
-        -- requirement. So declining IS reachable, at the CR 508.1a prompt where the
-        -- rules put it, and CombatSpec's "a Curse of the Nightly Hunt does not force
-        -- an attack a Ghostly Prison taxes" is the case that proves it.
-        --
-        -- The same shape a cast has, and the precedent is exact: Cast.castSpell does
-        -- not ask whether the caster wants to pay after they have announced the
-        -- spell, because announcing it was the choosing. What the player is still
-        -- asked here is WHICH sources to tap -- Mana.payCost's own prompt, CR
-        -- 508.1i's window -- so no source is committed for them either.
+        -- elision. CR 508.1j is unconditional once the creatures are chosen, and
+        -- CR 508.1d's excuse from paying is exercised one step earlier, by NOT
+        -- DECLARING the creature -- which is what attackCeiling's cost clause
+        -- keeps legal even under an attacking requirement. So declining IS
+        -- reachable, at the CR 508.1a prompt where the rules put it. The same
+        -- shape a cast has: Cast.castSpell does not ask whether the caster wants
+        -- to pay after they have announced the spell, because announcing it was
+        -- the choosing.
         paid <-
           if null (ManaCost.unwrap owed)
             then pure True
             else Mana.payCost pid owed
         if not paid
           then
-            -- CR 508.1's preamble: "the declaration is illegal; the game returns to
-            -- the moment before the declaration". The restore IS that sentence, and
-            -- it is reachable by an ordinary player -- declaring more attackers
-            -- than they can pay for is a mistake the rules catch here.
+            -- CR 508.1's preamble: the declaration is illegal and the game returns
+            -- to the moment before it. Reachable by an ordinary player --
+            -- declaring more attackers than they can pay for is a mistake the
+            -- rules catch here.
             --
             -- What the rules then expect, and pawl cannot do, is a fresh
             -- declaration: a pure `Prompt r -> r` returns the identical answer, so
@@ -1190,79 +1038,60 @@ declareAttackers pid = do
             -- smaller declaration would have obeyed (#600).
             State.put before
           else
-            -- CR 508.1k: "each chosen creature still controlled by the active
-            -- player becomes an attacking creature." After the payment, which is
-            -- the rules' own order.
+            -- CR 508.1k: each chosen creature becomes an attacking creature. After
+            -- the payment, which is the rules' own order.
             do
               State.modify' attach
               -- CR 508.2b: the declaration is what abilities trigger on, and CR
-              -- 508.3a scopes them to a creature that "is declared as an attacker"
-              -- -- so one event per creature chosen HERE, and none at all for a
-              -- creature put onto the battlefield attacking. Recorded after the
-              -- record is written, so the board a trigger's intervening-if clause
-              -- reads (CR 603.4) already has these creatures attacking.
+              -- 508.3a scopes them to a creature DECLARED as an attacker -- so one
+              -- event per creature chosen HERE, and none at all for a creature put
+              -- onto the battlefield attacking. Recorded after the record is
+              -- written, so the board a trigger's intervening-if clause reads (CR
+              -- 603.4) already has these creatures attacking.
               --
               -- The event names the creature and not what it was announced as
-              -- attacking, so CR 508.3a's "attacks [a player, planeswalker, or
-              -- battle]", CR 508.3b and CR 508.3e are unavailable (#538).
+              -- attacking, so CR 508.3a's attacks-a-permanent form, CR 508.3b and
+              -- CR 508.3e are unavailable (#538).
               State.modify' (\g -> List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid) h) g attacking)
 
--- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
--- chooses which defending player, planeswalker a defending player controls, or
--- battle a defending player protects it's attacking as it enters the
--- battlefield." Resolve calls this for each permanent an effect's EntryRiders say
--- is attacking -- a token its Create arm minted (Hanweir Garrison's), or a card
--- its MoveToZone arm returned to the battlefield (Meandering Towershell's);
--- nothing else does.
+-- CR 508.4: a creature put onto the battlefield attacking has its controller
+-- choose what it is attacking as it enters. Resolve calls this for each permanent
+-- an effect's EntryRiders say is attacking -- a token its Create arm minted
+-- (Hanweir Garrison's), or a card its MoveToZone arm returned to the battlefield
+-- (Meandering Towershell's); nothing else does.
 --
 -- The creature was never DECLARED, and this function's whole difference from
--- declareAttackers is what follows from that. It records no
--- GameEvent.AttackerDeclared, so CR 508.3a's "such abilities won't trigger if a
--- creature is put onto the battlefield attacking" holds by construction rather
--- than by a filter. It taps nothing, because CR 508.1f taps what is declared
--- (the tokens' own tapped status is the creating effect's, applied at entry). And
--- it asks none of canAttack's questions -- CR 508.4c: "a creature that's put onto
--- the battlefield attacking ... isn't affected by requirements or restrictions
--- that apply to the declaration of attackers" -- so summoning sickness (CR 302.6,
--- whose sentence is "a creature can't ATTACK unless...") and defender (CR 702.3b)
--- do not reach it. CombatSpec's "the tokens are attacking, and the attack trigger
--- fired only for the Garrison" proves the trigger half.
+-- declareAttackers follows from that. It records no GameEvent.AttackerDeclared,
+-- so CR 508.3a's exclusion of these creatures from attack triggers holds by
+-- construction rather than by a filter. It taps nothing, because CR 508.1f taps
+-- what is declared (a token's own tapped status comes from the creating effect).
+-- And it asks none of canAttack's questions, per CR 508.4c, so summoning sickness
+-- (CR 302.6) and defender (CR 702.3b) do not reach it.
 --
 -- What it does check is the three ways the rules say the creature enters WITHOUT
--- being an attacking creature. CR 506.3a: a noncreature permanent "does enter the
--- battlefield but it's never considered to be an attacking or blocking
--- permanent". CR 506.3b: the same for a creature entering "under the control of
--- any player except an attacking player", which by CR 506.2's first sentence is
--- the active player.
--- CR 506.3c and CR 508.4a: the same for one attacking "a player not in the game".
--- Each is a silent no-op rather than a failure -- the permanent is already on the
+-- being an attacking creature: CR 506.3a's noncreature permanent, CR 506.3b's
+-- creature entering under anyone but the attacking player (CR 506.2's active
+-- player), and CR 506.3c / CR 508.4a's attack on a player not in the game. Each
+-- is a silent no-op rather than a failure -- the permanent is already on the
 -- battlefield and stays there, which is precisely what those rules say.
 --
 -- Combat.defender being Nothing is the fourth way, and it is CR 506.3c's clause
 -- again rather than a fallback: outside the combat phase there is no defending
--- player at all (see Pawl.Types.Combat's defender field), so there is nobody for
--- the creature to be attacking.
+-- player at all (see Pawl.Types.Combat's defender field).
 --
 -- CR 508.4's CHOICE is prompted per permanent, over the same candidates CR
--- 508.1b's declaration offers, and two rulings say it must be: Hanweir
--- Garrison's ("You choose which player, planeswalker, or battle each token is
--- attacking as you create the tokens ... the tokens don't both have to attack
--- the same one") and Meandering Towershell's ("you choose which opponent or
--- opposing planeswalker it's attacking. It doesn't have to attack the same
--- opponent ... that it was when it was exiled"). It is elided at one candidate,
--- which is every board with no planeswalker on the defending player's side --
--- so a pool without one behaves exactly as it did before the prompt existed.
+-- 508.1b's declaration offers, and both Hanweir Garrison's and Meandering
+-- Towershell's rulings say it must be -- the tokens need not all attack the same
+-- thing, and a returning creature need not attack whom it attacked before. Elided
+-- at one candidate, which is every board with no planeswalker on the defending
+-- player's side.
 --
--- CR 508.4a's remaining clauses -- a planeswalker "no longer on the battlefield,
--- ... no longer a planeswalker or battle, [or] a planeswalker that is no longer
--- controlled by a defending player" -- need no check of their own: attackTargets
--- derives the offer from the board AT THIS MOMENT, so a candidate it lists
--- satisfies all three, and the degradation for an out-of-list answer is the
--- defending player, whom the guard below has already checked is in the game.
+-- CR 508.4a's remaining clauses need no check of their own: attackTargets derives
+-- the offer from the board AT THIS MOMENT, so a candidate it lists satisfies all
+-- three, and the degradation for an out-of-list answer is the defending player,
+-- whom the guard below has already checked is in the game.
 --
--- CR 508.4d ("a creature that's put onto the battlefield attacking during the
--- declare blockers step, combat damage step, or end of combat step enters the
--- battlefield as an unblocked creature") is not implemented: every source in the
+-- CR 508.4d's unblocked-on-entry rule is not implemented: every source in the
 -- pool enters during the declare attackers step, before blockers exist (#368).
 putOntoBattlefieldAttacking :: ObjectId -> Game ()
 putOntoBattlefieldAttacking oid = do
@@ -1277,9 +1106,9 @@ putOntoBattlefieldAttacking oid = do
         controller == GameState.activePlayer gs,
         -- CR 506.3c / CR 508.4a
         List.elem defender (Game.stillPlaying gs) -> do
-          -- CR 508.4: "its controller chooses", and by the guard above that
-          -- controller is the attacking player -- so the chooser is the same
-          -- player CR 508.1b asks, which is what lets the two share one prompt.
+          -- CR 508.4's chooser is the creature's controller, and by the guard
+          -- above that is the attacking player -- the same player CR 508.1b asks,
+          -- which is what lets the two share one prompt.
           target <- announceAttackTarget controller oid (attackTargets defender gs)
           State.put
             gs
@@ -1289,12 +1118,11 @@ putOntoBattlefieldAttacking oid = do
                       -- CR 506.4's comparand, for the same reason declareAttackers
                       -- takes one: this is where the creature joins combat.
                       Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c),
-                      -- CR 508.8's SECOND clause -- "or put onto the battlefield
-                      -- attacking". Written inside the guards, and so here rather
-                      -- than in Resolve's Create arm: CR 506.3a-c and CR 508.4a
-                      -- each let the permanent enter while it is "never
-                      -- considered to be an attacking creature", and one that
-                      -- never became an attacker cannot answer this rule.
+                      -- CR 508.8's SECOND clause. Written inside the guards, and
+                      -- so here rather than in Resolve's Create arm: CR 506.3a-c
+                      -- and CR 508.4a each let the permanent enter while never
+                      -- becoming an attacking creature, and one that never became
+                      -- an attacker cannot answer this rule.
                       Combat.attacked = Set.insert target (Combat.attacked c)
                     }
               }
@@ -1309,15 +1137,14 @@ putOntoBattlefieldAttacking oid = do
 -- them. Both need the attack-multiple-players option, which pawl has no options
 -- concept to read (#175).
 --
--- No still-playing guard: at three or more seats, a defending player who left
--- the game has had every object they owned removed by CR 800.4a, so
--- legalBlockers finds nothing for them and the inner Monad.unless
--- short-circuits. At two seats CR 800.4a never runs at all -- CR 800.1 gates it
--- on "more than two players" (Departure.continuesAfterDeparture) -- but CR
--- 104.2a ends the game the instant a player's last opponent leaves, which
--- Sba.checkSba records as GameState.result and Engine.playGame's loop reads
--- before ever calling declareBlockers again; see GameSpec.hs's
--- CR 800.4j/703.4i test for the state that leaves unreachable in play.
+-- No still-playing guard: at three or more seats, a defending player who left the
+-- game has had every object they owned removed by CR 800.4a, so legalBlockers
+-- finds nothing for them and the inner Monad.unless short-circuits. At two seats
+-- CR 800.4a never runs at all -- CR 800.1 gates it on more than two players
+-- (Departure.continuesAfterDeparture) -- but CR 104.2a ends the game the instant
+-- a player's last opponent leaves, which Sba.checkSba records as
+-- GameState.result and Engine.playGame's loop reads before ever calling
+-- declareBlockers again.
 declareBlockers :: Game ()
 declareBlockers = do
   start <- State.get
@@ -1334,26 +1161,18 @@ declareBlockers = do
         -- filtered down to its legal entries -- that is unsound, not merely
         -- inelegant: under menace, dropping one blocker from a pair leaves an
         -- illegal single block, so the filter would manufacture the illegality it
-        -- was meant to remove. M1b settled the identical question for CR 510.1e:
-        -- "checks the assignment AS A WHOLE, so this cannot be repaired by
-        -- filtering the way a discard can."
+        -- was meant to remove. CR 510.1e's assignment check has the same shape.
         --
         -- This is NOT CR 733's rewind. An enforcing engine never offers an
         -- illegal declaration, so only a broken interpreter arrives here, and
         -- re-prompting a pure `Prompt r -> r` returns the identical wrong answer.
         --
         -- Declining to block is NOT always legal: with a CR 509.1c requirement on
-        -- the board (Lure), "no blocks" can itself be the illegal answer, so
-        -- doing nothing is not a state this can fall back to. It degrades to
-        -- forcedBlockDeclaration instead -- always legal, and equal to "no
-        -- blocks" whenever no requirement is in force, so this is the same
-        -- fallback as before on every board that had one.
-        --
-        -- The same posture chooseDefender takes for an out-of-candidates answer:
-        -- degrade TOTALLY rather than fail, and never re-prompt. It is not the
-        -- engine choosing for the player -- the player's answer was taken and
-        -- rejected -- and where a requirement leaves exactly one legal
-        -- declaration, this hands back the one the rules already forced.
+        -- the board (Lure), "no blocks" can itself be the illegal answer, so doing
+        -- nothing is not a state this can fall back to. It degrades to
+        -- forcedBlockDeclaration instead -- always legal, and equal to "no blocks"
+        -- whenever no requirement is in force. The same posture chooseDefender
+        -- takes: degrade TOTALLY rather than fail, and never re-prompt.
         -- Replay.defaultAnswer's "no blocks" for this prompt routes through here
         -- too, so the two cannot disagree about what an illegal answer becomes.
         gs1 <- State.get
@@ -1364,10 +1183,8 @@ declareBlockers = do
               -- CR 506.4's comparand for the blockers, alongside the attackers'
               -- (declareAttackers). `pid` for the same reason it is there: every
               -- blocker here is one legalBlockers offered, which is
-              -- controllerOf == Just pid (CR 509.1a) -- required by
-              -- legalBlockDeclaration on the accepted path, and true by
-              -- construction on the forcedBlockDeclaration one, whose candidates
-              -- come from that same list. Unioned rather than replacing, since
-              -- the attackers' entries are already in this map.
+              -- controllerOf == Just pid (CR 509.1a) on both the accepted and the
+              -- forced path. Unioned rather than replacing, since the attackers'
+              -- entries are already in this map.
               joined = Map.union (Map.fromList (fmap (\b -> (b, pid)) (Map.keys declaration))) (Combat.joinedUnder (GameState.combat gs1))
           State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}

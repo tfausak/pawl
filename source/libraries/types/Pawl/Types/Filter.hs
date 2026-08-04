@@ -6,233 +6,154 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
--- | A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
--- predicate over one candidate -- an object, or (CR 115.1) a player, since a
--- target may be either -- expressed as data and evaluated by one generic
--- matcher (Pawl.Engine.Filter.matches) that never learns which effect produced it. Its
--- atoms case on CHARACTERISTICS (card type, supertype, colour, subtype, power,
--- abilities, controller, and for a player candidate its identity) -- exactly as
--- the rules already case on a CardType -- and on a handful of things CR 109.3 says are NOT
--- characteristics but that the closed half owns just as squarely: combat status
--- (IsAttacking, IsBlocking), attachment (IsAttachedToCreature,
--- IsAttachedToPermanent, and CanHostSubject for the attachment an effect is about
--- to make), what a permanent is represented by (IsToken), and what happened
--- earlier this turn (AttackedThisTurn, the only one that is not a present state
--- at all). Each arm carries its own defence. Casing on a characteristic
--- classification is legitimate; the invariant forbids only casing on an EFFECT's
--- identity, which this type never does.
+-- | A first-order predicate over one candidate -- an object, or (CR 115.1) a
+-- player, since a target may be either -- expressed as data and evaluated by one
+-- generic matcher (Pawl.Engine.Filter.matches) that never learns which effect
+-- produced it. Its atoms case on CHARACTERISTICS, and on a handful of things CR
+-- 109.3 says are NOT characteristics but that the closed half owns just as
+-- squarely: combat status, attachment, what a permanent is represented by, and
+-- what happened earlier this turn. Casing on a characteristic classification is
+-- legitimate; the invariant forbids only casing on an EFFECT's identity.
 --
 -- Flat, not layered: the atoms and the And/Or/Not combinators are sibling arms of
--- one type, mirroring Pawl.Types.Quantity's flat `Plus Quantity Quantity`
--- alongside its leaf arms. A Simple/combinator split would buy an enforceable
--- normal form only if it also restricted the recursion (CNF/DNF); unrestricted it
--- guarantees nothing the flat type does not.
---
--- `And []` is the trivial predicate -- the identity that matches everything -- so
--- a bare "target creature" (no narrowing) needs no separate "always" arm.
+-- one type, mirroring Pawl.Types.Quantity. A Simple/combinator split would buy an
+-- enforceable normal form only if it also restricted the recursion (CNF/DNF).
+-- `And []` is the trivial predicate, so a bare "target creature" needs no
+-- separate "always" arm.
 --
 -- PARAMETRIC in the keyword, and only to break a module cycle: HasKeyword below
--- has to name Pawl.Types.Keyword, and that module already names this one
--- (CR 702.29e typecycling and CR 702.14c landwalk each carry their "[type]" as
--- a Filter). Pawl.Types.Keyword
--- ties the knot by instantiating `Filter Keyword`, which is the single
--- application every other module in the project writes -- the same shape
--- Pawl.Types.Effect's `card` parameter takes for the Card/Effect cycle. Nothing
--- else is ever substituted for it, so read `Filter keyword` as `Filter Keyword.Keyword`
--- everywhere but here, in Pawl.Types.Cost and in Pawl.Types.CostComponent.
+-- names Pawl.Types.Keyword, and that module already names this one (CR 702.29e
+-- typecycling and CR 702.14c landwalk each carry their "[type]" as a Filter).
+-- Pawl.Types.Keyword ties the knot by instantiating `Filter Keyword`, the single
+-- application every module but this one, Pawl.Types.Cost and
+-- Pawl.Types.CostComponent writes.
 data Filter keyword
   = HasCardType CardType.CardType -- CR 205 / 300: the object's card types include this one.
   | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
   | HasColor Color.Color -- CR 105.2: the object's colours include this one.
   | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
-  | -- | The object HAS this keyword ability (CR 702.1: an object "lists only the
-    -- name of the ability as a 'keyword'") -- Plummet's "target creature with
-    -- flying" (CR 702.9). Unlike the five uncharacteristic atoms below, this one
-    -- needs no defence at all: CR 109.3 lists "abilities" among an object's
-    -- characteristics outright, so it sits with HasCardType and HasColor rather
-    -- than with IsAttacking.
+  | -- | The object HAS this keyword ability (CR 702.1) -- Plummet's "target
+    -- creature with flying" (CR 702.9). Needs no defence like the atoms below,
+    -- since CR 109.3 lists abilities among an object's characteristics.
     --
     -- MEMBERSHIP, not equality of an ability list: the projection stores keywords
-    -- as a Map Keyword Natural (ProjectedCharacteristics.keywords) because CR 702
-    -- instances stack, and this asks only whether the key is present. For a
-    -- parameterized keyword that makes `HasKeyword (Toxic 2)` ask about toxic 2
-    -- specifically rather than about toxic in general, which no card in the pool
-    -- needs either way (#522).
+    -- as a count because CR 702 instances stack, and this asks only whether the
+    -- key is present. For a parameterized keyword that makes `HasKeyword (Toxic
+    -- 2)` ask about toxic 2 specifically rather than toxic in general, which no
+    -- card in the pool needs either way (#522).
     --
     -- Read through the PROJECTION wherever one exists, so a creature that gains
-    -- flying at CR 613.1f layer 6 matches and a Humility'd one stops matching --
-    -- see Pawl.Engine.Projection.viewOfCharacteristics, and the printed-card
-    -- fallback in viewOfCard for a candidate off the battlefield.
+    -- flying at CR 613.1f layer 6 matches and a Humility'd one stops matching;
+    -- Projection.viewOfCard is the printed-card fallback off the battlefield.
     HasKeyword keyword
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
-  | -- | The candidate IS the evaluation's source object. Context-relative in the
-    -- same way ControlledBy is: the Filter value carries no object id, and the
-    -- answer comes from the Context the caller supplies. `Not IsSource` is how
-    -- CR 601.2c's "another" (a target slot) and a continuous effect's own
-    -- "each other" card text (an affected set, e.g. Opalescence -- not a rule
-    -- number) are both written -- one relation, one spelling, rather than a
-    -- parallel Exclusion field on each (#163).
+  | -- | The candidate IS the evaluation's source object. Context-relative like
+    -- ControlledBy: the Filter carries no object id, and the answer comes from the
+    -- Context. `Not IsSource` is how CR 601.2c's "another" and a continuous
+    -- effect's own "each other" card text (Opalescence) are both written -- one
+    -- relation, one spelling, rather than a parallel Exclusion field on each
+    -- (#163).
     IsSource
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
-    -- "target opponent". Context-relative in exactly the way ControlledBy is: it
-    -- carries no player id, and the answer comes from the Context the caller
-    -- supplies.
-    --
-    -- Separate from ControlledBy rather than a reuse of it, because they ask
-    -- about different things: ControlledBy asks who controls an OBJECT candidate,
-    -- and this asks who the candidate IS. CR 109.1's list of what an object is
-    -- has no "player" in it, and CR 108.4 gives a controller only to a card
-    -- representing a permanent or spell -- so the two are never both answerable
+    -- "target opponent". Context-relative like ControlledBy, but separate from it
+    -- rather than a reuse, because ControlledBy asks who controls an OBJECT
+    -- candidate and this asks who the candidate IS. CR 109.1's list of what an
+    -- object is has no "player" in it, and CR 108.4 gives a controller only to a
+    -- card representing a permanent or spell, so the two are never both answerable
     -- for one candidate.
     IsPlayer PlayerRelation.PlayerRelation
-  | -- | CR 508.1k: the candidate is an ATTACKING creature -- a creature declared
-    -- as an attacker this combat phase and not since removed from combat
-    -- (CR 506.4). "Target attacking creature" (Kill Shot) is the card text this
-    -- exists for.
+  | -- | CR 508.1k: the candidate is an ATTACKING creature -- declared as an
+    -- attacker this combat phase and not since removed from combat (CR 506.4).
+    -- Kill Shot's "target attacking creature".
     --
-    -- The one atom that reads something CR 109.3 explicitly says is NOT a
-    -- characteristic ("any other information about an object isn't a
-    -- characteristic"), alongside its examples of tapped-ness and what an Aura
-    -- enchants. That is not a breach of the invariant this type's haddock states:
-    -- combat status is a RULES concept the closed half already owns (CR 506-511,
-    -- Pawl.Types.Combat), so reading it is the same kind of act as reading a card
-    -- type. What the invariant forbids is casing on an EFFECT's identity, which
-    -- this arm still does not do.
+    -- The first atom reading something CR 109.3 says is NOT a characteristic,
+    -- which is no breach of the invariant above: combat status is a RULES concept
+    -- the closed half already owns (CR 506-511, Pawl.Types.Combat), so reading it
+    -- is the same kind of act as reading a card type.
     IsAttacking
-  | -- | CR 509.1g: the candidate is a BLOCKING creature -- one declared as a
-    -- blocker this combat phase ("it remains a blocking creature until it's
-    -- removed from combat or the combat phase ends, whichever comes first") and
-    -- not since removed under CR 506.4. Labyrinth of Skophos' "target attacking
-    -- or blocking creature" is the card text this exists for, and that text is
-    -- spelled `Or [IsAttacking, IsBlocking]` -- two atoms and one combinator,
-    -- rather than a third atom meaning "in combat", because the two roles are
-    -- separate rules concepts that separate cards ask about separately.
-    --
-    -- The fifth atom, after IsAttacking, IsAttachedToCreature, IsToken and
-    -- AttackedThisTurn, reading something CR 109.3 leaves off the characteristic
-    -- list -- and the only one of the five that is a MIRROR of an existing arm
-    -- rather than a new kind of reading, so it is legitimate for word-for-word
-    -- IsAttacking's reason: combat status is a RULES concept the closed half
-    -- already owns (CR 506-511, Pawl.Types.Combat), which makes reading it the
-    -- same kind of act as reading a card type. Casing on an EFFECT's identity is
-    -- what the invariant forbids, and this arm does not do it.
+  | -- | CR 509.1g: the candidate is a BLOCKING creature -- declared as a blocker
+    -- this combat phase and not since removed under CR 506.4. Labyrinth of
+    -- Skophos' "target attacking or blocking creature" is spelled
+    -- `Or [IsAttacking, IsBlocking]` rather than given a third atom meaning "in
+    -- combat", the two roles being separate rules concepts separate cards ask
+    -- about separately. Uncharacteristic for IsAttacking's reason.
     --
     -- NOT the same question as "is something blocking it": Pawl.Engine.Combat.isBlocked
     -- asks whether an ATTACKER has an entry in Combat.blockers, and this asks
-    -- whether the candidate is a MEMBER of some attacker's set. CR 509.1h's last
-    -- sentence is what keeps the two apart -- "a creature remains blocked even if
-    -- all the creatures blocking it are removed from combat" -- so an attacker
-    -- can be blocked at a moment when nothing answers True here.
+    -- whether the candidate is a MEMBER of some attacker's set. CR 509.1h keeps
+    -- them apart -- a creature remains blocked once every blocker leaves combat --
+    -- so an attacker can be blocked when nothing answers True here.
     IsBlocking
   | -- | CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
-    -- read of the turn-scoped GameEvent log, which is what CR 608.2i sanctions:
-    -- "Some effects look back in time and require information about previous
-    -- game states and actions rather than considering the current game state."
-    -- Never a stamp on the object.
+    -- read of the turn-scoped GameEvent log, which CR 608.2i sanctions; never a
+    -- stamp on the object. Uncharacteristic for IsAttacking's reason.
     --
     -- NOT a synonym for IsAttacking, and not expressible in terms of it:
     -- Combat.attackers is wiped by Combat.clearCombat as the end of combat step
-    -- ends (CR 511.3), so by the time a postcombat main phase resolves this
-    -- spell the combat's attackers are gone from the live record. The event log
-    -- is the right footing because it is cleared at turn handoff, which is
-    -- exactly the span "this turn" names.
+    -- ends (CR 511.3), so a postcombat main phase resolving this spell sees no
+    -- attackers in the live record. The event log is the right footing because it
+    -- is cleared at turn handoff, exactly the span "this turn" names.
     --
     -- DECLARED, like TriggerCondition.SelfAttacks and for that arm's reason: CR
-    -- 508.4 says a creature put onto the battlefield attacking "never attacked",
-    -- and only Combat.declareAttackers appends GameEvent.AttackerDeclared.
-    --
-    -- The fourth atom, after IsAttacking, IsAttachedToCreature and IsToken,
-    -- reading something CR 109.3 leaves off the characteristic list. Their
-    -- defence covers this one: what happened earlier this turn is a RULES record
-    -- the closed half owns outright (CR 608.2i, Pawl.Types.GameEvent), so reading
-    -- it is the same kind of act as reading a card type, and casing on an
-    -- EFFECT's identity is still what the invariant forbids and still not what
-    -- this does.
+    -- 508.4 says a creature put onto the battlefield attacking never attacked, and
+    -- only Combat.declareAttackers appends GameEvent.AttackerDeclared.
     AttackedThisTurn
-  | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to a creature -- "the object
-    -- or player an Aura is attached to is called enchanted" -- which is what
+  | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to a creature, which is what
     -- Crown of the Ages' "target Aura attached to a creature" narrows by.
+    -- Uncharacteristic for IsAttacking's reason -- attachment is a rules concept
+    -- the closed half owns (CR 301.5, 303.4, 701.3, Object.attachedTo).
     --
-    -- The second atom, after IsAttacking, reading something CR 109.3 explicitly
-    -- says is not a characteristic -- and it names attachment among its examples
-    -- ("what an Aura enchants"). IsAttacking's own defence covers this one word
-    -- for word: attachment is a RULES concept the closed half already owns (CR
-    -- 301.5, 303.4, 701.3, Object.attachedTo), so reading it is the same kind of
-    -- act as reading a card type, and casing on an EFFECT's identity is still
-    -- what the invariant forbids and still not what this does.
-    --
-    -- Nullary and creature-specific rather than a recursive `AttachedTo Filter`
-    -- that would compose with the rest of this type: the narrowest atom the one
-    -- card in the pool needs. The generalization is #356.
+    -- Nullary and creature-specific rather than a recursive `AttachedTo Filter`:
+    -- the narrowest atom the one card in the pool needs. The generalization is
+    -- #356.
     IsAttachedToCreature
   | -- | CR 303.4 / 701.3a: the candidate is attached to a PERMANENT -- Aura Graft's
     -- "target Aura that's attached to a permanent". Strictly wider than
     -- IsAttachedToCreature above and strictly narrower than "attached to
-    -- anything": CR 303.4 attaches an Aura to "an object or player", and only one
-    -- of those two is a permanent, so an enchant-player Aura (Curse of Death's
-    -- Hold) is out. An Aura on a noncreature permanent is in, which is the whole
-    -- difference from the atom above.
+    -- anything": CR 303.4 attaches an Aura to an object or a player, and only one
+    -- of those is a permanent, so an enchant-player Aura is out.
     --
     -- Nullary for IsAttachedToCreature's reason and one more of its own. #356's
     -- general `AttachedTo Filter` needs a RECURSIVE Pawl.Engine.Filter.View -- a
-    -- candidate's view would have to carry its host's -- which #356 records as a
-    -- bigger structural change than any card justifies, and which would also make
-    -- that record's derived Eq and Show diverge on a cyclic attachment. This atom
-    -- needs neither: being attached to a permanent is a question about the
-    -- ATTACHMENT, not about the host's characteristics, so it reads no second
-    -- projection at all.
+    -- candidate's view carrying its host's -- which would make that record's
+    -- derived Eq and Show diverge on a cyclic attachment. This atom needs neither:
+    -- being attached to a permanent is a question about the ATTACHMENT, not about
+    -- the host's characteristics, so it reads no second projection at all.
     IsAttachedToPermanent
-  | -- | CR 701.3a's last sentence: "An Aura, Equipment, or Fortification can't be
-    -- attached to an object or player it couldn't enchant, equip, or fortify,
-    -- respectively." The candidate is one the SUBJECT of the surrounding attach --
-    -- the permanent being moved -- could legally be attached to. Aura Graft's
-    -- "another permanent IT CAN ENCHANT".
+  | -- | CR 701.3a's last sentence: the candidate is one the SUBJECT of the
+    -- surrounding attach -- the permanent being moved -- could legally be attached
+    -- to. Aura Graft's "another permanent IT CAN ENCHANT".
     --
-    -- Context-relative in exactly the way IsSource and ControlledBy are: the
-    -- Filter value carries no object id, and the answer comes from what the caller
-    -- supplies. The subject arrives through Pawl.Engine.Filter.View rather than through
-    -- Context, because the answer is per-candidate and needs the game state --
-    -- which is the same footing `attachedToCreature` is on, and Context has
-    -- neither. Vacuously False wherever no attach frames the match, the posture
-    -- every other context-relative arm here takes.
+    -- Context-relative like IsSource, except that the subject arrives through
+    -- Pawl.Engine.Filter.View rather than through Context, the answer being
+    -- per-candidate and needing the game state. Vacuously False wherever no attach
+    -- frames the match.
     --
-    -- Asks about the SUBJECT and not about the candidate, which is what no
-    -- combination of the atoms above can express -- a destination filter narrowed
-    -- by HasCardType would still admit a creature the Aura's enchant ability
-    -- rejects. NOT a restatement of CR 303.4j: that rule is the backstop for a
-    -- card that does NOT say "it can enchant" (Crown of the Ages), where the
-    -- destination is offered and the move then fails. A card that says it narrows
-    -- the offer instead, and the two are only the same when the player would have
-    -- picked a legal destination anyway.
+    -- Asks about the SUBJECT and not about the candidate, which no combination of
+    -- the atoms above can express -- a destination filter narrowed by HasCardType
+    -- would still admit a creature the Aura's enchant ability rejects. NOT a
+    -- restatement of CR 303.4j, which is the backstop for a card that does NOT say
+    -- "it can enchant" (Crown of the Ages), where the destination is offered and
+    -- the move then fails.
     --
-    -- Answerable only where an attach frames the match, and vacuously False in
-    -- any other Filter position -- which is why writing it into one is a FAILING
-    -- TEST rather than a quiet False: Pawl.CardSpec's "CR 701.3a no card asks
-    -- CanHostSubject outside an attach's destination" walks every Filter position
-    -- a card has and rejects the atom in all of them but that one. Widening the
-    -- subject so every evaluation could see it is #572, and needs a card that asks
-    -- the question outside an attach. Reads the subject's enchant ability and not
-    -- CR 303.4's "other effects can limit what a permanent can be enchanted by"
+    -- Writing it into any other Filter position is a FAILING TEST rather than a
+    -- quiet False: Pawl.CardSpec walks every Filter position a card has and
+    -- rejects the atom in all but an attach's destination. Widening the subject so
+    -- every evaluation could see it is #572. Reads the subject's enchant ability
+    -- and not CR 303.4's other limits on what a permanent can be enchanted by
     -- (#472).
     CanHostSubject
-  | -- | CR 111.6: "A token isn't a card." Ashaya, Soul of the Wild's "nontoken
-    -- creatures you control" is the card text this exists for, and it is spelled
-    -- `Not IsToken` -- one relation, one spelling, the way CR 601.2c's "another"
-    -- is spelled `Not IsSource` (#163) rather than given a second arm.
+  | -- | CR 111.6: the candidate is a token. Ashaya, Soul of the Wild's "nontoken
+    -- creatures you control" is spelled `Not IsToken` -- one relation, one
+    -- spelling, the way "another" is spelled `Not IsSource` (#163).
+    -- Uncharacteristic for IsAttacking's reason (CR 111, Pawl.Types.Source).
     --
-    -- The third atom, after IsAttacking and IsAttachedToCreature, reading
-    -- something CR 109.3 leaves off the characteristic list. Their defence covers
-    -- this one too: what a permanent IS represented by is a RULES concept the
-    -- closed half owns outright (CR 111, Pawl.Types.Source), so reading it is the
-    -- same kind of act as reading a card type, and casing on an EFFECT's identity
-    -- is still what the invariant forbids and still not what this does.
-    --
-    -- Unlike those two it is not merely uncharacteristic but IMMUTABLE: CR 111.3
-    -- makes a token's effect-defined values "functionally equivalent" to printed
-    -- ones, so nothing in CR 613 can turn a card into a token or back. That is
-    -- what lets Pawl.Engine.Projection.filterReads declare it as reading nothing.
+    -- Unlike the other such atoms it is not merely uncharacteristic but IMMUTABLE:
+    -- CR 111.3 makes a token's effect-defined values equivalent to printed ones,
+    -- so nothing in CR 613 can turn a card into a token or back. That is what lets
+    -- Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsToken
   | And [Filter keyword]
   | Or [Filter keyword]

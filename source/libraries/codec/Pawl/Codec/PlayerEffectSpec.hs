@@ -50,8 +50,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.ReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
       """ {"type":"ReduceSpellCost","value":[{"type":"HasColor","value":{"type":"Blue"}},[{"type":"Generic","value":1}]]} """
-  -- Edgewalker's: the reduction that names a mana type, which the Medallion's
-  -- generic one above would not catch a regression in.
+  -- The reduction that names a mana type, which the generic one above would not
+  -- catch a regression in.
   Spec.it s "ReduceSpellCost, naming a mana type" $
     Common.assertJsonCodec
       s
@@ -78,9 +78,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.DontLoseUnspentMana ManaFilter.Any)
       """ {"type":"DontLoseUnspentMana","value":{"type":"Any"}} """
-  -- CR 106.1a / Omnath, Locus of Mana: the OTHER filter, which is the whole
-  -- difference between the two producers -- so a codec that dropped the payload
-  -- would round-trip one of these and not both.
+  -- CR 106.1a: the OTHER filter, so a codec that dropped the payload would
+  -- round-trip one of these and not both.
   Spec.it s "DontLoseUnspentMana, Omnath's green only" $
     Common.assertJsonCodec
       s
@@ -96,9 +95,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.CantBeTargetedBy PlayerScope.EachPlayer)
       """ {"type":"CantBeTargetedBy","value":{"type":"EachPlayer"}} """
-  -- CR 702.11c / Leyline of Sanctity: the OTHER scope, which is the whole
-  -- difference between the two keywords -- so a codec that dropped the payload
-  -- would round-trip one of these and not both.
+  -- CR 702.11c: the OTHER scope, so a codec that dropped the payload would
+  -- round-trip one of these and not both.
   Spec.it s "CantBeTargetedBy, hexproof's Opponents" $
     Common.assertJsonCodec
       s

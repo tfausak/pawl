@@ -9,12 +9,8 @@ import qualified Pawl.Types.CardName as CardName
 -- registry has no path to report and no file name to disagree with. Whatever a
 -- particular registry knows about its own failure goes in Invalid's message.
 --
--- Two constructors rather than the three exception types this replaced
--- (Pawl.Exceptions.{UnknownCard,CorruptCard,MisfiledCard}). What #167 bought was
--- that a caller wanting "unknown card X, did you mean...?" need not string-match
--- a `show` to tell it from "that card is broken", and that survives here. The
--- other two were both the second case and differed only in their message, which
--- is where they still differ.
+-- Two constructors, so a caller wanting "unknown card X, did you mean...?" need
+-- not string-match a `show` to tell it from "that card is broken" (#167).
 data CardError
   = Missing CardName.CardName
   | -- | Invalid rather than Corrupt: corruption suggests damaged bytes, which is

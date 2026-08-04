@@ -10,9 +10,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- object's whole characteristic set (name, mana cost, color, type line, rules
 -- text, abilities, power, toughness, loyalty, defense, …). This is just a value.
 --
--- Grows further: Half (Little Girl), Infinite (Mox Lotus). Star, Plus and Count
--- landed at P3b. Plus is binary and recursive so composition covers the awkward
--- printed values without new cases: 1+* is Plus (Literal 1) Star.
+-- Grows further: Half (Little Girl), Infinite (Mox Lotus). Plus is binary and
+-- recursive so composition covers the awkward printed values without new cases:
+-- 1+* is Plus (Literal 1) Star.
 --
 -- Deliberately NO Num instance. "Numeric tower" names the problem domain, not a
 -- class hierarchy. Num would be lawless and partial once Star and Infinite exist
@@ -31,44 +31,38 @@ data Quantity
     -- deals what it currently has.
     --
     -- Sibling of ManaValue, and read the same way: against the `oid` the caller
-    -- supplies, never against a target. What makes it different is that power is
-    -- PROJECTED (CR 613 layer 7) where mana value is computed from the printed
-    -- cost, so this arm goes through the injected ViewOf rather than
-    -- Game.cardOf -- which is also what lets a caller substitute CR 608.2h last
-    -- known information for a source that is gone.
+    -- supplies, never against a target. Power is PROJECTED (CR 613 layer 7)
+    -- where mana value is computed from the printed cost, so this arm goes
+    -- through the injected ViewOf -- which is also what lets a caller substitute
+    -- CR 608.2h last known information for a source that is gone.
     --
     -- No Toughness sibling: nothing in the pool reads one, and an unused arm is
     -- the speculative construction the project forbids.
     Power
   | -- | CR 601.2b: X -- a value the caster chose while casting, read from the
-    -- object's binding environment (Pawl.Engine.Binding.variableX). One-shot only: a
-    -- continuous effect must FREEZE this to a Literal when stored (Projection.hs
-    -- note), which no M4a card exercises.
+    -- object's binding environment. One-shot only: a continuous effect must
+    -- FREEZE this to a Literal when stored, which no card exercises.
     X
-  | -- | A number an EARLIER effect of the same resolution bound into a slot -- Bane
-    -- of Progress' "for each permanent destroyed this way", where the sweep's own
-    -- Destroy writes how many it actually destroyed and this reads it back. Read
-    -- from the binding environment of whichever object the evaluation is aimed at
-    -- -- for Pawl.Engine.Resolve, the effect's SOURCE, which is the same object the
-    -- producing effect wrote to (Pawl.Engine.Binding.amountOf, the channel X uses).
+  | -- | A number an EARLIER effect of the same resolution bound into a slot --
+    -- Bane of Progress' "for each permanent destroyed this way". Read from the
+    -- binding environment of whichever object the evaluation is aimed at; for
+    -- Pawl.Engine.Resolve, the effect's SOURCE, which is the same object the
+    -- producing effect wrote to.
     --
-    -- Named InSlot rather than Bound because PlayerRef.InSlot and ObjectRef.InSlot
-    -- already spell "read the binding at this slot" that way; a third reference
-    -- type reading a slot uses the same word.
+    -- Named InSlot rather than Bound because PlayerRef.InSlot and
+    -- ObjectRef.InSlot already spell "read the binding at this slot" that way.
     --
-    -- SEPARATE from X above rather than X being `InSlot Binding.variableX`, though
-    -- the two arms read the identical field. X is CR 601.2b's value a PLAYER chose
-    -- while casting, and being X is what the D4 "reads X iff the cost declares {X}"
-    -- lint (Resolve.readsX) is stated over, as well as the one slot read that
-    -- Resolve.slotsOf must NOT report; this is a value the ENGINE derived
-    -- mid-resolution, which neither lint may see. Collapsing them would restate
-    -- both as comparisons against one privileged slot name. Not retiring X's
-    -- reserved-slot shim in favour of this arm is #14.
+    -- SEPARATE from X above rather than X being `InSlot Binding.variableX`,
+    -- though the two arms read the identical field. X is CR 601.2b's value a
+    -- PLAYER chose while casting, which is what the "reads X iff the cost
+    -- declares {X}" lint is stated over and is the one slot read Resolve.slotsOf
+    -- must NOT report; this is a value the ENGINE derived mid-resolution, which
+    -- neither lint may see. Retiring X's reserved-slot shim in favour of this
+    -- arm is #14.
     --
     -- Nothing when the slot holds no amount -- the producing effect has not run
     -- yet, or bound nothing. Not 0: "how many were destroyed" is unanswered, not
-    -- answered with zero, and Resolve's arms already no-op on an unevaluable
-    -- quantity.
+    -- answered with zero.
     InSlot SlotName.SlotName
   | -- | CR 208.2 / 208.2a: the star printed in a power/toughness box, standing for
     -- a value a characteristic-defining ability defines. NOTATION, not a value:
@@ -78,21 +72,15 @@ data Quantity
     -- card data must honour, not something this type guarantees. Two cases reach
     -- the evaluator anyway, both benign:
     --
-    --   * a card whose OWN characteristicPT itself contained a Star -- the seed
-    --     substitutes Star for the printed characteristicPT without
-    --     re-descending into the replacement, and the codec accepts Star in any
-    --     Quantity position. The star reaches the CDA's evaluator, which is
-    --     Quantity.determine, so CR 208.2a makes the undeterminable value 0.
-    --     Hypothetical: no card in the pool does this; the Pawl.CardSpec
-    --     `cardOffends` lint family is where that check would live if it is ever
-    --     added.
+    --   * a card whose OWN characteristicPT itself contained a Star. The seed
+    --     substitutes without re-descending into the replacement, so the star
+    --     reaches the CDA's evaluator and CR 208.2a makes the undeterminable
+    --     value 0. Hypothetical: no card in the pool does this.
     --   * a card with printed Star power/toughness and NO characteristicPT at
     --     all, so there is nothing for the seed to substitute and the Star
-    --     reaches evaluate directly, at the seed, where CR 208.2a's substitution
-    --     does not apply (there is no CDA). Real: Primal Plasma (P5) is exactly this --
-    --     its star gets a value from an as-enters REPLACEMENT (CR 208.2b), not a
-    --     CDA. See the note on PC.power in Pawl.Engine.Projection's
-    --     `baseCharacteristics` for the consequence in full (#76).
+    --     reaches evaluate directly, where CR 208.2a's substitution does not
+    --     apply (there is no CDA). Real: Primal Plasma, whose star gets its value
+    --     from an as-enters REPLACEMENT (CR 208.2b) rather than a CDA (#76).
     Star
   | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity

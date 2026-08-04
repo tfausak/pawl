@@ -1,25 +1,16 @@
 -- One of CR 605.1a's three criteria, asked of an EFFECT: could it add mana, and
--- how is its type decided? The ABILITY-level classification that rule actually
--- defines is Pawl.Engine.Mana.isManaAbility, which folds this over an ability's
--- effects and adds the no-target and not-a-loyalty-ability clauses. Extracted from
--- Pawl.Engine.Resolve so that Pawl.Engine.Mana no longer has to import the
--- resolver to ask it.
+-- how is its type decided? The ABILITY-level classification that rule defines
+-- is Pawl.Engine.Mana.isManaAbility, which folds this over an ability's effects
+-- and adds the no-target and not-a-loyalty-ability clauses.
 --
--- That import was an INVERTED edge, and removing it is what lets
--- Pawl.Engine.Combat pay CR 508.1j's cost to attack: Pawl.Engine.Resolve is a
--- high-level module (it reaches Damage, Setup, Mulligan, Replacement and Combat
--- itself), so Mana -> Resolve -> Combat made a mana payment from inside combat a
--- module cycle. Mana is a low-level module and now depends only on low-level
--- ones.
+-- Here rather than in Pawl.Engine.Resolve so that Pawl.Engine.Mana need not
+-- import the resolver: Resolve is a high-level module, so Mana -> Resolve ->
+-- Combat made a mana payment from inside combat (CR 508.1j) a module cycle.
 --
--- Casing on Effect here rather than in Pawl.Engine.Resolve is not a breach of that
--- module's charter. design.md section 1 is what the charter enforces -- "the
--- closed half depends on a CLASSIFICATION of effects, never on the IDENTITY of
--- effects" -- and this function IS one of those classifications; design.md's risk
--- register names it by that name, as the `manaProduced()` bit whose absence grew
--- Argentum's mana subsystem 37 `is AddMana*Effect ->` branches. What stays
--- forbidden, here as everywhere, is a case that acts on WHICH effect it is, and
--- every arm below answers the one question in the type.
+-- Casing on Effect here is not a breach of design.md section 1: the closed half
+-- may depend on a CLASSIFICATION of effects, and this function is one. What
+-- stays forbidden is a case that acts on WHICH effect it is, and every arm
+-- below answers the one question in the type.
 module Pawl.Engine.ManaAbility where
 
 import qualified Pawl.Types.Card as Card.Type
@@ -27,14 +18,13 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import Pawl.Types.ManaProduction (ManaProduction)
 
--- CR 605: does this effect add mana, and how is its type decided? The "produces
--- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
--- to keep mana abilities off the stack, and by Mana.manaRoutesOfGiven to
--- enumerate what one activation of a source would add.
+-- CR 605: does this effect add mana, and how is its type decided? Read by
+-- Mana.isManaAbility to keep mana abilities off the stack, and by
+-- Mana.manaRoutesOfGiven to enumerate what one activation would add.
 --
 -- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
--- asks whether the ability "could add mana", which an unresolved colour choice
--- answers yes to; WHICH colour is Mana.tapForMana's prompt, not a static fact.
+-- asks whether the ability COULD add mana, which an unresolved colour choice
+-- answers yes to; which colour is Mana.tapForMana's prompt, not a static fact.
 manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
   Effect.AddMana production -> Just production

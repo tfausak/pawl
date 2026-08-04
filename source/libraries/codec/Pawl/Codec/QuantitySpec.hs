@@ -31,9 +31,8 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       Quantity.ManaValue
       """ {"type":"ManaValue"} """
-  -- CR 208.1, Ghitu Fire-Eater's "damage equal to its power". Nullary like
-  -- ManaValue, and NOT to be confused with the Power newtype, which wraps a
-  -- printed power/toughness box.
+  -- CR 208.1. Nullary like ManaValue, and NOT to be confused with the Power
+  -- newtype, which wraps a printed power/toughness box.
   Spec.it s "Power" $
     Common.assertJsonCodec
       s
@@ -48,10 +47,9 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       Quantity.X
       """ {"type":"X"} """
-  -- Bane of Progress' "for each permanent destroyed this way": a number an
-  -- earlier effect of the same resolution bound into a slot. Unlike X, it
-  -- carries the slot name on the wire -- nested under Plus, since composition
-  -- is where a recursive decoder loses a payload.
+  -- A number an earlier effect of the same resolution bound into a slot. Unlike
+  -- X it carries the slot name on the wire, nested under Plus here since
+  -- composition is where a recursive decoder loses a payload.
   Spec.it s "InSlot, bare and nested" $ do
     let slot = SlotName.MkSlotName (Text.pack "destroyed")
     Common.assertJsonCodec
@@ -81,9 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       (Quantity.Plus (Quantity.Literal 1) Quantity.Star)
       """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"Star"}]} """
   -- Quantity.Count's arm is tagged here and nowhere else: Pawl.Codec.Count
-  -- writes a bare object, so this pins the one "Count" tag in the encoding --
-  -- the arm reads like every other arm, and a Count payload can never be
-  -- double-tagged because only one level writes a tag at all.
+  -- writes a bare object, so a Count payload can never be double-tagged.
   Spec.it s "Count is tagged by Quantity, and the payload is Count's bare object" $
     Common.assertJsonCodec
       s
@@ -97,10 +93,8 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
           )
       )
       """ {"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Graveyard"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}} """
-  -- The arm that proves the Greatest payload is a whole Quantity rather than a
-  -- nullary tag: a Greatest whose per-member quantity is itself a Count
-  -- round-trips, which is the recursion Pawl.Types.Quantity's parameter exists
-  -- to permit.
+  -- Greatest's payload is a whole Quantity rather than a nullary tag, so a
+  -- per-member quantity that is itself a Count has to round-trip.
   Spec.it s "Greatest round-trips a nested Count payload" $
     Common.assertJsonCodec
       s

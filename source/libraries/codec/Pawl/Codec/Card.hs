@@ -1,15 +1,10 @@
 -- | @Card@ is the entry point to the rest of @Pawl.Codec@: the transitive
 -- closure of @Card@'s fields is one module per type, each exposing free
 -- @toJson@\/@fromJson@ functions rather than a type class, and this module is
--- where they are instantiated at @Card@ (§2 of the M3.5 spec).
+-- where they are instantiated at @Card@.
 --
 -- Every @Pawl.Types.*@ module stays JSON-free. Casing on an effect's identity
--- anywhere under @Pawl.Codec@ is open-half machinery, not the rules core --
--- mirroring 'Pawl.Engine.Resolve', which executes every @Effect@ and is the only
--- module allowed to case on one to decide WHAT IT DOES. The one other
--- @case@-on-@Effect@ in the engine is 'Pawl.Engine.ManaAbility', which answers CR
--- 605.1a's classification and executes nothing; its header says why it is not a
--- breach.
+-- anywhere under @Pawl.Codec@ is open-half machinery, not the rules core.
 module Pawl.Codec.Card where
 
 import qualified Data.Map.Strict as Map
@@ -51,8 +46,8 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Optionality as Optionality
 
 -- | What a card that says nothing about its spell means: one mode with no
--- effects and no targets, chosen. Every land and vanilla creature in the pool
--- has exactly this, which is why it is the default rather than a required key.
+-- effects and no targets, chosen. Every land and vanilla creature has exactly
+-- this, which is why it is the default rather than a required key.
 defaultSpell :: Modal.Modal Card.Card
 defaultSpell =
   Modal.MkModal

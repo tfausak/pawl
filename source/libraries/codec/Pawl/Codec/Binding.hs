@@ -11,9 +11,8 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.SlotName as SlotName
 
--- Runtime-only, never in card JSON -- covered for the same reason SetController's
--- PlayerId is: the codec must stay total over the transitive closure of what the
--- game state carries.
+-- Runtime-only, never in card JSON: the codec must stay total over the
+-- transitive closure of what the game state carries.
 toJson :: Binding.Binding -> Value.Value
 toJson b =
   Common.object . concat $
@@ -38,9 +37,8 @@ fromJson value = do
         Binding.copy = c
       }
 
--- A name-keyed map as a sorted array of entries, so the render is deterministic
--- and the file byte-stable (Pawl.Codec.TriggeredAbility.toJsonDelayed's own
--- comment).
+-- A name-keyed map as a sorted array of entries, so the render is
+-- deterministic.
 toJsonMap :: Map.Map SlotName.SlotName Binding.Binding -> Value.Value
 toJsonMap m =
   Common.encodeList

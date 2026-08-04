@@ -14,12 +14,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TurnWindow as TurnWindow
 
--- | R7's one case for MkDelayedTrigger's single constructor, at CR 603.7a/603.7b's
--- default (an unrestricted window and no expiry), plus the case each of those two
--- fields takes when the card does restrict it. 'bindings' carries a minimal
--- Binding rather than one with a `copy` snapshot (Pawl.Codec.BindingSpec is
--- already total over every Binding field on its own); 'ability' reuses
--- 'CardSpec.minimalTriggeredAbility' rather than building a second one by hand.
+-- | MkDelayedTrigger at CR 603.7a/603.7b's default (an unrestricted window and
+-- no expiry), plus the case each of those two fields takes when the card does
+-- restrict it.
 entry :: DelayedTrigger.DelayedTrigger
 entry =
   DelayedTrigger.MkDelayedTrigger
@@ -41,8 +38,8 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
   Spec.it s "MkDelayedTrigger, CR 603.7a/603.7b's default (armed with no onset gate, no stated duration)" $
     Common.assertJsonCodec s DelayedTrigger.toJson DelayedTrigger.fromJson entry entryJson
-  -- CR 603.7b: a stated duration, Full Throttle's "this turn" as the game
-  -- remembers it (Pawl.Engine.Expiry.arm's output, not the printed Duration).
+  -- CR 603.7b: a stated duration as the game remembers it
+  -- (Pawl.Engine.Expiry.arm's output, not the printed Duration).
   Spec.it s "MkDelayedTrigger, a stated expiry (CR 603.7b)" $
     Common.assertJsonCodec
       s
@@ -53,9 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
           <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
           <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"}}"
       )
-  -- CR 603.7a: an onset gate, at the arm Meandering Towershell's entry is stored
-  -- with before its turn arrives. Pawl.Codec.TurnWindowSpec is total over the
-  -- other two arms.
+  -- CR 603.7a: an onset gate. Pawl.Codec.TurnWindowSpec covers the other arms.
   Spec.it s "MkDelayedTrigger, an onset gate (CR 603.7a)" $
     Common.assertJsonCodec
       s
@@ -66,11 +61,9 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
           <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
           <> "\"window\":{\"type\":\"ControllersNextTurn\"}}"
       )
-  -- 'bindings' at its default (the empty map) and no stated 'expiry': 'window'
-  -- stays a required key regardless (Pawl.Codec.DelayedTrigger's own comment --
-  -- CR 603.7a's "no restriction" is one of TurnWindow's arms, not the absence of
-  -- one), so it is the only key besides the three unconditional ones that
-  -- survives.
+  -- 'bindings' at its default and no stated 'expiry'. 'window' stays a required
+  -- key regardless: CR 603.7a's "no restriction" is one of TurnWindow's arms,
+  -- not the absence of one.
   Spec.it s "an all-default value omits every optional key" $
     Common.assertJsonCodec
       s

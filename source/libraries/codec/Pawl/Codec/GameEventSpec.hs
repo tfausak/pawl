@@ -19,13 +19,10 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- | R7's ten cases, one per GameEvent constructor. The Moved/Revealed cases
--- carry 'ProjectedCharacteristicsSpec.testCharacteristics' as a stand-in
--- snapshot -- this sublibrary sits above Pawl.Registry and Pawl.Engine, so it
--- cannot build a real one the way Pawl.Engine.Projection.project does. The
--- registry-backed round-trips over REAL snapshots (Typhoid Rats, and the
--- doubled-toxic-keyword count survives the encoding) stay in
--- Pawl.CodecIntegrationSpec.
+-- | One case per GameEvent constructor. The Moved/Revealed cases carry a
+-- stand-in snapshot: this sublibrary sits above Pawl.Registry and Pawl.Engine,
+-- so it cannot build a real one. The registry-backed round-trips over real
+-- snapshots stay in Pawl.CodecIntegrationSpec.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
   Spec.it s "Moved" $

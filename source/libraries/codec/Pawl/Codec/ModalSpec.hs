@@ -21,10 +21,9 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
 
--- | Every case below instantiates the `card` parameter at 'Text.Text', a
--- stand-in that is never a real card -- 'Modal.toJson'/'Modal.fromJson' reach
--- it only through the supplied Mode codec, exactly like
--- 'Pawl.Codec.EffectSpec's own cardToJson/cardFromJson.
+-- | The `card` parameter is instantiated at 'Text.Text' throughout.
+-- 'Modal.toJson'/'Modal.fromJson' reach it only through the supplied Mode
+-- codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
 cardToJson = Common.text
 
@@ -37,11 +36,9 @@ toJson = Modal.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (Modal.Modal Text.Text)
 fromJson = Modal.fromJson cardFromJson
 
--- One constructor (MkModal), so three cases: a populated payload (Bonesplitter's
--- Equip, CR 702.6a/700.2's non-modal shape -- one Mode with no alternative), the
--- `selection` field defaulted (the only omissible one -- `modes` is required and
--- non-empty by invariant), and the empty-modes decode failure moved from
--- Pawl.CodecSpec.
+-- One constructor, so three cases: a populated payload in CR 700.2's non-modal
+-- shape, the `selection` field defaulted (the only omissible one -- `modes` is
+-- required and non-empty by invariant), and the empty-modes decode failure.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Modal" $ do
   Spec.it s "MkModal, Bonesplitter's Equip payload" $

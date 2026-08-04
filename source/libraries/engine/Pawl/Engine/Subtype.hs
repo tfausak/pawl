@@ -2,8 +2,8 @@
 -- subtype belongs to, and -- for a creature type, the one family whose word a
 -- rule asks pawl to WRITE rather than only to recognise -- what that word is.
 -- The rulebook owns these lists outright (CR 205.3i and CR 205.3m name the land
--- types and the creature types by name), so casing on a Subtype here is the same
--- kind of act as casing on a Phase -- it is a subtype's IDENTITY, never an
+-- types and the creature types by name), so casing on a Subtype here is the
+-- same kind of act as casing on a Phase -- it is a subtype's IDENTITY, never an
 -- effect's.
 module Pawl.Engine.Subtype where
 
@@ -12,14 +12,14 @@ import qualified Data.Text as Text
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 
--- | CR 612.2's question -- is this word one of the family's? -- where the family
--- is named by a card's text rather than fixed by a constructor.
+-- | CR 612.2's question -- is this word one of the family's? -- where the
+-- family is named by a card's text rather than fixed by a constructor.
 --
 -- BasicLandType answers with the whole of CR 205.3i, not CR 305.6's five: the
 -- narrowing to basics is on what a player may CHOOSE, while the family a swap
--- may reach is the land types. The difference is unobservable while the only
--- basic-land text-changer offers the five (a chosen basic is a land type either
--- way), and stating the family is what CR 612.2 actually says.
+-- may reach is the land types. Unobservable while the only basic-land
+-- text-changer offers the five, and stating the family is what CR 612.2
+-- actually says.
 inFamily :: SubtypeFamily.SubtypeFamily -> Subtype.Subtype -> Bool
 inFamily family = case family of
   SubtypeFamily.BasicLandType -> isLandType
@@ -47,17 +47,14 @@ isLandType subtype = case subtype of
   Subtype.Urzas -> True
   _ -> False
 
--- | CR 205.3m's list, carrying each creature type's PRINTED word -- "the two
--- words long" Time Lord and the punctuated Assembly-Worker, C'tan and Shi'ar
--- included -- and Nothing for a subtype of any other family. Transcribed from
--- docs/rules.txt's CR 205.3m, which names every one of them.
+-- | CR 205.3m's list, carrying each creature type's PRINTED word -- the
+-- two-word Time Lord and the punctuated Assembly-Worker, C'tan and Shi'ar
+-- included -- and Nothing for a subtype of any other family.
 --
 -- The word is what CR 612.2a needs and a family test cannot supply: a token's
 -- NAME is text, so swapping the creature type that defines it means writing the
--- new word out (Pawl.Engine.Projection.rewriteCard).
---
--- isCreatureType below reads this rather than restating the list, so the two
--- cannot drift.
+-- new word out (Pawl.Engine.Projection.rewriteCard). isCreatureType below reads
+-- this rather than restating the list, so the two cannot drift.
 creatureTypeWord :: Subtype.Subtype -> Maybe Text.Text
 creatureTypeWord subtype = case subtype of
   Subtype.Advisor -> Just (Text.pack "Advisor")

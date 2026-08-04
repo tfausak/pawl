@@ -14,8 +14,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Subtype as Subtype
 
 -- | Instantiated at 'Keyword.Keyword', the only concrete instantiation
--- anywhere in the pool (Pawl.Types.Filter's header) -- the same posture
--- FilterSpec takes.
+-- anywhere in the pool.
 toJson :: CostComponent.CostComponent Keyword.Keyword -> Value.Value
 toJson = CostComponent.toJson Keyword.toJson
 
@@ -52,8 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       fromJson
       (CostComponent.PayLife 2)
       """ {"type":"PayLife","value":2} """
-  -- Village Rites' one creature: the count and the Filter both ride the
-  -- payload, positionally.
+  -- The count and the Filter both ride the payload, positionally.
   Spec.it s "Sacrifice" $
     Common.assertJsonCodec
       s
@@ -82,7 +80,7 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       fromJson
       (CostComponent.PayEnergy 2)
       """ {"type":"PayEnergy","value":2} """
-  -- CR 606.4's two halves, Jace Beleren's +2 and -1.
+  -- CR 606.4's two halves.
   Spec.it s "AddLoyaltyToThis" $
     Common.assertJsonCodec
       s

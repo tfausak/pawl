@@ -7,11 +7,8 @@ import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Cost as Cost
 
--- | The keyword codec is a PARAMETER, mirroring CostComponent's own -- see
--- Pawl.Codec.Filter's header: the CostComponents this carries need one, and
--- every caller passes Pawl.Codec.Keyword.toJson. The 'Eq' constraint is only
--- for 'Common.optionalPair' on 'components'; every instantiation in the pool is
--- at 'Pawl.Types.Keyword.Keyword', which has one.
+-- | The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header. The 'Eq'
+-- constraint is only for 'Common.optionalPair' on 'components'.
 toJson :: (Eq keyword) => (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
 toJson encode c =
   Common.object
@@ -20,9 +17,9 @@ toJson encode c =
     )
 
 -- | CR 118.6: 'mana' is REQUIRED, not defaulted, despite being a 'Maybe' --
--- Nothing and Just (MkManaCost []) are both real, distinct values (Pawl.Types.
--- Cost's own comment), so there is no single default an absent key could mean.
--- A card file that forgets 'mana' is malformed rather than unpayable-by-default.
+-- Nothing and Just (MkManaCost []) are both real, distinct values, so there is
+-- no single default an absent key could mean. A card file that forgets 'mana'
+-- is malformed rather than unpayable-by-default.
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Cost.Cost keyword)
 fromJson decode value = do
   ps <- Common.asObject value

@@ -1,27 +1,21 @@
--- | Construction, normalization, and extraction helpers over the @json@
--- sublibrary's 'Value.Value', plus the tagged-object convention the codec builds
--- on, the element-generic combinators every per-type codec module is written in
--- terms of, the field combinators ('requiredPair', 'optionalPair',
--- 'defaultedField') those modules use to encode and decode a record's fields,
--- and the assertions its specs are written in terms of. Encoding and decoding
--- themselves live in 'Pawl.Json.Value'; this module adapts them to the codec's
--- @Either Text@ error channel.
+-- | The codec's base module: the tagged-object convention, the element-generic
+-- combinators, the field combinators, and the spec assertions every per-type
+-- module is written in terms of. Encoding and decoding themselves live in
+-- 'Pawl.Json.Value'; this module adapts them to the codec's @Either Text@ error
+-- channel.
 --
--- 'optionalPair' and 'defaultedField' carry one invariant between them: an
--- omitted key means the default that 'defaultedField' supplies, and that
--- default must be the same value 'optionalPair' omits a field for writing. A
--- per-type module calls both with the same default argument for a given field;
--- if the two ever drift apart, encoding a default value and decoding it back
--- stops being the identity.
+-- 'optionalPair' and 'defaultedField' carry one invariant between them: the
+-- default a per-type module passes to each for a given field must be the same
+-- binding, or encoding a default value and decoding it back stops being the
+-- identity.
 --
--- Nothing here names a @Pawl.Types@ type, which is what keeps it below all 98
+-- Nothing here names a @Pawl.Types@ type, which is what keeps it below the
 -- per-type modules rather than in a cycle with them.
 --
--- 'object' and 'asObject' trade in 'Pair.Pair' lists, which is the shape the
--- codec wants: it writes fields in a readable order rather than an alphabetical
--- one, and reads them back by name. That order is incidental -- JSON objects are
--- unordered, nothing checks the bytes of a card file, and 'sortKeys' exists to
--- compare two values regardless of it.
+-- 'object' and 'asObject' trade in 'Pair.Pair' lists so fields can be written
+-- in a readable order rather than an alphabetical one. That order is
+-- incidental: JSON objects are unordered, and 'sortKeys' exists to compare two
+-- values regardless of it.
 module Pawl.Codec.Common where
 
 import qualified Data.Foldable as Foldable
@@ -93,15 +87,10 @@ nullary t = tagged t Nothing
 -- Normalization --------------------------------------------------------------
 
 -- | Recursively sorts every object's keys, so that two values differing only in
--- key order compare equal. JSON objects are unordered, so this is the right
--- notion of equality for comparing a parsed file against a re-encoded one.
---
--- Arrays are deliberately left alone: JSON arrays /are/ ordered, and the codec
--- relies on that -- a name-keyed map is rendered as a sorted array of entries
--- precisely so the order is deterministic.
---
--- Duplicate keys are not merged. 'List.sortOn' is stable and the extraction
--- helpers take the first match, so the two agree.
+-- key order compare equal. Arrays are deliberately left alone: JSON arrays
+-- /are/ ordered, and the codec relies on that. Duplicate keys are not merged;
+-- 'List.sortOn' is stable and the extraction helpers take the first match, so
+-- the two agree.
 sortKeys :: Value.Value -> Value.Value
 sortKeys value = case value of
   Value.Array a -> Value.Array . Array.MkArray . fmap sortKeys $ Array.unwrap a
@@ -182,21 +171,21 @@ withValue mv f = case mv of
   Nothing -> Left $ Text.pack "missing tagged value"
 
 -- | A field that is always written, whatever its value. The singleton list is
--- so that 'Common.object . concat' can take required and defaulted fields in one
+-- so that 'Common.object . concat' can take required and optional fields in one
 -- list, with which is which readable down the left edge.
 requiredPair :: String -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
 requiredPair k f x = [pair k (f x)]
 
 -- | A field written only when it differs from the default that an absent key
 -- means. The default passed here and the one 'defaultedField' supplies must be
--- the same binding: that is the whole guarantee that a codec's two halves agree.
+-- the same binding.
 optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
 optionalPair k d f x = if x == d then [] else [pair k (f x)]
 
 -- | Reads a field that may be absent, supplying the default 'optionalPair'
 -- omits. A key that is present but null goes to the decoder rather than
 -- short-circuiting, so composing with 'decodeMaybe' accepts an absent key, an
--- explicit null, and a value alike (R7 of the omit-defaults design).
+-- explicit null, and a value alike.
 defaultedField ::
   String ->
   a ->
@@ -224,14 +213,10 @@ encodeList f = array . fmap f
 decodeList :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text [a]
 decodeList f value = asArray value >>= traverse f
 
--- | Writes a non-empty list as a plain JSON array, the same shape 'encodeList'
--- writes.
 encodeNonEmpty :: (a -> Value.Value) -> NonEmpty.NonEmpty a -> Value.Value
 encodeNonEmpty f = encodeList f . NonEmpty.toList
 
--- | The card-data invariant this type exists to enforce: whatever field is
--- typed 'NonEmpty.NonEmpty' has at least one part. An empty array is a decode
--- failure, not a value that does nothing.
+-- | An empty array is a decode failure, not a value that does nothing.
 decodeNonEmpty :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (NonEmpty.NonEmpty a)
 decodeNonEmpty f value = do
   xs <- decodeList f value
@@ -252,10 +237,9 @@ decodeSet :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value -> Ei
 decodeSet f value = Set.fromList <$> decodeList f value
 
 -- A count-per-key multiset, on the wire as a plain array WITH REPEATS rather
--- than as key/count pairs: it is what the thing being encoded is a list of, and
--- the encoding stays legible beside encodeSet's. Ascending by key, so it is
--- canonical. decodeMultiset recounts, so a hand-written file may repeat a key in
--- any order and a zero count is simply unsayable.
+-- than as key/count pairs, ascending by key so it is canonical. decodeMultiset
+-- recounts, so a hand-written file may repeat a key in any order and a zero
+-- count is unsayable.
 encodeMultiset :: (a -> Value.Value) -> Map.Map a Natural.Natural -> Value.Value
 encodeMultiset f = encodeList f . concatMap (\(k, n) -> List.genericReplicate n k) . Map.toAscList
 
@@ -307,10 +291,9 @@ assertFromJson s f j x = do
   v <- assertJson s j
   Spec.assertEq s (f v) (Right x)
 
--- | Compares 'sortKeys'-normalized values, because JSON objects are unordered
--- and key order is not a property the codec has. The failure renders both sides
--- as JSON rather than as 'Value.Value', so a mismatch can be read — and pasted
--- back into the literal — without translating a Show instance by hand.
+-- | Compares 'sortKeys'-normalized values, because key order is not a property
+-- the codec has. The failure renders both sides as JSON rather than as
+-- 'Value.Value', so a mismatch can be pasted back into the literal.
 assertToJson ::
   (Stack.HasCallStack, Monad m) =>
   Spec.Spec m n ->

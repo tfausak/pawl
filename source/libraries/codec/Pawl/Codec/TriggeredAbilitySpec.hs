@@ -36,10 +36,9 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 
--- | Every case below instantiates the `card` parameter at 'Text.Text', a
--- stand-in that is never a real card -- 'TriggeredAbility.toJson'/
--- 'TriggeredAbility.fromJson' reach it only through the supplied Modal codec,
--- exactly like 'Pawl.Codec.EffectSpec's own cardToJson/cardFromJson.
+-- | The `card` parameter is instantiated at 'Text.Text' throughout.
+-- 'TriggeredAbility.toJson'/'TriggeredAbility.fromJson' reach it only through
+-- the supplied Modal codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
 cardToJson = Common.text
 
@@ -52,11 +51,8 @@ toJson = TriggeredAbility.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility Text.Text)
 fromJson = TriggeredAbility.fromJson cardFromJson
 
--- One constructor (MkTriggeredAbility), so three cases: Sarcomancy's own two
--- triggered abilities (data/cards/sarcomancy.json) cover both states of the CR
--- 603.4 `intervening` field -- its zombie-token trigger states no intervening
--- "if" and its upkeep trigger states one -- and the third is every field left
--- at its default below.
+-- One constructor, so three cases: both states of CR 603.4's `intervening`
+-- field, and every field left at its default.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
   Spec.it s "MkTriggeredAbility, Sarcomancy's zombie-token trigger (no intervening if)" $
@@ -74,9 +70,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           }
       )
       """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},"Zombie Token"]}]}]}} """
-  -- CR 603.4's intervening "if" clause: emitted only when the ability states
-  -- one, so Sarcomancy's upkeep trigger ("if no Zombies") writes the key and
-  -- the case above (which states none) omits it.
+  -- CR 603.4's intervening "if" clause is emitted only when the ability states
+  -- one, so this case writes the key and the one above omits it.
   Spec.it s "MkTriggeredAbility, Sarcomancy's upkeep trigger (an intervening if)" $
     Common.assertJsonCodec
       s
@@ -99,12 +94,9 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
       )
       """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"intervening":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Objects"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}},"modal":{"modes":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}]}]}} """
   -- CR 603.7: Card.delayedAbilities is a name-keyed map, rendered as a sorted
-  -- array of entries so the render is deterministic and the file byte-stable
-  -- (Pawl.Codec.TargetSpec.toJsonMap's own comment, and Pawl.Codec.Binding's).
-  -- Two real delayed abilities (Full Throttle's "each combat" and Tidal
-  -- Wave's "sacrifice it"), inserted here in DESCENDING name order, so a trip
-  -- that emitted Map.toList's incidental order rather than Map.toAscList
-  -- would fail this case even though both proved correct in isolation.
+  -- array of entries so the render is deterministic. The two entries are
+  -- inserted in DESCENDING name order, so a trip that emitted the map's
+  -- incidental traversal order rather than Map.toAscList fails this case.
   Spec.it s "toJsonDelayed/fromJsonDelayed sorts by name (Full Throttle, Tidal Wave)" $
     Common.assertJsonCodec
       s
@@ -134,9 +126,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           ]
       )
       """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Untap","value":{"type":"AttackedThisTurn"}}]}]}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}}}] """
-  -- CR 603.4: no intervening "if" is what a triggered ability that states none
-  -- means, so only the two required keys survive -- 'condition' at CR 603.6a's
-  -- simplest trigger and 'modal' at the minimal non-modal payload (CR 700.2).
+  -- CR 603.4: an ability stating no intervening "if" leaves only the two
+  -- required keys.
   Spec.it s "an all-default value omits every optional key" $
     Common.assertJsonCodec
       s

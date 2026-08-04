@@ -8,21 +8,14 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Condition as Condition
 
 -- | A BARE OBJECT keyed by the record's field names, which is what every
--- single-constructor record in this codec writes (Pawl.Codec.Countering,
--- Pawl.Codec.Mode, Pawl.Codec.TriggeredAbility, ...). Common.tagged is for sum
+-- single-constructor record in this codec writes. Common.tagged is for sum
 -- types, where the tag picks a constructor; Condition has exactly one, so a tag
--- would carry no information and every parent that holds a Condition
--- (TriggerCondition.StateIs, Duration.ForAsLongAs, an ability's intervening
--- "if") is already tagged itself.
+-- would carry no information and every parent that holds a Condition is already
+-- tagged itself.
 --
--- Naming the sides on the wire is what the positional array could not do: the
--- first and third elements were both a Quantity, so a card file that swapped
--- them decoded silently into the wrong condition. "measured" and "threshold"
--- cannot be swapped by accident.
---
--- Both sides go through Quantity.toJson and nothing here spells out how a
--- Quantity is written, so a side that is a Count is Pawl.Codec.Quantity's tagged
--- Count arm and this module never has to know it.
+-- Naming the sides is what a positional array could not do: both are a
+-- Quantity, so a card file that swapped them would decode silently into the
+-- wrong condition. "measured" and "threshold" cannot be swapped by accident.
 toJson :: Condition.Condition -> Value.Value
 toJson condition =
   Common.object . concat $
