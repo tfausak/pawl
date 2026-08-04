@@ -1320,7 +1320,7 @@ nullChamberBoard plains mountain nullChamber =
 -- CR 201.4 answered PER CHOOSER, which is the whole of what makes Null Chamber
 -- worth testing: `pick` is asked WHO is choosing, so a case can put the
 -- controller's name and the opponent's on different cards. `opponent` settles CR
--- 608.2c's other choice -- which opponent is asked at all -- and is never
+-- the card's other open choice -- which opponent is asked at all -- and is never
 -- reached at two seats. Everything else is the shared interpreter.
 chamberAnswer :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> Prompt.Prompt r -> r
 chamberAnswer opponent pick p = case p of
@@ -1451,7 +1451,8 @@ nullChamberSpec s registry =
     -- Action.playableLands rather than Cast.castable.
     --
     -- The Plains is the falsifier, and it is also why the named land has to be a
-    -- nonbasic one: CR 201.4a forbids naming a basic land card, so a basic land
+    -- nonbasic one: the card forbids naming a basic land card and CR 201.4a is
+    -- what makes that restriction binding, so a basic land
     -- is the one land this card can never stop.
     Spec.it s "CR 305.1 a land with the chosen name can't be played, and a basic land still can" $ do
       plains <- S.printingOf s registry "Plains"
@@ -1494,12 +1495,13 @@ nullChamberSpec s registry =
           Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.alice gone)) "and the cast is offered again"
           Spec.assertBool s (elem barrensId (Action.playableLands S.alice gone)) "and the land may be played again"
 
-    -- CR 608.2c: "an opponent" is a choice the card leaves open, so its
-    -- controller makes it -- and at three seats that choice is real. The third
-    -- player is asked NOTHING, which a reading of "you and an opponent" as CR
-    -- 800.1's whole table (or as PlayerScope.EachPlayer, which coincides with
-    -- the card at two seats) would get wrong.
-    Spec.it s "CR 608.2c at three seats the controller picks which opponent names a card" $ do
+    -- "An opponent" is a choice the card leaves open and no rule assigns, so
+    -- pawl gives it to the ability's controller -- CR 109.5's "you", the player
+    -- the card's other half already names -- and at three seats that choice is
+    -- real. The third player is asked NOTHING, which a reading of "you and an
+    -- opponent" as the whole table (or as PlayerScope.EachPlayer, which
+    -- coincides with the card at two seats) would get wrong.
+    Spec.it s "CR 102.2 at three seats the controller picks which opponent names a card" $ do
       plains <- S.printingOf s registry "Plains"
       nullChamber <- S.printingOf s registry "Null Chamber"
       piker <- S.printingOf s registry "Goblin Piker"

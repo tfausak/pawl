@@ -84,9 +84,10 @@ data Response
     ChoseColor Color.Color
   | -- | CR 201.4 / 614.1c: the card name a player chose as an object entered.
     ChoseCardName CardName.CardName
-  | -- | CR 614.12a: the opponent a player chose for an as-enters choice the card
-    -- assigns to "an opponent". Unlike ChoseDefender, which also carries an
-    -- opponent, this answers no combat question.
+  | -- | The opponent a player chose for an as-enters choice the card assigns to
+    -- "an opponent" (CR 614.12a puts that choice before the permanent enters).
+    -- Unlike ChoseDefender, which also carries an opponent, this answers no
+    -- combat question.
     ChoseOpponent PlayerId.PlayerId
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as
     -- a permutation of the offered indices.

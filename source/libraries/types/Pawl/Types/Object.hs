@@ -138,7 +138,8 @@ data Object = MkObject
     -- players each name a card, and its prohibition asks only whether a name is
     -- among them -- so who named which is not a distinction any reader can make,
     -- and two players naming the same card is one prohibition either way. Empty
-    -- for everything that never chose (CR 201.2a: an object with no name).
+    -- for everything that never chose, which matches no card at all rather than
+    -- every card: the shape CR 201.2a gives an object with no name.
     --
     -- NOT a copiable value, for chosenColor's reason (CR 707.5, CR 707.6).
     --

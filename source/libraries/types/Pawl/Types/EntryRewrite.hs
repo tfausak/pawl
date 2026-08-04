@@ -47,8 +47,9 @@ data EntryRewrite
     --
     -- TWO choosers in ONE arm, which is why this is not ChooseColor with a
     -- PlayerScope bolted on. "You and an opponent" is not a PlayerScope: it
-    -- coincides with EachPlayer at two seats and diverges at three, where the
-    -- card names one opponent and CR 800.1's other seats choose nothing.
+    -- coincides with EachPlayer at two seats (CR 102.2) and diverges at three,
+    -- where the card names one opponent and the rest of the table choose
+    -- nothing.
     --
     -- The Filter is CR 201.4a's restriction on WHICH names may be chosen -- the
     -- characteristics of the card whose name is named -- read off the card,

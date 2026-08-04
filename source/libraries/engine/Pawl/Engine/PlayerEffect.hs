@@ -103,8 +103,8 @@ playersInScope perspective gs scope =
 -- quality-bearing prohibitions read it: Null Chamber's "the chosen names" are
 -- Object.chosenNames on the permanent that printed the ability, the same
 -- direction Modification.AddChosenColor reads a colour. Nothing for a stored
--- CR 611.2c effect, which is a resolved spell's and has no permanent behind it
--- -- and no such effect names a source-carried quality.
+-- CR 611.2c effect, which came from a resolved spell or ability and has no
+-- permanent behind it -- and no such effect names a source-carried quality.
 applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
 applying pid gs =
   let -- Hoisted out of the walk exactly as Projection.gather hoists it: an
@@ -180,35 +180,38 @@ castsThisTurn pid gs =
 -- over anything allowing or directing. One applicable prohibition is enough and
 -- nothing outvotes it.
 --
--- Takes the SPELL, as one half named: CR 709.3a evaluates only the chosen half
--- to see if it can be cast, so the name compared is the half's own and a split
+-- Takes the SPELL, as one half NAMED: CR 709.3a evaluates only the chosen half
+-- to see if it can be cast, so the name compared is that half's own and a split
 -- card is asked this question once per half. Two of the three prohibitions are
 -- quality-free -- "can't cast spells", "can't cast more than one spell" -- and
--- ignore both parameters; CR 601.3a's quality-bearing shape is what the third
--- needs them for (Null Chamber's "spells with the chosen names").
+-- so ignore the name entirely; CR 601.3a's quality-bearing shape is what the
+-- third needs it for (Null Chamber's "spells with the chosen names").
 --
 -- ONE name rather than the set CR 201.2a asks about ("at least one name in
 -- common"). Every spell in this pool has exactly one name at this moment: the
--- proposal has already fixed the half, and no other object has several names
+-- proposal has already fixed the half, and nothing else has several names
 -- (#650).
 --
--- CR 601.3a's LOOKAHEAD is still not implemented: the rule lets a player begin
--- casting when some proposal choice could move the spell out of the prohibited
--- class, and nothing here searches choice space (#95). It is not reachable by
--- this arm -- the only proposal choice that changes a spell's name is CR 709.3's
--- half, which the caller has already made, so each half is offered on its own
--- answer.
---
 -- A NAME rather than the spell's object id, because the name is the whole of
--- what the three arms read: the caller has the proposed card and takes the name
--- off its chosen face, which is also the only place it could come from -- pawl
--- projects nothing off the battlefield, and the card is still in the zone it is
+-- what the three arms read, and the caller already has it -- it takes the name
+-- off the chosen face, which is the only place it could come from, since pawl
+-- projects nothing off the battlefield and the card is still in the zone it is
 -- cast from (#160). A criterion over more of the spell than its name is what
 -- would want the object back (#95).
 --
--- CR 101.2 is why this folds as a DISJUNCTION: a "can't" effect takes precedence
--- over anything allowing or directing. One applicable prohibition is enough and
--- nothing outvotes it.
+-- CR 601.3a's LOOKAHEAD is still not implemented: the rule lets a player begin
+-- casting when some choice made during the proposal could move the spell out of
+-- the prohibited class, and nothing here searches choice space (#95).
+--
+-- Nothing in this pool reaches it, and that rests on a missing capability rather
+-- than on a claim about Magic. CR 601.2b names two choices that are made BEFORE
+-- the announcement it governs and may restrict it -- "choosing to cast a spell
+-- with flashback from a graveyard or choosing to cast a creature with morph face
+-- down" -- and both would move a spell across this prohibition, since CR 702.37a
+-- gives a face-down spell "no name" at all. CR 709.3's half is settled the same
+-- way, before the card is put onto the stack, which is why each half is offered
+-- as its own action here. Face-down casting is what pawl lacks: there is no
+-- face-down state for anything to be in (#192).
 prohibitsCasting :: PlayerId -> CardName -> GameState -> Bool
 prohibitsCasting pid name gs =
   let cast = castsThisTurn pid gs
@@ -265,8 +268,11 @@ prohibitsPlayingLand pid name gs =
 
 -- CR 614.1c: the card names chosen as this effect's source entered
 -- (Object.chosenNames). Empty for an effect with no source -- a stored CR 611.2c
--- row -- and for a permanent that chose nothing, which CR 201.2a makes the
--- answer that matches no object rather than one that matches every object.
+-- row -- and for a permanent that chose nothing.
+--
+-- The empty set is the answer that matches NO object rather than every object,
+-- which is the shape CR 201.2a describes for an object with no name: having no
+-- name is not sharing one.
 chosenNamesOf :: Maybe ObjectId -> GameState -> Set.Set CardName
 chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid -> Game.lookupObject oid gs)
 

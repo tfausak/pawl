@@ -342,20 +342,23 @@ data Prompt r where
   -- name". ADVISORY, like ChooseX's bound -- the answer is filtered against it
   -- nowhere (#663), and for the same reason there is no candidate list.
   ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Prompt CardName.CardName
-  -- | CR 614.12a: as an object enters, its controller chooses which opponent an
-  -- as-enters choice names -- Null Chamber's "you and AN OPPONENT each choose a
-  -- card name". The PlayerId is the chooser (the entering object's controller),
-  -- the ObjectId is the entering object, and the NonEmpty is that player's
-  -- opponents.
+  -- | Which opponent an as-enters choice names -- Null Chamber's "you and AN
+  -- OPPONENT each choose a card name". The PlayerId is the chooser, the ObjectId
+  -- is the entering object, and the NonEmpty is that player's opponents. CR
+  -- 614.12a is what puts the ask before the permanent enters: "If a replacement
+  -- effect that modifies how a permanent enters the battlefield requires a
+  -- choice, that choice is made before the permanent enters the battlefield."
   --
   -- Its own prompt rather than a reuse of ChooseDefender, which also answers with
   -- an opponent: that prompt asks CR 507.1's question, whom to attack, and a
   -- responder that knows which prompt it is answering knows which question it was
   -- asked.
   --
-  -- WHICH opponent is a choice the card leaves open, so its controller makes it
-  -- (CR 608.2c). Asked only when there are two or more: CR 102.2's two-player
-  -- game leaves exactly one opponent and nothing to ask.
+  -- WHO is asked is pawl's reading rather than a rule's: the card leaves "an
+  -- opponent" open and no rule assigns the pick, so it goes to the ability's
+  -- controller -- CR 109.5's "you", the player the card's other half already
+  -- names. Asked only when there are two or more: CR 102.2's two-player game
+  -- leaves exactly one opponent and nothing to ask.
   ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 603.3b: each player, in APNAP order, puts the triggered abilities they
   -- control on the stack in any order they choose. The [TriggerEntry] is that

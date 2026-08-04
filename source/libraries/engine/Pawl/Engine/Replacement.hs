@@ -846,9 +846,10 @@ apply batch candidate event =
           -- in the Oracle card reference.
           Nothing -> pure Set.empty
           Just controller -> do
-            -- CR 102.1 keeps a departed player's seat in the roster, so the
-            -- offer is Game.stillPlaying rather than the turn order: a player
-            -- who has left the game is not an opponent to ask.
+            -- CR 102.1 makes a player one of the people IN the game, and CR
+            -- 104.3a lets one leave at any time -- so the offer is
+            -- Game.stillPlaying and not GameState.turnOrder, which keeps a
+            -- departed seat.
             let opponents = filter (/= controller) (Game.stillPlaying gs)
             opponent <- case opponents of
               -- CR 102.2: a two-player game leaves exactly one opponent, and
